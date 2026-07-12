@@ -1,0 +1,10 @@
+{
+    "enabled": true,
+    "replacement": "검열됨",
+    "block_message": "그 말은 방송에서 말할 수 없습니다.",
+    "mode": "replace",
+    "max_text_length": 2000,
+    "log_enabled": true,
+    "log_clean_text": true,
+    "allow_words_file": "allow_words.txt"
+}

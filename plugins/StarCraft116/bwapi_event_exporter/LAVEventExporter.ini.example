@@ -1,0 +1,9 @@
+#20260703_kpopmodder: Copy next to LAVEventExporter.dll as LAVEventExporter.ini.
+# Paths may be absolute, or relative to this DLL folder.
+wrapped_ai=Stardust.dll
+events_path=C:\Vtuber_Souorce_Code\LAV_v0.2\logs\starcraft116_game_events.jsonl
+
+# BWAPI runs at roughly 24 logical frames per second.
+snapshot_interval_frames=144
+combat_cooldown_frames=96
+supply_block_cooldown_frames=240

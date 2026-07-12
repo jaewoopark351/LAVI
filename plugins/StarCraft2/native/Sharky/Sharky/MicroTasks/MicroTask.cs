@@ -1,0 +1,131 @@
+﻿namespace Sharky.MicroTasks
+{
+    public abstract class MicroTask : IMicroTask
+    {
+        public virtual bool NeverSkip { protected set { } get { return false; } }
+        public int Deaths { get; protected set; }
+
+        public List<UnitCommander> UnitCommanders { get; set; } = new List<UnitCommander>();
+        public float Priority { get; set; }
+
+        public bool Enabled { get; protected set; }
+        public double LongestFrame { get; set; }
+        public double TotalFrameTime { get; set; }
+        public bool LogEnable { get; set; } = true;
+
+        public virtual void ClaimUnits(Dictionary<ulong, UnitCommander> commanders)
+        {
+            throw new NotImplementedException();
+        }
+
+        public virtual IEnumerable<SC2APIProtocol.Action> PerformActions(int frame)
+        {
+            throw new NotImplementedException();
+        }
+
+        public virtual void ResetClaimedUnits()
+        {
+            foreach (var commander in UnitCommanders)
+            {
+                commander.Claimed = false;
+                commander.UnitRole = UnitRole.None;
+            }
+            UnitCommanders = new List<UnitCommander>();
+        }
+
+        public virtual void ResetClaimedUnits(UnitTypes unitType)
+        {
+            foreach (var commander in UnitCommanders.Where(u => u.UnitCalculation.Unit.UnitType == (uint)unitType))
+            {
+                commander.Claimed = false;
+                commander.UnitRole = UnitRole.None;
+            }
+            UnitCommanders.RemoveAll(u => u.UnitCalculation.Unit.UnitType == (uint)unitType);
+        }
+
+        public virtual List<UnitCommander> ResetNonEssentialClaims()
+        {
+            var unlcaimed = new List<UnitCommander>();
+            foreach (var commander in UnitCommanders)
+            {
+                commander.Claimed = false;
+                commander.UnitRole = UnitRole.None;
+                unlcaimed.Add(commander);
+            }
+            UnitCommanders = new List<UnitCommander>();
+            return unlcaimed;
+        }
+
+        public virtual void Enable()
+        {
+            if (Enabled) { return; }
+            Enabled = true;
+            if (LogEnable) { Console.WriteLine($"Enable {GetType().Name}"); }  
+        }
+
+        public virtual void Disable()
+        {
+            if (!Enabled) { return; }
+
+            if (LogEnable) 
+            { 
+                Console.WriteLine($"Disable {GetType().Name}");
+                PrintReport(1);
+            }
+
+            ResetClaimedUnits();
+            Enabled = false;         
+        }
+
+        public virtual void RemoveDeadUnits(List<ulong> deadUnits)
+        {
+            foreach (var tag in deadUnits)
+            {
+                foreach (var commander in UnitCommanders.Where(c => c.UnitCalculation.Unit.Tag == tag))
+                {
+                    commander.Claimed = false;
+                }
+                Deaths += UnitCommanders.RemoveAll(c => c.UnitCalculation.Unit.Tag == tag);
+            }
+        }
+
+        /// <summary>
+        /// Steals unit completely from this microtask commanders
+        /// </summary>
+        /// <param name="commander"></param>
+        public virtual void StealUnit(UnitCommander commander)
+        {
+            UnitCommanders.Remove(commander);
+        }
+
+        public override string ToString()
+        {
+            return !Enabled ? "<Disabled>" : $"Commanders: ({UnitCommanders.Count}) {string.Join(", ", UnitCommanders.Select(x => x.ToString()))}";
+        }
+
+        public virtual void PrintReport(int frame)
+        {
+            Console.WriteLine($"     Deaths: {Deaths}, Frames - Longest: {LongestFrame:F2}ms, Average: {TotalFrameTime/frame:F2}ms, Total: {TotalFrameTime:F2}ms");
+        }
+
+        public string? CommanderDebugText { get; set; }
+        public Color? CommanderDebugColor { get; set; }
+
+        public virtual void DebugUnits(DebugService debugService)
+        {
+            foreach (var unit in UnitCommanders)
+            {
+                var cooldown = "";
+                if (unit.UnitCalculation.Unit.HasWeaponCooldown)
+                {
+                    cooldown = ", " + unit.UnitCalculation.Unit.WeaponCooldown.ToString();
+                }
+                if (unit.ChildUnitCalculations.Any())
+                {
+                    cooldown += ", " + unit.ChildUnitCalculations.Count().ToString();
+                }
+                debugService.DebugUnitText(unit.UnitCalculation, $"{CommanderDebugText ?? GetType().Name.Replace("Task", "", StringComparison.InvariantCultureIgnoreCase)}, {unit.UnitRole}{cooldown}", CommanderDebugColor ?? debugService.DefaultMicroTaskColor);
+            }
+        }
+    }
+}

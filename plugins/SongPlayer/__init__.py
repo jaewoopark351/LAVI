@@ -1,0 +1,1 @@
+"""SongPlayer app component."""

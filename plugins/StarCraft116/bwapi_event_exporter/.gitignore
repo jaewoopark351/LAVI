@@ -1,0 +1,8 @@
+#20260703_kpopmodder: Keep local BWAPI exporter build artifacts out of git.
+/bin/
+/obj/
+/.vs/
+*.user
+*.suo
+*.VC.db
+*.VC.VC.opendb

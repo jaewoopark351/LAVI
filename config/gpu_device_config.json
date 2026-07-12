@@ -1,0 +1,26 @@
+{
+  "default_device": "cuda:0",
+  "VoiceInput": {
+    "device": "cuda:1"
+  },
+  "ScreenVision": {
+    "device": "cuda:1",
+    "device_map": {
+      "": 1
+    },
+    "max_memory": {
+      "1": "14GiB"
+    }
+  },
+  "GPTSoVITS": {
+    "cuda_visible_devices": "1"
+  },
+  "preflight": {
+    "enabled": true,
+    "check_cuda_available": true,
+    "check_device_exists": true,
+    "check_vram": true,
+    "min_free_vram_mb": 3000,
+    "warn_only": true
+  }
+}

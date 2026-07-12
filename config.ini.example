@@ -1,0 +1,41 @@
+#20260627_kpopmodder: Safe MemoryRouter defaults; copy needed keys into local config.ini only.
+
+[PluginSelection]
+; Keep the default LLM provider explicit when ChatGPT_OpenAI and Hybrid_OpenAI_LLM are both enabled.
+default_language_model_provider = Hybrid_OpenAI_LLM
+
+[LLM]
+; #20260629_kpopmodder: AI speech style mode appended to ai_character_system_prompt.txt before memory context.
+; Options: polite, casual
+speech_style = polite
+
+[MemoryRouter]
+enabled = true
+; Safe default: rule does not send user input to an external API.
+; OpenAI router is used only when you explicitly set provider = openai here.
+; If provider=openai is used, part of the user input may be sent to the OpenAI API.
+provider = rule
+timeout_sec = 5
+max_items = 5
+fallback_to_keyword = true
+
+; Accuracy-first recall: scan the full raw_events store before accepting a fast recent hit.
+; This is slower, but preserves older DB-backed memories better.
+accuracy_first_raw_search = true
+
+; Experimental: try derived_memory.sqlite3 before raw recall when the router asks for memory.
+prefer_derived_first = false
+
+; Experimental: allow source_event_count=1 and duplicate_count=0 screen_observation rows.
+allow_single_screen_observation_fallback = false
+
+[ScreenQuestionRouter]
+; #20260628_kpopmodder: Screen intent routing stays separate from MemoryRouter.
+enabled = true
+; Safe default: rule keeps screen-question routing local.
+; OpenAI router is used only when you explicitly set provider = openai here.
+; If provider=openai is used, user input may be sent to the OpenAI API, but
+; latest screen observation text is not sent to this router.
+provider = rule
+timeout_sec = 2
+fallback_to_keyword = true

@@ -1,0 +1,28 @@
+#20260621_kpopmodder: ScreenVision 깨진 관찰값 차단 목록.
+# 한 줄에 하나씩 추가한다.
+# 빈 줄과 # 주석은 무시된다.
+
+n/a
+na
+none
+null
+undefined
+unknown
+
+모름
+모르겠습니다
+
+화면에는
+현재 화면에는
+pc 화면에는
+화면에
+현재 화면에
+
+fps n/a
+fps na
+fps unavailable
+
+월球이 보입니다
+월球
+
+스nímka z obrazovky

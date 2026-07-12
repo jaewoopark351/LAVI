@@ -1,0 +1,463 @@
+# LAV_v0.2 Object-Oriented Architecture
+
+This document summarizes the main project-owned runtime classes and plugin
+relationships based on the current codebase. Internal classes from external
+libraries, model files, and disabled legacy code are excluded.
+
+## 1. Application and Plugin Architecture
+
+```mermaid
+classDiagram
+    direction LR
+
+    class MainBootstrap {
+        <<main.py>>
+        +load plugins
+        +bootstrap memory
+        +build Gradio UI
+        +wire event listeners
+        +launch queue
+    }
+    class GradioLaunch {
+        <<app_core.gradio_launch>>
+        +find_available_port()
+    }
+    class ModuleConfig {
+        <<app_core.module_config>>
+        +module_enabled()
+    }
+    class OptionalPluginLoader {
+        <<app_core.optional_plugin_loader>>
+        +instantiate_optional_plugin()
+        +import_optional_attribute()
+    }
+    class MemoryBootstrap {
+        <<app_core.memory_bootstrap>>
+        +bootstrap_memory()
+    }
+    class ScreenRouterBootstrap {
+        <<app_core.screen_router_bootstrap>>
+        +build_screen_question_router()
+    }
+    class RuntimeLifecycle
+    class GPUDeviceManager
+    class AudioDeviceManager
+
+    class PluginLoader
+    class PluginSelectionBase
+    class Provider
+    class Input
+    class LLM
+    class Translate
+    class TTS
+    class Vtuber
+
+    class ScreenVision
+    class SongPlayer
+    class Chess
+    class StarCraft116
+    class StarCraftRemastered {
+        <<disabled optional module>>
+    }
+
+    class InputPluginInterface {
+        <<interface>>
+    }
+    class LLMPluginInterface {
+        <<interface>>
+    }
+    class TranslationPluginInterface {
+        <<interface>>
+    }
+    class TTSPluginInterface {
+        <<interface>>
+    }
+    class VtuberPluginInterface {
+        <<interface>>
+    }
+
+    class VoiceInput
+    class TwitchChatFetch
+    class YoutubeChatFetch
+    class Hybrid_OpenAI_LLM
+    class ChatGPT_OpenAI
+    class NoTranslate
+    class LocalENToJA
+    class GPTSoVITS
+    class VtubeStudio
+
+    PluginSelectionBase <|-- Input
+    PluginSelectionBase <|-- LLM
+    PluginSelectionBase <|-- Translate
+    PluginSelectionBase <|-- TTS
+    PluginSelectionBase <|-- Vtuber
+    PluginSelectionBase *-- Provider
+    Provider o-- InputPluginInterface
+    Provider o-- LLMPluginInterface
+    Provider o-- TranslationPluginInterface
+    Provider o-- TTSPluginInterface
+    Provider o-- VtuberPluginInterface
+
+    InputPluginInterface <|.. VoiceInput
+    InputPluginInterface <|.. TwitchChatFetch
+    InputPluginInterface <|.. YoutubeChatFetch
+    LLMPluginInterface <|.. Hybrid_OpenAI_LLM
+    LLMPluginInterface <|.. ChatGPT_OpenAI
+    TranslationPluginInterface <|.. NoTranslate
+    TranslationPluginInterface <|.. LocalENToJA
+    TTSPluginInterface <|.. GPTSoVITS
+    VtuberPluginInterface <|.. VtubeStudio
+
+    PluginLoader o-- InputPluginInterface : discovers
+    PluginLoader o-- LLMPluginInterface : discovers
+    PluginLoader o-- TranslationPluginInterface : discovers
+    PluginLoader o-- TTSPluginInterface : discovers
+    PluginLoader o-- VtuberPluginInterface : discovers
+    PluginSelectionBase --> PluginLoader : selects provider
+
+    MainBootstrap --> PluginLoader : load_plugins()
+    MainBootstrap --> ModuleConfig : modules.json
+    MainBootstrap --> OptionalPluginLoader : optional imports
+    MainBootstrap --> MemoryBootstrap : memory services
+    MainBootstrap --> ScreenRouterBootstrap : screen router
+    MainBootstrap --> GradioLaunch : port probe
+    MainBootstrap --> GPUDeviceManager : startup placement
+    MainBootstrap *-- RuntimeLifecycle
+    MainBootstrap *-- Input
+    MainBootstrap *-- LLM
+    MainBootstrap *-- Translate
+    MainBootstrap *-- TTS
+    MainBootstrap *-- Vtuber
+    MainBootstrap --> AudioDeviceManager
+    MainBootstrap o-- ScreenVision : optional direct module
+    MainBootstrap o-- SongPlayer : optional direct module
+    MainBootstrap o-- Chess : optional direct module
+    MainBootstrap o-- StarCraft116 : optional direct module
+    MainBootstrap o-- StarCraftRemastered : disabled optional module
+
+    Input --> LLM : text event
+    ScreenVision --> LLM : observation event
+    LLM --> Translate : response event
+    Translate --> TTS : translated text
+    TTS --> Vtuber : mouth volume
+    SongPlayer --> Vtuber : mouth and expression
+    Chess --> LLM : text-only reaction
+    Chess --> TTS : reaction speech
+    StarCraft116 --> LLM : status/game reaction
+    StarCraft116 --> TTS : reaction speech
+```
+
+`main.py` is not a separate application class. It acts as the composition root
+where the application objects are created and connected. `MainBootstrap`,
+`MemoryBootstrap`, `ScreenRouterBootstrap`, `ModuleConfig`, and `GradioLaunch`
+are diagram-only module roles for files/functions.
+
+`ScreenVision`, `SongPlayer`, `Chess`, and `StarCraft116` are not
+`PluginSelectionBase` providers. They are direct `main.py` components gated by
+`modules.json` and loaded through `app_core.optional_plugin_loader`.
+`StarCraftRemastered` remains represented because `main.py` still has an
+optional loading hook for it, but the current `modules.json` disables it and
+its runtime class is commented out in the checked-in source.
+
+`Hybrid_OpenAI_LLM` is shown as the current default LLM provider.
+`ChatGPT_OpenAI` may still be available as an LLM provider, but the built-in
+default and `PluginSelection` settings prefer `Hybrid_OpenAI_LLM`.
+<!-- #20260704_kpopmodder: Updated optional direct-module docs for StarCraft116 and optional_plugin_loader. -->
+
+## 2. Core Runtime, Memory, and Screen Routing
+
+```mermaid
+classDiagram
+    direction TB
+
+    class RuntimeLifecycle
+    class EventManager
+    class EventSubscription
+
+    RuntimeLifecycle o-- Input : shutdown
+    RuntimeLifecycle o-- LLM : shutdown and idle check
+    RuntimeLifecycle o-- Translate : shutdown and idle check
+    RuntimeLifecycle o-- TTS : shutdown and idle check
+    RuntimeLifecycle o-- ScreenVision : optional shutdown
+    RuntimeLifecycle o-- SongPlayer : optional idle check
+    RuntimeLifecycle o-- Chess : optional shutdown
+    RuntimeLifecycle o-- StarCraft116 : optional shutdown
+    EventManager *-- EventSubscription
+
+    class LLM
+    class LLMContextManager
+    class LLMEventDispatcher
+    class LLMInputQueueWorker
+    class LLMResponsePipeline
+    class LLMStreamingChunker
+    class LLMInteractionContext
+    class LLMMemoryBridge
+    class ScreenQuestionRouter
+    class ScreenQuestionDecision
+    class OpenAIScreenQuestionRouterProvider
+
+    LLM *-- LLMContextManager
+    LLM *-- LLMEventDispatcher
+    LLM *-- LLMInputQueueWorker
+    LLM *-- LLMResponsePipeline
+    LLM *-- LLMStreamingChunker
+    LLM o-- ScreenQuestionRouter
+    LLMResponsePipeline *-- LLMMemoryBridge
+    LLMResponsePipeline *-- LLMInteractionContext
+    LLMResponsePipeline o-- ScreenQuestionRouter
+    ScreenQuestionRouter --> ScreenQuestionDecision
+    ScreenQuestionRouter o-- OpenAIScreenQuestionRouterProvider : optional AI route
+
+    class MemoryContextBuilder
+    class MemoryStore
+    class MemoryRetriever
+    class MemoryRouter
+    class MemoryRouteDecision
+    class OpenAIMemoryRouterProvider
+    class MemoryConsolidator
+    class RawEventSQLiteStore
+    class DerivedMemorySQLiteStore
+    class DerivedMemoryBuilder
+    class RawEventsJsonl {
+        <<file>>
+    }
+    class LongTermMemoryJson {
+        <<file>>
+    }
+
+    LLMMemoryBridge o-- MemoryContextBuilder
+    MemoryContextBuilder o-- MemoryStore
+    MemoryContextBuilder o-- MemoryRetriever
+    MemoryContextBuilder o-- MemoryRouter
+    MemoryRouter --> MemoryRouteDecision
+    MemoryRouter o-- OpenAIMemoryRouterProvider : optional AI route
+    MemoryRetriever *-- MemoryConsolidator
+    MemoryRetriever o-- DerivedMemorySQLiteStore : optional reference index
+    MemoryStore *-- RawEventSQLiteStore
+    MemoryStore --> RawEventsJsonl : source of truth
+    MemoryStore --> LongTermMemoryJson : manual long-term memory
+    RawEventSQLiteStore --> RawEventsJsonl : mirrors JSONL rows
+    DerivedMemoryBuilder --> RawEventsJsonl : rebuild source
+    DerivedMemoryBuilder --> DerivedMemorySQLiteStore : writes derived index
+
+    class TTS
+    class TTSTextProcessor
+    class TTSQueueWorker
+    class TTSInterruptController
+    class TTSMouthAnimator
+    class WinSoundAudioPlayer
+
+    TTS *-- TTSTextProcessor
+    TTS *-- TTSQueueWorker
+    TTS *-- TTSInterruptController
+    TTS *-- TTSMouthAnimator
+    TTS *-- WinSoundAudioPlayer
+    WinSoundAudioPlayer --> TTSMouthAnimator
+    TTSInterruptController --> EventManager : INTERRUPT
+
+    class ScreenVision
+    class ScreenCapture
+    class VisionAnalyzer
+    class ObservationPolicy
+    class ScreenObservationProcessor
+    class AutoWatchController
+
+    ScreenVision *-- ScreenCapture
+    ScreenVision *-- VisionAnalyzer
+    ScreenVision *-- ObservationPolicy
+    ScreenVision *-- ScreenObservationProcessor
+    ScreenVision *-- AutoWatchController
+    ScreenVision o-- MemoryStore
+    ScreenObservationProcessor --> ObservationPolicy
+    AutoWatchController --> ScreenCapture : callbacks
+
+    class AudioDeviceManager
+    class AudioDeviceRegistry
+    class AudioDeviceConfigStore
+    class AudioPlaybackController
+
+    AudioDeviceManager *-- AudioDeviceRegistry
+    AudioDeviceManager *-- AudioDeviceConfigStore
+    AudioDeviceManager *-- AudioPlaybackController
+```
+
+The memory layer keeps `raw_events.jsonl` as the recoverable source of truth.
+`raw_events.sqlite3` is a query mirror, and `derived_memory.sqlite3` is an
+optional derived search index. `MemoryRouter` and `ScreenQuestionRouter` do not
+answer the user directly; they only decide whether memory or screen context is
+needed.
+
+## 3. Internal Architecture of Major Provider Plugins
+
+```mermaid
+classDiagram
+    direction LR
+
+    class VoiceInput
+    class VoiceInputState
+    class MicrophoneRecorder
+    class WhisperTranscriber
+    class SpeakerIdentifier
+    class SpeakerService
+    class InterruptController
+    class OpenMicController
+    class VoiceInputRuntimeController
+    class VoiceInputUiController
+    class VoiceInputHotkeyController
+
+    VoiceInput *-- VoiceInputState
+    VoiceInput *-- MicrophoneRecorder
+    VoiceInput *-- WhisperTranscriber
+    VoiceInput *-- SpeakerIdentifier
+    VoiceInput *-- SpeakerService
+    VoiceInput *-- InterruptController
+    VoiceInput *-- OpenMicController
+    VoiceInput *-- VoiceInputRuntimeController
+    VoiceInput *-- VoiceInputUiController
+    VoiceInput *-- VoiceInputHotkeyController
+    SpeakerService --> SpeakerIdentifier
+    InterruptController --> MicrophoneRecorder
+    InterruptController --> SpeakerService
+    OpenMicController --> MicrophoneRecorder
+    OpenMicController --> SpeakerService
+
+    class Hybrid_OpenAI_LLM
+    class RouterFirstHybridEngine
+    class HybridOpenAISettings
+    class CommandOverrideRouter
+    class OpenAIRouteProvider
+    class MemoryRouterProvider_OpenAI
+    class OpenAIChatProvider
+    class DisabledLocalLightChatProvider
+
+    Hybrid_OpenAI_LLM *-- RouterFirstHybridEngine
+    Hybrid_OpenAI_LLM *-- HybridOpenAISettings
+    Hybrid_OpenAI_LLM *-- CommandOverrideRouter
+    Hybrid_OpenAI_LLM *-- OpenAIRouteProvider
+    Hybrid_OpenAI_LLM *-- MemoryRouterProvider_OpenAI
+    Hybrid_OpenAI_LLM *-- OpenAIChatProvider
+    Hybrid_OpenAI_LLM *-- DisabledLocalLightChatProvider
+    RouterFirstHybridEngine --> OpenAIChatProvider : openai_chat
+    RouterFirstHybridEngine --> DisabledLocalLightChatProvider : disabled fallback
+
+    class GPTSoVITS
+    class GPTSoVITSTTS
+    class TTSSynthesisService
+    class GPTSoVITSSettingsController
+    class GPTSoVITSConfigManager
+    class GPTSoVITSServerManager
+    class GPTSoVITSModelManager
+    class GPTSoVITSApiClient
+
+    GPTSoVITS *-- GPTSoVITSTTS
+    GPTSoVITS *-- TTSSynthesisService
+    GPTSoVITS *-- GPTSoVITSSettingsController
+    GPTSoVITSTTS *-- GPTSoVITSConfigManager
+    GPTSoVITSTTS *-- GPTSoVITSServerManager
+    GPTSoVITSTTS *-- GPTSoVITSModelManager
+    GPTSoVITSTTS *-- GPTSoVITSApiClient
+
+    class VtubeStudio
+    class VTubeStudioAuthManager
+    class VTubeStudioConnection
+    class VTubeStudioMouthController
+    class VTubeStudioBlinkController
+    class VTubeStudioSmileController
+    class VTubeStudioSongExpressionController
+
+    VtubeStudio *-- VTubeStudioAuthManager
+    VtubeStudio *-- VTubeStudioConnection
+    VtubeStudio *-- VTubeStudioMouthController
+    VtubeStudio *-- VTubeStudioBlinkController
+    VtubeStudio *-- VTubeStudioSmileController
+    VtubeStudio *-- VTubeStudioSongExpressionController
+    VTubeStudioBlinkController --> VTubeStudioSongExpressionController : override check
+    VTubeStudioSmileController --> VTubeStudioSongExpressionController : override check
+```
+
+## 4. Internal Architecture of Direct `main.py` Optional Modules
+
+```mermaid
+classDiagram
+    direction LR
+
+    class SongPlayer
+    class SongManifest
+    class SongEntry
+    class SongPlaybackController
+    class SongMouthAnimator
+    class SongRhythmAnimator
+    class EventManager
+    class VtubeStudio
+
+    SongPlayer *-- SongManifest
+    SongManifest o-- SongEntry : parsed manifest
+    SongPlayer *-- SongPlaybackController
+    SongPlaybackController *-- SongMouthAnimator
+    SongPlaybackController *-- SongRhythmAnimator
+    SongPlayer --> EventManager : interrupt before play
+    SongMouthAnimator --> VtubeStudio : mouth volume
+    SongRhythmAnimator --> VtubeStudio : rhythm expression
+    SongPlaybackController --> VtubeStudio : loud-note expression
+
+    class Chess
+    class ChessGameController
+    class ChessWebServer
+    class LC0UCIEngine
+    class ChessReactionRuntime
+    class ChessReactionPolicy
+    class LLM
+    class TTS
+
+    Chess *-- ChessGameController
+    Chess *-- ChessWebServer
+    Chess o-- LC0UCIEngine : optional configured engine
+    ChessWebServer --> ChessGameController : local HTTP API
+    ChessGameController o-- LC0UCIEngine : UCI bestmove
+    ChessGameController --> ChessReactionRuntime : ai_move_applied
+    ChessReactionRuntime --> ChessReactionPolicy : prompt and fallback text
+    ChessReactionRuntime --> LLM : generate_text_only()
+    ChessReactionRuntime --> TTS : receive_input()
+
+    class StarCraft116
+    class StarCraft116Config
+    class StarCraft116ExporterManager
+    class StarCraft116Launcher
+    class StarCraft116StatusReader
+    class StarCraft116RuntimeState
+    class StarCraft116GameEventTailer
+    class StarCraft116ReactionRuntime
+    class StarCraft116ReactionPolicy
+
+    StarCraft116 *-- StarCraft116Config
+    StarCraft116 *-- StarCraft116ExporterManager
+    StarCraft116 *-- StarCraft116Launcher
+    StarCraft116 *-- StarCraft116StatusReader
+    StarCraft116 *-- StarCraft116RuntimeState
+    StarCraft116 *-- StarCraft116GameEventTailer
+    StarCraft116 --> StarCraft116ReactionRuntime : status callback
+    StarCraft116GameEventTailer --> StarCraft116ReactionPolicy : game events
+    StarCraft116ReactionRuntime --> StarCraft116ReactionPolicy : prompt and fallback text
+    StarCraft116ReactionRuntime --> LLM : generate_text_only()
+    StarCraft116ReactionRuntime --> TTS : receive_input()
+```
+
+`SongPlayer`, `Chess`, and `StarCraft116` are selectable modules with their own
+Gradio tabs and controllers, not provider-selector plugins. `SongPlayer` keeps
+playback separate from the TTS queue. `Chess` embeds a local web board in
+Gradio through an iframe. `StarCraft116` manages BWAPI profile setup, launch
+commands, status polling, exported game events, and optional LLM/TTS reactions
+without merging that path into the generic LLM provider system.
+
+The current default GPU placement is documented through `GPUDeviceManager`:
+VoiceInput/Whisper, ScreenVision, and GPT-SoVITS are described as GPU 1 /
+`cuda:1`-family placements. Startup preflight logs re-check this placement.
+<!-- #20260630_kpopmodder: Mirror current GPU preflight ownership. -->
+
+## Relationship Symbols
+
+- `<|--`: Class inheritance
+- `<|..`: Interface implementation
+- `*--`: Composition; the owning object controls the component lifecycle
+- `o--`: Aggregation; an object is externally supplied or shared
+- `-->`: Event, callback, or general dependency

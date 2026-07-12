@@ -1,0 +1,327 @@
+#include "LadderGame.h"
+
+#include <sys/stat.h>
+#include <fcntl.h>
+
+#include <exception>
+#include <fstream>
+#include <string>
+#include <vector>
+#include <memory>
+#include <iostream>
+#include <future>
+#include <chrono>
+#include <sstream>
+#include <cctype>
+
+#include "sc2lib/sc2_lib.h"
+#include "sc2api/sc2_api.h"
+#include "sc2api/sc2_interfaces.h"
+#include "sc2api/sc2_score.h"
+#include "sc2api/sc2_map_info.h"
+#include "sc2utils/sc2_manage_process.h"
+#include "sc2api/sc2_game_settings.h"
+#include "sc2api/sc2_proto_interface.h"
+#include "sc2api/sc2_proto_to_pods.h"
+#include "s2clientprotocol/sc2api.pb.h"
+#include "sc2api/sc2_server.h"
+#include "sc2api/sc2_connection.h"
+#include "sc2api/sc2_args.h"
+#include "sc2api/sc2_client.h"
+#include "civetweb.h"
+
+#include "Types.h"
+#include "Tools.h"
+#include "Proxy.h"
+
+namespace
+{
+std::string AppendLanGameHostIpArg(std::string args, const std::string& hostIp)
+{
+    //20260711_kpopmodder: Keep LAN Lobby-only JoinGame host_ip plumbing out of
+    // the Local Match launcher by passing it through the dedicated LAN path.
+    if (hostIp.empty())
+    {
+        return args;
+    }
+    if (!args.empty())
+    {
+        args += " ";
+    }
+    args += "--lan-game-host-ip ";
+    args += hostIp;
+    return args;
+}
+}
+
+
+LadderGame::LadderGame(int InCoordinatorArgc, char** InCoordinatorArgv, LadderConfig *InConfig)
+    : CoordinatorArgc(InCoordinatorArgc)
+    , CoordinatorArgv(InCoordinatorArgv)
+    , Config(InConfig)
+{
+    const int maxGameTimeInt = Config->GetIntValue("MaxGameTime");
+    MaxGameTime = maxGameTimeInt > 0 ? static_cast<uint32_t>(maxGameTimeInt) : 0;
+    const int MaxRealGameTimeInt = Config->GetIntValue("MaxRealGameTime");
+    MaxRealGameTime = MaxRealGameTimeInt > 0 ? static_cast<uint32_t>(MaxRealGameTimeInt) : 0;
+    RealTime = Config->GetBoolValue("RealTimeMode");
+}
+
+void LadderGame::SetRealTime(bool InRealTime)
+{
+    RealTime = InRealTime;
+}
+
+void LadderGame::LogStartGame(const BotConfig &Bot1, const BotConfig &Bot2)
+{
+    //20260709_kpopmodder: LAV local human runs skip bot log files for the human placeholder slot.
+    const auto writeStartLog = [](const BotConfig& bot, const std::string& opponentName) {
+        if (bot.Type == BotType::Human || bot.RootPath.empty())
+        {
+            return;
+        }
+        std::time_t t = std::time(nullptr);
+        std::tm tm = *std::localtime(&t);
+        const std::string filename = bot.RootPath + "/data/stderr.log";
+        std::ofstream outfile;
+        outfile.open(filename, std::ios_base::app);
+        outfile << std::endl << std::put_time(&tm, "%d-%m-%Y %H-%M-%S") << ": Starting game vs " << opponentName << std::endl;
+        outfile.close();
+    };
+    writeStartLog(Bot1, Bot2.BotName);
+    writeStartLog(Bot2, Bot1.BotName);
+}
+
+GameResult LadderGame::StartGame(const BotConfig &Agent1, const BotConfig &Agent2, const std::string &Map, const std::string &RemoteHumanHost, int RemoteHumanClientPort)
+{
+    LogStartGame(Agent1, Agent2);
+    // Proxy init
+    Proxy proxyBot1(MaxGameTime, MaxRealGameTime, Agent1);
+    Proxy proxyBot2(MaxGameTime, MaxRealGameTime, Agent2);
+
+    // Start the SC2 instances
+    sc2::ProcessSettings process_settings;
+    sc2::GameSettings game_settings;
+    sc2::ParseSettings(CoordinatorArgc, CoordinatorArgv, process_settings, game_settings);
+    constexpr int portServerBot1 = 5677;
+    constexpr int portServerBot2 = 5678;
+    constexpr int portClientBot1 = 5679;
+    constexpr int portClientBot2 = 5680;
+    const bool useRemoteHuman1 = Agent1.Type == BotType::Human && !RemoteHumanHost.empty() && RemoteHumanClientPort > 0;
+    PrintThread {} << "Starting the StarCraft II clients." << std::endl;
+    if (useRemoteHuman1)
+    {
+        //20260709_kpopmodder: In remote-human mode the human SC2 process is launched by LAV_SC2_HumanJoiner on the other PC.
+        PrintThread {} << "Using remote human SC2 client at " << RemoteHumanHost << ":" << RemoteHumanClientPort << "." << std::endl;
+        proxyBot1.startProxyServer(portServerBot1);
+    }
+    else
+    {
+        proxyBot1.startSC2Instance(process_settings, portServerBot1, portClientBot1);
+    }
+    proxyBot2.startSC2Instance(process_settings, portServerBot2, portClientBot2);
+    const bool startSC2InstanceSuccessful1 = useRemoteHuman1
+        ? proxyBot1.ConnectToSC2Client(RemoteHumanHost, RemoteHumanClientPort)
+        : proxyBot1.ConnectToSC2Instance(process_settings, portServerBot1, portClientBot1);
+    const bool startSC2InstanceSuccessful2 = proxyBot2.ConnectToSC2Instance(process_settings, portServerBot2, portClientBot2);
+    if (!startSC2InstanceSuccessful1 || !startSC2InstanceSuccessful2)
+    {
+        PrintThread {} << "Failed to start the StarCraft II clients." << std::endl;
+        return GameResult();
+    }
+    // Setup map
+    PrintThread {} << "Creating the game on " << Map << "." << std::endl;
+    const bool setupGameSuccessful1 = proxyBot1.setupGame(process_settings, Map, RealTime, Agent1.Race, Agent2.Race);
+    const bool setupGameSuccessful2 = proxyBot2.setupGame(process_settings, Map, RealTime, Agent1.Race, Agent2.Race);
+    if (!setupGameSuccessful1 || !setupGameSuccessful2)
+    {
+        PrintThread {} << "Failed to create the game." << std::endl;
+        return GameResult();
+    }
+
+    // Start the bots
+    PrintThread {} << "Starting the bots " << Agent1.BotName << " and " << Agent2.BotName << "." << std::endl;
+    const bool startBotSuccessful1 = proxyBot1.startBot(portServerBot1, PORT_START, Agent2.PlayerId);
+    const bool startBotSuccessful2 = proxyBot2.startBot(portServerBot2, PORT_START, Agent1.PlayerId);
+    if (!startBotSuccessful1)
+    {
+        PrintThread {} << "Failed to start " << Agent1.BotName << "." << std::endl;
+    }
+    if (!startBotSuccessful2)
+    {
+        PrintThread {} << "Failed to start " << Agent2.BotName << "." << std::endl;
+    }
+    if (!startBotSuccessful1 || !startBotSuccessful2)
+    {
+        return GameResult();
+    }
+
+    // Start the match
+    PrintThread {} << "Starting the match." << std::endl;
+    proxyBot1.startGame();
+    proxyBot2.startGame();
+
+    // Check from time to time if the match finished
+    while (!proxyBot1.gameFinished() || !proxyBot2.gameFinished())
+    {
+        sc2::SleepFor(1000);
+    }
+
+    std::string replayDir = Config->GetStringValue("LocalReplayDirectory");
+    if (replayDir.back() != '/')
+    {
+        replayDir += "/";
+    }
+    std::string replayFile = replayDir + Agent1.BotName + "v" + Agent2.BotName + "-" + RemoveMapExtension(Map) + ".SC2Replay";
+    replayFile.erase(remove_if(replayFile.begin(), replayFile.end(), isspace), replayFile.end());
+    if (!(proxyBot1.saveReplay(replayFile) || proxyBot2.saveReplay(replayFile)))
+    {
+        PrintThread{} << "Saving replay failed." << std::endl;
+    }
+    ChangeBotNames(replayFile, Agent1.BotName, Agent2.BotName);
+
+    GameResult Result;
+    const auto resultBot1 = proxyBot1.getResult();
+    const auto resultBot2 = proxyBot2.getResult();
+
+
+    Result.Result = getEndResultFromProxyResults(resultBot1, resultBot2);
+    Result.Bot1AvgFrame = proxyBot1.stats().avgLoopDuration;
+    Result.Bot2AvgFrame = proxyBot2.stats().avgLoopDuration;
+    Result.GameLoop = proxyBot1.stats().gameLoops;
+
+    std::time_t t = std::time(nullptr);
+    std::tm tm = *std::gmtime(&t);
+    std::ostringstream oss;
+    oss << std::put_time(&tm, "%d-%m-%Y %H-%M-%S") <<"UTC";
+    Result.TimeStamp = oss.str();
+    return Result;
+}
+
+GameResult LadderGame::StartLanRemoteHumanGame(const BotConfig &RemoteHumanAgent, const BotConfig &BotAgent, const std::string &Map, const std::string &RemoteHumanHost, int RemoteHumanClientPort)
+{
+    //20260711_kpopmodder: LAN Lobby has a dedicated startup path so remote-human
+    // experiments do not change the Local Match launcher behavior.
+    BotConfig lanRemoteHumanAgent = RemoteHumanAgent;
+    BotConfig lanBotAgent = BotAgent;
+    lanRemoteHumanAgent.Args = AppendLanGameHostIpArg(lanRemoteHumanAgent.Args, RemoteHumanHost);
+    lanBotAgent.Args = AppendLanGameHostIpArg(lanBotAgent.Args, RemoteHumanHost);
+
+    LogStartGame(lanRemoteHumanAgent, lanBotAgent);
+    Proxy proxyHuman(MaxGameTime, MaxRealGameTime, lanRemoteHumanAgent);
+    Proxy proxyBot(MaxGameTime, MaxRealGameTime, lanBotAgent);
+
+    sc2::ProcessSettings process_settings;
+    sc2::GameSettings game_settings;
+    sc2::ParseSettings(CoordinatorArgc, CoordinatorArgv, process_settings, game_settings);
+
+    constexpr int portServerHuman = 5677;
+    constexpr int portServerBot = 5678;
+    constexpr int portClientBot = 5680;
+    constexpr int remoteApiWaitSeconds = 150;
+    constexpr unsigned int remotePingTimeoutMS = 2000U;
+
+    if (RemoteHumanHost.empty() || RemoteHumanClientPort <= 0)
+    {
+        PrintThread{} << "[LAN] Missing remote human SC2 endpoint." << std::endl;
+        return GameResult();
+    }
+
+    PrintThread{} << "[LAN] Starting StarCraft II LAN remote-human clients." << std::endl;
+    PrintThread{} << "[LAN] Remote human SC2 client: " << RemoteHumanHost << ":" << RemoteHumanClientPort << "." << std::endl;
+    PrintThread{} << "[LAN] Local bot SC2 client port: " << portClientBot << "." << std::endl;
+    PrintThread{} << "[LAN] JoinGame host_ip will use remote game creator IP: " << RemoteHumanHost << "." << std::endl;
+
+    proxyHuman.startProxyServer(portServerHuman);
+    proxyBot.startSC2Instance(process_settings, portServerBot, portClientBot);
+
+    const bool remoteReady = proxyHuman.ConnectToSC2ClientReady(
+        RemoteHumanHost,
+        RemoteHumanClientPort,
+        remoteApiWaitSeconds,
+        remotePingTimeoutMS);
+    const bool botClientReady = proxyBot.ConnectToSC2Instance(process_settings, portServerBot, portClientBot);
+    if (!remoteReady || !botClientReady)
+    {
+        PrintThread{} << "[LAN] Failed to start the StarCraft II clients. remote_ready="
+                      << (remoteReady ? "true" : "false")
+                      << " bot_ready=" << (botClientReady ? "true" : "false") << std::endl;
+        return GameResult();
+    }
+
+    PrintThread{} << "[LAN] Creating the game on " << Map << "." << std::endl;
+    const bool setupRemoteGame = proxyHuman.setupGame(process_settings, Map, RealTime, lanRemoteHumanAgent.Race, lanBotAgent.Race);
+    const bool setupBotGame = proxyBot.setupGame(process_settings, Map, RealTime, lanRemoteHumanAgent.Race, lanBotAgent.Race);
+    if (!setupRemoteGame || !setupBotGame)
+    {
+        PrintThread{} << "[LAN] Failed to create the game. remote_setup="
+                      << (setupRemoteGame ? "true" : "false")
+                      << " bot_setup=" << (setupBotGame ? "true" : "false") << std::endl;
+        return GameResult();
+    }
+
+    PrintThread{} << "[LAN] Starting remote human API bridge on port " << portServerHuman << "." << std::endl;
+    const bool startHumanBridge = proxyHuman.startBot(portServerHuman, PORT_START, lanBotAgent.PlayerId);
+    if (!startHumanBridge)
+    {
+        PrintThread{} << "[LAN] Failed to start remote human API bridge for " << lanRemoteHumanAgent.BotName << "." << std::endl;
+        return GameResult();
+    }
+
+    PrintThread{} << "[LAN] Starting bot " << lanBotAgent.BotName << " on port " << portServerBot << "." << std::endl;
+    const bool startBot = proxyBot.startBot(portServerBot, PORT_START, lanRemoteHumanAgent.PlayerId);
+    if (!startBot)
+    {
+        PrintThread{} << "[LAN] Failed to start " << lanBotAgent.BotName << "." << std::endl;
+        return GameResult();
+    }
+
+    PrintThread{} << "[LAN] Starting the match." << std::endl;
+    proxyHuman.startGame();
+    proxyBot.startGame();
+
+    while (!proxyHuman.gameFinished() || !proxyBot.gameFinished())
+    {
+        sc2::SleepFor(1000);
+    }
+
+    std::string replayDir = Config->GetStringValue("LocalReplayDirectory");
+    if (replayDir.back() != '/')
+    {
+        replayDir += "/";
+    }
+    std::string replayFile = replayDir + lanRemoteHumanAgent.BotName + "v" + lanBotAgent.BotName + "-" + RemoveMapExtension(Map) + ".SC2Replay";
+    replayFile.erase(remove_if(replayFile.begin(), replayFile.end(), isspace), replayFile.end());
+    if (!(proxyHuman.saveReplay(replayFile) || proxyBot.saveReplay(replayFile)))
+    {
+        PrintThread{} << "[LAN] Saving replay failed." << std::endl;
+    }
+    ChangeBotNames(replayFile, lanRemoteHumanAgent.BotName, lanBotAgent.BotName);
+
+    GameResult Result;
+    const auto resultHuman = proxyHuman.getResult();
+    const auto resultBot = proxyBot.getResult();
+
+    Result.Result = getEndResultFromProxyResults(resultHuman, resultBot);
+    Result.Bot1AvgFrame = proxyHuman.stats().avgLoopDuration;
+    Result.Bot2AvgFrame = proxyBot.stats().avgLoopDuration;
+    Result.GameLoop = proxyHuman.stats().gameLoops;
+
+    std::time_t t = std::time(nullptr);
+    std::tm tm = *std::gmtime(&t);
+    std::ostringstream oss;
+    oss << std::put_time(&tm, "%d-%m-%Y %H-%M-%S") <<"UTC";
+    Result.TimeStamp = oss.str();
+    return Result;
+}
+
+
+void LadderGame::ChangeBotNames(const std::string &ReplayFile, const std::string &Bot1Name, const std::string &Bot2Name)
+{
+    std::string CmdLine = Config->GetStringValue("ReplayBotRenameProgram");
+    if (CmdLine.size() > 0)
+    {
+        CmdLine = CmdLine + " " + ReplayFile + " " + FIRST_PLAYER_NAME + " " + Bot1Name + " " + SECOND_PLAYER_NAME + " " + Bot2Name;
+        StartExternalProcess(CmdLine);
+    }
+}

@@ -1,0 +1,15 @@
+{
+  "lc0_path": "C:\\Vtuber_Souorce_Code\\lc0\\lc0.exe",
+  "weights_path": "C:\\Vtuber_Souorce_Code\\lc0\\BT4-it332.pb.gz",
+  "backend": "cuda",
+  "cuda_visible_devices": "",
+  "movetime_ms": 1000,
+  "auto_start_engine": false,
+  "human_side": "white",
+  "ai_side": "black",
+  "web_server_host": "127.0.0.1",
+  "web_server_port": 8790,
+  "init_timeout_sec": 15,
+  "move_timeout_sec": 10,
+  "stop_timeout_sec": 2
+}

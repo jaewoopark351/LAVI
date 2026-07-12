@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="S2ClientProtocol/S2ClientProtocol.csproj" />
+  <Project Path="Sharky/Sharky.csproj" />
+  <Project Path="SharkyLAVBot/SharkyLAVBot.csproj" />
+</Solution>

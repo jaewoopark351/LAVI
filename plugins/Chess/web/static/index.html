@@ -1,0 +1,418 @@
+<!-- #20260628_kpopmodder: Added iframe Chess UI without changing Gradio itself. -->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LAV Chess</title>
+  <link rel="stylesheet" href="./vendor/cm-chessboard/assets/chessboard.css">
+  <style>
+    :root {
+      --border: #d0d7de;
+      --text: #24292f;
+      --muted: #57606a;
+      --panel: #f6f8fa;
+      --accent: #0969da;
+      --danger: #cf222e;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      min-height: 100%;
+    }
+
+    body {
+      margin: 0;
+      font-family: Segoe UI, Arial, sans-serif;
+      color: var(--text);
+      background: #ffffff;
+    }
+
+    .shell {
+      display: grid;
+      grid-template-columns: minmax(320px, 640px) minmax(300px, 1fr);
+      gap: 16px;
+      padding: 16px;
+      min-height: 100vh;
+      align-items: start;
+    }
+
+    .board-wrap {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    #board {
+      width: min(640px, calc(100vw - 32px), calc(100vh - 120px));
+      max-width: 100%;
+      aspect-ratio: 1 / 1;
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(88px, 1fr));
+      gap: 8px;
+      margin-top: 12px;
+      padding: 8px 0;
+      position: sticky;
+      bottom: 0;
+      z-index: 10;
+      background: rgba(255, 255, 255, 0.96);
+      border-top: 1px solid rgba(208, 215, 222, 0.7);
+    }
+
+    button {
+      height: 34px;
+      border: 1px solid var(--border);
+      background: #ffffff;
+      color: var(--text);
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    button:hover {
+      border-color: var(--accent);
+    }
+
+    button.danger {
+      color: var(--danger);
+    }
+
+    .panel {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 12px;
+      min-width: 0;
+    }
+
+    .field {
+      margin-bottom: 10px;
+    }
+
+    .label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    .value,
+    pre {
+      width: 100%;
+      min-height: 30px;
+      margin: 0;
+      padding: 8px;
+      border: 1px solid var(--border);
+      background: #ffffff;
+      border-radius: 6px;
+      font-family: Consolas, monospace;
+      font-size: 12px;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .log {
+      min-height: 150px;
+      max-height: 220px;
+      overflow: auto;
+    }
+
+    @media (max-width: 900px) {
+      .shell {
+        grid-template-columns: 1fr;
+        gap: 12px;
+        padding: 12px;
+      }
+
+      #board {
+        width: min(100%, calc(100vh - 132px));
+      }
+
+      .controls {
+        grid-template-columns: repeat(3, minmax(104px, 1fr));
+        margin-top: 8px;
+      }
+    }
+
+    @media (max-width: 620px) {
+      .controls {
+        grid-template-columns: repeat(2, minmax(112px, 1fr));
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="board-wrap">
+      <div id="board"></div>
+      <div class="controls">
+        <button id="new-game">New Game</button>
+        <button id="start-engine">Start LC0</button>
+        <button id="stop-engine">Stop LC0</button>
+        <button id="ai-move">AI Move</button>
+        <button id="reset" class="danger">Resign / Reset</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="field">
+        <span class="label">Engine Status</span>
+        <div id="engine-status" class="value">loading</div>
+      </div>
+      <div class="field">
+        <span class="label">Current FEN</span>
+        <div id="fen" class="value"></div>
+      </div>
+      <div class="field">
+        <span class="label">Move History / PGN</span>
+        <pre id="pgn"></pre>
+      </div>
+      <div class="field">
+        <span class="label">Last Move</span>
+        <div id="last-move" class="value"></div>
+      </div>
+      <div class="field">
+        <span class="label">AI Reaction</span>
+        <div id="ai-reaction" class="value"></div>
+      </div>
+      <div class="field">
+        <span class="label">Game Result</span>
+        <div id="result" class="value"></div>
+      </div>
+      <div class="field">
+        <span class="label">Engine Log</span>
+        <pre id="engine-log" class="log"></pre>
+      </div>
+      <div class="field">
+        <span class="label">Status</span>
+        <div id="message" class="value"></div>
+      </div>
+    </section>
+  </main>
+
+  <script type="module">
+    function setText(id, value) {
+      document.getElementById(id).textContent = value || "";
+    }
+
+    let Chessboard;
+    let COLOR;
+    let FEN;
+    let INPUT_EVENT_TYPE;
+    let PIECES_FILE_TYPE;
+    let boardAvailable = false;
+    try {
+      ({Chessboard, COLOR, FEN, INPUT_EVENT_TYPE, PIECES_FILE_TYPE} = await import("./vendor/cm-chessboard/src/Chessboard.js"));
+    } catch (error) {
+      setText("engine-status", "Chess board vendor load failed");
+      setText("message", `Cannot load local cm-chessboard vendor files: ${error}`);
+    }
+
+    const boardElement = document.getElementById("board");
+    let chessboard = null;
+    if (!Chessboard) {
+      boardElement.textContent = "Local chessboard vendor files are missing. API status remains available.";
+      boardElement.style.display = "flex";
+      boardElement.style.alignItems = "center";
+      boardElement.style.justifyContent = "center";
+      boardElement.style.padding = "16px";
+      boardElement.style.textAlign = "center";
+    }
+    if (Chessboard) {
+      try {
+        chessboard = new Chessboard(boardElement, {
+          position: FEN.start,
+          orientation: COLOR.white,
+          assetsUrl: "./vendor/cm-chessboard/assets/",
+          style: {
+            cssClass: "default",
+            pieces: {
+              type: PIECES_FILE_TYPE.svgSprite,
+              file: "pieces/staunty.svg",
+              tileSize: 40
+            }
+          }
+        });
+        boardAvailable = true;
+      } catch (error) {
+        setText("engine-status", "Chess board init failed");
+        setText("message", `Cannot initialize local chessboard: ${error}`);
+        boardElement.textContent = "Local chessboard initialization failed. API status remains available.";
+      }
+    }
+
+    let currentState = null;
+    let pendingMove = null;
+    let busy = false;
+    let moveInputEnabled = false;
+    let moveInputColor = null;
+    let renderedFen = null;
+    let renderedOrientation = null;
+
+    function configureMoveInput(humanColor) {
+      if (!chessboard) {
+        return;
+      }
+      if (moveInputEnabled && moveInputColor === humanColor) {
+        return;
+      }
+      if (moveInputEnabled && typeof chessboard.disableMoveInput === "function") {
+        chessboard.disableMoveInput();
+        moveInputEnabled = false;
+        moveInputColor = null;
+      }
+      chessboard.enableMoveInput(inputHandler, humanColor);
+      moveInputEnabled = true;
+      moveInputColor = humanColor;
+    }
+
+    function updateState(state, options = {}) {
+      currentState = state;
+      if (chessboard && state.fen && (options.forceBoard || state.fen !== renderedFen)) {
+        chessboard.setPosition(state.fen, true);
+        renderedFen = state.fen;
+      }
+      const humanColor = boardAvailable
+        ? (state.human_color === "black" ? COLOR.black : COLOR.white)
+        : (state.human_color || "white");
+      if (chessboard && typeof chessboard.setOrientation === "function" && humanColor !== renderedOrientation) {
+        chessboard.setOrientation(humanColor);
+        renderedOrientation = humanColor;
+      }
+      if (boardAvailable) {
+        configureMoveInput(humanColor);
+      }
+      const thinkingText = state.ai_thinking ? " | AI thinking" : "";
+      const engineText = `${state.engine_status || "unknown"}${thinkingText} | turn: ${state.turn || "unknown"} | human: ${state.human_color || "white"}`;
+      setText("engine-status", engineText);
+      setText("fen", state.fen);
+      setText("pgn", state.pgn || state.move_history || "");
+      setText("last-move", state.last_move);
+      setText("ai-reaction", state.ai_reaction);
+      setText("result", state.result);
+      setText("engine-log", state.engine_log);
+      setText("message", state.message);
+    }
+
+    async function getState() {
+      const response = await fetch("/api/state");
+      updateState(await response.json());
+    }
+
+    async function postJson(path, payload = {}) {
+      busy = true;
+      const previousFen = currentState ? currentState.fen : null;
+      try {
+        const response = await fetch(path, {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify(payload)
+        });
+        const state = await response.json();
+        const rejectedMove = path === "/api/move" && (state.ok === false || state.fen === previousFen);
+        updateState(state, {forceBoard: rejectedMove});
+      } catch (error) {
+        setText("message", `Request failed: ${error}`);
+        if (chessboard && currentState && currentState.fen) {
+          chessboard.setPosition(currentState.fen, true);
+        }
+      } finally {
+        busy = false;
+      }
+    }
+
+    function pieceAt(fen, square) {
+      const boardPart = String(fen || "").split(" ")[0];
+      const files = "abcdefgh";
+      const fileIndex = files.indexOf(square[0]);
+      const rankIndex = 8 - parseInt(square[1], 10);
+      if (fileIndex < 0 || rankIndex < 0 || rankIndex > 7) {
+        return "";
+      }
+      const rows = boardPart.split("/");
+      let file = 0;
+      for (const char of rows[rankIndex] || "") {
+        if (/[1-8]/.test(char)) {
+          file += parseInt(char, 10);
+        } else {
+          if (file === fileIndex) {
+            return char;
+          }
+          file += 1;
+        }
+      }
+      return "";
+    }
+
+    function promotionFor(from, to) {
+      const piece = pieceAt(currentState ? currentState.fen : "", from);
+      if ((piece === "P" && to[1] === "8") || (piece === "p" && to[1] === "1")) {
+        const choice = prompt("Promote to q, r, b, or n", "q");
+        return ["q", "r", "b", "n"].includes(String(choice).toLowerCase()) ? String(choice).toLowerCase() : "q";
+      }
+      return "";
+    }
+
+    function canMoveNow() {
+      if (busy || !currentState || currentState.game_over || currentState.ai_thinking) {
+        return false;
+      }
+      if (!boardAvailable) {
+        return false;
+      }
+      return currentState.turn === currentState.human_color;
+    }
+
+    async function sendMove(move) {
+      if (!move || !move.from || !move.to) {
+        return;
+      }
+      const promotion = promotionFor(move.from, move.to);
+      await postJson("/api/move", {
+        from: move.from,
+        to: move.to,
+        promotion
+      });
+    }
+
+    function inputHandler(event) {
+      if (event.type === INPUT_EVENT_TYPE.moveInputStarted) {
+        return canMoveNow();
+      }
+      if (event.type === INPUT_EVENT_TYPE.validateMoveInput) {
+        pendingMove = {
+          from: event.squareFrom,
+          to: event.squareTo
+        };
+        return true;
+      }
+      if (event.type === INPUT_EVENT_TYPE.moveInputFinished) {
+        const move = pendingMove;
+        pendingMove = null;
+        sendMove(move);
+        return true;
+      }
+      return true;
+    }
+
+    document.getElementById("new-game").addEventListener("click", () => postJson("/api/new-game"));
+    document.getElementById("start-engine").addEventListener("click", () => postJson("/api/start-engine"));
+    document.getElementById("stop-engine").addEventListener("click", () => postJson("/api/stop-engine"));
+    document.getElementById("ai-move").addEventListener("click", () => postJson("/api/ai-move"));
+    document.getElementById("reset").addEventListener("click", () => postJson("/api/resign-reset"));
+
+    await getState();
+    window.setInterval(getState, 3000);
+  </script>
+</body>
+</html>

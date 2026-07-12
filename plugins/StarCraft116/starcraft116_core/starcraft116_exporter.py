@@ -1,0 +1,296 @@
+#20260703_kpopmodder: Tracks the optional BWAPI AIModule proxy that emits StarCraft 1.16 JSONL events.
+import os
+
+
+class StarCraft116ExporterManager:
+    #20260703_kpopmodder: Keeps exporter installation checks separate from launch/status logic.
+    EXPORTER_DLL_NAME = "LAVEventExporter.dll"
+    EXPORTER_INI_NAME = "LAVEventExporter.ini"
+
+    def __init__(self, config_manager):
+        self.config_manager = config_manager
+
+    def status(self, profile_name=None):
+        profile_name = self._profile_name(profile_name)
+        profile = self.config_manager.get_profile(profile_name)
+        paths = self.paths(profile)
+        config_values = self.read_exporter_ini(paths["target_ini_path"])
+        wrapped_ai = os.path.basename(config_values.get("wrapped_ai", ""))
+        expected_wrapped_ai = os.path.basename(profile.get("bot_binary_path", ""))
+        return {
+            "enabled": self.config_manager.get_bool(
+                "bwapi_event_exporter_enabled",
+                False,
+            ),
+            "source_dir": paths["source_dir"],
+            "project_path": paths["project_path"],
+            "source_dll_path": paths["source_dll_path"],
+            "source_dll_exists": bool(
+                paths["source_dll_path"]
+                and os.path.isfile(paths["source_dll_path"])
+            ),
+            "target_dll_path": paths["target_dll_path"],
+            "target_dll_exists": bool(
+                paths["target_dll_path"]
+                and os.path.isfile(paths["target_dll_path"])
+            ),
+            "target_ini_path": paths["target_ini_path"],
+            "target_ini_exists": bool(
+                paths["target_ini_path"]
+                and os.path.isfile(paths["target_ini_path"])
+            ),
+            "expected_bwapi_ai": self.expected_bwapi_ai_path(),
+            "expected_ai_binary": self.EXPORTER_DLL_NAME,
+            "expected_wrapped_ai": expected_wrapped_ai,
+            "configured_wrapped_ai": wrapped_ai,
+            "wrapped_ai_matches_profile": bool(
+                expected_wrapped_ai
+                and wrapped_ai
+                and expected_wrapped_ai.lower() == wrapped_ai.lower()
+            ),
+            "events_path": config_values.get(
+                "events_path",
+                self.config_manager.resolve_game_events_path(),
+            ),
+            "config_values": config_values,
+        }
+
+    def paths(self, profile):
+        source_dir = os.path.join(
+            self.config_manager.plugin_root,
+            "bwapi_event_exporter",
+        )
+        build_config = str(
+            self.config_manager.get(
+                "bwapi_event_exporter_build_config",
+                "Release",
+            )
+            or "Release"
+        )
+        source_dll = self.config_manager.resolve_path_value(str(
+            self.config_manager.get("bwapi_event_exporter_source_dll_path", "")
+            or ""
+        ))
+        if not source_dll:
+            source_dll = os.path.join(
+                source_dir,
+                "bin",
+                build_config,
+                self.EXPORTER_DLL_NAME,
+            )
+
+        ai_dir = self._ai_dir(profile)
+        target_dll = os.path.join(ai_dir, self.EXPORTER_DLL_NAME) if ai_dir else ""
+        target_ini = os.path.join(ai_dir, self.EXPORTER_INI_NAME) if ai_dir else ""
+        return {
+            "source_dir": source_dir,
+            "project_path": os.path.join(source_dir, "LAVEventExporter.vcxproj"),
+            "source_dll_path": source_dll,
+            "target_dll_path": target_dll,
+            "target_ini_path": target_ini,
+        }
+
+    def expected_bwapi_ai_path(self):
+        return f"bwapi-data/AI/{self.EXPORTER_DLL_NAME}"
+
+    def build_ini_text(self, profile_name=None):
+        profile_name = self._profile_name(profile_name)
+        profile = self.config_manager.get_profile(profile_name)
+        wrapped_ai = self._wrapped_ai_value(profile)
+        lines = [
+            "#20260703_kpopmodder: LAV StarCraft 1.16 BWAPI event exporter config.",
+            f"wrapped_ai={wrapped_ai}",
+            f"events_path={self.config_manager.resolve_game_events_path()}",
+            "snapshot_interval_frames=144",
+            "combat_cooldown_frames=96",
+            "supply_block_cooldown_frames=240",
+            "",
+        ]
+        return "\n".join(lines)
+
+    def write_ini(self, profile_name=None):
+        profile_name = self._profile_name(profile_name)
+        profile = self.config_manager.get_profile(profile_name)
+        target_ini = self.paths(profile)["target_ini_path"]
+        if not target_ini:
+            return False, "LAVEventExporter.ini target path is not configured."
+
+        target_dir = os.path.dirname(target_ini)
+        if target_dir:
+            os.makedirs(target_dir, exist_ok=True)
+        with open(target_ini, "w", encoding="utf-8", newline="\n") as file:
+            file.write(self.build_ini_text(profile_name))
+        return True, f"Updated LAVEventExporter.ini for {profile_name}: {target_ini}"
+
+    def write_bwapi_ini_ai(self, profile_name=None, use_exporter=None):
+        #20260704_kpopmodder: BWAPI reads this file for DLL bots, so set ai/ai_dbg to the selected profile before launch.
+        profile_name = self._profile_name(profile_name)
+        profile = self.config_manager.get_profile(profile_name)
+        ai_value = self._bwapi_ai_value(profile, use_exporter=use_exporter)
+        if not ai_value:
+            return True, "Skipped bwapi.ini AI update for standalone BWAPI client bot."
+
+        bwapi_ini = self._bwapi_ini_path(profile)
+        if not bwapi_ini:
+            return False, "bwapi.ini target path is not configured."
+        if not os.path.isfile(bwapi_ini):
+            return False, f"bwapi.ini does not exist: {bwapi_ini}"
+
+        self._write_ini_values(
+            bwapi_ini,
+            "ai",
+            {
+                "ai": ai_value,
+                "ai_dbg": ai_value,
+            },
+        )
+        return True, f"Updated bwapi.ini AI for {profile_name}: {ai_value}"
+
+    def _wrapped_ai_value(self, profile):
+        bot_path = self.config_manager.resolve_profile_path(
+            profile,
+            "bot_binary_path",
+        )
+        if not bot_path:
+            return "Stardust.dll"
+
+        ai_dir = self._ai_dir(profile)
+        if ai_dir:
+            try:
+                bot_dir = os.path.normcase(os.path.dirname(bot_path))
+                expected_ai_dir = os.path.normcase(ai_dir)
+                if bot_dir == expected_ai_dir:
+                    return os.path.basename(bot_path)
+            except Exception:
+                pass
+        return bot_path
+
+    def _bwapi_ai_value(self, profile, use_exporter=None):
+        bot_path = self.config_manager.resolve_profile_path(
+            profile,
+            "bot_binary_path",
+        )
+        #20260704_kpopmodder: Monster-style EXE bots connect as BWAPI clients and must not be written as AI DLLs.
+        if os.path.splitext(bot_path or "")[1].lower() == ".exe":
+            return ""
+
+        if use_exporter is None:
+            use_exporter = self.config_manager.get_bool(
+                "bwapi_event_exporter_enabled",
+                False,
+            )
+        #20260704_kpopmodder: Use the exporter proxy when available so LAV can receive game events while wrapping the real bot.
+        if use_exporter:
+            return self.expected_bwapi_ai_path()
+
+        if not bot_path:
+            return ""
+
+        ai_dir = self._ai_dir(profile)
+        if ai_dir:
+            try:
+                bot_dir = os.path.normcase(os.path.dirname(bot_path))
+                expected_ai_dir = os.path.normcase(ai_dir)
+                if bot_dir == expected_ai_dir:
+                    return f"bwapi-data/AI/{os.path.basename(bot_path)}"
+            except Exception:
+                pass
+        return bot_path
+
+    def _bwapi_ini_path(self, profile):
+        bwapi_data_dir = self.config_manager.resolve_profile_path(
+            profile,
+            "bwapi_data_dir",
+        )
+        if bwapi_data_dir:
+            return os.path.join(bwapi_data_dir, "bwapi.ini")
+
+        starcraft_dir = self.config_manager.resolve_profile_path(
+            profile,
+            "starcraft_116_dir",
+        )
+        if starcraft_dir:
+            return os.path.join(starcraft_dir, "bwapi-data", "bwapi.ini")
+        return ""
+
+    def _write_ini_values(self, path, section, values):
+        #20260704_kpopmodder: Keep BWAPI's sample ini mostly intact while replacing only the AI keys.
+        with open(path, "r", encoding="utf-8", errors="replace") as file:
+            lines = file.read().splitlines()
+
+        section_header = f"[{section.lower()}]"
+        in_section = False
+        section_found = False
+        written = set()
+        output = []
+
+        for line in lines:
+            stripped = line.strip()
+            is_header = stripped.startswith("[") and stripped.endswith("]")
+            if is_header:
+                if in_section:
+                    for key, value in values.items():
+                        if key not in written:
+                            output.append(f"{key}     = {value}")
+                            written.add(key)
+                in_section = stripped.lower() == section_header
+                section_found = section_found or in_section
+                output.append(line)
+                continue
+
+            if in_section and "=" in stripped and not stripped.startswith((";", "#")):
+                key = stripped.split("=", 1)[0].strip().lower()
+                if key in values:
+                    output.append(f"{key}     = {values[key]}")
+                    written.add(key)
+                    continue
+
+            output.append(line)
+
+        if in_section:
+            for key, value in values.items():
+                if key not in written:
+                    output.append(f"{key}     = {value}")
+                    written.add(key)
+
+        if not section_found:
+            output.extend(["", f"[{section}]"])
+            for key, value in values.items():
+                output.append(f"{key}     = {value}")
+
+        with open(path, "w", encoding="utf-8", newline="\n") as file:
+            file.write("\n".join(output) + "\n")
+
+    def read_exporter_ini(self, path):
+        values = {}
+        if not path or not os.path.isfile(path):
+            return values
+        with open(path, "r", encoding="utf-8", errors="replace") as file:
+            for line in file:
+                stripped = line.strip()
+                if not stripped or stripped[0] in {"#", ";"} or "=" not in stripped:
+                    continue
+                key, value = stripped.split("=", 1)
+                values[key.strip().lower()] = value.strip().strip("\"'")
+        return values
+
+    def _profile_name(self, profile_name):
+        profile_name = str(profile_name or "").strip()
+        if profile_name in self.config_manager.profile_names():
+            return profile_name
+        return self.config_manager.get_active_profile_name()
+
+    def _ai_dir(self, profile):
+        bwapi_data_dir = self.config_manager.resolve_profile_path(
+            profile,
+            "bwapi_data_dir",
+        )
+        if bwapi_data_dir:
+            return os.path.join(bwapi_data_dir, "AI")
+        starcraft_dir = self.config_manager.resolve_profile_path(
+            profile,
+            "starcraft_116_dir",
+        )
+        if starcraft_dir:
+            return os.path.join(starcraft_dir, "bwapi-data", "AI")
+        return ""

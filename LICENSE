@@ -1,0 +1,67 @@
+MIT License
+
+Copyright (c) 2026 박재우 / jaewoopark351
+
+This license applies only to source code newly written or modified by
+박재우 / jaewoopark351 in this repository, unless otherwise stated.
+
+This project may include, depend on, or interoperate with third-party software,
+models, datasets, voice assets, Live2D assets, VTube Studio integrations,
+GPT-SoVITS, RVC-related components, and other external resources.
+
+Those third-party components are governed by their own respective licenses,
+terms, and copyright notices. This license does not override or replace the
+licenses of any third-party components, upstream projects, models, datasets,
+voice assets, or external resources.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of the source code covered by this license and associated documentation files
+(the "Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish, distribute,
+sublicense, and/or sell copies of the Software, and to permit persons to whom
+the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice, this permission notice, and the third-party notice
+above shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+===============================================================================
+Korean Translation / 한국어 번역
+===============================================================================
+
+MIT 라이선스
+
+Copyright (c) 2026 박재우 / jaewoopark351
+
+이 라이선스는 별도 표기가 없는 한, 이 저장소에서
+박재우 / jaewoopark351이 새로 작성하거나 수정한 소스코드에만 적용됩니다.
+
+이 프로젝트는 외부 소프트웨어, 모델, 데이터셋, 음성 리소스,
+Live2D 리소스, VTube Studio 연동 요소, GPT-SoVITS, RVC 관련 구성 요소
+및 기타 외부 리소스를 포함하거나, 이에 의존하거나, 이들과 함께 동작할 수 있습니다.
+
+이러한 외부 구성 요소는 각각의 원 라이선스, 이용 약관 및 저작권 고지를 따릅니다.
+본 라이선스는 외부 구성 요소, 원본 프로젝트, 모델, 데이터셋, 음성 리소스 또는
+기타 외부 리소스의 라이선스를 대체하거나 무효화하지 않습니다.
+
+본 라이선스가 적용되는 소스코드 및 관련 문서 파일, 이하 "소프트웨어"의 사본을
+취득하는 모든 사람에게, 사용, 복사, 수정, 병합, 게시, 배포, 재라이선스,
+판매할 수 있는 권리와, 해당 소프트웨어를 제공받은 사람이 동일하게 사용할 수 있는
+권리를 포함하여 제한 없이 소프트웨어를 취급할 수 있는 권한을 무상으로 허가합니다.
+
+단, 위의 저작권 고지, 본 허가 고지 및 위의 외부 구성 요소 관련 고지는
+소프트웨어의 모든 사본 또는 상당 부분에 포함되어야 합니다.
+
+본 소프트웨어는 상품성, 특정 목적에의 적합성 및 권리 비침해에 대한 보증을 포함하되
+이에 한정되지 않는 어떠한 명시적 또는 묵시적 보증 없이 "있는 그대로" 제공됩니다.
+저작권자 또는 권리자는 계약, 불법행위 또는 기타 사유와 관계없이,
+소프트웨어 또는 소프트웨어의 사용이나 기타 거래와 관련하여 발생하는 어떠한 청구,
+손해 또는 기타 책임에 대해서도 책임을 지지 않습니다.

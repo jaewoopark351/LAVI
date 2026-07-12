@@ -1,0 +1,4 @@
+#20260701_kpopmodder: Keep local CMake and SAIDA runtime artifacts out of commits.
+/build*/
+/bwapi-data/
+/*.log

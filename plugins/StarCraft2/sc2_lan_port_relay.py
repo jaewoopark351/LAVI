@@ -1,0 +1,1235 @@
+# #20260711_kpopmodder: Added LAN-only relay for SC2 JoinGame ports that bind to loopback.
+# #20260712_kpopmodder: Archived with LAN Lobby remote-human; keep as diagnostic reference only.
+# from __future__ import annotations
+
+# LAN_LOBBY_ARCHIVED_SOURCE = r'''
+# import socket
+# import threading
+# import time
+# from collections.abc import Iterable
+# from typing import Any, Callable
+
+
+# LogCallback = Callable[[str], None]
+
+
+# DEFAULT_SC2_MULTIPLAYER_START_PORT = 5690
+# DEFAULT_SC2_MULTIPLAYER_RELAY_SPAN = 5
+# LAN_PORT_LAYOUT_ROLE_SERVER_PEER_CLIENT = "role-server-peer-client"
+# LAN_PORT_LAYOUT_SWAPPED = "swapped"
+# LAN_PORT_LAYOUT_HOST_SERVER_REMOTE_CLIENT = "host-server-remote-client"
+# LAN_PORT_LAYOUT_S2CLIENT_API_SHARED = "s2client-api-shared"
+# LOOPBACK_TARGET_HOST = "127.0.0.1"
+# WINDOWS_UDP_CONNRESET_ERRNO = 10054
+# SIO_UDP_CONNRESET = getattr(socket, "SIO_UDP_CONNRESET", 0x9800000C)
+
+
+# def derive_multiplayer_ports(
+#     start_port: Any = DEFAULT_SC2_MULTIPLAYER_START_PORT,
+#     explicit_ports: Any = None,
+# ) -> list[int]:
+#     """Return the SC2 JoinGame port block.
+
+#     LavLanLadderServer currently sends JoinGame with start_port+1 through
+#     start_port+5. SC2 may open only a subset at runtime, but keeping the relay
+#     block stable makes timing less brittle.
+#     """
+#     ports = _normalize_ports(explicit_ports)
+#     if ports:
+#         return ports
+#     base = _valid_port(start_port, DEFAULT_SC2_MULTIPLAYER_START_PORT)
+#     return [
+#         port
+#         for port in range(base + 1, base + DEFAULT_SC2_MULTIPLAYER_RELAY_SPAN + 1)
+#         if 0 < port < 65536
+#     ]
+
+
+# def derive_first_player_client_ports(
+#     start_port: Any = DEFAULT_SC2_MULTIPLAYER_START_PORT,
+#     layout: Any = LAN_PORT_LAYOUT_ROLE_SERVER_PEER_CLIENT,
+# ) -> list[int]:
+#     """Ports the first-player SC2 client dials when joining a LAN-relayed game."""
+#     return derive_player_client_ports(start_port, "first", layout)
+
+
+# def derive_second_player_client_ports(
+#     start_port: Any = DEFAULT_SC2_MULTIPLAYER_START_PORT,
+#     layout: Any = LAN_PORT_LAYOUT_ROLE_SERVER_PEER_CLIENT,
+# ) -> list[int]:
+#     """Ports the second-player SC2 client dials when joining a LAN-relayed game."""
+#     return derive_player_client_ports(start_port, "second", layout)
+
+
+# def derive_first_player_server_ports(
+#     start_port: Any = DEFAULT_SC2_MULTIPLAYER_START_PORT,
+#     layout: Any = LAN_PORT_LAYOUT_ROLE_SERVER_PEER_CLIENT,
+# ) -> list[int]:
+#     """Default SC2 server ports for the first player in a two-player match."""
+#     return derive_player_server_ports(start_port, "first", layout)
+
+
+# def derive_second_player_server_ports(
+#     start_port: Any = DEFAULT_SC2_MULTIPLAYER_START_PORT,
+#     layout: Any = LAN_PORT_LAYOUT_ROLE_SERVER_PEER_CLIENT,
+# ) -> list[int]:
+#     """Default SC2 server ports for the second player in a two-player match."""
+#     return derive_player_server_ports(start_port, "second", layout)
+
+
+# def derive_player_server_ports(
+#     start_port: Any = DEFAULT_SC2_MULTIPLAYER_START_PORT,
+#     role: Any = "first",
+#     layout: Any = LAN_PORT_LAYOUT_ROLE_SERVER_PEER_CLIENT,
+# ) -> list[int]:
+#     """Return the JoinGame server_ports for a player role and layout.
+
+#     #20260712_kpopmodder: The archived LAN native experiment can run diagnostic port
+#     layouts. Keep the Python relay's idea of server/client ports identical to
+#     native, otherwise a swapped native JoinGame still talks to default relays.
+#     """
+#     role_name = _normalize_lan_player_role(role)
+#     layout_name = normalize_lan_port_layout(layout)
+#     if layout_name == LAN_PORT_LAYOUT_SWAPPED:
+#         role_name = _peer_lan_player_role(role_name)
+#     elif layout_name == LAN_PORT_LAYOUT_HOST_SERVER_REMOTE_CLIENT:
+#         role_name = "second"
+#     elif layout_name == LAN_PORT_LAYOUT_S2CLIENT_API_SHARED:
+#         role_name = "first"
+#     return _canonical_player_server_ports(start_port, role_name)
+
+
+# def derive_player_client_ports(
+#     start_port: Any = DEFAULT_SC2_MULTIPLAYER_START_PORT,
+#     role: Any = "first",
+#     layout: Any = LAN_PORT_LAYOUT_ROLE_SERVER_PEER_CLIENT,
+# ) -> list[int]:
+#     """Return the JoinGame client_ports for a player role and layout."""
+#     role_name = _normalize_lan_player_role(role)
+#     peer_role = _peer_lan_player_role(role_name)
+#     layout_name = normalize_lan_port_layout(layout)
+#     if layout_name == LAN_PORT_LAYOUT_SWAPPED:
+#         peer_role = role_name
+#     elif layout_name == LAN_PORT_LAYOUT_HOST_SERVER_REMOTE_CLIENT:
+#         peer_role = "first"
+#     elif layout_name == LAN_PORT_LAYOUT_S2CLIENT_API_SHARED:
+#         peer_role = "second"
+#     return _canonical_player_server_ports(start_port, peer_role)
+
+
+# def normalize_lan_port_layout(
+#     value: Any = LAN_PORT_LAYOUT_S2CLIENT_API_SHARED,
+# ) -> str:
+#     raw_text = str(value or "").strip()
+#     if not raw_text:
+#         return LAN_PORT_LAYOUT_S2CLIENT_API_SHARED
+#     text = raw_text.lower().replace("_", "-")
+#     if text in {
+#         "swapped",
+#         "swap",
+#         "flipped",
+#         "inverse",
+#         "peer-server-role-client",
+#         "swapped-server-client",
+#     }:
+#         return LAN_PORT_LAYOUT_SWAPPED
+#     if text in {
+#         "host-server-remote-client",
+#         "host-server",
+#         "host-owned-server",
+#         "host-server-remote",
+#     }:
+#         return LAN_PORT_LAYOUT_HOST_SERVER_REMOTE_CLIENT
+#     if text in {
+#         "s2client-api",
+#         "s2client-api-shared",
+#         "official",
+#         "official-shared",
+#         "official-shared-ports",
+#         "shared-ports",
+#     }:
+#         return LAN_PORT_LAYOUT_S2CLIENT_API_SHARED
+#     return LAN_PORT_LAYOUT_ROLE_SERVER_PEER_CLIENT
+
+
+# def resolve_lan_bind_host(
+#     preferred_host: Any = "",
+#     *,
+#     peer_host: Any = "",
+#     fallback_host: str = "",
+# ) -> str:
+#     """Choose a concrete LAN IP to avoid colliding with SC2's loopback bind.
+
+#     Binding the relay to 0.0.0.0 can conflict with SC2 when SC2 owns
+#     127.0.0.1:<port>. A specific local interface address keeps both sockets
+#     separate on Windows.
+#     """
+#     preferred = _clean_host(preferred_host)
+#     if preferred and not _is_loopback_or_unspecified(preferred):
+#         return preferred
+
+#     peer = _clean_host(peer_host)
+#     if peer and not _is_loopback_or_unspecified(peer):
+#         detected = _local_ip_for_peer(peer)
+#         if detected and not _is_loopback_or_unspecified(detected):
+#             return detected
+
+#     hostname_ip = _hostname_ip()
+#     if hostname_ip and not _is_loopback_or_unspecified(hostname_ip):
+#         return hostname_ip
+
+#     fallback = _clean_host(fallback_host)
+#     if fallback:
+#         return fallback
+#     return ""
+
+
+# class SC2LanPortRelayManager:
+#     """Owns TCP/UDP relays for the SC2 multiplayer port block."""
+
+#     def __init__(self, log_callback: LogCallback | None = None) -> None:
+#         self._log_callback = log_callback
+#         self._lock = threading.RLock()
+#         self._tcp_relays: list[_TcpPortRelay] = []
+#         self._udp_relays: list[_UdpPortRelay] = []
+#         self._config: dict[str, Any] = {}
+#         self._last_status: dict[str, Any] = {"running": False}
+
+#     def start(
+#         self,
+#         *,
+#         bind_host: str,
+#         ports: Iterable[int],
+#         target_host: str = LOOPBACK_TARGET_HOST,
+#         enable_tcp: bool = True,
+#         enable_udp: bool = True,
+#     ) -> dict[str, Any]:
+#         ports = _normalize_ports(list(ports))
+#         bind_host = _clean_host(bind_host)
+#         target_host = _clean_host(target_host) or LOOPBACK_TARGET_HOST
+#         config = {
+#             "bind_host": bind_host,
+#             "target_host": target_host,
+#             "ports": ports,
+#             "enable_tcp": bool(enable_tcp),
+#             "enable_udp": bool(enable_udp),
+#         }
+#         if not bind_host:
+#             status = {
+#                 "ok": False,
+#                 "running": False,
+#                 "error": "lan_bind_host_missing",
+#                 "config": config,
+#             }
+#             with self._lock:
+#                 self._last_status = status
+#             return status
+#         if not ports:
+#             status = {
+#                 "ok": False,
+#                 "running": False,
+#                 "error": "relay_ports_missing",
+#                 "config": config,
+#             }
+#             with self._lock:
+#                 self._last_status = status
+#             return status
+
+#         with self._lock:
+#             if (
+#                 self.is_running()
+#                 and self._config == config
+#                 and self._last_status.get("ok", False)
+#             ):
+#                 self._last_status = self.status()
+#                 self._last_status["ok"] = True
+#                 self._last_status["message"] = "already_running"
+#                 return dict(self._last_status)
+#             self.stop()
+#             errors: list[str] = []
+#             if enable_tcp:
+#                 for port in ports:
+#                     relay = _TcpPortRelay(
+#                         bind_host=bind_host,
+#                         port=port,
+#                         target_host=target_host,
+#                         target_port=port,
+#                         log_callback=self._log,
+#                     )
+#                     result = relay.start()
+#                     self._tcp_relays.append(relay)
+#                     if not result.get("ok"):
+#                         errors.append(f"tcp:{port}:{result.get('error')}")
+#             if enable_udp:
+#                 for port in ports:
+#                     relay = _UdpPortRelay(
+#                         bind_host=bind_host,
+#                         port=port,
+#                         target_host=target_host,
+#                         target_port=port,
+#                         log_callback=self._log,
+#                     )
+#                     result = relay.start()
+#                     self._udp_relays.append(relay)
+#                     if not result.get("ok"):
+#                         errors.append(f"udp:{port}:{result.get('error')}")
+#             self._config = config
+#             self._last_status = self.status()
+#             self._last_status["ok"] = not errors
+#             if errors:
+#                 self._last_status["error"] = "; ".join(errors)
+#             else:
+#                 self._last_status["message"] = "started"
+#             return dict(self._last_status)
+
+#     def stop(self) -> dict[str, Any]:
+#         with self._lock:
+#             for relay in self._tcp_relays:
+#                 relay.stop()
+#             for relay in self._udp_relays:
+#                 relay.stop()
+#             self._tcp_relays = []
+#             self._udp_relays = []
+#             self._config = {}
+#             self._last_status = {"running": False}
+#             return dict(self._last_status)
+
+#     def is_running(self) -> bool:
+#         return any(relay.is_running() for relay in self._tcp_relays + self._udp_relays)
+
+#     def status(self) -> dict[str, Any]:
+#         with self._lock:
+#             tcp = [relay.status() for relay in self._tcp_relays]
+#             udp = [relay.status() for relay in self._udp_relays]
+#             return {
+#                 "running": any(item.get("running") for item in tcp + udp),
+#                 "config": dict(self._config),
+#                 "tcp": tcp,
+#                 "udp": udp,
+#             }
+
+#     def _log(self, message: str) -> None:
+#         if callable(self._log_callback):
+#             try:
+#                 self._log_callback(message)
+#             except Exception:
+#                 pass
+
+
+# class SC2UdpPortPairRelayManager:
+#     """Owns UDP relays that preserve SC2's negotiated source ports.
+
+#     SC2's JoinGame port contract is stricter than a normal UDP forwarder:
+#     each client sends from its own server port to the peer's server port. If a
+#     relay uses an ephemeral source port, the remote SC2 process keeps waiting
+#     even though packets are technically crossing the LAN.
+#     """
+
+#     def __init__(self, log_callback: LogCallback | None = None) -> None:
+#         self._log_callback = log_callback
+#         self._lock = threading.RLock()
+#         self._relays: list[_UdpPortPairRelay] = []
+#         self._config: dict[str, Any] = {}
+#         self._last_status: dict[str, Any] = {"running": False}
+
+#     def start(
+#         self,
+#         *,
+#         lan_bind_host: str,
+#         peer_host: str,
+#         local_ports: Iterable[int],
+#         peer_ports: Iterable[int],
+#         local_bind_host: str = LOOPBACK_TARGET_HOST,
+#     ) -> dict[str, Any]:
+#         local_ports = _normalize_ports(list(local_ports))
+#         peer_ports = _normalize_ports(list(peer_ports))
+#         lan_bind_host = _clean_host(lan_bind_host)
+#         peer_host = _clean_host(peer_host)
+#         local_bind_host = _clean_host(local_bind_host) or LOOPBACK_TARGET_HOST
+#         config = {
+#             "lan_bind_host": lan_bind_host,
+#             "local_bind_host": local_bind_host,
+#             "peer_host": peer_host,
+#             "local_ports": local_ports,
+#             "peer_ports": peer_ports,
+#         }
+#         if not lan_bind_host:
+#             status = {
+#                 "ok": False,
+#                 "running": False,
+#                 "error": "lan_bind_host_missing",
+#                 "config": config,
+#             }
+#             with self._lock:
+#                 self._last_status = status
+#             return status
+#         if not peer_host:
+#             status = {
+#                 "ok": False,
+#                 "running": False,
+#                 "error": "peer_host_missing",
+#                 "config": config,
+#             }
+#             with self._lock:
+#                 self._last_status = status
+#             return status
+#         if not local_ports or not peer_ports or len(local_ports) != len(peer_ports):
+#             status = {
+#                 "ok": False,
+#                 "running": False,
+#                 "error": "port_pair_mismatch",
+#                 "config": config,
+#             }
+#             with self._lock:
+#                 self._last_status = status
+#             return status
+
+#         with self._lock:
+#             if (
+#                 self.is_running()
+#                 and self._config == config
+#                 and self._last_status.get("ok", False)
+#             ):
+#                 self._last_status = self.status()
+#                 self._last_status["ok"] = True
+#                 self._last_status["message"] = "already_running"
+#                 return dict(self._last_status)
+#             self.stop()
+#             errors: list[str] = []
+#             for local_port, peer_port in zip(local_ports, peer_ports):
+#                 relay = _UdpPortPairRelay(
+#                     lan_bind_host=lan_bind_host,
+#                     local_bind_host=local_bind_host,
+#                     peer_host=peer_host,
+#                     local_port=local_port,
+#                     peer_port=peer_port,
+#                     log_callback=self._log,
+#                 )
+#                 result = relay.start()
+#                 self._relays.append(relay)
+#                 if not result.get("ok"):
+#                     errors.append(
+#                         f"udp:{local_port}<->{peer_port}:{result.get('error')}"
+#                     )
+#             self._config = config
+#             self._last_status = self.status()
+#             self._last_status["ok"] = not errors
+#             if errors:
+#                 self._last_status["error"] = "; ".join(errors)
+#             else:
+#                 self._last_status["message"] = "started"
+#             return dict(self._last_status)
+
+#     def stop(self) -> dict[str, Any]:
+#         with self._lock:
+#             for relay in self._relays:
+#                 relay.stop()
+#             self._relays = []
+#             self._config = {}
+#             self._last_status = {"running": False}
+#             return dict(self._last_status)
+
+#     def is_running(self) -> bool:
+#         return any(relay.is_running() for relay in self._relays)
+
+#     def status(self) -> dict[str, Any]:
+#         with self._lock:
+#             relays = [relay.status() for relay in self._relays]
+#             return {
+#                 "running": any(item.get("running") for item in relays),
+#                 "config": dict(self._config),
+#                 "relays": relays,
+#             }
+
+#     def _log(self, message: str) -> None:
+#         if callable(self._log_callback):
+#             try:
+#                 self._log_callback(message)
+#             except Exception:
+#                 pass
+
+
+# class _TcpPortRelay:
+#     def __init__(
+#         self,
+#         *,
+#         bind_host: str,
+#         port: int,
+#         target_host: str,
+#         target_port: int,
+#         log_callback: LogCallback,
+#     ) -> None:
+#         self.bind_host = bind_host
+#         self.port = int(port)
+#         self.target_host = target_host
+#         self.target_port = int(target_port)
+#         self._log = log_callback
+#         self._stop = threading.Event()
+#         self._sock: socket.socket | None = None
+#         self._thread: threading.Thread | None = None
+#         self._last_error = ""
+#         self._lock = threading.Lock()
+#         self._connection_count = 0
+#         self._client_to_target_chunks = 0
+#         self._client_to_target_bytes = 0
+#         self._target_to_client_chunks = 0
+#         self._target_to_client_bytes = 0
+
+#     def start(self) -> dict[str, Any]:
+#         self._stop.clear()
+#         try:
+#             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+#             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+#             sock.bind((self.bind_host, self.port))
+#             sock.listen(16)
+#             sock.settimeout(0.5)
+#         except OSError as exc:
+#             self._last_error = str(exc)
+#             try:
+#                 sock.close()  # type: ignore[name-defined]
+#             except Exception:
+#                 pass
+#             self._log(f"TCP relay bind failed {self.bind_host}:{self.port} -> {self.target_host}:{self.target_port}: {exc}")
+#             return {"ok": False, "error": str(exc), **self.status()}
+#         self._sock = sock
+#         self._thread = threading.Thread(
+#             target=self._accept_loop,
+#             name=f"SC2LanTcpRelay.{self.port}",
+#             daemon=True,
+#         )
+#         self._thread.start()
+#         self._log(f"TCP relay listening {self.bind_host}:{self.port} -> {self.target_host}:{self.target_port}")
+#         return {"ok": True, **self.status()}
+
+#     def stop(self) -> None:
+#         self._stop.set()
+#         sock = self._sock
+#         if sock is not None:
+#             try:
+#                 sock.close()
+#             except OSError:
+#                 pass
+#         thread = self._thread
+#         if thread is not None and thread.is_alive():
+#             thread.join(timeout=1.0)
+#         self._sock = None
+#         self._thread = None
+
+#     def is_running(self) -> bool:
+#         thread = self._thread
+#         return bool(thread is not None and thread.is_alive())
+
+#     def status(self) -> dict[str, Any]:
+#         with self._lock:
+#             connection_count = self._connection_count
+#             client_to_target_chunks = self._client_to_target_chunks
+#             client_to_target_bytes = self._client_to_target_bytes
+#             target_to_client_chunks = self._target_to_client_chunks
+#             target_to_client_bytes = self._target_to_client_bytes
+#         return {
+#             "protocol": "tcp",
+#             "running": self.is_running(),
+#             "bind_host": self.bind_host,
+#             "port": self.port,
+#             "target_host": self.target_host,
+#             "target_port": self.target_port,
+#             "connection_count": connection_count,
+#             "client_to_target_chunks": client_to_target_chunks,
+#             "client_to_target_bytes": client_to_target_bytes,
+#             "target_to_client_chunks": target_to_client_chunks,
+#             "target_to_client_bytes": target_to_client_bytes,
+#             "last_error": self._last_error,
+#         }
+
+#     def _accept_loop(self) -> None:
+#         sock = self._sock
+#         if sock is None:
+#             return
+#         while not self._stop.is_set():
+#             try:
+#                 client, address = sock.accept()
+#             except socket.timeout:
+#                 continue
+#             except OSError as exc:
+#                 if not self._stop.is_set():
+#                     self._last_error = str(exc)
+#                     self._log(f"TCP relay accept failed {self.bind_host}:{self.port}: {exc}")
+#                 break
+#             threading.Thread(
+#                 target=self._handle_client,
+#                 args=(client, address),
+#                 name=f"SC2LanTcpRelay.{self.port}.client",
+#                 daemon=True,
+#             ).start()
+
+#     def _handle_client(self, client: socket.socket, address: tuple[str, int]) -> None:
+#         try:
+#             target = socket.create_connection((self.target_host, self.target_port), timeout=5.0)
+#         except OSError as exc:
+#             self._last_error = str(exc)
+#             self._log(f"TCP relay target connect failed {address} -> {self.target_host}:{self.target_port}: {exc}")
+#             try:
+#                 client.close()
+#             except OSError:
+#                 pass
+#             return
+
+#         self._log(f"TCP relay connected {address} -> {self.target_host}:{self.target_port}")
+#         with self._lock:
+#             self._connection_count += 1
+
+#         def count_client_to_target(byte_count: int) -> None:
+#             with self._lock:
+#                 self._client_to_target_chunks += 1
+#                 self._client_to_target_bytes += int(byte_count)
+
+#         def count_target_to_client(byte_count: int) -> None:
+#             with self._lock:
+#                 self._target_to_client_chunks += 1
+#                 self._target_to_client_bytes += int(byte_count)
+
+#         stop = threading.Event()
+#         threads = [
+#             threading.Thread(
+#                 target=_pipe_tcp,
+#                 args=(client, target, stop, count_client_to_target),
+#                 name=f"SC2LanTcpRelay.{self.port}.c2t",
+#                 daemon=True,
+#             ),
+#             threading.Thread(
+#                 target=_pipe_tcp,
+#                 args=(target, client, stop, count_target_to_client),
+#                 name=f"SC2LanTcpRelay.{self.port}.t2c",
+#                 daemon=True,
+#             ),
+#         ]
+#         for thread in threads:
+#             thread.start()
+#         while not stop.is_set() and any(thread.is_alive() for thread in threads):
+#             for thread in threads:
+#                 thread.join(timeout=0.5)
+#         stop.set()
+#         _safe_close_socket(client)
+#         _safe_close_socket(target)
+
+
+# class _UdpPortPairRelay:
+#     def __init__(
+#         self,
+#         *,
+#         lan_bind_host: str,
+#         local_bind_host: str,
+#         peer_host: str,
+#         local_port: int,
+#         peer_port: int,
+#         log_callback: LogCallback,
+#     ) -> None:
+#         self.lan_bind_host = lan_bind_host
+#         self.local_bind_host = local_bind_host
+#         self.peer_host = peer_host
+#         self.local_port = int(local_port)
+#         self.peer_port = int(peer_port)
+#         self._log = log_callback
+#         self._stop = threading.Event()
+#         self._lan_sock: socket.socket | None = None
+#         self._local_sock: socket.socket | None = None
+#         self._threads: list[threading.Thread] = []
+#         self._last_error = ""
+#         self._lan_to_local_packets = 0
+#         self._local_to_lan_packets = 0
+#         self._lan_to_local_bytes = 0
+#         self._local_to_lan_bytes = 0
+#         self._lan_recv_reset_count = 0
+#         self._local_recv_reset_count = 0
+
+#     def start(self) -> dict[str, Any]:
+#         self._stop.clear()
+#         try:
+#             lan_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+#             _configure_udp_socket(lan_sock)
+#             lan_sock.bind((self.lan_bind_host, self.local_port))
+#             lan_sock.settimeout(0.5)
+#             local_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+#             _configure_udp_socket(local_sock)
+#             local_sock.bind((self.local_bind_host, self.peer_port))
+#             local_sock.settimeout(0.5)
+#         except OSError as exc:
+#             self._last_error = str(exc)
+#             try:
+#                 lan_sock.close()  # type: ignore[name-defined]
+#             except Exception:
+#                 pass
+#             try:
+#                 local_sock.close()  # type: ignore[name-defined]
+#             except Exception:
+#                 pass
+#             self._log(
+#                 "UDP preserved relay bind failed "
+#                 f"LAN {self.lan_bind_host}:{self.local_port} "
+#                 f"<-> local {self.local_bind_host}:{self.peer_port} "
+#                 f"peer={self.peer_host}:{self.peer_port}: {exc}"
+#             )
+#             return {"ok": False, "error": str(exc), **self.status()}
+
+#         self._lan_sock = lan_sock
+#         self._local_sock = local_sock
+#         self._threads = [
+#             threading.Thread(
+#                 target=self._lan_to_local_loop,
+#                 name=f"SC2UdpPairRelay.{self.local_port}.lan_to_local",
+#                 daemon=True,
+#             ),
+#             threading.Thread(
+#                 target=self._local_to_lan_loop,
+#                 name=f"SC2UdpPairRelay.{self.local_port}.local_to_lan",
+#                 daemon=True,
+#             ),
+#         ]
+#         for thread in self._threads:
+#             thread.start()
+#         self._log(
+#             "UDP preserved relay listening "
+#             f"LAN {self.lan_bind_host}:{self.local_port} "
+#             f"<-> local {self.local_bind_host}:{self.peer_port} "
+#             f"peer={self.peer_host}:{self.peer_port}"
+#         )
+#         return {"ok": True, **self.status()}
+
+#     def stop(self) -> None:
+#         self._stop.set()
+#         for sock in (self._lan_sock, self._local_sock):
+#             if sock is not None:
+#                 _safe_close_socket(sock)
+#         for thread in self._threads:
+#             if thread.is_alive():
+#                 thread.join(timeout=1.0)
+#         self._lan_sock = None
+#         self._local_sock = None
+#         self._threads = []
+
+#     def is_running(self) -> bool:
+#         return any(thread.is_alive() for thread in self._threads)
+
+#     def status(self) -> dict[str, Any]:
+#         return {
+#             "protocol": "udp_port_pair",
+#             "running": self.is_running(),
+#             "lan_bind_host": self.lan_bind_host,
+#             "local_bind_host": self.local_bind_host,
+#             "peer_host": self.peer_host,
+#             "local_port": self.local_port,
+#             "peer_port": self.peer_port,
+#             "lan_to_local_packets": self._lan_to_local_packets,
+#             "local_to_lan_packets": self._local_to_lan_packets,
+#             "lan_to_local_bytes": self._lan_to_local_bytes,
+#             "local_to_lan_bytes": self._local_to_lan_bytes,
+#             "lan_recv_reset_count": self._lan_recv_reset_count,
+#             "local_recv_reset_count": self._local_recv_reset_count,
+#             "last_error": self._last_error,
+#         }
+
+#     def _lan_to_local_loop(self) -> None:
+#         lan_sock = self._lan_sock
+#         local_sock = self._local_sock
+#         if lan_sock is None or local_sock is None:
+#             return
+#         while not self._stop.is_set():
+#             try:
+#                 payload, peer = lan_sock.recvfrom(65535)
+#             except socket.timeout:
+#                 continue
+#             except OSError as exc:
+#                 if _is_udp_connreset(exc):
+#                     self._lan_recv_reset_count += 1
+#                     self._last_error = str(exc)
+#                     if self._should_log_reset(self._lan_recv_reset_count):
+#                         self._log(
+#                             "UDP preserved LAN recv reset ignored "
+#                             f"{self.lan_bind_host}:{self.local_port}: {exc}"
+#                         )
+#                     continue
+#                 if not self._stop.is_set():
+#                     self._last_error = str(exc)
+#                     self._log(
+#                         f"UDP preserved LAN recv failed {self.lan_bind_host}:{self.local_port}: {exc}"
+#                     )
+#                 break
+#             if not payload:
+#                 continue
+#             self._lan_to_local_packets += 1
+#             self._lan_to_local_bytes += len(payload)
+#             if self._lan_to_local_packets == 1 or int(peer[1]) != self.peer_port:
+#                 self._log(
+#                     "UDP preserved LAN->local "
+#                     f"{peer[0]}:{peer[1]} -> {self.local_bind_host}:{self.local_port} "
+#                     f"source={self.local_bind_host}:{self.peer_port}"
+#                 )
+#             try:
+#                 local_sock.sendto(payload, (self.local_bind_host, self.local_port))
+#             except OSError as exc:
+#                 self._last_error = str(exc)
+#                 self._log(
+#                     "UDP preserved LAN->local send failed "
+#                     f"{peer[0]}:{peer[1]} -> {self.local_bind_host}:{self.local_port}: {exc}"
+#                 )
+
+#     def _local_to_lan_loop(self) -> None:
+#         lan_sock = self._lan_sock
+#         local_sock = self._local_sock
+#         if lan_sock is None or local_sock is None:
+#             return
+#         while not self._stop.is_set():
+#             try:
+#                 payload, peer = local_sock.recvfrom(65535)
+#             except socket.timeout:
+#                 continue
+#             except OSError as exc:
+#                 if _is_udp_connreset(exc):
+#                     self._local_recv_reset_count += 1
+#                     self._last_error = str(exc)
+#                     if self._should_log_reset(self._local_recv_reset_count):
+#                         self._log(
+#                             "UDP preserved local recv reset ignored "
+#                             f"{self.local_bind_host}:{self.peer_port}: {exc}"
+#                         )
+#                     continue
+#                 if not self._stop.is_set():
+#                     self._last_error = str(exc)
+#                     self._log(
+#                         f"UDP preserved local recv failed {self.local_bind_host}:{self.peer_port}: {exc}"
+#                     )
+#                 break
+#             if not payload:
+#                 continue
+#             self._local_to_lan_packets += 1
+#             self._local_to_lan_bytes += len(payload)
+#             if self._local_to_lan_packets == 1 or int(peer[1]) != self.local_port:
+#                 self._log(
+#                     "UDP preserved local->LAN "
+#                     f"{peer[0]}:{peer[1]} -> {self.peer_host}:{self.peer_port} "
+#                     f"source={self.lan_bind_host}:{self.local_port}"
+#                 )
+#             try:
+#                 lan_sock.sendto(payload, (self.peer_host, self.peer_port))
+#             except OSError as exc:
+#                 self._last_error = str(exc)
+#                 self._log(
+#                     "UDP preserved local->LAN send failed "
+#                     f"{peer[0]}:{peer[1]} -> {self.peer_host}:{self.peer_port}: {exc}"
+#                 )
+
+#     def _should_log_reset(self, count: int) -> bool:
+#         return count <= 3 or count % 10 == 0
+
+
+# class _UdpPortRelay:
+#     def __init__(
+#         self,
+#         *,
+#         bind_host: str,
+#         port: int,
+#         target_host: str,
+#         target_port: int,
+#         log_callback: LogCallback,
+#     ) -> None:
+#         self.bind_host = bind_host
+#         self.port = int(port)
+#         self.target_host = target_host
+#         self.target_port = int(target_port)
+#         self._log = log_callback
+#         self._stop = threading.Event()
+#         self._sock: socket.socket | None = None
+#         self._thread: threading.Thread | None = None
+#         self._lock = threading.Lock()
+#         self._peers: dict[tuple[str, int], socket.socket] = {}
+#         self._last_error = ""
+#         self._packets_to_target = 0
+#         self._bytes_to_target = 0
+#         self._packets_to_peer = 0
+#         self._bytes_to_peer = 0
+
+#     def start(self) -> dict[str, Any]:
+#         self._stop.clear()
+#         try:
+#             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+#             _configure_udp_socket(sock)
+#             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+#             sock.bind((self.bind_host, self.port))
+#             sock.settimeout(0.5)
+#         except OSError as exc:
+#             self._last_error = str(exc)
+#             try:
+#                 sock.close()  # type: ignore[name-defined]
+#             except Exception:
+#                 pass
+#             self._log(f"UDP relay bind failed {self.bind_host}:{self.port} -> {self.target_host}:{self.target_port}: {exc}")
+#             return {"ok": False, "error": str(exc), **self.status()}
+#         self._sock = sock
+#         self._thread = threading.Thread(
+#             target=self._recv_loop,
+#             name=f"SC2LanUdpRelay.{self.port}",
+#             daemon=True,
+#         )
+#         self._thread.start()
+#         self._log(f"UDP relay listening {self.bind_host}:{self.port} -> {self.target_host}:{self.target_port}")
+#         return {"ok": True, **self.status()}
+
+#     def stop(self) -> None:
+#         self._stop.set()
+#         sock = self._sock
+#         if sock is not None:
+#             try:
+#                 sock.close()
+#             except OSError:
+#                 pass
+#         with self._lock:
+#             peer_sockets = list(self._peers.values())
+#             self._peers = {}
+#         for peer_sock in peer_sockets:
+#             _safe_close_socket(peer_sock)
+#         thread = self._thread
+#         if thread is not None and thread.is_alive():
+#             thread.join(timeout=1.0)
+#         self._sock = None
+#         self._thread = None
+
+#     def is_running(self) -> bool:
+#         thread = self._thread
+#         return bool(thread is not None and thread.is_alive())
+
+#     def status(self) -> dict[str, Any]:
+#         with self._lock:
+#             peer_count = len(self._peers)
+#             packets_to_target = self._packets_to_target
+#             bytes_to_target = self._bytes_to_target
+#             packets_to_peer = self._packets_to_peer
+#             bytes_to_peer = self._bytes_to_peer
+#         return {
+#             "protocol": "udp",
+#             "running": self.is_running(),
+#             "bind_host": self.bind_host,
+#             "port": self.port,
+#             "target_host": self.target_host,
+#             "target_port": self.target_port,
+#             "peer_count": peer_count,
+#             "packets_to_target": packets_to_target,
+#             "bytes_to_target": bytes_to_target,
+#             "packets_to_peer": packets_to_peer,
+#             "bytes_to_peer": bytes_to_peer,
+#             "last_error": self._last_error,
+#         }
+
+#     def _recv_loop(self) -> None:
+#         sock = self._sock
+#         if sock is None:
+#             return
+#         while not self._stop.is_set():
+#             try:
+#                 payload, peer = sock.recvfrom(65535)
+#             except socket.timeout:
+#                 continue
+#             except OSError as exc:
+#                 if not self._stop.is_set():
+#                     self._last_error = str(exc)
+#                     self._log(f"UDP relay recv failed {self.bind_host}:{self.port}: {exc}")
+#                 break
+#             if not payload:
+#                 continue
+#             local_sock = self._peer_socket(peer)
+#             with self._lock:
+#                 self._packets_to_target += 1
+#                 self._bytes_to_target += len(payload)
+#             try:
+#                 local_sock.sendto(payload, (self.target_host, self.target_port))
+#             except OSError as exc:
+#                 self._last_error = str(exc)
+#                 self._log(f"UDP relay send-to-target failed {peer} -> {self.target_host}:{self.target_port}: {exc}")
+
+#     def _peer_socket(self, peer: tuple[str, int]) -> socket.socket:
+#         with self._lock:
+#             existing = self._peers.get(peer)
+#             if existing is not None:
+#                 return existing
+#             local_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+#             _configure_udp_socket(local_sock)
+#             #20260711_kpopmodder: Loopback->LAN relay must let Windows choose
+#             # the outbound LAN interface, while LAN->loopback relay must stay
+#             # pinned to 127.0.0.1 so SC2 sees local traffic.
+#             reply_bind_host = (
+#                 LOOPBACK_TARGET_HOST
+#                 if _is_loopback_target(self.target_host)
+#                 else "0.0.0.0"
+#             )
+#             local_sock.bind((reply_bind_host, 0))
+#             local_sock.settimeout(0.5)
+#             self._peers[peer] = local_sock
+#             threading.Thread(
+#                 target=self._peer_reply_loop,
+#                 args=(peer, local_sock),
+#                 name=f"SC2LanUdpRelay.{self.port}.peer",
+#                 daemon=True,
+#             ).start()
+#             self._log(f"UDP relay peer mapped {peer} -> {self.target_host}:{self.target_port}")
+#             return local_sock
+
+#     def _peer_reply_loop(self, peer: tuple[str, int], local_sock: socket.socket) -> None:
+#         external = self._sock
+#         while not self._stop.is_set() and external is not None:
+#             try:
+#                 payload, _ = local_sock.recvfrom(65535)
+#             except socket.timeout:
+#                 continue
+#             except OSError:
+#                 break
+#             with self._lock:
+#                 self._packets_to_peer += 1
+#                 self._bytes_to_peer += len(payload)
+#             try:
+#                 external.sendto(payload, peer)
+#             except OSError as exc:
+#                 self._last_error = str(exc)
+#                 self._log(f"UDP relay send-to-peer failed {self.target_host}:{self.target_port} -> {peer}: {exc}")
+#                 break
+#         with self._lock:
+#             current = self._peers.get(peer)
+#             if current is local_sock:
+#                 self._peers.pop(peer, None)
+#         _safe_close_socket(local_sock)
+
+
+# def _pipe_tcp(
+#     source: socket.socket,
+#     target: socket.socket,
+#     stop: threading.Event,
+#     chunk_callback: Callable[[int], None] | None = None,
+# ) -> None:
+#     try:
+#         source.settimeout(0.5)
+#     except OSError:
+#         return
+#     while not stop.is_set():
+#         try:
+#             chunk = source.recv(65536)
+#         except socket.timeout:
+#             continue
+#         except OSError:
+#             break
+#         if not chunk:
+#             break
+#         if callable(chunk_callback):
+#             chunk_callback(len(chunk))
+#         try:
+#             target.sendall(chunk)
+#         except OSError:
+#             break
+#     stop.set()
+#     try:
+#         target.shutdown(socket.SHUT_WR)
+#     except OSError:
+#         pass
+
+
+# def _configure_udp_socket(sock: socket.socket) -> None:
+#     #20260711_kpopmodder: Windows reports ICMP port-unreachable as
+#     # WSAECONNRESET on later UDP recv calls. SC2's LAN handshake can briefly
+#     # hit closed ports while clients transition, so the relay must keep
+#     # running instead of treating that as a fatal socket failure.
+#     ioctl = getattr(sock, "ioctl", None)
+#     if not callable(ioctl):
+#         return
+#     try:
+#         ioctl(SIO_UDP_CONNRESET, False)
+#     except (OSError, ValueError, AttributeError):
+#         pass
+
+
+# def _is_udp_connreset(exc: OSError) -> bool:
+#     values = [
+#         getattr(exc, "winerror", None),
+#         getattr(exc, "errno", None),
+#     ]
+#     return WINDOWS_UDP_CONNRESET_ERRNO in values
+
+
+# def _normalize_ports(value: Any) -> list[int]:
+#     if value is None or value == "":
+#         return []
+#     raw_items: list[Any]
+#     if isinstance(value, str):
+#         raw_items = [item.strip() for item in value.split(",") if item.strip()]
+#     elif isinstance(value, Iterable):
+#         raw_items = list(value)
+#     else:
+#         raw_items = [value]
+#     ports: list[int] = []
+#     for item in raw_items:
+#         port = _valid_port(item, 0)
+#         if port and port not in ports:
+#             ports.append(port)
+#     return ports
+
+
+# def _normalize_lan_player_role(value: Any) -> str:
+#     text = str(value or "").strip().lower().replace("_", "-")
+#     if text in {
+#         "2",
+#         "second",
+#         "second-player",
+#         "player2",
+#         "player-2",
+#         "p2",
+#         "bot",
+#         "host-bot",
+#     }:
+#         return "second"
+#     return "first"
+
+
+# def _peer_lan_player_role(role: Any) -> str:
+#     return "second" if _normalize_lan_player_role(role) == "first" else "first"
+
+
+# def _canonical_player_server_ports(start_port: Any, role: Any) -> list[int]:
+#     offset = 2 if _normalize_lan_player_role(role) == "first" else 4
+#     return _derive_join_port_pair(start_port, offset)
+
+
+# def _derive_join_port_pair(start_port: Any, offset: int) -> list[int]:
+#     base = _valid_port(start_port, DEFAULT_SC2_MULTIPLAYER_START_PORT)
+#     return [
+#         port
+#         for port in (base + int(offset), base + int(offset) + 1)
+#         if 0 < port < 65536
+#     ]
+
+
+# def _valid_port(value: Any, default: int) -> int:
+#     try:
+#         port = int(value)
+#     except (TypeError, ValueError):
+#         return int(default)
+#     if 0 < port < 65536:
+#         return port
+#     return int(default)
+
+
+# def _clean_host(value: Any) -> str:
+#     return str(value or "").strip().strip("[]")
+
+
+# def _is_loopback_or_unspecified(value: str) -> bool:
+#     text = _clean_host(value).lower()
+#     return (
+#         not text
+#         or text in {"0.0.0.0", "::", "localhost", "::1"}
+#         or text.startswith("127.")
+#     )
+
+
+# def _is_loopback_target(value: str) -> bool:
+#     text = _clean_host(value).lower()
+#     return text in {"localhost", "::1"} or text.startswith("127.")
+
+
+# def _local_ip_for_peer(peer_host: str) -> str:
+#     try:
+#         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+#             sock.connect((peer_host, 9))
+#             return str(sock.getsockname()[0] or "")
+#     except OSError:
+#         return ""
+
+
+# def _hostname_ip() -> str:
+#     try:
+#         return socket.gethostbyname(socket.gethostname())
+#     except OSError:
+#         return ""
+
+
+# def _safe_close_socket(sock: socket.socket) -> None:
+#     try:
+#         sock.close()
+#     except OSError:
+#         pass
+# '''
+
+
+# #20260712_kpopmodder: LAN relay source above is intentionally commented out in
+# # a raw string so importing this module cannot bind sockets or start threads.
+# LAN_LOBBY_ARCHIVED_ERROR = "lan_lobby_archived"
+# LAN_LOBBY_ARCHIVED_MESSAGE = "LAN Lobby port relay source is archived/disabled."
+# LAN_PORT_LAYOUT_ROLE_SERVER_PEER_CLIENT = "role-server-peer-client"
+# LAN_PORT_LAYOUT_SWAPPED = "swapped"
+# LAN_PORT_LAYOUT_HOST_SERVER_REMOTE_CLIENT = "host-server-remote-client"
+# LAN_PORT_LAYOUT_S2CLIENT_API_SHARED = "s2client-api-shared"
+
+
+# def derive_multiplayer_ports(start_port=5690, ports=None):
+#     if ports:
+#         try:
+#             return [int(port) for port in ports]
+#         except (TypeError, ValueError):
+#             pass
+#     return [int(start_port) + offset for offset in (1, 2, 3, 4)]
+
+
+# def derive_first_player_client_ports(start_port=5690, layout=LAN_PORT_LAYOUT_S2CLIENT_API_SHARED):
+#     return [int(start_port) + 1, int(start_port) + 3]
+
+
+# def derive_second_player_client_ports(start_port=5690, layout=LAN_PORT_LAYOUT_S2CLIENT_API_SHARED):
+#     return [int(start_port) + 2, int(start_port) + 4]
+
+
+# def derive_first_player_server_ports(start_port=5690, layout=LAN_PORT_LAYOUT_S2CLIENT_API_SHARED):
+#     return [int(start_port) + 2, int(start_port) + 4]
+
+
+# def derive_second_player_server_ports(start_port=5690, layout=LAN_PORT_LAYOUT_S2CLIENT_API_SHARED):
+#     return [int(start_port) + 1, int(start_port) + 3]
+
+
+# def normalize_lan_port_layout(value=LAN_PORT_LAYOUT_S2CLIENT_API_SHARED):
+#     text = str(value or "").strip().lower()
+#     if text in {"swap", "swapped"}:
+#         return LAN_PORT_LAYOUT_SWAPPED
+#     if text in {"host-server", "host-server-remote-client"}:
+#         return LAN_PORT_LAYOUT_HOST_SERVER_REMOTE_CLIENT
+#     if text in {"shared", "official", "s2client", "s2client-api-shared"}:
+#         return LAN_PORT_LAYOUT_S2CLIENT_API_SHARED
+#     return LAN_PORT_LAYOUT_ROLE_SERVER_PEER_CLIENT
+
+
+# def resolve_lan_bind_host(value="", **kwargs):
+#     return str(value or "").strip()
+
+
+# class SC2LanPortRelayManager:
+#     #20260712_kpopmodder: No-op compatibility stub for archived LAN relay code.
+#     def __init__(self, *args, **kwargs):
+#         self.last_result = self._archived_result("init")
+
+#     def start(self, *args, **kwargs):
+#         self.last_result = self._archived_result("start")
+#         return dict(self.last_result)
+
+#     def stop(self):
+#         self.last_result = self._archived_result("stop")
+#         return dict(self.last_result)
+
+#     def status(self):
+#         return dict(self.last_result)
+
+#     def _archived_result(self, action):
+#         return {
+#             "ok": False,
+#             "running": False,
+#             "action": str(action or "lan_relay"),
+#             "error": LAN_LOBBY_ARCHIVED_ERROR,
+#             "message": LAN_LOBBY_ARCHIVED_MESSAGE,
+#         }
+
+
+# class SC2UdpPortPairRelayManager(SC2LanPortRelayManager):
+#     pass

@@ -1,0 +1,78 @@
+# medical
+감염병
+전염병
+질병
+병원균
+바이러스
+세균
+면역학
+생물학
+생물학적
+유전자
+유전자 조작
+유전자 편집
+유전자 삽입
+DNA
+RNA
+백신
+항체
+항원
+돌연변이
+
+# security
+삽입
+SQL 삽입
+코드 삽입
+패킷 삽입
+DLL 삽입
+메모리 삽입
+인젝션
+SQL Injection
+Prompt Injection
+Payload
+Exploit
+
+# ai
+검열
+필터
+Safety Filter
+Moderation
+Prompt
+Prompt Engineering
+LLM
+Inference
+Jailbreak
+Alignment
+Red Team
+
+# history
+나치
+히틀러
+제3제국
+파시즘
+홀로코스트
+전범
+전쟁범죄
+
+# philosophy
+음모
+음모론
+정치적 음모
+역사적 음모
+권력 음모
+조작설
+가설
+비판
+
+# anatomy
+음경
+음순
+유방
+자궁
+정자
+난자
+호르몬
+생식기관
+
+#예외
+색 스

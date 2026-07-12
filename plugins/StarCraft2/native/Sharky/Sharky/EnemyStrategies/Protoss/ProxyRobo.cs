@@ -1,0 +1,26 @@
+﻿namespace Sharky.EnemyStrategies.Protoss
+{
+    public class ProxyRobo : EnemyStrategy
+    {
+        TargetingData TargetingData;
+        public ProxyRobo(DefaultSharkyBot defaultSharkyBot) : base(defaultSharkyBot)
+        {
+            TargetingData = defaultSharkyBot.TargetingData;
+        }
+
+        protected override bool Detect(int frame)
+        {
+            if (EnemyData.EnemyRace != SC2APIProtocol.Race.Protoss) { return false; }
+
+            if (frame < SharkyOptions.FramesPerSecond * 60 * 5)
+            {
+                if (ActiveUnitData.EnemyUnits.Values.Any(u => u.Unit.UnitType == (uint)UnitTypes.PROTOSS_ROBOTICSFACILITY && Vector2.DistanceSquared(new Vector2(TargetingData.EnemyMainBasePoint.X, TargetingData.EnemyMainBasePoint.Y), u.Position) > (75 * 75)))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+    }
+}
