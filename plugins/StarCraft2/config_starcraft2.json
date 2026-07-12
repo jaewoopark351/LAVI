@@ -11,10 +11,6 @@
     "preferred_map":  "PersephoneLE.SC2Map",
     "auto_launch_probots":  false,
     "kill_existing_processes_before_launch":  true,
-    "log_paths":  [
-                      "C:\\Vtuber_Souorce_Code\\StarCraft2\\SC2AIApp_2025_S1\\SC2AIApp_2025_S1\\Bots\\changeling\\data\\stdout.log",
-                      "C:\\Vtuber_Souorce_Code\\StarCraft2\\SC2AIApp_2025_S1\\SC2AIApp_2025_S1\\Bots\\changeling\\data\\stderr.log"
-                  ],
     "watch_stdout":  true,
     "speak_events":  true,
     "runtime_download":  {
@@ -25,8 +21,8 @@
                          },
     "local_match":  {
                         "enabled":  false,
-                        "executable_path":  "C:\\Vtuber_Souorce_Code\\LAV_v0.2\\plugins\\StarCraft2\\native\\Sc2LadderServer\\bin\\LavHumanVsBot.exe",
-                        "working_directory":  "C:\\Vtuber_Souorce_Code\\LAV_v0.2\\plugins\\StarCraft2\\runtime",
+                        "executable_path":  "C:\\Vtuber_Souorce_Code\\LAVI\\plugins\\StarCraft2\\native\\Sc2LadderServer\\bin\\LavHumanVsBot.exe",
+                        "working_directory":  "C:\\Vtuber_Souorce_Code\\LAVI\\plugins\\StarCraft2\\runtime",
                         "args":  [
                                      "--human-name",
                                      "IdleProbe",

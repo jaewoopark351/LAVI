@@ -1,4 +1,4 @@
-# LAV_v0.2 Object-Oriented Architecture
+# LAVI Object-Oriented Architecture
 
 This document summarizes the main project-owned runtime classes and plugin
 relationships based on the current codebase. Internal classes from external

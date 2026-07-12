@@ -16,7 +16,7 @@ The DLL exports both:
 Build:
 
 ```bat
-cd /d C:\Vtuber_Souorce_Code\LAV_v0.2
+cd /d C:\Vtuber_Souorce_Code\LAVI
 cargo build --manifest-path plugins\StarCraftRemastered\samase_readonly_plugin\Cargo.toml --target i686-pc-windows-msvc --release
 ```
 
@@ -29,10 +29,10 @@ plugins\StarCraftRemastered\samase_readonly_plugin\target\i686-pc-windows-msvc\r
 Runtime environment:
 
 ```bat
-set LAV_SAMASE_STATE_PATH=C:\Vtuber_Souorce_Code\LAV_v0.2\logs\starcraft_samase_readonly_state.json
+set LAV_SAMASE_STATE_PATH=C:\Vtuber_Souorce_Code\LAVI\logs\starcraft_samase_readonly_state.json
 set LAV_SAMASE_STATE_EVERY_N_FRAMES=8
 set LAV_SAMASE_HEARTBEAT_INTERVAL_MS=1000
-set SAMASE_MORE_DLLS=C:\Vtuber_Souorce_Code\LAV_v0.2\plugins\StarCraftRemastered\samase_readonly_plugin\target\i686-pc-windows-msvc\release\lav_samase_readonly_plugin.dll
+set SAMASE_MORE_DLLS=C:\Vtuber_Souorce_Code\LAVI\plugins\StarCraftRemastered\samase_readonly_plugin\target\i686-pc-windows-msvc\release\lav_samase_readonly_plugin.dll
 ```
 
 The plugin currently proves that Samase can load a LAV DLL and write live
@@ -61,7 +61,7 @@ After running the generated `control_more_dll` script, summarize the large state
 JSON with:
 
 ```bat
-cd /d C:\Vtuber_Souorce_Code\LAV_v0.2
+cd /d C:\Vtuber_Souorce_Code\LAVI
 venv\Scripts\python.exe -m plugins.StarCraftRemastered.tools.samase_plugin_loader_probe --offset-summary
 ```
 
@@ -164,7 +164,7 @@ is confirmed.
 To prepare mod-folder placement candidates for the real plugin API path:
 
 ```bat
-cd /d C:\Vtuber_Souorce_Code\LAV_v0.2
+cd /d C:\Vtuber_Souorce_Code\LAVI
 venv\Scripts\python.exe -m plugins.StarCraftRemastered.tools.samase_plugin_loader_probe --plugin-dll plugins\StarCraftRemastered\samase_readonly_plugin\target\i686-pc-windows-msvc\release\lav_samase_readonly_plugin.dll --samase-exe "C:\Program Files (x86)\StarCraft\x86\samase-0.8.31.exe" --starcraft-x86-dir "C:\Program Files (x86)\StarCraft\x86"
 ```
 

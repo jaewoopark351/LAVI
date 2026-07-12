@@ -522,7 +522,7 @@ class GPTSoVITS(TTSPluginInterface):#20260615_kpopmodder
 #     text_language = "ko"
 #     prompt_language = "ko"
 #     prompt_text = "진짜 이때만큼 흥분했던 기억이 없는 것 같아요. 이 방송 이후로 1년이 지났지만 여전히 최고의 기억입니다."
-# #    ref_audio_path = r"C:\Vtuber_Souorce_Code\LAV_v0.2\voices\ref.wav"#20260611_kpopmodder
+# #    ref_audio_path = r"C:\Vtuber_Souorce_Code\LAVI\voices\ref.wav"#20260611_kpopmodder
 #     base_dir = os.path.abspath(#20260612_kpopmodder
 #         os.path.join(os.path.dirname(__file__), "..", "..")
 #     )

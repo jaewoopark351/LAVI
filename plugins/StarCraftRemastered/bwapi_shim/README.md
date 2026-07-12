@@ -96,7 +96,7 @@ C:\Vtuber_Souorce_Code\SAIDA-saida-aiide2018
 Then build the optional source-compatibility target:
 
 ```bat
-cd /d C:\Vtuber_Souorce_Code\LAV_v0.2\plugins\StarCraftRemastered\bwapi_shim
+cd /d C:\Vtuber_Souorce_Code\LAVI\plugins\StarCraftRemastered\bwapi_shim
 cmake -S . -B build-saida -G "Visual Studio 17 2022" -A Win32 -DLAV_BUILD_SAIDA_MOCK=ON -DLAV_SAIDA_SOURCE_DIR=C:/Vtuber_Souorce_Code/SAIDA-saida-aiide2018
 cmake --build build-saida --config Debug --target saida_mock_runtime
 build-saida\Debug\saida_mock_runtime.exe

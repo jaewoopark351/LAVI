@@ -1,4 +1,4 @@
-# LAV_v0.2 (Local AI VTuber)
+# LAVI (Live AI Vtuber Interface)
 
 ---
 
@@ -120,7 +120,7 @@ classDiagram
 
 [Mermaid Object-Oriented Diagram Source](docs/object_oriented_diagram_EN.md)
 
-> LAV_v0.2 is a local AI VTuber project built on a plugin-based architecture that connects input sources, STT/observation, LLM, Safety Filter, TTS, and VTube Studio output.
+> LAVI (Live AI Vtuber Interface) is a Windows-based AI VTuber project built on a plugin-based architecture that connects input sources, STT/observation, LLM, Safety Filter, TTS, and VTube Studio output.
 
 ---
 
@@ -372,7 +372,7 @@ venv\Scripts\hf.exe download Qwen/Qwen2.5-VL-3B-Instruct --cache-dir plugins\Scr
 The default GPU placement config is here:
 
 ```text
-LAV_v0.2\config\gpu_device_config.json
+LAVI\config\gpu_device_config.json
 ```
 
 The default layout is:
@@ -395,7 +395,7 @@ GPT-SoVITS is launched automatically by LAV as a child process.
 To pin only GPT-SoVITS to a separate GPU, use the `cuda_visible_devices` value in this file:
 
 ```text
-LAV_v0.2\plugins\GPTSoVITS\config\gpt_sovits_config.json
+LAVI\plugins\GPTSoVITS\config\gpt_sovits_config.json
 ```
 
 Keep `gpt_sovits_config.json` local. Commit only `gpt_sovits_config.example.json`.
@@ -432,7 +432,7 @@ nvidia-smi
 Check the LAV / GPT-SoVITS Python processes:
 
 ```powershell
-powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*LAV_v0.2*main.py*' -or $_.CommandLine -like '*GPT-SoVITS*api_v2.py*' } | Select-Object ProcessId,ExecutablePath,CommandLine | Format-List"
+powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*LAVI*main.py*' -or $_.CommandLine -like '*GPT-SoVITS*api_v2.py*' } | Select-Object ProcessId,ExecutablePath,CommandLine | Format-List"
 ```
 
 On startup, check for logs like these:
@@ -677,7 +677,7 @@ Example `LAVEventExporter.ini`:
 
 ```ini
 wrapped_ai=Stardust.dll
-events_path=C:\Vtuber_Souorce_Code\LAV_v0.2\logs\starcraft116_game_events.jsonl
+events_path=C:\Vtuber_Souorce_Code\LAVI\logs\starcraft116_game_events.jsonl
 snapshot_interval_frames=144
 combat_cooldown_frames=96
 supply_block_cooldown_frames=240
@@ -731,7 +731,7 @@ This batch file restarts Monster after a game/disconnect and writes
 `monster_log.txt`.
 
 ```bat
-copy C:\Vtuber_Souorce_Code\LAV_v0.2\plugins\StarCraft116\run_monster_robust_log.bat C:\Vtuber_Souorce_Code\StarCraft_1.16\Monster\run_monster_robust_log.bat
+copy C:\Vtuber_Souorce_Code\LAVI\plugins\StarCraft116\run_monster_robust_log.bat C:\Vtuber_Souorce_Code\StarCraft_1.16\Monster\run_monster_robust_log.bat
 ```
 
 The copied `.bat` file must sit beside `Monster.exe`.
@@ -746,7 +746,7 @@ copy C:\Vtuber_Souorce_Code\StarCraft_1.16\StarCraft\bwapi-data\BWAPI.dll C:\Vtu
 Then overwrite it with the LAV proxy DLL:
 
 ```bat
-copy C:\Vtuber_Souorce_Code\LAV_v0.2\plugins\StarCraft116\BWAPI.dll C:\Vtuber_Souorce_Code\StarCraft_1.16\StarCraft\bwapi-data\BWAPI.dll
+copy C:\Vtuber_Souorce_Code\LAVI\plugins\StarCraft116\BWAPI.dll C:\Vtuber_Souorce_Code\StarCraft_1.16\StarCraft\bwapi-data\BWAPI.dll
 ```
 
 `plugins\StarCraft116\BWAPI.dll` is the LAV proxy DLL.
@@ -877,6 +877,73 @@ plugins\StarCraft116\bwapi_event_exporter\README.md
 
 ---
 
+## 12.3. StarCraft II / Ares-sc2 / ProBots setup notes
+
+<!-- #20260713_kpopmodder: Document the external StarCraft II resources and local path fields required by the StarCraft2 plugin. -->
+
+The StarCraft2 plugin can work with several different bot/runtime paths. These paths are local to each PC, so update the Gradio fields and `plugins\StarCraft2\config_starcraft2.json` before running a match.
+
+Useful Ares-sc2 resources:
+
+```text
+Ares-sc2 framework:
+https://github.com/AresSC2/ares-sc2/
+
+Ares-sc2 bot template:
+https://github.com/AresSC2/ares-sc2-bot-template
+
+Official Ares-sc2 documentation:
+https://aressc2.github.io/ares-sc2/index.html
+
+Ares random example bot:
+https://github.com/AresSC2/ares-random-example
+```
+
+`Ares-sc2` is for developing Python StarCraft II bots. New bot projects should usually start from `ares-sc2-bot-template`, then use the official docs and example bot for reference.
+
+For the existing ProBots/Changeling workflow, download the ProBots vs Human App:
+
+```text
+https://versusai.net/how-to-play-against-the-probots/
+```
+
+The downloaded app contains the `Bots` folder used by LAV's StarCraft2 runtime. After downloading or moving it, update these paths in the StarCraft2 tab and in `plugins\StarCraft2\config_starcraft2.json`:
+
+```text
+StarCraft II Path
+SC2PATH
+Map Name
+Engine
+External Exe Path
+MicroMachine Exe Path
+Ares-sc2 Script Path
+External Jar Path
+```
+
+Common path fields in `config_starcraft2.json` that must be filled for the local machine:
+
+```json
+{
+  "sc2aiapp_path": "C:\\path\\to\\SC2AIApp.exe",
+  "probots_app_path": "C:\\path\\to\\SC2AIApp.exe",
+  "starcraft2_exe_path": "C:\\Program Files (x86)\\StarCraft II\\Versions\\BaseXXXXX\\SC2_x64.exe",
+  "starcraft2_install_path": "C:\\Program Files (x86)\\StarCraft II",
+  "maps_path": "C:\\path\\to\\Maps",
+  "ladder_proxy": {
+    "executable_path": "C:\\path\\to\\LavHumanVsBot.exe",
+    "working_directory": "C:\\path\\to\\StarCraft2\\runtime",
+    "args": ["--bot", "changeling", "--map", "PersephoneLE.SC2Map"]
+  },
+  "ares_sc2": {
+    "script_path": "C:\\path\\to\\ares-sc2-bot-template\\run.py"
+  }
+}
+```
+
+If `plugins\StarCraft2\runtime\jre\bin\java.exe` exists, the runtime already has a bundled Java executable and a separate system Java install is usually not required.
+
+---
+
 ## 13. LLM provider default selection
 
 Keeping both `ChatGPT_OpenAI` and `Hybrid_OpenAI_LLM` enabled is supported for comparison.
@@ -936,7 +1003,7 @@ Without the server, GPT-SoVITS TTS will not work.
 You must also manually specify the GPT-SoVITS server folder path in the following config file:
 
 ```text
-LAV_v0.2\plugins\GPTSoVITS\config\gpt_sovits_config.json
+LAVI\plugins\GPTSoVITS\config\gpt_sovits_config.json
 ```
 
 <table>
@@ -952,7 +1019,7 @@ LAV_v0.2\plugins\GPTSoVITS\config\gpt_sovits_config.json
 
 This project can be run from either **Windows Command Prompt or PowerShell**.
 
-The path `C:\Vtuber_Souorce_Code\LAV_v0.2` below is an example.
+The path `C:\Vtuber_Souorce_Code\LAVI` below is an example.
 Replace it with the actual path to your project.
 
 CMD and PowerShell use different syntax for environment variables and virtual environment activation.
@@ -967,7 +1034,7 @@ CUDA environment variables are not required for the CPU build or a basic run.
 ### CMD
 
 ```bat
-cd /d C:\Vtuber_Souorce_Code\LAV_v0.2
+cd /d C:\Vtuber_Souorce_Code\LAVI
 
 call venv\Scripts\activate.bat
 
@@ -977,7 +1044,7 @@ python main.py
 ### PowerShell
 
 ```powershell
-Set-Location "C:\Vtuber_Souorce_Code\LAV_v0.2"
+Set-Location "C:\Vtuber_Souorce_Code\LAVI"
 
 .\venv\Scripts\Activate.ps1
 
@@ -1017,7 +1084,7 @@ pause
 After that, double-click `run_lav.cmd` or run:
 
 ```bat
-cd /d C:\Vtuber_Souorce_Code\LAV_v0.2
+cd /d C:\Vtuber_Souorce_Code\LAVI
 run_lav.cmd
 ```
 
@@ -1031,7 +1098,7 @@ If this file remains in the repository, treat it as an auxiliary script for case
 For normal execution, use the following commands:
 
 ```bat
-cd /d C:\Vtuber_Souorce_Code\LAV_v0.2
+cd /d C:\Vtuber_Souorce_Code\LAVI
 call venv\Scripts\activate.bat
 python main.py
 ```
@@ -1146,7 +1213,7 @@ Check:
 
 ## VTube Studio Integration
 
-To connect VTube Studio to LAV_v0.2, you must allow the API plugin when VTube Studio asks for permission.
+To connect VTube Studio to LAVI, you must allow the API plugin when VTube Studio asks for permission.
 
 <table>
   <tr>
@@ -1155,10 +1222,10 @@ To connect VTube Studio to LAV_v0.2, you must allow the API plugin when VTube St
   </tr>
 </table>
 
-If VTube Studio fails to connect with LAV_v0.2, delete the `token.txt` file below and click **Authenticate** again in the Web GUI.
+If VTube Studio fails to connect with LAVI, delete the `token.txt` file below and click **Authenticate** again in the Web GUI.
 
 ```bat
-LAV_v0.2\plugins\VtubeStudio\token.txt
+LAVI\plugins\VtubeStudio\token.txt
 ```
 
 ![image](images/README/VtubeStudio_api_plugin_token.png)

@@ -103,8 +103,8 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     #20260711_kpopmodder: Keep Local Match launcher settings separate from LAN Lobby remote-human launcher settings.
     "local_match": {
         "enabled": False,
-        "executable_path": "C:\\Vtuber_Souorce_Code\\LAV_v0.2\\plugins\\StarCraft2\\native\\Sc2LadderServer\\bin\\LavHumanVsBot.exe",
-        "working_directory": "C:\\Vtuber_Souorce_Code\\LAV_v0.2\\plugins\\StarCraft2\\runtime",
+        "executable_path": "C:\\Vtuber_Souorce_Code\\LAVI\\plugins\\StarCraft2\\native\\Sc2LadderServer\\bin\\LavHumanVsBot.exe",
+        "working_directory": "C:\\Vtuber_Souorce_Code\\LAVI\\plugins\\StarCraft2\\runtime",
         "args": [
             "--human-name",
             "IdleProbe",

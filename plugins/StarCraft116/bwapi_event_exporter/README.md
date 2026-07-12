@@ -14,7 +14,7 @@ Open a Visual Studio Developer Command Prompt that can build Win32 C++ projects,
 then run:
 
 ```bat
-cd /d C:\Vtuber_Souorce_Code\LAV_v0.2\plugins\StarCraft116\bwapi_event_exporter
+cd /d C:\Vtuber_Souorce_Code\LAVI\plugins\StarCraft116\bwapi_event_exporter
 msbuild LAVEventExporter.vcxproj /p:Configuration=Release /p:Platform=Win32 /p:BWAPIReleaseDir=C:\Vtuber_Souorce_Code\StarCraft_1.16\BWAPI\Release_Binary
 ```
 
@@ -41,7 +41,7 @@ Edit `LAVEventExporter.ini` if needed:
 
 ```ini
 wrapped_ai=Stardust.dll
-events_path=C:\Vtuber_Souorce_Code\LAV_v0.2\logs\starcraft116_game_events.jsonl
+events_path=C:\Vtuber_Souorce_Code\LAVI\logs\starcraft116_game_events.jsonl
 snapshot_interval_frames=144
 combat_cooldown_frames=96
 supply_block_cooldown_frames=240

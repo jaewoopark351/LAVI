@@ -16,7 +16,7 @@ msbuild plugins\StarCraft116\bwapi_observer_client\LAVBWAPIObserverClient.vcxpro
 Runtime example:
 
 ```bat
-plugins\StarCraft116\bwapi_observer_client\bin\Release\LAVBWAPIObserverClient.exe --events-path C:\Vtuber_Souorce_Code\LAV_v0.2\logs\starcraft116_game_events.jsonl
+plugins\StarCraft116\bwapi_observer_client\bin\Release\LAVBWAPIObserverClient.exe --events-path C:\Vtuber_Souorce_Code\LAVI\logs\starcraft116_game_events.jsonl
 ```
 
 Useful arguments:

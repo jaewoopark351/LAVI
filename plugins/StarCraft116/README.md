@@ -105,7 +105,7 @@ Use BWAPI 4.2.0 for the Monster profile.
    that contains `Monster.exe`:
 
    ```bat
-   copy C:\Vtuber_Souorce_Code\LAV_v0.2\plugins\StarCraft116\run_monster_robust_log.bat C:\Vtuber_Souorce_Code\StarCraft_1.16\Monster\run_monster_robust_log.bat
+   copy C:\Vtuber_Souorce_Code\LAVI\plugins\StarCraft116\run_monster_robust_log.bat C:\Vtuber_Souorce_Code\StarCraft_1.16\Monster\run_monster_robust_log.bat
    ```
 
    The copied `.bat` must sit beside `Monster.exe`. It writes
@@ -116,7 +116,7 @@ Use BWAPI 4.2.0 for the Monster profile.
 
    ```bat
    copy C:\Vtuber_Souorce_Code\StarCraft_1.16\StarCraft\bwapi-data\BWAPI.dll C:\Vtuber_Souorce_Code\StarCraft_1.16\StarCraft\bwapi-data\BWAPI_real.dll
-   copy C:\Vtuber_Souorce_Code\LAV_v0.2\plugins\StarCraft116\BWAPI.dll C:\Vtuber_Souorce_Code\StarCraft_1.16\StarCraft\bwapi-data\BWAPI.dll
+   copy C:\Vtuber_Souorce_Code\LAVI\plugins\StarCraft116\BWAPI.dll C:\Vtuber_Souorce_Code\StarCraft_1.16\StarCraft\bwapi-data\BWAPI.dll
    ```
 
 `plugins\StarCraft116\BWAPI.dll` is the LAV proxy DLL. It loads
@@ -138,7 +138,7 @@ playing while LAV receives automatic JSONL events.
 Build:
 
 ```bat
-cd /d C:\Vtuber_Souorce_Code\LAV_v0.2\plugins\StarCraft116\bwapi_event_exporter
+cd /d C:\Vtuber_Souorce_Code\LAVI\plugins\StarCraft116\bwapi_event_exporter
 msbuild LAVEventExporter.vcxproj /p:Configuration=Release /p:Platform=Win32 /p:BWAPIReleaseDir=C:\Vtuber_Souorce_Code\StarCraft_1.16\BWAPI\Release_Binary
 ```
 

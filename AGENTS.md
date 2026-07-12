@@ -15,7 +15,7 @@ These rules override all other instructions in this file.
 For this project, the active repository root is:
 
 ```bat
-C:\Vtuber_Souorce_Code\LAV_v0.2
+C:\Vtuber_Souorce_Code\LAVI
 ```
 
 Codex must treat this path as the default and primary write boundary.
@@ -34,7 +34,7 @@ If the current directory or Git root is not the intended repository root, Codex 
 By default, Codex may only modify files inside:
 
 ```bat
-C:\Vtuber_Souorce_Code\LAV_v0.2
+C:\Vtuber_Souorce_Code\LAVI
 ```
 
 Do not modify files outside this repository unless the user explicitly provides an exact target path and confirms the operation.
@@ -157,7 +157,7 @@ Do not perform broad cleanup automatically.
 
 ## 1. Project Overview
 
-This repository is a Windows-based local AI VTuber project.
+This repository is a Windows-based Live AI Vtuber Interface project.
 
 Main components:
 
@@ -207,7 +207,7 @@ Always follow `README.md` for the current installation and runtime instructions.
 Expected local project path:
 
 ```bat
-C:\Vtuber_Souorce_Code\LAV_v0.2
+C:\Vtuber_Souorce_Code\LAVI
 ```
 
 Primary entry point:
@@ -223,7 +223,7 @@ Do not assume Linux paths unless the user explicitly asks for Linux support.
 The default writable project boundary is the active repository root:
 
 ```bat
-C:\Vtuber_Souorce_Code\LAV_v0.2
+C:\Vtuber_Souorce_Code\LAVI
 ```
 
 Codex may edit files inside this repository only.
@@ -763,7 +763,7 @@ Example prompt context:
 
 ```text
 [Relevant Memory]
-- The user uses Whisper large-v3 in LAV_v0.2.
+- The user uses Whisper large-v3 in LAVI.
 - AudioDeviceManager and VoiceInput had an input_device_index synchronization issue.
 - input_device_index_callback returning None should fallback to the system default input device.
 ```
