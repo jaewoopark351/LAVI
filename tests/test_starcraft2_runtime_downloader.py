@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest import mock
 
 from plugins.StarCraft2.starcraft2 import StarCraft2
-from plugins.StarCraft2.starcraft2_runtime_downloader import (
+from plugins.StarCraft2.starcraft2_core.starcraft2_runtime_downloader import (
     DEFAULT_RUNTIME_REPO_ID,
     StarCraft2RuntimeDownloader,
 )

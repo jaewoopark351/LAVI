@@ -14,7 +14,7 @@
 # from typing import Any, Dict, List, Optional, Tuple
 
 # from core.logger import log_print
-# from plugins.StarCraft2.sc2_lan_port_relay import normalize_lan_port_layout
+# from plugins.StarCraft2.starcraft2_core.sc2_lan_port_relay import normalize_lan_port_layout
 
 
 # LAN_DISCOVERY_PROTOCOL = "lav.sc2.lan_room"

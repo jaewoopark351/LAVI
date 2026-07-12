@@ -321,7 +321,7 @@ class AppComposer:
 
         if self.starcraft2_changeling_observer_extension is None:
             try:
-                from plugins.StarCraft2.sc2_extension import StarCraft2Extension
+                from plugins.StarCraft2.starcraft2_core.sc2_extension import StarCraft2Extension
 
                 self.starcraft2_changeling_observer_extension = StarCraft2Extension()
                 self.game_extension_registry.register(

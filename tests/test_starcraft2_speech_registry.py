@@ -2,13 +2,13 @@
 # structured telemetry or log-parser TTS path without a generic fallback.
 import unittest
 
-from plugins.StarCraft2.sc2_event_parser import SC2EventParser
-from plugins.StarCraft2.sc2_speech_terms import (
+from plugins.StarCraft2.starcraft2_core.sc2_event_parser import SC2EventParser
+from plugins.StarCraft2.starcraft2_core.sc2_speech_terms import (
     SC2_STRATEGY_SPEAK_NAMES,
     SC2_UNIT_SPEAK_NAMES,
     SC2_UPGRADE_SPEAK_NAMES,
 )
-from plugins.StarCraft2.sc2_telemetry_registry import (
+from plugins.StarCraft2.starcraft2_core.sc2_telemetry_registry import (
     SC2_BUILDING_CATEGORY,
     SC2_BUILDING_UNIT_TYPE_IDS,
     SC2_UNIT_CATEGORY,

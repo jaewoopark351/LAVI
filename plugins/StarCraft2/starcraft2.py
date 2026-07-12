@@ -17,9 +17,9 @@ from plugins.StarCraft2.starcraft2_core.starcraft2_engine_registry import (
 from plugins.StarCraft2.starcraft2_core.starcraft2_state import (
     StarCraft2RuntimeState,
 )
-from plugins.StarCraft2.sc2_ladder_proxy_launcher import SC2LadderProxyLauncher
+from plugins.StarCraft2.starcraft2_core.sc2_ladder_proxy_launcher import SC2LadderProxyLauncher
 from plugins.StarCraft2.bot_launch_profiles import get_bot_launch_profile
-from plugins.StarCraft2.starcraft2_runtime_downloader import (
+from plugins.StarCraft2.starcraft2_core.starcraft2_runtime_downloader import (
     DEFAULT_RUNTIME_REPO_ID,
     DEFAULT_RUNTIME_REPO_TYPE,
     DEFAULT_RUNTIME_REVISION,

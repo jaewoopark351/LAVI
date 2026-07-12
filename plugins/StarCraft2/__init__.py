@@ -7,6 +7,6 @@ def __getattr__(name):
     #20260710_kpopmodder: Keep package import lazy so the plugin loader can
     # load sibling modules without triggering a circular import.
     if name == "StarCraft2Extension":
-        from .sc2_extension import StarCraft2Extension
+        from .starcraft2_core.sc2_extension import StarCraft2Extension
         return StarCraft2Extension
     raise AttributeError(name)

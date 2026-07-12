@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
-from ..sc2_telemetry_registry import (
+from .sc2_telemetry_registry import (
     SC2_BUILDING_CATEGORY,
     SC2_UNIT_CATEGORY,
     canonical_unit_token,

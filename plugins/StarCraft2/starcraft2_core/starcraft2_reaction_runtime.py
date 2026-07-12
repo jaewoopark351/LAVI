@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any, Dict
 from core.logger import log_print
-from ..sc2_telemetry_registry import (
+from .sc2_telemetry_registry import (
     SC2_BUILDING_UNIT_TYPE_IDS,
     unit_speak_name,
     upgrade_speak_name,

@@ -11,12 +11,12 @@ from app_core.extensions.starcraft2_game_extension import (
     STARCRAFT2_STATUS_EVENT_CALLBACK_RESOURCE,
     StarCraft2GameExtension,
 )
-from plugins.StarCraft2.probots_launcher import ProBotsLauncher
-from plugins.StarCraft2.probots_log_watcher import ProBotsLogWatcher, WatchedLogState
-from plugins.StarCraft2.sc2_event_parser import SC2EventParser
-from plugins.StarCraft2.sc2_extension import StarCraft2Extension
-from plugins.StarCraft2.sc2_ladder_proxy_launcher import SC2LadderProxyLauncher
-from plugins.StarCraft2.sc2_tts_bridge import SC2TTSBridge
+from plugins.StarCraft2.starcraft2_core.probots_launcher import ProBotsLauncher
+from plugins.StarCraft2.starcraft2_core.probots_log_watcher import ProBotsLogWatcher, WatchedLogState
+from plugins.StarCraft2.starcraft2_core.sc2_event_parser import SC2EventParser
+from plugins.StarCraft2.starcraft2_core.sc2_extension import StarCraft2Extension
+from plugins.StarCraft2.starcraft2_core.sc2_ladder_proxy_launcher import SC2LadderProxyLauncher
+from plugins.StarCraft2.starcraft2_core.sc2_tts_bridge import SC2TTSBridge
 from plugins.StarCraft2.starcraft2 import StarCraft2
 from plugins.StarCraft2.bot_launch_profiles import get_bot_launch_profile
 
@@ -434,7 +434,7 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
     def test_launcher_reports_missing_path_without_spawning_process(self):
         launcher = ProBotsLauncher()
 
-        with mock.patch("plugins.StarCraft2.probots_launcher.subprocess.Popen") as popen:
+        with mock.patch("plugins.StarCraft2.starcraft2_core.probots_launcher.subprocess.Popen") as popen:
             result = launcher.start(app_path="C:\\missing\\SC2AIApp.exe")
 
         self.assertFalse(result["ok"])
@@ -463,11 +463,11 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
         process.stdout = None
         process.stderr = None
 
-        with mock.patch("plugins.StarCraft2.probots_launcher.os.path.isfile", return_value=True):
-            with mock.patch("plugins.StarCraft2.probots_launcher.os.path.isdir", return_value=True):
-                with mock.patch("plugins.StarCraft2.probots_launcher.subprocess.run") as run:
+        with mock.patch("plugins.StarCraft2.starcraft2_core.probots_launcher.os.path.isfile", return_value=True):
+            with mock.patch("plugins.StarCraft2.starcraft2_core.probots_launcher.os.path.isdir", return_value=True):
+                with mock.patch("plugins.StarCraft2.starcraft2_core.probots_launcher.subprocess.run") as run:
                     with mock.patch(
-                        "plugins.StarCraft2.probots_launcher.subprocess.Popen",
+                        "plugins.StarCraft2.starcraft2_core.probots_launcher.subprocess.Popen",
                         return_value=process,
                     ) as popen:
                         result = launcher.start_sc2aiapp(config, capture_output=False)
@@ -493,11 +493,11 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
         process.stdout = None
         process.stderr = None
 
-        with mock.patch("plugins.StarCraft2.probots_launcher.os.path.isfile", return_value=True):
-            with mock.patch("plugins.StarCraft2.probots_launcher.os.path.isdir", return_value=True):
-                with mock.patch("plugins.StarCraft2.probots_launcher.subprocess.run") as run:
+        with mock.patch("plugins.StarCraft2.starcraft2_core.probots_launcher.os.path.isfile", return_value=True):
+            with mock.patch("plugins.StarCraft2.starcraft2_core.probots_launcher.os.path.isdir", return_value=True):
+                with mock.patch("plugins.StarCraft2.starcraft2_core.probots_launcher.subprocess.run") as run:
                     with mock.patch(
-                        "plugins.StarCraft2.probots_launcher.subprocess.Popen",
+                        "plugins.StarCraft2.starcraft2_core.probots_launcher.subprocess.Popen",
                         return_value=process,
                     ):
                         result = launcher.start_sc2aiapp(config, capture_output=False)
@@ -508,7 +508,7 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
     def test_ladder_proxy_launcher_reports_missing_executable(self):
         launcher = SC2LadderProxyLauncher()
 
-        with mock.patch("plugins.StarCraft2.sc2_ladder_proxy_launcher.subprocess.Popen") as popen:
+        with mock.patch("plugins.StarCraft2.starcraft2_core.sc2_ladder_proxy_launcher.subprocess.Popen") as popen:
             result = launcher.start({"executable_path": ""})
 
         self.assertFalse(result["ok"])
@@ -531,10 +531,10 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
             "starcraft2_base_path": "C:\\SC2\\Versions\\Base97425",
         }
 
-        with mock.patch("plugins.StarCraft2.sc2_ladder_proxy_launcher.os.path.isfile", return_value=True):
-            with mock.patch("plugins.StarCraft2.sc2_ladder_proxy_launcher.os.path.isdir", return_value=True):
+        with mock.patch("plugins.StarCraft2.starcraft2_core.sc2_ladder_proxy_launcher.os.path.isfile", return_value=True):
+            with mock.patch("plugins.StarCraft2.starcraft2_core.sc2_ladder_proxy_launcher.os.path.isdir", return_value=True):
                 with mock.patch(
-                    "plugins.StarCraft2.sc2_ladder_proxy_launcher.subprocess.Popen",
+                    "plugins.StarCraft2.starcraft2_core.sc2_ladder_proxy_launcher.subprocess.Popen",
                     return_value=process,
                 ) as popen:
                     result = launcher.start(config, capture_output=False)
@@ -598,11 +598,11 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
             "restart_unhealthy_after_sec": 20.0,
         }
 
-        with mock.patch("plugins.StarCraft2.sc2_ladder_proxy_launcher.time.time", return_value=130.0):
-            with mock.patch("plugins.StarCraft2.sc2_ladder_proxy_launcher.os.path.isfile", return_value=True):
-                with mock.patch("plugins.StarCraft2.sc2_ladder_proxy_launcher.os.path.isdir", return_value=True):
+        with mock.patch("plugins.StarCraft2.starcraft2_core.sc2_ladder_proxy_launcher.time.time", return_value=130.0):
+            with mock.patch("plugins.StarCraft2.starcraft2_core.sc2_ladder_proxy_launcher.os.path.isfile", return_value=True):
+                with mock.patch("plugins.StarCraft2.starcraft2_core.sc2_ladder_proxy_launcher.os.path.isdir", return_value=True):
                     with mock.patch(
-                        "plugins.StarCraft2.sc2_ladder_proxy_launcher.subprocess.Popen",
+                        "plugins.StarCraft2.starcraft2_core.sc2_ladder_proxy_launcher.subprocess.Popen",
                         return_value=replacement_process,
                     ) as popen:
                         result = launcher.start(config, capture_output=False)
@@ -616,7 +616,7 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
         connection = mock.MagicMock()
 
         with mock.patch(
-            "plugins.StarCraft2.sc2_ladder_proxy_launcher.socket.create_connection",
+            "plugins.StarCraft2.starcraft2_core.sc2_ladder_proxy_launcher.socket.create_connection",
             return_value=connection,
         ) as create_connection:
             result = launcher.check_ports(
@@ -1033,9 +1033,9 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
         state = WatchedLogState(path=path, offset=0, exists=True)
         stream = _FakeBinaryFile(b"build barracks\n")
 
-        with mock.patch("plugins.StarCraft2.probots_log_watcher.os.path.isfile", return_value=True):
-            with mock.patch("plugins.StarCraft2.probots_log_watcher.os.path.getsize", return_value=15):
-                with mock.patch("plugins.StarCraft2.probots_log_watcher.open", return_value=stream):
+        with mock.patch("plugins.StarCraft2.starcraft2_core.probots_log_watcher.os.path.isfile", return_value=True):
+            with mock.patch("plugins.StarCraft2.starcraft2_core.probots_log_watcher.os.path.getsize", return_value=15):
+                with mock.patch("plugins.StarCraft2.starcraft2_core.probots_log_watcher.open", return_value=stream):
                     watcher._poll_state(state)
 
         self.assertEqual([(path, "build barracks")], lines)
@@ -1059,7 +1059,7 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
 
         extension.initialize(GameExtensionContext(tts=None))
         extension.tts_bridge.set_speak_callback(spoken.append)
-        with mock.patch("plugins.StarCraft2.sc2_extension.log_print") as log_print:
+        with mock.patch("plugins.StarCraft2.starcraft2_core.sc2_extension.log_print") as log_print:
             with mock.patch.object(extension, "_load_config", return_value=config):
                 with mock.patch.object(extension.log_watcher, "start", return_value={"ok": True}) as watcher_start:
                     with mock.patch.object(extension.launcher, "start") as launcher_start:
