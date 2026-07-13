@@ -201,9 +201,9 @@ class _LocalMatchLaunchDiagnostics:
             self.stages.setdefault(marker, time.time())
         self.last_lines.append(text)
 
-    def finalize(self, exit_code: Optional[int] = None) -> Dict[str, Any]:
+    def finalize(self, exit_code: Any = None) -> Dict[str, Any]:
         elapsed = self._elapsed()
-        exit_code_value = None if exit_code is None else int(exit_code)
+        exit_code_value = self._coerce_exit_code(exit_code)
         return {
             "started_at": self.started_at,
             "elapsed_sec": round(elapsed, 3),
@@ -250,6 +250,18 @@ class _LocalMatchLaunchDiagnostics:
                 else "match_runtime_error"
             )
         return "process_exit_failure"
+
+    def _coerce_exit_code(self, value: Any) -> Optional[int]:
+        if value is None:
+            return None
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            fallback = getattr(value, "returncode", None)
+            try:
+                return None if fallback is None else int(fallback)
+            except (TypeError, ValueError):
+                return None
 
     def _map_marker(self, line_lower: str) -> Optional[str]:
         markers = {

@@ -368,7 +368,7 @@ class SC2LadderProxyLauncher:
             "[SC2LadderProxyLauncher] exited "
             f"pid={pid} returncode={returncode}"
         )
-        diagnostics = self._diagnostics.finalize(returncode=returncode)
+        diagnostics = self._diagnostics.finalize(returncode)
         if isinstance(diagnostics, dict):
             self.last_error = str(diagnostics.get("launch_result") or self.last_error)
         if callable(exit_callback):
