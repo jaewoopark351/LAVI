@@ -95,6 +95,32 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
 
         self.assertEqual("engine_error", callback.call_args.args[0]["event_type"])
 
+    def test_extension_ladder_proxy_line_keeps_log_only(self):
+        status_callback = mock.Mock()
+        tts = mock.Mock()
+        context = GameExtensionContext(tts=tts)
+        context.set_shared(
+            STARCRAFT2_STATUS_EVENT_CALLBACK_RESOURCE,
+            status_callback,
+        )
+
+        extension = StarCraft2Extension(
+            plugin_root="C:\\fake\\StarCraft2",
+            config_path="missing.json",
+        )
+        extension.initialize(context)
+        extension.tts_bridge.speak = mock.Mock(return_value={"ok": True})
+
+        extension._on_ladder_proxy_line("stdout", "[LavHumanVsBot] Building unit: PROBE")
+        extension._on_ladder_proxy_line(
+            "stderr",
+            "[LavHumanVsBot] Finished with result: Player1Win",
+        )
+
+        status_callback.assert_not_called()
+        extension.tts_bridge.speak.assert_not_called()
+        tts.cancel_pending.assert_not_called()
+
     def test_parser_converts_known_events_and_dedupes_repeated_lines(self):
         parser = SC2EventParser(bot_name="Changeling")
 
