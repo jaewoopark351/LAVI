@@ -13,9 +13,13 @@ from plugins.StarCraft2.starcraft2_core.starcraft2_config import StarCraft2Confi
 from plugins.StarCraft2.starcraft2_core.starcraft2_engine_registry import (
     StarCraft2EngineRegistry,
 )
+from plugins.StarCraft2.starcraft2_core.starcraft2_event_bus import _StarCraft2EventBus
 from plugins.StarCraft2.starcraft2_core.starcraft2_event_service import (
     _StarCraft2EngineEventService,
     _StarCraft2LadderProxyEventService,
+)
+from plugins.StarCraft2.starcraft2_core.starcraft2_facade_service import (
+    _StarCraft2FacadeService,
 )
 from plugins.StarCraft2.starcraft2_core.starcraft2_state import (
     StarCraft2RuntimeState,
@@ -91,11 +95,12 @@ class StarCraft2:
             enemy_race=str(self.config_manager.get("enemy_race", "Zerg")),
             enemy_difficulty=str(self.config_manager.get("enemy_difficulty", "Easy")),
         )
-        self.current_engine = None
         self.status_event_callback = None
         self.tts = None
+        self.current_engine = None
         self.last_start_result: Dict[str, Any] = {}
         self.last_stop_result: Dict[str, Any] = {}
+        self._shutdown = False
         # self.lan_discovery = _ArchivedLanDiscoveryState()
         self.ladder_proxy = SC2LadderProxyLauncher()
         self.runtime_downloader = StarCraft2RuntimeDownloader()
@@ -108,18 +113,32 @@ class StarCraft2:
             self.runtime_downloader,
             self._arg_utils,
         )
-        self._engine_event_service = _StarCraft2EngineEventService(self.state)
+        self._event_bus = _StarCraft2EventBus()
+        self._engine_event_service = _StarCraft2EngineEventService(
+            self.state,
+            event_bus=self._event_bus,
+        )
+        self._facade_service = _StarCraft2FacadeService(
+            self.config_manager,
+            self.engine_registry,
+            self.state,
+            self.ladder_proxy,
+            self._match_config_service,
+            self._engine_event_service,
+            event_bus=self._event_bus,
+        )
         self._ladder_proxy_event_service = _StarCraft2LadderProxyEventService(
             self._engine_event_service,
             self.observation_tracker,
+            event_bus=self._event_bus,
         )
         self._local_match_service = _StarCraft2LocalMatchService(
-            self,
             self._arg_utils,
             self._match_config_service,
             self._local_match_command_template,
+            self.ladder_proxy,
+            line_callback=self._on_ladder_proxy_line,
         )
-        self._shutdown = False
 
     def create_ui(self):
         config = self.config_manager.snapshot()
@@ -154,78 +173,35 @@ class StarCraft2:
             local_match_section.bind()
 
     def start(self, config_overrides: Optional[Dict[str, Any]] = None, launch_source="manual"):
-        runtime_config = self.config_manager.build_runtime_config(config_overrides or {})
-        if not bool(runtime_config.get("enabled", False)):
-            result = self._facade_result(False, "enabled_false")
-            self.last_start_result = result
-            return result
-        if launch_source == "startup" and not bool(runtime_config.get("auto_launch", False)):
-            result = self._facade_result(True, None, {"skipped": "auto_launch_false"})
-            self.last_start_result = result
-            return result
-
-        engine_name = str(runtime_config.get("engine") or "internal_lav_bot")
-        if self.current_engine is None or self.current_engine.engine_name != engine_name:
-            self.current_engine = self.engine_registry.create(engine_name)
-        result = self.current_engine.start(
-            runtime_config,
-            event_callback=self._handle_engine_event,
-        )
-        self.last_start_result = result
-        self._sync_state_from_engine()
+        result = self._facade_service.start(config_overrides, launch_source)
+        self.current_engine = self._facade_service.current_engine
+        self.last_start_result = self._facade_service.last_start_result
         return result
 
     def stop(self):
-        if self.current_engine is None:
-            self.state.mark_stopped("not_running")
-            result = self._facade_result(True, None, {"stopped": "not_running"})
-            self.last_stop_result = result
-            return result
-        result = self.current_engine.stop()
-        self.last_stop_result = result
-        self._sync_state_from_engine()
+        result = self._facade_service.stop()
+        self.current_engine = self._facade_service.current_engine
+        self.last_stop_result = self._facade_service.last_stop_result
         return result
 
     def shutdown(self):
-        if self._shutdown:
-            return
-        self._shutdown = True
-        self.ladder_proxy.stop()
-        try:
-            self.stop()
-        except Exception as e:
-            log_print(f"[StarCraft2] shutdown failed: {e}")
+        self._facade_service.shutdown()
 
     def get_status(self):
-        self._sync_state_from_engine()
-        return {
-            "enabled": self.config_manager.get_bool("enabled", False),
-            "engine": str(self.config_manager.get("engine", "internal_lav_bot")),
-            "config": self.config_manager.config_message(),
-            "state": self.state.to_dict(),
-            "engine_status": (
-                self.current_engine.get_status()
-                if self.current_engine is not None
-                else {}
-            ),
-            "last_start_result": dict(self.last_start_result or {}),
-            "last_stop_result": dict(self.last_stop_result or {}),
-            "ladder_proxy": self.ladder_proxy.get_status(
-                self._match_config_service.ladder_proxy_config()
-            ),
-        }
+        return self._facade_service.get_status()
 
     def set_status_event_callback(self, callback):
         self.status_event_callback = callback
-        self._engine_event_service.set_status_event_callback(callback)
+        self._facade_service.set_status_event_callback(callback)
 
     def set_tts(self, tts):
         #20260710_kpopmodder: Keep a direct TTS fallback for local-match
         # lifecycle events when the reaction callback is unavailable.
         self.tts = tts
+        self._facade_service.set_tts(tts)
 
     def is_running(self) -> bool:
-        return bool(self.current_engine and self.current_engine.is_running())
+        return self._facade_service.is_running()
 
     def on_start_click(
         self,
@@ -368,7 +344,7 @@ class StarCraft2:
 #         return self._lan_lobby_archived_ui("check_proxy_ports")
 
     def _handle_engine_event(self, event):
-        self._engine_event_service.update_state(event)
+        self._facade_service.handle_engine_event(event)
 
 #     def _on_lan_ladder_proxy_exit(self, event: Dict[str, Any]) -> None:
 #         #20260712_kpopmodder: LAN Lobby exit handling is archived.
@@ -403,29 +379,10 @@ class StarCraft2:
 #         return self._lan_lobby_archived_result("remote_native_joiner_start")
 
     def _sync_state_from_engine(self):
-        if self.current_engine is None:
-            return
-        try:
-            status = self.current_engine.get_status()
-        except Exception as e:
-            self.state.mark_error(e)
-            return
-        if isinstance(status, dict):
-            self.state.running = bool(status.get("running", self.current_engine.is_running()))
-            self.state.last_error = status.get("last_error") or self.state.last_error
-            self.state.last_event = status.get("last_event") or self.state.last_event
-            self.state.process_pid = status.get("process_pid")
-            self.state.stdout_tail = list(status.get("stdout_tail") or [])[-20:]
-            self.state.stderr_tail = list(status.get("stderr_tail") or [])[-20:]
+        self._facade_service.sync_state_from_engine()
 
     def _facade_result(self, ok: bool, error=None, status=None):
-        return {
-            "ok": bool(ok),
-            "engine": str(self.config_manager.get("engine", "internal_lav_bot")),
-            "running": self.is_running(),
-            "status": status or {},
-            "error": None if error is None else str(error),
-        }
+        return self._facade_service._facade_result(ok, error, status)
 
     def _ui_values(self, result=None):
         status = self.get_status()
@@ -443,12 +400,7 @@ class StarCraft2:
         )
 
     def _status_json(self, status=None):
-        return json.dumps(
-            status or self.get_status(),
-            ensure_ascii=False,
-            indent=2,
-            default=str,
-        )
+        return self._facade_service.status_json(status)
 
 #     def _configure_lan_discovery(self, discovery_port):
 #         #20260712_kpopmodder: LAN Lobby discovery source is archived.

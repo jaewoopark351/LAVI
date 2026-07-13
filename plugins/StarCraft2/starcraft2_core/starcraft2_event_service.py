@@ -5,19 +5,26 @@ from __future__ import annotations
 import json
 
 from core.logger import log_print
+from .starcraft2_event_bus import _StarCraft2EventBus
 
 
 class _StarCraft2EngineEventService:
-    def __init__(self, state, status_event_callback=None):
+    def __init__(self, state, status_event_callback=None, event_bus: _StarCraft2EventBus | None = None):
         self.state = state
         self.status_event_callback = status_event_callback
+        self.event_bus = event_bus or _StarCraft2EventBus()
 
     def set_status_event_callback(self, callback):
         self.status_event_callback = callback
+        if self.event_bus is not None:
+            self.event_bus.set_status_event_callback(callback)
 
     def update_state(self, event):
         event = dict(event or {})
         self.state.update_event(event)
+        if self.event_bus is not None:
+            self.event_bus.publish(event)
+            return
         if callable(self.status_event_callback):
             try:
                 self.status_event_callback(event)
@@ -26,9 +33,15 @@ class _StarCraft2EngineEventService:
 
 
 class _StarCraft2LadderProxyEventService:
-    def __init__(self, engine_event_service: _StarCraft2EngineEventService, observation_tracker):
+    def __init__(
+        self,
+        engine_event_service: _StarCraft2EngineEventService,
+        observation_tracker,
+        event_bus: _StarCraft2EventBus | None = None,
+    ):
         self.engine_event_service = engine_event_service
         self.observation_tracker = observation_tracker
+        self.event_bus = event_bus
 
     def on_ladder_proxy_line(
         self,
@@ -80,20 +93,27 @@ class _StarCraft2LadderProxyEventService:
                     event_type = "game_won" if "win" in lower else "game_lost"
             elif self.is_ladder_proxy_error_line(lower):
                 event_type = "engine_error"
-            if event_type and callable(status_event_callback):
+            if event_type:
+                event = {
+                    "event_type": event_type,
+                    "details": {"result": text, "source": stream_name},
+                }
                 if event_type == "game_started":
                     self.observation_tracker.reset()
-                try:
-                    status_event_callback({
-                        "event_type": event_type,
-                        "details": {"result": text, "source": stream_name},
-                    })
-                except Exception as e:
-                    log_print(f"[StarCraft2] ladder proxy TTS callback failed: {e}")
-            elif event_type and tts is not None:
-                receive_input = getattr(tts, "receive_input", None)
-                if callable(receive_input):
-                    receive_input(f"StarCraft2 {event_type}")
+                if self.event_bus is not None:
+                    consumed = self.event_bus.publish(event)
+                    if consumed:
+                        return
+                if callable(status_event_callback):
+                    try:
+                        status_event_callback(event)
+                        return
+                    except Exception as e:
+                        log_print(f"[StarCraft2] ladder proxy TTS callback failed: {e}")
+                if tts is not None:
+                    receive_input = getattr(tts, "receive_input", None)
+                    if callable(receive_input):
+                        receive_input(f"StarCraft2 {event_type}")
 
     def is_ladder_proxy_error_line(self, lower_line: str) -> bool:
         lower = str(lower_line or "").lower()
