@@ -236,12 +236,12 @@ class _StarCraft2FacadeService:
                 args=args,
                 proxy_ports=proxy_ports,
                 ai_race=ai_race,
-            ).to_dict()
+            )
         )
 
     def on_local_match_stop_click(self):
         return self.local_match_status_json(
-            result=self.stop_local_match().to_dict()
+            result=self.stop_local_match()
         )
 
     def on_local_match_status_click(
@@ -259,7 +259,7 @@ class _StarCraft2FacadeService:
         )
         return self.local_match_status_json(
             ladder_proxy_config=None,
-            result=status.to_dict(),
+            result=status,
         )
 
     def local_match_status_json(self, ladder_proxy_config=None, result=None):

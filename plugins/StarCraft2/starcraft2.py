@@ -198,6 +198,20 @@ class StarCraft2:
     def set_status_event_callback(self, callback):
         self._facade_service.set_status_event_callback(callback)
 
+    @property
+    def status_event_callback(self):
+        return getattr(self._facade_service, "status_event_callback", None)
+
+    @status_event_callback.setter
+    def status_event_callback(self, callback):
+        self._facade_service.set_status_event_callback(callback)
+
+    def subscribe_events(self, callback):
+        return self._facade_service.subscribe_status_events(callback)
+
+    def subscribe_status_events(self, callback):
+        return self._facade_service.subscribe_status_events(callback)
+
     def set_tts(self, tts):
         self._facade_service.set_tts(tts)
 
@@ -292,18 +306,16 @@ class StarCraft2:
         proxy_ports,
         ai_race=None,
     ):
-        status = self._facade_service.start_local_match(
+        return self._facade_service.on_local_human_vs_changeling_click(
             executable_path,
             working_directory,
             args,
             proxy_ports,
             ai_race=ai_race,
         )
-        return self._local_match_status_json(result=status)
 
     def on_local_match_stop_click(self):
-        status = self._facade_service.stop_local_match()
-        return self._local_match_status_json(result=status)
+        return self._facade_service.on_local_match_stop_click()
 
     def on_local_match_status_click(
         self,
@@ -312,13 +324,12 @@ class StarCraft2:
         args,
         proxy_ports,
     ):
-        status = self._facade_service.get_local_match_status(
+        return self._facade_service.on_local_match_status_click(
             executable_path,
             working_directory,
             args,
             proxy_ports,
         )
-        return self._local_match_status_json(result=status)
 
 #     def on_ladder_proxy_start_click(
 #         self,

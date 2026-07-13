@@ -20,6 +20,24 @@ STARCRAFT2_STATUS_EVENT_CALLBACK_RESOURCE = "starcraft2_status_event_callback"
 STARCRAFT2_LOG_EVENT_ORIGIN = "starcraft2_log_observer"
 SHARED_STATUS_EVENT_CATEGORIES = {"upgrade", "strategy"}
 SHARED_LOG_ONLY_CATEGORIES = {"build", "train"}
+LADDER_PROXY_DUPLICATE_CATEGORIES = {
+    "build",
+    "train",
+    "unit_produced",
+    "worker_produced",
+    "building_started",
+    "building_lost",
+    "unit_lost",
+    "enemy_seen",
+    "enemy_destroyed",
+    "combat_started",
+    "supply_blocked",
+    "army_milestone",
+    "situation_update",
+    "game_started",
+    "game_ended",
+    "observation",
+}
 GENERIC_GAME_END_MESSAGE = "내가 경기를 종료했어요. 결과 로그를 확인할게요."
 
 
@@ -283,6 +301,8 @@ class StarCraft2Extension(GameExtensionInterface):
             f"source={source} category={event.category} message={event.message}"
         )
         category = str(event.category or "").strip().lower()
+        if self._suppress_ladder_proxy_event(source, category):
+            return
         status_event_callback = self._refresh_status_event_callback()
         if callable(status_event_callback):
             if category in SHARED_STATUS_EVENT_CATEGORIES:
@@ -313,6 +333,13 @@ class StarCraft2Extension(GameExtensionInterface):
         if message.strip() == GENERIC_GAME_END_MESSAGE:
             return True
         return "로그 해설" in message
+
+    #20260713_kpopmodder: Keep a single shared telemetry path for ladder proxy
+    # stdout by suppressing overlapping unit/build/supply categories.
+    def _suppress_ladder_proxy_event(self, source: str, category: str) -> bool:
+        if not str(source or "").lower().startswith("ladder_proxy:"):
+            return False
+        return str(category or "").strip().lower() in LADDER_PROXY_DUPLICATE_CATEGORIES
 
     def _refresh_status_event_callback(self):
         get_shared = getattr(self._context, "get_shared", None)

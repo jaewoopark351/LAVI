@@ -31,6 +31,7 @@ class StarCraft2GameExtension(GameExtensionInterface):
         self._game_end_cancelled = False
         self._suppress_post_game_tts = False
         self._reaction_callback = None
+        self._status_event_subscription = None
 
     @property
     def name(self) -> str:
@@ -46,9 +47,7 @@ class StarCraft2GameExtension(GameExtensionInterface):
         callback = self._build_status_callback(context)
         if callback is not None:
             self._reaction_callback = callback
-            setter = getattr(self.plugin, "set_status_event_callback", None)
-            if callable(setter):
-                setter(self._on_status_event)
+            self._status_event_subscription = self._bind_status_events(self._on_status_event)
         #20260711_kpopmodder: Publish the common SC2 status callback so the
         # passive log observer can reuse the main event/memory/TTS path.
         set_shared = getattr(context, "set_shared", None)
@@ -81,7 +80,35 @@ class StarCraft2GameExtension(GameExtensionInterface):
             self.worker.stop()
 
     def shutdown(self) -> None:
+        if self._status_event_subscription is not None:
+            unsubscribe = getattr(self._status_event_subscription, "unsubscribe", None)
+            if callable(unsubscribe):
+                unsubscribe()
+            self._status_event_subscription = None
         self.stop()
+
+    def _bind_status_events(self, callback):
+        plugin = self.plugin
+        if plugin is None or not callable(callback):
+            return None
+        subscribe = getattr(plugin, "subscribe_events", None)
+        if callable(subscribe):
+            try:
+                return subscribe(callback)
+            except Exception:
+                log_print("[StarCraft2GameExtension] subscribe_events failed; fallback to legacy callback path.")
+        subscribe = getattr(plugin, "subscribe_status_events", None)
+        if callable(subscribe):
+            try:
+                return subscribe(callback)
+            except Exception:
+                log_print("[StarCraft2GameExtension] subscribe_status_events failed; fallback to legacy callback path.")
+        setter = getattr(plugin, "set_status_event_callback", None)
+        if callable(setter):
+            setter(callback)
+            return None
+        log_print("[StarCraft2GameExtension] failed to bind status event path: no callback API on plugin")
+        return None
 
     def handle_command(self, command: Any) -> Dict[str, Any]:
         self._ensure_bridge_ready()

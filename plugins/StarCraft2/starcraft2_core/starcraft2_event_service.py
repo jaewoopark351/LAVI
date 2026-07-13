@@ -116,6 +116,7 @@ class _StarCraft2LadderProxyEventService:
             return True
         if (
             "expected query but got response_not_set" in lower
+            or "expected action but got response_not_set" in lower
             or "response response_not_set has" in lower
         ):
             self._response_not_set_ignore_until = now + 2.0
