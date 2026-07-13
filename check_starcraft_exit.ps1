@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'Stop'
 $OutputEncoding = [Console]::OutputEncoding = [Text.UTF8Encoding]::new()
 
-$logDir = 'C:\Vtuber_Souorce_Code\LAVI\logs'
+$logDir = Join-Path -Path $PSScriptRoot -ChildPath 'logs'
 $patternStrict = '\[StarCraft116MonsterLogEvents\].*event:\s*type=monster_exit_code\s+severity=(?<sev>\w+)\s+exit_code=(?<code>-?\d+)\s+cause=(?<cause>\S+)\s+reason=(?<reason>.+)$'
 $patternLoose = 'monster_exit_code'
 

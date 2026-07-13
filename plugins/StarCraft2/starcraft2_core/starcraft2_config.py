@@ -7,6 +7,20 @@ import os
 from typing import Any, Dict, List
 
 
+PROJECT_ROOT_MARKERS = [
+    r"C:\Vtuber_Souorce_Code\LAV_v0.2",
+]
+
+LOCAL_MATCH_EXECUTABLE_RELATIVE = os.path.join(
+    "plugins",
+    "StarCraft2",
+    "native",
+    "Sc2LadderServer",
+    "bin",
+    "LavHumanVsBot.exe",
+)
+LOCAL_MATCH_WORKDIR_RELATIVE = os.path.join("plugins", "StarCraft2", "runtime")
+
 DEFAULT_STARCRAFT2_PATH = "C:\\Program Files (x86)\\StarCraft II"
 
 
@@ -103,8 +117,8 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     #20260711_kpopmodder: Keep Local Match launcher settings separate from LAN Lobby remote-human launcher settings.
     "local_match": {
         "enabled": False,
-        "executable_path": "C:\\Vtuber_Souorce_Code\\LAVI\\plugins\\StarCraft2\\native\\Sc2LadderServer\\bin\\LavHumanVsBot.exe",
-        "working_directory": "C:\\Vtuber_Souorce_Code\\LAVI\\plugins\\StarCraft2\\runtime",
+        "executable_path": LOCAL_MATCH_EXECUTABLE_RELATIVE,
+        "working_directory": LOCAL_MATCH_WORKDIR_RELATIVE,
         "args": [
             "--human-name",
             "IdleProbe",
@@ -292,8 +306,20 @@ class StarCraft2Config:
             return ""
         value = os.path.expandvars(os.path.expanduser(value))
         if os.path.isabs(value):
+            value = self._migrate_old_repo_root(value)
             return os.path.normpath(value)
         return os.path.normpath(os.path.join(self.project_root, value))
+
+    def _migrate_old_repo_root(self, value: str) -> str:
+        legacy_value = os.path.normpath(os.path.normcase(os.path.expandvars(os.path.expanduser(value))))
+        for marker in PROJECT_ROOT_MARKERS:
+            legacy_root = os.path.normpath(os.path.normcase(marker))
+            if legacy_value == legacy_root or legacy_value.startswith(
+                f"{legacy_root}{os.sep}"
+            ):
+                suffix = legacy_value[len(legacy_root) :].lstrip("/\\")
+                return os.path.join(self.project_root, suffix)
+        return value
 
     def _default_config(self) -> Dict[str, Any]:
         return copy.deepcopy(DEFAULT_CONFIG)

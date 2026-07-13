@@ -53,6 +53,33 @@ class StarCraft2ConfigTests(unittest.TestCase):
                 config.resolve_starcraft2_path(),
             )
 
+    def test_relative_path_is_resolved_against_project_root(self):
+        config = StarCraft2Config(str(PROJECT_ROOT / "plugins" / "StarCraft2"))
+        expected = os.path.normpath(
+            PROJECT_ROOT / "plugins" / "StarCraft2" / "runtime"
+        )
+        self.assertEqual(
+            expected,
+            config.resolve_path_value("plugins\\StarCraft2\\runtime"),
+        )
+
+    def test_legacy_repo_root_is_migrated_to_current_root(self):
+        config = StarCraft2Config(str(PROJECT_ROOT / "plugins" / "StarCraft2"))
+        legacy_value = r"C:\Vtuber_Souorce_Code\LAV_v0.2\plugins\StarCraft2\native\Sc2LadderServer\bin\LavHumanVsBot.exe"
+        expected = os.path.normpath(
+            PROJECT_ROOT
+            / "plugins"
+            / "StarCraft2"
+            / "native"
+            / "Sc2LadderServer"
+            / "bin"
+            / "LavHumanVsBot.exe"
+        )
+        self.assertEqual(
+            os.path.normcase(expected),
+            os.path.normcase(config.resolve_path_value(legacy_value)),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
