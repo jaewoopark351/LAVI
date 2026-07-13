@@ -186,12 +186,8 @@ class _StarCraft2FacadeService:
 
     def set_status_event_callback(self, callback):
         self.status_event_callback = callback
-        if self.runtime_context is not None:
-            self.runtime_context.set_status_callback(callback)
         if self.engine_event_service is not None:
             self.engine_event_service.set_status_event_callback(callback)
-        if self.event_bus is not None:
-            self.event_bus.set_status_event_callback(callback)
 
     def subscribe_status_events(self, callback):
         if self.event_bus is None:
@@ -200,10 +196,6 @@ class _StarCraft2FacadeService:
 
     def set_tts(self, tts):
         self.tts = tts
-        if self.runtime_context is not None:
-            self.runtime_context.set_tts(tts)
-        if self.event_bus is not None:
-            self.event_bus.set_tts(tts)
 
     def is_running(self) -> bool:
         return bool(self.current_engine and self.current_engine.is_running())

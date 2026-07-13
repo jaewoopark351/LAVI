@@ -15,16 +15,19 @@ IMPORTANT_EVENT_TYPES = {
     "barracks_started",
     "enemy_seen",
     "attack_started",
+    "combat_started",
+    "building_started",
+    "unit_lost",
     "game_won",
     "game_lost",
     "game_ended",
     "engine_error",
     "error",
-    "building_started",
     "supply_blocked",
     "army_milestone",
     "unit_produced",
     "worker_produced",
+    "situation_update",
     "upgrade",
     "upgrade_completed",
     "strategy",
@@ -39,12 +42,22 @@ SILENT_TTS_EVENT_TYPES = {
 
 #20260711_kpopmodder: Zerg eggs and larvae are transient production state, so
 # keep their telemetry in logs without announcing each one through TTS.
-SILENT_TTS_UNIT_PRODUCTION_IDS = {"103", "151"}
+SILENT_TTS_TRANSIENT_ZERG_UNIT_IDS = {"103", "151"}
 
 EVENT_ALIASES = {
     "supply_depot_started": "first_supply",
     "barracks_started": "first_barracks",
     "error": "engine_error",
+    "attack_started": "combat_started",
+    "attack": "combat_started",
+    "rush": "combat_started",
+    "enemy": "enemy_seen",
+    "scout": "enemy_seen",
+    "build": "building_started",
+    "expand": "building_started",
+    "train": "unit_produced",
+    "observation": "situation_update",
+    "result": "game_ended",
 }
 
 
@@ -61,7 +74,7 @@ class StarCraft2ReactionPolicy:
             return False
         if event_type in SILENT_TTS_EVENT_TYPES:
             return False
-        if self._is_silent_unit_production(event_type, event):
+        if self._is_silent_transient_zerg_unit_event(event_type, event):
             return False
         if event_type not in IMPORTANT_EVENT_TYPES and event_type not in EVENT_ALIASES.values():
             return False
@@ -109,14 +122,14 @@ class StarCraft2ReactionPolicy:
             return f"{event_type}:{detail[:80]}"
         return event_type
 
-    def _is_silent_unit_production(self, event_type: str, event: Dict[str, Any]) -> bool:
-        if event_type != "unit_produced":
+    def _is_silent_transient_zerg_unit_event(self, event_type: str, event: Dict[str, Any]) -> bool:
+        if event_type not in {"unit_produced", "unit_lost"}:
             return False
         details = event.get("details") if isinstance(event.get("details"), dict) else {}
         dominant_unit_type_id = str(details.get("unit_type_id") or "").strip()
         if not dominant_unit_type_id:
             dominant_unit_type_id = self._dominant_positive_unit_type_id(event)
-        return dominant_unit_type_id in SILENT_TTS_UNIT_PRODUCTION_IDS
+        return dominant_unit_type_id in SILENT_TTS_TRANSIENT_ZERG_UNIT_IDS
 
     def _dominant_positive_unit_type_id(self, event: Dict[str, Any], allowed_ids=None) -> str:
         details = event.get("details") if isinstance(event.get("details"), dict) else {}

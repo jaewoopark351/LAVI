@@ -12,8 +12,6 @@ class SC2RuntimeContext:
     process_pid: Optional[int] = None
     stdout_tail: List[str] = field(default_factory=list)
     stderr_tail: List[str] = field(default_factory=list)
-    status_event_callback: Optional[Any] = None
-    tts: Optional[Any] = None
     event_bus: Optional[Any] = None
     status: Dict[str, Any] = field(default_factory=dict)
     started_at: Optional[float] = None
@@ -36,12 +34,6 @@ class SC2RuntimeContext:
     def set_tails(self, stdout_tail: Iterable[Any], stderr_tail: Iterable[Any]) -> None:
         self.stdout_tail = [str(line) for line in stdout_tail]
         self.stderr_tail = [str(line) for line in stderr_tail]
-
-    def set_status_callback(self, callback) -> None:
-        self.status_event_callback = callback if callable(callback) else None
-
-    def set_tts(self, tts) -> None:
-        self.tts = tts
 
     def set_status(self, value: Dict[str, Any] | None = None) -> None:
         self.status = value if isinstance(value, dict) else {}

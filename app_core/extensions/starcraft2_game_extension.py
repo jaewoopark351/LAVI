@@ -13,9 +13,18 @@ from .starcraft2_worker import StarCraft2Worker
 
 STARCRAFT2_STATUS_EVENT_CALLBACK_RESOURCE = "starcraft2_status_event_callback"
 STARCRAFT2_LOG_EVENT_ORIGIN = "starcraft2_log_observer"
-STARCRAFT2_TERMINAL_EVENT_TYPES = {
-    "game_ended", "game_won", "game_lost", "engine_error", "error",
-}
+
+
+class _StarCraft2StatusEventSubscription:
+    #20260714_kpopmodder: Keep callback lifecycle explicit across bridge-first and
+    # GameExtensionInterface-style callback registration paths.
+    def __init__(self, unsubscribe_callback):
+        self._unsubscribe_callback = unsubscribe_callback
+
+    def unsubscribe(self) -> None:
+        callback = self._unsubscribe_callback
+        if callable(callback):
+            callback()
 
 
 class StarCraft2GameExtension(GameExtensionInterface):
@@ -27,9 +36,6 @@ class StarCraft2GameExtension(GameExtensionInterface):
         self._context: Optional[GameExtensionContext] = None
         self._is_initialized = False
         self._is_started = False
-        self._game_active = False
-        self._game_end_cancelled = False
-        self._suppress_post_game_tts = False
         self._reaction_callback = None
         self._status_event_subscription = None
 
@@ -73,7 +79,6 @@ class StarCraft2GameExtension(GameExtensionInterface):
 
     def stop(self) -> None:
         self._is_started = False
-        self._game_active = False
         try:
             self.bridge.stop_game()
         finally:
@@ -96,17 +101,24 @@ class StarCraft2GameExtension(GameExtensionInterface):
             try:
                 return subscribe(callback)
             except Exception:
-                log_print("[StarCraft2GameExtension] subscribe_events failed; fallback to legacy callback path.")
+                log_print("[StarCraft2GameExtension] subscribe_events failed; trying alternate subscribe_status_events.")
         subscribe = getattr(plugin, "subscribe_status_events", None)
         if callable(subscribe):
             try:
                 return subscribe(callback)
             except Exception:
-                log_print("[StarCraft2GameExtension] subscribe_status_events failed; fallback to legacy callback path.")
-        setter = getattr(plugin, "set_status_event_callback", None)
-        if callable(setter):
-            setter(callback)
-            return None
+                log_print("[StarCraft2GameExtension] subscribe_status_events failed.")
+        set_status_event_callback = getattr(plugin, "set_status_event_callback", None)
+        if callable(set_status_event_callback):
+            try:
+                set_status_event_callback(callback)
+                return _StarCraft2StatusEventSubscription(
+                    lambda: set_status_event_callback(None)
+                )
+            except Exception:
+                log_print(
+                    "[StarCraft2GameExtension] set_status_event_callback failed."
+                )
         log_print("[StarCraft2GameExtension] failed to bind status event path: no callback API on plugin")
         return None
 
@@ -140,90 +152,16 @@ class StarCraft2GameExtension(GameExtensionInterface):
 
     def _on_status_event(self, event: Any) -> None:
         event = dict(event or {}) if isinstance(event, dict) else {}
-        event_type = str(event.get("event_type") or "").strip().lower()
-        if event_type == "game_started":
-            self._game_active = True
-            self._game_end_cancelled = False
-            self._suppress_post_game_tts = False
-        elif event_type in STARCRAFT2_TERMINAL_EVENT_TYPES:
-            self._game_active = False
-            self._suppress_post_game_tts = True
-            if not self._game_end_cancelled:
-                self._cancel_pending_tts(event_type)
-                self._game_end_cancelled = True
-        elif self._suppress_post_game_tts:
-            #20260711_kpopmodder: Preserve late post-game telemetry in logs and
-            # raw memory while preventing it from refilling the spoken queue.
-            raw_details = event.get("details")
-            details = dict(raw_details) if isinstance(raw_details, dict) else {}
-            details["speak"] = False
-            event["details"] = details
-            log_print(
-                "[StarCraft2GameExtension] post-game TTS suppressed: "
-                f"event={event_type}"
-            )
         if callable(self._reaction_callback):
-            # The shared callback owns both policy admission and TTS. A false
-            # result may mean the event was intentionally rate-limited; never
-            # bypass that decision with a second speech path.
             self._reaction_callback(event)
-        else:
-            self._speak_structured_log_event(event)
-
-    def _cancel_pending_tts(self, event_type: str) -> bool:
-        tts = getattr(self._context, "tts", None) if self._context is not None else None
-        cancel_pending = getattr(tts, "cancel_pending", None)
-        try:
-            if callable(cancel_pending):
-                cancel_pending(reason=f"starcraft2_{event_type}")
-                log_print(
-                    "[StarCraft2GameExtension] pending TTS cancelled: "
-                    f"event={event_type}"
-                )
-                return True
-
-            handle_interrupt = getattr(tts, "handle_interrupt", None)
-            if callable(handle_interrupt):
-                handle_interrupt()
-                log_print(
-                    "[StarCraft2GameExtension] pending TTS interrupted via fallback: "
-                    f"event={event_type}"
-                )
-                return True
-        except Exception as e:
-            log_print(
-                "[StarCraft2GameExtension] pending TTS cancellation failed: "
-                f"event={event_type} error={e}"
-            )
-        return False
-
-    def _speak_structured_log_event(self, event: Any) -> bool:
-        event = event if isinstance(event, dict) else {}
-        event_type = str(event.get("event_type") or "").strip().lower()
-        details = event.get("details") if isinstance(event.get("details"), dict) else {}
-        if event_type not in {"upgrade", "strategy"}:
-            return False
-        if str(details.get("origin") or "") != STARCRAFT2_LOG_EVENT_ORIGIN:
-            return False
-        if details.get("speak") is False:
-            return False
-        message = str(details.get("message") or "").strip()
-        tts = getattr(self._context, "tts", None) if self._context is not None else None
-        receive_input = getattr(tts, "receive_input", None)
-        if not message or not callable(receive_input):
-            return False
-        #20260711_kpopmodder: The current reaction policy does not yet render
-        # upgrade/strategy events, so keep their structured main-path fallback
-        # here without bypassing the shared callback or duplicating telemetry.
-        receive_input(message)
-        return True
 
     def _build_status_callback(self, context: Optional[GameExtensionContext]):
         if context is None:
             return None
         llm = getattr(context, "llm", None)
         tts = getattr(context, "tts", None)
-        if llm is None or tts is None:
+        if tts is None:
+            log_print("[StarCraft2GameExtension] status callback skipped: tts is required")
             return None
         try:
             from plugins.StarCraft2.starcraft2_core.starcraft2_reaction_runtime import (

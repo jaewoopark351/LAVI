@@ -284,7 +284,7 @@ class StarCraft2GameExtensionTests(unittest.TestCase):
         self.assertIn("추출장 1기", text)
         self.assertNotIn("extractor", text)
 
-    def test_transient_zerg_production_and_army_milestone_are_log_only(self):
+    def test_transient_zerg_events_and_army_milestone_are_log_only(self):
         events = (
             {
                 "event_type": "unit_produced",
@@ -293,6 +293,14 @@ class StarCraft2GameExtensionTests(unittest.TestCase):
             {
                 "event_type": "unit_produced",
                 "details": {"unit_changes": {"151": 1}},
+            },
+            {
+                "event_type": "unit_lost",
+                "details": {"unit_type_id": "103", "unit_changes": {"103": 1}},
+            },
+            {
+                "event_type": "unit_lost",
+                "details": {"unit_type_id": "151", "unit_changes": {"151": 1}},
             },
             {
                 "event_type": "army_milestone",
@@ -336,6 +344,24 @@ class StarCraft2GameExtensionTests(unittest.TestCase):
 
         self.assertTrue(emitted)
         tts.receive_input.assert_called_once_with("내가 대군주를 생산했어요.")
+
+    def test_non_transient_unit_loss_still_uses_tts(self):
+        event = {
+            "event_type": "unit_lost",
+            "details": {"unit_type_id": "106", "unit_changes": {"106": 1}},
+        }
+        tts = mock.Mock()
+
+        emitted = handle_starcraft2_status_event(
+            mock.Mock(),
+            tts,
+            None,
+            StarCraft2ReactionPolicy(min_interval_sec=0),
+            event,
+        )
+
+        self.assertTrue(emitted)
+        tts.receive_input.assert_called_once_with("내 대군주 1기를 잃었어요.")
 
     def test_game_end_cancels_stale_tts_and_next_game_resumes_speech(self):
         plugin = FakeStarCraft2Plugin(enabled=True)

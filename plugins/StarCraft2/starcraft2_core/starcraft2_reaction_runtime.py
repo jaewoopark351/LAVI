@@ -10,20 +10,181 @@ from .sc2_telemetry_registry import (
 )
 from .starcraft2_reaction_policy import StarCraft2ReactionPolicy
 
-def build_starcraft2_status_event_callback(llm, tts, memory_store=None):
-    policy = StarCraft2ReactionPolicy()
-    return lambda event: handle_starcraft2_status_event(llm, tts, memory_store, policy, event)
+
+class StarCraft2ReactionRuntime:
+    #20260713_kpopmodder: Centralize SC2 lifecycle, policy filtering, raw-event
+    # memory, and TTS handoff for both extension and observer paths.
+    TERMINAL_EVENT_TYPES = {
+        "game_started",
+        "game_ended",
+        "game_won",
+        "game_lost",
+        "engine_error",
+        "error",
+    }
+
+    def __init__(
+        self,
+        llm,
+        tts,
+        memory_store=None,
+        policy: StarCraft2ReactionPolicy | None = None,
+        post_game_suppression: bool = False,
+        terminal_cancel_reason: str | None = None,
+    ):
+        self.llm = llm
+        self.tts = tts
+        self.memory_store = memory_store
+        self.policy = policy
+        self.post_game_suppression = bool(post_game_suppression)
+        self.terminal_cancel_reason = terminal_cancel_reason
+        self._game_active = False
+        self._game_end_cancelled = False
+        self._suppress_post_game_tts = False
+
+    def handle_status_event(self, event: Dict[str, Any]) -> bool:
+        normalized = dict(event or {})
+        event_type = str(normalized.get("event_type") or "").strip().lower()
+        details = self._details(normalized.get("details"))
+
+        log_print(f"[StarCraft2Reaction] event={event_type}")
+        self._store_event(normalized)
+        self._update_game_state(event_type, details)
+
+        if self.post_game_suppression and self._suppress_post_game_tts and (
+            event_type not in self.TERMINAL_EVENT_TYPES
+        ):
+            normalized["details"] = dict(details)
+            normalized["details"]["speak"] = False
+            log_print(
+                "[StarCraft2ReactionRuntime] post-game TTS suppressed: "
+                f"event={event_type}"
+            )
+
+        if self.policy is not None and not self.policy.should_emit(normalized):
+            return False
+        text = build_starcraft2_reaction_text(normalized)
+        if not text:
+            details = normalized.get("details")
+            if isinstance(details, dict):
+                text = str(details.get("message") or "").strip()
+        return self._speak(text)
+
+    def _update_game_state(self, event_type: str, event_details: Dict[str, Any]) -> None:
+        if event_type == "game_started":
+            self._game_active = True
+            self._game_end_cancelled = False
+            self._suppress_post_game_tts = False
+            return
+        if event_type in self.TERMINAL_EVENT_TYPES:
+            self._game_active = False
+            if self.post_game_suppression:
+                self._suppress_post_game_tts = True
+            if not self._game_end_cancelled:
+                self._cancel_pending_tts(event_type, event_details)
+                self._game_end_cancelled = True
+
+    def _cancel_pending_tts(
+        self,
+        event_type: str,
+        event_details: Dict[str, Any],
+    ) -> None:
+        tts = self.tts
+        cancel_pending = getattr(tts, "cancel_pending", None)
+        try:
+            if callable(cancel_pending):
+                reason = (
+                    str(event_details.get("terminal_cancel_reason") or "").strip()
+                    or self.terminal_cancel_reason
+                    or f"starcraft2_{event_type}"
+                )
+                cancel_pending(reason=reason)
+                return
+
+            handle_interrupt = getattr(tts, "handle_interrupt", None)
+            if callable(handle_interrupt):
+                handle_interrupt()
+        except Exception as exc:
+            log_print(
+                "[StarCraft2ReactionRuntime] pending TTS cancellation failed: "
+                f"event={event_type} error={exc}"
+            )
+
+    def _speak(self, text: str) -> bool:
+        message = str(text or "").strip()
+        if not message:
+            return False
+
+        tts = self.tts
+        if tts is None:
+            return False
+
+        receive_input = getattr(tts, "receive_input", None)
+        if callable(receive_input):
+            receive_input(message)
+            return True
+
+        speak = getattr(tts, "speak", None)
+        if callable(speak):
+            try:
+                result = speak(message)
+                if isinstance(result, dict):
+                    return bool(result.get("ok", True))
+            except Exception as exc:
+                log_print(f"[StarCraft2ReactionRuntime] tts speak failed: {exc}")
+                return False
+            return True
+
+        return False
+
+    @staticmethod
+    def _details(details: Any) -> Dict[str, Any]:
+        return details if isinstance(details, dict) else {}
+
+    def _store_event(self, event: Dict[str, Any]) -> None:
+        add_raw_event = (
+            getattr(self.memory_store, "add_raw_event", None)
+            if self.memory_store
+            else None
+        )
+        if callable(add_raw_event):
+            try:
+                add_raw_event(
+                    "starcraft2_game_event",
+                    json.dumps(event, ensure_ascii=False, default=str),
+                    source="starcraft2",
+                    metadata={"event_type": event.get("event_type", "")},
+                )
+            except Exception as exc:
+                log_print(f"[StarCraft2Reaction] raw event store failed: {exc}")
+
+
+def build_starcraft2_status_event_callback(
+    llm,
+    tts,
+    memory_store=None,
+    terminal_cancel_reason: str | None = None,
+):
+    runtime = StarCraft2ReactionRuntime(
+        llm,
+        tts,
+        memory_store=memory_store,
+        policy=StarCraft2ReactionPolicy(),
+        post_game_suppression=True,
+        terminal_cancel_reason=terminal_cancel_reason,
+    )
+    return runtime.handle_status_event
+
 
 def handle_starcraft2_status_event(llm, tts, memory_store, policy, event):
-    event = dict(event or {})
-    event_type = str(event.get("event_type") or "")
-    log_print(f"[StarCraft2Reaction] event={event_type}")
-    _store_starcraft2_raw_event(memory_store, event)
-    if not policy.should_emit(event): return False
-    text = build_starcraft2_reaction_text(event)
-    receive_input = getattr(tts, "receive_input", None)
-    if text and callable(receive_input): receive_input(text); return True
-    return False
+    runtime = StarCraft2ReactionRuntime(
+        llm,
+        tts,
+        memory_store=memory_store,
+        policy=policy,
+        post_game_suppression=False,
+    )
+    return runtime.handle_status_event(event)
 
 def build_starcraft2_reaction_text(event: Dict[str, Any]) -> str:
     kind = str(event.get("event_type") or "").lower()

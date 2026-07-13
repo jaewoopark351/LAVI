@@ -18,8 +18,14 @@ from .sc2_tts_bridge import SC2TTSBridge
 
 STARCRAFT2_STATUS_EVENT_CALLBACK_RESOURCE = "starcraft2_status_event_callback"
 STARCRAFT2_LOG_EVENT_ORIGIN = "starcraft2_log_observer"
-SHARED_STATUS_EVENT_CATEGORIES = {"upgrade", "strategy"}
-SHARED_LOG_ONLY_CATEGORIES = {"build", "train"}
+SHARED_LOG_ONLY_CATEGORIES = {
+    #20260714_kpopmodder: These parser categories overlap ladder proxy telemetry
+    # and are intentionally diagnostic-only to keep one shared path.
+    "build",
+    "train",
+    "expand",
+    "observation",
+}
 GENERIC_GAME_END_MESSAGE = "내가 경기를 종료했어요. 결과 로그를 확인할게요."
 
 
@@ -285,35 +291,76 @@ class StarCraft2Extension(GameExtensionInterface):
         )
         category = str(event.category or "").strip().lower()
         status_event_callback = self._refresh_status_event_callback()
+        event_type = self._normalize_parser_event_type(category, event)
         if callable(status_event_callback):
-            if category in SHARED_STATUS_EVENT_CATEGORIES:
-                if self._publish_status_event(status_event_callback, source, event):
-                    return
-            elif category in SHARED_LOG_ONLY_CATEGORIES:
+            if category in SHARED_LOG_ONLY_CATEGORIES:
                 #20260711_kpopmodder: Unit/build log lines overlap the main
                 # ResponseObservation telemetry, so keep them diagnostic-only
                 # whenever the shared status-event path is active.
                 return
-        if str(event.message or "").strip() == GENERIC_GAME_END_MESSAGE:
-            self.tts_bridge.cancel_pending(reason="starcraft2_log_game_ended")
-        if self._should_log_only_event(event):
+            if event_type and self._publish_status_event(
+                status_event_callback,
+                source,
+                event,
+                event_type,
+            ):
+                return
+        if self._should_log_only_event(event, event_type):
             return
-        result = self.tts_bridge.speak(event.message)
-        if not result.get("ok"):
-            log_print(
-                "[StarCraft2Extension] TTS bridge did not speak event "
-                f"source={source} error={result.get('error', '')}"
-            )
 
-    def _should_log_only_event(self, event) -> bool:
+    def _should_log_only_event(self, event, event_type: str = "") -> bool:
         #20260710_kpopmodder: Only startup/log-intro notices stay silent; live SC2 commentary should speak.
-        category = str(getattr(event, "category", "") or "").strip().lower()
+        category = str(event_type or getattr(event, "category", "") or "").strip().lower()
         message = str(getattr(event, "message", "") or "")
         if category == "game_started":
+            return True
+        if category == "game_ended" and self._is_log_terminal_event(category, event):
             return True
         if message.strip() == GENERIC_GAME_END_MESSAGE:
             return True
         return "로그 해설" in message
+
+    def _normalize_parser_event_type(self, category: str, event) -> str:
+        event_type = str(category or "").strip().lower()
+        raw_line = str(getattr(event, "raw_line", "") or "").lower()
+        message = str(getattr(event, "message", "") or "").lower()
+        source = f"{raw_line} {message}"
+        if event_type != "result":
+            return event_type
+        if (
+            "victory" in source
+            or "won the game" in source
+            or "player2 win" in source
+            or "player2win" in source
+            or "player1 win" in source
+            or "player1win" in source
+        ):
+            return "game_won"
+        if (
+            "defeat" in source
+            or "lost the game" in source
+            or "resigning" in source
+            or "player2 loss" in source
+            or "player2loss" in source
+            or "player1 loss" in source
+            or "player1loss" in source
+        ):
+            return "game_lost"
+        if "game ended" in source or "match ended" in source:
+            return "game_ended"
+        if "engine error" in source:
+            return "engine_error"
+        return "game_ended"
+
+    def _is_log_terminal_event(self, event_type: str, event) -> bool:
+        if str(event_type).strip().lower() != "game_ended":
+            return False
+        message = str(getattr(event, "message", "") or "")
+        raw_line = str(getattr(event, "raw_line", "") or "")
+        return (
+            message.strip() == GENERIC_GAME_END_MESSAGE
+            or "END GAME REPORT" in raw_line.upper()
+        )
 
     def _refresh_status_event_callback(self):
         get_shared = getattr(self._context, "get_shared", None)
@@ -322,11 +369,15 @@ class StarCraft2Extension(GameExtensionInterface):
             if callable(get_shared)
             else None
         )
-        self._status_event_callback = callback if callable(callback) else None
-        return self._status_event_callback
+        if callable(callback):
+            self._status_event_callback = callback
+            return callback
+        self._status_event_callback = None
+        return None
 
-    def _publish_status_event(self, callback, source: str, event) -> bool:
-        category = str(getattr(event, "category", "") or "").strip().lower()
+    def _publish_status_event(self, callback, source: str, event, event_type: str = "") -> bool:
+        category = str(event_type or getattr(event, "category", "") or "").strip().lower()
+        is_log_terminal = self._is_log_terminal_event(category, event)
         payload = {
             "event_type": category,
             "details": {
@@ -338,6 +389,8 @@ class StarCraft2Extension(GameExtensionInterface):
                 "speak": bool(self.tts_bridge.enabled),
             },
         }
+        if is_log_terminal:
+            payload["details"]["terminal_cancel_reason"] = "starcraft2_log_game_ended"
         try:
             #20260711_kpopmodder: Route strategy/upgrade commentary through
             # the main StarCraft2 callback so memory and TTS share one event.

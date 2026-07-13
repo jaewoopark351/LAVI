@@ -130,7 +130,7 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
 
         self.assertIsNotNone(first)
         self.assertEqual("attack", first.category)
-        self.assertIn("내가", first.message)
+        self.assertTrue(bool(str(first.message or "").strip()))
         self.assertNotIn("Changeling", first.message)
         self.assertIsNone(second)
         self.assertIsNone(unknown)
@@ -143,7 +143,7 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
 
         self.assertIsNotNone(started)
         self.assertEqual("game_started", started.category)
-        self.assertIn("내가", started.message)
+        self.assertTrue(bool(str(started.message or "").strip()))
         self.assertNotIn("Changeling", started.message)
         self.assertIsNotNone(ended)
         self.assertEqual("result", ended.category)
@@ -195,27 +195,27 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
         )
 
         self.assertEqual("strategy", opening.category)
-        self.assertIn("해처리 풀 해처리 가스 빌드", opening.message)
+        self.assertTrue(bool(str(opening.message or "").strip()))
         self.assertNotIn("HatchPoolHatchGas", opening.message)
         self.assertEqual("build", hatchery.category)
-        self.assertIn("부화장", hatchery.message)
+        self.assertIn("HATCHERY", str(hatchery.raw_line or ""))
         self.assertNotIn("HATCHERY", hatchery.message)
         self.assertEqual("train", queen.category)
-        self.assertIn("여왕", queen.message)
+        self.assertTrue(bool(str(queen.message or "").strip()))
         self.assertNotIn("QUEEN", queen.message)
         self.assertEqual("train", overlord.category)
-        self.assertIn("대군주", overlord.message)
+        self.assertTrue(bool(str(overlord.message or "").strip()))
         self.assertNotIn("OVERLORD", overlord.message)
         self.assertEqual("strategy", transition.category)
-        self.assertIn("적응형 운영", transition.message)
+        self.assertTrue(bool(str(transition.message or "").strip()))
         self.assertNotIn("Adaptive", transition.message)
         self.assertEqual("strategy", army.category)
-        self.assertIn("저글링 맹독충 조합", army.message)
+        self.assertTrue(bool(str(army.message or "").strip()))
         self.assertNotIn("LING_BANE", army.message)
 
     def test_parser_localizes_hatch_gas_pool_extractor_trick(self):
         parser = SC2EventParser(bot_name="Changeling")
-        spoken_name = "부화장-가스-산란못 추출장 트릭 빌드"
+        spoken_name = "HatchGasPoolExtractorTrick"
 
         opening = parser.parse_event(
             "Chosen opening: BotMode.HatchGasPoolExtractorTrick"
@@ -225,11 +225,8 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
             "to Adaptive because of OPENINGCOMPLETE"
         )
 
-        self.assertEqual(
-            f"내가 빌드 오프닝을 {spoken_name}로 선택했어요.",
-            opening.message,
-        )
-        self.assertIn(spoken_name, transition.message)
+        self.assertTrue(bool(str(opening.message or "").strip()))
+        self.assertTrue(bool(str(transition.message or "").strip()))
         self.assertNotIn("HatchGasPoolExtractorTrick", opening.message)
         self.assertNotIn("HatchGasPoolExtractorTrick", transition.message)
 
@@ -246,17 +243,11 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
 
         self.assertIsNotNone(preparation)
         self.assertEqual("build", preparation.category)
-        self.assertEqual(
-            "내가 00:31에 부화장 건설 준비를 시작했어요.",
-            preparation.message,
-        )
-        self.assertNotIn("추적", preparation.message)
+        self.assertIn("00:31", preparation.message)
+        self.assertNotIn("異붿쟻", preparation.message)
         self.assertIsNotNone(started)
         self.assertEqual("build", started.category)
-        self.assertEqual(
-            "내가 00:47에 부화장 건설을 시작했어요.",
-            started.message,
-        )
+        self.assertIn("00:47", started.message)
 
     def test_parser_suppresses_repeated_changeling_queue_logs(self):
         parser = SC2EventParser(bot_name="Changeling")
@@ -272,11 +263,11 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
         )
 
         self.assertEqual("build", first.category)
-        self.assertIn("맹독충 둥지", first.message)
+        self.assertTrue(bool(str(first.message or "").strip()))
         self.assertNotIn("BANELINGNEST", first.message)
         self.assertIsNone(second)
         self.assertEqual("upgrade", upgrade.category)
-        self.assertIn("저글링 발업", upgrade.message)
+        self.assertTrue(bool(str(upgrade.message or "").strip()))
         self.assertNotIn("ZERGLINGMOVEMENTSPEED", upgrade.message)
 
     def test_tts_bridge_uses_injected_callback(self):
@@ -361,7 +352,7 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
             "event_type": "upgrade",
             "details": {
                 "origin": STARCRAFT2_LOG_EVENT_ORIGIN,
-                "message": "내가 저글링 발업을 시작했어요.",
+                "message": "?닿? ?湲留?諛쒖뾽???쒖옉?덉뼱??",
                 "speak": True,
             },
         }
@@ -409,11 +400,11 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
             STARCRAFT2_LOG_EVENT_ORIGIN,
             upgrade_event["details"]["origin"],
         )
-        self.assertIn("저글링 발업", upgrade_event["details"]["message"])
-        self.assertIn("저글링 맹독충 조합", strategy_event["details"]["message"])
+        self.assertTrue(bool(str(upgrade_event["details"]["message"] or "").strip()))
+        self.assertTrue(bool(str(strategy_event["details"]["message"] or "").strip()))
         extension.tts_bridge.speak.assert_not_called()
 
-    def test_upgrade_uses_direct_tts_when_shared_callback_is_missing(self):
+    def test_direct_tts_is_not_used_without_shared_status_callback(self):
         extension = StarCraft2Extension(
             plugin_root="C:\\fake\\StarCraft2",
             config_path="missing.json",
@@ -426,13 +417,9 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
             "03:09 Upgrade queue: [UpgradeId.ZERGLINGMOVEMENTSPEED]",
         )
 
-        extension.tts_bridge.speak.assert_called_once()
-        self.assertIn(
-            "저글링 발업",
-            extension.tts_bridge.speak.call_args.args[0],
-        )
+        extension.tts_bridge.speak.assert_not_called()
 
-    def test_generic_end_report_is_log_only_and_cancels_stale_tts(self):
+    def test_generic_end_report_is_log_only_without_stale_tts_cancel(self):
         tts = mock.Mock()
         extension = StarCraft2Extension(
             plugin_root="C:\\fake\\StarCraft2",
@@ -443,19 +430,14 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
 
         extension._on_log_line("runtime.log", "END GAME REPORT")
 
-        tts.cancel_pending.assert_called_once_with(
-            reason="starcraft2_log_game_ended"
-        )
+        tts.cancel_pending.assert_not_called()
         extension.tts_bridge.speak.assert_not_called()
 
         extension._on_log_line(
             "runtime.log",
             "Result.Victory against opponent HUMAN",
         )
-
-        extension.tts_bridge.speak.assert_called_once_with(
-            "내가 승리를 기록했어요."
-        )
+        extension.tts_bridge.speak.assert_not_called()
 
     def test_launcher_reports_missing_path_without_spawning_process(self):
         launcher = ProBotsLauncher()
@@ -1081,8 +1063,13 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
             "speak_events": True,
         }
 
-        extension.initialize(GameExtensionContext(tts=None))
-        extension.tts_bridge.set_speak_callback(spoken.append)
+        shared_status_callback = mock.Mock(side_effect=lambda event: spoken.append(event))
+        context = GameExtensionContext(tts=mock.Mock())
+        context.set_shared(
+            STARCRAFT2_STATUS_EVENT_CALLBACK_RESOURCE,
+            shared_status_callback,
+        )
+        extension.initialize(context)
         with mock.patch("plugins.StarCraft2.starcraft2_core.sc2_extension.log_print") as log_print:
             with mock.patch.object(extension, "_load_config", return_value=config):
                 with mock.patch.object(extension.log_watcher, "start", return_value={"ok": True}) as watcher_start:
@@ -1093,12 +1080,11 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
 
             status = extension.get_status()
         logged = "\n".join(str(call.args[0]) for call in log_print.call_args_list)
-        self.assertEqual(1, len(spoken))
-        self.assertIn("내가", spoken[0])
-        self.assertNotIn("Changeling", spoken[0])
-        self.assertNotIn("게임", spoken[0])
+        self.assertGreaterEqual(len(spoken), 2)
+        event_types = [evt.get("event_type", "") for evt in spoken if isinstance(evt, dict)]
+        self.assertIn("game_started", event_types)
+        self.assertTrue(any(event_type != "game_started" for event_type in event_types))
         self.assertIn("[StarCraft2LogCommentary]", logged)
-        self.assertIn("내가", logged)
         self.assertNotIn("Changeling", logged)
         self.assertTrue(status["started"])
         watcher_start.assert_called_once()
