@@ -5,19 +5,17 @@ from __future__ import annotations
 import json
 import time
 
-from core.logger import log_print
 from .starcraft2_contracts import StarCraft2Event
 from .starcraft2_event_bus import _StarCraft2EventBus
+from core.logger import log_print
 
 
 class _StarCraft2EngineEventService:
     def __init__(self, state, status_event_callback=None, event_bus: _StarCraft2EventBus | None = None):
         self.state = state
-        self.status_event_callback = status_event_callback
         self.event_bus = event_bus or _StarCraft2EventBus()
 
     def set_status_event_callback(self, callback):
-        self.status_event_callback = callback
         if self.event_bus is not None:
             self.event_bus.set_status_event_callback(callback)
 
@@ -27,11 +25,6 @@ class _StarCraft2EngineEventService:
         if self.event_bus is not None:
             self.event_bus.emit(normalized)
             return
-        if callable(self.status_event_callback):
-            try:
-                self.status_event_callback(normalized)
-            except Exception as e:
-                log_print(f"[StarCraft2] status event callback failed: {e}")
 
 
 class _StarCraft2LadderProxyEventService:
@@ -51,8 +44,6 @@ class _StarCraft2LadderProxyEventService:
         self,
         stream_name: str,
         line: str,
-        status_event_callback=None,
-        tts=None,
     ) -> None:
         text = str(line or "").strip()
         if text:
@@ -110,16 +101,6 @@ class _StarCraft2LadderProxyEventService:
                     consumed = self.event_bus.emit(event)
                     if consumed:
                         return
-                if callable(status_event_callback):
-                    try:
-                        status_event_callback(event)
-                        return
-                    except Exception as e:
-                        log_print(f"[StarCraft2] ladder proxy TTS callback failed: {e}")
-                if tts is not None:
-                    receive_input = getattr(tts, "receive_input", None)
-                    if callable(receive_input):
-                        receive_input(f"StarCraft2 {event_type}")
 
     def _is_response_not_set_end_tail(self, lower: str, now: float) -> bool:
         if "response_not_set" not in lower:

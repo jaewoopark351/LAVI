@@ -14,6 +14,7 @@ from .starcraft2_dto import (
     StarCraft2LocalMatchCommand,
     StarCraft2LocalMatchStatus,
 )
+from .starcraft2_event_bus import _StarCraft2EventBus
 from .starcraft2_runtime_context import SC2RuntimeContext
 
 
@@ -35,6 +36,7 @@ class _StarCraft2LocalMatchService:
         command_template,
         ladder_proxy,
         line_callback: LineCallback = None,
+        event_bus: Optional[_StarCraft2EventBus] = None,
         runtime_context: Optional[SC2RuntimeContext] = None,
     ):
         self.arg_utils = arg_utils
@@ -42,6 +44,7 @@ class _StarCraft2LocalMatchService:
         self.command_template = command_template
         self.ladder_proxy = ladder_proxy
         self.line_callback = line_callback
+        self.event_bus = event_bus
         self.runtime_context = runtime_context
 
     def local_match_race_from_args(self, args, fallback: str = "Terran") -> str:
@@ -355,8 +358,39 @@ class _StarCraft2LocalMatchService:
             config,
             capture_output=bool(capture_output),
             line_callback=self.line_callback,
+            exit_callback=self._on_ladder_proxy_exit,
         )
         return StarCraft2CommandResult.from_mapping(raw_result, action="local_human_vs_changeling")
+
+    def _on_ladder_proxy_exit(self, result: Dict[str, Any]) -> None:
+        details = result if isinstance(result, dict) else {}
+        event = {
+            "event_type": "proxy_stopped",
+            "details": {
+                "source": "ladder_proxy",
+                "pid": details.get("pid"),
+                "returncode": details.get("returncode"),
+                "launch_diagnostics": details.get("launch_diagnostics"),
+            },
+        }
+        if self.event_bus is not None:
+            self.event_bus.emit(event)
+        if self.runtime_context is None:
+            return
+        runtime_status = self.ladder_proxy.get_status(
+            self.config_service.local_match_config()
+        )
+        self.runtime_context.set_status(runtime_status)
+        self.runtime_context.set_tails(
+            runtime_status.get("stdout_tail", []),
+            runtime_status.get("stderr_tail", []),
+        )
+        self.runtime_context.clear_process()
+        self.runtime_context.stopped_at = time.time()
+        returncode = details.get("returncode")
+        self.runtime_context.runtime_error = (
+            None if returncode in (0, None) else f"proxy_exit_{returncode}"
+        )
 
     def _sync_runtime_context(
         self,

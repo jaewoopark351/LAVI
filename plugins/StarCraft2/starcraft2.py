@@ -7,7 +7,6 @@ from typing import Any, Dict, Optional
 
 import gradio as gr
 
-from core.logger import log_print
 from plugins.StarCraft2.starcraft2_core.starcraft2_arg_utils import _StarCraft2ArgUtils
 from plugins.StarCraft2.starcraft2_core.starcraft2_config import StarCraft2Config
 from plugins.StarCraft2.starcraft2_core.starcraft2_engine_registry import (
@@ -96,27 +95,25 @@ class StarCraft2:
             enemy_race=str(self.config_manager.get("enemy_race", "Zerg")),
             enemy_difficulty=str(self.config_manager.get("enemy_difficulty", "Easy")),
         )
-        self.status_event_callback = None
-        self.tts = None
         self.current_engine = None
         self.last_start_result: Dict[str, Any] = {}
         self.last_stop_result: Dict[str, Any] = {}
         self._shutdown = False
         # self.lan_discovery = _ArchivedLanDiscoveryState()
-        self.ladder_proxy = SC2LadderProxyLauncher()
+        self._runtime_context = SC2RuntimeContext()
+        self.ladder_proxy = SC2LadderProxyLauncher(
+            runtime_context=self._runtime_context,
+        )
         self.runtime_downloader = StarCraft2RuntimeDownloader()
         self.observation_tracker = SC2ObservationTracker()
         self._local_match_command_template = _LocalMatchCommandTemplate()
         self._arg_utils = _StarCraft2ArgUtils(SC2_RACE_CHOICES)
-        self._runtime_context = SC2RuntimeContext()
         self._match_config_service = _StarCraft2MatchConfigService(
             self.config_manager,
             self.plugin_root,
             self.runtime_downloader,
             self._arg_utils,
         )
-        self._last_sc2_event: Dict[str, Any] = {}
-        self._sc2_event_subscription = None
         self._event_bus = _StarCraft2EventBus()
         self._engine_event_service = _StarCraft2EngineEventService(
             self.state,
@@ -128,6 +125,7 @@ class StarCraft2:
             self._local_match_command_template,
             self.ladder_proxy,
             line_callback=self._on_ladder_proxy_line,
+            event_bus=self._event_bus,
             runtime_context=self._runtime_context,
         )
         self._facade_service = _StarCraft2FacadeService(
@@ -178,7 +176,6 @@ class StarCraft2:
             local_match_section.build(config)
             bot_section.bind()
             local_match_section.bind()
-            self._subscribe_sc2_events()
 
     def start(self, config_overrides: Optional[Dict[str, Any]] = None, launch_source="manual"):
         result = self._facade_service.start(config_overrides, launch_source)
@@ -199,13 +196,9 @@ class StarCraft2:
         return self._facade_service.get_status()
 
     def set_status_event_callback(self, callback):
-        self.status_event_callback = callback
         self._facade_service.set_status_event_callback(callback)
 
     def set_tts(self, tts):
-        #20260710_kpopmodder: Keep a direct TTS fallback for local-match
-        # lifecycle events when the reaction callback is unavailable.
-        self.tts = tts
         self._facade_service.set_tts(tts)
 
     def is_running(self) -> bool:
@@ -354,24 +347,7 @@ class StarCraft2:
 #         #20260712_kpopmodder: LAN Lobby proxy checks are archived.
 #         return self._lan_lobby_archived_ui("check_proxy_ports")
 
-    def _handle_engine_event(self, event):
-        self._facade_service.handle_engine_event(event)
-
-    def _subscribe_sc2_events(self):
-        if self._sc2_event_subscription is not None:
-            return
-        subscription = self._facade_service.subscribe_status_events(self._on_sc2_event)
-        if subscription is not None:
-            self._sc2_event_subscription = subscription
-
-    def _on_sc2_event(self, event: Dict[str, Any]) -> None:
-        self._last_sc2_event = dict(event) if isinstance(event, dict) else {}
-        state = getattr(self._facade_service, "state", None)
-        update_event = getattr(state, "update_event", None)
-        if callable(update_event):
-            update_event(self._last_sc2_event)
-
-#     def _on_lan_ladder_proxy_exit(self, event: Dict[str, Any]) -> None:
+    #     def _on_lan_ladder_proxy_exit(self, event: Dict[str, Any]) -> None:
 #         #20260712_kpopmodder: LAN Lobby exit handling is archived.
 #         log_print("[StarCraft2] LAN Lobby exit callback ignored because LAN Lobby is archived.")
 #
@@ -383,12 +359,7 @@ class StarCraft2:
         self._ladder_proxy_event_service.on_ladder_proxy_line(
             stream_name,
             line,
-            status_event_callback=self.status_event_callback,
-            tts=self.tts,
         )
-
-    def _is_ladder_proxy_error_line(self, lower_line: str) -> bool:
-        return self._ladder_proxy_event_service.is_ladder_proxy_error_line(lower_line)
 
 #     def _maybe_request_remote_native_joiner(self, line: str) -> None:
 #         #20260712_kpopmodder: Remote-native JoinGame source is archived.
@@ -402,12 +373,6 @@ class StarCraft2:
 #     def _request_remote_native_joiner_start(self, config: Dict[str, Any]) -> Dict[str, Any]:
 #         #20260712_kpopmodder: Remote-native JoinGame source is archived.
 #         return self._lan_lobby_archived_result("remote_native_joiner_start")
-
-    def _sync_state_from_engine(self):
-        self._facade_service.sync_state_from_engine()
-
-    def _facade_result(self, ok: bool, error=None, status=None):
-        return self._facade_service._facade_result(ok, error, status)
 
     def _ui_values(self, result=None):
         status = self.get_status()
