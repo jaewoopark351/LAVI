@@ -56,10 +56,6 @@ class AppComposer:
         self.screen_vision = None
         self.game_extension_context = None
         self.handle_chess_ai_move_applied = None
-        self.handle_starcraft116_status_event = None
-        self.build_starcraft116_status_event_callback = None
-        self.handle_starcraft2_status_event = None
-        self.build_starcraft2_status_event_callback = None
         self.game_extension_registry = ExtensionRegistry()
         self.core_components = []
         self.optional_components = []
@@ -243,13 +239,9 @@ class AppComposer:
             "StarCraft116",
         )#20260702_kpopmodder: StarCraft 1.16 BWAPI bot launcher is separate from Remastered.
         #20260707_kpopmodder: StarCraft116 plugin startup/watcher callback is owned by StarCraft116GameExtension.
-        self.handle_starcraft116_status_event = None
-        self.build_starcraft116_status_event_callback = None
         self.starcraft2_plugin = self.instantiate_manifest_plugin(
             "StarCraft2",
         )#20260707_kpopmodder: StarCraft2 plugin lifecycle/callback wiring is owned by StarCraft2GameExtension.
-        self.handle_starcraft2_status_event = None
-        self.build_starcraft2_status_event_callback = None
         self.screen_vision = self.instantiate_manifest_plugin(
             "ScreenVision",
             memory_store=self.memory_store,

@@ -174,8 +174,14 @@ class AppComposerTests(unittest.TestCase):
             composer.create_optional_plugins()
 
         self.assertIsNotNone(composer.starcraft116_plugin)
-        self.assertIsNone(composer.handle_starcraft116_status_event)
-        self.assertIsNone(composer.build_starcraft116_status_event_callback)
+        self.assertFalse(
+            hasattr(composer, "handle_starcraft116_status_event"),
+            "AppComposer should not keep StarCraft116 callback holders after extension migration.",
+        )
+        self.assertFalse(
+            hasattr(composer, "build_starcraft116_status_event_callback"),
+            "AppComposer should not keep StarCraft116 callback builders after extension migration.",
+        )
 
     def test_game_plugins_are_not_direct_lifecycle_components(self):
         composer = AppComposer()
