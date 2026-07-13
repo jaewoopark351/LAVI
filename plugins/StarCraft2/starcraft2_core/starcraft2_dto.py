@@ -16,7 +16,22 @@ class StarCraft2LocalMatchCommand(LocalMatchLaunchConfigDTO):
 
     @classmethod
     def from_mapping(cls, value: Any) -> "StarCraft2LocalMatchCommand":
-        return cls(**LocalMatchLaunchConfigDTO.from_mapping(value).to_dict())
+        dto = LocalMatchLaunchConfigDTO.from_mapping(value)
+        return cls(
+            executable_path=dto.executable_path,
+            working_directory=dto.working_directory,
+            args=dto.args,
+            proxy_ports=list(dto.proxy_ports),
+            bot_name=dto.bot_name,
+            ai_race=dto.ai_race,
+            human_race=dto.human_race,
+            capture_output=dto.capture_output,
+            keep_local_match_identity_args=dto.keep_local_match_identity_args,
+            starcraft2_exe_path=dto.starcraft2_exe_path,
+            starcraft2_support64_path=dto.starcraft2_support64_path,
+            starcraft2_base_path=dto.starcraft2_base_path,
+            check_hosts=list(dto.check_hosts),
+        )
 
 
 class StarCraft2CommandResult(StartResultDTO):
@@ -40,4 +55,3 @@ class StarCraft2LocalMatchStatus(LocalMatchRuntimeStatusDTO):
         if value is None:
             return {}
         return {"ok": bool(value)}
-

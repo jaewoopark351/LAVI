@@ -499,6 +499,8 @@ classDiagram
         +get_status()
         +set_status_event_callback(callback)
         +set_tts(tts)
+        +subscribe_status_events(callback)
+        +on_local_human_vs_changeling_click(...)
     }
     class StarCraft2GameExtension {
         <<app_core.extensions>>
@@ -509,6 +511,33 @@ classDiagram
     }
     class StarCraft2Bridge
     class StarCraft2Worker
+    class StarCraft2FacadeService {
+        <<orchestrator>>
+        +start(config_overrides)
+        +stop()
+        +get_status()
+        +on_local_human_vs_changeling_click(...)
+    }
+    class StarCraft2LocalMatchService {
+        <<domain service>>
+        +start_local_match(command)
+        +stop_local_match()
+        +get_local_match_status()
+    }
+    class StarCraft2EventBus {
+        <<observer channel>>
+        +subscribe(callback)
+        +emit(event)
+    }
+    class StarCraft2Contracts {
+        <<DTO/dataclass>>
+        +StartResultDTO
+        +StopResultDTO
+        +LocalMatchRuntimeStatusDTO
+        +StarCraft2Event
+    }
+    class StarCraft2EngineEventService
+    class StarCraft2LadderProxyEventService
     class StarCraft2EngineRegistry
     class StarCraft2EngineInterface {
         <<interface>>
@@ -551,7 +580,8 @@ classDiagram
     StarCraft2GameExtension *-- StarCraft2Bridge
     StarCraft2GameExtension *-- StarCraft2Worker
     StarCraft2GameExtension --> StarCraft2 : facade/plugin
-    StarCraft2GameExtension --> StarCraft2ReactionRuntime : status callback
+    StarCraft2GameExtension --> StarCraft2EventBus : subscribes
+    StarCraft2GameExtension --> StarCraft2ReactionRuntime : event callback
     StarCraft2ReactionRuntime --> StarCraft2ReactionPolicy : speak/log policy
     StarCraft2ReactionRuntime *-- StarCraft2ReactionTTSAdapter
     StarCraft2ReactionRuntime *-- StarCraft2ReactionMemoryRecorder
@@ -559,8 +589,19 @@ classDiagram
     StarCraft2ReactionMemoryRecorder --> MemoryStore : raw event memory
 
     StarCraft2 *-- StarCraft2EngineRegistry
+    StarCraft2 *-- StarCraft2FacadeService
+    StarCraft2 *-- StarCraft2LocalMatchService
+    StarCraft2 *-- StarCraft2EventBus
     StarCraft2 *-- SC2LadderProxyLauncher
     StarCraft2 *-- SC2ObservationTracker
+    StarCraft2FacadeService --> StarCraft2EngineRegistry : start/stop/status
+    StarCraft2FacadeService --> StarCraft2LocalMatchService : local match flow
+    StarCraft2FacadeService --> StarCraft2Contracts : typed results
+    StarCraft2LocalMatchService --> SC2LadderProxyLauncher : launch/stop/status
+    StarCraft2LadderProxyEventService --> SC2ObservationTracker : telemetry deltas
+    StarCraft2LadderProxyEventService --> StarCraft2EventBus : stdout/game events
+    StarCraft2EngineEventService --> StarCraft2EventBus : engine events
+    StarCraft2EventBus --> StarCraft2Contracts : StarCraft2Event
     StarCraft2EngineRegistry o-- StarCraft2EngineInterface
     StarCraft2EngineInterface <|.. InternalLAVBotEngine
     StarCraft2EngineInterface <|.. AresSC2BotEngine
@@ -575,8 +616,10 @@ classDiagram
     StarCraft2Extension --> StarCraft2GameExtension : shared status callback
 ```
 
-`StarCraft2GameExtension`은 현재 StarCraft2 facade와 worker 명령 경로를 소유하는 활성 lifecycle adapter입니다. `StarCraft2Extension`은 ProBots/Changeling 로그를 관찰하고 이벤트를 파싱한 뒤 공유 StarCraft2 status callback을 재사용하는 수동 관찰자입니다. 현재 소스에서 LAN Lobby remote-human 코드는 보관용으로 주석 처리되어 있으며 live 다이어그램에는 포함하지 않습니다.
-<!-- #20260713_kpopmodder: Document current StarCraft2 facade/observer split and archived LAN Lobby status. -->
+`StarCraft2`는 이제 UI와 조립 표면입니다. Gradio 탭을 만들고 runtime 참조를 보관하지만, 실행은 `StarCraft2FacadeService`로 위임합니다. `StarCraft2FacadeService`는 start/stop/status와 Local Human vs AI 버튼 흐름을 조율하는 경계입니다. Local match 명령 생성, runtime preflight, ladder-proxy 실행, stdout/game-event 파싱, reaction TTS/memory 처리는 domain service 쪽에 남깁니다.
+
+`StarCraft2EventBus`는 SC2 stdout 기반 이벤트, engine 이벤트, telemetry observation을 모으는 단일 live event channel입니다. UI/game extension은 이 채널을 구독하며 ladder stdout을 직접 파싱하지 않습니다. `StarCraft2Extension`은 여전히 수동 관찰자입니다. ProBots/Changeling 로그를 관찰하고 이벤트를 파싱한 뒤 공유 StarCraft2 status callback을 재사용하지만, main game facade를 직접 제어하지 않습니다. 현재 소스에서 LAN Lobby remote-human 코드는 보관용으로 주석 처리되어 있으며 live 다이어그램에는 포함하지 않습니다.
+<!-- #20260713_kpopmodder: Document current StarCraft2 facade/service/event split and archived LAN Lobby status. -->
 
 ## 관계 기호
 

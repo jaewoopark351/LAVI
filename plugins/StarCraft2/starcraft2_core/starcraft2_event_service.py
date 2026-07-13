@@ -6,14 +6,14 @@ import json
 import time
 
 from .starcraft2_contracts import StarCraft2Event
-from .starcraft2_event_bus import _StarCraft2EventBus
+from .starcraft2_event_bus import StarCraft2EventBus
 from core.logger import log_print
 
 
 class _StarCraft2EngineEventService:
-    def __init__(self, state, status_event_callback=None, event_bus: _StarCraft2EventBus | None = None):
+    def __init__(self, state, status_event_callback=None, event_bus: StarCraft2EventBus | None = None):
         self.state = state
-        self.event_bus = event_bus or _StarCraft2EventBus()
+        self.event_bus = event_bus or StarCraft2EventBus()
 
     def set_status_event_callback(self, callback):
         #20260714_kpopmodder: Keep API compatibility for legacy callers,
@@ -34,7 +34,7 @@ class _StarCraft2LadderProxyEventService:
         self,
         engine_event_service: _StarCraft2EngineEventService,
         observation_tracker,
-        event_bus: _StarCraft2EventBus | None = None,
+        event_bus: StarCraft2EventBus | None = None,
     ):
         self.engine_event_service = engine_event_service
         self.observation_tracker = observation_tracker

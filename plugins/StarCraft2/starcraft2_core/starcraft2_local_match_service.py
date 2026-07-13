@@ -14,7 +14,7 @@ from .starcraft2_dto import (
     StarCraft2LocalMatchCommand,
     StarCraft2LocalMatchStatus,
 )
-from .starcraft2_event_bus import _StarCraft2EventBus
+from .starcraft2_event_bus import StarCraft2EventBus
 from .starcraft2_runtime_context import SC2RuntimeContext
 
 
@@ -36,7 +36,7 @@ class _StarCraft2LocalMatchService:
         command_template,
         ladder_proxy,
         line_callback: LineCallback = None,
-        event_bus: Optional[_StarCraft2EventBus] = None,
+        event_bus: Optional[StarCraft2EventBus] = None,
         runtime_context: Optional[SC2RuntimeContext] = None,
     ):
         self.arg_utils = arg_utils

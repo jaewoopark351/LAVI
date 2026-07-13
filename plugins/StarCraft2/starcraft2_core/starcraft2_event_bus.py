@@ -10,9 +10,9 @@ from core.logger import log_print
 EventCallback = Callable[[Dict[str, Any]], None]
 
 
-class _StarCraft2EventBusSubscription:
+class StarCraft2EventBusSubscription:
     #20260713_kpopmodder: Keep subscription lifecycle explicit and safely reversible.
-    def __init__(self, bus: "_StarCraft2EventBus", callback: EventCallback):
+    def __init__(self, bus: "StarCraft2EventBus", callback: EventCallback):
         self._bus = bus
         self._callback = callback
         self._unsubscribed = False
@@ -24,18 +24,19 @@ class _StarCraft2EventBusSubscription:
         self._bus._unsubscribe(self._callback)
 
 
-class _StarCraft2EventBus:
+class StarCraft2EventBus:
+    #20260713_kpopmodder: Public event fan-out boundary for SC2 stdout/game/TTS/memory flow.
     def __init__(self):
         self._subscribers: List[EventCallback] = []
         self._status_event_callback_subscription = None
 
-    def subscribe(self, callback: Optional[EventCallback]) -> _StarCraft2EventBusSubscription:
+    def subscribe(self, callback: Optional[EventCallback]) -> StarCraft2EventBusSubscription:
         if not callable(callback):
-            return _StarCraft2EventBusSubscription(self, lambda event: None)
+            return StarCraft2EventBusSubscription(self, lambda event: None)
         self._subscribers.append(callback)
-        return _StarCraft2EventBusSubscription(self, callback)
+        return StarCraft2EventBusSubscription(self, callback)
 
-    def set_status_event_callback(self, callback: Optional[EventCallback]) -> Optional[_StarCraft2EventBusSubscription]:
+    def set_status_event_callback(self, callback: Optional[EventCallback]) -> Optional[StarCraft2EventBusSubscription]:
         # 20260713_kpopmodder: keep compatibility for legacy setter calls
         # by routing through the subscription channel (single path only).
         previous = self._status_event_callback_subscription
@@ -77,3 +78,7 @@ class _StarCraft2EventBus:
 
     def _unsubscribe(self, callback: EventCallback) -> None:
         self._subscribers = [item for item in self._subscribers if item is not callback]
+
+
+_StarCraft2EventBusSubscription = StarCraft2EventBusSubscription
+_StarCraft2EventBus = StarCraft2EventBus

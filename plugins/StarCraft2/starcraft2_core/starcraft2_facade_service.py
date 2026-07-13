@@ -12,11 +12,12 @@ from .starcraft2_contracts import (
     StopResultDTO,
 )
 from .starcraft2_runtime_context import SC2RuntimeContext
-from .starcraft2_event_bus import _StarCraft2EventBus
+from .starcraft2_event_bus import StarCraft2EventBus
 from .starcraft2_local_match_service import _StarCraft2LocalMatchService
 
 
-class _StarCraft2FacadeService:
+class StarCraft2FacadeService:
+    #20260713_kpopmodder: Public orchestration boundary between UI callbacks and SC2 domain services.
     def __init__(
         self,
         config_manager,
@@ -26,7 +27,7 @@ class _StarCraft2FacadeService:
         match_config_service,
         engine_event_service,
         local_match_service: Optional[_StarCraft2LocalMatchService] = None,
-        event_bus: _StarCraft2EventBus | None = None,
+        event_bus: StarCraft2EventBus | None = None,
         runtime_context: Optional[SC2RuntimeContext] = None,
     ):
         self.config_manager = config_manager
@@ -402,3 +403,6 @@ class _StarCraft2FacadeService:
             error=None if error is None else str(error),
             details={},
         )
+
+
+_StarCraft2FacadeService = StarCraft2FacadeService

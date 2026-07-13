@@ -1,4 +1,5 @@
 #20260707_kpopmodder: Added optional StarCraft2 facade for Windows-first engine adapter control.
+#20260713_kpopmodder: Keep this module as UI wiring plus service assembly; SC2 behavior lives in core services.
 from __future__ import annotations
 
 import os
@@ -11,13 +12,13 @@ from plugins.StarCraft2.starcraft2_core.starcraft2_config import StarCraft2Confi
 from plugins.StarCraft2.starcraft2_core.starcraft2_engine_registry import (
     StarCraft2EngineRegistry,
 )
-from plugins.StarCraft2.starcraft2_core.starcraft2_event_bus import _StarCraft2EventBus
+from plugins.StarCraft2.starcraft2_core.starcraft2_event_bus import StarCraft2EventBus
 from plugins.StarCraft2.starcraft2_core.starcraft2_event_service import (
     _StarCraft2EngineEventService,
     _StarCraft2LadderProxyEventService,
 )
 from plugins.StarCraft2.starcraft2_core.starcraft2_facade_service import (
-    _StarCraft2FacadeService,
+    StarCraft2FacadeService,
 )
 from plugins.StarCraft2.starcraft2_core.starcraft2_state import (
     StarCraft2RuntimeState,
@@ -113,7 +114,7 @@ class StarCraft2:
             self.runtime_downloader,
             self._arg_utils,
         )
-        self._event_bus = _StarCraft2EventBus()
+        self._event_bus = StarCraft2EventBus()
         self._engine_event_service = _StarCraft2EngineEventService(
             self.state,
             event_bus=self._event_bus,
@@ -127,7 +128,7 @@ class StarCraft2:
             event_bus=self._event_bus,
             runtime_context=self._runtime_context,
         )
-        self._facade_service = _StarCraft2FacadeService(
+        self._facade_service = StarCraft2FacadeService(
             self.config_manager,
             self.engine_registry,
             self.state,
