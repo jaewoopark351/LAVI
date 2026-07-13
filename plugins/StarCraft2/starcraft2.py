@@ -115,6 +115,8 @@ class StarCraft2:
             self.runtime_downloader,
             self._arg_utils,
         )
+        self._last_sc2_event: Dict[str, Any] = {}
+        self._sc2_event_subscription = None
         self._event_bus = _StarCraft2EventBus()
         self._engine_event_service = _StarCraft2EngineEventService(
             self.state,
@@ -176,6 +178,7 @@ class StarCraft2:
             local_match_section.build(config)
             bot_section.bind()
             local_match_section.bind()
+            self._subscribe_sc2_events()
 
     def start(self, config_overrides: Optional[Dict[str, Any]] = None, launch_source="manual"):
         result = self._facade_service.start(config_overrides, launch_source)
@@ -296,16 +299,18 @@ class StarCraft2:
         proxy_ports,
         ai_race=None,
     ):
-        return self._facade_service.on_local_human_vs_changeling_click(
+        status = self._facade_service.start_local_match(
             executable_path,
             working_directory,
             args,
             proxy_ports,
             ai_race=ai_race,
         )
+        return self._local_match_status_json(result=status)
 
     def on_local_match_stop_click(self):
-        return self._facade_service.on_local_match_stop_click()
+        status = self._facade_service.stop_local_match()
+        return self._local_match_status_json(result=status)
 
     def on_local_match_status_click(
         self,
@@ -314,12 +319,13 @@ class StarCraft2:
         args,
         proxy_ports,
     ):
-        return self._facade_service.on_local_match_status_click(
+        status = self._facade_service.get_local_match_status(
             executable_path,
             working_directory,
             args,
             proxy_ports,
         )
+        return self._local_match_status_json(result=status)
 
 #     def on_ladder_proxy_start_click(
 #         self,
@@ -351,6 +357,20 @@ class StarCraft2:
     def _handle_engine_event(self, event):
         self._facade_service.handle_engine_event(event)
 
+    def _subscribe_sc2_events(self):
+        if self._sc2_event_subscription is not None:
+            return
+        subscription = self._facade_service.subscribe_status_events(self._on_sc2_event)
+        if subscription is not None:
+            self._sc2_event_subscription = subscription
+
+    def _on_sc2_event(self, event: Dict[str, Any]) -> None:
+        self._last_sc2_event = dict(event) if isinstance(event, dict) else {}
+        state = getattr(self._facade_service, "state", None)
+        update_event = getattr(state, "update_event", None)
+        if callable(update_event):
+            update_event(self._last_sc2_event)
+
 #     def _on_lan_ladder_proxy_exit(self, event: Dict[str, Any]) -> None:
 #         #20260712_kpopmodder: LAN Lobby exit handling is archived.
 #         log_print("[StarCraft2] LAN Lobby exit callback ignored because LAN Lobby is archived.")
@@ -363,6 +383,8 @@ class StarCraft2:
         self._ladder_proxy_event_service.on_ladder_proxy_line(
             stream_name,
             line,
+            status_event_callback=self.status_event_callback,
+            tts=self.tts,
         )
 
     def _is_ladder_proxy_error_line(self, lower_line: str) -> bool:

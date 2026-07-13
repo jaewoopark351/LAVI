@@ -6,7 +6,11 @@ import time
 from typing import Any, Dict, Optional
 
 from core.logger import log_print
-from .starcraft2_contracts import StartResultDTO
+from .starcraft2_contracts import (
+    LocalMatchRuntimeStatusDTO,
+    StartResultDTO,
+    StopResultDTO,
+)
 from .starcraft2_runtime_context import SC2RuntimeContext
 from .starcraft2_event_bus import _StarCraft2EventBus
 from .starcraft2_local_match_service import _StarCraft2LocalMatchService
@@ -69,23 +73,79 @@ class _StarCraft2FacadeService:
             runtime_config,
             event_callback=self.handle_engine_event,
         )
-        self._sync_runtime_context(result)
-        self.last_start_result = result
+        facade_result = StartResultDTO.from_mapping(result, action="start")
+        self._sync_runtime_context(facade_result.to_dict())
+        self.last_start_result = facade_result.to_dict()
         self._sync_state_from_engine()
-        return result
+        return self.last_start_result
 
     def stop(self):
         if self.current_engine is None:
             self.state.mark_stopped("not_running")
-            result = self._facade_result(True, None, {"stopped": "not_running"})
+            result = self._facade_result(
+                True,
+                None,
+                {"stopped": "not_running"},
+                stopped=True,
+                action="stop",
+            )
             self.last_stop_result = result
             return result
 
-        result = self.current_engine.stop()
-        self._sync_runtime_context(result)
-        self.last_stop_result = result
+        result = StopResultDTO.from_mapping(
+            self.current_engine.stop(),
+            action="stop",
+        )
+        result_payload = result.to_dict()
+        self._sync_runtime_context(result_payload)
+        self.last_stop_result = result_payload
         self._sync_state_from_engine()
-        return result
+        return self.last_stop_result
+
+    def status(self) -> Dict[str, Any]:
+        return self.get_status()
+
+    def start_local_match(
+        self,
+        executable_path,
+        working_directory,
+        args,
+        proxy_ports,
+        ai_race=None,
+    ):
+        if self.local_match_service is None:
+            return self._local_match_missing_status()
+        return self.local_match_service.start_local_match(
+            executable_path,
+            working_directory,
+            args,
+            proxy_ports,
+            ai_race=ai_race,
+        )
+
+    def stop_local_match(self):
+        if self.local_match_service is None:
+            return self._local_match_missing_status()
+        return self.local_match_service.stop_local_match()
+
+    def get_local_match_status(
+        self,
+        executable_path=None,
+        working_directory=None,
+        args=None,
+        proxy_ports=None,
+    ):
+        if self.local_match_service is None:
+            return self._local_match_missing_status()
+        return self.local_match_service.get_local_match_status(
+            executable_path=executable_path,
+            working_directory=working_directory,
+            args=args,
+            proxy_ports=proxy_ports,
+        )
+
+    def local_match_status(self):
+        return self.get_local_match_status()
 
     def shutdown(self):
         if self._shutdown:
@@ -133,6 +193,11 @@ class _StarCraft2FacadeService:
         if self.event_bus is not None:
             self.event_bus.set_status_event_callback(callback)
 
+    def subscribe_status_events(self, callback):
+        if self.event_bus is None:
+            return None
+        return self.event_bus.subscribe(callback)
+
     def set_tts(self, tts):
         self.tts = tts
         if self.runtime_context is not None:
@@ -164,30 +229,20 @@ class _StarCraft2FacadeService:
         proxy_ports,
         ai_race=None,
     ):
-        if self.local_match_service is None:
-            return json.dumps(
-                {"ok": False, "error": "local_match_service_missing"},
-                ensure_ascii=False,
-                indent=2,
-                default=str,
-            )
-        return self.local_match_service.on_local_human_vs_changeling_click(
-            executable_path,
-            working_directory,
-            args,
-            proxy_ports,
-            ai_race=ai_race,
+        return self.local_match_status_json(
+            result=self.start_local_match(
+                executable_path=executable_path,
+                working_directory=working_directory,
+                args=args,
+                proxy_ports=proxy_ports,
+                ai_race=ai_race,
+            ).to_dict()
         )
 
     def on_local_match_stop_click(self):
-        if self.local_match_service is None:
-            return json.dumps(
-                {"ok": False, "error": "local_match_service_missing"},
-                ensure_ascii=False,
-                indent=2,
-                default=str,
-            )
-        return self.local_match_service.on_local_match_stop_click()
+        return self.local_match_status_json(
+            result=self.stop_local_match().to_dict()
+        )
 
     def on_local_match_status_click(
         self,
@@ -196,18 +251,15 @@ class _StarCraft2FacadeService:
         args,
         proxy_ports,
     ):
-        if self.local_match_service is None:
-            return json.dumps(
-                {"ok": False, "error": "local_match_service_missing"},
-                ensure_ascii=False,
-                indent=2,
-                default=str,
-            )
-        return self.local_match_service.on_local_match_status_click(
-            executable_path,
-            working_directory,
-            args,
-            proxy_ports,
+        status = self.get_local_match_status(
+            executable_path=executable_path,
+            working_directory=working_directory,
+            args=args,
+            proxy_ports=proxy_ports,
+        )
+        return self.local_match_status_json(
+            ladder_proxy_config=None,
+            result=status.to_dict(),
         )
 
     def local_match_status_json(self, ladder_proxy_config=None, result=None):
@@ -233,6 +285,22 @@ class _StarCraft2FacadeService:
             return str(fallback or "Zerg")
         return self.local_match_service.local_match_ai_race_from_args(
             args, fallback=fallback
+        )
+
+    def _local_match_missing_status(self) -> LocalMatchRuntimeStatusDTO:
+        return LocalMatchRuntimeStatusDTO(
+            mode="local_human_vs_changeling",
+            result=StartResultDTO(
+                ok=False,
+                action="local_human_vs_changeling",
+                error="local_match_service_missing",
+                message="local_match_service_missing",
+            ),
+            ladder_proxy={
+                "ok": False,
+                "running": False,
+                "status": {"error": "local_match_service_missing"},
+            },
         )
 
     def sync_state_from_engine(self):
@@ -292,11 +360,20 @@ class _StarCraft2FacadeService:
         self.runtime_context.clear_process()
         self.runtime_context.runtime_error = None if status_payload.get("error") is None else str(status_payload.get("error"))
 
-    def _facade_result(self, ok: bool, error=None, status=None):
-        return StartResultDTO(
+    def _facade_result(
+        self,
+        ok: bool,
+        error=None,
+        status=None,
+        stopped: bool = False,
+        action: str = "start",
+    ):
+        return StopResultDTO(
             ok=bool(ok),
             running=self.is_running(),
-            action="start",
+            action=action,
+            stopped=bool(stopped),
             status=dict(status or {}),
             error=None if error is None else str(error),
+            details={},
         ).to_dict()

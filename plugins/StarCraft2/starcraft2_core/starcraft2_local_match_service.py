@@ -4,9 +4,10 @@ from __future__ import annotations
 import json
 import subprocess
 import time
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, Optional, Union
 
 from core.logger import log_print
+from .starcraft2_contracts import LocalMatchRuntimeStatusDTO, StartResultDTO
 
 from .starcraft2_dto import (
     StarCraft2CommandResult,
@@ -71,6 +72,59 @@ class _StarCraft2LocalMatchService:
         )
         return subprocess.list2cmdline(normalized_args)
 
+    def start_local_match(
+        self,
+        executable_path,
+        working_directory,
+        args,
+        proxy_ports,
+        ai_race=None,
+    ) -> LocalMatchRuntimeStatusDTO:
+        command = self._build_local_match_command(
+            executable_path=executable_path,
+            working_directory=working_directory,
+            args=args,
+            proxy_ports=proxy_ports,
+            ai_race=ai_race,
+        )
+        if isinstance(command, StarCraft2CommandResult):
+            return self._make_local_match_status(result=command)
+        start_result = self._start_local_human_vs_changeling(command)
+        return self._make_local_match_status(
+            result=start_result,
+            ladder_proxy_config=self.config_service.local_match_config(
+                executable_path=str(executable_path or ""),
+                working_directory=str(working_directory or ""),
+                args=args,
+                proxy_ports=proxy_ports,
+                bot_name=command.bot_name,
+                keep_local_match_identity_args=command.keep_local_match_identity_args,
+            ),
+        )
+
+    def stop_local_match(self) -> LocalMatchRuntimeStatusDTO:
+        result = self._stop_local_match()
+        return self._make_local_match_status(
+            result=result,
+            ladder_proxy_config=self.config_service.local_match_config(),
+        )
+
+    def get_local_match_status(
+        self,
+        executable_path=None,
+        working_directory=None,
+        args=None,
+        proxy_ports=None,
+    ) -> LocalMatchRuntimeStatusDTO:
+        return self._make_local_match_status(
+            ladder_proxy_config=self.config_service.local_match_config(
+                executable_path=executable_path,
+                working_directory=working_directory,
+                args=args,
+                proxy_ports=proxy_ports,
+            ),
+        )
+
     def on_local_human_vs_changeling_click(
         self,
         executable_path,
@@ -79,6 +133,23 @@ class _StarCraft2LocalMatchService:
         proxy_ports,
         ai_race=None,
     ):
+        status = self.start_local_match(
+            executable_path=executable_path,
+            working_directory=working_directory,
+            args=args,
+            proxy_ports=proxy_ports,
+            ai_race=ai_race,
+        )
+        return self._local_match_status_json(result=status)
+
+    def _build_local_match_command(
+        self,
+        executable_path,
+        working_directory,
+        args,
+        proxy_ports,
+        ai_race=None,
+    ) -> Union[StarCraft2LocalMatchCommand, StarCraft2CommandResult]:
         selected_ai_race = self.arg_utils.normalize_sc2_race(
             ai_race
             or self.arg_utils.local_match_ai_race_from_args(
@@ -97,9 +168,7 @@ class _StarCraft2LocalMatchService:
                 error="local_match_random_ai_not_supported",
                 message="Random AI is disabled until deterministic bot selection is implemented.",
             )
-            return self._local_match_status_json(
-                result=result,
-            )
+            return result
 
         args = self.on_local_match_ai_race_change(selected_ai_race, args)
         selected_human_race = self.arg_utils.local_match_race_from_args(args)
@@ -121,12 +190,12 @@ class _StarCraft2LocalMatchService:
             capture_output=True,
             keep_local_match_identity_args=False,
         )
-        return self._start_local_human_vs_changeling(command)
+        return command
 
     def _start_local_human_vs_changeling(
         self,
         command: StarCraft2LocalMatchCommand,
-    ):
+    ) -> StarCraft2CommandResult:
         launch_template = self.command_template.build_launch_args(
             command.args,
             bot_name=command.bot_name,
@@ -156,7 +225,8 @@ class _StarCraft2LocalMatchService:
             log_print(
                 f"[StarCraft2LocalMatchService] runtime restore failed: {result.to_dict()}"
             )
-            return self._local_match_status_json(config, result)
+            self._sync_runtime_context(result, config)
+            return result
 
         if runtime_download.get("downloaded"):
             #20260712_kpopmodder: Rebuild config after restore so bot profile
@@ -190,16 +260,16 @@ class _StarCraft2LocalMatchService:
             log_print(
                 f"[StarCraft2LocalMatchService] preflight failed: {result.to_dict()}"
             )
-            return self._local_match_status_json(config, result)
+            self._sync_runtime_context(result, config)
+            return result
 
         start_result = self._launch_local_match_process(config, command.capture_output)
         self._sync_runtime_context(start_result, config)
-        return self._local_match_status_json(config, start_result)
+        return start_result
 
     def on_local_match_stop_click(self):
-        result = self._stop_local_match()
-        self._sync_runtime_context(result, self.config_service.local_match_config())
-        return self._local_match_status_json(result=result)
+        status = self.stop_local_match()
+        return self._local_match_status_json(result=status)
 
     def _stop_local_match(self) -> StarCraft2CommandResult:
         return StarCraft2CommandResult.from_mapping(
@@ -214,26 +284,53 @@ class _StarCraft2LocalMatchService:
         args,
         proxy_ports,
     ):
-        config = self.config_service.local_match_config(
+        status = self.get_local_match_status(
             executable_path=executable_path,
             working_directory=working_directory,
             args=args,
             proxy_ports=proxy_ports,
         )
-        return self._local_match_status_json(config)
+        return self._local_match_status_json(result=status)
 
-    def _local_match_status_json(self, ladder_proxy_config=None, result: Optional[StarCraft2CommandResult] = None):
+    def _make_local_match_status(
+        self,
+        ladder_proxy_config=None,
+        result: Optional[StarCraft2CommandResult] = None,
+    ) -> LocalMatchRuntimeStatusDTO:
         proxy_config = (
             ladder_proxy_config
             if isinstance(ladder_proxy_config, dict)
             else self.config_service.local_match_config()
         )
-        status = StarCraft2LocalMatchStatus(
-            result=result,
+        if isinstance(result, LocalMatchRuntimeStatusDTO):
+            return result
+        normalized_result = (
+            result
+            if isinstance(result, StarCraft2CommandResult)
+            else StartResultDTO.from_mapping(result, action="local_human_vs_changeling")
+        )
+        return StarCraft2LocalMatchStatus(
+            result=normalized_result,
             ladder_proxy=self.ladder_proxy.get_status(proxy_config),
         )
+
+    def _local_match_status_json(
+        self,
+        ladder_proxy_config=None,
+        result: Optional[Union[LocalMatchRuntimeStatusDTO, StarCraft2CommandResult, Dict[str, Any]]] = None,
+    ):
+        proxy_config = (
+            ladder_proxy_config
+            if isinstance(ladder_proxy_config, dict)
+            else self.config_service.local_match_config()
+        )
+        status = (
+            result.to_dict()
+            if isinstance(result, LocalMatchRuntimeStatusDTO)
+            else self._make_local_match_status(proxy_config, result).to_dict()
+        )
         return json.dumps(
-            status.to_dict(),
+            status,
             ensure_ascii=False,
             indent=2,
             default=str,
@@ -242,7 +339,7 @@ class _StarCraft2LocalMatchService:
     def local_match_status_json(
         self,
         ladder_proxy_config=None,
-        result: Optional[StarCraft2CommandResult] = None,
+        result: Optional[Union[LocalMatchRuntimeStatusDTO, StarCraft2CommandResult, Dict[str, Any]]] = None,
     ):
         return self._local_match_status_json(
             ladder_proxy_config=ladder_proxy_config,
