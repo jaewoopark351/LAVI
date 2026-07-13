@@ -113,6 +113,7 @@ class _StarCraft2ArgUtils:
                 #20260710_kpopmodder: LavHumanVsBot uses its built-in
                 # human name in the current binary; passing this legacy
                 # option prevents all local bot types from progressing.
+                "--bot",
                 "--human-name",
             },
         )

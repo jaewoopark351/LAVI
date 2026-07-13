@@ -46,33 +46,9 @@ class _StarCraft2LocalMatchService:
         return subprocess.list2cmdline(normalized_args)
 
     def on_local_match_ai_race_change(self, ai_race, args):
-        selected_race = self.arg_utils.normalize_sc2_race(ai_race, fallback="Zerg")
         normalized_args = self.arg_utils.strip_local_match_args(
             self.arg_utils.normalize_ladder_args(args)
         )
-        bot_name = LOCAL_MATCH_AI_BY_RACE.get(selected_race, "")
-        replaced = False
-        rewritten = []
-        skip_next = False
-        for arg in normalized_args:
-            text = str(arg or "").strip()
-            if skip_next:
-                skip_next = False
-                continue
-            if text == "--bot":
-                rewritten.extend(["--bot", bot_name] if bot_name else [])
-                skip_next = True
-                replaced = True
-                continue
-            if text.startswith("--bot="):
-                if bot_name:
-                    rewritten.append("--bot=" + bot_name)
-                replaced = True
-                continue
-            rewritten.append(arg)
-        if bot_name and not replaced:
-            rewritten = ["--bot", bot_name] + rewritten
-        normalized_args = rewritten
         return subprocess.list2cmdline(normalized_args)
 
     def on_local_human_vs_changeling_click(
@@ -106,6 +82,7 @@ class _StarCraft2LocalMatchService:
             working_directory=working_directory,
             args=args,
             proxy_ports=proxy_ports,
+            bot_name=bot_name,
         )
         runtime_download = self.config_service.ensure_local_match_runtime(config)
         config["runtime_download"] = runtime_download
@@ -126,6 +103,7 @@ class _StarCraft2LocalMatchService:
                 working_directory=working_directory,
                 args=args,
                 proxy_ports=proxy_ports,
+                bot_name=bot_name,
             )
             config["runtime_download"] = runtime_download
         bot_profile_validation = config.get("bot_profile_validation", {})

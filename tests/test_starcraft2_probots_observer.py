@@ -875,7 +875,7 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
         )
 
         self.assertEqual(
-            ["--bot", "changeling"],
+            [],
             result["args"],
         )
         self.assertFalse(result["remote_human_enabled"])
@@ -894,7 +894,7 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
         result = facade._local_match_config()
 
         self.assertEqual(
-            ["--bot", "changeling"],
+            [],
             result["args"],
         )
 
@@ -917,7 +917,7 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
                 normalized = facade._normalize_ladder_args(result)
 
                 self.assertEqual(
-                    ["--bot", "changeling", "--race", "Protoss"],
+                    ["--race", "Protoss"],
                     normalized,
                 )
                 self.assertEqual(1, normalized.count("--race"))
@@ -932,8 +932,6 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
 
         self.assertEqual(
             [
-                "--bot",
-                "changeling",
                 "--bot-dir",
                 "C:\\SC2 Bots",
                 "--race",
@@ -960,14 +958,14 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
 
     def test_starcraft2_local_match_ai_race_maps_to_bot(self):
         facade = StarCraft2()
-        for race, bot in (("Terran", "BenBotBC"), ("Protoss", "sharkbot"), ("Zerg", "changeling")):
+        for race, _ in (("Terran", "BenBotBC"), ("Protoss", "sharkbot"), ("Zerg", "changeling")):
             with self.subTest(race=race):
                 result = facade.on_local_match_ai_race_change(
                     race,
                     "--bot changeling --race Protoss",
                 )
                 self.assertEqual(
-                    ["--bot", bot, "--race", "Protoss"],
+                    ["--race", "Protoss"],
                     facade._normalize_ladder_args(result),
                 )
 
@@ -1019,7 +1017,7 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
 
         started_config = start.call_args.args[0]
         self.assertEqual(
-            ["--bot", "changeling", "--race", "Protoss"],
+            ["--race", "Protoss"],
             started_config["args"],
         )
         self.assertNotIn("remote_human", started_config)

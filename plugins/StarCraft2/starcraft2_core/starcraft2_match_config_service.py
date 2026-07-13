@@ -60,6 +60,7 @@ class _StarCraft2MatchConfigService:
         working_directory=None,
         args=None,
         proxy_ports=None,
+        bot_name: Optional[str] = None,
     ) -> Dict[str, Any]:
         #20260711_kpopmodder: Local Match intentionally no longer reads the LAN
         # Lobby launcher defaults; this protects local play while remote-human
@@ -90,26 +91,29 @@ class _StarCraft2MatchConfigService:
             config["args"] = args if isinstance(args, list) else str(args or "")
         if proxy_ports is not None and str(proxy_ports or "").strip():
             config["ports"] = proxy_ports
-        config["args"] = self.arg_utils.strip_local_match_args(
-            self.arg_utils.normalize_ladder_args(config.get("args", []))
-        )
+        normalized_args = self.arg_utils.normalize_ladder_args(config.get("args", []))
+        config["args"] = self.arg_utils.strip_local_match_args(normalized_args)
         config["proxy_host"] = ""
         config["check_hosts"] = ["127.0.0.1"]
         config["remote_human_enabled"] = False
         config["mode"] = "local_human_vs_changeling"
-        normalized_args = config["args"]
-        bot_name = ""
+        resolved_bot_name = ""
+        preferred_bot_name = str(bot_name or "").strip()
         for index, arg in enumerate(normalized_args):
-            if str(arg).strip() == "--bot" and index + 1 < len(normalized_args):
-                bot_name = str(normalized_args[index + 1]).strip()
+            if preferred_bot_name:
                 break
-        profile = get_bot_launch_profile(bot_name)
+            if str(arg).strip() == "--bot" and index + 1 < len(normalized_args):
+                resolved_bot_name = str(normalized_args[index + 1]).strip()
+                break
+        if preferred_bot_name:
+            resolved_bot_name = preferred_bot_name
+        profile = get_bot_launch_profile(resolved_bot_name)
         config["bot_profile"] = {
             "name": profile.name,
             "type": profile.bot_type,
             "file_name": profile.file_name,
             "required_runtime": profile.required_runtime,
-        } if profile else {"name": bot_name, "error": "unknown_bot_profile"}
+        } if profile else {"name": resolved_bot_name, "error": "unknown_bot_profile"}
         if profile:
             bot_root = os.path.join(config.get("working_directory", ""), "Bots")
             config["bot_profile_validation"] = profile.validate(bot_root)

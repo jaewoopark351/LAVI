@@ -181,7 +181,9 @@ class StarCraft2RuntimeDownloaderTests(unittest.TestCase):
 
         facade = StarCraft2()
         facade.plugin_root = str(plugin_root)
+        facade._match_config_service.plugin_root = str(plugin_root)
         facade.runtime_downloader = StarCraft2RuntimeDownloader(fake_download)
+        facade._match_config_service.runtime_downloader = facade.runtime_downloader
         facade.config_manager.config["runtime_download"] = {
             "enabled": True,
             "repo_id": DEFAULT_RUNTIME_REPO_ID,

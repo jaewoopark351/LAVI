@@ -4,6 +4,7 @@
 #include <iostream>
 #include <cstdlib>
 #include <string>
+#include <vector>
 
 #include "AgentsConfig.h"
 #include "LadderConfig.h"
@@ -32,6 +33,70 @@ bool hasArg(int argc, char** argv, const std::string& name)
         }
     }
     return false;
+}
+
+std::string normalizeArgName(const std::string& name)
+{
+    return name + "=";
+}
+
+bool shouldExcludeFromSc2Args(const std::string& arg)
+{
+    static const std::vector<std::string> excluded = {
+        "--human-name",
+        "--bot",
+        "--map",
+        "--race",
+        "--bot-race",
+        "--bot-dir",
+        "--config",
+        "--remote-human-host",
+        "--remote-human-client-port",
+        "--no-realtime",
+        "--realtime",
+    };
+    for (const auto& excluded_name : excluded)
+    {
+        if (arg == excluded_name || arg.rfind(normalizeArgName(excluded_name), 0) == 0)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool isBooleanArgValue(const std::string& arg)
+{
+    return arg == "--no-realtime" || arg == "--realtime";
+}
+
+std::vector<std::string> coordinatorArgs(int argc, char** argv)
+{
+    std::vector<std::string> args;
+    if (argc <= 0)
+    {
+        return args;
+    }
+    args.reserve(static_cast<size_t>(argc));
+    args.push_back(argv[0] ? argv[0] : "");
+    for (int i = 1; i < argc; ++i)
+    {
+        const std::string current_arg = argv[i] ? argv[i] : "";
+        if (current_arg.empty())
+        {
+            continue;
+        }
+        if (shouldExcludeFromSc2Args(current_arg))
+        {
+            if (!isBooleanArgValue(current_arg) && current_arg.find('=') == std::string::npos && i + 1 < argc)
+            {
+                ++i;
+            }
+            continue;
+        }
+        args.push_back(current_arg);
+    }
+    return args;
 }
 
 std::string argValue(int argc, char** argv, const std::string& name, const std::string& fallback)
@@ -125,7 +190,18 @@ int main(int argc, char** argv)
     }
     std::cout << std::endl;
 
-    LadderGame game(argc, argv, &config);
+    const auto coordinator_args = coordinatorArgs(argc, argv);
+    std::vector<char*> coordinator_argv;
+    coordinator_argv.reserve(coordinator_args.size());
+    for (auto& arg : coordinator_args)
+    {
+        coordinator_argv.push_back(arg.data());
+    }
+    LadderGame game(
+        static_cast<int>(coordinator_argv.size()),
+        coordinator_argv.data(),
+        &config,
+    );
     game.SetRealTime(realtime);
     GameResult result = game.StartGame(human, bot, mapName, remoteHumanHost, remoteHumanClientPort);
     std::cout << "[LavHumanVsBot] Finished with result: " << GetResultType(result.Result) << std::endl;

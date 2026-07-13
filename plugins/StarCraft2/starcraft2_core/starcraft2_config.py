@@ -122,8 +122,6 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "args": [
             "--human-name",
             "IdleProbe",
-            "--bot",
-            "changeling",
             "--map",
             "PersephoneLE.SC2Map",
             "--race",

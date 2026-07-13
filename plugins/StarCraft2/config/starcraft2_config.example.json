@@ -57,7 +57,7 @@
     "human_vs_bot":  {
                          "launcher_path":  "",
                          "working_directory":  "",
-                         "args":  [
+                        "args":  [
 
                                   ]
                      },
@@ -71,11 +71,9 @@
                         "enabled":  false,
                         "executable_path":  "plugins\\StarCraft2\\native\\Sc2LadderServer\\bin\\LavHumanVsBot.exe",
                         "working_directory":  "plugins\\StarCraft2\\runtime",
-                        "args":  [
+                         "args":  [
                                      "--human-name",
                                      "IdleProbe",
-                                     "--bot",
-                                     "changeling",
                                      "--map",
                                      "PersephoneLE.SC2Map",
                                      "--race",
