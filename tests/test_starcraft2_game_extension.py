@@ -9,6 +9,9 @@ from app_core.extensions.starcraft2_game_extension import StarCraft2GameExtensio
 from plugins.StarCraft2.starcraft2_core.starcraft2_observation_tracker import (
     SC2ObservationTracker,
 )
+from plugins.StarCraft2.starcraft2_core.sc2_telemetry_registry import (
+    SC2_LOG_ONLY_UNIT_TYPE_ID_BY_TOKEN,
+)
 from plugins.StarCraft2.starcraft2_core.starcraft2_reaction_policy import (
     StarCraft2ReactionPolicy,
 )
@@ -204,6 +207,41 @@ class StarCraft2GameExtensionTests(unittest.TestCase):
         self.assertEqual(["unit_produced"], [event["event_type"] for event in events])
         self.assertEqual("103", events[0]["details"]["unit_type_id"])
 
+    def test_log_only_telemetry_units_do_not_emit_unknown_events(self):
+        tracker = SC2ObservationTracker()
+        base = {
+            "schema": 1,
+            "role": "ai",
+            "game_loop": 224,
+            "unit_type_counts": {},
+            "under_construction_type_counts": {},
+        }
+        changed = dict(base)
+        changed.update({
+            "game_loop": 448,
+            "unit_type_counts": {
+                str(SC2_LOG_ONLY_UNIT_TYPE_ID_BY_TOKEN[token]): 1
+                for token in (
+                    "FACTORYFLYING",
+                    "CHANGELING",
+                    "CHANGELINGZERGLINGWINGS",
+                    "CREEPTUMOR",
+                    "ZERGLINGBURROWED",
+                    "OVERLORDCOCOON",
+                    "CREEPTUMORBURROWED",
+                    "CREEPTUMORQUEEN",
+                )
+            },
+        })
+
+        self.assertEqual([], tracker.update(base))
+        events = tracker.update(changed)
+
+        self.assertTrue(events)
+        self.assertFalse(
+            any(str(event["event_type"]).startswith("unknown_") for event in events)
+        )
+
     def test_reaction_text_uses_shared_speech_name_for_extractor(self):
         event = {
             "event_type": "building_started",
@@ -326,6 +364,29 @@ class StarCraft2GameExtensionTests(unittest.TestCase):
                     f"[StarCraft2Reaction] event={event['event_type']}"
                 )
                 memory_store.add_raw_event.assert_called_once()
+
+    def test_log_only_telemetry_units_stay_speech_silent(self):
+        policy = StarCraft2ReactionPolicy(min_interval_sec=0)
+        for token in (
+            "FACTORYFLYING",
+            "CHANGELING",
+            "CHANGELINGZERGLINGWINGS",
+            "CREEPTUMOR",
+            "ZERGLINGBURROWED",
+            "OVERLORDCOCOON",
+            "CREEPTUMORBURROWED",
+            "CREEPTUMORQUEEN",
+        ):
+            with self.subTest(token=token):
+                self.assertFalse(policy.should_emit({
+                    "event_type": "unit_produced",
+                    "details": {
+                        "unit_type_id": str(SC2_LOG_ONLY_UNIT_TYPE_ID_BY_TOKEN[token]),
+                        "unit_changes": {
+                            str(SC2_LOG_ONLY_UNIT_TYPE_ID_BY_TOKEN[token]): 1
+                        },
+                    },
+                }))
 
     def test_non_egg_unit_production_still_uses_tts(self):
         event = {

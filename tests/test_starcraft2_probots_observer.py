@@ -109,7 +109,6 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
             config_path="missing.json",
         )
         extension.initialize(context)
-        extension.tts_bridge.speak = mock.Mock(return_value={"ok": True})
 
         extension._on_ladder_proxy_line("stdout", "[LavHumanVsBot] Building unit: PROBE")
         extension._on_ladder_proxy_line(
@@ -118,7 +117,7 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
         )
 
         status_callback.assert_not_called()
-        extension.tts_bridge.speak.assert_not_called()
+        self.assertFalse(hasattr(extension, "tts_bridge"))
         tts.cancel_pending.assert_not_called()
 
     def test_parser_converts_known_events_and_dedupes_repeated_lines(self):
@@ -375,7 +374,6 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
             config_path="missing.json",
         )
         extension.initialize(context)
-        extension.tts_bridge.speak = mock.Mock(return_value={"ok": True})
 
         extension._on_log_line(
             "runtime.log",
@@ -402,7 +400,7 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
         )
         self.assertTrue(bool(str(upgrade_event["details"]["message"] or "").strip()))
         self.assertTrue(bool(str(strategy_event["details"]["message"] or "").strip()))
-        extension.tts_bridge.speak.assert_not_called()
+        self.assertFalse(hasattr(extension, "tts_bridge"))
 
     def test_direct_tts_is_not_used_without_shared_status_callback(self):
         extension = StarCraft2Extension(
@@ -410,14 +408,13 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
             config_path="missing.json",
         )
         extension.initialize(GameExtensionContext(tts=mock.Mock()))
-        extension.tts_bridge.speak = mock.Mock(return_value={"ok": True})
 
         extension._on_log_line(
             "runtime.log",
             "03:09 Upgrade queue: [UpgradeId.ZERGLINGMOVEMENTSPEED]",
         )
 
-        extension.tts_bridge.speak.assert_not_called()
+        self.assertFalse(hasattr(extension, "tts_bridge"))
 
     def test_generic_end_report_is_log_only_without_stale_tts_cancel(self):
         tts = mock.Mock()
@@ -426,18 +423,16 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
             config_path="missing.json",
         )
         extension.initialize(GameExtensionContext(tts=tts))
-        extension.tts_bridge.speak = mock.Mock(return_value={"ok": True})
 
         extension._on_log_line("runtime.log", "END GAME REPORT")
 
         tts.cancel_pending.assert_not_called()
-        extension.tts_bridge.speak.assert_not_called()
 
         extension._on_log_line(
             "runtime.log",
             "Result.Victory against opponent HUMAN",
         )
-        extension.tts_bridge.speak.assert_not_called()
+        self.assertFalse(hasattr(extension, "tts_bridge"))
 
     def test_launcher_reports_missing_path_without_spawning_process(self):
         launcher = ProBotsLauncher()

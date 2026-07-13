@@ -4,7 +4,10 @@ from __future__ import annotations
 import time
 from typing import Any, Dict
 
-from .sc2_telemetry_registry import SC2_BUILDING_UNIT_TYPE_IDS
+from .sc2_telemetry_registry import (
+    SC2_BUILDING_UNIT_TYPE_IDS,
+    SC2_LOG_ONLY_UNIT_TYPE_IDS,
+)
 
 
 IMPORTANT_EVENT_TYPES = {
@@ -40,9 +43,12 @@ SILENT_TTS_EVENT_TYPES = {
     "army_milestone",
 }
 
-#20260711_kpopmodder: Zerg eggs and larvae are transient production state, so
-# keep their telemetry in logs without announcing each one through TTS.
-SILENT_TTS_TRANSIENT_ZERG_UNIT_IDS = {"103", "151"}
+#20260711_kpopmodder: Transient/state-only unit IDs stay in diagnostics without
+# announcing every morph, burrowed state, cocoon, or changeling through TTS.
+SILENT_TTS_TRANSIENT_ZERG_UNIT_IDS = {
+    str(unit_type_id)
+    for unit_type_id in SC2_LOG_ONLY_UNIT_TYPE_IDS
+}
 
 #20260713_kpopmodder: Single low-signal worker/zergling production ticks are
 # useful telemetry but too noisy for spoken reactions.

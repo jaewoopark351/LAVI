@@ -554,7 +554,6 @@ classDiagram
     class ProBotsLauncher
     class ProBotsLogWatcher
     class SC2EventParser
-    class SC2TTSBridge
     class StarCraft2ReactionRuntime
     class StarCraft2ReactionPolicy
     class StarCraft2ReactionTTSAdapter
@@ -592,7 +591,6 @@ classDiagram
     StarCraft2Extension *-- ProBotsLauncher
     StarCraft2Extension *-- ProBotsLogWatcher
     StarCraft2Extension *-- SC2EventParser
-    StarCraft2Extension *-- SC2TTSBridge
     StarCraft2Extension --> StarCraft2GameExtension : shared status callback
 ```
 

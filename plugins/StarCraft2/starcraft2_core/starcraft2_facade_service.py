@@ -47,6 +47,8 @@ class _StarCraft2FacadeService:
         self.tts = None
         self.last_start_result: Dict[str, Any] = {}
         self.last_stop_result: Dict[str, Any] = {}
+        self._last_start_result_dto: Optional[StartResultDTO] = None
+        self._last_stop_result_dto: Optional[StopResultDTO] = None
         self._shutdown = False
 
     def start(
@@ -57,14 +59,12 @@ class _StarCraft2FacadeService:
         runtime_config = self.config_manager.build_runtime_config(config_overrides or {})
         if not bool(runtime_config.get("enabled", False)):
             result = self._facade_result(False, "enabled_false")
-            self.last_start_result = result
-            return result
+            return self._remember_start_result(result)
         if launch_source == "startup" and not bool(
             runtime_config.get("auto_launch", False)
         ):
             result = self._facade_result(True, None, {"skipped": "auto_launch_false"})
-            self.last_start_result = result
-            return result
+            return self._remember_start_result(result)
 
         engine_name = str(runtime_config.get("engine") or "internal_lav_bot")
         if self.current_engine is None or self.current_engine.engine_name != engine_name:
@@ -75,7 +75,7 @@ class _StarCraft2FacadeService:
         )
         facade_result = StartResultDTO.from_mapping(result, action="start")
         self._sync_runtime_context(facade_result.to_dict())
-        self.last_start_result = facade_result.to_dict()
+        self._remember_start_result(facade_result)
         self._sync_state_from_engine()
         return self.last_start_result
 
@@ -89,8 +89,7 @@ class _StarCraft2FacadeService:
                 stopped=True,
                 action="stop",
             )
-            self.last_stop_result = result
-            return result
+            return self._remember_stop_result(result)
 
         result = StopResultDTO.from_mapping(
             self.current_engine.stop(),
@@ -98,7 +97,7 @@ class _StarCraft2FacadeService:
         )
         result_payload = result.to_dict()
         self._sync_runtime_context(result_payload)
-        self.last_stop_result = result_payload
+        self._remember_stop_result(result)
         self._sync_state_from_engine()
         return self.last_stop_result
 
@@ -182,6 +181,21 @@ class _StarCraft2FacadeService:
             ensure_ascii=False,
             indent=2,
             default=str,
+        )
+
+    def ui_values(self, result=None):
+        status = self.get_status()
+        last_event = status.get("state", {}).get("last_event") or {}
+        last_error = (
+            (result or {}).get("error")
+            if isinstance(result, dict)
+            else None
+        ) or status.get("state", {}).get("last_error") or ""
+        return (
+            self.config_manager.config_message(),
+            self.status_json(status),
+            json.dumps(last_event, ensure_ascii=False, indent=2, default=str),
+            str(last_error or ""),
         )
 
     def set_status_event_callback(self, callback):
@@ -352,6 +366,16 @@ class _StarCraft2FacadeService:
         self.runtime_context.clear_process()
         self.runtime_context.runtime_error = None if status_payload.get("error") is None else str(status_payload.get("error"))
 
+    def _remember_start_result(self, result: StartResultDTO) -> Dict[str, Any]:
+        self._last_start_result_dto = result
+        self.last_start_result = result.to_dict()
+        return self.last_start_result
+
+    def _remember_stop_result(self, result: StopResultDTO) -> Dict[str, Any]:
+        self._last_stop_result_dto = result
+        self.last_stop_result = result.to_dict()
+        return self.last_stop_result
+
     def _facade_result(
         self,
         ok: bool,
@@ -360,12 +384,21 @@ class _StarCraft2FacadeService:
         stopped: bool = False,
         action: str = "start",
     ):
-        return StopResultDTO(
+        if action == "stop" or stopped:
+            return StopResultDTO(
+                ok=bool(ok),
+                running=self.is_running(),
+                action=action,
+                stopped=bool(stopped),
+                status=dict(status or {}),
+                error=None if error is None else str(error),
+                details={},
+            )
+        return StartResultDTO(
             ok=bool(ok),
             running=self.is_running(),
             action=action,
-            stopped=bool(stopped),
             status=dict(status or {}),
             error=None if error is None else str(error),
             details={},
-        ).to_dict()
+        )

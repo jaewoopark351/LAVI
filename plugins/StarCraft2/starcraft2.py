@@ -1,7 +1,6 @@
 #20260707_kpopmodder: Added optional StarCraft2 facade for Windows-first engine adapter control.
 from __future__ import annotations
 
-import json
 import os
 from typing import Any, Dict, Optional
 
@@ -386,19 +385,7 @@ class StarCraft2:
 #         return self._lan_lobby_archived_result("remote_native_joiner_start")
 
     def _ui_values(self, result=None):
-        status = self.get_status()
-        last_event = status.get("state", {}).get("last_event") or {}
-        last_error = (
-            (result or {}).get("error")
-            if isinstance(result, dict)
-            else None
-        ) or status.get("state", {}).get("last_error") or ""
-        return (
-            self.config_manager.config_message(),
-            self._status_json(status),
-            json.dumps(last_event, ensure_ascii=False, indent=2, default=str),
-            str(last_error or ""),
-        )
+        return self._facade_service.ui_values(result)
 
     def _status_json(self, status=None):
         return self._facade_service.status_json(status)

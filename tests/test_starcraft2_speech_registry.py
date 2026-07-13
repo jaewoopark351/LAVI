@@ -11,6 +11,8 @@ from plugins.StarCraft2.starcraft2_core.sc2_speech_terms import (
 from plugins.StarCraft2.starcraft2_core.sc2_telemetry_registry import (
     SC2_BUILDING_CATEGORY,
     SC2_BUILDING_UNIT_TYPE_IDS,
+    SC2_LOG_ONLY_UNIT_TYPE_ID_BY_TOKEN,
+    SC2_LOG_ONLY_UNIT_TYPE_IDS,
     SC2_UNIT_CATEGORY,
     SC2_UNIT_TYPE_ID_BY_TOKEN,
     SC2_UNIT_TYPE_IDS,
@@ -42,6 +44,38 @@ class StarCraft2SpeechRegistryTests(unittest.TestCase):
         )
         self.assertEqual(54, len(SC2_UNIT_TYPE_IDS))
         self.assertEqual(45, len(SC2_BUILDING_UNIT_TYPE_IDS))
+
+    def test_log_only_telemetry_units_are_known_but_not_speech_terms(self):
+        expected_tokens = {
+            "CHANGELING",
+            "CHANGELINGZERGLINGWINGS",
+            "CREEPTUMOR",
+            "CREEPTUMORBURROWED",
+            "CREEPTUMORQUEEN",
+            "FACTORYFLYING",
+            "OVERLORDCOCOON",
+            "ZERGLINGBURROWED",
+        }
+
+        self.assertTrue(expected_tokens.issubset(SC2_LOG_ONLY_UNIT_TYPE_ID_BY_TOKEN))
+        self.assertTrue(
+            {
+                12,
+                16,
+                43,
+                87,
+                119,
+                128,
+                137,
+                138,
+            }.issubset(SC2_LOG_ONLY_UNIT_TYPE_IDS)
+        )
+        for token in expected_tokens:
+            self.assertEqual(
+                token,
+                canonical_unit_token(SC2_LOG_ONLY_UNIT_TYPE_ID_BY_TOKEN[token]),
+            )
+            self.assertNotIn(token, SC2_UNIT_SPEAK_NAMES)
 
     def test_all_unit_and_building_ids_render_configured_korean_names(self):
         for token, spoken_name in SC2_UNIT_SPEAK_NAMES.items():

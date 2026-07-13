@@ -13,7 +13,6 @@ from core.logger import log_print
 from .probots_launcher import ProBotsLauncher
 from .probots_log_watcher import ProBotsLogWatcher
 from .sc2_event_parser import SC2EventParser
-from .sc2_tts_bridge import SC2TTSBridge
 
 
 STARCRAFT2_STATUS_EVENT_CALLBACK_RESOURCE = "starcraft2_status_event_callback"
@@ -109,7 +108,9 @@ class StarCraft2Extension(GameExtensionInterface):
         self.launcher = ProBotsLauncher()
         self.log_watcher = ProBotsLogWatcher()
         self.parser = SC2EventParser(bot_name=str(self.config.get("preferred_bot") or "Changeling"))
-        self.tts_bridge = SC2TTSBridge(enabled=bool(self.config.get("speak_events", True)))
+        #20260713_kpopmodder: This observer no longer owns direct TTS output;
+        # it only marks whether shared status events may be spoken downstream.
+        self._speak_events_enabled = bool(self.config.get("speak_events", True))
         self._context: Optional[GameExtensionContext] = None
         self._is_initialized = False
         self._is_started = False
@@ -122,7 +123,6 @@ class StarCraft2Extension(GameExtensionInterface):
 
     def initialize(self, context: GameExtensionContext) -> None:
         self._context = context
-        self.tts_bridge.set_tts(getattr(context, "tts", None))
         self._refresh_status_event_callback()
         self._is_initialized = True
         self._last_status_message = "initialized"
@@ -132,7 +132,7 @@ class StarCraft2Extension(GameExtensionInterface):
             return
         self.config = self._load_config()
         self.parser = SC2EventParser(bot_name=str(self.config.get("preferred_bot") or "Changeling"))
-        self.tts_bridge.enabled = bool(self.config.get("speak_events", True))
+        self._speak_events_enabled = bool(self.config.get("speak_events", True))
         self._refresh_status_event_callback()
 
         if not bool(self.config.get("enabled", False)):
@@ -189,6 +189,7 @@ class StarCraft2Extension(GameExtensionInterface):
             return {"ok": True, "action": action, "status": self.get_status()}
         if action == "reload":
             self.config = self._load_config()
+            self._speak_events_enabled = bool(self.config.get("speak_events", True))
             return {"ok": True, "action": action, "config": copy.deepcopy(self.config)}
 #         if action in {"lan_start_scan", "scan_lan_rooms", "start_lan_scan"}:
 #             #20260712_kpopmodder: LAN Lobby commands are archived and should not
@@ -248,7 +249,11 @@ class StarCraft2Extension(GameExtensionInterface):
             "path_validation": self.launcher.validate_sc2aiapp_config(self.config),
             "probots": self.launcher.get_status(),
             "log_watcher": self.log_watcher.get_status(),
-            "tts_bridge": self.tts_bridge.get_status(),
+            "event_routing": {
+                "direct_tts_bridge": False,
+                "shared_status_callback": callable(self._status_event_callback),
+                "speak_events_enabled": bool(self._speak_events_enabled),
+            },
 #             "lan_lobby_archived": {
 #                 "disabled": True,
 #                 "error": LAN_LOBBY_ARCHIVED_ERROR,
@@ -386,7 +391,7 @@ class StarCraft2Extension(GameExtensionInterface):
                 "message": str(getattr(event, "message", "") or ""),
                 "source": str(source or ""),
                 "raw_line": str(getattr(event, "raw_line", "") or ""),
-                "speak": bool(self.tts_bridge.enabled),
+                "speak": bool(self._speak_events_enabled),
             },
         }
         if is_log_terminal:
