@@ -874,6 +874,48 @@ Prefer configurable paths when possible.
 
 ---
 
+## 19.1 Internal and External Path Rules
+
+Runtime resource paths and configuration paths must follow these rules:
+
+* Files located inside the active LAVI repository must be stored as paths relative to the repository root.
+* Files located outside the active LAVI repository must be stored as absolute paths.
+* Relative paths must always be resolved from the active repository root, not from the current working directory.
+* Do not use `os.getcwd()` or the process launch directory as the base for project resource paths.
+* Existing absolute paths must remain readable for backward compatibility.
+* When saving or rewriting configuration:
+
+  * Convert a path to a relative path only when its resolved target is inside the active repository root.
+  * Preserve the absolute path when its resolved target is outside the active repository root.
+* Do not blindly convert every absolute path to a relative path.
+* Repository safety boundaries, approved external application locations, and Codex write boundaries must remain absolute paths.
+
+Examples:
+
+```text
+# Inside the LAVI repository: store as relative paths
+config/config.json
+plugins/GPTSoVITS/config.json
+voices/LAVI/reference.wav
+pretrained_models/whisper-large-v3
+
+# Outside the LAVI repository: store as absolute paths
+C:\Program Files (x86)\StarCraft II
+D:\AI_Models\external_model.gguf
+C:\GPT-SoVITS\GPT_SoVITS\pretrained_models
+```
+
+Path loading must support both forms:
+
+```text
+relative path -> resolve from the LAVI repository root
+absolute path -> use the absolute path directly
+```
+
+Path normalization must be centralized in an existing path/config utility when possible. Do not add independent path-resolution implementations to multiple plugins.
+
+---
+
 ## 20. Model File Rules
 
 Model files are large and should not be committed.

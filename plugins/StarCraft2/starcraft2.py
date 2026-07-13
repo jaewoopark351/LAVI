@@ -34,6 +34,7 @@ from plugins.StarCraft2.starcraft2_core.starcraft2_observation_tracker import (
 )
 from plugins.StarCraft2.starcraft2_core.starcraft2_local_match_service import _StarCraft2LocalMatchService
 from plugins.StarCraft2.starcraft2_core.starcraft2_runtime_downloader import StarCraft2RuntimeDownloader
+from plugins.StarCraft2.starcraft2_core.starcraft2_runtime_context import SC2RuntimeContext
 from plugins.StarCraft2.starcraft2_core.starcraft2_ui_sections import (
     _StarCraft2BotEngineSection,
     _StarCraft2LocalMatchSection,
@@ -107,6 +108,7 @@ class StarCraft2:
         self.observation_tracker = SC2ObservationTracker()
         self._local_match_command_template = _LocalMatchCommandTemplate()
         self._arg_utils = _StarCraft2ArgUtils(SC2_RACE_CHOICES)
+        self._runtime_context = SC2RuntimeContext()
         self._match_config_service = _StarCraft2MatchConfigService(
             self.config_manager,
             self.plugin_root,
@@ -118,6 +120,14 @@ class StarCraft2:
             self.state,
             event_bus=self._event_bus,
         )
+        self._local_match_service = _StarCraft2LocalMatchService(
+            self._arg_utils,
+            self._match_config_service,
+            self._local_match_command_template,
+            self.ladder_proxy,
+            line_callback=self._on_ladder_proxy_line,
+            runtime_context=self._runtime_context,
+        )
         self._facade_service = _StarCraft2FacadeService(
             self.config_manager,
             self.engine_registry,
@@ -125,19 +135,14 @@ class StarCraft2:
             self.ladder_proxy,
             self._match_config_service,
             self._engine_event_service,
+            local_match_service=self._local_match_service,
             event_bus=self._event_bus,
+            runtime_context=self._runtime_context,
         )
         self._ladder_proxy_event_service = _StarCraft2LadderProxyEventService(
             self._engine_event_service,
             self.observation_tracker,
             event_bus=self._event_bus,
-        )
-        self._local_match_service = _StarCraft2LocalMatchService(
-            self._arg_utils,
-            self._match_config_service,
-            self._local_match_command_template,
-            self.ladder_proxy,
-            line_callback=self._on_ladder_proxy_line,
         )
 
     def create_ui(self):
@@ -278,10 +283,10 @@ class StarCraft2:
 #         return self._lan_rooms_json(), self._lan_status_json()
 
     def on_local_match_race_change(self, race, args):
-        return self._local_match_service.on_local_match_race_change(race, args)
+        return self._facade_service.on_local_match_race_change(race, args)
 
     def on_local_match_ai_race_change(self, ai_race, args):
-        return self._local_match_service.on_local_match_ai_race_change(ai_race, args)
+        return self._facade_service.on_local_match_ai_race_change(ai_race, args)
 
     def on_local_human_vs_changeling_click(
         self,
@@ -291,7 +296,7 @@ class StarCraft2:
         proxy_ports,
         ai_race=None,
     ):
-        return self._local_match_service.on_local_human_vs_changeling_click(
+        return self._facade_service.on_local_human_vs_changeling_click(
             executable_path,
             working_directory,
             args,
@@ -300,7 +305,7 @@ class StarCraft2:
         )
 
     def on_local_match_stop_click(self):
-        return self._local_match_service.on_local_match_stop_click()
+        return self._facade_service.on_local_match_stop_click()
 
     def on_local_match_status_click(
         self,
@@ -309,7 +314,7 @@ class StarCraft2:
         args,
         proxy_ports,
     ):
-        return self._local_match_service.on_local_match_status_click(
+        return self._facade_service.on_local_match_status_click(
             executable_path,
             working_directory,
             args,
@@ -358,8 +363,6 @@ class StarCraft2:
         self._ladder_proxy_event_service.on_ladder_proxy_line(
             stream_name,
             line,
-            status_event_callback=self.status_event_callback,
-            tts=self.tts,
         )
 
     def _is_ladder_proxy_error_line(self, lower_line: str) -> bool:
@@ -529,16 +532,27 @@ class StarCraft2:
         args: Any,
         fallback: str = "Terran",
     ) -> str:
-        return self._local_match_service.local_match_race_from_args(
+        return self._facade_service.local_match_race_from_args(
             args,
             fallback=fallback,
         )
 
     def _local_match_ai_race_from_args(self, args, fallback="Zerg"):
-        return self._local_match_service.local_match_ai_race_from_args(
+        return self._facade_service.local_match_ai_race_from_args(
             args,
             fallback=fallback,
         )
+
+    #20260713_kpopmodder: Preserve legacy UI helper names after service extraction.
+    def local_match_race_from_args(
+        self,
+        args: Any,
+        fallback: str = "Terran",
+    ) -> str:
+        return self._local_match_race_from_args(args, fallback=fallback)
+
+    def local_match_ai_race_from_args(self, args, fallback="Zerg"):
+        return self._local_match_ai_race_from_args(args, fallback=fallback)
 
 #     def _strip_remote_human_args(self, args: list[str]) -> list[str]:
 #         return self._strip_ladder_args(
@@ -581,7 +595,14 @@ class StarCraft2:
 #         return self._lan_rooms_json(), self._lan_status_json(config)
 
     def _local_match_status_json(self, ladder_proxy_config=None, result=None):
-        return self._local_match_service.local_match_status_json(
+        return self._facade_service.local_match_status_json(
+            ladder_proxy_config=ladder_proxy_config,
+            result=result,
+        )
+
+    #20260713_kpopmodder: Preserve legacy UI method name after service extraction.
+    def local_match_status_json(self, ladder_proxy_config=None, result=None):
+        return self._local_match_status_json(
             ladder_proxy_config=ladder_proxy_config,
             result=result,
         )

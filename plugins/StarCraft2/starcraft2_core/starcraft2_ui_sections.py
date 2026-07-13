@@ -174,7 +174,7 @@ class _StarCraft2LocalMatchSection:
                 owner.local_match_race_dropdown = gr.Dropdown(
                     label="Local Human Race",
                     choices=self.sc2_race_choices,
-                    value=owner._local_match_service.local_match_race_from_args(
+                    value=owner.local_match_race_from_args(
                         local_match_args
                     ),
                     interactive=True,
@@ -182,7 +182,7 @@ class _StarCraft2LocalMatchSection:
                 owner.local_match_ai_race_dropdown = gr.Dropdown(
                     label="Local AI Race",
                     choices=self.sc2_race_choices,
-                    value=owner._local_match_service.local_match_ai_race_from_args(
+                    value=owner.local_match_ai_race_from_args(
                         local_match_args
                     ),
                     interactive=True,
@@ -207,7 +207,7 @@ class _StarCraft2LocalMatchSection:
                 owner.local_match_status_button = gr.Button("Local Match Status")
             owner.local_match_status_box = gr.Textbox(
                 label="Local Match Status",
-                value=owner._local_match_service.local_match_status_json(),
+                value=owner.local_match_status_json(),
                 lines=8,
                 interactive=False,
             )

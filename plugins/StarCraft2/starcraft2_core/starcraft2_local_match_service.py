@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import time
 from typing import Any, Callable, Dict, Optional
 
 from core.logger import log_print
@@ -12,6 +13,7 @@ from .starcraft2_dto import (
     StarCraft2LocalMatchCommand,
     StarCraft2LocalMatchStatus,
 )
+from .starcraft2_runtime_context import SC2RuntimeContext
 
 
 LineCallback = Optional[Callable[[str, str], None]]
@@ -32,12 +34,14 @@ class _StarCraft2LocalMatchService:
         command_template,
         ladder_proxy,
         line_callback: LineCallback = None,
+        runtime_context: Optional[SC2RuntimeContext] = None,
     ):
         self.arg_utils = arg_utils
         self.config_service = config_service
         self.command_template = command_template
         self.ladder_proxy = ladder_proxy
         self.line_callback = line_callback
+        self.runtime_context = runtime_context
 
     def local_match_race_from_args(self, args, fallback: str = "Terran") -> str:
         return self.arg_utils.local_match_race_from_args(args, fallback=fallback)
@@ -189,10 +193,12 @@ class _StarCraft2LocalMatchService:
             return self._local_match_status_json(config, result)
 
         start_result = self._launch_local_match_process(config, command.capture_output)
+        self._sync_runtime_context(start_result, config)
         return self._local_match_status_json(config, start_result)
 
     def on_local_match_stop_click(self):
         result = self._stop_local_match()
+        self._sync_runtime_context(result, self.config_service.local_match_config())
         return self._local_match_status_json(result=result)
 
     def _stop_local_match(self) -> StarCraft2CommandResult:
@@ -254,3 +260,82 @@ class _StarCraft2LocalMatchService:
             line_callback=self.line_callback,
         )
         return StarCraft2CommandResult.from_mapping(raw_result, action="local_human_vs_changeling")
+
+    def _sync_runtime_context(
+        self,
+        result: StarCraft2CommandResult,
+        config: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        if self.runtime_context is None:
+            return
+        if not isinstance(result, StarCraft2CommandResult):
+            return
+        runtime_status = self.ladder_proxy.get_status(config or {})
+        self.runtime_context.set_status(runtime_status)
+        validation = runtime_status.get("validation")
+        validation_data = validation if isinstance(validation, dict) else {}
+        self.runtime_context.timeout_sec = float(validation_data.get("connect_timeout_sec") or self.runtime_context.timeout_sec)
+        configured_hosts = self._normalize_config_check_hosts(config)
+        self.runtime_context.check_hosts = list(configured_hosts or ["127.0.0.1"])
+        runtime_ports = self._normalize_runtime_ports(runtime_status, config)
+        if runtime_ports:
+            self.runtime_context.ports = runtime_ports
+        if result.ok and runtime_status.get("running"):
+            if self.runtime_context.started_at is None:
+                self.runtime_context.started_at = time.time()
+            self.runtime_context.set_process(getattr(self.ladder_proxy, "process", None), "local_match_proxy")
+            self.runtime_context.set_tails(
+                runtime_status.get("stdout_tail", []),
+                runtime_status.get("stderr_tail", []),
+            )
+            self.runtime_context.runtime_error = None
+            return
+        if result.ok and not runtime_status.get("running"):
+            self.runtime_context.stopped_at = runtime_status.get("stopped_at")
+            self.runtime_context.clear_process()
+            self.runtime_context.runtime_error = None if result.error is None else str(result.error)
+            return
+        self.runtime_context.stopped_at = runtime_status.get("stopped_at")
+        self.runtime_context.runtime_error = (
+            None if result.error is None else str(result.error)
+        )
+        self.runtime_context.clear_process()
+
+    def _normalize_config_check_hosts(self, config: Optional[Dict[str, Any]]) -> list[str]:
+        config = config if isinstance(config, dict) else {}
+        hosts = []
+        raw_hosts = config.get("check_hosts", []) if isinstance(config, dict) else []
+        if isinstance(raw_hosts, str):
+            raw_hosts = [part.strip() for part in raw_hosts.split(",")]
+        if isinstance(raw_hosts, list):
+            hosts.extend(str(item).strip() for item in raw_hosts if str(item).strip())
+        return hosts if hosts else ["127.0.0.1"]
+
+    def _normalize_runtime_ports(
+        self,
+        runtime_status: Dict[str, Any],
+        config: Optional[Dict[str, Any]],
+    ) -> list[int]:
+        candidate = None
+        for source in (config, runtime_status.get("ports"), runtime_status.get("validation")):
+            if isinstance(source, dict) and source:
+                value = source.get("ports")
+                if value is not None:
+                    candidate = value
+                    break
+            elif isinstance(source, (list, tuple)) or isinstance(source, str):
+                candidate = source
+                break
+        if candidate is None:
+            return []
+        if isinstance(candidate, str):
+            raw_values = [part.strip() for part in candidate.split(",")]
+        else:
+            raw_values = candidate
+        ports: list[int] = []
+        for item in raw_values:
+            try:
+                ports.append(int(item))
+            except (TypeError, ValueError):
+                continue
+        return ports if ports else []

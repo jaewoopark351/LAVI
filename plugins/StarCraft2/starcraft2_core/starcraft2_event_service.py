@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import json
+import time
 
 from core.logger import log_print
+from .starcraft2_contracts import StarCraft2Event
 from .starcraft2_event_bus import _StarCraft2EventBus
 
 
@@ -20,14 +22,14 @@ class _StarCraft2EngineEventService:
             self.event_bus.set_status_event_callback(callback)
 
     def update_state(self, event):
-        event = dict(event or {})
-        self.state.update_event(event)
+        normalized = StarCraft2Event.from_mapping(event).to_dict()
+        self.state.update_event(normalized)
         if self.event_bus is not None:
-            self.event_bus.publish(event)
+            self.event_bus.emit(normalized)
             return
         if callable(self.status_event_callback):
             try:
-                self.status_event_callback(event)
+                self.status_event_callback(normalized)
             except Exception as e:
                 log_print(f"[StarCraft2] status event callback failed: {e}")
 
@@ -42,6 +44,8 @@ class _StarCraft2LadderProxyEventService:
         self.engine_event_service = engine_event_service
         self.observation_tracker = observation_tracker
         self.event_bus = event_bus
+        #20260713_kpopmodder: Ignore known RESPONSE_NOT_SET tail noise after a match end.
+        self._response_not_set_ignore_until = 0.0
 
     def on_ladder_proxy_line(
         self,
@@ -71,8 +75,10 @@ class _StarCraft2LadderProxyEventService:
             event_type = ""
             if "starting the match" in lower:
                 event_type = "game_started"
+                self._response_not_set_ignore_until = 0.0
             elif "client changed status from in_game to ended" in lower:
                 event_type = "game_ended"
+                self._response_not_set_ignore_until = time.time() + 5.0
             elif "finished with result:" in lower:
                 # LavHumanVsBot assigns Player1 to LAVHuman and Player2 to
                 # the AI. Report the result from the AI/TTS perspective;
@@ -101,7 +107,7 @@ class _StarCraft2LadderProxyEventService:
                 if event_type == "game_started":
                     self.observation_tracker.reset()
                 if self.event_bus is not None:
-                    consumed = self.event_bus.publish(event)
+                    consumed = self.event_bus.emit(event)
                     if consumed:
                         return
                 if callable(status_event_callback):
@@ -115,10 +121,36 @@ class _StarCraft2LadderProxyEventService:
                     if callable(receive_input):
                         receive_input(f"StarCraft2 {event_type}")
 
+    def _is_response_not_set_end_tail(self, lower: str, now: float) -> bool:
+        if "response_not_set" not in lower:
+            return False
+
+        if "not supported if game has already ended" in lower or "already ended" in lower:
+            return True
+
+        # The first RESPONSE_NOT_SET line is usually the paired message that
+        # arrives right before/at game end, followed by one more summary line.
+        # Treat this burst as benign if it falls in the ignore window.
+        if now <= self._response_not_set_ignore_until:
+            return True
+        if (
+            "expected query but got response_not_set" in lower
+            or "response response_not_set has" in lower
+        ):
+            self._response_not_set_ignore_until = now + 2.0
+            return True
+
+        return False
+
     def is_ladder_proxy_error_line(self, lower_line: str) -> bool:
         lower = str(lower_line or "").lower()
         if not lower:
             return False
+
+        now = time.time()
+        if self._is_response_not_set_end_tail(lower, now):
+            return False
+
         #20260712_kpopmodder: Native diagnostics include harmless fields like
         # error_count=0 in successful CreateGame/JoinGame summaries. Do not
         # convert those normal summaries into engine_error events.
@@ -139,6 +171,7 @@ class _StarCraft2LadderProxyEventService:
             "error:" in lower
             or "timeout/closed/error" in lower
             or "waiting for a response had a timeout" in lower
+            or "response_not_set" in lower
             or " failed" in lower
             or "failed " in lower
             or " crashed" in lower

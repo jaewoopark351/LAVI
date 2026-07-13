@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from typing import Any, Callable, Dict, List, Optional
 
+from .starcraft2_contracts import StarCraft2Event
 from core.logger import log_print
 
 
@@ -44,10 +45,11 @@ class _StarCraft2EventBus:
     def set_subscribers(self, callbacks: List[EventCallback]) -> None:
         self._subscribers = list(callbacks)
 
-    def publish(self, event: Dict[str, Any] | None) -> bool:
-        payload = dict(event or {})
-        if not payload:
+    def emit(self, event: Dict[str, Any] | StarCraft2Event | None) -> bool:
+        normalized = StarCraft2Event.from_mapping(event)
+        if not normalized.event_type:
             return False
+        payload = normalized.to_dict()
         event_type = str(payload.get("event_type") or "").strip().lower()
         if event_type:
             payload = dict(payload)
@@ -75,7 +77,10 @@ class _StarCraft2EventBus:
         receive_input = getattr(tts, "receive_input", None)
         if callable(receive_input):
             try:
-                text = str(payload.get("details", {}).get("result") or "")
+                details = payload.get("details")
+                if not isinstance(details, dict):
+                    details = {}
+                text = str(details.get("result") or "")
                 if not text:
                     text = f"StarCraft2 {event_type}"
                 receive_input(text)
@@ -83,6 +88,10 @@ class _StarCraft2EventBus:
             except Exception as e:
                 log_print(f"[StarCraft2EventBus] fallback TTS failed: {e}")
         return False
+
+    def publish(self, event: Dict[str, Any] | None) -> bool:
+        # Backward-compatible alias for existing call sites.
+        return self.emit(event)
 
     def _unsubscribe(self, callback: EventCallback) -> None:
         self._subscribers = [item for item in self._subscribers if item is not callback]
