@@ -11,10 +11,14 @@ classDiagram
 
     class MainBootstrap {
         <<main.py>>
-        +load plugins
-        +bootstrap memory
-        +build Gradio UI
-        +wire event listeners
+        +AppComposer().run()
+    }
+    class AppComposer {
+        <<app_core.app_composer>>
+        +run()
+        +create core components
+        +create optional modules
+        +register game extensions
         +launch queue
     }
     class GradioLaunch {
@@ -41,6 +45,17 @@ classDiagram
     class RuntimeLifecycle
     class GPUDeviceManager
     class AudioDeviceManager
+    class ExtensionRegistry {
+        <<app_core.extensions>>
+        +register()
+        +initialize()
+        +get()
+        +stop_all()
+    }
+    class GameExtensionContext
+    class GameExtensionInterface {
+        <<interface>>
+    }
 
     class PluginLoader
     class PluginSelectionBase
@@ -55,8 +70,15 @@ classDiagram
     class SongPlayer
     class Chess
     class StarCraft116
+    class StarCraft2
     class StarCraftRemastered {
-        <<disabled optional module>>
+        <<optional module>>
+    }
+    class ChessGameExtension
+    class StarCraft116GameExtension
+    class StarCraft2GameExtension
+    class StarCraft2Extension {
+        <<passive log observer>>
     }
 
     class InputPluginInterface {
@@ -114,25 +136,38 @@ classDiagram
     PluginLoader o-- VtuberPluginInterface : discovers
     PluginSelectionBase --> PluginLoader : selects provider
 
-    MainBootstrap --> PluginLoader : load_plugins()
-    MainBootstrap --> ModuleConfig : modules.json
-    MainBootstrap --> OptionalPluginLoader : optional imports
-    MainBootstrap --> MemoryBootstrap : memory services
-    MainBootstrap --> ScreenRouterBootstrap : screen router
-    MainBootstrap --> GradioLaunch : port probe
-    MainBootstrap --> GPUDeviceManager : startup placement
-    MainBootstrap *-- RuntimeLifecycle
-    MainBootstrap *-- Input
-    MainBootstrap *-- LLM
-    MainBootstrap *-- Translate
-    MainBootstrap *-- TTS
-    MainBootstrap *-- Vtuber
-    MainBootstrap --> AudioDeviceManager
-    MainBootstrap o-- ScreenVision : optional direct module
-    MainBootstrap o-- SongPlayer : optional direct module
-    MainBootstrap o-- Chess : optional direct module
-    MainBootstrap o-- StarCraft116 : optional direct module
-    MainBootstrap o-- StarCraftRemastered : disabled optional module
+    MainBootstrap --> AppComposer : run
+    AppComposer --> PluginLoader : load_plugins()
+    AppComposer --> ModuleConfig : modules.json
+    AppComposer --> OptionalPluginLoader : optional imports
+    AppComposer --> MemoryBootstrap : memory services
+    AppComposer --> ScreenRouterBootstrap : screen router
+    AppComposer --> GradioLaunch : port probe
+    AppComposer --> GPUDeviceManager : startup placement
+    AppComposer *-- RuntimeLifecycle
+    AppComposer *-- ExtensionRegistry
+    AppComposer --> GameExtensionContext : shared runtime
+    AppComposer *-- Input
+    AppComposer *-- LLM
+    AppComposer *-- Translate
+    AppComposer *-- TTS
+    AppComposer *-- Vtuber
+    AppComposer --> AudioDeviceManager
+    AppComposer o-- ScreenVision : optional direct module
+    AppComposer o-- SongPlayer : optional direct module
+    AppComposer o-- Chess : optional direct module
+    AppComposer o-- StarCraft116 : optional direct module
+    AppComposer o-- StarCraft2 : optional direct module
+    AppComposer o-- StarCraftRemastered : optional direct module
+    ExtensionRegistry o-- GameExtensionInterface
+    GameExtensionInterface <|.. ChessGameExtension
+    GameExtensionInterface <|.. StarCraft116GameExtension
+    GameExtensionInterface <|.. StarCraft2GameExtension
+    GameExtensionInterface <|.. StarCraft2Extension
+    ChessGameExtension --> Chess
+    StarCraft116GameExtension --> StarCraft116
+    StarCraft2GameExtension --> StarCraft2
+    StarCraft2Extension --> StarCraft2GameExtension : shared callback
 
     Input --> LLM : text event
     ScreenVision --> LLM : observation event
@@ -144,13 +179,15 @@ classDiagram
     Chess --> TTS : reaction speech
     StarCraft116 --> LLM : status/game reaction
     StarCraft116 --> TTS : reaction speech
+    StarCraft2 --> TTS : telemetry reaction
 ```
 
-`main.py`는 별도 애플리케이션 클래스가 아니라 객체를 조립하는 지점입니다.
+`main.py`는 별도 애플리케이션 클래스가 아니라 `AppComposer().run()`을 호출하는 얇은 진입점입니다.
+`AppComposer`가 시작 조립, 플러그인 로딩, Gradio UI 구성, 선택 모듈 로딩, 게임 확장 등록, lifecycle 시작, Gradio launch를 소유합니다.
 `MainBootstrap`, `MemoryBootstrap`, `ScreenRouterBootstrap`, `ModuleConfig`, `GradioLaunch`는 파일/함수 역할을 표현하기 위한 도식상의 모듈입니다.
-`ScreenVision`, `SongPlayer`, `Chess`, `StarCraft116`은 `PluginSelectionBase` provider가 아니라 `modules.json`으로 켜고 끄는 `main.py` 직접 구성 요소입니다.
+`ScreenVision`, `SongPlayer`, `Chess`, `StarCraft116`, `StarCraft2`, `StarCraftRemastered`는 `PluginSelectionBase` provider가 아니라 `modules.json`으로 켜고 끄는 `AppComposer` 선택 구성 요소입니다.
 이 직접 모듈들은 `app_core.optional_plugin_loader`를 통해 선택적으로 import/생성됩니다.
-`StarCraftRemastered`는 `main.py`에 선택 로딩 훅이 남아 있어 다이어그램에 표시하지만, 현재 `modules.json`에서는 비활성화되어 있고 체크인된 런타임 클래스도 주석 처리된 상태입니다.
+현재 `modules.json` 기준으로 `StarCraft2`, `StarCraft116`, `Chess`, `ScreenVision`, `SongPlayer`는 활성화되어 있고 `StarCraftRemastered`는 비활성화되어 있습니다.
 
 `Hybrid_OpenAI_LLM`은 현재 기본 LLM provider로 표시합니다. `ChatGPT_OpenAI`는 활성화 가능한 LLM provider이지만 기본 선택은 `PluginSelection` 설정과 내장 기본값에 의해 `Hybrid_OpenAI_LLM`이 우선됩니다. <!-- #20260630_kpopmodder: Update architecture docs for app_core bootstrap, lazy provider loading, and direct optional modules. -->
 <!-- #20260704_kpopmodder: Updated optional direct-module docs for StarCraft116 and optional_plugin_loader. -->
@@ -435,6 +472,110 @@ classDiagram
 `StarCraft116`은 BWAPI 프로필 설정, 실행 명령, 상태 조회, 게임 이벤트 tailing, 선택적 LLM/TTS 반응을 관리합니다.
 
 현재 기본 GPU 배치는 `GPUDeviceManager` 기준으로 VoiceInput/Whisper, ScreenVision, GPT-SoVITS를 GPU 1 / `cuda:1` 계열로 설명합니다. 시작 시 preflight 로그가 이 배치를 다시 확인합니다. <!-- #20260630_kpopmodder: Mirror current GPU preflight ownership. -->
+
+## 5. StarCraft2 확장과 엔진 구조
+
+```mermaid
+classDiagram
+    direction LR
+
+    class AppComposer
+    class ExtensionRegistry
+    class GameExtensionInterface {
+        <<interface>>
+        +initialize(context)
+        +start()
+        +stop()
+        +handle_command(command)
+        +get_status()
+    }
+    class GameExtensionContext
+
+    class StarCraft2 {
+        <<plugins.StarCraft2.starcraft2>>
+        +create_ui()
+        +start(config_overrides)
+        +stop()
+        +get_status()
+        +set_status_event_callback(callback)
+        +set_tts(tts)
+    }
+    class StarCraft2GameExtension {
+        <<app_core.extensions>>
+        +start()
+        +stop()
+        +handle_command(command)
+        +get_status()
+    }
+    class StarCraft2Bridge
+    class StarCraft2Worker
+    class StarCraft2EngineRegistry
+    class StarCraft2EngineInterface {
+        <<interface>>
+        +start(config, event_callback)
+        +stop()
+        +get_status()
+    }
+    class InternalLAVBotEngine
+    class AresSC2BotEngine
+    class MicroMachineBotEngine
+    class ExternalExeBotEngine
+    class ExternalJarBotEngine
+    class HumanVsBotLauncher
+    class SC2LadderProxyLauncher
+    class SC2ObservationTracker
+
+    class StarCraft2Extension {
+        <<passive log observer>>
+        +start()
+        +stop()
+        +handle_command(command)
+        +get_status()
+    }
+    class ProBotsLauncher
+    class ProBotsLogWatcher
+    class SC2EventParser
+    class SC2TTSBridge
+    class StarCraft2ReactionRuntime
+    class StarCraft2ReactionPolicy
+    class TTS
+    class MemoryStore
+
+    AppComposer *-- ExtensionRegistry
+    AppComposer --> GameExtensionContext
+    ExtensionRegistry o-- GameExtensionInterface
+    GameExtensionInterface <|.. StarCraft2GameExtension
+    GameExtensionInterface <|.. StarCraft2Extension
+
+    StarCraft2GameExtension *-- StarCraft2Bridge
+    StarCraft2GameExtension *-- StarCraft2Worker
+    StarCraft2GameExtension --> StarCraft2 : facade/plugin
+    StarCraft2GameExtension --> StarCraft2ReactionRuntime : status callback
+    StarCraft2GameExtension --> TTS : cancel pending on terminal events
+    StarCraft2ReactionRuntime --> StarCraft2ReactionPolicy
+    StarCraft2ReactionRuntime --> TTS : direct speech
+    StarCraft2ReactionRuntime --> MemoryStore : raw event memory
+
+    StarCraft2 *-- StarCraft2EngineRegistry
+    StarCraft2 *-- SC2LadderProxyLauncher
+    StarCraft2 *-- SC2ObservationTracker
+    StarCraft2EngineRegistry o-- StarCraft2EngineInterface
+    StarCraft2EngineInterface <|.. InternalLAVBotEngine
+    StarCraft2EngineInterface <|.. AresSC2BotEngine
+    StarCraft2EngineInterface <|.. MicroMachineBotEngine
+    StarCraft2EngineInterface <|.. ExternalExeBotEngine
+    StarCraft2EngineInterface <|.. ExternalJarBotEngine
+    StarCraft2EngineInterface <|.. HumanVsBotLauncher
+
+    StarCraft2Extension *-- ProBotsLauncher
+    StarCraft2Extension *-- ProBotsLogWatcher
+    StarCraft2Extension *-- SC2EventParser
+    StarCraft2Extension *-- SC2TTSBridge
+    StarCraft2Extension --> StarCraft2GameExtension : shared status callback
+```
+
+`StarCraft2GameExtension`은 현재 StarCraft2 facade와 worker 명령 경로를 소유하는 활성 lifecycle adapter입니다. `StarCraft2Extension`은 ProBots/Changeling 로그를 관찰하고 이벤트를 파싱한 뒤 공유 StarCraft2 status callback을 재사용하는 수동 관찰자입니다. 현재 소스에서 LAN Lobby remote-human 코드는 보관용으로 주석 처리되어 있으며 live 다이어그램에는 포함하지 않습니다.
+<!-- #20260713_kpopmodder: Document current StarCraft2 facade/observer split and archived LAN Lobby status. -->
 
 ## 관계 기호
 

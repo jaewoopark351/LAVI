@@ -127,84 +127,85 @@ class StarCraft2:
                     lines=1,
                     interactive=False,
                 )
-            with gr.Row():
-                self.map_name_box = gr.Textbox(
-                    label="Map Name",
-                    value=str(config.get("map_name", "AbyssalReefLE")),
-                    lines=1,
+            with gr.Accordion("Bot Engine", open=False):
+                with gr.Row():
+                    self.map_name_box = gr.Textbox(
+                        label="Map Name",
+                        value=str(config.get("map_name", "AbyssalReefLE")),
+                        lines=1,
+                    )
+                    self.engine_dropdown = gr.Dropdown(
+                        label="Engine",
+                        choices=self.engine_registry.names(),
+                        value=str(config.get("engine", "internal_lav_bot")),
+                        interactive=True,
+                    )
+                with gr.Row():
+                    self.race_dropdown = gr.Dropdown(
+                        label="Player Race",
+                        choices=SC2_RACE_CHOICES,
+                        value=str(config.get("race", "Terran")),
+                        interactive=True,
+                    )
+                    self.enemy_race_dropdown = gr.Dropdown(
+                        label="Enemy Race",
+                        choices=SC2_RACE_CHOICES,
+                        value=str(config.get("enemy_race", "Zerg")),
+                        interactive=True,
+                    )
+                    self.enemy_difficulty_dropdown = gr.Dropdown(
+                        label="Enemy Difficulty",
+                        choices=["VeryEasy", "Easy", "Medium", "MediumHard", "Hard"],
+                        value=str(config.get("enemy_difficulty", "Easy")),
+                        interactive=True,
+                    )
+                self.realtime_box = gr.Checkbox(
+                    label="Realtime",
+                    value=bool(config.get("realtime", False)),
                 )
-                self.engine_dropdown = gr.Dropdown(
-                    label="Engine",
-                    choices=self.engine_registry.names(),
-                    value=str(config.get("engine", "internal_lav_bot")),
-                    interactive=True,
+                with gr.Row():
+                    self.external_exe_path_box = gr.Textbox(
+                        label="External Exe Path",
+                        value=str(config.get("external_exe", {}).get("path", "")),
+                        lines=1,
+                    )
+                    self.micromachine_path_box = gr.Textbox(
+                        label="MicroMachine Exe Path",
+                        value=str(config.get("micromachine", {}).get("path", "")),
+                        lines=1,
+                    )
+                    self.ares_sc2_script_box = gr.Textbox(
+                        label="Ares-sc2 Script Path",
+                        value=str(config.get("ares_sc2", {}).get("script_path", "")),
+                        lines=1,
+                    )
+                    self.external_jar_path_box = gr.Textbox(
+                        label="External Jar Path",
+                        value=str(config.get("external_jar", {}).get("jar_path", "")),
+                        lines=1,
+                    )
+                with gr.Row():
+                    self.start_button = gr.Button("Start")
+                    self.stop_button = gr.Button("Stop")
+                    self.status_button = gr.Button("Status")
+                self.status_box = gr.Textbox(
+                    label="Status",
+                    value=self._status_json(),
+                    lines=12,
+                    interactive=False,
                 )
-            with gr.Row():
-                self.race_dropdown = gr.Dropdown(
-                    label="Player Race",
-                    choices=SC2_RACE_CHOICES,
-                    value=str(config.get("race", "Terran")),
-                    interactive=True,
+                self.last_event_box = gr.Textbox(
+                    label="Last Event",
+                    value="",
+                    lines=4,
+                    interactive=False,
                 )
-                self.enemy_race_dropdown = gr.Dropdown(
-                    label="Enemy Race",
-                    choices=SC2_RACE_CHOICES,
-                    value=str(config.get("enemy_race", "Zerg")),
-                    interactive=True,
+                self.last_error_box = gr.Textbox(
+                    label="Last Error",
+                    value="",
+                    lines=2,
+                    interactive=False,
                 )
-                self.enemy_difficulty_dropdown = gr.Dropdown(
-                    label="Enemy Difficulty",
-                    choices=["VeryEasy", "Easy", "Medium", "MediumHard", "Hard"],
-                    value=str(config.get("enemy_difficulty", "Easy")),
-                    interactive=True,
-                )
-            self.realtime_box = gr.Checkbox(
-                label="Realtime",
-                value=bool(config.get("realtime", False)),
-            )
-            with gr.Row():
-                self.external_exe_path_box = gr.Textbox(
-                    label="External Exe Path",
-                    value=str(config.get("external_exe", {}).get("path", "")),
-                    lines=1,
-                )
-                self.micromachine_path_box = gr.Textbox(
-                    label="MicroMachine Exe Path",
-                    value=str(config.get("micromachine", {}).get("path", "")),
-                    lines=1,
-                )
-                self.ares_sc2_script_box = gr.Textbox(
-                    label="Ares-sc2 Script Path",
-                    value=str(config.get("ares_sc2", {}).get("script_path", "")),
-                    lines=1,
-                )
-                self.external_jar_path_box = gr.Textbox(
-                    label="External Jar Path",
-                    value=str(config.get("external_jar", {}).get("jar_path", "")),
-                    lines=1,
-                )
-            with gr.Row():
-                self.start_button = gr.Button("Start")
-                self.stop_button = gr.Button("Stop")
-                self.status_button = gr.Button("Status")
-            self.status_box = gr.Textbox(
-                label="Status",
-                value=self._status_json(),
-                lines=12,
-                interactive=False,
-            )
-            self.last_event_box = gr.Textbox(
-                label="Last Event",
-                value="",
-                lines=4,
-                interactive=False,
-            )
-            self.last_error_box = gr.Textbox(
-                label="Last Error",
-                value="",
-                lines=2,
-                interactive=False,
-            )
             local_match_config = self.config_manager.get_section("local_match")
             ladder_config = self.config_manager.get_section("ladder_proxy")
             local_match_args = local_match_config.get("args", ladder_config.get("args", []))

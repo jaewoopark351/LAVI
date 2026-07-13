@@ -49,12 +49,36 @@ sequenceDiagram
 classDiagram
     direction LR
 
+    class AppComposer {
+        <<app_core.app_composer>>
+        +run()
+        +build Gradio UI
+        +register game extensions
+        +wire event listeners
+    }
     class MainBootstrap {
         <<main.py>>
-        +load plugins
-        +bootstrap memory
-        +build Gradio UI
-        +wire events
+        +AppComposer().run()
+    }
+    class ExtensionRegistry {
+        +register(extension)
+        +initialize(context)
+        +get(name)
+        +stop_all()
+    }
+    class GameExtensionContext {
+        +llm
+        +tts
+        +screen_vision
+        +memory_store
+    }
+    class GameExtensionInterface {
+        <<interface>>
+        +initialize(context)
+        +start()
+        +stop()
+        +handle_command(command)
+        +get_status()
     }
     class PluginLoader
     class PluginSelectionBase
@@ -87,16 +111,26 @@ classDiagram
     class ScreenVision
     class Chess
     class StarCraft116
+    class StarCraft2
     class StarCraftRemastered {
-        <<disabled optional module>>
+        <<optional module>>
     }
+    class ChessGameExtension
+    class StarCraft116GameExtension
+    class StarCraft2GameExtension
+    class StarCraft2Extension {
+        <<passive log observer>>
+    }
+    class StarCraft2EngineRegistry
 
-    MainBootstrap --> PluginLoader : load_plugins()
-    MainBootstrap --> OptionalPluginLoader : optional modules
-    MainBootstrap --> RuntimeLifecycle : startup / shutdown
-    MainBootstrap --> AudioDeviceManager : audio devices
-    MainBootstrap --> GPUDeviceManager : GPU state
-
+    MainBootstrap --> AppComposer : run
+    AppComposer --> PluginLoader : load_plugins()
+    AppComposer --> OptionalPluginLoader : optional modules
+    AppComposer --> RuntimeLifecycle : startup / shutdown
+    AppComposer --> AudioDeviceManager : audio devices
+    AppComposer --> GPUDeviceManager : GPU state
+    AppComposer *-- ExtensionRegistry
+    AppComposer --> GameExtensionContext : shared runtime resources
     PluginSelectionBase *-- Provider
     PluginSelectionBase --> PluginLoader : select provider
     Provider o-- InputPluginInterface
@@ -115,7 +149,22 @@ classDiagram
     OptionalPluginLoader --> ScreenVision
     OptionalPluginLoader --> Chess
     OptionalPluginLoader --> StarCraft116
+    OptionalPluginLoader --> StarCraft2
     OptionalPluginLoader --> StarCraftRemastered
+
+    ExtensionRegistry o-- GameExtensionInterface
+    GameExtensionContext --> LLM
+    GameExtensionContext --> TTS
+    GameExtensionContext --> ScreenVision
+    GameExtensionInterface <|.. ChessGameExtension
+    GameExtensionInterface <|.. StarCraft116GameExtension
+    GameExtensionInterface <|.. StarCraft2GameExtension
+    GameExtensionInterface <|.. StarCraft2Extension
+    ChessGameExtension --> Chess
+    StarCraft116GameExtension --> StarCraft116
+    StarCraft2GameExtension --> StarCraft2
+    StarCraft2Extension --> StarCraft2GameExtension : shared status callback
+    StarCraft2 --> StarCraft2EngineRegistry
 ```
 
 [Mermaid Object-Oriented Diagram Source](docs/object_oriented_diagram_EN.md)
