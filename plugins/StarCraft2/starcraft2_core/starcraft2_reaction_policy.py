@@ -44,6 +44,10 @@ SILENT_TTS_EVENT_TYPES = {
 # keep their telemetry in logs without announcing each one through TTS.
 SILENT_TTS_TRANSIENT_ZERG_UNIT_IDS = {"103", "151"}
 
+#20260713_kpopmodder: Single low-signal worker/zergling production ticks are
+# useful telemetry but too noisy for spoken reactions.
+LOW_SIGNAL_SINGLE_PRODUCTION_UNIT_TYPE_IDS = {"45", "84", "104", "105"}
+
 EVENT_ALIASES = {
     "supply_depot_started": "first_supply",
     "barracks_started": "first_barracks",
@@ -63,8 +67,25 @@ EVENT_ALIASES = {
 
 class StarCraft2ReactionPolicy:
     #20260707_kpopmodder: Avoid noisy frame-level chatter from SC2 bot events.
-    def __init__(self, min_interval_sec: float = 8.0):
+    def __init__(
+        self,
+        min_interval_sec: float = 8.0,
+        low_signal_single_production_unit_type_ids=None,
+        low_signal_single_production_min_count: int = 2,
+    ):
         self.min_interval_sec = max(float(min_interval_sec), 0.0)
+        if low_signal_single_production_unit_type_ids is None:
+            low_signal_single_production_unit_type_ids = (
+                LOW_SIGNAL_SINGLE_PRODUCTION_UNIT_TYPE_IDS
+            )
+        self.low_signal_single_production_unit_type_ids = {
+            str(unit_type_id)
+            for unit_type_id in low_signal_single_production_unit_type_ids
+        }
+        self.low_signal_single_production_min_count = max(
+            int(low_signal_single_production_min_count or 1),
+            1,
+        )
         self._last_event_time_by_key = {}
 
     def should_emit(self, event: Dict[str, Any]) -> bool:
@@ -75,6 +96,8 @@ class StarCraft2ReactionPolicy:
         if event_type in SILENT_TTS_EVENT_TYPES:
             return False
         if self._is_silent_transient_zerg_unit_event(event_type, event):
+            return False
+        if self._is_low_signal_single_production_event(event_type, event):
             return False
         if event_type not in IMPORTANT_EVENT_TYPES and event_type not in EVENT_ALIASES.values():
             return False
@@ -130,6 +153,52 @@ class StarCraft2ReactionPolicy:
         if not dominant_unit_type_id:
             dominant_unit_type_id = self._dominant_positive_unit_type_id(event)
         return dominant_unit_type_id in SILENT_TTS_TRANSIENT_ZERG_UNIT_IDS
+
+    def _is_low_signal_single_production_event(
+        self,
+        event_type: str,
+        event: Dict[str, Any],
+    ) -> bool:
+        if event_type not in {"unit_produced", "worker_produced"}:
+            return False
+        details = event.get("details") if isinstance(event.get("details"), dict) else {}
+        unit_type_id = str(details.get("unit_type_id") or "").strip()
+        if not unit_type_id:
+            unit_type_id = self._dominant_positive_unit_type_id(event)
+        if unit_type_id not in self.low_signal_single_production_unit_type_ids:
+            return False
+        return (
+            self._dominant_positive_unit_count(event, unit_type_id)
+            < self.low_signal_single_production_min_count
+        )
+
+    def _dominant_positive_unit_count(
+        self,
+        event: Dict[str, Any],
+        unit_type_id: str,
+    ) -> int:
+        details = event.get("details") if isinstance(event.get("details"), dict) else {}
+        try:
+            explicit_count = int(details.get("count") or 0)
+        except (TypeError, ValueError):
+            explicit_count = 0
+        if explicit_count > 0:
+            return explicit_count
+
+        changes = details.get("unit_changes") if isinstance(details.get("unit_changes"), dict) else {}
+        positive_counts = []
+        for candidate_unit_type_id, raw_delta in changes.items():
+            if str(candidate_unit_type_id) != str(unit_type_id):
+                continue
+            try:
+                delta = int(raw_delta or 0)
+            except (TypeError, ValueError):
+                continue
+            if delta > 0:
+                positive_counts.append(delta)
+        if positive_counts:
+            return max(positive_counts)
+        return 1 if unit_type_id else 0
 
     def _dominant_positive_unit_type_id(self, event: Dict[str, Any], allowed_ids=None) -> str:
         details = event.get("details") if isinstance(event.get("details"), dict) else {}

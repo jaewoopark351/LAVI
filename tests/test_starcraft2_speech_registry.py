@@ -72,7 +72,10 @@ class StarCraft2SpeechRegistryTests(unittest.TestCase):
                 self.assertNotIn("내가 유닛", text)
 
     def test_all_unit_and_building_types_get_independent_cooldowns(self):
-        policy = StarCraft2ReactionPolicy(min_interval_sec=8)
+        policy = StarCraft2ReactionPolicy(
+            min_interval_sec=8,
+            low_signal_single_production_unit_type_ids=(),
+        )
         events = []
         for token, unit_type_id in SC2_UNIT_TYPE_ID_BY_TOKEN.items():
             category = unit_category(unit_type_id)

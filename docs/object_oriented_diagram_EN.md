@@ -557,6 +557,8 @@ classDiagram
     class SC2TTSBridge
     class StarCraft2ReactionRuntime
     class StarCraft2ReactionPolicy
+    class StarCraft2ReactionTTSAdapter
+    class StarCraft2ReactionMemoryRecorder
     class TTS
     class MemoryStore
 
@@ -570,10 +572,11 @@ classDiagram
     StarCraft2GameExtension *-- StarCraft2Worker
     StarCraft2GameExtension --> StarCraft2 : facade/plugin
     StarCraft2GameExtension --> StarCraft2ReactionRuntime : status callback
-    StarCraft2GameExtension --> TTS : cancel pending on terminal events
-    StarCraft2ReactionRuntime --> StarCraft2ReactionPolicy
-    StarCraft2ReactionRuntime --> TTS : direct speech
-    StarCraft2ReactionRuntime --> MemoryStore : raw event memory
+    StarCraft2ReactionRuntime --> StarCraft2ReactionPolicy : speak/log policy
+    StarCraft2ReactionRuntime *-- StarCraft2ReactionTTSAdapter
+    StarCraft2ReactionRuntime *-- StarCraft2ReactionMemoryRecorder
+    StarCraft2ReactionTTSAdapter --> TTS : cancel/speak
+    StarCraft2ReactionMemoryRecorder --> MemoryStore : raw event memory
 
     StarCraft2 *-- StarCraft2EngineRegistry
     StarCraft2 *-- SC2LadderProxyLauncher

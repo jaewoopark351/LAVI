@@ -345,6 +345,43 @@ class StarCraft2GameExtensionTests(unittest.TestCase):
         self.assertTrue(emitted)
         tts.receive_input.assert_called_once_with("내가 대군주를 생산했어요.")
 
+    def test_single_low_signal_production_is_log_only_but_batch_still_speaks(self):
+        policy = StarCraft2ReactionPolicy(min_interval_sec=0)
+        tts = mock.Mock()
+        memory_store = mock.Mock()
+
+        with mock.patch(
+            "plugins.StarCraft2.starcraft2_core.starcraft2_reaction_runtime.log_print"
+        ):
+            emitted = handle_starcraft2_status_event(
+                mock.Mock(),
+                tts,
+                memory_store,
+                policy,
+                {
+                    "event_type": "unit_produced",
+                    "details": {"unit_type_id": "104", "unit_changes": {"104": 1}},
+                },
+            )
+
+        self.assertFalse(emitted)
+        tts.receive_input.assert_not_called()
+        memory_store.add_raw_event.assert_called_once()
+
+        emitted = handle_starcraft2_status_event(
+            mock.Mock(),
+            tts,
+            memory_store,
+            policy,
+            {
+                "event_type": "unit_produced",
+                "details": {"unit_type_id": "104", "unit_changes": {"104": 2}},
+            },
+        )
+
+        self.assertTrue(emitted)
+        tts.receive_input.assert_called_once()
+
     def test_non_transient_unit_loss_still_uses_tts(self):
         event = {
             "event_type": "unit_lost",
