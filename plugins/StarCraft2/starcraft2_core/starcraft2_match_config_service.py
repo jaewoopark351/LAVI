@@ -61,6 +61,7 @@ class _StarCraft2MatchConfigService:
         args=None,
         proxy_ports=None,
         bot_name: Optional[str] = None,
+        keep_local_match_identity_args: bool = False,
     ) -> Dict[str, Any]:
         #20260711_kpopmodder: Local Match intentionally no longer reads the LAN
         # Lobby launcher defaults; this protects local play while remote-human
@@ -92,7 +93,11 @@ class _StarCraft2MatchConfigService:
         if proxy_ports is not None and str(proxy_ports or "").strip():
             config["ports"] = proxy_ports
         normalized_args = self.arg_utils.normalize_ladder_args(config.get("args", []))
-        config["args"] = self.arg_utils.strip_local_match_args(normalized_args)
+        config["args"] = (
+            normalized_args
+            if keep_local_match_identity_args
+            else self.arg_utils.strip_local_match_args(normalized_args)
+        )
         config["proxy_host"] = ""
         config["check_hosts"] = ["127.0.0.1"]
         config["remote_human_enabled"] = False

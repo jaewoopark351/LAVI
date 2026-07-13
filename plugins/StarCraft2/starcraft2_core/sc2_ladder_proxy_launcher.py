@@ -12,6 +12,7 @@ from collections.abc import Iterable
 from typing import Any, Callable, Dict, List, Optional
 
 from core.logger import log_print
+from .sc2_local_match_command_template import _LocalMatchLaunchDiagnostics
 
 
 LineCallback = Callable[[str, str], None]
@@ -34,6 +35,7 @@ class SC2LadderProxyLauncher:
         self._stdout_thread = None
         self._stderr_thread = None
         self._monitor_thread = None
+        self._diagnostics = _LocalMatchLaunchDiagnostics()
 
     def validate_config(self, config: Dict[str, Any]) -> Dict[str, Any]:
         executable_path = self._clean_path(config.get("executable_path"))
@@ -93,6 +95,8 @@ class SC2LadderProxyLauncher:
         command = [validation["executable_path"]] + command_args
         stdout = subprocess.PIPE if capture_output else None
         stderr = subprocess.PIPE if capture_output else None
+        self._diagnostics = _LocalMatchLaunchDiagnostics()
+        self._diagnostics.start()
         try:
             log_print(
                 "[SC2LadderProxyLauncher] starting "
@@ -203,6 +207,7 @@ class SC2LadderProxyLauncher:
         if isinstance(config, dict):
             status["validation"] = self.validate_config(config)
             status["ports"] = self.check_ports(config)
+        status["launch_diagnostics"] = self._diagnostics.snapshot()
         return status
 
     def _check_port(self, host: str, port: int, timeout: float) -> Dict[str, Any]:
@@ -342,6 +347,7 @@ class SC2LadderProxyLauncher:
                 if not line:
                     continue
                 tail.append(line)
+                self._diagnostics.add_line(label, line)
                 if callable(callback):
                     callback(label, line)
         except Exception as e:
@@ -362,9 +368,18 @@ class SC2LadderProxyLauncher:
             "[SC2LadderProxyLauncher] exited "
             f"pid={pid} returncode={returncode}"
         )
+        diagnostics = self._diagnostics.finalize(returncode=returncode)
+        if isinstance(diagnostics, dict):
+            self.last_error = str(diagnostics.get("launch_result") or self.last_error)
         if callable(exit_callback):
             try:
-                exit_callback({"pid": pid, "returncode": returncode})
+                exit_callback(
+                    {
+                        "pid": pid,
+                        "returncode": returncode,
+                        "launch_diagnostics": diagnostics,
+                    }
+                )
             except Exception as e:
                 log_print(f"[SC2LadderProxyLauncher] exit callback failed pid={pid}: {e}")
 

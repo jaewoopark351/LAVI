@@ -20,6 +20,9 @@ from plugins.StarCraft2.starcraft2_core.starcraft2_event_service import (
 from plugins.StarCraft2.starcraft2_core.starcraft2_state import (
     StarCraft2RuntimeState,
 )
+from plugins.StarCraft2.starcraft2_core.sc2_local_match_command_template import (
+    _LocalMatchCommandTemplate,
+)
 from plugins.StarCraft2.starcraft2_core.sc2_ladder_proxy_launcher import SC2LadderProxyLauncher
 from plugins.StarCraft2.starcraft2_core.starcraft2_match_config_service import _StarCraft2MatchConfigService
 from plugins.StarCraft2.starcraft2_core.starcraft2_observation_tracker import (
@@ -97,6 +100,7 @@ class StarCraft2:
         self.ladder_proxy = SC2LadderProxyLauncher()
         self.runtime_downloader = StarCraft2RuntimeDownloader()
         self.observation_tracker = SC2ObservationTracker()
+        self._local_match_command_template = _LocalMatchCommandTemplate()
         self._arg_utils = _StarCraft2ArgUtils(SC2_RACE_CHOICES)
         self._match_config_service = _StarCraft2MatchConfigService(
             self.config_manager,
@@ -113,6 +117,7 @@ class StarCraft2:
             self,
             self._arg_utils,
             self._match_config_service,
+            self._local_match_command_template,
         )
         self._shutdown = False
 
@@ -471,12 +476,14 @@ class StarCraft2:
         working_directory=None,
         args=None,
         proxy_ports=None,
+        keep_local_match_identity_args: bool = False,
     ) -> Dict[str, Any]:
         return self._match_config_service.local_match_config(
             executable_path=executable_path,
             working_directory=working_directory,
             args=args,
             proxy_ports=proxy_ports,
+            keep_local_match_identity_args=keep_local_match_identity_args,
         )
 
     def _ensure_local_match_runtime(self, config: Dict[str, Any]) -> Dict[str, Any]:

@@ -190,17 +190,17 @@ int main(int argc, char** argv)
     }
     std::cout << std::endl;
 
-    const auto coordinator_args = coordinatorArgs(argc, argv);
+    std::vector<std::string> coordinator_args = coordinatorArgs(argc, argv);
     std::vector<char*> coordinator_argv;
     coordinator_argv.reserve(coordinator_args.size());
     for (auto& arg : coordinator_args)
     {
-        coordinator_argv.push_back(arg.data());
+        coordinator_argv.push_back(&arg[0]);
     }
     LadderGame game(
         static_cast<int>(coordinator_argv.size()),
         coordinator_argv.data(),
-        &config,
+        &config
     );
     game.SetRealTime(realtime);
     GameResult result = game.StartGame(human, bot, mapName, remoteHumanHost, remoteHumanClientPort);

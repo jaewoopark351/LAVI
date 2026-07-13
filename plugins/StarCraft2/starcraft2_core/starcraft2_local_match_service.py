@@ -18,10 +18,11 @@ LOCAL_MATCH_AI_BY_RACE = {
 
 
 class _StarCraft2LocalMatchService:
-    def __init__(self, owner, arg_utils, config_service):
+    def __init__(self, owner, arg_utils, config_service, command_template):
         self.owner = owner
         self.arg_utils = arg_utils
         self.config_service = config_service
+        self.command_template = command_template
 
     def local_match_race_from_args(self, args, fallback: str = "Terran") -> str:
         return self.arg_utils.local_match_race_from_args(args, fallback=fallback)
@@ -77,13 +78,24 @@ class _StarCraft2LocalMatchService:
             }
             return self.local_match_status_json(result=result)
         args = self.on_local_match_ai_race_change(selected_ai_race, args)
+        selected_human_race = self.arg_utils.local_match_race_from_args(args)
+        template_args = self.command_template.build_launch_args(
+            args,
+            bot_name=bot_name,
+            human_name="LAVHuman",
+            human_race=selected_human_race,
+            bot_race=selected_ai_race,
+        )
+        launch_template = template_args.as_dict()
         config = self.config_service.local_match_config(
             executable_path=executable_path,
             working_directory=working_directory,
-            args=args,
+            args=launch_template["args"],
             proxy_ports=proxy_ports,
             bot_name=bot_name,
+            keep_local_match_identity_args=True,
         )
+        config["launch_template"] = launch_template
         runtime_download = self.config_service.ensure_local_match_runtime(config)
         config["runtime_download"] = runtime_download
         if not runtime_download.get("ok", False):
@@ -101,11 +113,13 @@ class _StarCraft2LocalMatchService:
             config = self.config_service.local_match_config(
                 executable_path=executable_path,
                 working_directory=working_directory,
-                args=args,
+                args=launch_template["args"],
                 proxy_ports=proxy_ports,
                 bot_name=bot_name,
+                keep_local_match_identity_args=True,
             )
             config["runtime_download"] = runtime_download
+            config["launch_template"] = launch_template
         bot_profile_validation = config.get("bot_profile_validation", {})
         if (
             isinstance(bot_profile_validation, dict)
