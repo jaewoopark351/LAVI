@@ -39,6 +39,7 @@ class ChessGameExtension(GameExtensionInterface):
         return "chess"
 
     def initialize(self, context: GameExtensionContext) -> None:
+        super().initialize(context)
         self._context = context
         if self.plugin is None:
             self._maybe_build_plugin()
@@ -61,9 +62,12 @@ class ChessGameExtension(GameExtensionInterface):
             raise RuntimeError("Chess plugin is not available")
         self._ensure_server_started(plugin)
         self._is_started = True
+        self.mark_started(True)
+        self.publish_event("extension_started")
 
     def stop(self) -> None:
         self._is_started = False
+        self.mark_started(False)
         if self.plugin is None:
             return
         try:
@@ -77,26 +81,23 @@ class ChessGameExtension(GameExtensionInterface):
         self.stop()
 
     def handle_command(self, command: Any) -> Dict[str, Any]:
+        command_dto = self.record_command(command)
         if self.plugin is None:
-            return {"ok": False, "error": "missing_plugin"}
+            result = {"ok": False, "error": "missing_plugin"}
+            self.record_result(result, action=command_dto.action)
+            return result
 
-        action = None
-        payload = {}
-        if isinstance(command, dict):
-            payload = dict(command)
-            action = str(
-                payload.get("action")
-                or payload.get("type")
-                or payload.get("event")
-                or ""
-            ).strip().lower()
-        elif isinstance(command, str):
-            action = command.strip().lower()
+        action = command_dto.action
+        payload = command_dto.to_legacy_dict()
 
         if action not in self._command_handlers:
-            return {"ok": False, "action": action or "", "error": "unknown_action"}
+            result = {"ok": False, "action": action or "", "error": "unknown_action"}
+            self.record_result(result, action=action)
+            return result
 
-        return self._run_command(action, payload)
+        result = self._run_command(action, payload)
+        self.record_result(result, action=action)
+        return result
 
     def get_status(self) -> Dict[str, Any]:
         status = {
@@ -109,6 +110,7 @@ class ChessGameExtension(GameExtensionInterface):
         plugin = self.plugin
         if plugin is None:
             status["plugin"] = {"ready": False}
+            self._attach_runtime_status(status)
             return status
         try:
             controller = getattr(plugin, "controller", None)
@@ -131,7 +133,15 @@ class ChessGameExtension(GameExtensionInterface):
                 )
         except Exception as e:
             status["error"] = str(e)
+        self._attach_runtime_status(status)
         return status
+
+    def _attach_runtime_status(self, status: Dict[str, Any]) -> None:
+        runtime_context = getattr(self, "runtime_context", None)
+        snapshot = getattr(runtime_context, "snapshot", None)
+        if callable(snapshot):
+            status["runtime_context"] = snapshot()
+        self.record_status(status)
 
     def _run_command(self, action: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         plugin = self.plugin

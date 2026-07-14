@@ -44,6 +44,7 @@ class StarCraft2GameExtension(GameExtensionInterface):
         return "starcraft2"
 
     def initialize(self, context: GameExtensionContext) -> None:
+        super().initialize(context)
         self._context = context
         if self.plugin is None:
             self._maybe_build_plugin()
@@ -72,6 +73,8 @@ class StarCraft2GameExtension(GameExtensionInterface):
         self._ensure_bridge_ready()
         self.worker.start()
         self._is_started = True
+        self.mark_started(True)
+        self.publish_event("extension_started")
         #20260710_kpopmodder: SC2 commentary is sourced from Ladder Proxy
         # ResponseObservation telemetry; do not use noisy ScreenVision frames.
         if self._auto_launch_enabled():
@@ -79,6 +82,7 @@ class StarCraft2GameExtension(GameExtensionInterface):
 
     def stop(self) -> None:
         self._is_started = False
+        self.mark_started(False)
         try:
             self.bridge.stop_game()
         finally:
@@ -123,8 +127,11 @@ class StarCraft2GameExtension(GameExtensionInterface):
         return None
 
     def handle_command(self, command: Any) -> Dict[str, Any]:
+        command_dto = self.record_command(command)
         self._ensure_bridge_ready()
-        return self.worker.handle_command(command)
+        result = self.worker.handle_command(command_dto.to_legacy_dict())
+        self.record_result(result, action=command_dto.action)
+        return result
 
     def get_status(self) -> Dict[str, Any]:
         plugin_status = {}
@@ -141,6 +148,11 @@ class StarCraft2GameExtension(GameExtensionInterface):
             "started": self._is_started,
         }
         plugin_status["worker"] = self.worker.get_status()
+        runtime_context = getattr(self, "runtime_context", None)
+        snapshot = getattr(runtime_context, "snapshot", None)
+        if callable(snapshot):
+            plugin_status["runtime_context"] = snapshot()
+        self.record_status(plugin_status)
         return plugin_status
 
     def _auto_launch_enabled(self) -> bool:

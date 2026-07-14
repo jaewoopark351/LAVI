@@ -46,6 +46,10 @@ classDiagram
     class RuntimeLifecycle
     class GPUDeviceManager
     class AudioDeviceManager
+    class GameExtensionCompositionService {
+        <<app_core.extensions>>
+        +compose()
+    }
     class ExtensionRegistry {
         <<app_core.extensions>>
         +register()
@@ -54,8 +58,17 @@ classDiagram
         +stop_all()
     }
     class GameExtensionContext
+    class GameRuntimeContextRegistry
+    class GameEventBus
+    class GameCommandDTO
+    class GameStatusDTO
+    class GameResultDTO
     class GameExtensionInterface {
         <<interface>>
+        +normalize_command()
+        +record_result()
+        +record_status()
+        +publish_event()
     }
 
     class PluginLoader
@@ -147,6 +160,9 @@ classDiagram
     AppComposer --> GPUDeviceManager : startup placement
     AppComposer *-- RuntimeLifecycle
     AppComposer *-- ExtensionRegistry
+    AppComposer *-- GameExtensionCompositionService
+    AppComposer *-- GameRuntimeContextRegistry
+    AppComposer *-- GameEventBus
     AppComposer --> GameExtensionContext : shared runtime
     AppComposer *-- Input
     AppComposer *-- LLM
@@ -160,7 +176,14 @@ classDiagram
     AppComposer o-- StarCraft116 : optional direct module
     AppComposer o-- StarCraft2 : optional direct module
     AppComposer o-- StarCraftRemastered : optional direct module
+    GameExtensionCompositionService --> ExtensionRegistry : register and initialize
     ExtensionRegistry o-- GameExtensionInterface
+    GameExtensionContext --> GameRuntimeContextRegistry
+    GameExtensionContext --> GameEventBus
+    GameExtensionInterface --> GameCommandDTO : command contract
+    GameExtensionInterface --> GameStatusDTO : status contract
+    GameExtensionInterface --> GameResultDTO : result contract
+    GameExtensionInterface --> GameEventBus : observer events
     GameExtensionInterface <|.. ChessGameExtension
     GameExtensionInterface <|.. StarCraft116GameExtension
     GameExtensionInterface <|.. StarCraft2GameExtension
@@ -189,6 +212,15 @@ loading, Gradio UI construction, optional module loading, game extension
 registration, lifecycle startup, and Gradio launch. `MainBootstrap`,
 `MemoryBootstrap`, `ScreenRouterBootstrap`, `ModuleConfig`, and `GradioLaunch`
 are diagram-only module roles for files/functions.
+
+`AppComposer` delegates game extension construction and registration to
+`GameExtensionCompositionService`. The shared game-extension layer also exposes
+`GameCommandDTO`, `GameStatusDTO`, `GameResultDTO`,
+`GameRuntimeContextRegistry`, and `GameEventBus`, so command/status/result/event
+handoffs can move away from ad-hoc dicts without forcing every game plugin to
+change at once.
+
+<!-- #20260715_kpopmodder: Document game extension composition service and shared contracts. -->
 
 `ScreenVision`, `SongPlayer`, `Chess`, `StarCraft116`, `StarCraft2`, and
 `StarCraftRemastered` are not `PluginSelectionBase` providers. They are

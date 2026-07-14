@@ -7,7 +7,13 @@ import sys
 
 from app_core.gradio_launch import find_available_port
 from app_core.memory_bootstrap import bootstrap_memory
-from app_core.extensions import ExtensionRegistry, GameExtensionContext
+from app_core.extensions import (
+    ExtensionRegistry,
+    GameEventBus,
+    GameExtensionCompositionService,
+    GameExtensionContext,
+    GameRuntimeContextRegistry,
+)
 from app_core.optional_module_manifest import get_optional_module_manifest
 from app_core.optional_plugin_loader import (
     instantiate_optional_plugin,
@@ -55,8 +61,13 @@ class AppComposer:
         self.starcraft2_changeling_observer_extension = None
         self.screen_vision = None
         self.game_extension_context = None
+        self.game_runtime_contexts = GameRuntimeContextRegistry()
+        self.game_event_bus = GameEventBus()
         self.handle_chess_ai_move_applied = None
         self.game_extension_registry = ExtensionRegistry()
+        self.game_extension_composition_service = GameExtensionCompositionService(
+            self.game_extension_registry,
+        )
         self.core_components = []
         self.optional_components = []
         self._startup_components = []  #20260706_kpopmodder: Keep startup-instantiated components for guaranteed cleanup.
@@ -182,6 +193,8 @@ class AppComposer:
             memory_context_builder=self.memory_context_builder,
             screen_question_router=self.screen_question_router,
             global_state=global_state,
+            runtime_contexts=self.game_runtime_contexts,
+            event_bus=self.game_event_bus,
             runtime_state={},
         )
         self._register_game_extensions()
@@ -271,113 +284,24 @@ class AppComposer:
             )#20260630_kpopmodder
 
     def _register_game_extensions(self):
-        registered_extensions = []
-        if self.starcraft116_plugin is not None and (
-            self.starcraft116_game_extension is None
-        ):
-            try:
-                from app_core.extensions.starcraft116_game_extension import (
-                    StarCraft116GameExtension,
-                )
-
-                self.starcraft116_game_extension = StarCraft116GameExtension(
-                    plugin=self.starcraft116_plugin,
-                )
-                self.game_extension_registry.register(self.starcraft116_game_extension)
-                registered_extensions.append(self.starcraft116_game_extension)
-            except Exception as e:
-                log_print(
-                    "[AppComposer] register StarCraft116GameExtension failed: "
-                    f"{type(e).__name__}: {e}"
-                )
-                self.starcraft116_game_extension = None
-
-        if self.starcraft2_plugin is not None and self.starcraft2_game_extension is None:
-            try:
-                from app_core.extensions.starcraft2_game_extension import (
-                    StarCraft2GameExtension,
-                )
-
-                self.starcraft2_game_extension = StarCraft2GameExtension(
-                    plugin=self.starcraft2_plugin,
-                )
-                self.game_extension_registry.register(self.starcraft2_game_extension)
-                registered_extensions.append(self.starcraft2_game_extension)
-                log_print("[AppComposer] starcraft2 game extension registered")
-            except Exception as e:
-                log_print(
-                    "[AppComposer] register StarCraft2GameExtension failed: "
-                    f"{type(e).__name__}: {e}"
-                )
-                self.starcraft2_game_extension = None
-
-        if self.starcraft2_changeling_observer_extension is None:
-            try:
-                from plugins.StarCraft2.starcraft2_core.sc2_extension import StarCraft2Extension
-
-                self.starcraft2_changeling_observer_extension = StarCraft2Extension()
-                self.game_extension_registry.register(
-                    self.starcraft2_changeling_observer_extension
-                )
-                registered_extensions.append(
-                    self.starcraft2_changeling_observer_extension
-                )
-                log_print(
-                    "[AppComposer] starcraft2 Changeling observer extension registered"
-                )
-            except Exception as e:
-                log_print(
-                    "[AppComposer] register StarCraft2 Changeling observer failed: "
-                    f"{type(e).__name__}: {e}"
-                )
-                self.starcraft2_changeling_observer_extension = None
-
-        if self.chess_plugin is not None and self.chess_game_extension is None:
-            try:
-                from app_core.extensions.chess_game_extension import (
-                    ChessGameExtension,
-                )
-
-                self.chess_game_extension = ChessGameExtension(
-                    plugin=self.chess_plugin,
-                )
-                self.game_extension_registry.register(self.chess_game_extension)
-                registered_extensions.append(self.chess_game_extension)
-                log_print("[AppComposer] chess game extension registered")
-            except Exception as e:
-                log_print(
-                    "[AppComposer] register ChessGameExtension failed: "
-                    f"{type(e).__name__}: {e}"
-                )
-                self.chess_game_extension = None
-
-        if registered_extensions:
-            self.game_extension_registry.initialize(self.game_extension_context)
-
-        if self.starcraft116_game_extension is not None:
-            starcraft116_lookup = (
-                self.game_extension_registry.get("starcraft116") is not None
-            )
-            log_print(
-                f"[AppComposer] registry lookup starcraft116: {starcraft116_lookup}"
-            )
-        if self.starcraft2_game_extension is not None:
-            starcraft2_lookup = (
-                self.game_extension_registry.get("starcraft2") is not None
-            )
-            log_print(f"[AppComposer] registry lookup starcraft2: {starcraft2_lookup}")
-        if self.starcraft2_changeling_observer_extension is not None:
-            starcraft2_observer_lookup = (
-                self.game_extension_registry.get("starcraft2_changeling_observer")
-                is not None
-            )
-            log_print(
-                "[AppComposer] registry lookup starcraft2_changeling_observer: "
-                f"{starcraft2_observer_lookup}"
-            )
-        if self.chess_game_extension is not None:
-            chess_lookup = self.game_extension_registry.get("chess") is not None
-            log_print(f"[AppComposer] registry lookup chess: {chess_lookup}")
+        result = self.game_extension_composition_service.compose(
+            context=self.game_extension_context,
+            starcraft116_plugin=self.starcraft116_plugin,
+            starcraft2_plugin=self.starcraft2_plugin,
+            chess_plugin=self.chess_plugin,
+            starcraft116_game_extension=self.starcraft116_game_extension,
+            starcraft2_game_extension=self.starcraft2_game_extension,
+            starcraft2_changeling_observer_extension=(
+                self.starcraft2_changeling_observer_extension
+            ),
+            chess_game_extension=self.chess_game_extension,
+        )
+        self.starcraft116_game_extension = result.starcraft116_game_extension
+        self.starcraft2_game_extension = result.starcraft2_game_extension
+        self.starcraft2_changeling_observer_extension = (
+            result.starcraft2_changeling_observer_extension
+        )
+        self.chess_game_extension = result.chess_game_extension
 
     def create_component_ui(self):
         import gradio as gr

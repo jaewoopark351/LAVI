@@ -122,6 +122,7 @@ class StarCraft2Extension(GameExtensionInterface):
         return "starcraft2_changeling_observer"
 
     def initialize(self, context: GameExtensionContext) -> None:
+        super().initialize(context)
         self._context = context
         self._refresh_status_event_callback()
         self._is_initialized = True
@@ -158,39 +159,55 @@ class StarCraft2Extension(GameExtensionInterface):
         # if bool(lan_config.get("auto_host_room", False)):
         #     self.lan_discovery.start_host(self._lan_room_info())
         self._is_started = True
+        self.mark_started(True)
+        self.publish_event("extension_started")
         self._last_status_message = "watching_logs"
 
     def stop(self) -> None:
         self.log_watcher.stop()
         self.launcher.stop()
         self._is_started = False
+        self.mark_started(False)
         self._last_status_message = "stopped"
 
     def handle_command(self, command: Any) -> Any:
-        action = self._action(command)
+        command_dto = self.record_command(command)
+        action = command_dto.action
         if action in {"start", "launch"}:
             self.start()
-            return {"ok": True, "action": action, "status": self.get_status()}
+            result = {"ok": True, "action": action, "status": self.get_status()}
+            self.record_result(result, action=action)
+            return result
         if action in {"launch_sc2aiapp", "launch_probots", "start_sc2aiapp"}:
             self.config = self._load_config()
             result = self._launch_sc2aiapp()
-            return {"ok": bool(result.get("ok")), "action": action, "result": result}
+            payload = {"ok": bool(result.get("ok")), "action": action, "result": result}
+            self.record_result(payload, action=action)
+            return payload
         if action in {"validate_paths", "validate_sc2aiapp"}:
             self.config = self._load_config()
-            return {
+            result = {
                 "ok": True,
                 "action": action,
                 "validation": self.launcher.validate_sc2aiapp_config(self.config),
             }
+            self.record_result(result, action=action)
+            return result
         if action == "stop":
             self.stop()
-            return {"ok": True, "action": action, "status": self.get_status()}
+            result = {"ok": True, "action": action, "status": self.get_status()}
+            self.record_result(result, action=action)
+            return result
         if action in {"status", "get_status"}:
-            return {"ok": True, "action": action, "status": self.get_status()}
+            result = {"ok": True, "action": action, "status": self.get_status()}
+            self.record_result(result, action=action)
+            return result
         if action == "reload":
             self.config = self._load_config()
             self._speak_events_enabled = bool(self.config.get("speak_events", True))
-            return {"ok": True, "action": action, "config": copy.deepcopy(self.config)}
+            result = {"ok": True, "action": action, "config": copy.deepcopy(self.config)}
+            self.record_result(result, action=action)
+            return result
 #         if action in {"lan_start_scan", "scan_lan_rooms", "start_lan_scan"}:
 #             #20260712_kpopmodder: LAN Lobby commands are archived and should not
 #             # open sockets during routine maintenance.
@@ -226,7 +243,9 @@ class StarCraft2Extension(GameExtensionInterface):
 #                 "message": LAN_LOBBY_ARCHIVED_MESSAGE,
 #                 "status": {"archived": True},
 #             }
-        return {"ok": False, "action": action, "error": "unknown_action"}
+        result = {"ok": False, "action": action, "error": "unknown_action"}
+        self.record_result(result, action=action)
+        return result
 
 #     def _lan_lobby_archived_result(self, action: str) -> Dict[str, Any]:
 #         result = {
@@ -239,7 +258,7 @@ class StarCraft2Extension(GameExtensionInterface):
 #         return result
 
     def get_status(self) -> Dict[str, Any]:
-        return {
+        status = {
             "name": self.name,
             "initialized": self._is_initialized,
             "started": self._is_started,
@@ -260,6 +279,12 @@ class StarCraft2Extension(GameExtensionInterface):
 #                 "message": LAN_LOBBY_ARCHIVED_MESSAGE,
 #             },
         }
+        runtime_context = getattr(self, "runtime_context", None)
+        snapshot = getattr(runtime_context, "snapshot", None)
+        if callable(snapshot):
+            status["runtime_context"] = snapshot()
+        self.record_status(status)
+        return status
 
     def _on_process_line(self, stream_name: str, line: str) -> None:
         if not bool(self.config.get("watch_stdout", True)):

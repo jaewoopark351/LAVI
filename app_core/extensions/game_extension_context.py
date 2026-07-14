@@ -23,6 +23,8 @@ class GameExtensionContext:
     memory_context_builder: Any = None
     screen_question_router: Any = None
     global_state: Any = None
+    runtime_contexts: Any = None
+    event_bus: Any = None
     runtime_state: Dict[str, Any] = field(default_factory=dict)
     shared_resources: Dict[str, Any] = field(default_factory=dict)
 
@@ -31,4 +33,18 @@ class GameExtensionContext:
 
     def get_shared(self, key: str, default: Any = None) -> Any:
         return self.shared_resources.get(key, default)
+
+    def get_runtime_context(self, name: str):
+        registry = self.runtime_contexts
+        getter = getattr(registry, "get", None)
+        if callable(getter):
+            return getter(name)
+        key = str(name or "").strip().lower()
+        return self.runtime_state.setdefault(key, {})
+
+    def publish_event(self, event) -> bool:
+        emitter = getattr(self.event_bus, "emit", None)
+        if not callable(emitter):
+            return False
+        return bool(emitter(event))
 

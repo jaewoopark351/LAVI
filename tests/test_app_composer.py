@@ -6,6 +6,7 @@ from unittest import mock
 
 from app_core import optional_plugin_loader
 from app_core.app_composer import AppComposer
+from app_core.extensions import GameExtensionCompositionResult
 
 
 class FakeQueueComponent:
@@ -230,3 +231,43 @@ class AppComposerTests(unittest.TestCase):
         lifecycle.start_components.assert_called_once()
         lifecycle.start_global_updates.assert_called_once()
         extension.start.assert_not_called()
+
+    def test_register_game_extensions_delegates_to_composition_service(self):
+        composer = AppComposer()
+        composer.game_extension_context = object()
+        composer.starcraft116_plugin = object()
+        composer.starcraft2_plugin = object()
+        composer.chess_plugin = object()
+        starcraft116_extension = object()
+        starcraft2_extension = object()
+        observer_extension = object()
+        chess_extension = object()
+        composer.game_extension_composition_service = mock.Mock()
+        composer.game_extension_composition_service.compose.return_value = (
+            GameExtensionCompositionResult(
+                starcraft116_game_extension=starcraft116_extension,
+                starcraft2_game_extension=starcraft2_extension,
+                starcraft2_changeling_observer_extension=observer_extension,
+                chess_game_extension=chess_extension,
+            )
+        )
+
+        composer._register_game_extensions()
+
+        composer.game_extension_composition_service.compose.assert_called_once_with(
+            context=composer.game_extension_context,
+            starcraft116_plugin=composer.starcraft116_plugin,
+            starcraft2_plugin=composer.starcraft2_plugin,
+            chess_plugin=composer.chess_plugin,
+            starcraft116_game_extension=None,
+            starcraft2_game_extension=None,
+            starcraft2_changeling_observer_extension=None,
+            chess_game_extension=None,
+        )
+        self.assertIs(starcraft116_extension, composer.starcraft116_game_extension)
+        self.assertIs(starcraft2_extension, composer.starcraft2_game_extension)
+        self.assertIs(
+            observer_extension,
+            composer.starcraft2_changeling_observer_extension,
+        )
+        self.assertIs(chess_extension, composer.chess_game_extension)

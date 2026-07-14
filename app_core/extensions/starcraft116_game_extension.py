@@ -29,6 +29,7 @@ class StarCraft116GameExtension(GameExtensionInterface):
         return "starcraft116"
 
     def initialize(self, context: GameExtensionContext) -> None:
+        super().initialize(context)
         self._context = context
         if self.plugin is None:
             self._maybe_build_plugin()
@@ -57,12 +58,15 @@ class StarCraft116GameExtension(GameExtensionInterface):
             self.bridge.start_status_listener()
             self.worker.start()
             self._is_started = True
+            self.mark_started(True)
+            self.publish_event("extension_started")
         except Exception as e:
             log_print(f"[StarCraft116GameExtension] start failed: {e}")
             raise
 
     def stop(self) -> None:
         self._is_started = False
+        self.mark_started(False)
         try:
             self.worker.stop()
         finally:
@@ -73,7 +77,10 @@ class StarCraft116GameExtension(GameExtensionInterface):
         self.stop()
 
     def handle_command(self, command: Any) -> Any:
-        return self.worker.handle_command(command)
+        command_dto = self.record_command(command)
+        result = self.worker.handle_command(command_dto.to_legacy_dict())
+        self.record_result(result, action=command_dto.action)
+        return result
 
     #20260706_kpopmodder: Shim path for ScreenVision event->command wiring.
     def _on_screen_observation_event(self, payload: Any = None, **kwargs):
@@ -165,6 +172,11 @@ class StarCraft116GameExtension(GameExtensionInterface):
             "bridge_watcher": self.bridge.get_watcher_state(),
         }
         base["worker"] = self.worker.get_status()
+        runtime_context = getattr(self, "runtime_context", None)
+        snapshot = getattr(runtime_context, "snapshot", None)
+        if callable(snapshot):
+            base["runtime_context"] = snapshot()
+        self.record_status(base)
         return base
 
     def _is_status_listener_set(self) -> bool:

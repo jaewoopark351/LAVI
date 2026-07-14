@@ -45,6 +45,10 @@ classDiagram
     class RuntimeLifecycle
     class GPUDeviceManager
     class AudioDeviceManager
+    class GameExtensionCompositionService {
+        <<app_core.extensions>>
+        +compose()
+    }
     class ExtensionRegistry {
         <<app_core.extensions>>
         +register()
@@ -53,8 +57,17 @@ classDiagram
         +stop_all()
     }
     class GameExtensionContext
+    class GameRuntimeContextRegistry
+    class GameEventBus
+    class GameCommandDTO
+    class GameStatusDTO
+    class GameResultDTO
     class GameExtensionInterface {
         <<interface>>
+        +normalize_command()
+        +record_result()
+        +record_status()
+        +publish_event()
     }
 
     class PluginLoader
@@ -146,6 +159,9 @@ classDiagram
     AppComposer --> GPUDeviceManager : startup placement
     AppComposer *-- RuntimeLifecycle
     AppComposer *-- ExtensionRegistry
+    AppComposer *-- GameExtensionCompositionService
+    AppComposer *-- GameRuntimeContextRegistry
+    AppComposer *-- GameEventBus
     AppComposer --> GameExtensionContext : shared runtime
     AppComposer *-- Input
     AppComposer *-- LLM
@@ -159,7 +175,14 @@ classDiagram
     AppComposer o-- StarCraft116 : optional direct module
     AppComposer o-- StarCraft2 : optional direct module
     AppComposer o-- StarCraftRemastered : optional direct module
+    GameExtensionCompositionService --> ExtensionRegistry : register and initialize
     ExtensionRegistry o-- GameExtensionInterface
+    GameExtensionContext --> GameRuntimeContextRegistry
+    GameExtensionContext --> GameEventBus
+    GameExtensionInterface --> GameCommandDTO : command contract
+    GameExtensionInterface --> GameStatusDTO : status contract
+    GameExtensionInterface --> GameResultDTO : result contract
+    GameExtensionInterface --> GameEventBus : observer events
     GameExtensionInterface <|.. ChessGameExtension
     GameExtensionInterface <|.. StarCraft116GameExtension
     GameExtensionInterface <|.. StarCraft2GameExtension
@@ -191,6 +214,12 @@ classDiagram
 
 `Hybrid_OpenAI_LLM`은 현재 기본 LLM provider로 표시합니다. `ChatGPT_OpenAI`는 활성화 가능한 LLM provider이지만 기본 선택은 `PluginSelection` 설정과 내장 기본값에 의해 `Hybrid_OpenAI_LLM`이 우선됩니다. <!-- #20260630_kpopmodder: Update architecture docs for app_core bootstrap, lazy provider loading, and direct optional modules. -->
 <!-- #20260704_kpopmodder: Updated optional direct-module docs for StarCraft116 and optional_plugin_loader. -->
+`AppComposer`는 게임 확장 생성과 등록 세부 로직을
+`GameExtensionCompositionService`에 위임합니다. 공통 게임 확장 계층은
+`GameCommandDTO`, `GameStatusDTO`, `GameResultDTO`,
+`GameRuntimeContextRegistry`, `GameEventBus`를 제공해서 command/status/result와
+observer 이벤트 전달이 임의 dict에만 의존하지 않도록 합니다.
+<!-- #20260715_kpopmodder: Document game extension composition service and shared contracts. -->
 
 ## 2. 핵심 실행 객체와 메모리/화면 라우팅 구조
 

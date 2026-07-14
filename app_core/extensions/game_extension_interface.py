@@ -5,6 +5,11 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict
 
 from app_core.extensions.game_extension_context import GameExtensionContext
+from app_core.extensions.game_extension_contracts import (
+    GameCommandDTO,
+    GameResultDTO,
+    GameStatusDTO,
+)
 
 
 class GameExtensionInterface(ABC):
@@ -27,6 +32,60 @@ class GameExtensionInterface(ABC):
         Existing core components can be passed through `context` as a dict.
         """
         self.context = context
+        self.runtime_context = None
+        self.event_bus = getattr(context, "event_bus", None)
+        get_runtime_context = getattr(context, "get_runtime_context", None)
+        if callable(get_runtime_context):
+            self.runtime_context = get_runtime_context(self.name)
+            marker = getattr(self.runtime_context, "mark_initialized", None)
+            if callable(marker):
+                marker(True)
+
+    def normalize_command(self, command: Any) -> GameCommandDTO:
+        return GameCommandDTO.from_mapping(command)
+
+    def record_command(self, command: Any) -> GameCommandDTO:
+        runtime_context = getattr(self, "runtime_context", None)
+        setter = getattr(runtime_context, "set_command", None)
+        if callable(setter):
+            return setter(command)
+        return self.normalize_command(command)
+
+    def record_result(self, result: Any, action: str = "") -> GameResultDTO:
+        runtime_context = getattr(self, "runtime_context", None)
+        setter = getattr(runtime_context, "set_result", None)
+        if callable(setter):
+            return setter(result, action=action)
+        return GameResultDTO.from_mapping(result, action=action)
+
+    def record_status(self, status: Dict[str, Any]) -> GameStatusDTO:
+        runtime_context = getattr(self, "runtime_context", None)
+        setter = getattr(runtime_context, "set_status", None)
+        if callable(setter):
+            setter(status)
+        return GameStatusDTO.from_mapping(status, name=self.name)
+
+    def mark_started(self, value: bool = True) -> None:
+        runtime_context = getattr(self, "runtime_context", None)
+        marker = getattr(runtime_context, "mark_started", None)
+        if callable(marker):
+            marker(value)
+
+    def publish_event(self, event_type: str, details: Dict[str, Any] | None = None) -> bool:
+        event_bus = getattr(self, "event_bus", None)
+        emitter = getattr(event_bus, "emit", None)
+        if not callable(emitter):
+            return False
+        return bool(
+            emitter(
+                {
+                    "event_type": event_type,
+                    "game": self.name,
+                    "source": "game_extension",
+                    "details": dict(details or {}),
+                }
+            )
+        )
 
     @abstractmethod
     def start(self) -> None:
