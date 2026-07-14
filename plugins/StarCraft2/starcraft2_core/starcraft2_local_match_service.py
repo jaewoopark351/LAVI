@@ -28,7 +28,8 @@ LOCAL_MATCH_AI_BY_RACE = {
 }
 
 
-class _StarCraft2LocalMatchService:
+class StarCraft2LocalMatchService:
+    #20260715_kpopmodder: Public domain service boundary for Local Human vs AI flow.
     def __init__(
         self,
         arg_utils,
@@ -470,3 +471,6 @@ class _StarCraft2LocalMatchService:
             except (TypeError, ValueError):
                 continue
         return ports if ports else []
+
+
+_StarCraft2LocalMatchService = StarCraft2LocalMatchService

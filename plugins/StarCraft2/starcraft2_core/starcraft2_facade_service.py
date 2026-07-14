@@ -13,7 +13,7 @@ from .starcraft2_contracts import (
 )
 from .starcraft2_runtime_context import SC2RuntimeContext
 from .starcraft2_event_bus import StarCraft2EventBus
-from .starcraft2_local_match_service import _StarCraft2LocalMatchService
+from .starcraft2_local_match_service import StarCraft2LocalMatchService
 
 
 class StarCraft2FacadeService:
@@ -26,7 +26,7 @@ class StarCraft2FacadeService:
         ladder_proxy,
         match_config_service,
         engine_event_service,
-        local_match_service: Optional[_StarCraft2LocalMatchService] = None,
+        local_match_service: Optional[StarCraft2LocalMatchService] = None,
         event_bus: StarCraft2EventBus | None = None,
         runtime_context: Optional[SC2RuntimeContext] = None,
     ):

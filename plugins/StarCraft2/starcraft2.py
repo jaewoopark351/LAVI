@@ -14,8 +14,8 @@ from plugins.StarCraft2.starcraft2_core.starcraft2_engine_registry import (
 )
 from plugins.StarCraft2.starcraft2_core.starcraft2_event_bus import StarCraft2EventBus
 from plugins.StarCraft2.starcraft2_core.starcraft2_event_service import (
-    _StarCraft2EngineEventService,
-    _StarCraft2LadderProxyEventService,
+    StarCraft2EngineEventService,
+    StarCraft2LadderProxyEventService,
 )
 from plugins.StarCraft2.starcraft2_core.starcraft2_facade_service import (
     StarCraft2FacadeService,
@@ -31,7 +31,7 @@ from plugins.StarCraft2.starcraft2_core.starcraft2_match_config_service import _
 from plugins.StarCraft2.starcraft2_core.starcraft2_observation_tracker import (
     SC2ObservationTracker,
 )
-from plugins.StarCraft2.starcraft2_core.starcraft2_local_match_service import _StarCraft2LocalMatchService
+from plugins.StarCraft2.starcraft2_core.starcraft2_local_match_service import StarCraft2LocalMatchService
 from plugins.StarCraft2.starcraft2_core.starcraft2_runtime_downloader import StarCraft2RuntimeDownloader
 from plugins.StarCraft2.starcraft2_core.starcraft2_runtime_context import SC2RuntimeContext
 from plugins.StarCraft2.starcraft2_core.starcraft2_ui_sections import (
@@ -115,11 +115,11 @@ class StarCraft2:
             self._arg_utils,
         )
         self._event_bus = StarCraft2EventBus()
-        self._engine_event_service = _StarCraft2EngineEventService(
+        self._engine_event_service = StarCraft2EngineEventService(
             self.state,
             event_bus=self._event_bus,
         )
-        self._local_match_service = _StarCraft2LocalMatchService(
+        self._local_match_service = StarCraft2LocalMatchService(
             self._arg_utils,
             self._match_config_service,
             self._local_match_command_template,
@@ -139,7 +139,7 @@ class StarCraft2:
             event_bus=self._event_bus,
             runtime_context=self._runtime_context,
         )
-        self._ladder_proxy_event_service = _StarCraft2LadderProxyEventService(
+        self._ladder_proxy_event_service = StarCraft2LadderProxyEventService(
             self._engine_event_service,
             self.observation_tracker,
             event_bus=self._event_bus,

@@ -10,7 +10,8 @@ from .starcraft2_event_bus import StarCraft2EventBus
 from core.logger import log_print
 
 
-class _StarCraft2EngineEventService:
+class StarCraft2EngineEventService:
+    #20260715_kpopmodder: Public event-state adapter for SC2 engine events.
     def __init__(self, state, status_event_callback=None, event_bus: StarCraft2EventBus | None = None):
         self.state = state
         self.event_bus = event_bus or StarCraft2EventBus()
@@ -29,10 +30,11 @@ class _StarCraft2EngineEventService:
             return
 
 
-class _StarCraft2LadderProxyEventService:
+class StarCraft2LadderProxyEventService:
+    #20260715_kpopmodder: Public stdout/event parser boundary for ladder-proxy output.
     def __init__(
         self,
-        engine_event_service: _StarCraft2EngineEventService,
+        engine_event_service: StarCraft2EngineEventService,
         observation_tracker,
         event_bus: StarCraft2EventBus | None = None,
     ):
@@ -162,3 +164,7 @@ class _StarCraft2LadderProxyEventService:
             or "crashed " in lower
             or "exception" in lower
         )
+
+
+_StarCraft2EngineEventService = StarCraft2EngineEventService
+_StarCraft2LadderProxyEventService = StarCraft2LadderProxyEventService

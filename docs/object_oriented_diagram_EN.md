@@ -642,6 +642,10 @@ and the Local Human vs AI button flow. Local match command construction,
 runtime preflight, ladder-proxy launch, stdout/game-event parsing, and reaction
 TTS/memory handling remain in domain services.
 
+`StarCraft2LocalMatchService`, `StarCraft2EngineEventService`, and
+`StarCraft2LadderProxyEventService` are the public service names in code.
+The underscore-prefixed names remain as compatibility aliases only.
+
 `StarCraft2EventBus` is the single live event channel for SC2 stdout-derived
 events, engine events, and telemetry observations. UI/game extensions subscribe
 to it; they do not parse ladder stdout directly. `StarCraft2Extension` is still
@@ -650,6 +654,7 @@ reuses the shared StarCraft2 status callback instead of controlling the main
 game facade. LAN Lobby remote-human code is archived/commented out in the
 current source and is not part of the live diagram.
 <!-- #20260713_kpopmodder: Document current StarCraft2 facade/service/event split and archived LAN Lobby status. -->
+<!-- #20260715_kpopmodder: Keep public SC2 service names and legacy aliases documented with source. -->
 
 ## Relationship Symbols
 

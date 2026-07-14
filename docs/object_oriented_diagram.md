@@ -619,7 +619,11 @@ classDiagram
 `StarCraft2`는 이제 UI와 조립 표면입니다. Gradio 탭을 만들고 runtime 참조를 보관하지만, 실행은 `StarCraft2FacadeService`로 위임합니다. `StarCraft2FacadeService`는 start/stop/status와 Local Human vs AI 버튼 흐름을 조율하는 경계입니다. Local match 명령 생성, runtime preflight, ladder-proxy 실행, stdout/game-event 파싱, reaction TTS/memory 처리는 domain service 쪽에 남깁니다.
 
 `StarCraft2EventBus`는 SC2 stdout 기반 이벤트, engine 이벤트, telemetry observation을 모으는 단일 live event channel입니다. UI/game extension은 이 채널을 구독하며 ladder stdout을 직접 파싱하지 않습니다. `StarCraft2Extension`은 여전히 수동 관찰자입니다. ProBots/Changeling 로그를 관찰하고 이벤트를 파싱한 뒤 공유 StarCraft2 status callback을 재사용하지만, main game facade를 직접 제어하지 않습니다. 현재 소스에서 LAN Lobby remote-human 코드는 보관용으로 주석 처리되어 있으며 live 다이어그램에는 포함하지 않습니다.
+
+`StarCraft2LocalMatchService`, `StarCraft2EngineEventService`, `StarCraft2LadderProxyEventService`는 현재 코드의 public service 이름입니다. 기존 `_...` 이름은 호환성 alias로만 유지합니다.
+
 <!-- #20260713_kpopmodder: Document current StarCraft2 facade/service/event split and archived LAN Lobby status. -->
+<!-- #20260715_kpopmodder: Keep public SC2 service names and legacy aliases documented with source. -->
 
 ## 관계 기호
 

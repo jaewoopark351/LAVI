@@ -187,6 +187,8 @@ class StarCraft2Event:
 
     @classmethod
     def from_mapping(cls, value: Any) -> "StarCraft2Event":
+        if isinstance(value, cls):
+            return value
         payload = value if isinstance(value, dict) else {}
         return cls(
             event_type=str(payload.get("event_type") or ""),
