@@ -5,6 +5,7 @@ from app_core.extensions import (
     GameCommandDTO,
     GameEventBus,
     GameEventDTO,
+    GameEventMonitor,
     GameResultDTO,
     GameRuntimeContextRegistry,
     GameStatusDTO,
@@ -12,6 +13,7 @@ from app_core.extensions import (
     GameStopResultDTO,
 )
 from app_core.extensions.chess_game_extension import ChessGameExtension
+from app_core.extensions.game_extension_context import GameExtensionContext
 from app_core.extensions.starcraft116_game_extension import StarCraft116GameExtension
 
 
@@ -109,6 +111,29 @@ class GameExtensionContractsTests(unittest.TestCase):
         self.assertEqual("extension_started", events[0]["event_type"])
         self.assertEqual("starcraft2", events[0]["game"])
 
+    def test_game_event_monitor_logs_successful_bus_delivery(self):
+        messages = []
+        bus = GameEventBus()
+        monitor = GameEventMonitor(logger=messages.append)
+        monitor.attach(bus)
+
+        delivered = bus.emit(
+            GameEventDTO(
+                event_type="game_started",
+                game="starcraft2",
+                source="starcraft2",
+            )
+        )
+
+        self.assertTrue(delivered)
+        self.assertEqual(1, monitor.snapshot()["total_events"])
+        self.assertTrue(
+            any(
+                "[GameEventMonitor] received game=starcraft2" in item
+                for item in messages
+            )
+        )
+
     def test_chess_and_starcraft116_status_include_common_status_shape(self):
         chess = ChessGameExtension(plugin=_FakeChessPlugin())
         chess._is_initialized = True
@@ -125,11 +150,61 @@ class GameExtensionContractsTests(unittest.TestCase):
         self.assertTrue(sc116_status["initialized"])
         self.assertEqual("starcraft116", sc116_status["game_status"]["name"])
 
+    def test_chess_handle_command_records_result_and_runtime_resources(self):
+        registry = GameRuntimeContextRegistry()
+        context = GameExtensionContext(runtime_contexts=registry, event_bus=GameEventBus())
+        chess = ChessGameExtension(plugin=_FakeChessPlugin())
+        chess.initialize(context)
+
+        result = chess.handle_command({"action": "new_game"})
+
+        snapshot = registry.snapshot()["chess"]
+        self.assertTrue(result["ok"])
+        self.assertEqual("new_game", snapshot["last_command"]["action"])
+        self.assertTrue(snapshot["last_result"]["ok"])
+        self.assertEqual("new_game", snapshot["last_result"]["action"])
+        self.assertEqual("_FakeChessPlugin", snapshot["resources"]["plugin"]["type"])
+        self.assertEqual(
+            "_FakeChessController",
+            snapshot["resources"]["controller"]["type"],
+        )
+        self.assertEqual(
+            "_FakeChessWebServer",
+            snapshot["resources"]["web_server"]["type"],
+        )
+
+    def test_starcraft116_handle_command_records_result_contract(self):
+        registry = GameRuntimeContextRegistry()
+        starcraft116 = StarCraft116GameExtension(plugin=_FakeStarCraft116Plugin())
+        starcraft116.runtime_context = registry.get("starcraft116")
+
+        result = starcraft116.handle_command({"action": "status"})
+
+        snapshot = registry.snapshot()["starcraft116"]
+        self.assertTrue(result["ok"])
+        self.assertEqual("status", snapshot["last_command"]["action"])
+        self.assertTrue(snapshot["last_result"]["ok"])
+        self.assertEqual("status", snapshot["last_result"]["action"])
+
+
 class _FakeChessPlugin:
     server_url = "http://127.0.0.1:8765"
     server_message = "ready"
     web_server = None
     controller = None
+
+    def __init__(self):
+        self.controller = _FakeChessController()
+        self.web_server = _FakeChessWebServer()
+
+
+class _FakeChessController:
+    def new_game(self):
+        return {"fen": "startpos"}
+
+
+class _FakeChessWebServer:
+    url = "http://127.0.0.1:8765"
 
 
 class _FakeStarCraft116Plugin:

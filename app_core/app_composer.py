@@ -10,6 +10,7 @@ from app_core.memory_bootstrap import bootstrap_memory
 from app_core.extensions import (
     ExtensionRegistry,
     GameEventBus,
+    GameEventMonitor,
     GameExtensionCompositionService,
     GameExtensionContext,
     GameRuntimeContextRegistry,
@@ -63,6 +64,8 @@ class AppComposer:
         self.game_extension_context = None
         self.game_runtime_contexts = GameRuntimeContextRegistry()
         self.game_event_bus = GameEventBus()
+        self.game_event_monitor = GameEventMonitor()
+        self.game_event_monitor.attach(self.game_event_bus)
         self.handle_chess_ai_move_applied = None
         self.game_extension_registry = ExtensionRegistry()
         self.game_extension_composition_service = GameExtensionCompositionService(

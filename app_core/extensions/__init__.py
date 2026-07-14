@@ -3,6 +3,7 @@
 
 from .extension_registry import ExtensionRegistry
 from .game_event_bus import GameEventBus, GameEventDTO
+from .game_event_monitor import GameEventMonitor
 from .game_extension_composition import (
     GameExtensionCompositionResult,
     GameExtensionCompositionService,
@@ -23,6 +24,7 @@ __all__ = [
     "GameCommandDTO",
     "GameEventBus",
     "GameEventDTO",
+    "GameEventMonitor",
     "GameExtensionCompositionResult",
     "GameExtensionCompositionService",
     "GameExtensionContext",

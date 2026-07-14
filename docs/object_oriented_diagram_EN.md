@@ -59,7 +59,16 @@ classDiagram
     }
     class GameExtensionContext
     class GameRuntimeContextRegistry
+    class GameRuntimeContext {
+        +set_resource()
+        +snapshot()
+    }
     class GameEventBus
+    class GameEventMonitor {
+        +attach(event_bus)
+        +receive(event)
+        +snapshot()
+    }
     class GameCommandDTO
     class GameStatusDTO
     class GameResultDTO
@@ -163,6 +172,7 @@ classDiagram
     AppComposer *-- GameExtensionCompositionService
     AppComposer *-- GameRuntimeContextRegistry
     AppComposer *-- GameEventBus
+    AppComposer *-- GameEventMonitor
     AppComposer --> GameExtensionContext : shared runtime
     AppComposer *-- Input
     AppComposer *-- LLM
@@ -178,8 +188,10 @@ classDiagram
     AppComposer o-- StarCraftRemastered : optional direct module
     GameExtensionCompositionService --> ExtensionRegistry : register and initialize
     ExtensionRegistry o-- GameExtensionInterface
+    GameRuntimeContextRegistry *-- GameRuntimeContext
     GameExtensionContext --> GameRuntimeContextRegistry
     GameExtensionContext --> GameEventBus
+    GameEventMonitor --> GameEventBus : subscribes for delivery logs
     GameExtensionInterface --> GameCommandDTO : command contract
     GameExtensionInterface --> GameStatusDTO : status contract
     GameExtensionInterface --> GameResultDTO : result contract
@@ -189,6 +201,7 @@ classDiagram
     GameExtensionInterface <|.. StarCraft2GameExtension
     GameExtensionInterface <|.. StarCraft2Extension
     ChessGameExtension --> Chess
+    ChessGameExtension --> GameRuntimeContext : plugin/controller/web_server resources
     StarCraft116GameExtension --> StarCraft116
     StarCraft2GameExtension --> StarCraft2
     StarCraft2Extension --> StarCraft2GameExtension : shared callback
@@ -219,8 +232,14 @@ are diagram-only module roles for files/functions.
 `GameRuntimeContextRegistry`, and `GameEventBus`, so command/status/result/event
 handoffs can move away from ad-hoc dicts without forcing every game plugin to
 change at once.
+`GameEventMonitor` subscribes to the shared `GameEventBus` and logs sampled
+delivery confirmations such as `[GameEventMonitor] received ...`, so SC2 bridge
+events can be verified at runtime without changing the SC2 TTS/memory path.
+`GameRuntimeContext` can also keep resource references; Chess now records its
+plugin/controller/web_server resources in the shared context snapshot first.
 
 <!-- #20260715_kpopmodder: Document game extension composition service and shared contracts. -->
+<!-- #20260715_kpopmodder: Document GameEventMonitor and Chess runtime-context resource tracking. -->
 
 `ScreenVision`, `SongPlayer`, `Chess`, `StarCraft116`, `StarCraft2`, and
 `StarCraftRemastered` are not `PluginSelectionBase` providers. They are
@@ -702,7 +721,9 @@ The underscore-prefixed names remain as compatibility aliases only.
 the legacy SC2 result dictionaries. UI/Gradio boundaries still receive dict or
 JSON payloads produced at the edge. `StarCraft2EventBus` remains the SC2-specific
 channel, but `StarCraft2GameEventBridge` mirrors events into the shared
-`GameEventBus` when one is attached.
+`GameEventBus` when one is attached. `GameEventMonitor` is the runtime proof
+point for that bridge: successful shared delivery appears as sampled
+`[GameEventMonitor] received ...` log lines.
 
 `StarCraft2EventBus` is the single live event channel for SC2 stdout-derived
 events, engine events, and telemetry observations. UI/game extensions subscribe
@@ -714,6 +735,7 @@ current source and is not part of the live diagram.
 <!-- #20260713_kpopmodder: Document current StarCraft2 facade/service/event split and archived LAN Lobby status. -->
 <!-- #20260715_kpopmodder: Keep public SC2 service names and legacy aliases documented with source. -->
 <!-- #20260715_kpopmodder: Document common DTO result wrappers and the SC2-to-GameEventBus bridge. -->
+<!-- #20260715_kpopmodder: Document common GameEventBus runtime monitoring. -->
 
 ## Relationship Symbols
 

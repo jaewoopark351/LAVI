@@ -49,6 +49,7 @@ class ChessGameExtension(GameExtensionInterface):
         if self._context is None:
             return
         self._bind_ai_reaction_callback(self._context)
+        self._sync_runtime_context_resources()
         self._is_initialized = True
 
     def start(self) -> None:
@@ -61,6 +62,7 @@ class ChessGameExtension(GameExtensionInterface):
         if plugin is None:
             raise RuntimeError("Chess plugin is not available")
         self._ensure_server_started(plugin)
+        self._sync_runtime_context_resources()
         self._is_started = True
         self.mark_started(True)
         self.publish_event("extension_started")
@@ -228,6 +230,7 @@ class ChessGameExtension(GameExtensionInterface):
     def _ensure_plugin_ready(self):
         if self.plugin is None:
             self._maybe_build_plugin()
+        self._sync_runtime_context_resources()
 
     def _maybe_build_plugin(self):
         try:
@@ -269,3 +272,15 @@ class ChessGameExtension(GameExtensionInterface):
             )
         except Exception as e:
             log_print(f"[ChessGameExtension] callback registration failed: {e}")
+
+    def _sync_runtime_context_resources(self) -> None:
+        runtime_context = getattr(self, "runtime_context", None)
+        set_resource = getattr(runtime_context, "set_resource", None)
+        if not callable(set_resource):
+            return
+        plugin = self.plugin
+        set_resource("plugin", plugin)
+        if plugin is None:
+            return
+        set_resource("controller", getattr(plugin, "controller", None))
+        set_resource("web_server", getattr(plugin, "web_server", None))

@@ -58,7 +58,16 @@ classDiagram
     }
     class GameExtensionContext
     class GameRuntimeContextRegistry
+    class GameRuntimeContext {
+        +set_resource()
+        +snapshot()
+    }
     class GameEventBus
+    class GameEventMonitor {
+        +attach(event_bus)
+        +receive(event)
+        +snapshot()
+    }
     class GameCommandDTO
     class GameStatusDTO
     class GameResultDTO
@@ -162,6 +171,7 @@ classDiagram
     AppComposer *-- GameExtensionCompositionService
     AppComposer *-- GameRuntimeContextRegistry
     AppComposer *-- GameEventBus
+    AppComposer *-- GameEventMonitor
     AppComposer --> GameExtensionContext : shared runtime
     AppComposer *-- Input
     AppComposer *-- LLM
@@ -177,8 +187,10 @@ classDiagram
     AppComposer o-- StarCraftRemastered : optional direct module
     GameExtensionCompositionService --> ExtensionRegistry : register and initialize
     ExtensionRegistry o-- GameExtensionInterface
+    GameRuntimeContextRegistry *-- GameRuntimeContext
     GameExtensionContext --> GameRuntimeContextRegistry
     GameExtensionContext --> GameEventBus
+    GameEventMonitor --> GameEventBus : subscribes for delivery logs
     GameExtensionInterface --> GameCommandDTO : command contract
     GameExtensionInterface --> GameStatusDTO : status contract
     GameExtensionInterface --> GameResultDTO : result contract
@@ -188,6 +200,7 @@ classDiagram
     GameExtensionInterface <|.. StarCraft2GameExtension
     GameExtensionInterface <|.. StarCraft2Extension
     ChessGameExtension --> Chess
+    ChessGameExtension --> GameRuntimeContext : plugin/controller/web_server resources
     StarCraft116GameExtension --> StarCraft116
     StarCraft2GameExtension --> StarCraft2
     StarCraft2Extension --> StarCraft2GameExtension : shared callback
@@ -219,7 +232,13 @@ classDiagram
 `GameCommandDTO`, `GameStatusDTO`, `GameResultDTO`,
 `GameRuntimeContextRegistry`, `GameEventBus`를 제공해서 command/status/result와
 observer 이벤트 전달이 임의 dict에만 의존하지 않도록 합니다.
+`GameEventMonitor` subscribes to the shared `GameEventBus` and logs sampled
+delivery confirmations such as `[GameEventMonitor] received ...`, so SC2 bridge
+events can be verified at runtime without changing the SC2 TTS/memory path.
+`GameRuntimeContext` can also keep resource references; Chess now records its
+plugin/controller/web_server resources in the shared context snapshot first.
 <!-- #20260715_kpopmodder: Document game extension composition service and shared contracts. -->
+<!-- #20260715_kpopmodder: Document GameEventMonitor and Chess runtime-context resource tracking. -->
 
 ## 2. 핵심 실행 객체와 메모리/화면 라우팅 구조
 
@@ -672,9 +691,13 @@ classDiagram
 
 `StarCraft2LocalMatchService`, `StarCraft2EngineEventService`, `StarCraft2LadderProxyEventService`는 현재 코드의 public service 이름입니다. 기존 `_...` 이름은 호환성 alias로만 유지합니다.
 
+`GameEventMonitor` is the runtime proof point for the SC2-to-common bus bridge:
+successful shared delivery appears as sampled `[GameEventMonitor] received ...`
+log lines.
 <!-- #20260713_kpopmodder: Document current StarCraft2 facade/service/event split and archived LAN Lobby status. -->
 <!-- #20260715_kpopmodder: Keep public SC2 service names and legacy aliases documented with source. -->
 <!-- #20260715_kpopmodder: Document common DTO result wrappers and the SC2-to-GameEventBus bridge. -->
+<!-- #20260715_kpopmodder: Document common GameEventBus runtime monitoring. -->
 
 ## 관계 기호
 

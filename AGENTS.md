@@ -562,8 +562,8 @@ Instead, comment out the old code using the language-appropriate comment syntax,
 Example:
 
 ```python
-#20260620_kpopmodder: Disabled old CUDA path handling because Transformers local LLM no longer uses llama-cpp-python.
-# old_code = load_llama_cpp_cuda_path()  #20260619_kpopmodder
+#YYYYMMDD_kpopmodder: Disabled old CUDA path handling because Transformers local LLM no longer uses llama-cpp-python.
+# old_code = load_llama_cpp_cuda_path()  #YYYYMMDD_kpopmodder
 ```
 
 For multi-line removed blocks, comment out the smallest necessary block only.
@@ -575,19 +575,19 @@ When adding a risky or important change, add a comment using the same style.
 Example:
 
 ```python
-#20260619_kpopmodder: Keep CUDA path explicit because llama-cpp-python may fail to load CUDA DLLs on Windows.
+#YYYYMMDD_kpopmodder: Keep CUDA path explicit because llama-cpp-python may fail to load CUDA DLLs on Windows.
 ```
 
-When adding a new class, new module, or new file, include a `#20260628_kpopmodder` marker comment near the top of the new code.
+When adding a new class, new module, or new file, include a `#YYYYMMDD_kpopmodder` marker comment near the top of the new code.
 This marker is required even if the class or module is otherwise straightforward, because it records project history and AI-agent changes.
 
 Recommended Python examples:
 
 ```python
-#20260628_kpopmodder: Added this module to isolate MemoryRouter preflight behavior.
+#YYYYMMDD_kpopmodder: Added this module to isolate MemoryRouter preflight behavior.
 
 
-#20260628_kpopmodder: Added this class to keep GPU preflight checks separate from runtime startup.
+#YYYYMMDD_kpopmodder: Added this class to keep GPU preflight checks separate from runtime startup.
 class GpuPreflightRunner:
     ...
 ```
