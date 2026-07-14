@@ -202,6 +202,13 @@ class AppComposer:
         )
         self._register_game_extensions()
 
+    def get_game_debug_status(self):
+        #20260715_kpopmodder: Expose shared game runtime/event snapshots without adding UI-specific logic here.
+        return {
+            "runtime_contexts": self.game_runtime_contexts.snapshot(),
+            "event_monitor": self.game_event_monitor.snapshot(),
+        }
+
     def create_core_components(self):
         from Input import Input
         from LLM import LLM

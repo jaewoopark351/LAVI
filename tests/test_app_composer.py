@@ -271,3 +271,31 @@ class AppComposerTests(unittest.TestCase):
             composer.starcraft2_changeling_observer_extension,
         )
         self.assertIs(chess_extension, composer.chess_game_extension)
+
+    def test_game_debug_status_exposes_runtime_and_recent_events(self):
+        composer = AppComposer()
+        runtime_context = composer.game_runtime_contexts.get("starcraft116")
+        runtime_context.mark_initialized(True)
+
+        composer.game_event_bus.emit(
+            {
+                "event_type": "unit_created",
+                "game": "starcraft116",
+                "source": "test",
+                "details": {
+                    "unit": {"id": 7, "type": "Terran Marine"},
+                    "summary": "Terran Marine created.",
+                },
+            }
+        )
+
+        status = composer.get_game_debug_status()
+
+        self.assertTrue(status["runtime_contexts"]["starcraft116"]["initialized"])
+        self.assertEqual(1, status["event_monitor"]["total_events"])
+        recent = status["event_monitor"]["recent_events"][0]
+        self.assertEqual("unit_created", recent["event_type"])
+        self.assertEqual("starcraft116", recent["game"])
+        self.assertEqual("test", recent["source"])
+        self.assertEqual("dict", recent["details"]["unit"]["type"])
+        self.assertEqual("Terran Marine created.", recent["details"]["summary"])

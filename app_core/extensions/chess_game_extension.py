@@ -86,20 +86,17 @@ class ChessGameExtension(GameExtensionInterface):
         command_dto = self.record_command(command)
         if self.plugin is None:
             result = {"ok": False, "error": "missing_plugin"}
-            self.record_result(result, action=command_dto.action)
-            return result
+            return self._finalize_command_result(result, action=command_dto.action)
 
         action = command_dto.action
         payload = command_dto.to_legacy_dict()
 
         if action not in self._command_handlers:
             result = {"ok": False, "action": action or "", "error": "unknown_action"}
-            self.record_result(result, action=action)
-            return result
+            return self._finalize_command_result(result, action=action)
 
         result = self._run_command(action, payload)
-        self.record_result(result, action=action)
-        return result
+        return self._finalize_command_result(result, action=action)
 
     def get_status(self) -> Dict[str, Any]:
         status = {
@@ -210,6 +207,14 @@ class ChessGameExtension(GameExtensionInterface):
             }
         except Exception as e:
             return {"ok": False, "action": action, "error": str(e)}
+
+    def _finalize_command_result(
+        self,
+        result: Any,
+        action: str = "",
+    ) -> Dict[str, Any]:
+        result_dto = self.record_result(result, action=action)
+        return result_dto.to_legacy_dict()
 
     def _ensure_server_started(self, plugin) -> Optional[str]:
         starter = getattr(plugin, "_ensure_server_started", None)

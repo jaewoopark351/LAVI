@@ -126,7 +126,10 @@ class GameExtensionContractsTests(unittest.TestCase):
         )
 
         self.assertTrue(delivered)
-        self.assertEqual(1, monitor.snapshot()["total_events"])
+        snapshot = monitor.snapshot()
+        self.assertEqual(1, snapshot["total_events"])
+        self.assertEqual("game_started", snapshot["recent_events"][0]["event_type"])
+        self.assertEqual("starcraft2", snapshot["recent_events"][0]["game"])
         self.assertTrue(
             any(
                 "[GameEventMonitor] received game=starcraft2" in item
@@ -160,6 +163,9 @@ class GameExtensionContractsTests(unittest.TestCase):
 
         snapshot = registry.snapshot()["chess"]
         self.assertTrue(result["ok"])
+        self.assertEqual("new_game", result["action"])
+        self.assertEqual({"fen": "startpos"}, result["state"])
+        self.assertEqual({"fen": "startpos"}, result["details"]["state"])
         self.assertEqual("new_game", snapshot["last_command"]["action"])
         self.assertTrue(snapshot["last_result"]["ok"])
         self.assertEqual("new_game", snapshot["last_result"]["action"])
@@ -175,16 +181,39 @@ class GameExtensionContractsTests(unittest.TestCase):
 
     def test_starcraft116_handle_command_records_result_contract(self):
         registry = GameRuntimeContextRegistry()
+        context = GameExtensionContext(runtime_contexts=registry, event_bus=GameEventBus())
         starcraft116 = StarCraft116GameExtension(plugin=_FakeStarCraft116Plugin())
-        starcraft116.runtime_context = registry.get("starcraft116")
+        starcraft116.initialize(context)
+        self.addCleanup(starcraft116.shutdown)
 
         result = starcraft116.handle_command({"action": "status"})
 
         snapshot = registry.snapshot()["starcraft116"]
         self.assertTrue(result["ok"])
+        self.assertEqual("status", result["action"])
         self.assertEqual("status", snapshot["last_command"]["action"])
         self.assertTrue(snapshot["last_result"]["ok"])
         self.assertEqual("status", snapshot["last_result"]["action"])
+        self.assertEqual(
+            "_FakeStarCraft116Plugin",
+            snapshot["resources"]["plugin"]["type"],
+        )
+        self.assertEqual(
+            "StarCraft116Bridge",
+            snapshot["resources"]["bridge"]["type"],
+        )
+        self.assertEqual(
+            "StarCraft116Worker",
+            snapshot["resources"]["worker"]["type"],
+        )
+        self.assertEqual(
+            "_FakeStarCraft116Config",
+            snapshot["resources"]["config_manager"]["type"],
+        )
+        self.assertEqual(
+            "_FakeStarCraft116Launcher",
+            snapshot["resources"]["launcher"]["type"],
+        )
 
 
 class _FakeChessPlugin:
@@ -212,8 +241,30 @@ class _FakeStarCraft116Plugin:
     game_event_thread = None
     game_event_stop_event = None
 
+    def __init__(self):
+        self.config_manager = _FakeStarCraft116Config()
+        self.launcher = _FakeStarCraft116Launcher()
+        self.status_reader = _FakeStarCraft116StatusReader()
+        self.state = _FakeStarCraft116RuntimeState()
+
     def get_status(self):
         return {"plugin": {"ready": True}}
+
+
+class _FakeStarCraft116Config:
+    pass
+
+
+class _FakeStarCraft116Launcher:
+    pass
+
+
+class _FakeStarCraft116StatusReader:
+    pass
+
+
+class _FakeStarCraft116RuntimeState:
+    pass
 
 
 if __name__ == "__main__":

@@ -19,6 +19,7 @@ classDiagram
         +create core components
         +create optional modules
         +register game extensions
+        +get_game_debug_status()
         +launch queue
     }
     class GradioLaunch {
@@ -66,6 +67,7 @@ classDiagram
     class GameEventMonitor {
         +attach(event_bus)
         +receive(event)
+        +recent_events
         +snapshot()
     }
     class GameCommandDTO
@@ -202,6 +204,7 @@ classDiagram
     ChessGameExtension --> Chess
     ChessGameExtension --> GameRuntimeContext : plugin/controller/web_server resources
     StarCraft116GameExtension --> StarCraft116
+    StarCraft116GameExtension --> GameRuntimeContext : plugin/bridge/worker resources
     StarCraft2GameExtension --> StarCraft2
     StarCraft2Extension --> StarCraft2GameExtension : shared callback
 
@@ -235,10 +238,14 @@ observer 이벤트 전달이 임의 dict에만 의존하지 않도록 합니다.
 `GameEventMonitor` subscribes to the shared `GameEventBus` and logs sampled
 delivery confirmations such as `[GameEventMonitor] received ...`, so SC2 bridge
 events can be verified at runtime without changing the SC2 TTS/memory path.
+It also keeps a small recent-event snapshot that `AppComposer.get_game_debug_status()`
+can expose for runtime/debug inspection.
 `GameRuntimeContext` can also keep resource references; Chess now records its
-plugin/controller/web_server resources in the shared context snapshot first.
+plugin/controller/web_server resources, and StarCraft116 records plugin/bridge/worker
+runtime resources, in the shared context snapshot first.
 <!-- #20260715_kpopmodder: Document game extension composition service and shared contracts. -->
 <!-- #20260715_kpopmodder: Document GameEventMonitor and Chess runtime-context resource tracking. -->
+<!-- #20260715_kpopmodder: Document GameEventMonitor recent snapshots and StarCraft116 runtime resources. -->
 
 ## 2. 핵심 실행 객체와 메모리/화면 라우팅 구조
 

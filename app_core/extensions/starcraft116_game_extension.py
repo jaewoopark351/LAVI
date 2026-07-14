@@ -33,6 +33,7 @@ class StarCraft116GameExtension(GameExtensionInterface):
         self._context = context
         if self.plugin is None:
             self._maybe_build_plugin()
+        self._sync_runtime_context_resources()
 
         callback = self._build_status_callback(context)
         if callback is not None and getattr(self.plugin, "status_event_callback", None) is None:
@@ -57,6 +58,7 @@ class StarCraft116GameExtension(GameExtensionInterface):
         try:
             self.bridge.start_status_listener()
             self.worker.start()
+            self._sync_runtime_context_resources()
             self._is_started = True
             self.mark_started(True)
             self.publish_event("extension_started")
@@ -72,6 +74,7 @@ class StarCraft116GameExtension(GameExtensionInterface):
         finally:
             self.bridge.stop_status_listener()
             self._unsubscribe_screen_observation_events()
+            self._sync_runtime_context_resources()
 
     def shutdown(self) -> None:
         self.stop()
@@ -79,8 +82,7 @@ class StarCraft116GameExtension(GameExtensionInterface):
     def handle_command(self, command: Any) -> Any:
         command_dto = self.record_command(command)
         result = self.worker.handle_command(command_dto.to_legacy_dict())
-        self.record_result(result, action=command_dto.action)
-        return result
+        return self._finalize_command_result(result, action=command_dto.action)
 
     #20260706_kpopmodder: Shim path for ScreenVision event->command wiring.
     def _on_screen_observation_event(self, payload: Any = None, **kwargs):
@@ -172,11 +174,20 @@ class StarCraft116GameExtension(GameExtensionInterface):
             "bridge_watcher": self.bridge.get_watcher_state(),
         }
         base["worker"] = self.worker.get_status()
+        self._sync_runtime_context_resources()
         runtime_context = getattr(self, "runtime_context", None)
         snapshot = getattr(runtime_context, "snapshot", None)
         if callable(snapshot):
             base["runtime_context"] = snapshot()
         return self.apply_status_contract(base)
+
+    def _finalize_command_result(
+        self,
+        result: Any,
+        action: str = "",
+    ) -> Dict[str, Any]:
+        result_dto = self.record_result(result, action=action)
+        return result_dto.to_legacy_dict()
 
     def _is_status_listener_set(self) -> bool:
         return bool(
@@ -237,6 +248,7 @@ class StarCraft116GameExtension(GameExtensionInterface):
             self.bridge.plugin = self.plugin
         if self.worker.bridge is None:
             self.worker.bridge = self.bridge
+        self._sync_runtime_context_resources()
 
     def _maybe_build_plugin(self):
         try:
@@ -246,3 +258,30 @@ class StarCraft116GameExtension(GameExtensionInterface):
         self.plugin = StarCraft116()
         self.bridge.plugin = self.plugin
         self.worker.bridge = self.bridge
+        self._sync_runtime_context_resources()
+
+    def _sync_runtime_context_resources(self) -> None:
+        runtime_context = getattr(self, "runtime_context", None)
+        set_resource = getattr(runtime_context, "set_resource", None)
+        if not callable(set_resource):
+            return
+
+        plugin = self.plugin
+        set_resource("plugin", plugin)
+        set_resource("bridge", self.bridge)
+        set_resource("worker", self.worker)
+        if plugin is None:
+            return
+
+        for key in (
+            "config_manager",
+            "exporter_manager",
+            "launcher",
+            "status_reader",
+            "state",
+            "game_event_tailer",
+            "monster_log_tailer",
+            "bwapi_proxy_event_tailer",
+            "game_event_thread",
+        ):
+            set_resource(key, getattr(plugin, key, None))
