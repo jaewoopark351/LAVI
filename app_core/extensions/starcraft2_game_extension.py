@@ -51,6 +51,7 @@ class StarCraft2GameExtension(GameExtensionInterface):
         tts_setter = getattr(self.plugin, "set_tts", None)
         if callable(tts_setter):
             tts_setter(getattr(context, "tts", None))
+        self._bind_common_event_bus(context)
         callback = self._build_status_callback(context)
         if callback is not None:
             self._reaction_callback = callback
@@ -126,6 +127,14 @@ class StarCraft2GameExtension(GameExtensionInterface):
         log_print("[StarCraft2GameExtension] failed to bind status event path: no callback API on plugin")
         return None
 
+    def _bind_common_event_bus(self, context: Optional[GameExtensionContext]) -> None:
+        if context is None or self.plugin is None:
+            return
+        event_bus = getattr(context, "event_bus", None)
+        attach = getattr(self.plugin, "attach_game_event_bus", None)
+        if callable(attach):
+            attach(event_bus)
+
     def handle_command(self, command: Any) -> Dict[str, Any]:
         command_dto = self.record_command(command)
         self._ensure_bridge_ready()
@@ -152,8 +161,7 @@ class StarCraft2GameExtension(GameExtensionInterface):
         snapshot = getattr(runtime_context, "snapshot", None)
         if callable(snapshot):
             plugin_status["runtime_context"] = snapshot()
-        self.record_status(plugin_status)
-        return plugin_status
+        return self.apply_status_contract(plugin_status)
 
     def _auto_launch_enabled(self) -> bool:
         config_manager = getattr(self.plugin, "config_manager", None)

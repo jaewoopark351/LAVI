@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Any, Callable, Dict, List, Optional
 
 from .starcraft2_contracts import StarCraft2Event
+from .starcraft2_game_event_bridge import StarCraft2GameEventBridge
 from core.logger import log_print
 
 
@@ -26,9 +27,20 @@ class StarCraft2EventBusSubscription:
 
 class StarCraft2EventBus:
     #20260713_kpopmodder: Public event fan-out boundary for SC2 stdout/game/TTS/memory flow.
-    def __init__(self):
+    def __init__(self, common_event_bus: Any = None):
         self._subscribers: List[EventCallback] = []
         self._status_event_callback_subscription = None
+        self._common_event_bridge = StarCraft2GameEventBridge(common_event_bus)
+
+    def set_common_event_bus(self, common_event_bus: Any = None) -> None:
+        self._common_event_bridge.set_event_bus(common_event_bus)
+
+    def subscribe_common_events(self, callback: Optional[EventCallback]):
+        common_bus = getattr(self._common_event_bridge, "game_event_bus", None)
+        subscribe = getattr(common_bus, "subscribe", None)
+        if not callable(subscribe):
+            return None
+        return subscribe(callback)
 
     def subscribe(self, callback: Optional[EventCallback]) -> StarCraft2EventBusSubscription:
         if not callable(callback):
@@ -60,6 +72,7 @@ class StarCraft2EventBus:
         event_type = str(payload.get("event_type") or "").strip().lower()
         if event_type:
             payload = dict(payload)
+        self._emit_common_event(payload)
         delivered = False
         for subscriber in list(self._subscribers):
             if not callable(subscriber):
@@ -78,6 +91,13 @@ class StarCraft2EventBus:
 
     def _unsubscribe(self, callback: EventCallback) -> None:
         self._subscribers = [item for item in self._subscribers if item is not callback]
+
+    def _emit_common_event(self, payload: Dict[str, Any]) -> None:
+        bridge = getattr(self, "_common_event_bridge", None)
+        emit = getattr(bridge, "emit", None)
+        if not callable(emit):
+            return
+        emit(payload)
 
 
 _StarCraft2EventBusSubscription = StarCraft2EventBusSubscription

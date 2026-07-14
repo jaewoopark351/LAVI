@@ -6,6 +6,8 @@ from typing import Any, Dict, Optional
 
 import time
 
+from app_core.extensions.game_extension_contracts import GameResultDTO, GameStatusDTO
+
 
 def _coerce_dict(value: Any) -> Dict[str, Any]:
     return dict(value) if isinstance(value, dict) else {}
@@ -166,15 +168,22 @@ class LocalMatchRuntimeStatusDTO:
     mode: str = "local_human_vs_changeling"
     result: Optional[StartResultDTO] = None
     ladder_proxy: Dict[str, Any] = field(default_factory=dict)
+    game_result: Optional[GameResultDTO] = None
+    game_status: Optional[GameStatusDTO] = None
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        payload = {
             "mode": str(self.mode),
             "result": (
                 self.result.to_dict() if isinstance(self.result, StartResultDTO) else _coerce_dict(self.result)
             ),
             "ladder_proxy": _coerce_dict(self.ladder_proxy),
         }
+        if isinstance(self.game_result, GameResultDTO):
+            payload["game_result"] = self.game_result.to_dict()
+        if isinstance(self.game_status, GameStatusDTO):
+            payload["game_status"] = self.game_status.to_dict()
+        return payload
 
 
 @dataclass(frozen=True)

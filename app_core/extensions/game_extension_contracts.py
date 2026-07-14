@@ -13,6 +13,42 @@ def _coerce_action(value: Any) -> str:
     return str(value or "").strip().lower()
 
 
+_RESULT_RESERVED_KEYS = {
+    "ok",
+    "action",
+    "status",
+    "error",
+    "message",
+    "details",
+    "running",
+    "started",
+    "stopped",
+}
+
+_STATUS_RESERVED_KEYS = {
+    "name",
+    "initialized",
+    "started",
+    "plugin",
+    "worker",
+    "runtime",
+    "runtime_context",
+    "details",
+    "error",
+    "extension",
+    "game_status",
+}
+
+
+def _merge_details(payload: Mapping[str, Any], reserved_keys: set[str]) -> Dict[str, Any]:
+    details = _coerce_dict(payload.get("details"))
+    for key, value in payload.items():
+        if key in reserved_keys:
+            continue
+        details.setdefault(str(key), value)
+    return details
+
+
 @dataclass(frozen=True)
 class GameCommandDTO:
     action: str = ""
@@ -81,23 +117,94 @@ class GameResultDTO:
             status=_coerce_dict(payload.get("status")),
             error=None if payload.get("error") is None else str(payload.get("error")),
             message=None if payload.get("message") is None else str(payload.get("message")),
-            details=_coerce_dict(payload.get("details")),
+            details=_merge_details(payload, _RESULT_RESERVED_KEYS),
         )
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
 
+    def to_legacy_dict(self) -> Dict[str, Any]:
+        payload = dict(self.details)
+        payload.update(
+            {
+                "ok": self.ok,
+                "action": self.action,
+                "status": dict(self.status),
+                "error": self.error,
+                "message": self.message,
+            }
+        )
+        if not self.status:
+            payload.pop("status", None)
+        if self.error is None:
+            payload.pop("error", None)
+        if self.message is None:
+            payload.pop("message", None)
+        if self.details:
+            payload["details"] = dict(self.details)
+        return payload
+
 
 @dataclass(frozen=True)
 class GameStartResultDTO(GameResultDTO):
     action: str = "start"
+    running: bool = False
     started: bool = False
+
+    @classmethod
+    def from_mapping(cls, value: Any, action: str = "start") -> "GameStartResultDTO":
+        if isinstance(value, cls):
+            return value
+        base = GameResultDTO.from_mapping(value, action=action)
+        payload = value if isinstance(value, Mapping) else {}
+        running = bool(payload.get("running", False))
+        return cls(
+            ok=base.ok,
+            action=base.action or "start",
+            status=dict(base.status),
+            error=base.error,
+            message=base.message,
+            details=dict(base.details),
+            running=running,
+            started=bool(payload.get("started", running)),
+        )
+
+    def to_legacy_dict(self) -> Dict[str, Any]:
+        payload = super().to_legacy_dict()
+        payload["running"] = bool(self.running)
+        payload["started"] = bool(self.started)
+        return payload
 
 
 @dataclass(frozen=True)
 class GameStopResultDTO(GameResultDTO):
     action: str = "stop"
+    running: bool = False
     stopped: bool = False
+
+    @classmethod
+    def from_mapping(cls, value: Any, action: str = "stop") -> "GameStopResultDTO":
+        if isinstance(value, cls):
+            return value
+        base = GameResultDTO.from_mapping(value, action=action)
+        payload = value if isinstance(value, Mapping) else {}
+        running = bool(payload.get("running", False))
+        return cls(
+            ok=base.ok,
+            action=base.action or "stop",
+            status=dict(base.status),
+            error=base.error,
+            message=base.message,
+            details=dict(base.details),
+            running=running,
+            stopped=bool(payload.get("stopped", base.ok and not running)),
+        )
+
+    def to_legacy_dict(self) -> Dict[str, Any]:
+        payload = super().to_legacy_dict()
+        payload["running"] = bool(self.running)
+        payload["stopped"] = bool(self.stopped)
+        return payload
 
 
 @dataclass(frozen=True)
@@ -124,10 +231,34 @@ class GameStatusDTO:
             plugin=_coerce_dict(payload.get("plugin")),
             worker=_coerce_dict(payload.get("worker")),
             runtime=_coerce_dict(payload.get("runtime_context") or payload.get("runtime")),
-            details=_coerce_dict(payload.get("details")),
+            details=_merge_details(payload, _STATUS_RESERVED_KEYS),
             error=None if payload.get("error") is None else str(payload.get("error")),
         )
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
 
+    def to_legacy_dict(self) -> Dict[str, Any]:
+        payload = dict(self.details)
+        payload.update(
+            {
+                "name": self.name,
+                "initialized": self.initialized,
+                "started": self.started,
+                "plugin": dict(self.plugin),
+                "worker": dict(self.worker),
+                "runtime": dict(self.runtime),
+                "error": self.error,
+            }
+        )
+        if not self.plugin:
+            payload.pop("plugin", None)
+        if not self.worker:
+            payload.pop("worker", None)
+        if not self.runtime:
+            payload.pop("runtime", None)
+        if self.error is None:
+            payload.pop("error", None)
+        if self.details:
+            payload["details"] = dict(self.details)
+        return payload

@@ -5,6 +5,7 @@ import json
 import time
 from typing import Any, Dict, Optional
 
+from app_core.extensions import GameStartResultDTO, GameStatusDTO, GameStopResultDTO
 from core.logger import log_print
 from .starcraft2_contracts import (
     LocalMatchRuntimeStatusDTO,
@@ -50,6 +51,9 @@ class StarCraft2FacadeService:
         self.last_stop_result: Dict[str, Any] = {}
         self._last_start_result_dto: Optional[StartResultDTO] = None
         self._last_stop_result_dto: Optional[StopResultDTO] = None
+        self._last_game_start_result_dto: Optional[GameStartResultDTO] = None
+        self._last_game_stop_result_dto: Optional[GameStopResultDTO] = None
+        self._last_game_status_dto: Optional[GameStatusDTO] = None
         self._shutdown = False
 
     def start(
@@ -159,7 +163,7 @@ class StarCraft2FacadeService:
 
     def get_status(self) -> Dict[str, Any]:
         self._sync_state_from_engine()
-        return {
+        status = {
             "enabled": self.config_manager.get_bool("enabled", False),
             "engine": str(self.config_manager.get("engine", "internal_lav_bot")),
             "config": self.config_manager.config_message(),
@@ -175,6 +179,9 @@ class StarCraft2FacadeService:
                 self.match_config_service.ladder_proxy_config()
             ),
         }
+        game_status = self._build_game_status_dto(status)
+        status["game_status"] = game_status.to_dict()
+        return status
 
     def status_json(self, status=None) -> str:
         return json.dumps(
@@ -295,19 +302,36 @@ class StarCraft2FacadeService:
         )
 
     def _local_match_missing_status(self) -> LocalMatchRuntimeStatusDTO:
+        result = StartResultDTO(
+            ok=False,
+            action="local_human_vs_changeling",
+            error="local_match_service_missing",
+            message="local_match_service_missing",
+        )
+        game_result = GameStartResultDTO.from_mapping(
+            result.to_dict(),
+            action="local_human_vs_changeling",
+        )
+        game_status = GameStatusDTO.from_mapping(
+            {
+                "name": "starcraft2",
+                "initialized": True,
+                "started": False,
+                "details": {"mode": "local_human_vs_changeling"},
+                "error": "local_match_service_missing",
+            },
+            name="starcraft2",
+        )
         return LocalMatchRuntimeStatusDTO(
             mode="local_human_vs_changeling",
-            result=StartResultDTO(
-                ok=False,
-                action="local_human_vs_changeling",
-                error="local_match_service_missing",
-                message="local_match_service_missing",
-            ),
+            result=result,
             ladder_proxy={
                 "ok": False,
                 "running": False,
                 "status": {"error": "local_match_service_missing"},
             },
+            game_result=game_result,
+            game_status=game_status,
         )
 
     def sync_state_from_engine(self):
@@ -369,13 +393,48 @@ class StarCraft2FacadeService:
 
     def _remember_start_result(self, result: StartResultDTO) -> Dict[str, Any]:
         self._last_start_result_dto = result
+        self._last_game_start_result_dto = GameStartResultDTO.from_mapping(
+            result.to_dict(),
+            action=result.action,
+        )
         self.last_start_result = result.to_dict()
+        self.last_start_result["game_result"] = (
+            self._last_game_start_result_dto.to_dict()
+        )
         return self.last_start_result
 
     def _remember_stop_result(self, result: StopResultDTO) -> Dict[str, Any]:
         self._last_stop_result_dto = result
+        self._last_game_stop_result_dto = GameStopResultDTO.from_mapping(
+            result.to_dict(),
+            action=result.action,
+        )
         self.last_stop_result = result.to_dict()
+        self.last_stop_result["game_result"] = self._last_game_stop_result_dto.to_dict()
         return self.last_stop_result
+
+    def _build_game_status_dto(self, status: Dict[str, Any]) -> GameStatusDTO:
+        state = status.get("state") if isinstance(status, dict) else {}
+        state = state if isinstance(state, dict) else {}
+        engine_status = status.get("engine_status") if isinstance(status, dict) else {}
+        engine_status = engine_status if isinstance(engine_status, dict) else {}
+        runtime_snapshot = (
+            self.runtime_context.snapshot()
+            if self.runtime_context is not None
+            and callable(getattr(self.runtime_context, "snapshot", None))
+            else {}
+        )
+        payload = {
+            "name": "starcraft2",
+            "initialized": True,
+            "started": bool(state.get("running") or engine_status.get("running")),
+            "runtime": runtime_snapshot,
+            "details": dict(status or {}),
+            "error": state.get("last_error") or engine_status.get("last_error"),
+        }
+        dto = GameStatusDTO.from_mapping(payload, name="starcraft2")
+        self._last_game_status_dto = dto
+        return dto
 
     def _facade_result(
         self,

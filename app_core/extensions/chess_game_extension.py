@@ -110,8 +110,7 @@ class ChessGameExtension(GameExtensionInterface):
         plugin = self.plugin
         if plugin is None:
             status["plugin"] = {"ready": False}
-            self._attach_runtime_status(status)
-            return status
+            return self._attach_runtime_status(status)
         try:
             controller = getattr(plugin, "controller", None)
             web_server = getattr(plugin, "web_server", None)
@@ -133,15 +132,14 @@ class ChessGameExtension(GameExtensionInterface):
                 )
         except Exception as e:
             status["error"] = str(e)
-        self._attach_runtime_status(status)
-        return status
+        return self._attach_runtime_status(status)
 
-    def _attach_runtime_status(self, status: Dict[str, Any]) -> None:
+    def _attach_runtime_status(self, status: Dict[str, Any]) -> Dict[str, Any]:
         runtime_context = getattr(self, "runtime_context", None)
         snapshot = getattr(runtime_context, "snapshot", None)
         if callable(snapshot):
             status["runtime_context"] = snapshot()
-        self.record_status(status)
+        return self.apply_status_contract(status)
 
     def _run_command(self, action: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         plugin = self.plugin

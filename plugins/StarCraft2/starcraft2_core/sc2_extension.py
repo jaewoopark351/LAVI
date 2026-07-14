@@ -283,8 +283,7 @@ class StarCraft2Extension(GameExtensionInterface):
         snapshot = getattr(runtime_context, "snapshot", None)
         if callable(snapshot):
             status["runtime_context"] = snapshot()
-        self.record_status(status)
-        return status
+        return self.apply_status_contract(status)
 
     def _on_process_line(self, stream_name: str, line: str) -> None:
         if not bool(self.config.get("watch_stdout", True)):

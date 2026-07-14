@@ -176,8 +176,7 @@ class StarCraft116GameExtension(GameExtensionInterface):
         snapshot = getattr(runtime_context, "snapshot", None)
         if callable(snapshot):
             base["runtime_context"] = snapshot()
-        self.record_status(base)
-        return base
+        return self.apply_status_contract(base)
 
     def _is_status_listener_set(self) -> bool:
         return bool(

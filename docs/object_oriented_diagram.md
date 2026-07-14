@@ -529,6 +529,8 @@ classDiagram
         +set_status_event_callback(callback)
         +set_tts(tts)
         +subscribe_status_events(callback)
+        +attach_game_event_bus(bus)
+        +subscribe_common_events(callback)
         +on_local_human_vs_changeling_click(...)
     }
     class StarCraft2GameExtension {
@@ -556,6 +558,12 @@ classDiagram
     class StarCraft2EventBus {
         <<observer channel>>
         +subscribe(callback)
+        +set_common_event_bus(bus)
+        +subscribe_common_events(callback)
+        +emit(event)
+    }
+    class StarCraft2GameEventBridge {
+        <<adapter>>
         +emit(event)
     }
     class StarCraft2Contracts {
@@ -565,6 +573,10 @@ classDiagram
         +LocalMatchRuntimeStatusDTO
         +StarCraft2Event
     }
+    class GameStartResultDTO
+    class GameStopResultDTO
+    class GameStatusDTO
+    class GameEventBus
     class StarCraft2EngineEventService
     class StarCraft2LadderProxyEventService
     class StarCraft2EngineRegistry
@@ -626,11 +638,18 @@ classDiagram
     StarCraft2FacadeService --> StarCraft2EngineRegistry : start/stop/status
     StarCraft2FacadeService --> StarCraft2LocalMatchService : local match flow
     StarCraft2FacadeService --> StarCraft2Contracts : typed results
+    StarCraft2FacadeService --> GameStartResultDTO : common start result
+    StarCraft2FacadeService --> GameStopResultDTO : common stop result
+    StarCraft2FacadeService --> GameStatusDTO : common status
     StarCraft2LocalMatchService --> SC2LadderProxyLauncher : launch/stop/status
+    StarCraft2LocalMatchService --> GameStartResultDTO : common local result
+    StarCraft2LocalMatchService --> GameStatusDTO : common local status
     StarCraft2LadderProxyEventService --> SC2ObservationTracker : telemetry deltas
     StarCraft2LadderProxyEventService --> StarCraft2EventBus : stdout/game events
     StarCraft2EngineEventService --> StarCraft2EventBus : engine events
     StarCraft2EventBus --> StarCraft2Contracts : StarCraft2Event
+    StarCraft2EventBus *-- StarCraft2GameEventBridge
+    StarCraft2GameEventBridge --> GameEventBus : mirror shared events
     StarCraft2EngineRegistry o-- StarCraft2EngineInterface
     StarCraft2EngineInterface <|.. InternalLAVBotEngine
     StarCraft2EngineInterface <|.. AresSC2BotEngine
@@ -647,12 +666,15 @@ classDiagram
 
 `StarCraft2`는 이제 UI와 조립 표면입니다. Gradio 탭을 만들고 runtime 참조를 보관하지만, 실행은 `StarCraft2FacadeService`로 위임합니다. `StarCraft2FacadeService`는 start/stop/status와 Local Human vs AI 버튼 흐름을 조율하는 경계입니다. Local match 명령 생성, runtime preflight, ladder-proxy 실행, stdout/game-event 파싱, reaction TTS/memory 처리는 domain service 쪽에 남깁니다.
 
+`StarCraft2FacadeService`와 `StarCraft2LocalMatchService`는 기존 SC2 result dict를 유지하면서 공통 `GameStartResultDTO`, `GameStopResultDTO`, `GameStatusDTO` wrapper를 함께 보관합니다. UI/Gradio 경계에서는 마지막에 dict/JSON으로 변환된 payload만 반환합니다. `StarCraft2EventBus`는 계속 SC2 전용 live channel이고, `StarCraft2GameEventBridge`가 연결된 공통 `GameEventBus`로 이벤트를 mirror합니다.
+
 `StarCraft2EventBus`는 SC2 stdout 기반 이벤트, engine 이벤트, telemetry observation을 모으는 단일 live event channel입니다. UI/game extension은 이 채널을 구독하며 ladder stdout을 직접 파싱하지 않습니다. `StarCraft2Extension`은 여전히 수동 관찰자입니다. ProBots/Changeling 로그를 관찰하고 이벤트를 파싱한 뒤 공유 StarCraft2 status callback을 재사용하지만, main game facade를 직접 제어하지 않습니다. 현재 소스에서 LAN Lobby remote-human 코드는 보관용으로 주석 처리되어 있으며 live 다이어그램에는 포함하지 않습니다.
 
 `StarCraft2LocalMatchService`, `StarCraft2EngineEventService`, `StarCraft2LadderProxyEventService`는 현재 코드의 public service 이름입니다. 기존 `_...` 이름은 호환성 alias로만 유지합니다.
 
 <!-- #20260713_kpopmodder: Document current StarCraft2 facade/service/event split and archived LAN Lobby status. -->
 <!-- #20260715_kpopmodder: Keep public SC2 service names and legacy aliases documented with source. -->
+<!-- #20260715_kpopmodder: Document common DTO result wrappers and the SC2-to-GameEventBus bridge. -->
 
 ## 관계 기호
 

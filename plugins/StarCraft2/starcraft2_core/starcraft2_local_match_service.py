@@ -6,6 +6,12 @@ import subprocess
 import time
 from typing import Any, Callable, Dict, Optional, Union
 
+from app_core.extensions import (
+    GameResultDTO,
+    GameStartResultDTO,
+    GameStatusDTO,
+    GameStopResultDTO,
+)
 from core.logger import log_print
 from .starcraft2_contracts import LocalMatchRuntimeStatusDTO, StartResultDTO
 
@@ -47,6 +53,9 @@ class StarCraft2LocalMatchService:
         self.line_callback = line_callback
         self.event_bus = event_bus
         self.runtime_context = runtime_context
+        self._last_game_result_dto: Optional[GameResultDTO] = None
+        self._last_game_stop_result_dto: Optional[GameStopResultDTO] = None
+        self._last_game_status_dto: Optional[GameStatusDTO] = None
 
     def local_match_race_from_args(self, args, fallback: str = "Terran") -> str:
         return self.arg_utils.local_match_race_from_args(args, fallback=fallback)
@@ -313,9 +322,17 @@ class StarCraft2LocalMatchService:
             if isinstance(result, StarCraft2CommandResult)
             else StartResultDTO.from_mapping(result, action="local_human_vs_changeling")
         )
+        game_result = self._build_game_result_dto(normalized_result)
+        ladder_proxy_status = self.ladder_proxy.get_status(proxy_config)
+        game_status = self._build_game_status_dto(
+            result=game_result,
+            ladder_proxy_status=ladder_proxy_status,
+        )
         return StarCraft2LocalMatchStatus(
             result=normalized_result,
-            ladder_proxy=self.ladder_proxy.get_status(proxy_config),
+            ladder_proxy=ladder_proxy_status,
+            game_result=game_result,
+            game_status=game_status,
         )
 
     def _local_match_status_json(
@@ -362,6 +379,47 @@ class StarCraft2LocalMatchService:
             exit_callback=self._on_ladder_proxy_exit,
         )
         return StarCraft2CommandResult.from_mapping(raw_result, action="local_human_vs_changeling")
+
+    def _build_game_result_dto(self, result: StartResultDTO) -> GameResultDTO:
+        payload = result.to_dict() if isinstance(result, StartResultDTO) else {}
+        action = str(payload.get("action") or "")
+        if action in {"local_match_stop", "stop"}:
+            stop_dto = GameStopResultDTO.from_mapping(payload, action="stop")
+            self._last_game_stop_result_dto = stop_dto
+            self._last_game_result_dto = stop_dto
+            return stop_dto
+        game_result = GameStartResultDTO.from_mapping(
+            payload,
+            action=action or "local_human_vs_changeling",
+        )
+        self._last_game_result_dto = game_result
+        return game_result
+
+    def _build_game_status_dto(
+        self,
+        result: GameResultDTO,
+        ladder_proxy_status: Dict[str, Any],
+    ) -> GameStatusDTO:
+        status_payload = {
+            "name": "starcraft2",
+            "initialized": True,
+            "started": bool(ladder_proxy_status.get("running")),
+            "runtime": (
+                self.runtime_context.snapshot()
+                if self.runtime_context is not None
+                and callable(getattr(self.runtime_context, "snapshot", None))
+                else {}
+            ),
+            "details": {
+                "mode": "local_human_vs_changeling",
+                "result": result.to_dict(),
+                "ladder_proxy": dict(ladder_proxy_status or {}),
+            },
+            "error": result.error,
+        }
+        dto = GameStatusDTO.from_mapping(status_payload, name="starcraft2")
+        self._last_game_status_dto = dto
+        return dto
 
     def _on_ladder_proxy_exit(self, result: Dict[str, Any]) -> None:
         details = result if isinstance(result, dict) else {}

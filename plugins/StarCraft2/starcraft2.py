@@ -212,6 +212,17 @@ class StarCraft2:
     def subscribe_status_events(self, callback):
         return self._facade_service.subscribe_status_events(callback)
 
+    def attach_game_event_bus(self, game_event_bus):
+        setter = getattr(self._event_bus, "set_common_event_bus", None)
+        if callable(setter):
+            setter(game_event_bus)
+
+    def subscribe_common_events(self, callback):
+        subscriber = getattr(self._event_bus, "subscribe_common_events", None)
+        if callable(subscriber):
+            return subscriber(callback)
+        return None
+
     def set_tts(self, tts):
         self._facade_service.set_tts(tts)
 

@@ -65,6 +65,25 @@ class GameExtensionInterface(ABC):
             setter(status)
         return GameStatusDTO.from_mapping(status, name=self.name)
 
+    def apply_status_contract(self, status: Dict[str, Any]) -> Dict[str, Any]:
+        payload = dict(status or {})
+        dto = self.record_status(payload)
+        payload.setdefault("name", dto.name)
+        payload.setdefault("initialized", dto.initialized)
+        payload.setdefault("started", dto.started)
+        if dto.plugin:
+            payload.setdefault("plugin", dict(dto.plugin))
+        if dto.worker:
+            payload.setdefault("worker", dict(dto.worker))
+        if dto.runtime:
+            payload.setdefault("runtime", dict(dto.runtime))
+        if dto.details:
+            payload.setdefault("details", dict(dto.details))
+        if dto.error is not None:
+            payload.setdefault("error", dto.error)
+        payload["game_status"] = dto.to_dict()
+        return payload
+
     def mark_started(self, value: bool = True) -> None:
         runtime_context = getattr(self, "runtime_context", None)
         marker = getattr(runtime_context, "mark_started", None)
