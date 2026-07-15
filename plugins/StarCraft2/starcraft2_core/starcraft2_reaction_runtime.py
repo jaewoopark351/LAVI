@@ -12,6 +12,7 @@ from .starcraft2_reaction_io import (
     StarCraft2ReactionTTSAdapter,
 )
 from .starcraft2_reaction_policy import StarCraft2ReactionPolicy
+from .starcraft2_contracts import StarCraft2Event
 
 
 class StarCraft2ReactionRuntime:
@@ -55,9 +56,14 @@ class StarCraft2ReactionRuntime:
         self._suppress_post_game_tts = False
 
     def handle_status_event(self, event: Dict[str, Any]) -> bool:
-        normalized = dict(event or {})
-        event_type = str(normalized.get("event_type") or "").strip().lower()
-        details = self._details(normalized.get("details"))
+        #20260715_kpopmodder: Preserve the legacy EventBus callback while the
+        # reaction core uses the typed event contract.
+        return self.handle_event(StarCraft2Event.from_mapping(event))
+
+    def handle_event(self, event: StarCraft2Event) -> bool:
+        normalized = StarCraft2Event.from_mapping(event)
+        event_type = str(normalized.event_type or "").strip().lower()
+        details = dict(normalized.details)
 
         log_print(f"[StarCraft2Reaction] event={event_type}")
         self.memory_recorder.store_event(normalized)
@@ -66,8 +72,15 @@ class StarCraft2ReactionRuntime:
         if self.post_game_suppression and self._suppress_post_game_tts and (
             event_type not in self.TERMINAL_EVENT_TYPES
         ):
-            normalized["details"] = dict(details)
-            normalized["details"]["speak"] = False
+            suppressed_details = dict(details)
+            suppressed_details["speak"] = False
+            normalized = StarCraft2Event(
+                event_type=normalized.event_type,
+                details=suppressed_details,
+                source=normalized.source,
+                engine=normalized.engine,
+                time=normalized.time,
+            )
             log_print(
                 "[StarCraft2ReactionRuntime] post-game TTS suppressed: "
                 f"event={event_type}"
@@ -77,9 +90,7 @@ class StarCraft2ReactionRuntime:
             return False
         text = build_starcraft2_reaction_text(normalized)
         if not text:
-            details = normalized.get("details")
-            if isinstance(details, dict):
-                text = str(details.get("message") or "").strip()
+            text = str(normalized.details.get("message") or "").strip()
         return self.tts_adapter.speak(text)
 
     def _update_game_state(self, event_type: str, event_details: Dict[str, Any]) -> None:
@@ -126,11 +137,12 @@ def handle_starcraft2_status_event(llm, tts, memory_store, policy, event):
         policy=policy,
         post_game_suppression=False,
     )
-    return runtime.handle_status_event(event)
+    return runtime.handle_event(StarCraft2Event.from_mapping(event))
 
-def build_starcraft2_reaction_text(event: Dict[str, Any]) -> str:
-    kind = str(event.get("event_type") or "").lower()
-    details = event.get("details") if isinstance(event.get("details"), dict) else {}
+def build_starcraft2_reaction_text(event: StarCraft2Event) -> str:
+    normalized = StarCraft2Event.from_mapping(event)
+    kind = str(normalized.event_type or "").lower()
+    details = dict(normalized.details)
     snapshot = details.get("snapshot") if isinstance(details.get("snapshot"), dict) else {}
     changes = details.get("unit_changes") if isinstance(details.get("unit_changes"), dict) else {}
     provided_message = str(details.get("message") or "").strip()

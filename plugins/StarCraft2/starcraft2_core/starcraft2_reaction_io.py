@@ -5,6 +5,7 @@ import json
 from typing import Any, Dict
 
 from core.logger import log_print
+from .starcraft2_contracts import StarCraft2Event
 
 
 #20260713_kpopmodder: Keep raw-event persistence separate from reaction policy and TTS flow.
@@ -12,7 +13,8 @@ class StarCraft2ReactionMemoryRecorder:
     def __init__(self, memory_store=None):
         self.memory_store = memory_store
 
-    def store_event(self, event: Dict[str, Any]) -> None:
+    def store_event(self, event: StarCraft2Event) -> None:
+        normalized = StarCraft2Event.from_mapping(event)
         add_raw_event = (
             getattr(self.memory_store, "add_raw_event", None)
             if self.memory_store
@@ -22,11 +24,12 @@ class StarCraft2ReactionMemoryRecorder:
             return
 
         try:
+            payload = normalized.to_dict()
             add_raw_event(
                 "starcraft2_game_event",
-                json.dumps(event, ensure_ascii=False, default=str),
+                json.dumps(payload, ensure_ascii=False, default=str),
                 source="starcraft2",
-                metadata={"event_type": event.get("event_type", "")},
+                metadata={"event_type": normalized.event_type},
             )
         except Exception as exc:
             log_print(f"[StarCraft2Reaction] raw event store failed: {exc}")

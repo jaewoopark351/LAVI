@@ -11,6 +11,12 @@ from plugins.StarCraft2.starcraft2_core.starcraft2_event_service import (
 from plugins.StarCraft2.starcraft2_core.starcraft2_reaction_runtime import (
     StarCraft2ReactionRuntime,
 )
+from plugins.StarCraft2.starcraft2_core.starcraft2_reaction_io import (
+    StarCraft2ReactionMemoryRecorder,
+)
+from plugins.StarCraft2.starcraft2_core.starcraft2_reaction_policy import (
+    StarCraft2ReactionPolicy,
+)
 
 
 class StarCraft2EventContractTests(unittest.TestCase):
@@ -138,13 +144,16 @@ class StarCraft2EventContractTests(unittest.TestCase):
         self.assertTrue(delivered)
         self.assertEqual("game_started", received[0]["event_type"])
 
-    def test_reaction_tts_and_memory_keep_legacy_dict_contract(self):
+    def test_reaction_runtime_passes_typed_event_to_policy_and_memory(self):
         memory_recorder = mock.Mock()
+        policy = mock.Mock()
+        policy.should_emit.return_value = True
         tts_adapter = mock.Mock()
         tts_adapter.speak.return_value = True
         runtime = StarCraft2ReactionRuntime(
             llm=None,
             tts=None,
+            policy=policy,
             memory_recorder=memory_recorder,
             tts_adapter=tts_adapter,
         )
@@ -154,9 +163,84 @@ class StarCraft2EventContractTests(unittest.TestCase):
         bus.emit(StarCraft2Event("game_won", {"result": "Player2Win"}))
 
         stored = memory_recorder.store_event.call_args.args[0]
-        self.assertIsInstance(stored, dict)
-        self.assertEqual("game_won", stored["event_type"])
+        filtered = policy.should_emit.call_args.args[0]
+        self.assertIsInstance(stored, StarCraft2Event)
+        self.assertIsInstance(filtered, StarCraft2Event)
+        self.assertEqual("game_won", stored.event_type)
         tts_adapter.speak.assert_called_once_with("내가 이번 경기를 이겼어요.")
+
+    def test_legacy_status_callback_delegates_to_typed_core(self):
+        runtime = StarCraft2ReactionRuntime(llm=None, tts=None)
+        runtime.handle_event = mock.Mock(return_value=True)
+
+        result = runtime.handle_status_event(
+            {"event_type": "game_won", "details": {"result": "Player2Win"}}
+        )
+
+        self.assertTrue(result)
+        event = runtime.handle_event.call_args.args[0]
+        self.assertIsInstance(event, StarCraft2Event)
+        self.assertEqual("game_won", event.event_type)
+
+    def test_policy_accepts_typed_event_contract(self):
+        policy = StarCraft2ReactionPolicy(min_interval_sec=0)
+
+        emitted = policy.should_emit(
+            StarCraft2Event(
+                "unit_produced",
+                {"unit_type_id": "106", "unit_changes": {"106": 1}},
+            )
+        )
+
+        self.assertTrue(emitted)
+
+    def test_memory_recorder_serializes_typed_event_at_storage_edge(self):
+        memory_store = mock.Mock()
+        recorder = StarCraft2ReactionMemoryRecorder(memory_store)
+        event = StarCraft2Event("game_won", {"result": "Player2Win"})
+
+        recorder.store_event(event)
+
+        args = memory_store.add_raw_event.call_args.args
+        kwargs = memory_store.add_raw_event.call_args.kwargs
+        self.assertEqual("starcraft2_game_event", args[0])
+        self.assertIn('"event_type": "game_won"', args[1])
+        self.assertEqual({"event_type": "game_won"}, kwargs["metadata"])
+
+    def test_typed_game_end_cancels_once_and_result_still_speaks(self):
+        tts_adapter = mock.Mock()
+        tts_adapter.speak.return_value = True
+        runtime = StarCraft2ReactionRuntime(
+            llm=None,
+            tts=None,
+            policy=StarCraft2ReactionPolicy(min_interval_sec=0),
+            tts_adapter=tts_adapter,
+            post_game_suppression=True,
+        )
+
+        runtime.handle_event(StarCraft2Event("game_ended"))
+        runtime.handle_event(StarCraft2Event("game_ended"))
+        runtime.handle_event(StarCraft2Event("game_won"))
+
+        tts_adapter.cancel_pending.assert_called_once_with("game_ended", {})
+        tts_adapter.speak.assert_called_once_with("내가 이번 경기를 이겼어요.")
+
+    def test_typed_proxy_stopped_is_suppressed_after_game_end(self):
+        policy = StarCraft2ReactionPolicy(min_interval_sec=0)
+        tts_adapter = mock.Mock()
+        runtime = StarCraft2ReactionRuntime(
+            llm=None,
+            tts=None,
+            policy=policy,
+            tts_adapter=tts_adapter,
+            post_game_suppression=True,
+        )
+
+        runtime.handle_event(StarCraft2Event("game_ended"))
+        emitted = runtime.handle_event(StarCraft2Event("proxy_stopped"))
+
+        self.assertFalse(emitted)
+        tts_adapter.speak.assert_not_called()
 
 
 if __name__ == "__main__":

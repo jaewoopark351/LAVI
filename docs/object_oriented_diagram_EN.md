@@ -701,10 +701,20 @@ classDiagram
     class ProBotsLauncher
     class ProBotsLogWatcher
     class SC2EventParser
-    class StarCraft2ReactionRuntime
-    class StarCraft2ReactionPolicy
+    class StarCraft2ReactionRuntime {
+        <<typed reaction orchestrator>>
+        +handle_status_event(legacy_dict): bool
+        +handle_event(event: StarCraft2Event): bool
+    }
+    class StarCraft2ReactionPolicy {
+        <<typed policy>>
+        +should_emit(event: StarCraft2Event): bool
+    }
     class StarCraft2ReactionTTSAdapter
-    class StarCraft2ReactionMemoryRecorder
+    class StarCraft2ReactionMemoryRecorder {
+        <<typed memory adapter>>
+        +store_event(event: StarCraft2Event)
+    }
     class TTS
     class MemoryStore
 
@@ -830,6 +840,14 @@ through the `proxy_stopped` event on `StarCraft2EventBus`.
 <!-- #20260715_kpopmodder: Document common DTO result wrappers and the SC2-to-GameEventBus bridge. -->
 <!-- #20260715_kpopmodder: Document common GameEventBus runtime monitoring. -->
 <!-- #20260715_kpopmodder: Document the typed stdout-event and EventBus boundary. -->
+The reaction core also uses `StarCraft2Event` end to end.
+`StarCraft2ReactionRuntime.handle_status_event()` remains only as the dict
+adapter for existing EventBus subscribers, while `handle_event()` owns typed
+execution. `StarCraft2ReactionPolicy` and `StarCraft2ReactionMemoryRecorder`
+consume DTOs directly; raw memory calls `to_dict()` only at the JSON storage
+edge. `StarCraft2ReactionTTSAdapter` still owns only string speech and queue
+cancellation, not event interpretation.
+<!-- #20260715_kpopmodder: Document the typed reaction policy and memory boundary. -->
 <!-- #20260715_kpopmodder: Document Facade-only SC2RuntimeContext ownership. -->
 <!-- #20260715_kpopmodder: Document StarCraft2RuntimeFactory composition ownership. -->
 

@@ -679,10 +679,20 @@ classDiagram
     class ProBotsLauncher
     class ProBotsLogWatcher
     class SC2EventParser
-    class StarCraft2ReactionRuntime
-    class StarCraft2ReactionPolicy
+    class StarCraft2ReactionRuntime {
+        <<typed reaction orchestrator>>
+        +handle_status_event(legacy_dict): bool
+        +handle_event(event: StarCraft2Event): bool
+    }
+    class StarCraft2ReactionPolicy {
+        <<typed policy>>
+        +should_emit(event: StarCraft2Event): bool
+    }
     class StarCraft2ReactionTTSAdapter
-    class StarCraft2ReactionMemoryRecorder
+    class StarCraft2ReactionMemoryRecorder {
+        <<typed memory adapter>>
+        +store_event(event: StarCraft2Event)
+    }
     class TTS
     class MemoryStore
 
@@ -771,6 +781,8 @@ log lines.
 <!-- #20260715_kpopmodder: Document the typed ladder-proxy process boundary. -->
 `StarCraft2LadderProxyEventService.parse_line()`은 stdout과 `LAV_OBSERVATION` JSON을 `StarCraft2Event` 목록으로 변환합니다. `StarCraft2EngineEventService`는 typed 이벤트의 상태 갱신과 EventBus 전달만 조율하고 문자열을 직접 해석하지 않습니다. `StarCraft2EventBus`는 내부와 공통 GameEventBus mirror에서 typed 계약을 사용하며, 기존 Reaction TTS·memory·UI subscriber를 호출하는 마지막 경계에서만 dict로 변환합니다.
 <!-- #20260715_kpopmodder: Document the typed stdout-event and EventBus boundary. -->
+Reaction 계층의 core 계약도 `StarCraft2Event`로 통일됩니다. `StarCraft2ReactionRuntime.handle_status_event()`만 기존 EventBus subscriber용 dict adapter로 남고 `handle_event()`가 typed 실행을 담당합니다. `StarCraft2ReactionPolicy`와 `StarCraft2ReactionMemoryRecorder`도 DTO를 직접 받으며, raw memory JSON 직렬화 직전에만 `to_dict()`를 사용합니다. `StarCraft2ReactionTTSAdapter`는 이벤트를 소유하지 않고 기존처럼 문자열 발화와 queue 취소만 담당합니다.
+<!-- #20260715_kpopmodder: Document the typed reaction policy and memory boundary. -->
 <!-- #20260715_kpopmodder: Document Facade-only SC2RuntimeContext ownership. -->
 <!-- #20260715_kpopmodder: Document StarCraft2RuntimeFactory composition ownership. -->
 

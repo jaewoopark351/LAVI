@@ -8,6 +8,7 @@ from .sc2_telemetry_registry import (
     SC2_BUILDING_UNIT_TYPE_IDS,
     SC2_LOG_ONLY_UNIT_TYPE_IDS,
 )
+from .starcraft2_contracts import StarCraft2Event
 
 
 IMPORTANT_EVENT_TYPES = {
@@ -94,9 +95,10 @@ class StarCraft2ReactionPolicy:
         )
         self._last_event_time_by_key = {}
 
-    def should_emit(self, event: Dict[str, Any]) -> bool:
+    def should_emit(self, event: StarCraft2Event) -> bool:
+        event = StarCraft2Event.from_mapping(event)
         event_type = self.normalized_event_type(event)
-        details = event.get("details") if isinstance(event.get("details"), dict) else {}
+        details = event.details
         if details.get("speak") is False:
             return False
         if event_type in SILENT_TTS_EVENT_TYPES:
@@ -116,13 +118,15 @@ class StarCraft2ReactionPolicy:
         self._last_event_time_by_key[key] = now
         return True
 
-    def normalized_event_type(self, event: Dict[str, Any]) -> str:
-        event_type = str((event or {}).get("event_type") or "").strip().lower()
+    def normalized_event_type(self, event: StarCraft2Event) -> str:
+        event = StarCraft2Event.from_mapping(event)
+        event_type = str(event.event_type or "").strip().lower()
         return EVENT_ALIASES.get(event_type, event_type)
 
-    def event_key(self, event: Dict[str, Any]) -> str:
+    def event_key(self, event: StarCraft2Event) -> str:
+        event = StarCraft2Event.from_mapping(event)
         event_type = self.normalized_event_type(event)
-        details = event.get("details") if isinstance(event.get("details"), dict) else {}
+        details = event.details
         if event_type in {"building_started", "unit_produced", "worker_produced", "unit_lost"}:
             unit_type_id = str(details.get("unit_type_id") or "").strip()
             if not unit_type_id:
@@ -147,14 +151,18 @@ class StarCraft2ReactionPolicy:
             if strategy_key:
                 return f"{event_type}:{strategy_key[:160]}"
         if event_type in {"enemy_seen", "engine_error", "game_ended"}:
-            detail = str((event or {}).get("details") or "")
+            detail = str(event.details or "")
             return f"{event_type}:{detail[:80]}"
         return event_type
 
-    def _is_silent_transient_zerg_unit_event(self, event_type: str, event: Dict[str, Any]) -> bool:
+    def _is_silent_transient_zerg_unit_event(
+        self,
+        event_type: str,
+        event: StarCraft2Event,
+    ) -> bool:
         if event_type not in {"unit_produced", "unit_lost"}:
             return False
-        details = event.get("details") if isinstance(event.get("details"), dict) else {}
+        details = event.details
         dominant_unit_type_id = str(details.get("unit_type_id") or "").strip()
         if not dominant_unit_type_id:
             dominant_unit_type_id = self._dominant_positive_unit_type_id(event)
@@ -163,11 +171,11 @@ class StarCraft2ReactionPolicy:
     def _is_low_signal_single_production_event(
         self,
         event_type: str,
-        event: Dict[str, Any],
+        event: StarCraft2Event,
     ) -> bool:
         if event_type not in {"unit_produced", "worker_produced"}:
             return False
-        details = event.get("details") if isinstance(event.get("details"), dict) else {}
+        details = event.details
         unit_type_id = str(details.get("unit_type_id") or "").strip()
         if not unit_type_id:
             unit_type_id = self._dominant_positive_unit_type_id(event)
@@ -180,10 +188,10 @@ class StarCraft2ReactionPolicy:
 
     def _dominant_positive_unit_count(
         self,
-        event: Dict[str, Any],
+        event: StarCraft2Event,
         unit_type_id: str,
     ) -> int:
-        details = event.get("details") if isinstance(event.get("details"), dict) else {}
+        details = event.details
         try:
             explicit_count = int(details.get("count") or 0)
         except (TypeError, ValueError):
@@ -206,8 +214,12 @@ class StarCraft2ReactionPolicy:
             return max(positive_counts)
         return 1 if unit_type_id else 0
 
-    def _dominant_positive_unit_type_id(self, event: Dict[str, Any], allowed_ids=None) -> str:
-        details = event.get("details") if isinstance(event.get("details"), dict) else {}
+    def _dominant_positive_unit_type_id(
+        self,
+        event: StarCraft2Event,
+        allowed_ids=None,
+    ) -> str:
+        details = event.details
         changes = details.get("unit_changes") if isinstance(details.get("unit_changes"), dict) else {}
         candidates = []
         normalized_allowed_ids = (
@@ -233,5 +245,10 @@ class StarCraft2ReactionPolicy:
         return max(candidates, key=lambda item: item[1])[0]
 
 
-def should_speak_starcraft2_event(event: Dict[str, Any], policy: StarCraft2ReactionPolicy | None = None) -> bool:
-    return (policy or StarCraft2ReactionPolicy()).should_emit(event)
+def should_speak_starcraft2_event(
+    event: StarCraft2Event,
+    policy: StarCraft2ReactionPolicy | None = None,
+) -> bool:
+    return (policy or StarCraft2ReactionPolicy()).should_emit(
+        StarCraft2Event.from_mapping(event)
+    )
