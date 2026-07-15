@@ -6,6 +6,8 @@ from collections import deque
 from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, Iterable, List, Optional
 
+from .starcraft2_contracts import StarCraft2Event
+
 
 @dataclass
 class StarCraft2RuntimeState:
@@ -90,8 +92,13 @@ class StarCraft2RuntimeState:
         if stderr_tail is not None:
             self.stderr_tail = [str(line) for line in stderr_tail][-20:]
 
-    def update_event(self, event: Dict[str, Any]) -> None:
-        self.last_event = dict(event or {})
+    #20260715_kpopmodder: Accept typed SC2 events at the state boundary.
+    def update_event(self, event: Dict[str, Any] | StarCraft2Event) -> None:
+        self.last_event = (
+            event.to_dict()
+            if isinstance(event, StarCraft2Event)
+            else dict(event or {})
+        )
         self.last_event_at = time.time()
         event_type = str(self.last_event.get("event_type") or "")
         details = self.last_event.get("details")

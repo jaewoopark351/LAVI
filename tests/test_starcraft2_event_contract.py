@@ -47,7 +47,7 @@ class StarCraft2EventContractTests(unittest.TestCase):
     def test_observation_json_returns_typed_tracker_events(self):
         tracker = mock.Mock()
         tracker.update.return_value = [
-            {"event_type": "unit_produced", "details": {"unit_type_id": "104"}}
+            StarCraft2Event("unit_produced", {"unit_type_id": "104"})
         ]
         service, _, _, _ = self.make_service(tracker)
 
@@ -116,6 +116,7 @@ class StarCraft2EventContractTests(unittest.TestCase):
         service.engine_event_service.update_state(event)
 
         state.update_event.assert_called_once()
+        self.assertIs(event, state.update_event.call_args.args[0])
         emitted = bus.emit.call_args.args[0]
         self.assertIsInstance(emitted, StarCraft2Event)
         self.assertIs(event, emitted)
@@ -132,6 +133,22 @@ class StarCraft2EventContractTests(unittest.TestCase):
         self.assertIs(event, bus._common_event_bridge.emit.call_args.args[0])
         self.assertIsInstance(received[0], dict)
         self.assertEqual("game_started", received[0]["event_type"])
+
+    #20260715_kpopmodder: Internal subscribers can stay typed while legacy callbacks get dicts.
+    def test_event_bus_typed_subscriber_receives_dto_without_dict_conversion(self):
+        received = []
+        legacy = []
+        bus = StarCraft2EventBus()
+        bus.subscribe_typed(received.append)
+        bus.subscribe(legacy.append)
+
+        event = StarCraft2Event("proxy_stopped", {"returncode": 0})
+        delivered = bus.emit(event)
+
+        self.assertTrue(delivered)
+        self.assertIs(event, received[0])
+        self.assertIsInstance(legacy[0], dict)
+        self.assertEqual("proxy_stopped", legacy[0]["event_type"])
 
     def test_subscriber_failure_does_not_block_later_subscriber(self):
         received = []

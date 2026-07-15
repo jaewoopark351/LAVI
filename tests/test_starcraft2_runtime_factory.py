@@ -27,7 +27,8 @@ class StarCraft2RuntimeFactoryTests(unittest.TestCase):
         self.assertIs(bundle.facade_service.local_match_service, bundle.local_match_service)
         self.assertIs(bundle.local_match_service.ladder_proxy, bundle.ladder_proxy)
         self.assertIs(bundle.local_match_service.event_bus, bundle.event_bus)
-        self.assertIs(bundle.local_match_service.runtime_context, bundle.runtime_context)
+        self.assertNotIn("runtime_context", bundle.local_match_service.__dict__)
+        self.assertTrue(callable(bundle.local_match_service._runtime_snapshot_provider))
         self.assertIs(
             bundle.local_match_service.line_callback.__self__,
             bundle.ladder_proxy_event_service,

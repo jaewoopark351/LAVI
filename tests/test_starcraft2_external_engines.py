@@ -15,6 +15,11 @@ from plugins.StarCraft2.starcraft2_core.external_jar_bot_engine import (
 from plugins.StarCraft2.starcraft2_core.micromachine_bot_engine import (
     MicroMachineBotEngine,
 )
+from plugins.StarCraft2.starcraft2_core.starcraft2_contracts import (
+    EngineResultDTO,
+    EngineStatusDTO,
+    StarCraft2Event,
+)
 
 
 class FakeProcess:
@@ -62,10 +67,13 @@ class StarCraft2ExternalEnginesTests(unittest.TestCase):
             status = engine.get_status()
             stop_result = engine.stop()
 
-        self.assertTrue(start_result["ok"])
-        self.assertTrue(status["running"])
-        self.assertEqual(4242, status["process_pid"])
-        self.assertTrue(stop_result["ok"])
+        self.assertIsInstance(start_result, EngineResultDTO)
+        self.assertIsInstance(status, EngineStatusDTO)
+        self.assertIsInstance(stop_result, EngineResultDTO)
+        self.assertTrue(start_result.ok)
+        self.assertTrue(status.running)
+        self.assertEqual(4242, status.to_dict()["process_pid"])
+        self.assertTrue(stop_result.ok)
         self.assertTrue(fake_process.terminated)
         popen.assert_called_once()
         self.assertEqual(
@@ -93,10 +101,13 @@ class StarCraft2ExternalEnginesTests(unittest.TestCase):
             status = engine.get_status()
             stop_result = engine.stop()
 
-        self.assertTrue(start_result["ok"])
-        self.assertTrue(status["running"])
-        self.assertEqual(5151, status["process_pid"])
-        self.assertTrue(stop_result["ok"])
+        self.assertIsInstance(start_result, EngineResultDTO)
+        self.assertIsInstance(status, EngineStatusDTO)
+        self.assertIsInstance(stop_result, EngineResultDTO)
+        self.assertTrue(start_result.ok)
+        self.assertTrue(status.running)
+        self.assertEqual(5151, status.to_dict()["process_pid"])
+        self.assertTrue(stop_result.ok)
         self.assertEqual(
             ["java", "-jar", "C:\\Bots\\KetrocBot.jar", "--OpponentId", "LAV"],
             popen.call_args.args[0],
@@ -135,10 +146,13 @@ class StarCraft2ExternalEnginesTests(unittest.TestCase):
             status = engine.get_status()
             stop_result = engine.stop()
 
-        self.assertTrue(start_result["ok"])
-        self.assertTrue(status["running"])
-        self.assertEqual(6161, status["process_pid"])
-        self.assertTrue(stop_result["ok"])
+        self.assertIsInstance(start_result, EngineResultDTO)
+        self.assertIsInstance(status, EngineStatusDTO)
+        self.assertIsInstance(stop_result, EngineResultDTO)
+        self.assertTrue(start_result.ok)
+        self.assertTrue(status.running)
+        self.assertEqual(6161, status.to_dict()["process_pid"])
+        self.assertTrue(stop_result.ok)
         self.assertEqual([exe_path, "--ladder"], popen.call_args.args[0])
         self.assertEqual(working_directory, popen.call_args.kwargs["cwd"])
 
@@ -198,8 +212,10 @@ class StarCraft2ExternalEnginesTests(unittest.TestCase):
             start_result = engine.start(config)
             stop_result = engine.stop()
 
-        self.assertTrue(start_result["ok"])
-        self.assertTrue(stop_result["ok"])
+        self.assertIsInstance(start_result, EngineResultDTO)
+        self.assertIsInstance(stop_result, EngineResultDTO)
+        self.assertTrue(start_result.ok)
+        self.assertTrue(stop_result.ok)
         self.assertEqual(
             [exe_path, "-e", sc2_executable, "--ladder"],
             popen.call_args.args[0],
@@ -226,8 +242,9 @@ class StarCraft2ExternalEnginesTests(unittest.TestCase):
         ):
             result = engine.start(config)
 
-        self.assertFalse(result["ok"])
-        self.assertIn("micromachine_bot_config_missing", result["error"])
+        self.assertIsInstance(result, EngineResultDTO)
+        self.assertFalse(result.ok)
+        self.assertIn("micromachine_bot_config_missing", result.error)
         popen.assert_not_called()
 
     def test_ares_sc2_runs_python_script_from_script_folder(self):
@@ -264,8 +281,10 @@ class StarCraft2ExternalEnginesTests(unittest.TestCase):
             start_result = engine.start(config)
             stop_result = engine.stop()
 
-        self.assertTrue(start_result["ok"])
-        self.assertTrue(stop_result["ok"])
+        self.assertIsInstance(start_result, EngineResultDTO)
+        self.assertIsInstance(stop_result, EngineResultDTO)
+        self.assertTrue(start_result.ok)
+        self.assertTrue(stop_result.ok)
         self.assertEqual(
             [
                 python_path,
@@ -298,8 +317,9 @@ class StarCraft2ExternalEnginesTests(unittest.TestCase):
         ):
             result = engine.start(config)
 
-        self.assertFalse(result["ok"])
-        self.assertIn("ares_sc2_script_not_found", result["error"])
+        self.assertIsInstance(result, EngineResultDTO)
+        self.assertFalse(result.ok)
+        self.assertIn("ares_sc2_script_not_found", result.error)
         popen.assert_not_called()
 
     def test_ares_sc2_reports_missing_poetry_before_launch(self):
@@ -327,9 +347,34 @@ class StarCraft2ExternalEnginesTests(unittest.TestCase):
         ):
             result = engine.start(config)
 
-        self.assertFalse(result["ok"])
-        self.assertIn("ares_sc2_poetry_not_found", result["error"])
+        self.assertIsInstance(result, EngineResultDTO)
+        self.assertFalse(result.ok)
+        self.assertIn("ares_sc2_poetry_not_found", result.error)
         popen.assert_not_called()
+
+    #20260715_kpopmodder: External process callbacks preserve the typed event path.
+    def test_external_process_event_callback_receives_typed_event(self):
+        fake_process = FakeProcess(pid=5252)
+        engine = ExternalExeBotEngine()
+        events = []
+        config = {
+            "external_exe": {
+                "path": "C:\\Bots\\MicroMachine.exe",
+                "working_directory": "",
+            }
+        }
+
+        with mock.patch(
+            "plugins.StarCraft2.starcraft2_core.external_exe_bot_engine.subprocess.Popen",
+            return_value=fake_process,
+        ):
+            result = engine.start(config, event_callback=events.append)
+            engine.stop()
+
+        self.assertIsInstance(result, EngineResultDTO)
+        self.assertIsInstance(events[0], StarCraft2Event)
+        self.assertEqual("process_started", events[0].event_type)
+        self.assertEqual(5252, events[0].details["pid"])
 
 
 if __name__ == "__main__":

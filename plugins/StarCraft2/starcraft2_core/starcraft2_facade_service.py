@@ -16,6 +16,7 @@ from .starcraft2_contracts import (
     LocalMatchRuntimeStatusDTO,
     StartResultDTO,
     StopResultDTO,
+    StarCraft2Event,
 )
 from .starcraft2_engine_interface import adapt_starcraft2_engine
 from .starcraft2_runtime_context import SC2RuntimeContext
@@ -51,7 +52,7 @@ class StarCraft2FacadeService:
         if self.runtime_context is not None and self.event_bus is not None:
             self.runtime_context.event_bus = self.event_bus
         self._runtime_event_subscription = (
-            self.event_bus.subscribe(self._handle_runtime_event)
+            self.event_bus.subscribe_typed(self._handle_runtime_event)
             if self.event_bus is not None
             else None
         )
@@ -276,14 +277,12 @@ class StarCraft2FacadeService:
     def handle_engine_event(self, event):
         self.engine_event_service.update_state(event)
 
-    def _handle_runtime_event(self, event: Dict[str, Any]) -> None:
-        event_type = str(event.get("event_type") or "").strip().lower()
+    def _handle_runtime_event(self, event: StarCraft2Event) -> None:
+        normalized = StarCraft2Event.from_mapping(event)
+        event_type = normalized.event_type.strip().lower()
         if event_type != "proxy_stopped":
             return
-        details = event.get("details")
-        self._sync_local_match_runtime_context(
-            exit_details=details if isinstance(details, dict) else {},
-        )
+        self._sync_local_match_runtime_context(exit_details=normalized.details)
 
     def on_local_match_race_change(self, race, args):
         if self.local_match_service is None:
@@ -360,6 +359,75 @@ class StarCraft2FacadeService:
         return self.local_match_service.local_match_ai_race_from_args(
             args, fallback=fallback
         )
+
+    #20260715_kpopmodder: Keep legacy UI helper names delegated through the facade boundary.
+    def ladder_proxy_config(
+        self,
+        executable_path=None,
+        working_directory=None,
+        args=None,
+        proxy_host=None,
+        proxy_ports=None,
+    ) -> Dict[str, Any]:
+        return self.match_config_service.ladder_proxy_config(
+            executable_path=executable_path,
+            working_directory=working_directory,
+            args=args,
+            proxy_host=proxy_host,
+            proxy_ports=proxy_ports,
+        )
+
+    def local_match_config(
+        self,
+        executable_path=None,
+        working_directory=None,
+        args=None,
+        proxy_ports=None,
+        keep_local_match_identity_args: bool = False,
+    ) -> Dict[str, Any]:
+        return self.match_config_service.local_match_config(
+            executable_path=executable_path,
+            working_directory=working_directory,
+            args=args,
+            proxy_ports=proxy_ports,
+            keep_local_match_identity_args=keep_local_match_identity_args,
+        )
+
+    def ensure_local_match_runtime(self, config: Dict[str, Any]) -> Dict[str, Any]:
+        return self.match_config_service.ensure_local_match_runtime(config)
+
+    def same_path(self, left: str, right: str) -> bool:
+        return self._arg_utils().same_path(left, right)
+
+    def config_bool(self, value: Any, default: bool = False) -> bool:
+        return self._arg_utils().config_bool(value, default=default)
+
+    def float_config_value(self, value: Any, default: float) -> float:
+        return self._arg_utils().float_config_value(value, default)
+
+    def normalize_ladder_args(self, value: Any) -> list[str]:
+        return self._arg_utils().normalize_ladder_args(value)
+
+    def has_arg(self, args: list[str], name: str) -> bool:
+        return self._arg_utils().has_arg(args, name)
+
+    def ladder_arg_value(self, args: list[str], name: str, fallback: str = "") -> str:
+        return self._arg_utils().ladder_arg_value(args, name, fallback=fallback)
+
+    def normalize_sc2_race(self, value: Any, fallback: str = "Random") -> str:
+        return self._arg_utils().normalize_sc2_race(value, fallback=fallback)
+
+    def strip_local_match_args(self, args: list[str]) -> list[str]:
+        return self._arg_utils().strip_local_match_args(args)
+
+    def strip_ladder_args(self, args: list[str], names: set[str]) -> list[str]:
+        return self._arg_utils().strip_ladder_args(args, names)
+
+    def _arg_utils(self):
+        arg_utils = getattr(self.match_config_service, "arg_utils", None)
+        if arg_utils is None:
+            raise RuntimeError("starcraft2_arg_utils_missing")
+        return arg_utils
 
     def _local_match_missing_status(self) -> LocalMatchRuntimeStatusDTO:
         result = StartResultDTO(

@@ -348,6 +348,7 @@ class StarCraft2:
 #         #20260712_kpopmodder: LAN Lobby discovery source is archived.
 #         return self._lan_lobby_archived_result("configure_lan_discovery")
 
+    #20260715_kpopmodder: Legacy UI helper names delegate through Facade.
     def _ladder_proxy_config(
         self,
         executable_path=None,
@@ -356,7 +357,7 @@ class StarCraft2:
         proxy_host=None,
         proxy_ports=None,
     ):
-        return self._match_config_service.ladder_proxy_config(
+        return self._facade_service.ladder_proxy_config(
             executable_path=executable_path,
             working_directory=working_directory,
             args=args,
@@ -372,7 +373,7 @@ class StarCraft2:
         proxy_ports=None,
         keep_local_match_identity_args: bool = False,
     ) -> Dict[str, Any]:
-        return self._match_config_service.local_match_config(
+        return self._facade_service.local_match_config(
             executable_path=executable_path,
             working_directory=working_directory,
             args=args,
@@ -381,13 +382,13 @@ class StarCraft2:
         )
 
     def _ensure_local_match_runtime(self, config: Dict[str, Any]) -> Dict[str, Any]:
-        return self._match_config_service.ensure_local_match_runtime(config)
+        return self._facade_service.ensure_local_match_runtime(config)
 
     def _same_path(self, left: str, right: str) -> bool:
-        return self._arg_utils.same_path(left, right)
+        return self._facade_service.same_path(left, right)
 
     def _config_bool(self, value: Any, default: bool = False) -> bool:
-        return self._arg_utils.config_bool(value, default=default)
+        return self._facade_service.config_bool(value, default=default)
 
 #     def _lan_room_info(
 #         self,
@@ -452,19 +453,19 @@ class StarCraft2:
 #         return 0
 
     def _float_config_value(self, value: Any, default: float) -> float:
-        return self._arg_utils.float_config_value(value, default)
+        return self._facade_service.float_config_value(value, default)
 
     def _normalize_ladder_args(self, value: Any) -> list[str]:
-        return self._arg_utils.normalize_ladder_args(value)
+        return self._facade_service.normalize_ladder_args(value)
 
     def _has_arg(self, args: list[str], name: str) -> bool:
-        return self._arg_utils.has_arg(args, name)
+        return self._facade_service.has_arg(args, name)
 
     def _ladder_arg_value(self, args: list[str], name: str, fallback: str = "") -> str:
-        return self._arg_utils.ladder_arg_value(args, name, fallback=fallback)
+        return self._facade_service.ladder_arg_value(args, name, fallback=fallback)
 
     def _normalize_sc2_race(self, value: Any, fallback: str = "Random") -> str:
-        return self._arg_utils.normalize_sc2_race(value, fallback=fallback)
+        return self._facade_service.normalize_sc2_race(value, fallback=fallback)
 
     def _local_match_race_from_args(
         self,
@@ -505,10 +506,10 @@ class StarCraft2:
 #         )
 
     def _strip_local_match_args(self, args: list[str]) -> list[str]:
-        return self._arg_utils.strip_local_match_args(args)
+        return self._facade_service.strip_local_match_args(args)
 
     def _strip_ladder_args(self, args: list[str], names: set[str]) -> list[str]:
-        return self._arg_utils.strip_ladder_args(args, names)
+        return self._facade_service.strip_ladder_args(args, names)
 
 #     def _lan_rooms_json(self):
 #         return json.dumps(

@@ -618,6 +618,7 @@ classDiagram
     class StarCraft2EventBus {
         <<typed observer channel>>
         +subscribe(legacy_dict_callback)
+        +subscribe_typed(callback)
         +set_common_event_bus(bus)
         +subscribe_common_events(callback)
         +emit(event: StarCraft2Event): bool
@@ -665,16 +666,16 @@ classDiagram
         <<typed_DTO_engine>>
     }
     class AresSC2BotEngine {
-        <<legacy_adapter_backed>>
+        <<typed_external_process_engine>>
     }
     class MicroMachineBotEngine {
-        <<legacy_adapter_backed>>
+        <<typed_external_process_engine>>
     }
     class ExternalExeBotEngine {
-        <<legacy_adapter_backed>>
+        <<typed_external_process_engine>>
     }
     class ExternalJarBotEngine {
-        <<legacy_adapter_backed>>
+        <<typed_external_process_engine>>
     }
     class HumanVsBotLauncher {
         <<typed_placeholder>>
@@ -689,7 +690,14 @@ classDiagram
         <<runtime state>>
         +snapshot()
     }
-    class SC2ObservationTracker
+    class StarCraft2RuntimeState {
+        <<typed state sink>>
+        +update_event(event: StarCraft2Event)
+    }
+    class SC2ObservationTracker {
+        <<typed telemetry tracker>>
+        +update(snapshot): StarCraft2Event[]
+    }
 
     class StarCraft2Extension {
         <<passive log observer>>
@@ -760,6 +768,7 @@ classDiagram
     StarCraft2LocalMatchService --> GameStatusDTO : common local status
     StarCraft2LadderProxyEventService --> SC2ObservationTracker : telemetry deltas
     StarCraft2LadderProxyEventService --> StarCraft2EventBus : stdout/game events
+    StarCraft2EngineEventService --> StarCraft2RuntimeState : typed state update
     StarCraft2EngineEventService --> StarCraft2EventBus : engine events
     StarCraft2EventBus --> StarCraft2Contracts : StarCraft2Event
     StarCraft2EventBus *-- StarCraft2GameEventBridge
@@ -791,12 +800,12 @@ TTS/memory handling remain in domain services.
 `StarCraft2LadderProxyEventService` are the public service names in code.
 The underscore-prefixed names remain as compatibility aliases only.
 
-`InternalLAVBotEngine` is the first live game engine to consume
-`EngineStartCommandDTO` and return `EngineResultDTO` and `EngineStatusDTO`
-directly. Ares, MicroMachine, and the external EXE/JAR engines retain their
-existing dict behavior behind `LegacyStarCraft2EngineAdapter`.
-`HumanVsBotLauncher` is a non-running placeholder that already uses the typed
-contract.
+`InternalLAVBotEngine`, Ares, MicroMachine, external EXE, external JAR, and
+`HumanVsBotLauncher` now expose the `EngineStartCommandDTO`,
+`EngineResultDTO`, and `EngineStatusDTO` contract directly. The external
+engines keep their existing subprocess launch/preflight behavior; only the
+public engine boundary is typed. `LegacyStarCraft2EngineAdapter` remains for
+future or temporarily unmigrated engines.
 
 `SC2LadderProxyLauncher` is a typed process boundary that consumes
 `LocalMatchLaunchConfigDTO` and returns `LadderProxyResultDTO`,
@@ -823,12 +832,12 @@ reuses the shared StarCraft2 status callback instead of controlling the main
 game facade. LAN Lobby remote-human code is archived/commented out in the
 current source and is not part of the live diagram.
 
-`StarCraft2LadderProxyEventService.parse_line()` converts stdout and
-`LAV_OBSERVATION` JSON into lists of `StarCraft2Event` values.
-`StarCraft2EngineEventService` only coordinates typed state updates and EventBus
-delivery; it does not interpret text. `StarCraft2EventBus` uses the typed
-contract internally and for the shared GameEventBus mirror, converting to dict
-only at the final boundary for existing Reaction TTS, memory, and UI subscribers.
+`StarCraft2LadderProxyEventService.parse_line()` and `SC2ObservationTracker`
+return `StarCraft2Event` lists. `StarCraft2EngineEventService` sends the typed
+event to `StarCraft2RuntimeState.update_event()` and then to `StarCraft2EventBus`;
+it does not interpret text. `StarCraft2EventBus.subscribe_typed()` keeps Facade
+and other internal subscribers on DTOs, while `subscribe()` remains the legacy
+dict callback edge for Reaction TTS, memory, UI, and existing extension code.
 
 `StarCraft2FacadeService` is the sole writer of `SC2RuntimeContext`.
 `SC2LadderProxyLauncher` only reports process status, while
@@ -840,6 +849,7 @@ through the `proxy_stopped` event on `StarCraft2EventBus`.
 <!-- #20260715_kpopmodder: Document common DTO result wrappers and the SC2-to-GameEventBus bridge. -->
 <!-- #20260715_kpopmodder: Document common GameEventBus runtime monitoring. -->
 <!-- #20260715_kpopmodder: Document the typed stdout-event and EventBus boundary. -->
+<!-- #20260715_kpopmodder: Document typed external engines, RuntimeState updates, and typed EventBus subscribers. -->
 The reaction core also uses `StarCraft2Event` end to end.
 `StarCraft2ReactionRuntime.handle_status_event()` remains only as the dict
 adapter for existing EventBus subscribers, while `handle_event()` owns typed

@@ -8,6 +8,7 @@ from .starcraft2_contracts import (
     EngineResultDTO,
     EngineStartCommandDTO,
     EngineStatusDTO,
+    StarCraft2Event,
 )
 
 
@@ -20,7 +21,7 @@ class StarCraft2EngineInterface(ABC):
     def start(
         self,
         command: EngineStartCommandDTO,
-        event_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+        event_callback: Optional[Callable[[StarCraft2Event], None]] = None,
     ) -> EngineResultDTO:
         raise NotImplementedError
 
@@ -83,7 +84,7 @@ class LegacyStarCraft2EngineAdapter(StarCraft2EngineInterface):
     def start(
         self,
         command: EngineStartCommandDTO,
-        event_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+        event_callback: Optional[Callable[[StarCraft2Event], None]] = None,
     ) -> EngineResultDTO:
         normalized = EngineStartCommandDTO.from_mapping(command)
         result = self._engine.start(normalized.to_dict(), event_callback=event_callback)
@@ -116,7 +117,7 @@ def adapt_starcraft2_engine(engine: Any) -> StarCraft2EngineInterface:
 
 class InvalidStarCraft2Engine(StarCraft2EngineInterface):
     #20260715_kpopmodder: Preserve direct registry callers until invalid-engine APIs migrate.
-    uses_engine_dto_contract = False
+    uses_engine_dto_contract = True
     #20260707_kpopmodder: Return safe errors for bad engine names without crashing UI startup.
     def __init__(self, requested_name: str, valid_names):
         self.engine_name = str(requested_name or "unknown")

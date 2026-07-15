@@ -88,7 +88,7 @@ class StarCraft2RuntimeFactory:
             ladder_proxy,
             line_callback=ladder_proxy_event_service.on_ladder_proxy_line,
             event_bus=event_bus,
-            runtime_context=runtime_context,
+            runtime_snapshot_provider=runtime_context.snapshot,
         )
         facade_service = StarCraft2FacadeService(
             config_manager,

@@ -25,7 +25,8 @@ class StarCraft2EngineEventService:
 
     def update_state(self, event: StarCraft2Event) -> None:
         normalized = StarCraft2Event.from_mapping(event)
-        self.state.update_event(normalized.to_dict())
+        #20260715_kpopmodder: RuntimeState now receives the DTO directly.
+        self.state.update_event(normalized)
         if self.event_bus is not None:
             self.event_bus.emit(normalized)
 
@@ -73,10 +74,8 @@ class StarCraft2LadderProxyEventService:
                 snapshot = json.loads(text[telemetry_index + len(telemetry_prefix):])
             except (TypeError, ValueError, json.JSONDecodeError):
                 return []
-            return [
-                StarCraft2Event.from_mapping(event)
-                for event in self.observation_tracker.update(snapshot)
-            ]
+            #20260715_kpopmodder: ObservationTracker is the typed telemetry boundary.
+            return list(self.observation_tracker.update(snapshot))
 
         #20260710_kpopmodder: Convert local-match lifecycle lines into
         # the existing LAV reaction/TTS callback path.

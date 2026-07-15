@@ -124,7 +124,7 @@ class StarCraft2GameExtensionTests(unittest.TestCase):
         self.assertEqual([], tracker.update(base))
         changed = dict(base)
         changed.update({"game_loop": 448, "under_construction_units": 1})
-        self.assertEqual("building_started", tracker.update(changed)[0]["event_type"])
+        self.assertEqual("building_started", tracker.update(changed)[0].event_type)
         self.assertEqual([], tracker.update(changed))
 
     def test_observation_tracker_emits_each_type_and_completed_upgrade(self):
@@ -173,9 +173,9 @@ class StarCraft2GameExtensionTests(unittest.TestCase):
             ],
             [
                 (
-                    event["event_type"],
-                    event["details"].get("unit_type_id")
-                    or event["details"].get("upgrade_id"),
+                    event.event_type,
+                    event.details.get("unit_type_id")
+                    or event.details.get("upgrade_id"),
                 )
                 for event in events
             ],
@@ -204,8 +204,8 @@ class StarCraft2GameExtensionTests(unittest.TestCase):
         self.assertEqual([], tracker.update(base))
         events = tracker.update(changed)
 
-        self.assertEqual(["unit_produced"], [event["event_type"] for event in events])
-        self.assertEqual("103", events[0]["details"]["unit_type_id"])
+        self.assertEqual(["unit_produced"], [event.event_type for event in events])
+        self.assertEqual("103", events[0].details["unit_type_id"])
 
     def test_log_only_telemetry_units_do_not_emit_unknown_events(self):
         tracker = SC2ObservationTracker()
@@ -239,7 +239,7 @@ class StarCraft2GameExtensionTests(unittest.TestCase):
 
         self.assertTrue(events)
         self.assertFalse(
-            any(str(event["event_type"]).startswith("unknown_") for event in events)
+            any(str(event.event_type).startswith("unknown_") for event in events)
         )
 
     def test_reaction_text_uses_shared_speech_name_for_extractor(self):

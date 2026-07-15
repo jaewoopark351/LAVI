@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 from typing import Any, Dict, List
 
+from .starcraft2_contracts import EngineResultDTO, EngineStartCommandDTO
 from .external_exe_bot_engine import ExternalProcessBotEngine
 
 
@@ -12,7 +13,14 @@ class MicroMachineBotEngine(ExternalProcessBotEngine):
     engine_name = "micromachine"
     config_section = "micromachine"
 
-    def start(self, config: Dict[str, Any], event_callback=None) -> Dict[str, Any]:
+    #20260715_kpopmodder: Keep MicroMachine preflight while using the DTO engine boundary.
+    def start(
+        self,
+        command: EngineStartCommandDTO,
+        event_callback=None,
+    ) -> EngineResultDTO:
+        command = EngineStartCommandDTO.from_mapping(command)
+        config = command.to_dict()
         section = self._section(config)
         error = self._preflight_error(section)
         if error:
@@ -23,7 +31,7 @@ class MicroMachineBotEngine(ExternalProcessBotEngine):
                 status=self.get_status(),
                 error=error,
             )
-        return super().start(config, event_callback=event_callback)
+        return super().start(command, event_callback=event_callback)
 
     def _section(self, config: Dict[str, Any]) -> Dict[str, Any]:
         section = super()._section(config)

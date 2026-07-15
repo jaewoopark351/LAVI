@@ -51,6 +51,7 @@ class StarCraft2LocalMatchService:
         ladder_proxy,
         line_callback: LineCallback = None,
         event_bus: Optional[StarCraft2EventBus] = None,
+        runtime_snapshot_provider: Optional[Callable[[], Dict[str, Any]]] = None,
         runtime_context: Optional[SC2RuntimeContext] = None,
     ):
         self.arg_utils = arg_utils
@@ -59,7 +60,15 @@ class StarCraft2LocalMatchService:
         self.ladder_proxy = ladder_proxy
         self.line_callback = line_callback
         self.event_bus = event_bus
-        self.runtime_context = runtime_context
+        #20260715_kpopmodder: Read Facade-owned runtime state without owning it.
+        if callable(runtime_snapshot_provider):
+            self._runtime_snapshot_provider = runtime_snapshot_provider
+        elif runtime_context is not None and callable(
+            getattr(runtime_context, "snapshot", None)
+        ):
+            self._runtime_snapshot_provider = runtime_context.snapshot
+        else:
+            self._runtime_snapshot_provider = None
         self._last_game_result_dto: Optional[GameResultDTO] = None
         self._last_game_stop_result_dto: Optional[GameStopResultDTO] = None
         self._last_game_status_dto: Optional[GameStatusDTO] = None
@@ -281,7 +290,12 @@ class StarCraft2LocalMatchService:
             )
             return result
 
-        start_result = self._launch_local_match_process(config, command.capture_output)
+        #20260715_kpopmodder: Pass the normalized DTO to the launcher boundary.
+        start_result = self._launch_local_match_process(
+            LocalMatchLaunchConfigDTO.from_mapping(
+                {**dict(config or {}), "capture_output": bool(command.capture_output)}
+            )
+        )
         return start_result
 
     def on_local_match_stop_click(self):
@@ -378,15 +392,11 @@ class StarCraft2LocalMatchService:
 
     def _launch_local_match_process(
         self,
-        config: Dict[str, Any],
-        capture_output: bool,
+        command: LocalMatchLaunchConfigDTO,
     ) -> StarCraft2CommandResult:
-        proxy_command = LocalMatchLaunchConfigDTO.from_mapping(
-            {**dict(config or {}), "capture_output": bool(capture_output)}
-        )
         proxy_result = LadderProxyResultDTO.from_mapping(
             self.ladder_proxy.start(
-                proxy_command,
+                LocalMatchLaunchConfigDTO.from_mapping(command),
                 line_callback=self.line_callback,
                 exit_callback=self._on_ladder_proxy_exit,
             )
@@ -420,12 +430,7 @@ class StarCraft2LocalMatchService:
             "name": "starcraft2",
             "initialized": True,
             "started": bool(ladder_proxy_status.get("running")),
-            "runtime": (
-                self.runtime_context.snapshot()
-                if self.runtime_context is not None
-                and callable(getattr(self.runtime_context, "snapshot", None))
-                else {}
-            ),
+            "runtime": self._runtime_snapshot(),
             "details": {
                 "mode": "local_human_vs_changeling",
                 "result": result.to_dict(),
@@ -450,5 +455,17 @@ class StarCraft2LocalMatchService:
         )
         if self.event_bus is not None:
             self.event_bus.emit(event)
+
+    #20260715_kpopmodder: Snapshot read only; Facade remains the context writer.
+    def _runtime_snapshot(self) -> Dict[str, Any]:
+        provider = self._runtime_snapshot_provider
+        if not callable(provider):
+            return {}
+        try:
+            snapshot = provider()
+        except Exception as e:
+            log_print(f"[StarCraft2LocalMatchService] runtime snapshot failed: {e}")
+            return {}
+        return dict(snapshot) if isinstance(snapshot, dict) else {}
 
 _StarCraft2LocalMatchService = StarCraft2LocalMatchService

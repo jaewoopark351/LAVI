@@ -248,7 +248,6 @@ class StarCraft2FacadeServiceTests(unittest.TestCase):
     def test_local_match_service_emits_exit_without_writing_runtime_context(self):
         context = SC2RuntimeContext(status={"owner": "facade"}, process_pid=99)
         service = self._build_local_match_service()
-        service.runtime_context = context
 
         service._on_ladder_proxy_exit(
             LadderProxyExitEventDTO(pid=99, returncode=4)
@@ -257,8 +256,40 @@ class StarCraft2FacadeServiceTests(unittest.TestCase):
         snapshot = context.snapshot()
         self.assertEqual({"owner": "facade"}, snapshot["status"])
         self.assertEqual(99, snapshot["process_pid"])
+        self.assertNotIn("runtime_context", service.__dict__)
 
-    def _build_facade(self):
+    #20260715_kpopmodder: LocalMatch may read runtime snapshots but must not own context.
+    def test_local_match_service_reads_runtime_snapshot_without_owning_context(self):
+        context = SC2RuntimeContext(status={"owner": "facade"}, process_pid=77)
+        service = self._build_local_match_service(
+            runtime_snapshot_provider=context.snapshot
+        )
+
+        status = service.get_local_match_status()
+
+        payload = status.to_dict()
+        self.assertEqual(77, payload["game_status"]["runtime"]["process_pid"])
+        self.assertNotIn("runtime_context", service.__dict__)
+
+    #20260715_kpopmodder: Facade applies proxy_stopped through the typed EventBus path.
+    def test_facade_handles_proxy_stopped_as_typed_runtime_event(self):
+        event_bus = StarCraft2EventBus()
+        context = SC2RuntimeContext()
+        facade = self._build_facade(event_bus=event_bus, runtime_context=context)
+        facade.ladder_proxy.get_status.return_value = LadderProxyStatusDTO(
+            running=False,
+            returncode=0,
+        )
+
+        delivered = event_bus.emit(
+            StarCraft2Event("proxy_stopped", {"returncode": 0})
+        )
+
+        self.assertTrue(delivered)
+        self.assertIsNone(context.runtime_error)
+        self.assertIsNotNone(context.stopped_at)
+
+    def _build_facade(self, event_bus=None, runtime_context=None):
         config_manager = mock.Mock()
         config_manager.build_runtime_config.return_value = {
             "enabled": True,
@@ -282,9 +313,11 @@ class StarCraft2FacadeServiceTests(unittest.TestCase):
             ladder_proxy=ladder_proxy,
             match_config_service=match_config_service,
             engine_event_service=None,
+            event_bus=event_bus,
+            runtime_context=runtime_context,
         )
 
-    def _build_local_match_service(self):
+    def _build_local_match_service(self, runtime_snapshot_provider=None):
         arg_utils = mock.Mock()
         config_service = mock.Mock()
         config_service.local_match_config.return_value = {}
@@ -309,6 +342,7 @@ class StarCraft2FacadeServiceTests(unittest.TestCase):
             config_service,
             command_template,
             ladder_proxy,
+            runtime_snapshot_provider=runtime_snapshot_provider,
         )
 
 

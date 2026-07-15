@@ -9,26 +9,34 @@ from core.logger import log_print
 
 
 EventCallback = Callable[[Dict[str, Any]], None]
+TypedEventCallback = Callable[[StarCraft2Event], None]
 
 
 class StarCraft2EventBusSubscription:
     #20260713_kpopmodder: Keep subscription lifecycle explicit and safely reversible.
-    def __init__(self, bus: "StarCraft2EventBus", callback: EventCallback):
+    def __init__(
+        self,
+        bus: "StarCraft2EventBus",
+        callback: EventCallback | TypedEventCallback,
+        typed: bool = False,
+    ):
         self._bus = bus
         self._callback = callback
+        self._typed = bool(typed)
         self._unsubscribed = False
 
     def unsubscribe(self) -> None:
         if self._unsubscribed:
             return
         self._unsubscribed = True
-        self._bus._unsubscribe(self._callback)
+        self._bus._unsubscribe(self._callback, typed=self._typed)
 
 
 class StarCraft2EventBus:
     #20260713_kpopmodder: Public event fan-out boundary for SC2 stdout/game/TTS/memory flow.
     def __init__(self, common_event_bus: Any = None):
         self._subscribers: List[EventCallback] = []
+        self._typed_subscribers: List[TypedEventCallback] = []
         self._status_event_callback_subscription = None
         self._common_event_bridge = StarCraft2GameEventBridge(common_event_bus)
 
@@ -47,6 +55,21 @@ class StarCraft2EventBus:
             return StarCraft2EventBusSubscription(self, lambda event: None)
         self._subscribers.append(callback)
         return StarCraft2EventBusSubscription(self, callback)
+
+    def subscribe_typed(
+        self,
+        callback: Optional[TypedEventCallback],
+    ) -> StarCraft2EventBusSubscription:
+        #20260715_kpopmodder: Typed subscribers stay inside the SC2 boundary;
+        # legacy dict conversion happens only through subscribe().
+        if not callable(callback):
+            return StarCraft2EventBusSubscription(
+                self,
+                lambda event: None,
+                typed=True,
+            )
+        self._typed_subscribers.append(callback)
+        return StarCraft2EventBusSubscription(self, callback, typed=True)
 
     def set_status_event_callback(self, callback: Optional[EventCallback]) -> Optional[StarCraft2EventBusSubscription]:
         # 20260713_kpopmodder: keep compatibility for legacy setter calls
@@ -71,12 +94,23 @@ class StarCraft2EventBus:
         if not normalized.event_type:
             return False
         self._emit_common_event(normalized)
-        payload = normalized.to_dict()
         delivered = False
+        for subscriber in list(self._typed_subscribers):
+            if not callable(subscriber):
+                continue
+            try:
+                subscriber(normalized)
+                delivered = True
+            except Exception as e:
+                log_print(f"[StarCraft2EventBus] typed event subscriber failed: {e}")
+
+        payload = None
         for subscriber in list(self._subscribers):
             if not callable(subscriber):
                 continue
             try:
+                if payload is None:
+                    payload = normalized.to_dict()
                 subscriber(payload)
                 delivered = True
             except Exception as e:
@@ -88,7 +122,16 @@ class StarCraft2EventBus:
         # Backward-compatible alias for existing call sites.
         return self.emit(StarCraft2Event.from_mapping(event))
 
-    def _unsubscribe(self, callback: EventCallback) -> None:
+    def _unsubscribe(
+        self,
+        callback: EventCallback | TypedEventCallback,
+        typed: bool = False,
+    ) -> None:
+        if typed:
+            self._typed_subscribers = [
+                item for item in self._typed_subscribers if item is not callback
+            ]
+            return
         self._subscribers = [item for item in self._subscribers if item is not callback]
 
     def _emit_common_event(self, event: StarCraft2Event) -> None:

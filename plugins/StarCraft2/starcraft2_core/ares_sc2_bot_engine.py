@@ -5,6 +5,7 @@ import os
 import shutil
 from typing import Any, Dict, List
 
+from .starcraft2_contracts import EngineResultDTO, EngineStartCommandDTO
 from .external_exe_bot_engine import ExternalProcessBotEngine
 
 
@@ -87,7 +88,14 @@ class AresSC2BotEngine(ExternalProcessBotEngine):
 
         return ""
 
-    def start(self, config: Dict[str, Any], event_callback=None) -> Dict[str, Any]:
+    #20260715_kpopmodder: Accept typed commands without changing Ares launch behavior.
+    def start(
+        self,
+        command: EngineStartCommandDTO,
+        event_callback=None,
+    ) -> EngineResultDTO:
+        command = EngineStartCommandDTO.from_mapping(command)
+        config = command.to_dict()
         section = self._section(config)
         preflight_error = self._preflight_error(section)
         if preflight_error:
@@ -97,7 +105,7 @@ class AresSC2BotEngine(ExternalProcessBotEngine):
                 status=self.get_status(),
                 error=preflight_error,
             )
-        return super().start(config, event_callback=event_callback)
+        return super().start(command, event_callback=event_callback)
 
     def _working_directory(self, section: Dict[str, Any]) -> str:
         working_directory = str(section.get("working_directory") or "").strip().strip("\"'")

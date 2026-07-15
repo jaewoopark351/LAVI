@@ -11,6 +11,7 @@ from .sc2_telemetry_registry import (
     canonical_upgrade_token,
     unit_category,
 )
+from .starcraft2_contracts import StarCraft2Event
 
 
 class SC2ObservationTracker:
@@ -21,7 +22,8 @@ class SC2ObservationTracker:
         self._last: Optional[Dict[str, int]] = None
         self._last_frame = -1
 
-    def update(self, snapshot: Dict[str, Any]):
+    #20260715_kpopmodder: Return typed telemetry events instead of dict payloads.
+    def update(self, snapshot: Dict[str, Any]) -> list[StarCraft2Event]:
         if not isinstance(snapshot, dict):
             return []
         if int(snapshot.get("schema") or 0) != 1:
@@ -96,8 +98,8 @@ class SC2ObservationTracker:
             }
             events = [
                 event for event in events
-                if event.get("event_type") != "building_started"
-                or str(event.get("details", {}).get("unit_type_id", "")) in typed_building_ids
+                if event.event_type != "building_started"
+                or str(event.details.get("unit_type_id", "")) in typed_building_ids
             ]
 
         if (
@@ -183,17 +185,18 @@ class SC2ObservationTracker:
             events.append(self._event("situation_update", snapshot, values))
         return events
 
+    #20260715_kpopmodder: Keep dict conversion outside the observation tracker.
     def _event(self, event_type, snapshot, values, message="", **details):
-        return {
-            "event_type": event_type,
-            "details": {
+        return StarCraft2Event(
+            event_type=str(event_type or ""),
+            details={
                 "message": message,
                 "bot": snapshot.get("bot", ""),
                 "game_loop": int(snapshot.get("game_loop") or 0),
                 "snapshot": values,
                 **details,
             },
-        }
+        )
 
     def _type_event(self, event_type, snapshot, values, unit_type_id, count, message):
         token = canonical_unit_token(unit_type_id)

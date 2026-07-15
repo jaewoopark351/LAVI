@@ -10,13 +10,21 @@ from typing import Any, Dict, Iterable, List, Optional
 
 from core.logger import log_print
 
+from .starcraft2_contracts import (
+    EngineResultDTO,
+    EngineStartCommandDTO,
+    EngineStatusDTO,
+    StarCraft2Event,
+)
 from .starcraft2_engine_interface import StarCraft2EngineInterface
 from .starcraft2_state import StarCraft2RuntimeState
 
 
 class ExternalProcessBotEngine(StarCraft2EngineInterface):
+    #20260715_kpopmodder: External engines now expose the typed engine contract while preserving process launch behavior.
     engine_name = "external_process"
     config_section = ""
+    uses_engine_dto_contract = True
 
     def __init__(self, tail_size: int = 20, stop_timeout_sec: float = 5.0):
         self.state = StarCraft2RuntimeState(engine=self.engine_name)
@@ -28,10 +36,17 @@ class ExternalProcessBotEngine(StarCraft2EngineInterface):
         self._stop_timeout_sec = max(float(stop_timeout_sec), 0.1)
         self._started_at = 0.0
 
-    def start(self, config: Dict[str, Any], event_callback=None) -> Dict[str, Any]:
+    #20260715_kpopmodder: Normalize legacy dict input at the external engine edge.
+    def start(
+        self,
+        command: EngineStartCommandDTO,
+        event_callback=None,
+    ) -> EngineResultDTO:
         if self.is_running():
             return self._result(True, status=self.get_status())
 
+        command = EngineStartCommandDTO.from_mapping(command)
+        config = command.to_dict()
         section = self._section(config)
         command = self._build_command(section)
         if not command:
@@ -71,7 +86,7 @@ class ExternalProcessBotEngine(StarCraft2EngineInterface):
         self._emit(event_callback, "process_started", {"pid": self.state.process_pid})
         return self._result(True, status=self.get_status())
 
-    def stop(self) -> Dict[str, Any]:
+    def stop(self) -> EngineResultDTO:
         process = self.process
         if process is None:
             self.state.mark_stopped()
@@ -96,10 +111,10 @@ class ExternalProcessBotEngine(StarCraft2EngineInterface):
         self.process = None
         return self._result(True, running=False, status=self.get_status())
 
-    def shutdown(self) -> Dict[str, Any]:
+    def shutdown(self) -> EngineResultDTO:
         return self.stop()
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> EngineStatusDTO:
         process = self.process
         running = self._process_running(process) if process is not None else False
         self.state.running = running
@@ -119,7 +134,7 @@ class ExternalProcessBotEngine(StarCraft2EngineInterface):
             if self._started_at and running
             else 0.0
         )
-        return status
+        return EngineStatusDTO.from_mapping(status, engine=self.engine_name)
 
     def is_running(self) -> bool:
         return self._process_running(self.process)
@@ -193,16 +208,17 @@ class ExternalProcessBotEngine(StarCraft2EngineInterface):
             return False
         return poll() is None
 
+    #20260715_kpopmodder: External engine callbacks now emit typed SC2 events.
     def _emit(self, callback, event_type: str, details: Dict[str, Any] | None = None):
         if not callable(callback):
             return
-        event = {
-            "source": "starcraft2",
-            "engine": self.engine_name,
-            "event_type": event_type,
-            "details": details or {},
-            "time": time.time(),
-        }
+        event = StarCraft2Event(
+            event_type=str(event_type or ""),
+            details=dict(details or {}),
+            source="starcraft2",
+            engine=self.engine_name,
+            time=time.time(),
+        )
         try:
             callback(event)
         except Exception as e:
@@ -212,4 +228,3 @@ class ExternalProcessBotEngine(StarCraft2EngineInterface):
 class ExternalExeBotEngine(ExternalProcessBotEngine):
     engine_name = "external_exe"
     config_section = "external_exe"
-
