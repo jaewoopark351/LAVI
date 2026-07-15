@@ -23,12 +23,11 @@ class StarCraft2EngineEventService:
         if self.event_bus is not None and callback is not None:
             self.event_bus.set_status_event_callback(callback)
 
-    def update_state(self, event):
-        normalized = StarCraft2Event.from_mapping(event).to_dict()
-        self.state.update_event(normalized)
+    def update_state(self, event: StarCraft2Event) -> None:
+        normalized = StarCraft2Event.from_mapping(event)
+        self.state.update_event(normalized.to_dict())
         if self.event_bus is not None:
             self.event_bus.emit(normalized)
-            return
 
 
 class StarCraft2LadderProxyEventService:
@@ -53,64 +52,72 @@ class StarCraft2LadderProxyEventService:
         line: str,
     ) -> None:
         text = str(line or "").strip()
-        if text:
-            log_print(f"[StarCraft2] ladder_proxy {stream_name}: {text[:1000]}")
-            telemetry_prefix = "LAV_OBSERVATION "
-            #20260710_kpopmodder: Ladder Proxy prepends its own timestamp
-            # to stdout lines, so telemetry may not begin at position zero.
-            telemetry_index = text.find(telemetry_prefix)
-            if telemetry_index >= 0:
-                try:
-                    snapshot = json.loads(text[telemetry_index + len(telemetry_prefix):])
-                except (TypeError, ValueError, json.JSONDecodeError):
-                    snapshot = None
-                for event in self.observation_tracker.update(snapshot):
-                    self.engine_event_service.update_state(event)
-                return
-            #20260710_kpopmodder: Convert local-match lifecycle lines into
-            # the existing LAV reaction/TTS callback path.
-            lower = text.lower()
-            event_type = ""
-            if "starting the match" in lower:
-                event_type = "game_started"
-                self._response_not_set_ignore_until = 0.0
-                self._game_ended_emitted = False
-            elif "client changed status from in_game to ended" in lower:
-                self._response_not_set_ignore_until = time.time() + 5.0
-                if not self._game_ended_emitted:
-                    event_type = "game_ended"
-                    self._game_ended_emitted = True
-            elif "finished with result:" in lower:
-                # LavHumanVsBot assigns Player1 to LAVHuman and Player2 to
-                # the AI. Report the result from the AI/TTS perspective;
-                # checking only for the word "win" reverses Player1Win.
-                if "initializationerror" in lower or "initialization error" in lower:
-                    #20260711_kpopmodder: Startup failures are diagnostics, not
-                    # match losses; engine_error stays log-only in the SC2 TTS policy.
-                    event_type = "engine_error"
-                elif "player2win" in lower or "player2 win" in lower:
-                    event_type = "game_won"
-                elif "player1win" in lower or "player1 win" in lower:
-                    event_type = "game_lost"
-                elif "player2loss" in lower or "player2 loss" in lower:
-                    event_type = "game_lost"
-                elif "player1loss" in lower or "player1 loss" in lower:
-                    event_type = "game_won"
-                else:
-                    event_type = "game_won" if "win" in lower else "game_lost"
-            elif self.is_ladder_proxy_error_line(lower):
+        if not text:
+            return
+        log_print(f"[StarCraft2] ladder_proxy {stream_name}: {text[:1000]}")
+        for event in self.parse_line(stream_name, text):
+            self.engine_event_service.update_state(event)
+
+    def parse_line(self, stream_name: str, line: str) -> list[StarCraft2Event]:
+        """Convert one ladder-proxy output line into typed SC2 events."""
+        text = str(line or "").strip()
+        if not text:
+            return []
+
+        telemetry_prefix = "LAV_OBSERVATION "
+        #20260710_kpopmodder: Ladder Proxy prepends its own timestamp
+        # to stdout lines, so telemetry may not begin at position zero.
+        telemetry_index = text.find(telemetry_prefix)
+        if telemetry_index >= 0:
+            try:
+                snapshot = json.loads(text[telemetry_index + len(telemetry_prefix):])
+            except (TypeError, ValueError, json.JSONDecodeError):
+                return []
+            return [
+                StarCraft2Event.from_mapping(event)
+                for event in self.observation_tracker.update(snapshot)
+            ]
+
+        #20260710_kpopmodder: Convert local-match lifecycle lines into
+        # the existing LAV reaction/TTS callback path.
+        lower = text.lower()
+        event_type = ""
+        if "starting the match" in lower:
+            event_type = "game_started"
+            self._response_not_set_ignore_until = 0.0
+            self._game_ended_emitted = False
+            self.observation_tracker.reset()
+        elif "client changed status from in_game to ended" in lower:
+            self._response_not_set_ignore_until = time.time() + 5.0
+            if not self._game_ended_emitted:
+                event_type = "game_ended"
+                self._game_ended_emitted = True
+        elif "finished with result:" in lower:
+            # LavHumanVsBot assigns Player1 to LAVHuman and Player2 to
+            # the AI. Report the result from the AI/TTS perspective.
+            if "initializationerror" in lower or "initialization error" in lower:
                 event_type = "engine_error"
-            if event_type:
-                event = {
-                    "event_type": event_type,
-                    "details": {"result": text, "source": stream_name},
-                }
-                if event_type == "game_started":
-                    self.observation_tracker.reset()
-                if self.event_bus is not None:
-                    consumed = self.event_bus.emit(event)
-                    if consumed:
-                        return
+            elif "player2win" in lower or "player2 win" in lower:
+                event_type = "game_won"
+            elif "player1win" in lower or "player1 win" in lower:
+                event_type = "game_lost"
+            elif "player2loss" in lower or "player2 loss" in lower:
+                event_type = "game_lost"
+            elif "player1loss" in lower or "player1 loss" in lower:
+                event_type = "game_won"
+            else:
+                event_type = "game_won" if "win" in lower else "game_lost"
+        elif self.is_ladder_proxy_error_line(lower):
+            event_type = "engine_error"
+
+        if not event_type:
+            return []
+        return [
+            StarCraft2Event(
+                event_type=event_type,
+                details={"result": text, "source": str(stream_name or "stdout")},
+            )
+        ]
 
     def _is_response_not_set_end_tail(self, lower: str, now: float) -> bool:
         if "response_not_set" not in lower:

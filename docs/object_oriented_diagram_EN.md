@@ -616,11 +616,11 @@ classDiagram
         +get_local_match_status()
     }
     class StarCraft2EventBus {
-        <<observer channel>>
-        +subscribe(callback)
+        <<typed observer channel>>
+        +subscribe(legacy_dict_callback)
         +set_common_event_bus(bus)
         +subscribe_common_events(callback)
-        +emit(event)
+        +emit(event: StarCraft2Event): bool
     }
     class StarCraft2GameEventBridge {
         <<adapter>>
@@ -645,8 +645,14 @@ classDiagram
     class GameStopResultDTO
     class GameStatusDTO
     class GameEventBus
-    class StarCraft2EngineEventService
-    class StarCraft2LadderProxyEventService
+    class StarCraft2EngineEventService {
+        +update_state(event: StarCraft2Event)
+    }
+    class StarCraft2LadderProxyEventService {
+        <<typed stdout parser>>
+        +parse_line(stream, line): StarCraft2Event[]
+        +on_ladder_proxy_line(stream, line)
+    }
     class StarCraft2EngineRegistry
     class StarCraft2EngineInterface {
         <<interface>>
@@ -807,6 +813,13 @@ reuses the shared StarCraft2 status callback instead of controlling the main
 game facade. LAN Lobby remote-human code is archived/commented out in the
 current source and is not part of the live diagram.
 
+`StarCraft2LadderProxyEventService.parse_line()` converts stdout and
+`LAV_OBSERVATION` JSON into lists of `StarCraft2Event` values.
+`StarCraft2EngineEventService` only coordinates typed state updates and EventBus
+delivery; it does not interpret text. `StarCraft2EventBus` uses the typed
+contract internally and for the shared GameEventBus mirror, converting to dict
+only at the final boundary for existing Reaction TTS, memory, and UI subscribers.
+
 `StarCraft2FacadeService` is the sole writer of `SC2RuntimeContext`.
 `SC2LadderProxyLauncher` only reports process status, while
 `StarCraft2LocalMatchService` produces results/events and reads snapshots only
@@ -816,6 +829,7 @@ through the `proxy_stopped` event on `StarCraft2EventBus`.
 <!-- #20260715_kpopmodder: Keep public SC2 service names and legacy aliases documented with source. -->
 <!-- #20260715_kpopmodder: Document common DTO result wrappers and the SC2-to-GameEventBus bridge. -->
 <!-- #20260715_kpopmodder: Document common GameEventBus runtime monitoring. -->
+<!-- #20260715_kpopmodder: Document the typed stdout-event and EventBus boundary. -->
 <!-- #20260715_kpopmodder: Document Facade-only SC2RuntimeContext ownership. -->
 <!-- #20260715_kpopmodder: Document StarCraft2RuntimeFactory composition ownership. -->
 

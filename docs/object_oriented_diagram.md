@@ -594,11 +594,11 @@ classDiagram
         +get_local_match_status()
     }
     class StarCraft2EventBus {
-        <<observer channel>>
-        +subscribe(callback)
+        <<typed observer channel>>
+        +subscribe(legacy_dict_callback)
         +set_common_event_bus(bus)
         +subscribe_common_events(callback)
-        +emit(event)
+        +emit(event: StarCraft2Event): bool
     }
     class StarCraft2GameEventBridge {
         <<adapter>>
@@ -623,8 +623,14 @@ classDiagram
     class GameStopResultDTO
     class GameStatusDTO
     class GameEventBus
-    class StarCraft2EngineEventService
-    class StarCraft2LadderProxyEventService
+    class StarCraft2EngineEventService {
+        +update_state(event: StarCraft2Event)
+    }
+    class StarCraft2LadderProxyEventService {
+        <<typed stdout parser>>
+        +parse_line(stream, line): StarCraft2Event[]
+        +on_ladder_proxy_line(stream, line)
+    }
     class StarCraft2EngineRegistry
     class StarCraft2EngineInterface {
         <<interface>>
@@ -763,6 +769,8 @@ log lines.
 <!-- #20260715_kpopmodder: Document common GameEventBus runtime monitoring. -->
 <!-- #20260715_kpopmodder: Document typed internal engine and adapter-backed migration state. -->
 <!-- #20260715_kpopmodder: Document the typed ladder-proxy process boundary. -->
+`StarCraft2LadderProxyEventService.parse_line()`은 stdout과 `LAV_OBSERVATION` JSON을 `StarCraft2Event` 목록으로 변환합니다. `StarCraft2EngineEventService`는 typed 이벤트의 상태 갱신과 EventBus 전달만 조율하고 문자열을 직접 해석하지 않습니다. `StarCraft2EventBus`는 내부와 공통 GameEventBus mirror에서 typed 계약을 사용하며, 기존 Reaction TTS·memory·UI subscriber를 호출하는 마지막 경계에서만 dict로 변환합니다.
+<!-- #20260715_kpopmodder: Document the typed stdout-event and EventBus boundary. -->
 <!-- #20260715_kpopmodder: Document Facade-only SC2RuntimeContext ownership. -->
 <!-- #20260715_kpopmodder: Document StarCraft2RuntimeFactory composition ownership. -->
 

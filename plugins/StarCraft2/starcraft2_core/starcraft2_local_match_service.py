@@ -18,6 +18,7 @@ from .starcraft2_contracts import (
     LadderProxyStatusDTO,
     LocalMatchLaunchConfigDTO,
     LocalMatchRuntimeStatusDTO,
+    StarCraft2Event,
     StartResultDTO,
 )
 
@@ -438,15 +439,15 @@ class StarCraft2LocalMatchService:
 
     def _on_ladder_proxy_exit(self, result: LadderProxyExitEventDTO) -> None:
         details = LadderProxyExitEventDTO.from_mapping(result)
-        event = {
-            "event_type": "proxy_stopped",
-            "details": {
+        event = StarCraft2Event(
+            event_type="proxy_stopped",
+            details={
                 "source": "ladder_proxy",
                 "pid": details.pid,
                 "returncode": details.returncode,
                 "launch_diagnostics": dict(details.launch_diagnostics),
             },
-        }
+        )
         if self.event_bus is not None:
             self.event_bus.emit(event)
 

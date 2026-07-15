@@ -64,15 +64,14 @@ class StarCraft2EventBus:
     def set_subscribers(self, callbacks: List[EventCallback]) -> None:
         self._subscribers = list(callbacks) if callbacks is not None else []
 
-    def emit(self, event: Dict[str, Any] | StarCraft2Event | None) -> bool:
+    def emit(self, event: StarCraft2Event) -> bool:
+        #20260715_kpopmodder: Internal publishers use the typed event contract;
+        # from_mapping remains as a compatibility guard for legacy callers.
         normalized = StarCraft2Event.from_mapping(event)
         if not normalized.event_type:
             return False
+        self._emit_common_event(normalized)
         payload = normalized.to_dict()
-        event_type = str(payload.get("event_type") or "").strip().lower()
-        if event_type:
-            payload = dict(payload)
-        self._emit_common_event(payload)
         delivered = False
         for subscriber in list(self._subscribers):
             if not callable(subscriber):
@@ -85,19 +84,19 @@ class StarCraft2EventBus:
 
         return delivered
 
-    def publish(self, event: Dict[str, Any] | None) -> bool:
+    def publish(self, event: Dict[str, Any] | StarCraft2Event | None) -> bool:
         # Backward-compatible alias for existing call sites.
-        return self.emit(event)
+        return self.emit(StarCraft2Event.from_mapping(event))
 
     def _unsubscribe(self, callback: EventCallback) -> None:
         self._subscribers = [item for item in self._subscribers if item is not callback]
 
-    def _emit_common_event(self, payload: Dict[str, Any]) -> None:
+    def _emit_common_event(self, event: StarCraft2Event) -> None:
         bridge = getattr(self, "_common_event_bridge", None)
         emit = getattr(bridge, "emit", None)
         if not callable(emit):
             return
-        emit(payload)
+        emit(event)
 
 
 _StarCraft2EventBusSubscription = StarCraft2EventBusSubscription
