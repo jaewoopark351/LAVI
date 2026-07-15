@@ -56,6 +56,29 @@ C:\ProgramData
 
 `C:\Program Files (x86)\StarCraft II` may be inspected for integration or debugging, but must not be modified, cleaned up, moved, renamed, or deleted unless the user explicitly requests a specific file-level change.
 
+### Test isolation directory
+
+The default directory for isolated testing, reproduction scripts, exploratory checks, temporary test fixtures, and test-generated artifacts is:
+
+```bat
+C:\Vtuber_Souorce_Code\LAVI\test\test_Isolation
+```
+
+Repository-relative form:
+
+```text
+test\test_Isolation
+```
+
+When creating a new ad-hoc test or a temporary test-only file, Codex must use this directory unless:
+
+* the repository already has an established test location for that specific component, or
+* the user explicitly provides a different path.
+
+Do not automatically move existing tests into this directory.
+Do not place production runtime code, model files, secrets, or permanent user configuration in this directory.
+Do not treat this directory as an automatic cleanup target. All deletion and cleanup safety rules still apply.
+
 ### Forbidden destructive commands
 
 Never run broad destructive commands.
@@ -956,6 +979,26 @@ Do not remove useful debug logs during active troubleshooting unless the user as
 ## 22. Testing Rules
 
 After code changes, suggest the smallest relevant test first.
+
+For isolated or ad-hoc testing, use the repository-relative directory:
+
+```bat
+test\test_Isolation
+```
+
+Resolve it from the active repository root as:
+
+```bat
+C:\Vtuber_Souorce_Code\LAVI\test\test_Isolation
+```
+
+Testing behavior:
+
+* Put new reproduction scripts, exploratory tests, temporary fixtures, test logs, and test-generated outputs in this directory by default.
+* Keep existing established unit or integration tests in their current project-defined locations unless the user explicitly requests migration.
+* Do not make production code depend on files under `test\test_Isolation`.
+* When practical, configure test output, cache, and temporary paths to stay inside this directory.
+* A test isolation directory is not permission for automatic deletion; print exact cleanup candidates and ask for confirmation first.
 
 Basic syntax check:
 
