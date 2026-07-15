@@ -74,18 +74,56 @@ class StarCraft2:
         self.last_stop_result: Dict[str, Any] = {}
         self._shutdown = False
         # self.lan_discovery = _ArchivedLanDiscoveryState()
-        self._runtime_context = runtime.runtime_context
-        self.ladder_proxy = runtime.ladder_proxy
-        self.runtime_downloader = runtime.runtime_downloader
-        self.observation_tracker = runtime.observation_tracker
-        self._local_match_command_template = runtime.local_match_command_template
-        self._arg_utils = runtime.arg_utils
-        self._match_config_service = runtime.match_config_service
         self._event_bus = runtime.event_bus
-        self._engine_event_service = runtime.engine_event_service
-        self._local_match_service = runtime.local_match_service
         self._facade_service = runtime.facade_service
-        self._ladder_proxy_event_service = runtime.ladder_proxy_event_service
+
+    #20260715_kpopmodder: Compatibility accessors keep old tests/callers working
+    # while runtime ownership stays behind StarCraft2FacadeService.
+    @property
+    def _runtime_context(self):
+        return self._facade_service.runtime_context
+
+    @property
+    def ladder_proxy(self):
+        return self._facade_service.ladder_proxy
+
+    @property
+    def runtime_downloader(self):
+        return self._match_config_service.runtime_downloader
+
+    @runtime_downloader.setter
+    def runtime_downloader(self, value):
+        self._match_config_service.runtime_downloader = value
+
+    @property
+    def observation_tracker(self):
+        service = self._ladder_proxy_event_service
+        return getattr(service, "observation_tracker", None)
+
+    @property
+    def _local_match_command_template(self):
+        return getattr(self._local_match_service, "command_template", None)
+
+    @property
+    def _arg_utils(self):
+        return getattr(self._match_config_service, "arg_utils", None)
+
+    @property
+    def _match_config_service(self):
+        return self._facade_service.match_config_service
+
+    @property
+    def _engine_event_service(self):
+        return self._facade_service.engine_event_service
+
+    @property
+    def _local_match_service(self):
+        return self._facade_service.local_match_service
+
+    @property
+    def _ladder_proxy_event_service(self):
+        callback = getattr(self._local_match_service, "line_callback", None)
+        return getattr(callback, "__self__", None)
 
     def create_ui(self):
         config = self.config_manager.snapshot()
@@ -320,10 +358,10 @@ class StarCraft2:
 #         return {"archived": True, "exit": dict(snapshot or {})}
 
     def _on_ladder_proxy_line(self, stream_name: str, line: str) -> None:
-        self._ladder_proxy_event_service.on_ladder_proxy_line(
-            stream_name,
-            line,
-        )
+        service = self._ladder_proxy_event_service
+        handler = getattr(service, "on_ladder_proxy_line", None)
+        if callable(handler):
+            handler(stream_name, line)
 
 #     def _maybe_request_remote_native_joiner(self, line: str) -> None:
 #         #20260712_kpopmodder: Remote-native JoinGame source is archived.

@@ -1,6 +1,6 @@
 #20260707_kpopmodder: StarCraft2 event callback builder for TTS reactions.
 from __future__ import annotations
-from typing import Any, Dict
+from typing import Any, Dict, Union
 from core.logger import log_print
 from .sc2_telemetry_registry import (
     SC2_BUILDING_UNIT_TYPE_IDS,
@@ -55,7 +55,10 @@ class StarCraft2ReactionRuntime:
         self._game_end_cancelled = False
         self._suppress_post_game_tts = False
 
-    def handle_status_event(self, event: Dict[str, Any]) -> bool:
+    def handle_status_event(
+        self,
+        event: Union[Dict[str, Any], StarCraft2Event, Any],
+    ) -> bool:
         #20260715_kpopmodder: Preserve the legacy EventBus callback while the
         # reaction core uses the typed event contract.
         return self.handle_event(StarCraft2Event.from_mapping(event))

@@ -197,8 +197,9 @@ class StarCraft2FacadeService:
         if self._shutdown:
             return
         self._shutdown = True
-        self.ladder_proxy.stop()
-        self._sync_local_match_runtime_context()
+        #20260715_kpopmodder: Keep the proxy stop result inside Facade-owned runtime state.
+        proxy_stop_result = self.ladder_proxy.stop()
+        self._sync_local_match_runtime_context(result=proxy_stop_result)
         subscription = self._runtime_event_subscription
         if subscription is not None:
             subscription.unsubscribe()
@@ -579,7 +580,8 @@ class StarCraft2FacadeService:
             return
 
         self.runtime_context.clear_process()
-        self.runtime_context.stopped_at = time.time()
+        if self.runtime_context.stopped_at is None:
+            self.runtime_context.stopped_at = time.time()
         result_payload = result.to_dict() if hasattr(result, "to_dict") else result
         result_payload = result_payload if isinstance(result_payload, dict) else {}
         details = exit_details if isinstance(exit_details, dict) else {}

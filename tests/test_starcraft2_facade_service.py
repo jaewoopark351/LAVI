@@ -289,6 +289,50 @@ class StarCraft2FacadeServiceTests(unittest.TestCase):
         self.assertIsNone(context.runtime_error)
         self.assertIsNotNone(context.stopped_at)
 
+    #20260715_kpopmodder: Shutdown must preserve proxy stop failures in Facade-owned state.
+    def test_shutdown_syncs_ladder_proxy_stop_result_to_runtime_context(self):
+        context = SC2RuntimeContext()
+        facade = self._build_facade(runtime_context=context)
+        facade.ladder_proxy.stop.return_value = LadderProxyResultDTO(
+            ok=False,
+            running=False,
+            error="proxy_stop_failed",
+            status=LadderProxyStatusDTO(running=False),
+        )
+        facade.ladder_proxy.get_status.return_value = LadderProxyStatusDTO(
+            running=False,
+        )
+
+        facade.shutdown()
+
+        self.assertEqual("proxy_stop_failed", context.runtime_error)
+        facade.ladder_proxy.stop.assert_called_once()
+
+    #20260715_kpopmodder: Status polling after proxy_stopped must not move the stop time.
+    def test_local_match_status_does_not_overwrite_proxy_stopped_time(self):
+        context = SC2RuntimeContext()
+        facade = self._build_facade(runtime_context=context)
+        facade.ladder_proxy.get_status.return_value = LadderProxyStatusDTO(
+            running=False,
+            returncode=0,
+        )
+
+        with mock.patch(
+            "plugins.StarCraft2.starcraft2_core.starcraft2_facade_service.time.time",
+            return_value=10.0,
+        ):
+            facade._sync_local_match_runtime_context(
+                exit_details={"returncode": 0}
+            )
+        with mock.patch(
+            "plugins.StarCraft2.starcraft2_core.starcraft2_facade_service.time.time",
+            return_value=20.0,
+        ):
+            facade._sync_local_match_runtime_context()
+
+        self.assertEqual(10.0, context.stopped_at)
+        self.assertIsNone(context.runtime_error)
+
     def _build_facade(self, event_bus=None, runtime_context=None):
         config_manager = mock.Mock()
         config_manager.build_runtime_config.return_value = {

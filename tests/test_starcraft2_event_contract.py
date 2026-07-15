@@ -199,6 +199,17 @@ class StarCraft2EventContractTests(unittest.TestCase):
         self.assertIsInstance(event, StarCraft2Event)
         self.assertEqual("game_won", event.event_type)
 
+    def test_legacy_status_callback_accepts_typed_event(self):
+        runtime = StarCraft2ReactionRuntime(llm=None, tts=None)
+        runtime.handle_event = mock.Mock(return_value=True)
+
+        result = runtime.handle_status_event(StarCraft2Event("game_lost", {"result": "Player1Win"}))
+
+        self.assertTrue(result)
+        event = runtime.handle_event.call_args.args[0]
+        self.assertIsInstance(event, StarCraft2Event)
+        self.assertEqual("game_lost", event.event_type)
+
     def test_policy_accepts_typed_event_contract(self):
         policy = StarCraft2ReactionPolicy(min_interval_sec=0)
 
