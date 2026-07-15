@@ -12,11 +12,19 @@ from collections.abc import Iterable
 from typing import Any, Callable, Dict, List, Optional
 
 from core.logger import log_print
+from .starcraft2_contracts import (
+    LadderProxyExitEventDTO,
+    LadderProxyPortCheckDTO,
+    LadderProxyPortsStatusDTO,
+    LadderProxyResultDTO,
+    LadderProxyStatusDTO,
+    LocalMatchLaunchConfigDTO,
+)
 from .sc2_local_match_command_template import _LocalMatchLaunchDiagnostics
 
 
 LineCallback = Callable[[str, str], None]
-ExitCallback = Callable[[Dict[str, Any]], None]
+ExitCallback = Callable[[LadderProxyExitEventDTO], None]
 
 
 class SC2LadderProxyLauncher:
@@ -39,9 +47,10 @@ class SC2LadderProxyLauncher:
         self._monitor_thread = None
         self._diagnostics = _LocalMatchLaunchDiagnostics()
 
-    def validate_config(self, config: Dict[str, Any]) -> Dict[str, Any]:
-        executable_path = self._clean_path(config.get("executable_path"))
-        working_directory = self._clean_path(config.get("working_directory"))
+    def validate_config(self, command: LocalMatchLaunchConfigDTO) -> Dict[str, Any]:
+        command = LocalMatchLaunchConfigDTO.from_mapping(command)
+        executable_path = self._clean_path(command.executable_path)
+        working_directory = self._clean_path(command.working_directory)
         if not executable_path:
             return {"ok": False, "error": "ladder_proxy_executable_missing", "path": ""}
         if not os.path.isfile(executable_path):
@@ -64,39 +73,49 @@ class SC2LadderProxyLauncher:
 
     def start(
         self,
-        config: Dict[str, Any],
-        capture_output: bool = True,
+        command: LocalMatchLaunchConfigDTO,
         line_callback: Optional[LineCallback] = None,
         exit_callback: Optional[ExitCallback] = None,
-    ) -> Dict[str, Any]:
+    ) -> LadderProxyResultDTO:
+        command = LocalMatchLaunchConfigDTO.from_mapping(command)
         if self.is_running():
-            status = self.get_status(config)
-            if self._should_restart_unhealthy(config, status):
+            status = self.get_status(command)
+            if self._should_restart_unhealthy(command, status):
                 log_print(
                     "[SC2LadderProxyLauncher] restarting unhealthy process "
-                    f"pid={status.get('pid')} uptime_sec={status.get('uptime_sec')}"
+                    f"pid={status.pid} uptime_sec={status.uptime_sec}"
                 )
                 self.stop()
             else:
-                return {"ok": True, "running": True, "status": status}
+                return LadderProxyResultDTO(ok=True, running=True, status=status)
 
         #20260712_kpopmodder: Clear stale process tails before each new launch so
         # LAN Lobby diagnostics do not report stdout/stderr from an older match.
         self.stdout_tail.clear()
         self.stderr_tail.clear()
-        validation = self.validate_config(config)
+        validation = self.validate_config(command)
         if not validation.get("ok"):
             self.last_error = str(validation.get("error", "ladder_proxy_config_invalid"))
-            return {"ok": False, "running": False, **validation}
+            return LadderProxyResultDTO(
+                ok=False,
+                running=False,
+                status=self.get_status(command),
+                error=self.last_error,
+                details={
+                    key: value
+                    for key, value in validation.items()
+                    if key not in {"ok", "error"}
+                },
+            )
 
         command_args = self._with_sc2_executable_arg(
-            self._normalize_args(config.get("args", [])),
-            config,
+            self._normalize_args(command.args),
+            command,
         )
 
-        command = [validation["executable_path"]] + command_args
-        stdout = subprocess.PIPE if capture_output else None
-        stderr = subprocess.PIPE if capture_output else None
+        process_command = [validation["executable_path"]] + command_args
+        stdout = subprocess.PIPE if command.capture_output else None
+        stderr = subprocess.PIPE if command.capture_output else None
         self._diagnostics = _LocalMatchLaunchDiagnostics()
         self._diagnostics.start()
         try:
@@ -112,11 +131,11 @@ class SC2LadderProxyLauncher:
                 f"args={command_args}"
             )
             self.process = subprocess.Popen(
-                command,
+                process_command,
                 cwd=validation["working_directory"] or None,
                 stdout=stdout,
                 stderr=stderr,
-                env=self._build_env(config),
+                env=self._build_env(command),
                 text=True,
                 encoding="utf-8",
                 errors="replace",
@@ -125,15 +144,20 @@ class SC2LadderProxyLauncher:
         except Exception as e:
             self.last_error = str(e)
             log_print(f"[SC2LadderProxyLauncher] launch failed: {e}")
-            return {"ok": False, "running": False, "error": str(e)}
+            return LadderProxyResultDTO(
+                ok=False,
+                running=False,
+                status=self.get_status(command),
+                error=str(e),
+            )
 
         self.started_at = time.time()
         self.last_error = ""
         log_print(
             "[SC2LadderProxyLauncher] started "
-            f"pid={getattr(self.process, 'pid', None)} capture_output={capture_output}"
+            f"pid={getattr(self.process, 'pid', None)} capture_output={command.capture_output}"
         )
-        if capture_output:
+        if command.capture_output:
             self._stdout_thread = self._start_reader_thread(
                 getattr(self.process, "stdout", None),
                 self.stdout_tail,
@@ -153,12 +177,21 @@ class SC2LadderProxyLauncher:
             daemon=True,
         )
         self._monitor_thread.start()
-        return {"ok": True, "running": True, "status": self.get_status(config)}
+        return LadderProxyResultDTO(
+            ok=True,
+            running=True,
+            status=self.get_status(command),
+        )
 
-    def stop(self, timeout_sec: float = 5.0) -> Dict[str, Any]:
+    def stop(self, timeout_sec: float = 5.0) -> LadderProxyResultDTO:
         process = self.process
         if process is None:
-            return {"ok": True, "running": False, "status": self.get_status()}
+            return LadderProxyResultDTO(
+                ok=True,
+                running=False,
+                status=self.get_status(),
+                stopped=True,
+            )
 
         if self.is_running():
             try:
@@ -173,69 +206,104 @@ class SC2LadderProxyLauncher:
                 process.wait(timeout=1.0)
             except Exception as e:
                 self.last_error = str(e)
-                return {"ok": False, "error": str(e), "status": self.get_status()}
+                return LadderProxyResultDTO(
+                    ok=False,
+                    running=self.is_running(),
+                    status=self.get_status(),
+                    error=str(e),
+                )
         self.process = None
-        return {"ok": True, "running": False, "status": self.get_status()}
+        return LadderProxyResultDTO(
+            ok=True,
+            running=False,
+            status=self.get_status(),
+            stopped=True,
+        )
 
     def is_running(self) -> bool:
         process = self.process
         return bool(process is not None and process.poll() is None)
 
-    def check_ports(self, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        value = config if isinstance(config, dict) else {}
-        ports = self._normalize_ports(value.get("ports", [5677, 5678]))
-        hosts = self._normalize_hosts(value)
-        timeout = self._float_value(value.get("connect_timeout_sec"), 0.5)
+    def check_ports(
+        self,
+        command: Optional[LocalMatchLaunchConfigDTO] = None,
+    ) -> LadderProxyPortsStatusDTO:
+        command = LocalMatchLaunchConfigDTO.from_mapping(command)
+        ports = list(command.proxy_ports)
+        hosts = self._normalize_hosts(command)
+        timeout = command.connect_timeout_sec
         checks = []
         for host in hosts:
             for port in ports:
                 checks.append(self._check_port(host, port, timeout))
-        return {
-            "ok": any(item.get("open") for item in checks),
-            "hosts": hosts,
-            "ports": ports,
-            "checks": checks,
-        }
+        return LadderProxyPortsStatusDTO(
+            ok=any(item.open for item in checks),
+            hosts=hosts,
+            ports=ports,
+            checks=checks,
+        )
 
-    def get_status(self, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def get_status(
+        self,
+        command: Optional[LocalMatchLaunchConfigDTO] = None,
+    ) -> LadderProxyStatusDTO:
         process = self.process
-        status = {
-            "running": self.is_running(),
-            "pid": getattr(process, "pid", None) if process is not None else None,
-            "returncode": process.poll() if process is not None else None,
-            "uptime_sec": (
+        normalized_command = (
+            LocalMatchLaunchConfigDTO.from_mapping(command)
+            if command is not None
+            else None
+        )
+        validation = (
+            self.validate_config(normalized_command)
+            if normalized_command is not None
+            else {}
+        )
+        ports = (
+            self.check_ports(normalized_command)
+            if normalized_command is not None
+            else None
+        )
+        return LadderProxyStatusDTO(
+            running=self.is_running(),
+            pid=getattr(process, "pid", None) if process is not None else None,
+            returncode=process.poll() if process is not None else None,
+            uptime_sec=(
                 round(time.time() - self.started_at, 3)
                 if self.started_at and self.is_running()
                 else 0.0
             ),
-            "last_error": self.last_error,
-            "stdout_tail": list(self.stdout_tail),
-            "stderr_tail": list(self.stderr_tail),
-        }
-        if isinstance(config, dict):
-            status["validation"] = self.validate_config(config)
-            status["ports"] = self.check_ports(config)
-        status["launch_diagnostics"] = self._diagnostics.snapshot()
-        return status
+            last_error=self.last_error,
+            stdout_tail=list(self.stdout_tail),
+            stderr_tail=list(self.stderr_tail),
+            validation=validation,
+            ports=ports,
+            launch_diagnostics=self._diagnostics.snapshot(),
+        )
 
-    def _check_port(self, host: str, port: int, timeout: float) -> Dict[str, Any]:
+    def _check_port(self, host: str, port: int, timeout: float) -> LadderProxyPortCheckDTO:
         try:
             with socket.create_connection((host, int(port)), timeout=max(0.1, timeout)):
-                return {"host": host, "port": int(port), "open": True, "error": ""}
+                return LadderProxyPortCheckDTO(host=host, port=int(port), open=True)
         except OSError as e:
-            return {"host": host, "port": int(port), "open": False, "error": str(e)}
+            return LadderProxyPortCheckDTO(
+                host=host,
+                port=int(port),
+                open=False,
+                error=str(e),
+            )
 
-    def _should_restart_unhealthy(self, config: Dict[str, Any], status: Dict[str, Any]) -> bool:
-        if not bool(config.get("restart_unhealthy", False)):
+    def _should_restart_unhealthy(
+        self,
+        command: LocalMatchLaunchConfigDTO,
+        status: LadderProxyStatusDTO,
+    ) -> bool:
+        if not command.restart_unhealthy:
             return False
-        try:
-            uptime_sec = float(status.get("uptime_sec") or 0.0)
-        except (TypeError, ValueError):
-            uptime_sec = 0.0
-        threshold = self._float_value(config.get("restart_unhealthy_after_sec"), 20.0)
+        uptime_sec = status.uptime_sec
+        threshold = command.restart_unhealthy_after_sec
         if uptime_sec < max(1.0, threshold):
             return False
-        if self._has_startup_progress(status.get("stdout_tail", [])):
+        if self._has_startup_progress(status.stdout_tail):
             return False
         return True
 
@@ -258,12 +326,12 @@ class SC2LadderProxyLauncher:
                 return True
         return False
 
-    def _build_env(self, config: Dict[str, Any]) -> Dict[str, str]:
+    def _build_env(self, command: LocalMatchLaunchConfigDTO) -> Dict[str, str]:
         env = os.environ.copy()
-        starcraft2_exe_path = self._clean_path(config.get("starcraft2_exe_path"))
-        support64_path = self._clean_path(config.get("starcraft2_support64_path"))
-        base_path = self._clean_path(config.get("starcraft2_base_path"))
-        working_directory = self._clean_path(config.get("working_directory"))
+        starcraft2_exe_path = self._clean_path(command.starcraft2_exe_path)
+        support64_path = self._clean_path(command.starcraft2_support64_path)
+        base_path = self._clean_path(command.starcraft2_base_path)
+        working_directory = self._clean_path(command.working_directory)
         if starcraft2_exe_path:
             env["SC2PATH"] = starcraft2_exe_path
         existing_path = env.get("PATH", "")
@@ -275,15 +343,9 @@ class SC2LadderProxyLauncher:
         env["PATH"] = ";".join(item for item in path_parts if item)
         return env
 
-    def _normalize_hosts(self, config: Dict[str, Any]) -> List[str]:
-        raw_hosts = config.get("check_hosts")
-        if isinstance(raw_hosts, str):
-            values = [part.strip() for part in raw_hosts.split(",")]
-        elif isinstance(raw_hosts, Iterable):
-            values = [str(item or "").strip() for item in raw_hosts]
-        else:
-            values = []
-        proxy_host = str(config.get("proxy_host") or "").strip()
+    def _normalize_hosts(self, command: LocalMatchLaunchConfigDTO) -> List[str]:
+        values = [str(item or "").strip() for item in command.check_hosts]
+        proxy_host = command.proxy_host.strip()
         hosts = ["127.0.0.1"]
         for item in values + [proxy_host]:
             if item and item not in hosts:
@@ -318,10 +380,14 @@ class SC2LadderProxyLauncher:
             return [str(item) for item in value if str(item)]
         return []
 
-    def _with_sc2_executable_arg(self, args: List[str], config: Dict[str, Any]) -> List[str]:
+    def _with_sc2_executable_arg(
+        self,
+        args: List[str],
+        command: LocalMatchLaunchConfigDTO,
+    ) -> List[str]:
         if self._has_sc2_executable_arg(args):
             return list(args)
-        starcraft2_exe_path = self._clean_path(config.get("starcraft2_exe_path"))
+        starcraft2_exe_path = self._clean_path(command.starcraft2_exe_path)
         if not starcraft2_exe_path:
             return list(args)
         #20260709_kpopmodder: s2client-api ParseSettings reads --executable, not SC2PATH.
@@ -382,11 +448,11 @@ class SC2LadderProxyLauncher:
         if callable(exit_callback):
             try:
                 exit_callback(
-                    {
-                        "pid": pid,
-                        "returncode": returncode,
-                        "launch_diagnostics": diagnostics,
-                    }
+                    LadderProxyExitEventDTO(
+                        pid=pid,
+                        returncode=returncode,
+                        launch_diagnostics=diagnostics,
+                    )
                 )
             except Exception as e:
                 log_print(f"[SC2LadderProxyLauncher] exit callback failed pid={pid}: {e}")

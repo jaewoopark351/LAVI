@@ -16,6 +16,13 @@ from plugins.StarCraft2.starcraft2_core.probots_log_watcher import ProBotsLogWat
 from plugins.StarCraft2.starcraft2_core.sc2_event_parser import SC2EventParser
 from plugins.StarCraft2.starcraft2_core.sc2_extension import StarCraft2Extension
 from plugins.StarCraft2.starcraft2_core.sc2_ladder_proxy_launcher import SC2LadderProxyLauncher
+from plugins.StarCraft2.starcraft2_core.starcraft2_contracts import (
+    LadderProxyExitEventDTO,
+    LadderProxyPortsStatusDTO,
+    LadderProxyResultDTO,
+    LadderProxyStatusDTO,
+    LocalMatchLaunchConfigDTO,
+)
 from plugins.StarCraft2.starcraft2_core.sc2_tts_bridge import SC2TTSBridge
 from plugins.StarCraft2.starcraft2 import StarCraft2
 from plugins.StarCraft2.bot_launch_profiles import get_bot_launch_profile
@@ -559,10 +566,11 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
         launcher = SC2LadderProxyLauncher()
 
         with mock.patch("plugins.StarCraft2.starcraft2_core.sc2_ladder_proxy_launcher.subprocess.Popen") as popen:
-            result = launcher.start({"executable_path": ""})
+            result = launcher.start(LocalMatchLaunchConfigDTO())
 
-        self.assertFalse(result["ok"])
-        self.assertEqual("ladder_proxy_executable_missing", result["error"])
+        self.assertIsInstance(result, LadderProxyResultDTO)
+        self.assertFalse(result.ok)
+        self.assertEqual("ladder_proxy_executable_missing", result.error)
         popen.assert_not_called()
 
     def test_ladder_proxy_launcher_starts_external_process_with_sc2_env(self):
@@ -579,7 +587,9 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
             "starcraft2_exe_path": "C:\\SC2\\Versions\\Base97425\\SC2_x64.exe",
             "starcraft2_support64_path": "C:\\SC2\\Support64",
             "starcraft2_base_path": "C:\\SC2\\Versions\\Base97425",
+            "capture_output": False,
         }
+        command = LocalMatchLaunchConfigDTO.from_mapping(config)
 
         with mock.patch("plugins.StarCraft2.starcraft2_core.sc2_ladder_proxy_launcher.os.path.isfile", return_value=True):
             with mock.patch("plugins.StarCraft2.starcraft2_core.sc2_ladder_proxy_launcher.os.path.isdir", return_value=True):
@@ -587,9 +597,10 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
                     "plugins.StarCraft2.starcraft2_core.sc2_ladder_proxy_launcher.subprocess.Popen",
                     return_value=process,
                 ) as popen:
-                    result = launcher.start(config, capture_output=False)
+                    result = launcher.start(command)
 
-        self.assertTrue(result["ok"])
+        self.assertIsInstance(result, LadderProxyResultDTO)
+        self.assertTrue(result.ok)
         popen.assert_called_once()
         self.assertEqual(
             [
@@ -646,7 +657,9 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
             "args": [],
             "restart_unhealthy": True,
             "restart_unhealthy_after_sec": 20.0,
+            "capture_output": False,
         }
+        command = LocalMatchLaunchConfigDTO.from_mapping(config)
 
         with mock.patch("plugins.StarCraft2.starcraft2_core.sc2_ladder_proxy_launcher.time.time", return_value=130.0):
             with mock.patch("plugins.StarCraft2.starcraft2_core.sc2_ladder_proxy_launcher.os.path.isfile", return_value=True):
@@ -655,9 +668,10 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
                         "plugins.StarCraft2.starcraft2_core.sc2_ladder_proxy_launcher.subprocess.Popen",
                         return_value=replacement_process,
                     ) as popen:
-                        result = launcher.start(config, capture_output=False)
+                        result = launcher.start(command)
 
-        self.assertTrue(result["ok"])
+        self.assertIsInstance(result, LadderProxyResultDTO)
+        self.assertTrue(result.ok)
         stale_process.terminate.assert_called_once()
         popen.assert_called_once()
 
@@ -670,17 +684,76 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
             return_value=connection,
         ) as create_connection:
             result = launcher.check_ports(
-                {
+                LocalMatchLaunchConfigDTO.from_mapping({
                     "proxy_host": "192.168.0.67",
                     "ports": "5677,5678",
                     "connect_timeout_sec": 0.1,
-                }
+                })
             )
 
-        self.assertTrue(result["ok"])
-        self.assertEqual(["127.0.0.1", "192.168.0.67"], result["hosts"])
-        self.assertEqual([5677, 5678], result["ports"])
+        self.assertIsInstance(result, LadderProxyPortsStatusDTO)
+        self.assertTrue(result.ok)
+        self.assertEqual(["127.0.0.1", "192.168.0.67"], result.hosts)
+        self.assertEqual([5677, 5678], result.ports)
         self.assertEqual(4, create_connection.call_count)
+
+    def test_ladder_proxy_launcher_returns_typed_status_and_exit_event(self):
+        launcher = SC2LadderProxyLauncher()
+        process = mock.Mock(pid=4321)
+        process.poll.return_value = None
+        process.wait.return_value = 0
+        launcher.process = process
+        launcher.started_at = 100.0
+        command = LocalMatchLaunchConfigDTO.from_mapping(
+            {
+                "executable_path": "C:\\Tools\\Sc2LadderServer.exe",
+                "ports": "5677,5678",
+                "check_hosts": "127.0.0.1",
+            }
+        )
+
+        with mock.patch(
+            "plugins.StarCraft2.starcraft2_core.sc2_ladder_proxy_launcher.time.time",
+            return_value=110.0,
+        ):
+            with mock.patch(
+                "plugins.StarCraft2.starcraft2_core.sc2_ladder_proxy_launcher.os.path.isfile",
+                return_value=True,
+            ):
+                status = launcher.get_status(command)
+
+        events = []
+        launcher._monitor_process_exit(process, events.append)
+
+        self.assertIsInstance(status, LadderProxyStatusDTO)
+        self.assertTrue(status.running)
+        self.assertEqual(4321, status.pid)
+        self.assertEqual([5677, 5678], status.ports.ports)
+        self.assertEqual(1, len(events))
+        self.assertIsInstance(events[0], LadderProxyExitEventDTO)
+        self.assertEqual(0, events[0].returncode)
+
+    def test_local_match_launch_config_preserves_proxy_runtime_settings(self):
+        command = LocalMatchLaunchConfigDTO.from_mapping(
+            {
+                "ports": "5677,5678",
+                "check_hosts": "127.0.0.1,192.168.0.67",
+                "proxy_host": "192.168.0.68",
+                "connect_timeout_sec": 1.25,
+                "restart_unhealthy": False,
+                "restart_unhealthy_after_sec": 45,
+            }
+        )
+
+        self.assertEqual([5677, 5678], command.proxy_ports)
+        self.assertEqual(
+            ["127.0.0.1", "192.168.0.67"],
+            command.check_hosts,
+        )
+        self.assertEqual("192.168.0.68", command.proxy_host)
+        self.assertEqual(1.25, command.connect_timeout_sec)
+        self.assertFalse(command.restart_unhealthy)
+        self.assertEqual(45.0, command.restart_unhealthy_after_sec)
 
     def test_starcraft2_facade_preserves_ladder_proxy_args_without_override(self):
         facade = StarCraft2()
@@ -1066,12 +1139,10 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
                 )
 
         started_config = start.call_args.args[0]
-        self.assertEqual(
-            ["--race", "Protoss"],
-            started_config["args"],
-        )
-        self.assertNotIn("remote_human", started_config)
-        self.assertFalse(started_config["remote_human_enabled"])
+        self.assertIsInstance(started_config, LocalMatchLaunchConfigDTO)
+        self.assertEqual("--race Protoss", started_config.args)
+        self.assertEqual([5677, 5678], started_config.proxy_ports)
+        self.assertNotIn("remote_human", started_config.to_dict())
 
     def test_log_watcher_tails_new_lines(self):
         path = "C:\\logs\\probots.log"

@@ -12,7 +12,14 @@ from app_core.extensions import (
     GameStopResultDTO,
 )
 from core.logger import log_print
-from .starcraft2_contracts import LocalMatchRuntimeStatusDTO, StartResultDTO
+from .starcraft2_contracts import (
+    LadderProxyExitEventDTO,
+    LadderProxyResultDTO,
+    LadderProxyStatusDTO,
+    LocalMatchLaunchConfigDTO,
+    LocalMatchRuntimeStatusDTO,
+    StartResultDTO,
+)
 
 from .starcraft2_dto import (
     StarCraft2CommandResult,
@@ -281,8 +288,9 @@ class StarCraft2LocalMatchService:
         return self._local_match_status_json(result=status)
 
     def _stop_local_match(self) -> StarCraft2CommandResult:
+        proxy_result = LadderProxyResultDTO.from_mapping(self.ladder_proxy.stop())
         return StarCraft2CommandResult.from_mapping(
-            self.ladder_proxy.stop(),
+            proxy_result.to_dict(),
             action="local_match_stop",
         )
 
@@ -319,14 +327,18 @@ class StarCraft2LocalMatchService:
             else StartResultDTO.from_mapping(result, action="local_human_vs_changeling")
         )
         game_result = self._build_game_result_dto(normalized_result)
-        ladder_proxy_status = self.ladder_proxy.get_status(proxy_config)
+        proxy_command = LocalMatchLaunchConfigDTO.from_mapping(proxy_config)
+        ladder_proxy_status = LadderProxyStatusDTO.from_mapping(
+            self.ladder_proxy.get_status(proxy_command)
+        )
+        ladder_proxy_status_payload = ladder_proxy_status.to_dict()
         game_status = self._build_game_status_dto(
             result=game_result,
-            ladder_proxy_status=ladder_proxy_status,
+            ladder_proxy_status=ladder_proxy_status_payload,
         )
         return StarCraft2LocalMatchStatus(
             result=normalized_result,
-            ladder_proxy=ladder_proxy_status,
+            ladder_proxy=ladder_proxy_status_payload,
             game_result=game_result,
             game_status=game_status,
         )
@@ -368,13 +380,20 @@ class StarCraft2LocalMatchService:
         config: Dict[str, Any],
         capture_output: bool,
     ) -> StarCraft2CommandResult:
-        raw_result = self.ladder_proxy.start(
-            config,
-            capture_output=bool(capture_output),
-            line_callback=self.line_callback,
-            exit_callback=self._on_ladder_proxy_exit,
+        proxy_command = LocalMatchLaunchConfigDTO.from_mapping(
+            {**dict(config or {}), "capture_output": bool(capture_output)}
         )
-        return StarCraft2CommandResult.from_mapping(raw_result, action="local_human_vs_changeling")
+        proxy_result = LadderProxyResultDTO.from_mapping(
+            self.ladder_proxy.start(
+                proxy_command,
+                line_callback=self.line_callback,
+                exit_callback=self._on_ladder_proxy_exit,
+            )
+        )
+        return StarCraft2CommandResult.from_mapping(
+            proxy_result.to_dict(),
+            action="local_human_vs_changeling",
+        )
 
     def _build_game_result_dto(self, result: StartResultDTO) -> GameResultDTO:
         payload = result.to_dict() if isinstance(result, StartResultDTO) else {}
@@ -417,15 +436,15 @@ class StarCraft2LocalMatchService:
         self._last_game_status_dto = dto
         return dto
 
-    def _on_ladder_proxy_exit(self, result: Dict[str, Any]) -> None:
-        details = result if isinstance(result, dict) else {}
+    def _on_ladder_proxy_exit(self, result: LadderProxyExitEventDTO) -> None:
+        details = LadderProxyExitEventDTO.from_mapping(result)
         event = {
             "event_type": "proxy_stopped",
             "details": {
                 "source": "ladder_proxy",
-                "pid": details.get("pid"),
-                "returncode": details.get("returncode"),
-                "launch_diagnostics": details.get("launch_diagnostics"),
+                "pid": details.pid,
+                "returncode": details.returncode,
+                "launch_diagnostics": dict(details.launch_diagnostics),
             },
         }
         if self.event_bus is not None:

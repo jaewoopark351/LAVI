@@ -11,6 +11,8 @@ from .starcraft2_contracts import (
     EngineResultDTO,
     EngineStartCommandDTO,
     EngineStatusDTO,
+    LadderProxyStatusDTO,
+    LocalMatchLaunchConfigDTO,
     LocalMatchRuntimeStatusDTO,
     StartResultDTO,
     StopResultDTO,
@@ -207,6 +209,13 @@ class StarCraft2FacadeService:
 
     def get_status(self) -> Dict[str, Any]:
         self._sync_state_from_engine()
+        ladder_proxy_status = LadderProxyStatusDTO.from_mapping(
+            self.ladder_proxy.get_status(
+                LocalMatchLaunchConfigDTO.from_mapping(
+                    self.match_config_service.ladder_proxy_config()
+                )
+            )
+        ).to_dict()
         status = {
             "enabled": self.config_manager.get_bool("enabled", False),
             "engine": str(self.config_manager.get("engine", "internal_lav_bot")),
@@ -219,9 +228,7 @@ class StarCraft2FacadeService:
             ),
             "last_start_result": dict(self.last_start_result or {}),
             "last_stop_result": dict(self.last_stop_result or {}),
-            "ladder_proxy": self.ladder_proxy.get_status(
-                self.match_config_service.ladder_proxy_config()
-            ),
+            "ladder_proxy": ladder_proxy_status,
         }
         game_status = self._build_game_status_dto(status)
         status["game_status"] = game_status.to_dict()
@@ -466,7 +473,11 @@ class StarCraft2FacadeService:
             if isinstance(config, dict)
             else self.match_config_service.local_match_config()
         )
-        runtime_status = self.ladder_proxy.get_status(runtime_config)
+        runtime_status = LadderProxyStatusDTO.from_mapping(
+            self.ladder_proxy.get_status(
+                LocalMatchLaunchConfigDTO.from_mapping(runtime_config)
+            )
+        ).to_dict()
         self.runtime_context.set_status(runtime_status)
         self.runtime_context.set_tails(
             runtime_status.get("stdout_tail", []),
@@ -534,6 +545,8 @@ class StarCraft2FacadeService:
         if candidate is None:
             validation = runtime_status.get("validation")
             candidate = validation.get("ports") if isinstance(validation, dict) else None
+        if isinstance(candidate, dict):
+            candidate = candidate.get("ports")
         if isinstance(candidate, str):
             candidate = [part.strip() for part in candidate.split(",")]
         if not isinstance(candidate, (list, tuple)):

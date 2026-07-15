@@ -14,6 +14,10 @@ from plugins.StarCraft2.starcraft2_core.starcraft2_dto import (
     StarCraft2LocalMatchCommand,
 )
 from plugins.StarCraft2.starcraft2_core.starcraft2_contracts import (
+    LadderProxyExitEventDTO,
+    LadderProxyResultDTO,
+    LadderProxyStatusDTO,
+    LocalMatchLaunchConfigDTO,
     LocalMatchRuntimeStatusDTO,
     StarCraft2Event,
 )
@@ -225,13 +229,12 @@ class StarCraft2FacadeServiceTests(unittest.TestCase):
         }
         facade.ladder_proxy.process = mock.Mock(pid=4321)
         facade.ladder_proxy.started_at = 123.0
-        facade.ladder_proxy.get_status.return_value = {
-            "running": True,
-            "pid": 4321,
-            "stdout_tail": ["ready"],
-            "stderr_tail": [],
-            "validation": {"connect_timeout_sec": 2.5},
-        }
+        facade.ladder_proxy.get_status.return_value = LadderProxyStatusDTO(
+            running=True,
+            pid=4321,
+            stdout_tail=["ready"],
+            validation={"connect_timeout_sec": 2.5},
+        )
 
         facade.start_local_match("proxy.exe", "runtime", "", "5677,5678")
 
@@ -247,7 +250,9 @@ class StarCraft2FacadeServiceTests(unittest.TestCase):
         service = self._build_local_match_service()
         service.runtime_context = context
 
-        service._on_ladder_proxy_exit({"pid": 99, "returncode": 4})
+        service._on_ladder_proxy_exit(
+            LadderProxyExitEventDTO(pid=99, returncode=4)
+        )
 
         snapshot = context.snapshot()
         self.assertEqual({"owner": "facade"}, snapshot["status"])
@@ -267,7 +272,7 @@ class StarCraft2FacadeServiceTests(unittest.TestCase):
         engine_registry.create.return_value = engine
         state = _FakeState()
         ladder_proxy = mock.Mock()
-        ladder_proxy.get_status.return_value = {"running": False}
+        ladder_proxy.get_status.return_value = LadderProxyStatusDTO(running=False)
         match_config_service = mock.Mock()
         match_config_service.ladder_proxy_config.return_value = {}
         return StarCraft2FacadeService(
@@ -285,16 +290,20 @@ class StarCraft2FacadeServiceTests(unittest.TestCase):
         config_service.local_match_config.return_value = {}
         command_template = mock.Mock()
         ladder_proxy = mock.Mock()
-        ladder_proxy.stop.return_value = {
-            "ok": True,
-            "running": False,
-            "stopped": True,
-            "status": {"running": False},
-        }
-        ladder_proxy.get_status.side_effect = lambda config=None: {
-            "running": bool(config and config.get("running")),
-            "status": dict(config or {}),
-        }
+        ladder_proxy.stop.return_value = LadderProxyResultDTO(
+            ok=True,
+            running=False,
+            stopped=True,
+            status=LadderProxyStatusDTO(running=False),
+        )
+        ladder_proxy.get_status.side_effect = lambda command=None: LadderProxyStatusDTO(
+            running=False,
+            validation=(
+                {"executable_path": command.executable_path}
+                if isinstance(command, LocalMatchLaunchConfigDTO)
+                else {}
+            ),
+        )
         return StarCraft2LocalMatchService(
             arg_utils,
             config_service,

@@ -631,6 +631,11 @@ classDiagram
         +EngineStartCommandDTO
         +EngineResultDTO
         +EngineStatusDTO
+        +LocalMatchLaunchConfigDTO
+        +LadderProxyResultDTO
+        +LadderProxyStatusDTO
+        +LadderProxyExitEventDTO
+        +LadderProxyPortCheckDTO
         +StartResultDTO
         +StopResultDTO
         +LocalMatchRuntimeStatusDTO
@@ -668,7 +673,12 @@ classDiagram
     class HumanVsBotLauncher {
         <<typed_placeholder>>
     }
-    class SC2LadderProxyLauncher
+    class SC2LadderProxyLauncher {
+        <<typed_DTO_boundary>>
+        +start(command: LocalMatchLaunchConfigDTO): LadderProxyResultDTO
+        +stop(timeout_sec): LadderProxyResultDTO
+        +get_status(command): LadderProxyStatusDTO
+    }
     class SC2RuntimeContext {
         <<runtime state>>
         +snapshot()
@@ -727,6 +737,8 @@ classDiagram
     StarCraft2FacadeService --> GameStatusDTO : common status
     StarCraft2FacadeService --> SC2RuntimeContext : sole writer
     StarCraft2LocalMatchService --> SC2LadderProxyLauncher : launch/stop/status
+    StarCraft2LocalMatchService --> StarCraft2Contracts : proxy DTO conversion
+    SC2LadderProxyLauncher --> StarCraft2Contracts : typed process results
     StarCraft2LocalMatchService ..> SC2RuntimeContext : snapshot read only
     StarCraft2LocalMatchService --> GameStartResultDTO : common local result
     StarCraft2LocalMatchService --> GameStatusDTO : common local status
@@ -769,6 +781,14 @@ directly. Ares, MicroMachine, and the external EXE/JAR engines retain their
 existing dict behavior behind `LegacyStarCraft2EngineAdapter`.
 `HumanVsBotLauncher` is a non-running placeholder that already uses the typed
 contract.
+
+`SC2LadderProxyLauncher` is a typed process boundary that consumes
+`LocalMatchLaunchConfigDTO` and returns `LadderProxyResultDTO`,
+`LadderProxyStatusDTO`, and `LadderProxyExitEventDTO`.
+`StarCraft2LocalMatchService` coordinates these contracts into common SC2
+results and the `proxy_stopped` event. `StarCraft2FacadeService` converts the
+DTO status to the existing UI dictionary shape and remains the sole writer of
+`SC2RuntimeContext`. Existing UI callbacks and JSON output remain unchanged.
 
 `StarCraft2FacadeService` and `StarCraft2LocalMatchService` now keep common
 `GameStartResultDTO`, `GameStopResultDTO`, and `GameStatusDTO` wrappers beside

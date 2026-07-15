@@ -609,6 +609,11 @@ classDiagram
         +EngineStartCommandDTO
         +EngineResultDTO
         +EngineStatusDTO
+        +LocalMatchLaunchConfigDTO
+        +LadderProxyResultDTO
+        +LadderProxyStatusDTO
+        +LadderProxyExitEventDTO
+        +LadderProxyPortCheckDTO
         +StartResultDTO
         +StopResultDTO
         +LocalMatchRuntimeStatusDTO
@@ -646,7 +651,12 @@ classDiagram
     class HumanVsBotLauncher {
         <<typed_placeholder>>
     }
-    class SC2LadderProxyLauncher
+    class SC2LadderProxyLauncher {
+        <<typed_DTO_boundary>>
+        +start(command: LocalMatchLaunchConfigDTO): LadderProxyResultDTO
+        +stop(timeout_sec): LadderProxyResultDTO
+        +get_status(command): LadderProxyStatusDTO
+    }
     class SC2RuntimeContext {
         <<runtime state>>
         +snapshot()
@@ -705,6 +715,8 @@ classDiagram
     StarCraft2FacadeService --> GameStatusDTO : common status
     StarCraft2FacadeService --> SC2RuntimeContext : sole writer
     StarCraft2LocalMatchService --> SC2LadderProxyLauncher : launch/stop/status
+    StarCraft2LocalMatchService --> StarCraft2Contracts : proxy DTO conversion
+    SC2LadderProxyLauncher --> StarCraft2Contracts : typed process results
     StarCraft2LocalMatchService ..> SC2RuntimeContext : snapshot read only
     StarCraft2LocalMatchService --> GameStartResultDTO : common local result
     StarCraft2LocalMatchService --> GameStatusDTO : common local status
@@ -738,6 +750,8 @@ classDiagram
 
 `InternalLAVBotEngine`은 실제 게임 엔진 중 처음으로 `EngineStartCommandDTO`, `EngineResultDTO`, `EngineStatusDTO`를 직접 사용하는 typed 엔진입니다. Ares, MicroMachine, 외부 EXE/JAR 엔진은 기존 동작을 보존하기 위해 `LegacyStarCraft2EngineAdapter` 뒤에서 dict 계약을 계속 사용합니다. `HumanVsBotLauncher`는 typed 계약을 사용하는 비실행 placeholder입니다.
 
+`SC2LadderProxyLauncher`는 `LocalMatchLaunchConfigDTO`를 입력으로 받고 `LadderProxyResultDTO`, `LadderProxyStatusDTO`, `LadderProxyExitEventDTO`를 반환하는 typed 프로세스 경계입니다. `StarCraft2LocalMatchService`가 이 DTO를 SC2 공통 결과와 `proxy_stopped` 이벤트로 조율하며, `StarCraft2FacadeService`는 DTO를 UI용 dict로 변환한 뒤 `SC2RuntimeContext`를 갱신하는 유일한 writer로 남습니다. 기존 UI 콜백과 JSON 출력은 변경하지 않습니다.
+
 `GameEventMonitor` is the runtime proof point for the SC2-to-common bus bridge:
 successful shared delivery appears as sampled `[GameEventMonitor] received ...`
 log lines.
@@ -748,6 +762,7 @@ log lines.
 <!-- #20260715_kpopmodder: Document common DTO result wrappers and the SC2-to-GameEventBus bridge. -->
 <!-- #20260715_kpopmodder: Document common GameEventBus runtime monitoring. -->
 <!-- #20260715_kpopmodder: Document typed internal engine and adapter-backed migration state. -->
+<!-- #20260715_kpopmodder: Document the typed ladder-proxy process boundary. -->
 <!-- #20260715_kpopmodder: Document Facade-only SC2RuntimeContext ownership. -->
 <!-- #20260715_kpopmodder: Document StarCraft2RuntimeFactory composition ownership. -->
 

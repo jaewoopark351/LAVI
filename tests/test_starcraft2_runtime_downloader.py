@@ -215,8 +215,8 @@ class StarCraft2RuntimeDownloaderTests(unittest.TestCase):
         started_config = start.call_args.args[0]
 
         self.assertEqual(1, len(calls))
-        self.assertTrue(started_config["runtime_download"]["downloaded"])
-        self.assertTrue(started_config["bot_profile_validation"]["ok"])
+        self.assertTrue(started_config.runtime_download["downloaded"])
+        self.assertTrue(started_config.bot_profile_validation["ok"])
 
     def test_local_match_blocks_missing_selected_bot_runtime(self):
         temp_dir = self._make_temp_dir()
