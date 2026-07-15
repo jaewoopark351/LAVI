@@ -5,6 +5,8 @@ import queue
 import tempfile
 import unittest
 
+import pytest
+
 from memory_core.sqlite_write_gate import (
     SQLiteWriteLockTimeout,
     connect_sqlite,
@@ -52,6 +54,7 @@ class SQLiteWriteGateTests(unittest.TestCase):
             finally:
                 connection.close()
 
+    @pytest.mark.integration
     def test_writer_lock_times_out_while_other_process_holds_gate(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             db_path = os.path.join(temp_dir, "raw_events.sqlite3")

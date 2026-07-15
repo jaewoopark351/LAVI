@@ -5,21 +5,22 @@ import os
 import re
 
 from core.logger import log_print
+from core.paths import get_lavi_paths
 
 
 class GPUDeviceManager:#20260626_kpopmodder
     DEFAULT_CONFIG = {
         "default_device": "cuda:0",
         "VoiceInput": {
-            "device": "cuda:1",
+            "device": "cuda:0",
         },
         "ScreenVision": {
-            "device": "cuda:1",
-            "device_map": {"": 1},
-            "max_memory": {"1": "14GiB"},
+            "device": "cuda:0",
+            "device_map": "auto",
+            "max_memory": {},
         },
         "GPTSoVITS": {
-            "cuda_visible_devices": "1",
+            "cuda_visible_devices": "",
         },
         "preflight": {
             "enabled": True,
@@ -37,14 +38,8 @@ class GPUDeviceManager:#20260626_kpopmodder
     }
 
     def __init__(self, config_path=None):
-        project_root = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "..")
-        )
-        self.config_path = config_path or os.path.join(
-            project_root,
-            "config",
-            "gpu_device_config.json",
-        )
+        self.paths = get_lavi_paths()
+        self.config_path = str(config_path or self.paths.config_path("gpu_device_config.json"))
         self.config_loaded_from_file = False
         self.config_load_failed = False
         self.config = self._load_config()

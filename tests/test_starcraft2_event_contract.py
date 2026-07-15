@@ -108,6 +108,26 @@ class StarCraft2EventContractTests(unittest.TestCase):
         self.assertEqual([], success)
         self.assertEqual([], tail)
 
+    #20260716_kpopmodder: Already-ended SC2 protocol cleanup must not emit
+    # a second engine_error after a valid match ending.
+    def test_terminal_protocol_cleanup_stays_log_only(self):
+        service, _, _, _ = self.make_service()
+
+        service.parse_line(
+            "stdout", "changeling : Client changed status from in_game to ended"
+        )
+        protocol_error = service.parse_line(
+            "stderr",
+            "sc2.protocol.ProtocolError: ['Not supported if game has already ended']",
+        )
+        pyi_tail = service.parse_line(
+            "stderr",
+            "[PYI-30628:ERROR] Failed to execute script 'run' due to unhandled exception!",
+        )
+
+        self.assertEqual([], protocol_error)
+        self.assertEqual([], pyi_tail)
+
     def test_engine_service_updates_state_and_bus_with_typed_event(self):
         service, state, bus, _ = self.make_service()
         bus.emit = mock.Mock(return_value=True)
@@ -269,6 +289,48 @@ class StarCraft2EventContractTests(unittest.TestCase):
 
         tts_adapter.cancel_pending.assert_called_once_with("game_ended", {})
         tts_adapter.speak.assert_called_once_with("내가 이번 경기를 이겼어요.")
+
+    #20260716_kpopmodder: Changeling log result and ladder proxy final result
+    # can arrive separately; only one victory/defeat TTS should be spoken.
+    def test_typed_result_tts_is_spoken_once_per_match(self):
+        tts_adapter = mock.Mock()
+        tts_adapter.speak.return_value = True
+        runtime = StarCraft2ReactionRuntime(
+            llm=None,
+            tts=None,
+            policy=StarCraft2ReactionPolicy(min_interval_sec=0),
+            tts_adapter=tts_adapter,
+            post_game_suppression=True,
+        )
+
+        runtime.handle_event(StarCraft2Event("game_ended"))
+        first = runtime.handle_event(StarCraft2Event("game_won", {"origin": "log"}))
+        duplicate = runtime.handle_event(
+            StarCraft2Event("game_won", {"origin": "ladder_proxy"})
+        )
+
+        self.assertTrue(first)
+        self.assertFalse(duplicate)
+        self.assertEqual(1, tts_adapter.speak.call_count)
+
+    #20260716_kpopmodder: Result dedupe is match-scoped, not app-lifetime.
+    def test_typed_result_tts_dedupe_resets_on_new_match(self):
+        tts_adapter = mock.Mock()
+        tts_adapter.speak.return_value = True
+        runtime = StarCraft2ReactionRuntime(
+            llm=None,
+            tts=None,
+            policy=StarCraft2ReactionPolicy(min_interval_sec=0),
+            tts_adapter=tts_adapter,
+            post_game_suppression=True,
+        )
+
+        runtime.handle_event(StarCraft2Event("game_won"))
+        runtime.handle_event(StarCraft2Event("game_won"))
+        runtime.handle_event(StarCraft2Event("game_started"))
+        runtime.handle_event(StarCraft2Event("game_won"))
+
+        self.assertEqual(2, tts_adapter.speak.call_count)
 
     def test_typed_proxy_stopped_is_suppressed_after_game_end(self):
         policy = StarCraft2ReactionPolicy(min_interval_sec=0)

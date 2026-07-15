@@ -4,6 +4,7 @@ from __future__ import annotations
 import copy
 import json
 import os
+import time
 from typing import Any, Dict, Optional
 
 from app_core.extensions import GameExtensionInterface
@@ -13,6 +14,7 @@ from core.logger import log_print
 from .probots_launcher import ProBotsLauncher
 from .probots_log_watcher import ProBotsLogWatcher
 from .sc2_event_parser import SC2EventParser
+from .starcraft2_config import StarCraft2Config
 
 
 STARCRAFT2_STATUS_EVENT_CALLBACK_RESOURCE = "starcraft2_status_event_callback"
@@ -99,11 +101,10 @@ class StarCraft2Extension(GameExtensionInterface):
     """Observe ProBots/Changeling logs and write commentary; never controls SC2."""
 
     def __init__(self, plugin_root: Optional[str] = None, config_path: Optional[str] = None):
-        self.plugin_root = plugin_root or os.path.dirname(os.path.abspath(__file__))
-        self.config_path = config_path or os.path.join(
-            self.plugin_root,
-            "config_starcraft2.json",
-        )
+        self.plugin_root = plugin_root or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        self.config_path = config_path
+        self.config_manager = StarCraft2Config(self.plugin_root, config_path=self.config_path)
+        self.config_path = self.config_manager.config_path
         self.config = self._load_config()
         self.launcher = ProBotsLauncher()
         self.log_watcher = ProBotsLogWatcher()
@@ -116,6 +117,9 @@ class StarCraft2Extension(GameExtensionInterface):
         self._is_started = False
         self._last_status_message = "created"
         self._status_event_callback = None
+        #20260716_kpopmodder: Tracks short SC2 shutdown windows so terminal
+        # protocol cleanup noise does not become shared engine_error events.
+        self._terminal_shutdown_error_ignore_until = 0.0
 
     @property
     def name(self) -> str:
@@ -311,6 +315,8 @@ class StarCraft2Extension(GameExtensionInterface):
             if bot_name.lower() in source_text:
                 self.parser.bot_name = bot_name
                 break
+        if self._is_terminal_shutdown_noise_line(line):
+            return
         event = self.parser.parse_event(line)
         if event is None:
             return
@@ -336,6 +342,57 @@ class StarCraft2Extension(GameExtensionInterface):
                 return
         if self._should_log_only_event(event, event_type):
             return
+
+    def _is_terminal_shutdown_noise_line(self, line: str) -> bool:
+        lower = str(line or "").strip().lower()
+        if not lower:
+            return False
+
+        now = time.time()
+        if "starting game" in lower or "starting ladder game" in lower or "starting the match" in lower:
+            self._terminal_shutdown_error_ignore_until = 0.0
+            return False
+
+        if (
+            "end game report" in lower
+            or "game ended" in lower
+            or "match ended" in lower
+            or "client changed status from in_game to ended" in lower
+            or "finished with result:" in lower
+        ):
+            self._terminal_shutdown_error_ignore_until = max(
+                self._terminal_shutdown_error_ignore_until,
+                now + 30.0,
+            )
+
+        #20260716_kpopmodder: Only the exact already-ended protocol tail is
+        # silent. Other protocol/engine errors still flow to normal handling.
+        terminal_protocol = (
+            ("already ended" in lower or "game has already ended" in lower)
+            and (
+                "not supported" in lower
+                or "protocolerror" in lower
+                or "response_not_set" in lower
+            )
+        )
+        if terminal_protocol:
+            self._terminal_shutdown_error_ignore_until = now + 30.0
+            return True
+
+        if now > self._terminal_shutdown_error_ignore_until:
+            return False
+
+        shutdown_followup_markers = (
+            "[pyi-",
+            "failed to execute script",
+            "unhandled exception",
+            "unclosed client session",
+            "task exception was never retrieved",
+            "expected query but got response_not_set",
+            "expected action but got response_not_set",
+            "response response_not_set has",
+        )
+        return any(marker in lower for marker in shutdown_followup_markers)
 
     def _should_log_only_event(self, event, event_type: str = "") -> bool:
         #20260710_kpopmodder: Only startup/log-intro notices stay silent; live SC2 commentary should speak.
@@ -441,14 +498,9 @@ class StarCraft2Extension(GameExtensionInterface):
 
     def _load_config(self) -> Dict[str, Any]:
         config = copy.deepcopy(DEFAULT_CONFIG)
-        if not os.path.isfile(self.config_path):
-            return config
-        try:
-            with open(self.config_path, "r", encoding="utf-8") as file:
-                loaded = json.load(file)
-        except Exception as e:
-            log_print(f"[StarCraft2Extension] config load failed: {e}")
-            return config
+        self.config_manager = StarCraft2Config(self.plugin_root, config_path=self.config_path)
+        self.config_path = self.config_manager.config_path
+        loaded = self.config_manager.snapshot()
         if isinstance(loaded, dict):
             config.update(copy.deepcopy(loaded))
         return config
@@ -471,7 +523,7 @@ class StarCraft2Extension(GameExtensionInterface):
                 continue
             text = os.path.expandvars(os.path.expanduser(text))
             if not os.path.isabs(text):
-                text = os.path.join(self.plugin_root, text)
+                text = self.config_manager.resolve_path_value(text)
             append_path(text)
         #20260711_kpopmodder: Always observe the bot logs produced by the
         # repo-local Ladder Proxy runtime while preserving configured paths.

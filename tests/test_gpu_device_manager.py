@@ -74,7 +74,7 @@ class GPUDeviceManagerTests(unittest.TestCase):#20260626_kpopmodder
         manager._gpu_log_done = True
         return manager
 
-    def test_default_voice_input_device_is_cuda_one(self):#20260627_kpopmodder
+    def test_default_voice_input_device_is_cuda_zero(self):#20260627_kpopmodder
         temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(temp_dir.cleanup)
         manager = GPUDeviceManager(
@@ -83,7 +83,7 @@ class GPUDeviceManagerTests(unittest.TestCase):#20260626_kpopmodder
         manager._gpu_log_done = True
 
         with self._patch_torch_cuda(manager, available=True, count=2):
-            self.assertEqual(manager.get_device("VoiceInput"), "cuda:1")
+            self.assertEqual(manager.get_device("VoiceInput"), "cuda:0")
 
     def test_configured_device_map_and_max_memory_are_sanitized(self):#20260626_kpopmodder
         manager = self._manager_with_config({

@@ -4,6 +4,7 @@ import traceback
 
 from app_core.module_config import module_enabled
 from core.logger import log_print
+from plugin_system.registry import plugin_registry
 
 
 def instantiate_optional_plugin(
@@ -16,6 +17,7 @@ def instantiate_optional_plugin(
     **kwargs,
 ):
     if not module_enabled(plugin_name, default_enabled, project_root):
+        plugin_registry.record(plugin_name, "DISABLED", kind="optional")
         log_print(
             f"[Startup][DISABLED] [{plugin_name}] optional plugin disabled in modules.json "
             f"(default_enabled={default_enabled})"
@@ -26,6 +28,7 @@ def instantiate_optional_plugin(
         module = importlib.import_module(module_path)
     except Exception as e:
         trace = traceback.format_exc().strip()
+        plugin_registry.record(plugin_name, "BROKEN", kind="optional", detail=e)
         log_print(
             f"[Startup][BROKEN] [{plugin_name}] enabled plugin module import failed: "
             f"{type(e).__name__}: {e}\n{trace}"
@@ -36,6 +39,7 @@ def instantiate_optional_plugin(
         plugin_class = getattr(module, class_name)
     except Exception as e:
         trace = traceback.format_exc().strip()
+        plugin_registry.record(plugin_name, "BROKEN", kind="optional", detail=e)
         log_print(
             f"[Startup][BROKEN] [{plugin_name}] enabled plugin missing class '{class_name}': "
             f"{class_name}: {type(e).__name__}: {e}\n{trace}"
@@ -43,7 +47,9 @@ def instantiate_optional_plugin(
         return None
 
     try:
-        return plugin_class(*args, **kwargs)
+        plugin = plugin_class(*args, **kwargs)
+        plugin_registry.record(plugin_name, "READY", kind="optional")
+        return plugin
     except KeyboardInterrupt:
         log_print(
             f"[Startup] [{plugin_name}] optional plugin constructor interrupted."
@@ -51,6 +57,7 @@ def instantiate_optional_plugin(
         raise
     except Exception as e:
         trace = traceback.format_exc().strip()
+        plugin_registry.record(plugin_name, "BROKEN", kind="optional", detail=e)
         log_print(
             f"[Startup][BROKEN] [{plugin_name}] enabled plugin constructor failed: "
             f"{type(e).__name__}: {e}\n{trace}"

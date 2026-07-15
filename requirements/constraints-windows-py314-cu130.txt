@@ -1,0 +1,4 @@
+#20260716_kpopmodder: Verified Windows Python 3.14 CUDA 13.0 wheel set; install with the cu130 index URL only.
+torch==2.13.0+cu130
+torchvision==0.28.0+cu130
+torchaudio==2.11.0+cu130

@@ -1,0 +1,3 @@
+#20260716_kpopmodder: Development and test-only dependencies.
+pytest==9.1.1
+ruff==0.15.17

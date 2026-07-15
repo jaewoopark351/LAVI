@@ -26,6 +26,7 @@ class StarCraft2ReactionRuntime:
         "engine_error",
         "error",
     }
+    RESULT_EVENT_TYPES = {"game_won", "game_lost"}
 
     def __init__(
         self,
@@ -54,6 +55,9 @@ class StarCraft2ReactionRuntime:
         self._game_active = False
         self._game_end_cancelled = False
         self._suppress_post_game_tts = False
+        #20260716_kpopmodder: The log observer and ladder proxy can both
+        # report the same final result. Speak one result per match only.
+        self._spoken_result_event_type = ""
 
     def handle_status_event(
         self,
@@ -89,18 +93,29 @@ class StarCraft2ReactionRuntime:
                 f"event={event_type}"
             )
 
+        if event_type in self.RESULT_EVENT_TYPES and self._spoken_result_event_type:
+            log_print(
+                "[StarCraft2ReactionRuntime] duplicate result TTS suppressed: "
+                f"event={event_type} first={self._spoken_result_event_type}"
+            )
+            return False
+
         if self.policy is not None and not self.policy.should_emit(normalized):
             return False
         text = build_starcraft2_reaction_text(normalized)
         if not text:
             text = str(normalized.details.get("message") or "").strip()
-        return self.tts_adapter.speak(text)
+        spoken = self.tts_adapter.speak(text)
+        if spoken and event_type in self.RESULT_EVENT_TYPES:
+            self._spoken_result_event_type = event_type
+        return spoken
 
     def _update_game_state(self, event_type: str, event_details: Dict[str, Any]) -> None:
         if event_type == "game_started":
             self._game_active = True
             self._game_end_cancelled = False
             self._suppress_post_game_tts = False
+            self._spoken_result_event_type = ""
             return
         if event_type in self.TERMINAL_EVENT_TYPES:
             self._game_active = False

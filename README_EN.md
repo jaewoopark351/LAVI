@@ -310,6 +310,14 @@ call venv\Scripts\activate.bat
 
 If `(venv)` appears, it is working.
 
+For the reproducible Windows install path, use the project-local installer instead of `run.bat`:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install_windows.ps1
+```
+
+`run.bat` is only a runtime launcher. It uses `venv\Scripts\python.exe`, runs `scripts\preflight.py`, and exits non-zero when the venv or preflight is not ready.
+
 ---
 
 ## 5. Install base tools
@@ -317,14 +325,14 @@ If `(venv)` appears, it is working.
 Update the installation tools to the latest versions.
 
 ```bat
-python -m pip install -U pip setuptools wheel
+python -m pip --version
 ```
 
 CMake may be required when some packages are installed from source instead of prebuilt wheels.
 Run the following command only if a build error occurs.
 
 ```bat
-pip install cmake
+python -m pip install cmake
 ```
 
 ---
@@ -332,7 +340,7 @@ pip install cmake
 ## 6. Install PyTorch (CUDA 13.0)
 
 ```bat
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu130
+python -m pip install torch==2.13.0+cu130 torchvision==0.28.0+cu130 torchaudio==2.11.0+cu130 --index-url https://download.pytorch.org/whl/cu130
 ```
 
 ---
@@ -340,7 +348,7 @@ pip install torch torchvision torchaudio --index-url https://download.pytorch.or
 ## 7. Install required manual package
 
 ```bat
-pip install git+https://github.com/chameleon-ai/LangSegment-0.3.5-backup.git
+python -m pip install git+https://github.com/chameleon-ai/LangSegment-0.3.5-backup.git
 ```
 
 ---
@@ -348,7 +356,7 @@ pip install git+https://github.com/chameleon-ai/LangSegment-0.3.5-backup.git
 ## 8. Install requirements.txt
 
 ```bat
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 ```
 
 ---
@@ -429,16 +437,18 @@ The default layout is:
 <!-- #20260627_kpopmodder: Match GPU docs to config/gpu_device_config.json. -->
 
 ```text
-GPU 0 / RTX 5070 Ti: default fallback GPU
-GPU 1 / RTX 5060 Ti: VoiceInput / Whisper, ScreenVision / Qwen2.5-VL, GPT-SoVITS API server
+default_device: cuda:0
+VoiceInput: cuda:0
+ScreenVision: device_map auto
+GPTSoVITS: no CUDA_VISIBLE_DEVICES override by default
 ```
 
 > Transformers_LLM is a legacy plugin that is not recommended for current use. Its folder and commented-out code traces remain, but runtime class/client/settings are disabled and `modules.json` sets it to `false`. Do not include it in the default GPU placement.
-> VoiceInput, ScreenVision, and GPT-SoVITS are all placed on GPU 1 / RTX 5060 Ti, so VRAM exhaustion may happen when they run together. If that happens, adjust the VoiceInput or ScreenVision placement in `config\gpu_device_config.json`.
+> The example config avoids pinning everything to `cuda:1`. Copy it to `config\gpu_device_config.json` and adjust only for the local machine.
 
 Do not run the LAV main process with `CUDA_VISIBLE_DEVICES=0`.
-If you limit the main LAV process that way, ScreenVision will not be able to see `cuda:1`.
-The main LAV process must be able to see both GPU 0 and GPU 1, while each plugin is pinned through the `device` or `device_map` values in `gpu_device_config.json`.
+If you limit the main LAV process that way, other GPUs will not be visible to LAV.
+The main LAV process must be able to see the GPUs you want to use, while each plugin selects its GPU through the `device` or `device_map` values in `gpu_device_config.json`.
 
 GPT-SoVITS is launched automatically by LAV as a child process.
 To pin only GPT-SoVITS to a separate GPU, use the `cuda_visible_devices` value in this file:
@@ -486,16 +496,16 @@ powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $
 
 On startup, check for logs like these:
 
-<!-- #20260627_kpopmodder: Expected startup log reflects VoiceInput on cuda:1. -->
+<!-- #20260627_kpopmodder: Expected startup log reflects portable cuda:0/default GPU placement. -->
 
 ```text
 [GPUDeviceManager] detected: 0 = NVIDIA GeForce RTX 5070 Ti
 [GPUDeviceManager] detected: 1 = NVIDIA GeForce RTX 5060 Ti
-[GPUDeviceManager] VoiceInput -> cuda:1
-[GPUDeviceManager] ScreenVision -> cuda:1
+[GPUDeviceManager] VoiceInput -> cuda:0
+[GPUDeviceManager] ScreenVision -> cuda:0
 [GPUDeviceManager] GPTSoVITS -> CUDA_VISIBLE_DEVICES=1
-[ScreenVision] resolved device=cuda:1
-[VoiceInput] resolved device=cuda:1
+[ScreenVision] resolved device=cuda:0
+[VoiceInput] resolved device=cuda:0
 [GPTSoVITS_TTS] CUDA_VISIBLE_DEVICES=1
 ```
 
@@ -930,7 +940,7 @@ plugins\StarCraft116\bwapi_event_exporter\README.md
 
 <!-- #20260713_kpopmodder: Document the external StarCraft II resources and local path fields required by the StarCraft2 plugin. -->
 
-The StarCraft2 plugin can work with several different bot/runtime paths. These paths are local to each PC, so update the Gradio fields and `plugins\StarCraft2\config_starcraft2.json` before running a match.
+The StarCraft2 plugin can work with several different bot/runtime paths. These paths are local to each PC, so update the Gradio fields and `config\starcraft2_config.json` before running a match.
 
 Useful Ares-sc2 resources:
 
@@ -956,7 +966,7 @@ For the existing ProBots/Changeling workflow, download the ProBots vs Human App:
 https://versusai.net/how-to-play-against-the-probots/
 ```
 
-The downloaded app contains the `Bots` folder used by LAV's StarCraft2 runtime. After downloading or moving it, update these paths in the StarCraft2 tab and in `plugins\StarCraft2\config_starcraft2.json`:
+The downloaded app contains the `Bots` folder used by LAV's StarCraft2 runtime. After downloading or moving it, update these paths in the StarCraft2 tab and in `config\starcraft2_config.json`:
 
 ```text
 StarCraft II Path
@@ -969,7 +979,7 @@ Ares-sc2 Script Path
 External Jar Path
 ```
 
-Common path fields in `config_starcraft2.json` that must be filled for the local machine:
+Common path fields in `config\starcraft2_config.json` that must be filled for the local machine:
 
 ```json
 {
@@ -1167,32 +1177,21 @@ Not required for normal execution
 
 ---
 
-# requirements.txt Important
+# requirements files
 
-It is recommended to remove the following packages from `requirements.txt` because installation order and environment dependencies matter.
+`requirements.txt` is now an entrypoint that includes grouped runtime requirements:
 
 ```text
-torch
-torchvision
-torchaudio
-LangSegment
+requirements/base.txt
+requirements/windows.txt
+requirements/voice.txt
+requirements/vision.txt
+requirements/games.txt
+requirements/dev.txt
 ```
 
-Generate full package list:
-
-```bat
-pip freeze > requirements_full.txt
-```
-
-Generate clean `requirements.txt`:
-
-```bat
-findstr /V /R /I ^
-/C:"^torch==" ^
-/C:"^torchvision==" ^
-/C:"^torchaudio==" ^
-/C:"^LangSegment==" requirements_full.txt > requirements.txt
-```
+The known-good frozen environment snapshot remains in `requirements_full.txt`.
+The CUDA 13.0 PyTorch wheel pins are in `requirements/constraints-windows-py314-cu130.txt` and must be installed with the dedicated `cu130` index URL.
 
 ---
 

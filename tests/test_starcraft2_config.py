@@ -13,7 +13,9 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 class StarCraft2ConfigTests(unittest.TestCase):
     def test_modules_json_declares_starcraft2_toggle(self):
-        modules = json.loads((PROJECT_ROOT / "modules.json").read_text(encoding="utf-8"))
+        modules = json.loads(
+            (PROJECT_ROOT / "config" / "modules.example.json").read_text(encoding="utf-8")
+        )
 
         self.assertIn("StarCraft2", modules)
         self.assertIsInstance(modules.get("StarCraft2"), bool)
@@ -31,7 +33,7 @@ class StarCraft2ConfigTests(unittest.TestCase):
         self.assertIn("external_jar", example)
         self.assertIn("human_vs_bot", example)
         self.assertIn("runtime_download", example)
-        self.assertTrue(example["runtime_download"]["enabled"])
+        self.assertFalse(example["runtime_download"]["enabled"])
         self.assertEqual(
             "jaewoopark96/plugins_StarCraft2_runtime",
             example["runtime_download"]["repo_id"],
@@ -75,10 +77,14 @@ class StarCraft2ConfigTests(unittest.TestCase):
             / "bin"
             / "LavHumanVsBot.exe"
         )
-        self.assertEqual(
-            os.path.normcase(expected),
-            os.path.normcase(config.resolve_path_value(legacy_value)),
-        )
+        with mock.patch.dict(
+            os.environ,
+            {"LAVI_LEGACY_PROJECT_ROOTS": r"C:\Vtuber_Souorce_Code\LAV_v0.2"},
+        ):
+            self.assertEqual(
+                os.path.normcase(expected),
+                os.path.normcase(config.resolve_path_value(legacy_value)),
+            )
 
 
 if __name__ == "__main__":

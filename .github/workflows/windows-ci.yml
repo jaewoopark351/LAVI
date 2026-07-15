@@ -1,0 +1,31 @@
+#20260715_kpopmodder: Added the dependency-light Windows quality gate.
+name: Windows CI
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - run: python -m pip install -r requirements/base.txt -r requirements/windows.txt -r requirements/dev.txt
+      - name: Compile tracked source files
+        shell: pwsh
+        run: |
+          #20260716_kpopmodder: Avoid compiling repo-local venv and locked temp folders.
+          $paths = @(
+            "app_core",
+            "audio_core",
+            "core",
+            "llm_core",
+            "memory_core",
+            "plugin_system",
+            "plugins",
+            "scripts"
+          )
+          $paths += (Get-ChildItem -LiteralPath . -Filter *.py -File).FullName
+          $paths += (Get-ChildItem -LiteralPath .\tests -Filter *.py -File).FullName
+          python -m compileall -q @paths
+      - run: python -m pytest -m "not gpu and not integration and not network and not slow"
+      - run: python -m pip check

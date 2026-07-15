@@ -75,7 +75,7 @@ class PluginSystemImportTests(unittest.TestCase):
             loader._load_plugins_from_directory(str(plugin_dir))
 
             loaded_names = [
-                plugin.__class__.__name__
+                plugin.name
                 for plugin in loader.plugins["language_model"]
             ]
             self.assertEqual(["MissingKeyPlugin"], loaded_names)
@@ -264,20 +264,31 @@ class PluginSystemImportTests(unittest.TestCase):
 
             run_mock.assert_not_called()
             loaded_names = [
-                plugin.__class__.__name__
+                plugin.name
                 for plugin in loader.plugins["language_model"]
             ]
             self.assertEqual(["ReqPlugin"], loaded_names)
 
-    def test_loader_isolates_plugin_import_failure(self):#20260630_kpopmodder
+    def test_loader_isolates_plugin_import_failure_on_selected_handle(self):#20260630_kpopmodder
         from plugin_system.loader import PluginLoader
+        from plugin_system.interfaces import LLMPluginInterface
 
         with tempfile.TemporaryDirectory() as temp_dir:
             plugin_root = Path(temp_dir) / "plugins"
             plugin_dir = plugin_root / "MixedPlugin"
             plugin_dir.mkdir(parents=True)
             (plugin_dir / "BadPlugin.py").write_text(
-                "raise RuntimeError('import boom')\n",
+                "\n".join([
+                    "from plugin_system.interfaces import LLMPluginInterface",
+                    "raise RuntimeError('import boom')",
+                    "class BadPlugin(LLMPluginInterface):",
+                    "    def init(self):",
+                    "        pass",
+                    "    def predict(self, message, history):",
+                    "        return ''",
+                    "    def create_ui(self):",
+                    "        return None",
+                ]),
                 encoding="utf-8",
             )
             (plugin_dir / "GoodPlugin.py").write_text(
@@ -302,14 +313,16 @@ class PluginSystemImportTests(unittest.TestCase):
             loader.plugin_setting_path = str(modules_path)
             loader._load_plugins_from_directory(str(plugin_dir))
 
-            loaded_names = [
-                plugin.__class__.__name__
-                for plugin in loader.plugins["language_model"]
-            ]
-            self.assertEqual(["GoodPlugin"], loaded_names)
+            handles = loader.plugins["language_model"]
+            loaded_names = [plugin.name for plugin in handles]
+            self.assertEqual(["BadPlugin", "GoodPlugin"], loaded_names)
+            self.assertIsNone(handles[0].construct(LLMPluginInterface))
+            self.assertIsNotNone(handles[1].construct(LLMPluginInterface))
 
-    def test_loader_isolates_plugin_constructor_failure(self):#20260630_kpopmodder
+    def test_loader_defers_and_isolates_plugin_constructor_failure(self):#20260630_kpopmodder
         from plugin_system.loader import PluginLoader
+        from plugin_system.loader import PluginState
+        from plugin_system.interfaces import LLMPluginInterface
 
         with tempfile.TemporaryDirectory() as temp_dir:
             plugin_root = Path(temp_dir) / "plugins"
@@ -347,11 +360,14 @@ class PluginSystemImportTests(unittest.TestCase):
             loader.plugin_setting_path = str(modules_path)
             loader._load_plugins_from_directory(str(plugin_dir))
 
-            loaded_names = [
-                plugin.__class__.__name__
-                for plugin in loader.plugins["language_model"]
-            ]
-            self.assertEqual(["GoodPlugin"], loaded_names)
+            handles = loader.plugins["language_model"]
+            loaded_names = [plugin.name for plugin in handles]
+            self.assertEqual(["FailingPlugin", "GoodPlugin"], loaded_names)
+            self.assertIsNone(handles[0].instance)
+            self.assertEqual(PluginState.READY, handles[0].status)
+            self.assertIsNone(handles[0].construct(LLMPluginInterface))
+            self.assertEqual(PluginState.BROKEN, handles[0].status)
+            self.assertIsNotNone(handles[1].construct(LLMPluginInterface))
 
     def test_loader_module_name_keeps_policy_suffix(self):#20260703_kpopmodder
         from plugin_system.loader import PluginLoader
@@ -383,8 +399,155 @@ class PluginSystemImportTests(unittest.TestCase):
             loader.plugin_setting_path = str(modules_path)
             loader._load_plugins_from_directory(str(plugin_dir))
 
-            loaded = loader.plugins["language_model"][0]
+            loaded = loader.plugins["language_model"][0].construct()
             self.assertTrue(loaded.__class__.__module__.endswith(".policy"))
+
+    def test_loader_is_idempotent(self):#20260716_kpopmodder
+        from plugin_system.loader import PluginLoader
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            plugin_root = Path(temp_dir) / "plugins"
+            plugin_dir = plugin_root / "OncePlugin"
+            plugin_dir.mkdir(parents=True)
+            (plugin_dir / "OncePlugin.py").write_text(
+                "\n".join([
+                    "from plugin_system.interfaces import LLMPluginInterface",
+                    "",
+                    "class OncePlugin(LLMPluginInterface):",
+                    "    def init(self):",
+                    "        pass",
+                    "    def predict(self, message, history):",
+                    "        return ''",
+                    "    def create_ui(self):",
+                    "        return None",
+                ]),
+                encoding="utf-8",
+            )
+            modules_path = Path(temp_dir) / "modules.json"
+            modules_path.write_text(json.dumps({}), encoding="utf-8")
+
+            loader = PluginLoader("plugins")
+            loader.plugin_directory = str(plugin_root)
+            loader.plugin_setting_path = str(modules_path)
+            loader.load_plugins()
+            loader.load_plugins()
+
+            loaded_names = [plugin.name for plugin in loader.plugins["language_model"]]
+            self.assertEqual(["OncePlugin"], loaded_names)
+
+    def test_selection_with_handles_constructs_only_selected_provider(self):#20260716_kpopmodder
+        from plugin_system.selection import PluginSelectionBase
+
+        class FakeSelectionInterface:
+            pass
+
+        class SelectedProvider(FakeSelectionInterface):
+            def __init__(self):
+                self.init_count = 0
+
+            def init(self):
+                self.init_count += 1
+
+            def create_ui(self):
+                return None
+
+        class LazyProvider(FakeSelectionInterface):
+            def __init__(self):
+                self.init_count = 0
+
+            def init(self):
+                self.init_count += 1
+
+            def create_ui(self):
+                return None
+
+        class FakeHandle:
+            def __init__(self, name, plugin):
+                self.name = name
+                self.plugin = plugin
+                self.construct_count = 0
+                self.error = ""
+
+            def construct(self, expected_interface=None):
+                self.construct_count += 1
+                return self.plugin
+
+            def mark_running(self):
+                pass
+
+        selected = SelectedProvider()
+        lazy = LazyProvider()
+        selected_handle = FakeHandle("SelectedProvider", selected)
+        lazy_handle = FakeHandle("LazyProvider", lazy)
+        fake_loader = mock.Mock()
+        fake_loader.interface_to_category = {
+            FakeSelectionInterface: "fake_category",
+        }
+        fake_loader.plugins = {
+            "fake_category": [selected_handle, lazy_handle],
+        }
+
+        with mock.patch("plugin_system.selection.plugin_loader", fake_loader):
+            with mock.patch(
+                "plugin_system.selection.config_manager.load_section",
+                return_value={},
+            ):
+                selection = PluginSelectionBase(FakeSelectionInterface)
+
+        self.assertIs(selection.current_plugin, selected)
+        self.assertEqual(1, selected_handle.construct_count)
+        self.assertEqual(0, lazy_handle.construct_count)
+        self.assertEqual(1, selected.init_count)
+        self.assertEqual(0, lazy.init_count)
+
+    def test_selection_falls_back_when_configured_provider_fails(self):#20260716_kpopmodder
+        from plugin_system.selection import PluginSelectionBase
+
+        class FakeSelectionInterface:
+            pass
+
+        class BrokenProvider(FakeSelectionInterface):
+            def init(self):
+                raise RuntimeError("broken default")
+
+            def create_ui(self):
+                return None
+
+        class StableProvider(FakeSelectionInterface):
+            def __init__(self):
+                self.init_count = 0
+
+            def init(self):
+                self.init_count += 1
+
+            def create_ui(self):
+                return None
+
+        broken = BrokenProvider()
+        stable = StableProvider()
+        fake_loader = mock.Mock()
+        fake_loader.interface_to_category = {
+            FakeSelectionInterface: "fake_category",
+        }
+        fake_loader.plugins = {
+            "fake_category": [broken, stable],
+        }
+
+        with mock.patch("plugin_system.selection.plugin_loader", fake_loader):
+            with mock.patch(
+                "plugin_system.selection.config_manager.load_section",
+                return_value={"default_fake_category_provider": "BrokenProvider"},
+            ):
+                selection = PluginSelectionBase(FakeSelectionInterface)
+
+        self.assertIs(selection.current_plugin, stable)
+        self.assertEqual(1, stable.init_count)
+        broken_provider = selection.find_provider_by_name(
+            selection.provider_list,
+            "BrokenProvider",
+        )
+        self.assertTrue(broken_provider.disabled)
+        self.assertIn("broken default", broken_provider.init_error)
 
     def test_optional_plugin_loader_isolates_import_failure(self):#20260703_kpopmodder
         from app_core.optional_plugin_loader import instantiate_optional_plugin

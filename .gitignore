@@ -6,10 +6,34 @@ plugins/StarCraft116/bwapi_dll_probe/obj/
 plugins/StarCraft116/bwapi_observer_client/obj/
 plugins/StarCraft116/bwapi_dll_probe/bin/Release/*.pdb
 plugins/StarCraft116/bwapi_observer_client/bin/Release/*.pdb
-.*
+# Local dotfiles and tool caches
+.env
+.env.*
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+.vs/
+.vscode/
+.codex_pycache/
+.codex_tmp/
+.dotnet_home/
+.test_tmp/
+.tmp-tests/
+plugins/StarCraft2/native/**/.dotnet_home/
+plugins/StarCraft2/native/**/.travis/
+plugins/StarCraft2/native/**/.travis.yml
+plugins/StarCraft2/native/**/.gitmodules
+plugins/StarCraft2/native/**/.editorconfig
+!.github/
+!.github/workflows/
+!.github/workflows/*.yml
 *env
 !.gitignore
 flagged
+#20260716_kpopmodder: Ignore the stray zero-byte root file named "python"; tracked removal is handled separately.
+/python
 venv
 gradio_cached_examples
 gradio-env
@@ -82,6 +106,9 @@ config.ini
 # ==============================
 config.ini
 config/audio_device_config.json
+config/gpu_device_config.json
+config/modules.json
+config/starcraft2_config.json
 config/gpt_sovits_config.json
 plugins/GPTSoVITS/config/gpt_sovits_config.json
 !config/gpt_sovits_config.example.json
@@ -93,7 +120,11 @@ plugins/Chess/config/chess_config.json
 plugins/Chess/**/*.pb.gz
 plugins/StarCraftRemastered/config/starcraft_remastered_config.json
 plugins/StarCraft116/config/starcraft116_config.json
+plugins/StarCraft2/config_starcraft2.json
 plugins/StarCraft2/config/starcraft2_config.json
+!config/modules.example.json
+!config/gpu_device_config.example.json
+!config/starcraft2_config.example.json
 
 # ==============================
 # Transformers_LLM local model cache
@@ -129,6 +160,8 @@ logs/
 memory/
 *.bak
 *.bak*
+test/test_Isolation/
+tests/tmp*/
 
 ai_character_system_prompt.txt
 

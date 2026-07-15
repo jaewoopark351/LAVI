@@ -6,10 +6,16 @@ from core.logger import log_print, debug_print#20260612_kpopmodder
 from plugin_system.loader import plugin_loader
 
 
+class PluginStartupError(RuntimeError):
+    #20260716_kpopmodder: Raise readable startup errors when required categories have no usable provider.
+    pass
+
+
 class Provider():
     #20260630_kpopmodder: Track lazy init state per provider so startup does not load every backend.
     def __init__(self):
         self.plugin = None
+        self.handle = None
         self.name = ""
         self.ui = None
         self.initialized = False
@@ -61,10 +67,14 @@ class PluginSelectionBase():#20260622_kpopmodder
         self.provider_list = []
         self.plugin_type = plugin_type
         self.category_name = plugin_loader.interface_to_category[self.plugin_type]
-        for plugin in plugin_loader.plugins[self.category_name]:
+        for plugin_entry in plugin_loader.plugins[self.category_name]:
             provider = Provider()
-            provider.plugin = plugin
-            provider.name = plugin.__class__.__name__
+            if hasattr(plugin_entry, "construct"):
+                provider.handle = plugin_entry
+                provider.name = plugin_entry.name
+            else:
+                provider.plugin = plugin_entry
+                provider.name = plugin_entry.__class__.__name__
             self.provider_list.append(provider)
 
         self.default_provider, self.default_provider_source = (
@@ -82,6 +92,15 @@ class PluginSelectionBase():#20260622_kpopmodder
         if self.load_provider(self.default_provider.name):
             self.current_provider = self.default_provider
             self.current_plugin = self.default_provider.plugin
+        else:
+            self._activate_first_available_provider(exclude_name=self.default_provider.name)
+
+        if self.current_plugin is None:
+            available_names = [provider.name for provider in self.provider_list]
+            raise PluginStartupError(
+                "No usable provider for required plugin category "
+                f"{self.category_name}. available={available_names}"
+            )
 
     # Creates the dropdown menu for selecting current plugin
     def create_plugin_selection_ui(self):
@@ -99,8 +118,11 @@ class PluginSelectionBase():#20260622_kpopmodder
     # Creates the custom UI from each plugin
     def create_plugin_ui(self):
         for provider in self.provider_list:
+            plugin = self._ensure_provider_constructed(provider)
+            if plugin is None:
+                continue
             try:
-                provider.ui = provider.plugin.create_ui()
+                provider.ui = plugin.create_ui()
             except Exception as e:
                 #20260630_kpopmodder: UI failure disables only this provider.
                 provider.disabled = True
@@ -138,6 +160,10 @@ class PluginSelectionBase():#20260622_kpopmodder
         if found_provider.initialized:
             return True
         # log_print(f"Found {found_provider} .")#20260612_kpopmodder
+        plugin = self._ensure_provider_constructed(found_provider)
+        if plugin is None:
+            return False
+
         if not issubclass(type(found_provider.plugin), self.plugin_type):
             #20260630_kpopmodder: Bad provider contract disables only the provider.
             found_provider.disabled = True
@@ -160,11 +186,57 @@ class PluginSelectionBase():#20260622_kpopmodder
             )
             return False
 
+        start = getattr(found_provider.plugin, "start", None)
+        if callable(start):
+            try:
+                start()
+            except Exception as e:
+                found_provider.disabled = True
+                found_provider.init_error = str(e)
+                log_print(
+                    f"[PluginSelection] provider start failed; disabled "
+                    f"{found_provider.name}: {e}"
+                )
+                return False
         found_provider.initialized = True
+        provider_handle = getattr(found_provider, "handle", None)
+        if provider_handle is not None:
+            provider_handle.mark_running()
         log_print(
             f"[PluginSelection] provider initialized: {found_provider.name}"
         )
         return True
+
+    def _ensure_provider_constructed(self, provider):
+        if provider.plugin is not None:
+            return provider.plugin
+        if provider.handle is None:
+            provider.disabled = True
+            provider.init_error = "provider has no plugin handle"
+            return None
+
+        plugin = provider.handle.construct(self.plugin_type)
+        if plugin is None:
+            provider.disabled = True
+            provider.init_error = provider.handle.error or "plugin construct failed"
+            return None
+        provider.plugin = plugin
+        return provider.plugin
+
+    def _activate_first_available_provider(self, exclude_name=""):
+        for provider in self.provider_list:
+            if provider.name == exclude_name:
+                continue
+            if not self.load_provider(provider.name):
+                continue
+            self.current_provider = provider
+            self.current_plugin = provider.plugin
+            log_print(
+                "[PluginSelection] fallback provider selected: "
+                f"{self.category_name} -> {provider.name}"
+            )#20260716_kpopmodder
+            return True
+        return False
 
     # Gradio doesn't support dynamic showing/hiding of elements
     # def hide_other_ui(self, provider_name):

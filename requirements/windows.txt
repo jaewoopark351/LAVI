@@ -1,0 +1,4 @@
+#20260716_kpopmodder: Windows-only runtime helpers. Install only into the project venv.
+audioop-lts==0.2.2
+pyreadline3==3.5.6
+pywin32==312

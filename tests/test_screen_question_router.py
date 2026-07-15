@@ -256,11 +256,11 @@ class ScreenQuestionMainWiringTests(unittest.TestCase):
         self.assertIn("provider = rule", config_text)
         self.assertIn("fallback_to_keyword = true", config_text)
 
-    def test_main_connects_screen_question_router_bootstrap_to_llm(self):
-        #20260630_kpopmodder: main.py now consumes the app_core screen router bootstrap.
+    def test_app_composer_connects_screen_question_router_bootstrap_to_llm(self):
+        #20260716_kpopmodder: AppComposer owns screen router bootstrap while main.py stays thin.
         project_root = Path(__file__).resolve().parents[1]
-        main_path = project_root / "main.py"
-        module = ast.parse(main_path.read_text(encoding="utf-8"))
+        composer_path = project_root / "app_core" / "app_composer.py"
+        module = ast.parse(composer_path.read_text(encoding="utf-8-sig"))
 
         screen_router_bootstrap_calls = [
             node
@@ -277,10 +277,14 @@ class ScreenQuestionMainWiringTests(unittest.TestCase):
             and getattr(node.func, "id", "") == "LLM"
         ]
         self.assertTrue(llm_calls)
-        llm_router_keywords = [
-            getattr(keyword.value, "id", "")
-            for call in llm_calls
-            for keyword in call.keywords
-            if keyword.arg == "screen_question_router"
-        ]
+        llm_router_keywords = []
+        for call in llm_calls:
+            for keyword in call.keywords:
+                if keyword.arg != "screen_question_router":
+                    continue
+                if isinstance(keyword.value, ast.Name):
+                    llm_router_keywords.append(keyword.value.id)
+                elif isinstance(keyword.value, ast.Attribute):
+                    llm_router_keywords.append(keyword.value.attr)
+
         self.assertIn("screen_question_router", llm_router_keywords)

@@ -309,6 +309,14 @@ py -3.14 -m venv venv
 call venv\Scripts\activate.bat
 ```
 
+Reproducible Windows install path:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install_windows.ps1
+```
+
+`run.bat` is now runtime-only. It uses `venv\Scripts\python.exe`, runs `scripts\preflight.py`, and exits with a non-zero code if the venv or preflight fails.
+
 명령어 앞에 `(venv)`가 보이면 정상입니다.
 
 ---
@@ -318,14 +326,14 @@ call venv\Scripts\activate.bat
 설치 도구를 최신 버전으로 업데이트합니다.
 
 ```bat
-python -m pip install -U pip setuptools wheel
+python -m pip --version
 ```
 
 일부 패키지가 wheel이 아니라 소스 빌드로 설치될 경우 CMake가 필요할 수 있습니다.
 빌드 오류가 발생할 때만 아래 명령어를 추가로 실행하세요.
 
 ```bat
-pip install cmake
+python -m pip install cmake
 ```
 
 ---
@@ -333,7 +341,7 @@ pip install cmake
 ## 6. PyTorch 설치 (CUDA 13.0)
 
 ```bat
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu130
+python -m pip install torch==2.13.0+cu130 torchvision==0.28.0+cu130 torchaudio==2.11.0+cu130 --index-url https://download.pytorch.org/whl/cu130
 ```
 
 ---
@@ -341,7 +349,7 @@ pip install torch torchvision torchaudio --index-url https://download.pytorch.or
 ## 7. 수동 설치 패키지 설치
 
 ```bat
-pip install git+https://github.com/chameleon-ai/LangSegment-0.3.5-backup.git
+python -m pip install git+https://github.com/chameleon-ai/LangSegment-0.3.5-backup.git
 ```
 
 ---
@@ -349,7 +357,7 @@ pip install git+https://github.com/chameleon-ai/LangSegment-0.3.5-backup.git
 ## 8. requirements.txt 설치
 
 ```bat
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 ```
 
 ---
@@ -430,16 +438,18 @@ LAVI\config\gpu_device_config.json
 <!-- #20260627_kpopmodder: Match GPU docs to config/gpu_device_config.json. -->
 
 ```text
-GPU 0 / RTX 5070 Ti: default fallback GPU
-GPU 1 / RTX 5060 Ti: VoiceInput / Whisper, ScreenVision / Qwen2.5-VL, GPT-SoVITS API server
+default_device: cuda:0
+VoiceInput: cuda:0
+ScreenVision: device_map auto
+GPTSoVITS: no CUDA_VISIBLE_DEVICES override by default
 ```
 
 > Transformers_LLM은 현재 사용 권장하지 않는 legacy 플러그인입니다. 폴더와 주석 처리된 코드 흔적은 남아 있지만 runtime class/client/settings는 비활성화되어 있고 `modules.json`에서도 `false`입니다. 기본 GPU 배치 대상에 포함하지 않습니다.
-> VoiceInput, ScreenVision, GPT-SoVITS가 모두 GPU 1 / RTX 5060 Ti에 배치되므로, 동시 사용 시 VRAM 부족이 발생할 수 있습니다. 이 경우 `config\gpu_device_config.json`에서 VoiceInput 또는 ScreenVision 배치를 조정하세요.
+> 기본 예제는 특정 PC의 `cuda:1`에 고정하지 않습니다. `config\gpu_device_config.example.json`을 복사한 뒤 로컬 GPU 배치가 필요할 때만 조정하세요.
 
 LAV 본체를 실행할 때 `CUDA_VISIBLE_DEVICES=0`으로 제한하지 마세요.
-그렇게 실행하면 LAV 프로세스 안에서 ScreenVision이 `cuda:1`을 볼 수 없습니다.
-LAV 본체는 GPU 0과 GPU 1을 모두 볼 수 있어야 하며, 각 플러그인이 `gpu_device_config.json`의 `device` 또는 `device_map`으로 사용할 GPU를 고정합니다.
+그렇게 실행하면 LAV 프로세스 안에서 다른 GPU를 볼 수 없습니다.
+LAV 본체는 필요한 GPU를 모두 볼 수 있어야 하며, 각 플러그인이 `gpu_device_config.json`의 `device` 또는 `device_map`으로 사용할 GPU를 선택합니다.
 
 GPT-SoVITS는 LAV가 자식 프로세스로 자동 실행합니다.
 GPT-SoVITS만 별도 GPU로 고정하려면 아래 파일의 `cuda_visible_devices` 값을 사용합니다.
@@ -487,16 +497,16 @@ powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $
 
 시작 로그에서 아래 흐름을 확인하세요.
 
-<!-- #20260627_kpopmodder: Expected startup log reflects VoiceInput on cuda:1. -->
+<!-- #20260627_kpopmodder: Expected startup log reflects portable cuda:0/default GPU placement. -->
 
 ```text
 [GPUDeviceManager] detected: 0 = NVIDIA GeForce RTX 5070 Ti
 [GPUDeviceManager] detected: 1 = NVIDIA GeForce RTX 5060 Ti
-[GPUDeviceManager] VoiceInput -> cuda:1
-[GPUDeviceManager] ScreenVision -> cuda:1
+[GPUDeviceManager] VoiceInput -> cuda:0
+[GPUDeviceManager] ScreenVision -> cuda:0
 [GPUDeviceManager] GPTSoVITS -> CUDA_VISIBLE_DEVICES=1
-[ScreenVision] resolved device=cuda:1
-[VoiceInput] resolved device=cuda:1
+[ScreenVision] resolved device=cuda:0
+[VoiceInput] resolved device=cuda:0
 [GPTSoVITS_TTS] CUDA_VISIBLE_DEVICES=1
 ```
 
@@ -929,7 +939,7 @@ plugins\StarCraft116\bwapi_event_exporter\README.md
 
 <!-- #20260713_kpopmodder: Document the external StarCraft II resources and local path fields required by the StarCraft2 plugin. -->
 
-StarCraft2 플러그인은 여러 봇/런타임 경로를 사용할 수 있습니다. 이 경로들은 PC마다 다르므로, 매치를 실행하기 전에 Gradio의 StarCraft2 탭과 `plugins\StarCraft2\config_starcraft2.json` 값을 로컬 환경에 맞게 수정해야 합니다.
+StarCraft2 플러그인은 여러 봇/런타임 경로를 사용할 수 있습니다. 이 경로들은 PC마다 다르므로, 매치를 실행하기 전에 Gradio의 StarCraft2 탭과 `config\starcraft2_config.json` 값을 로컬 환경에 맞게 수정해야 합니다.
 
 Ares-sc2 참고 자료:
 
@@ -955,7 +965,7 @@ https://github.com/AresSC2/ares-random-example
 https://versusai.net/how-to-play-against-the-probots/
 ```
 
-다운로드한 앱 안의 `Bots` 폴더를 LAV StarCraft2 runtime에서 사용합니다. 다운로드하거나 폴더를 옮긴 뒤에는 StarCraft2 탭과 `plugins\StarCraft2\config_starcraft2.json`의 경로들을 채워야 합니다.
+다운로드한 앱 안의 `Bots` 폴더를 LAV StarCraft2 runtime에서 사용합니다. 다운로드하거나 폴더를 옮긴 뒤에는 StarCraft2 탭과 `config\starcraft2_config.json`의 경로들을 채워야 합니다.
 
 ```text
 StarCraft II Path
@@ -968,7 +978,7 @@ Ares-sc2 Script Path
 External Jar Path
 ```
 
-`config_starcraft2.json`에서 로컬 환경에 맞게 채워야 하는 대표 경로:
+`config\starcraft2_config.json`에서 로컬 환경에 맞게 채워야 하는 대표 경로:
 
 ```json
 {
@@ -1171,10 +1181,12 @@ python main.py
 아래 패키지들은 설치 순서와 환경 의존성 문제로 인해 `requirements.txt` 에서 제거하는 것을 권장합니다.
 
 ```text
-torch
-torchvision
-torchaudio
-LangSegment
+requirements/base.txt
+requirements/windows.txt
+requirements/voice.txt
+requirements/vision.txt
+requirements/games.txt
+requirements/dev.txt
 ```
 
 전체 패키지 목록 저장:
@@ -1192,6 +1204,9 @@ findstr /V /R /I ^
 /C:"^torchaudio==" ^
 /C:"^LangSegment==" requirements_full.txt > requirements.txt
 ```
+
+Current dependency management uses grouped files under `requirements\`.
+Do not regenerate `requirements.txt` from `pip freeze` unless you are intentionally updating the frozen snapshot.
 
 ---
 

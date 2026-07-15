@@ -13,7 +13,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 class TransformersLLMImportTests(unittest.TestCase):#20260626_kpopmodder
     def test_transformers_llm_is_disabled_in_modules_json(self):#20260627_kpopmodder
-        modules_path = PROJECT_ROOT / "modules.json"
+        modules_path = PROJECT_ROOT / "config" / "modules.example.json"
         modules = json.loads(modules_path.read_text(encoding="utf-8"))
 
         self.assertIs(modules.get("Transformers_LLM"), False)

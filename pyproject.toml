@@ -1,0 +1,25 @@
+#20260716_kpopmodder: Define the default test contract without requiring GPU, games, models, or network.
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+norecursedirs = [
+    ".git",
+    ".venv",
+    "venv",
+    ".codex_tmp",
+    ".codex_pycache",
+    ".dotnet_home",
+    ".test_tmp",
+    ".tmp-tests",
+    "test/test_Isolation",
+    "tests/tmp*",
+]
+markers = [
+    "windows: tests that require Windows-specific APIs or paths",
+    "gpu: tests that require CUDA or GPU hardware",
+    "integration: tests that require external programs, games, models, or services",
+    "network: tests that require network access",
+    "slow: tests that are intentionally slower than the default quality gate",
+]
+filterwarnings = [
+    "default",
+]

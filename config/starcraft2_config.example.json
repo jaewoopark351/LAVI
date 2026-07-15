@@ -1,0 +1,130 @@
+{
+  "enabled": false,
+  "engine": "internal_lav_bot",
+  "starcraft2_path": "C:\\Program Files (x86)\\StarCraft II",
+  "map_name": "AbyssalReefLE",
+  "race": "Terran",
+  "enemy_race": "Zerg",
+  "enemy_difficulty": "Easy",
+  "realtime": false,
+  "auto_launch": false,
+  "step_time": 0.015,
+  "max_game_seconds": 1800,
+  "target_workers": 18,
+  "target_barracks": 4,
+  "attack_count": 8,
+  "reinforce_interval_sec": 5,
+  "enemy_seen_event_interval_sec": 20,
+  "enable_lav_coach": true,
+  "coach_event_interval_sec": 8,
+  "sc2aiapp_path": "",
+  "probots_app_path": "",
+  "starcraft2_exe_path": "",
+  "starcraft2_support64_path": "",
+  "starcraft2_base_path": "",
+  "starcraft2_install_path": "C:\\Program Files (x86)\\StarCraft II",
+  "maps_path": "",
+  "preferred_bot": "Changeling",
+  "preferred_map": "PersephoneLE.SC2Map",
+  "auto_launch_probots": false,
+  "kill_existing_processes_before_launch": false,
+  "log_paths": [],
+  "watch_stdout": true,
+  "speak_events": true,
+  "external_exe": {
+    "path": "",
+    "working_directory": "",
+    "args": []
+  },
+  "micromachine": {
+    "path": "",
+    "working_directory": "",
+    "args": [],
+    "starcraft2_executable": "",
+    "auto_add_executable_arg": true,
+    "bot_config_name": "BotConfig.txt",
+    "require_bot_config": true
+  },
+  "ares_sc2": {
+    "script_path": "",
+    "working_directory": "",
+    "python_path": "",
+    "use_poetry": false,
+    "poetry_path": "poetry",
+    "python_command": "python",
+    "args": []
+  },
+  "external_jar": {
+    "java_path": "java",
+    "jar_path": "",
+    "working_directory": "",
+    "args": []
+  },
+  "human_vs_bot": {
+    "launcher_path": "",
+    "working_directory": "",
+    "args": []
+  },
+  "runtime_download": {
+    "enabled": false,
+    "repo_id": "jaewoopark96/plugins_StarCraft2_runtime",
+    "repo_type": "model",
+    "revision": "main"
+  },
+  "local_match": {
+    "enabled": false,
+    "executable_path": "plugins\\StarCraft2\\native\\Sc2LadderServer\\bin\\LavHumanVsBot.exe",
+    "working_directory": "plugins\\StarCraft2\\runtime",
+    "args": [
+      "--human-name",
+      "IdleProbe",
+      "--map",
+      "PersephoneLE.SC2Map",
+      "--race",
+      "Protoss",
+      "--bot-dir",
+      "Bots/",
+      "--config",
+      "HumanLadder.json"
+    ],
+    "ports": [
+      5677,
+      5678
+    ],
+    "check_hosts": [
+      "127.0.0.1"
+    ],
+    "connect_timeout_sec": 0.5,
+    "capture_output": true,
+    "restart_unhealthy": true,
+    "restart_unhealthy_after_sec": 20.0,
+    "remote_human_enabled": false,
+    "starcraft2_exe_path": "",
+    "starcraft2_support64_path": "",
+    "starcraft2_base_path": ""
+  },
+  "ladder_proxy": {
+    "enabled": false,
+    "archived": true,
+    "notes": "20260712_kpopmodder: LAN Lobby ladder proxy is archived/disabled.",
+    "executable_path": "",
+    "working_directory": "",
+    "args": [],
+    "ports": [
+      5677,
+      5678
+    ],
+    "check_hosts": [
+      "127.0.0.1"
+    ],
+    "connect_timeout_sec": 0.5,
+    "capture_output": true,
+    "auto_start_with_lan_host": false,
+    "remote_human_enabled": false,
+    "remote_human_client_port": 5679,
+    "remote_start_timeout_sec": 60.0,
+    "starcraft2_exe_path": "",
+    "starcraft2_support64_path": "",
+    "starcraft2_base_path": ""
+  }
+}

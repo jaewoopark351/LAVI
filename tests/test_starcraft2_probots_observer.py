@@ -218,6 +218,32 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
             with self.subTest(line=line):
                 self.assertIsNone(parser.parse_event(line))
 
+    #20260716_kpopmodder: The observer may see SC2's already-ended protocol
+    # tail in logs, but that shutdown noise must not reach the shared event bus.
+    def test_extension_suppresses_terminal_protocol_cleanup_noise(self):
+        status_callback = mock.Mock()
+        context = GameExtensionContext()
+        context.set_shared(
+            STARCRAFT2_STATUS_EVENT_CALLBACK_RESOURCE,
+            status_callback,
+        )
+        extension = StarCraft2Extension(
+            plugin_root="C:\\fake\\StarCraft2",
+            config_path="missing.json",
+        )
+        extension.initialize(context)
+
+        extension._handle_raw_line(
+            "stderr.log",
+            "sc2.protocol.ProtocolError: ['Not supported if game has already ended']",
+        )
+        extension._handle_raw_line(
+            "stderr.log",
+            "[PYI-30628:ERROR] Failed to execute script 'run' due to unhandled exception!",
+        )
+
+        status_callback.assert_not_called()
+
     def test_parser_allows_same_event_again_after_new_game(self):
         parser = SC2EventParser(bot_name="Changeling")
 

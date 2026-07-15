@@ -44,6 +44,9 @@ class StarCraft2LadderProxyEventService:
         self.event_bus = event_bus
         #20260713_kpopmodder: Ignore known RESPONSE_NOT_SET tail noise after a match end.
         self._response_not_set_ignore_until = 0.0
+        #20260716_kpopmodder: SC2 can emit PyInstaller/protocol noise while
+        # tearing down after a valid match result. Keep that tail log-only.
+        self._terminal_shutdown_error_ignore_until = 0.0
         #20260715_kpopmodder: Both SC2 clients report ended; emit one match event.
         self._game_ended_emitted = False
 
@@ -84,14 +87,18 @@ class StarCraft2LadderProxyEventService:
         if "starting the match" in lower:
             event_type = "game_started"
             self._response_not_set_ignore_until = 0.0
+            self._terminal_shutdown_error_ignore_until = 0.0
             self._game_ended_emitted = False
             self.observation_tracker.reset()
         elif "client changed status from in_game to ended" in lower:
-            self._response_not_set_ignore_until = time.time() + 5.0
+            now = time.time()
+            self._response_not_set_ignore_until = now + 5.0
+            self._terminal_shutdown_error_ignore_until = now + 30.0
             if not self._game_ended_emitted:
                 event_type = "game_ended"
                 self._game_ended_emitted = True
         elif "finished with result:" in lower:
+            self._terminal_shutdown_error_ignore_until = time.time() + 30.0
             # LavHumanVsBot assigns Player1 to LAVHuman and Player2 to
             # the AI. Report the result from the AI/TTS perspective.
             if "initializationerror" in lower or "initialization error" in lower:
@@ -140,12 +147,46 @@ class StarCraft2LadderProxyEventService:
 
         return False
 
+    def _is_terminal_shutdown_error_line(self, lower: str, now: float) -> bool:
+        #20260716_kpopmodder: Do not promote the well-known "game already
+        # ended" cleanup burst into engine_error after the result is known.
+        already_ended = "already ended" in lower or "game has already ended" in lower
+        terminal_protocol = (
+            already_ended
+            and (
+                "not supported" in lower
+                or "protocolerror" in lower
+                or "response_not_set" in lower
+            )
+        )
+        if terminal_protocol:
+            self._response_not_set_ignore_until = now + 5.0
+            self._terminal_shutdown_error_ignore_until = now + 30.0
+            return True
+
+        if now > self._terminal_shutdown_error_ignore_until:
+            return False
+
+        shutdown_followup_markers = (
+            "[pyi-",
+            "failed to execute script",
+            "unhandled exception",
+            "unclosed client session",
+            "task exception was never retrieved",
+            "expected query but got response_not_set",
+            "expected action but got response_not_set",
+            "response response_not_set has",
+        )
+        return any(marker in lower for marker in shutdown_followup_markers)
+
     def is_ladder_proxy_error_line(self, lower_line: str) -> bool:
         lower = str(lower_line or "").lower()
         if not lower:
             return False
 
         now = time.time()
+        if self._is_terminal_shutdown_error_line(lower, now):
+            return False
         if self._is_response_not_set_end_tail(lower, now):
             return False
 

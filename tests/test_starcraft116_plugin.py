@@ -29,7 +29,7 @@ class StarCraft116PluginTests(unittest.TestCase):
         return path
 
     def test_modules_json_has_starcraft116_toggle(self):
-        modules = json.loads((PROJECT_ROOT / "modules.json").read_text(
+        modules = json.loads((PROJECT_ROOT / "config" / "modules.example.json").read_text(
             encoding="utf-8",
         ))
 

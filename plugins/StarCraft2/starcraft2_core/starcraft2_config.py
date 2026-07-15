@@ -4,12 +4,15 @@ from __future__ import annotations
 import copy
 import json
 import os
+import shutil
+from pathlib import Path
 from typing import Any, Dict, List
 
+from core.logger import log_print
+from core.paths import get_lavi_paths
 
-PROJECT_ROOT_MARKERS = [
-    r"C:\Vtuber_Souorce_Code\LAV_v0.2",
-]
+
+LEGACY_PROJECT_ROOTS_ENV = "LAVI_LEGACY_PROJECT_ROOTS"
 
 LOCAL_MATCH_EXECUTABLE_RELATIVE = os.path.join(
     "plugins",
@@ -166,27 +169,29 @@ DEFAULT_CONFIG: Dict[str, Any] = {
 
 class StarCraft2Config:
     #20260707_kpopmodder: Keep StarCraft II optional so missing game files never break LAV startup.
-    def __init__(self, plugin_root: str | None = None):
+    def __init__(self, plugin_root: str | None = None, config_path: str | None = None):
         self.plugin_root = plugin_root or os.path.dirname(
             os.path.dirname(os.path.abspath(__file__))
         )
         self.project_root = os.path.dirname(os.path.dirname(self.plugin_root))
-        self.config_dir = os.path.join(self.plugin_root, "config")
-        self.config_path = os.path.join(
-            self.config_dir,
-            "starcraft2_config.json",
-        )
-        self.example_config_path = os.path.join(
-            self.config_dir,
+        self.paths = get_lavi_paths(Path(self.project_root))
+        self.config_path = str(config_path or self.paths.config_path("starcraft2_config.json"))
+        self.config_dir = os.path.dirname(self.config_path)
+        self.example_config_path = str(self.paths.config_path("starcraft2_config.example.json"))
+        self.legacy_example_config_path = os.path.join(
+            self.plugin_root,
+            "config",
             "starcraft2_config.example.json",
         )
         self.config: Dict[str, Any] = self._default_config()
         self.config_exists = False
         self.load_error = ""
+        self.migrated_from = ""
         self.load()
 
     def load(self) -> Dict[str, Any]:
         self.config = self._default_config()
+        self._migrate_legacy_config_if_missing()
         self.config_exists = os.path.exists(self.config_path)
         self.load_error = ""
 
@@ -211,7 +216,12 @@ class StarCraft2Config:
         return self.load()
 
     def load_example_config(self) -> Dict[str, Any]:
-        with open(self.example_config_path, "r", encoding="utf-8") as file:
+        example_path = (
+            self.example_config_path
+            if os.path.exists(self.example_config_path)
+            else self.legacy_example_config_path
+        )
+        with open(example_path, "r", encoding="utf-8") as file:
             data = json.load(file)
         if not isinstance(data, dict):
             raise ValueError("StarCraft2 example config must be a JSON object")
@@ -306,11 +316,32 @@ class StarCraft2Config:
         if os.path.isabs(value):
             value = self._migrate_old_repo_root(value)
             return os.path.normpath(value)
-        return os.path.normpath(os.path.join(self.project_root, value))
+        return os.path.normpath(str(self.paths.root_path(value)))
+
+    def _legacy_config_paths(self) -> List[str]:
+        return [
+            os.path.join(self.plugin_root, "config_starcraft2.json"),
+            os.path.join(self.plugin_root, "config", "starcraft2_config.json"),
+        ]
+
+    def _migrate_legacy_config_if_missing(self) -> None:
+        if os.path.exists(self.config_path):
+            return
+        for legacy_path in self._legacy_config_paths():
+            if not os.path.exists(legacy_path):
+                continue
+            os.makedirs(os.path.dirname(self.config_path), exist_ok=True)
+            shutil.copy2(legacy_path, self.config_path)
+            self.migrated_from = legacy_path
+            log_print(
+                "[StarCraft2Config] migrated legacy config without overwrite: "
+                f"{legacy_path} -> {self.config_path}"
+            )#20260716_kpopmodder
+            return
 
     def _migrate_old_repo_root(self, value: str) -> str:
         legacy_value = os.path.normpath(os.path.normcase(os.path.expandvars(os.path.expanduser(value))))
-        for marker in PROJECT_ROOT_MARKERS:
+        for marker in self._legacy_project_root_markers():
             legacy_root = os.path.normpath(os.path.normcase(marker))
             if legacy_value == legacy_root or legacy_value.startswith(
                 f"{legacy_root}{os.sep}"
@@ -318,6 +349,15 @@ class StarCraft2Config:
                 suffix = legacy_value[len(legacy_root) :].lstrip("/\\")
                 return os.path.join(self.project_root, suffix)
         return value
+
+    def _legacy_project_root_markers(self) -> List[str]:
+        #20260716_kpopmodder: Keep legacy migration configurable without committing a private PC path.
+        value = os.environ.get(LEGACY_PROJECT_ROOTS_ENV, "")
+        return [
+            item.strip().strip("\"'")
+            for item in value.split(os.pathsep)
+            if item.strip()
+        ]
 
     def _default_config(self) -> Dict[str, Any]:
         return copy.deepcopy(DEFAULT_CONFIG)

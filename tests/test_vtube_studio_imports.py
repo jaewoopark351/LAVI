@@ -93,7 +93,7 @@ class VTubeStudioImportTests(unittest.TestCase):
             values,
             [
                 [("EyeOpenLeft", 0.0), ("EyeOpenRight", 0.0)],
-                [("EyeOpenLeft", 0.5), ("EyeOpenRight", 0.5)],
+                [("EyeOpenLeft", 0.52), ("EyeOpenRight", 0.52)],
             ],
         )
 
@@ -116,14 +116,14 @@ class VTubeStudioImportTests(unittest.TestCase):
             for message in sent_messages
         ]
         expected_values = [
-            0.375,
-            0.25,
-            0.125,
+            0.39,
+            0.26,
+            0.13,
             0.0,
-            0.125,
-            0.25,
-            0.375,
-            0.5,
+            0.13,
+            0.26,
+            0.39,
+            0.52,
         ]
         self.assertEqual(len(values), len(expected_values))
         for value, expected_value in zip(values, expected_values):
