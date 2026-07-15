@@ -37,6 +37,121 @@ def _coerce_str(value: Any, fallback: str = "") -> str:
     return str(value or "").strip() if value is not None else fallback
 
 
+#20260715_kpopmodder: Add typed command, result, and status contracts for SC2 engines.
+@dataclass(frozen=True)
+class EngineStartCommandDTO:
+    """Stable command passed from the SC2 orchestrator to an engine."""
+
+    config: Dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def from_mapping(cls, value: Any) -> "EngineStartCommandDTO":
+        if isinstance(value, cls):
+            return value
+        return cls(config=_coerce_dict(value))
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self.config)
+
+
+@dataclass(frozen=True)
+class EngineStatusDTO:
+    """Stable status returned by every SC2 engine contract."""
+
+    engine: str = "unknown"
+    running: bool = False
+    status: Dict[str, Any] = field(default_factory=dict)
+    error: Optional[str] = None
+
+    @classmethod
+    def from_mapping(
+        cls,
+        value: Any,
+        engine: str = "unknown",
+    ) -> "EngineStatusDTO":
+        if isinstance(value, cls):
+            return value
+        payload = value if isinstance(value, dict) else {}
+        normalized_engine = _coerce_str(payload.get("engine"), engine or "unknown")
+        nested_status = payload.get("status")
+        status = _coerce_dict(nested_status) if isinstance(nested_status, dict) else dict(payload)
+        status.pop("engine", None)
+        status.pop("error", None)
+        running = bool(payload.get("running", status.get("running", False)))
+        status["running"] = running
+        error = payload.get("error", status.get("last_error"))
+        return cls(
+            engine=normalized_engine,
+            running=running,
+            status=status,
+            error=None if error is None else str(error),
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        payload = dict(self.status)
+        payload["engine"] = self.engine
+        payload["running"] = bool(self.running)
+        if self.error is not None:
+            payload["error"] = self.error
+        return payload
+
+
+@dataclass(frozen=True)
+class EngineResultDTO:
+    """Stable start/stop result returned by an SC2 engine."""
+
+    ok: bool
+    engine: str = "unknown"
+    running: bool = False
+    status: EngineStatusDTO = field(default_factory=EngineStatusDTO)
+    error: Optional[str] = None
+    stopped: bool = False
+    details: Dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def from_mapping(
+        cls,
+        value: Any,
+        engine: str = "unknown",
+    ) -> "EngineResultDTO":
+        if isinstance(value, cls):
+            return value
+        payload = value if isinstance(value, dict) else {}
+        normalized_engine = _coerce_str(payload.get("engine"), engine or "unknown")
+        status = EngineStatusDTO.from_mapping(
+            payload.get("status"),
+            engine=normalized_engine,
+        )
+        running = bool(payload.get("running", status.running))
+        if running != status.running:
+            status = EngineStatusDTO(
+                engine=status.engine,
+                running=running,
+                status={**status.status, "running": running},
+                error=status.error,
+            )
+        return cls(
+            ok=bool(payload.get("ok", False)),
+            engine=normalized_engine,
+            running=running,
+            status=status,
+            error=None if payload.get("error") is None else str(payload.get("error")),
+            stopped=bool(payload.get("stopped", False)),
+            details=_coerce_dict(payload.get("details")),
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "ok": bool(self.ok),
+            "engine": self.engine,
+            "running": bool(self.running),
+            "status": self.status.to_dict(),
+            "error": self.error,
+            "stopped": bool(self.stopped),
+            "details": dict(self.details),
+        }
+
+
 @dataclass(frozen=True)
 class LocalMatchLaunchConfigDTO:
     executable_path: str = ""

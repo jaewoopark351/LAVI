@@ -4,7 +4,58 @@
 #include "LadderManager.h"
 #include <Windows.h>
 #include <array>
+#include <chrono>
+#include <fstream>
+#include <sstream>
+#include <vector>
 #include <Wincrypt.h>
+
+namespace
+{
+//20260715_kpopmodder: Preserve native bot launch failure details in the parent log.
+std::string FormatWindowsError(const DWORD errorCode)
+{
+	LPSTR messageBuffer = nullptr;
+	const DWORD size = FormatMessageA(
+		FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+		nullptr,
+		errorCode,
+		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+		reinterpret_cast<LPSTR>(&messageBuffer),
+		0,
+		nullptr);
+	const std::string message = messageBuffer != nullptr && size > 0
+		? std::string(messageBuffer, size)
+		: std::string("unknown Windows error");
+	if (messageBuffer != nullptr)
+	{
+		LocalFree(messageBuffer);
+	}
+	return message;
+}
+
+std::string ReadAppendedLogTail(const std::string& path, const std::streamoff initialSize)
+{
+	constexpr std::streamoff maxTailBytes = 4096;
+	std::ifstream input(path, std::ios::binary | std::ios::ate);
+	if (!input)
+	{
+		return std::string();
+	}
+	const std::streamoff finalSize = input.tellg();
+	if (finalSize <= initialSize)
+	{
+		return std::string();
+	}
+	const std::streamoff appendedSize = finalSize - initialSize;
+	const std::streamoff readSize = appendedSize < maxTailBytes ? appendedSize : maxTailBytes;
+	input.seekg(finalSize - readSize);
+	std::string tail(static_cast<size_t>(readSize), '\0');
+	input.read(&tail[0], readSize);
+	tail.resize(static_cast<size_t>(input.gcount()));
+	return tail;
+}
+}
 
 void StartBotProcess(const BotConfig &Agent, const std::string &CommandLine, unsigned long *ProcessId)
 {
@@ -17,6 +68,14 @@ void StartBotProcess(const BotConfig &Agent, const std::string &CommandLine, uns
 	securityAttributes.lpSecurityDescriptor = NULL;
 	securityAttributes.bInheritHandle = TRUE;
 	std::string stderrLogFile = Agent.RootPath + "/data/stderr.log";
+	std::streamoff stderrInitialSize = 0;
+	{
+		std::ifstream existingStderr(stderrLogFile, std::ios::binary | std::ios::ate);
+		if (existingStderr)
+		{
+			stderrInitialSize = existingStderr.tellg();
+		}
+	}
 	HANDLE stderrfile = CreateFile(stderrLogFile.c_str(),
 		FILE_APPEND_DATA,
 		FILE_SHARE_WRITE | FILE_SHARE_READ,
@@ -24,6 +83,14 @@ void StartBotProcess(const BotConfig &Agent, const std::string &CommandLine, uns
 		OPEN_ALWAYS,
 		FILE_ATTRIBUTE_NORMAL,
 		NULL);
+	if (stderrfile == INVALID_HANDLE_VALUE)
+	{
+		const DWORD errorCode = GetLastError();
+		PrintThread{} << "[BotLaunchDiagnostics] bot=" << Agent.BotName
+			<< " stage=open_stderr failed=true win32_error=" << errorCode
+			<< " message=" << FormatWindowsError(errorCode)
+			<< " path=" << stderrLogFile << std::endl;
+	}
 
 	HANDLE stdoutfile = NULL;
 	if (Agent.Debug)
@@ -47,11 +114,16 @@ void StartBotProcess(const BotConfig &Agent, const std::string &CommandLine, uns
 	startupInfo.cb = sizeof(STARTUPINFO);
 	startupInfo.dwFlags |= STARTF_USESTDHANDLES;
 	startupInfo.hStdInput = INVALID_HANDLE_VALUE;
-	startupInfo.hStdError = stderrfile;
+	startupInfo.hStdError = stderrfile != INVALID_HANDLE_VALUE
+		? stderrfile
+		: GetStdHandle(STD_ERROR_HANDLE);
 	startupInfo.hStdOutput = stdoutfile;
 
 	DWORD exitCode;
-	LPSTR cmdLine = const_cast<char *>(CommandLine.c_str());
+	std::vector<char> mutableCommandLine(CommandLine.begin(), CommandLine.end());
+	mutableCommandLine.push_back('\0');
+	LPSTR cmdLine = mutableCommandLine.data();
+	const auto launchStartedAt = std::chrono::steady_clock::now();
 	// Create the process
 
 	BOOL result = CreateProcess(NULL, cmdLine,
@@ -62,27 +134,36 @@ void StartBotProcess(const BotConfig &Agent, const std::string &CommandLine, uns
 
 	if (!result)
 	{
-		// Get the error from the system
-		LPSTR lpMsgBuf;
-		DWORD dw = GetLastError();
-		size_t size = FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-			NULL, dw, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR)&lpMsgBuf, 0, NULL);
-		std::string message(lpMsgBuf, size);
-		PrintThread{} << "Starting bot: " << Agent.BotName << " with command:" << std::endl << CommandLine << " failed. Error " << dw << " : " << message << std::endl;
-		// Free resources created by the system
-		LocalFree(lpMsgBuf);
+		const DWORD errorCode = GetLastError();
+		PrintThread{} << "[BotLaunchDiagnostics] bot=" << Agent.BotName
+			<< " stage=create_process failed=true win32_error=" << errorCode
+			<< " message=" << FormatWindowsError(errorCode)
+			<< " cwd=" << Agent.RootPath
+			<< " stderr_path=" << stderrLogFile << std::endl;
 		// We failed.
 		exitCode = -1;
 	}
 	else
 	{
 		PrintThread{} << "Starting bot: " << Agent.BotName << " with command:" << CommandLine << std::endl;
+		PrintThread{} << "[BotLaunchDiagnostics] bot=" << Agent.BotName
+			<< " stage=create_process failed=false pid=" << processInformation.dwProcessId
+			<< " cwd=" << Agent.RootPath
+			<< " stderr_path=" << stderrLogFile << std::endl;
 		// Successfully created the process.  Wait for it to finish.
 		*ProcessId = processInformation.dwProcessId;
 		WaitForSingleObject(processInformation.hProcess, INFINITE);
 
 		// Get the exit code.
 		result = GetExitCodeProcess(processInformation.hProcess, &exitCode);
+		const DWORD exitCodeError = result ? ERROR_SUCCESS : GetLastError();
+		const auto runtimeMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+			std::chrono::steady_clock::now() - launchStartedAt).count();
+		PrintThread{} << "[BotLaunchDiagnostics] bot=" << Agent.BotName
+			<< " stage=process_exit pid=" << processInformation.dwProcessId
+			<< " runtime_ms=" << runtimeMs
+			<< " exit_code=" << (result ? static_cast<long long>(exitCode) : -1LL)
+			<< " get_exit_code_error=" << exitCodeError << std::endl;
 
 		// Close the handles.
 		CloseHandle(processInformation.hProcess);
@@ -96,10 +177,25 @@ void StartBotProcess(const BotConfig &Agent, const std::string &CommandLine, uns
 
 		// We succeeded.
 	}
-	CloseHandle(stderrfile);
+	if (stderrfile != INVALID_HANDLE_VALUE)
+	{
+		FlushFileBuffers(stderrfile);
+		CloseHandle(stderrfile);
+	}
 	if (Agent.Debug)
 	{
-		CloseHandle(stdoutfile);
+		if (stdoutfile != INVALID_HANDLE_VALUE && stdoutfile != NULL)
+		{
+			CloseHandle(stdoutfile);
+		}
+	}
+	const std::string stderrTail = ReadAppendedLogTail(stderrLogFile, stderrInitialSize);
+	if (!stderrTail.empty())
+	{
+		PrintThread{} << "[BotLaunchDiagnostics] bot=" << Agent.BotName
+			<< " stage=stderr_tail path=" << stderrLogFile
+			<< " bytes=" << stderrTail.size() << std::endl
+			<< stderrTail << std::endl;
 	}
 }
 

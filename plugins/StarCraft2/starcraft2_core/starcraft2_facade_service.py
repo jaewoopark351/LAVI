@@ -8,10 +8,14 @@ from typing import Any, Dict, Optional
 from app_core.extensions import GameStartResultDTO, GameStatusDTO, GameStopResultDTO
 from core.logger import log_print
 from .starcraft2_contracts import (
+    EngineResultDTO,
+    EngineStartCommandDTO,
+    EngineStatusDTO,
     LocalMatchRuntimeStatusDTO,
     StartResultDTO,
     StopResultDTO,
 )
+from .starcraft2_engine_interface import adapt_starcraft2_engine
 from .starcraft2_runtime_context import SC2RuntimeContext
 from .starcraft2_event_bus import StarCraft2EventBus
 from .starcraft2_local_match_service import StarCraft2LocalMatchService
@@ -73,12 +77,17 @@ class StarCraft2FacadeService:
 
         engine_name = str(runtime_config.get("engine") or "internal_lav_bot")
         if self.current_engine is None or self.current_engine.engine_name != engine_name:
-            self.current_engine = self.engine_registry.create(engine_name)
+            self.current_engine = adapt_starcraft2_engine(
+                self.engine_registry.create(engine_name)
+            )
         result = self.current_engine.start(
-            runtime_config,
+            EngineStartCommandDTO.from_mapping(runtime_config),
             event_callback=self.handle_engine_event,
         )
-        facade_result = StartResultDTO.from_mapping(result, action="start")
+        result_payload = (
+            result.to_dict() if isinstance(result, EngineResultDTO) else result
+        )
+        facade_result = StartResultDTO.from_mapping(result_payload, action="start")
         self._sync_runtime_context(facade_result.to_dict())
         self._remember_start_result(facade_result)
         self._sync_state_from_engine()
@@ -96,8 +105,11 @@ class StarCraft2FacadeService:
             )
             return self._remember_stop_result(result)
 
+        engine_result = self.current_engine.stop()
         result = StopResultDTO.from_mapping(
-            self.current_engine.stop(),
+            engine_result.to_dict()
+            if isinstance(engine_result, EngineResultDTO)
+            else engine_result,
             action="stop",
         )
         result_payload = result.to_dict()
@@ -169,7 +181,7 @@ class StarCraft2FacadeService:
             "config": self.config_manager.config_message(),
             "state": self.state.to_dict(),
             "engine_status": (
-                self.current_engine.get_status()
+                self._engine_status_payload()
                 if self.current_engine is not None
                 else {}
             ),
@@ -341,7 +353,7 @@ class StarCraft2FacadeService:
         if self.current_engine is None:
             return
         try:
-            status = self.current_engine.get_status()
+            status = self._engine_status_payload()
         except Exception as e:
             self.state.mark_error(e)
             return
@@ -353,6 +365,14 @@ class StarCraft2FacadeService:
             self.state.stdout_tail = list(status.get("stdout_tail") or [])[-20:]
             self.state.stderr_tail = list(status.get("stderr_tail") or [])[-20:]
             self._sync_runtime_context(status=status)
+
+    def _engine_status_payload(self) -> Dict[str, Any]:
+        if self.current_engine is None:
+            return {}
+        status = self.current_engine.get_status()
+        if isinstance(status, EngineStatusDTO):
+            return status.to_dict()
+        return dict(status) if isinstance(status, dict) else {}
 
     def _sync_runtime_context(self, status: Dict[str, Any] | None = None):
         if self.runtime_context is None:

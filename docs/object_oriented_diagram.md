@@ -594,6 +594,9 @@ classDiagram
     }
     class StarCraft2Contracts {
         <<DTO/dataclass>>
+        +EngineStartCommandDTO
+        +EngineResultDTO
+        +EngineStatusDTO
         +StartResultDTO
         +StopResultDTO
         +LocalMatchRuntimeStatusDTO
@@ -608,10 +611,11 @@ classDiagram
     class StarCraft2EngineRegistry
     class StarCraft2EngineInterface {
         <<interface>>
-        +start(config, event_callback)
-        +stop()
-        +get_status()
+        +start(command: EngineStartCommandDTO, event_callback): EngineResultDTO
+        +stop(): EngineResultDTO
+        +get_status(): EngineStatusDTO
     }
+    class LegacyStarCraft2EngineAdapter
     class InternalLAVBotEngine
     class AresSC2BotEngine
     class MicroMachineBotEngine

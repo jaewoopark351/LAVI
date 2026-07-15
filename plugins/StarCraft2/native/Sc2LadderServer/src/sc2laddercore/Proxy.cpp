@@ -644,6 +644,12 @@ bool Proxy::startBot(const int portServer, const int portStart, const std::strin
     m_botProgramThread = std::async(std::launch::async, &StartBotProcess, m_botConfig, botStartCommand, &m_botThreadId);
     if (m_botProgramThread.wait_for(std::chrono::seconds(2)) == std::future_status::ready)
     {
+        //20260715_kpopmodder: Identify bots that exit before connecting to the proxy.
+        PrintThread{} << "[BotLaunchDiagnostics] bot=" << m_botConfig.BotName
+                      << " stage=early_exit pid=" << m_botThreadId
+                      << " connected=false wait_ms=2000"
+                      << " stderr_path=" << m_botConfig.RootPath << "/data/stderr.log"
+                      << std::endl;
         return false;
     }
     constexpr size_t maxStartUpTime = 10U; // The bot gets 10 seconds to connect to the proxy. This is NOT the first game loop time.
@@ -655,6 +661,12 @@ bool Proxy::startBot(const int portServer, const int portStart, const std::strin
         }
         sc2::SleepFor(1000);
     }
+    //20260715_kpopmodder: Distinguish a live-but-unconnected bot from CreateProcess failure.
+    PrintThread{} << "[BotLaunchDiagnostics] bot=" << m_botConfig.BotName
+                  << " stage=proxy_connect_timeout pid=" << m_botThreadId
+                  << " connected=false wait_ms=" << (maxStartUpTime * 1000U)
+                  << " stderr_path=" << m_botConfig.RootPath << "/data/stderr.log"
+                  << std::endl;
     return false;
 }
 
