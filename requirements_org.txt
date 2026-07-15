@@ -224,11 +224,8 @@ tokenizers==0.22.2
 toml==0.10.2
 tomlkit==0.12.0
 toolz==1.1.0
-torch==2.13.0+cu130
-torchaudio==2.11.0+cu130
 torchcodec==0.14.0
 torchmetrics==1.9.0
-torchvision==0.28.0+cu130
 tqdm==4.68.3
 transformers==5.12.1
 twitchio==2.8.2
