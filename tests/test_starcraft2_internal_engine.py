@@ -10,6 +10,11 @@ from unittest import mock
 from plugins.StarCraft2.starcraft2_core.internal_lav_bot_engine import (
     InternalLAVBotEngine,
 )
+from plugins.StarCraft2.starcraft2_core.starcraft2_contracts import (
+    EngineResultDTO,
+    EngineStartCommandDTO,
+    EngineStatusDTO,
+)
 from plugins.StarCraft2.starcraft2_core.starcraft2_lav_bot import (
     build_lav_starcraft2_bot,
 )
@@ -108,6 +113,9 @@ class FakeRunner:
     def get_status(self):
         return {"running": False, "last_error": "", "last_result": None}
 
+    def join(self, timeout=None):
+        return True
+
 
 class StarCraft2InternalEngineTests(unittest.TestCase):
     def test_importing_engine_does_not_require_burnysc2(self):
@@ -120,11 +128,14 @@ class StarCraft2InternalEngineTests(unittest.TestCase):
             "plugins.StarCraft2.starcraft2_core.internal_lav_bot_engine.importlib.import_module",
             side_effect=ModuleNotFoundError("No module named 'sc2'"),
         ):
-            result = engine.start({"map_name": "AbyssalReefLE"})
+            result = engine.start(
+                EngineStartCommandDTO.from_mapping({"map_name": "AbyssalReefLE"})
+            )
 
-        self.assertFalse(result["ok"])
-        self.assertIn("burnysc2_import_failed", result["error"])
-        self.assertIn("No module named 'sc2'", result["status"]["last_error"])
+        self.assertIsInstance(result, EngineResultDTO)
+        self.assertFalse(result.ok)
+        self.assertIn("burnysc2_import_failed", result.error)
+        self.assertIn("No module named 'sc2'", result.status.status["last_error"])
 
     def test_start_uses_sync_runner_for_burnysc2_run_game(self):
         engine = InternalLAVBotEngine()
@@ -133,12 +144,66 @@ class StarCraft2InternalEngineTests(unittest.TestCase):
         fake_modules = {"run_game": lambda *args, **kwargs: "Victory"}
 
         with mock.patch.object(engine, "_load_sc2_modules", return_value=fake_modules):
-            result = engine.start({"map_name": "001_wasteland", "enabled": True})
+            result = engine.start(
+                EngineStartCommandDTO.from_mapping(
+                    {"map_name": "001_wasteland", "enabled": True}
+                )
+            )
 
-        self.assertTrue(result["ok"])
+        self.assertIsInstance(result, EngineResultDTO)
+        self.assertTrue(result.ok)
         self.assertFalse(fake_runner.start_called)
         self.assertTrue(fake_runner.start_sync_called)
         self.assertIsNotNone(fake_runner.function_factory)
+
+    #20260715_kpopmodder: Lock the live internal engine to the typed boundary.
+    def test_internal_engine_uses_typed_command_result_and_status_contracts(self):
+        engine = InternalLAVBotEngine()
+        engine.runner = FakeRunner()
+        command = EngineStartCommandDTO.from_mapping(
+            {"map_name": "001_wasteland", "enabled": True}
+        )
+
+        with mock.patch.object(engine, "_load_sc2_modules", return_value={}):
+            start_result = engine.start(command)
+
+        self.assertTrue(engine.uses_engine_dto_contract)
+        self.assertIsInstance(start_result, EngineResultDTO)
+        self.assertEqual("001_wasteland", engine._config["map_name"])
+        self.assertIsInstance(engine.get_status(), EngineStatusDTO)
+        self.assertIsInstance(engine.stop(), EngineResultDTO)
+        self.assertIsInstance(engine.shutdown(), EngineResultDTO)
+
+    def test_runner_start_failure_returns_error_dto_without_raising(self):
+        engine = InternalLAVBotEngine()
+        engine.runner = FakeRunner()
+        engine.runner.start_sync = mock.Mock(side_effect=RuntimeError("runner failed"))
+
+        with mock.patch.object(engine, "_load_sc2_modules", return_value={}):
+            result = engine.start(EngineStartCommandDTO())
+
+        self.assertIsInstance(result, EngineResultDTO)
+        self.assertFalse(result.ok)
+        self.assertFalse(result.running)
+        self.assertIn("engine_start_failed", result.error)
+        self.assertIn("runner failed", result.status.status["last_error"])
+
+    def test_start_preserves_event_callback_path(self):
+        engine = InternalLAVBotEngine()
+        engine.runner = FakeRunner()
+        events = []
+
+        with mock.patch.object(engine, "_load_sc2_modules", return_value={}):
+            result = engine.start(
+                EngineStartCommandDTO.from_mapping({"map_name": "callback_map"}),
+                event_callback=events.append,
+            )
+
+        engine._emit("game_started", {"ready": True})
+
+        self.assertIsInstance(result, EngineResultDTO)
+        self.assertEqual(["game_started"], [event["event_type"] for event in events])
+        self.assertEqual("callback_map", events[0]["map_name"])
 
     def test_run_game_sync_shims_burnysc2_signal_registration_in_worker_thread(self):
         engine = InternalLAVBotEngine()

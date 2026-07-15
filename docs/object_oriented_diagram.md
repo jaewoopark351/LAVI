@@ -628,12 +628,24 @@ classDiagram
         +get_status(): EngineStatusDTO
     }
     class LegacyStarCraft2EngineAdapter
-    class InternalLAVBotEngine
-    class AresSC2BotEngine
-    class MicroMachineBotEngine
-    class ExternalExeBotEngine
-    class ExternalJarBotEngine
-    class HumanVsBotLauncher
+    class InternalLAVBotEngine {
+        <<typed_DTO_engine>>
+    }
+    class AresSC2BotEngine {
+        <<legacy_adapter_backed>>
+    }
+    class MicroMachineBotEngine {
+        <<legacy_adapter_backed>>
+    }
+    class ExternalExeBotEngine {
+        <<legacy_adapter_backed>>
+    }
+    class ExternalJarBotEngine {
+        <<legacy_adapter_backed>>
+    }
+    class HumanVsBotLauncher {
+        <<typed_placeholder>>
+    }
     class SC2LadderProxyLauncher
     class SC2RuntimeContext {
         <<runtime state>>
@@ -724,6 +736,8 @@ classDiagram
 
 `StarCraft2LocalMatchService`, `StarCraft2EngineEventService`, `StarCraft2LadderProxyEventService`는 현재 코드의 public service 이름입니다. 기존 `_...` 이름은 호환성 alias로만 유지합니다.
 
+`InternalLAVBotEngine`은 실제 게임 엔진 중 처음으로 `EngineStartCommandDTO`, `EngineResultDTO`, `EngineStatusDTO`를 직접 사용하는 typed 엔진입니다. Ares, MicroMachine, 외부 EXE/JAR 엔진은 기존 동작을 보존하기 위해 `LegacyStarCraft2EngineAdapter` 뒤에서 dict 계약을 계속 사용합니다. `HumanVsBotLauncher`는 typed 계약을 사용하는 비실행 placeholder입니다.
+
 `GameEventMonitor` is the runtime proof point for the SC2-to-common bus bridge:
 successful shared delivery appears as sampled `[GameEventMonitor] received ...`
 log lines.
@@ -733,6 +747,7 @@ log lines.
 <!-- #20260715_kpopmodder: Keep public SC2 service names and legacy aliases documented with source. -->
 <!-- #20260715_kpopmodder: Document common DTO result wrappers and the SC2-to-GameEventBus bridge. -->
 <!-- #20260715_kpopmodder: Document common GameEventBus runtime monitoring. -->
+<!-- #20260715_kpopmodder: Document typed internal engine and adapter-backed migration state. -->
 <!-- #20260715_kpopmodder: Document Facade-only SC2RuntimeContext ownership. -->
 <!-- #20260715_kpopmodder: Document StarCraft2RuntimeFactory composition ownership. -->
 

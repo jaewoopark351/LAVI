@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import time
 
 from .starcraft2_contracts import StarCraft2Event
@@ -43,6 +44,8 @@ class StarCraft2LadderProxyEventService:
         self.event_bus = event_bus
         #20260713_kpopmodder: Ignore known RESPONSE_NOT_SET tail noise after a match end.
         self._response_not_set_ignore_until = 0.0
+        #20260715_kpopmodder: Both SC2 clients report ended; emit one match event.
+        self._game_ended_emitted = False
 
     def on_ladder_proxy_line(
         self,
@@ -71,9 +74,12 @@ class StarCraft2LadderProxyEventService:
             if "starting the match" in lower:
                 event_type = "game_started"
                 self._response_not_set_ignore_until = 0.0
+                self._game_ended_emitted = False
             elif "client changed status from in_game to ended" in lower:
-                event_type = "game_ended"
                 self._response_not_set_ignore_until = time.time() + 5.0
+                if not self._game_ended_emitted:
+                    event_type = "game_ended"
+                    self._game_ended_emitted = True
             elif "finished with result:" in lower:
                 # LavHumanVsBot assigns Player1 to LAVHuman and Player2 to
                 # the AI. Report the result from the AI/TTS perspective;
@@ -137,10 +143,15 @@ class StarCraft2LadderProxyEventService:
         if self._is_response_not_set_end_tail(lower, now):
             return False
 
+        #20260715_kpopmodder: Native BotLaunchDiagnostics reports boolean
+        # fields such as failed=false. Remove only the successful field before
+        # checking for real failure words elsewhere on the same line.
+        error_probe = re.sub(r"\bfailed\s*=\s*false\b", "", lower)
+
         #20260712_kpopmodder: Native diagnostics include harmless fields like
         # error_count=0 in successful CreateGame/JoinGame summaries. Do not
         # convert those normal summaries into engine_error events.
-        if "error_count=0" in lower and "error:" not in lower:
+        if "error_count=0" in error_probe and "error:" not in error_probe:
             blocked_terms = (
                 " failed",
                 "failed ",
@@ -151,18 +162,18 @@ class StarCraft2LadderProxyEventService:
                 "crashed ",
                 "exception",
             )
-            if not any(term in lower for term in blocked_terms):
+            if not any(term in error_probe for term in blocked_terms):
                 return False
         return (
-            "error:" in lower
-            or "timeout/closed/error" in lower
-            or "waiting for a response had a timeout" in lower
-            or "response_not_set" in lower
-            or " failed" in lower
-            or "failed " in lower
-            or " crashed" in lower
-            or "crashed " in lower
-            or "exception" in lower
+            "error:" in error_probe
+            or "timeout/closed/error" in error_probe
+            or "waiting for a response had a timeout" in error_probe
+            or "response_not_set" in error_probe
+            or " failed" in error_probe
+            or "failed " in error_probe
+            or " crashed" in error_probe
+            or "crashed " in error_probe
+            or "exception" in error_probe
         )
 
 

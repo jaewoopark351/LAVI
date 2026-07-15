@@ -95,6 +95,53 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
 
         self.assertEqual("engine_error", callback.call_args.args[0]["event_type"])
 
+    #20260715_kpopmodder: Successful native diagnostics must stay log-only.
+    def test_ladder_failed_false_diagnostic_is_not_reported_as_engine_error(self):
+        plugin = StarCraft2()
+        callback = mock.Mock()
+        plugin.status_event_callback = callback
+
+        plugin._on_ladder_proxy_line(
+            "stdout",
+            "[BotLaunchDiagnostics] bot=changeling stage=create_process "
+            "failed=false pid=31684",
+        )
+
+        callback.assert_not_called()
+
+        plugin._on_ladder_proxy_line(
+            "stderr",
+            "[BotLaunchDiagnostics] failed=false error: process unavailable",
+        )
+        self.assertEqual("engine_error", callback.call_args.args[0]["event_type"])
+
+    def test_ladder_emits_game_ended_once_per_match(self):
+        plugin = StarCraft2()
+        events = []
+        plugin.status_event_callback = events.append
+
+        plugin._on_ladder_proxy_line("stdout", "Starting the match.")
+        plugin._on_ladder_proxy_line(
+            "stdout",
+            "changeling : Client changed status from in_game to ended",
+        )
+        plugin._on_ladder_proxy_line(
+            "stdout",
+            "LAVHuman : Client changed status from in_game to ended",
+        )
+
+        self.assertEqual(
+            ["game_started", "game_ended"],
+            [event["event_type"] for event in events],
+        )
+
+        plugin._on_ladder_proxy_line("stdout", "Starting the match.")
+        plugin._on_ladder_proxy_line(
+            "stdout",
+            "LAVHuman : Client changed status from in_game to ended",
+        )
+        self.assertEqual(2, sum(event["event_type"] == "game_ended" for event in events))
+
     def test_extension_ladder_proxy_line_keeps_log_only(self):
         status_callback = mock.Mock()
         tts = mock.Mock()

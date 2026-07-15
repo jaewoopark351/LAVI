@@ -12,6 +12,11 @@ from typing import Any, Dict, List
 
 from core.logger import log_print
 
+from .starcraft2_contracts import (
+    EngineResultDTO,
+    EngineStartCommandDTO,
+    EngineStatusDTO,
+)
 from .starcraft2_engine_interface import StarCraft2EngineInterface
 from .starcraft2_lav_bot import build_lav_starcraft2_bot
 from .starcraft2_runner import StarCraft2ThreadedAsyncRunner
@@ -21,6 +26,8 @@ from .starcraft2_state import StarCraft2RuntimeState
 class InternalLAVBotEngine(StarCraft2EngineInterface):
     #20260707_kpopmodder: Import burnysc2/sc2 only when this engine is actually started.
     engine_name = "internal_lav_bot"
+    #20260715_kpopmodder: This is the first live SC2 engine using the DTO contract directly.
+    uses_engine_dto_contract = True
 
     def __init__(self):
         self.state = StarCraft2RuntimeState(engine=self.engine_name)
@@ -30,11 +37,16 @@ class InternalLAVBotEngine(StarCraft2EngineInterface):
         self._config: Dict[str, Any] = {}
         self._emitted_lifecycle_events = set()
 
-    def start(self, config: Dict[str, Any], event_callback=None) -> Dict[str, Any]:
+    def start(
+        self,
+        command: EngineStartCommandDTO,
+        event_callback=None,
+    ) -> EngineResultDTO:
         if self.is_running():
             return self._result(True, status=self.get_status())
 
-        self._config = dict(config or {})
+        command = EngineStartCommandDTO.from_mapping(command)
+        self._config = command.to_dict()
         self._event_callback = event_callback
         self._stop_event.clear()
         self._emitted_lifecycle_events.clear()
@@ -56,10 +68,20 @@ class InternalLAVBotEngine(StarCraft2EngineInterface):
                 error=f"burnysc2_import_failed: {e}",
             )
 
-        self.runner.start_sync(lambda: self._run_game_sync(sc2_modules))
+        try:
+            self.runner.start_sync(lambda: self._run_game_sync(sc2_modules))
+        except Exception as e:
+            self.state.mark_error(e)
+            self._emit("error", {"error": str(e)})
+            return self._result(
+                False,
+                running=False,
+                status=self.get_status(),
+                error=f"engine_start_failed: {e}",
+            )
         return self._result(True, status=self.get_status())
 
-    def stop(self) -> Dict[str, Any]:
+    def stop(self) -> EngineResultDTO:
         self._stop_event.set()
         stopped = self.runner.join(timeout=3.0)
         if stopped:
@@ -68,14 +90,14 @@ class InternalLAVBotEngine(StarCraft2EngineInterface):
         self.state.last_error = "stop_timeout"
         return self._result(False, running=True, status=self.get_status(), error="stop_timeout")
 
-    def shutdown(self) -> Dict[str, Any]:
+    def shutdown(self) -> EngineResultDTO:
         return self.stop()
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> EngineStatusDTO:
         status = self.state.to_dict()
         status["runner"] = self.runner.get_status()
         status["sc2path"] = os.environ.get("SC2PATH", "")
-        return status
+        return EngineStatusDTO.from_mapping(status, engine=self.engine_name)
 
     def is_running(self) -> bool:
         return self.runner.is_running()

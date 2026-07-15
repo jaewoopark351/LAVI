@@ -650,12 +650,24 @@ classDiagram
         +get_status(): EngineStatusDTO
     }
     class LegacyStarCraft2EngineAdapter
-    class InternalLAVBotEngine
-    class AresSC2BotEngine
-    class MicroMachineBotEngine
-    class ExternalExeBotEngine
-    class ExternalJarBotEngine
-    class HumanVsBotLauncher
+    class InternalLAVBotEngine {
+        <<typed_DTO_engine>>
+    }
+    class AresSC2BotEngine {
+        <<legacy_adapter_backed>>
+    }
+    class MicroMachineBotEngine {
+        <<legacy_adapter_backed>>
+    }
+    class ExternalExeBotEngine {
+        <<legacy_adapter_backed>>
+    }
+    class ExternalJarBotEngine {
+        <<legacy_adapter_backed>>
+    }
+    class HumanVsBotLauncher {
+        <<typed_placeholder>>
+    }
     class SC2LadderProxyLauncher
     class SC2RuntimeContext {
         <<runtime state>>
@@ -750,6 +762,13 @@ TTS/memory handling remain in domain services.
 `StarCraft2LocalMatchService`, `StarCraft2EngineEventService`, and
 `StarCraft2LadderProxyEventService` are the public service names in code.
 The underscore-prefixed names remain as compatibility aliases only.
+
+`InternalLAVBotEngine` is the first live game engine to consume
+`EngineStartCommandDTO` and return `EngineResultDTO` and `EngineStatusDTO`
+directly. Ares, MicroMachine, and the external EXE/JAR engines retain their
+existing dict behavior behind `LegacyStarCraft2EngineAdapter`.
+`HumanVsBotLauncher` is a non-running placeholder that already uses the typed
+contract.
 
 `StarCraft2FacadeService` and `StarCraft2LocalMatchService` now keep common
 `GameStartResultDTO`, `GameStopResultDTO`, and `GameStatusDTO` wrappers beside
