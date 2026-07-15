@@ -150,6 +150,23 @@ class StarCraft2EventContractTests(unittest.TestCase):
         self.assertIsInstance(legacy[0], dict)
         self.assertEqual("proxy_stopped", legacy[0]["event_type"])
 
+    #20260715_kpopmodder: Legacy adapters should not share mutable payloads.
+    def test_legacy_subscriber_mutation_does_not_leak_to_next_subscriber(self):
+        received = []
+        bus = StarCraft2EventBus()
+
+        def mutating_subscriber(payload):
+            payload["event_type"] = "mutated"
+            payload["details"]["source"] = "mutated"
+
+        bus.subscribe(mutating_subscriber)
+        bus.subscribe(received.append)
+
+        bus.emit(StarCraft2Event("game_started", {"source": "original"}))
+
+        self.assertEqual("game_started", received[0]["event_type"])
+        self.assertEqual("original", received[0]["details"]["source"])
+
     def test_subscriber_failure_does_not_block_later_subscriber(self):
         received = []
         bus = StarCraft2EventBus()

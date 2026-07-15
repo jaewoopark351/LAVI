@@ -805,7 +805,9 @@ The underscore-prefixed names remain as compatibility aliases only.
 `EngineResultDTO`, and `EngineStatusDTO` contract directly. The external
 engines keep their existing subprocess launch/preflight behavior; only the
 public engine boundary is typed. `LegacyStarCraft2EngineAdapter` remains for
-future or temporarily unmigrated engines.
+future or temporarily unmigrated engines. This boundary PR does not expand
+external-engine runtime behavior or validation; that remains a separate
+high-risk PR item.
 
 `SC2LadderProxyLauncher` is a typed process boundary that consumes
 `LocalMatchLaunchConfigDTO` and returns `LadderProxyResultDTO`,
@@ -843,13 +845,18 @@ dict callback edge for Reaction TTS, memory, UI, and existing extension code.
 `SC2LadderProxyLauncher` only reports process status, while
 `StarCraft2LocalMatchService` produces results/events and reads snapshots only
 when composing UI status DTOs. Asynchronous proxy exits return to the Facade
-through the `proxy_stopped` event on `StarCraft2EventBus`.
+through the `proxy_stopped` event on `StarCraft2EventBus`. Top-level start/stop
+errors from SC2 DTOs are copied into `SC2RuntimeContext.runtime_error`, so UI
+status polling and stop/shutdown paths do not lose the runtime failure reason.
+Legacy `StarCraft2EventBus.subscribe()` callbacks receive a fresh dict payload
+per subscriber; DTO subscribers stay on `subscribe_typed()`.
 <!-- #20260713_kpopmodder: Document current StarCraft2 facade/service/event split and archived LAN Lobby status. -->
 <!-- #20260715_kpopmodder: Keep public SC2 service names and legacy aliases documented with source. -->
 <!-- #20260715_kpopmodder: Document common DTO result wrappers and the SC2-to-GameEventBus bridge. -->
 <!-- #20260715_kpopmodder: Document common GameEventBus runtime monitoring. -->
 <!-- #20260715_kpopmodder: Document the typed stdout-event and EventBus boundary. -->
 <!-- #20260715_kpopmodder: Document typed external engines, RuntimeState updates, and typed EventBus subscribers. -->
+<!-- #20260715_kpopmodder: Document Facade runtime-error ownership and isolated legacy EventBus payloads. -->
 The reaction core also uses `StarCraft2Event` end to end.
 `StarCraft2ReactionRuntime.handle_status_event()` remains only as the dict
 adapter for existing EventBus subscribers, while `handle_event()` owns typed

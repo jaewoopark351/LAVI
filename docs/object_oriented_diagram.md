@@ -773,7 +773,7 @@ classDiagram
 
 `StarCraft2LocalMatchService`, `StarCraft2EngineEventService`, `StarCraft2LadderProxyEventService`는 현재 코드의 public service 이름입니다. 기존 `_...` 이름은 호환성 alias로만 유지합니다.
 
-`InternalLAVBotEngine`, Ares, MicroMachine, 외부 EXE, 외부 JAR, `HumanVsBotLauncher`는 이제 `EngineStartCommandDTO`, `EngineResultDTO`, `EngineStatusDTO` 계약을 직접 노출합니다. 외부 엔진은 기존 subprocess 실행과 preflight 동작은 그대로 보존하고 public engine 경계만 typed로 전환했습니다. `LegacyStarCraft2EngineAdapter`는 이후 추가되거나 임시로 미전환된 엔진을 위한 호환 계층으로 남습니다.
+`InternalLAVBotEngine`, Ares, MicroMachine, 외부 EXE, 외부 JAR, `HumanVsBotLauncher`는 현재 소스에서 `EngineStartCommandDTO`, `EngineResultDTO`, `EngineStatusDTO` 계약을 직접 노출합니다. 외부 엔진은 기존 subprocess 실행과 preflight 동작은 그대로 보존하고 public engine 경계만 typed로 전환된 상태입니다. 이번 경계 정리 PR에서는 외부 엔진의 runtime 동작이나 실환경 검증 범위를 더 넓히지 않으며, 해당 작업은 별도 고위험 PR 항목으로 분리합니다. `LegacyStarCraft2EngineAdapter`는 이후 추가되거나 임시로 미전환된 엔진을 위한 호환 계층으로 남습니다.
 
 `SC2LadderProxyLauncher`는 `LocalMatchLaunchConfigDTO`를 입력으로 받고 `LadderProxyResultDTO`, `LadderProxyStatusDTO`, `LadderProxyExitEventDTO`를 반환하는 typed 프로세스 경계입니다. `StarCraft2LocalMatchService`가 이 DTO를 SC2 공통 결과와 `proxy_stopped` 이벤트로 조율하며, `StarCraft2FacadeService`는 DTO를 UI용 dict로 변환한 뒤 `SC2RuntimeContext`를 갱신하는 유일한 writer로 남습니다. 기존 UI 콜백과 JSON 출력은 변경하지 않습니다.
 
@@ -781,7 +781,7 @@ classDiagram
 successful shared delivery appears as sampled `[GameEventMonitor] received ...`
 log lines.
 
-`SC2RuntimeContext`의 상태 변경은 `StarCraft2FacadeService`만 수행합니다. `SC2LadderProxyLauncher`는 프로세스 상태를 반환하고, `StarCraft2LocalMatchService`는 결과와 이벤트를 생성하며 UI 상태 DTO를 만들 때 snapshot만 읽습니다. 비동기 proxy 종료도 `StarCraft2EventBus`의 `proxy_stopped` 이벤트를 통해 Facade가 반영합니다.
+`SC2RuntimeContext`의 상태 변경은 `StarCraft2FacadeService`만 수행합니다. `SC2LadderProxyLauncher`는 프로세스 상태를 반환하고, `StarCraft2LocalMatchService`는 결과와 이벤트를 생성하며 UI 상태 DTO를 만들 때 snapshot만 읽습니다. 비동기 proxy 종료도 `StarCraft2EventBus`의 `proxy_stopped` 이벤트를 통해 Facade가 반영합니다. SC2 start/stop DTO의 top-level error도 `SC2RuntimeContext.runtime_error`로 복사해서 UI status polling, stop, shutdown 경로에서 실패 이유가 사라지지 않게 합니다. 기존 `StarCraft2EventBus.subscribe()` callback은 subscriber마다 독립 dict payload를 받고, 내부 DTO subscriber는 `subscribe_typed()`에 남습니다.
 <!-- #20260713_kpopmodder: Document current StarCraft2 facade/service/event split and archived LAN Lobby status. -->
 <!-- #20260715_kpopmodder: Keep public SC2 service names and legacy aliases documented with source. -->
 <!-- #20260715_kpopmodder: Document common DTO result wrappers and the SC2-to-GameEventBus bridge. -->
@@ -791,6 +791,7 @@ log lines.
 `StarCraft2LadderProxyEventService.parse_line()`과 `SC2ObservationTracker`는 `StarCraft2Event` 목록을 반환합니다. `StarCraft2EngineEventService`는 typed 이벤트를 `StarCraft2RuntimeState.update_event()`와 `StarCraft2EventBus`로 전달만 하고 문자열을 직접 해석하지 않습니다. `StarCraft2EventBus.subscribe_typed()`는 Facade 같은 내부 subscriber를 DTO 위에 남기고, `subscribe()`는 기존 Reaction TTS·memory·UI·extension subscriber를 위한 legacy dict callback 경계로 유지합니다.
 <!-- #20260715_kpopmodder: Document the typed stdout-event and EventBus boundary. -->
 <!-- #20260715_kpopmodder: Document typed external engines, RuntimeState updates, and typed EventBus subscribers. -->
+<!-- #20260715_kpopmodder: Document Facade runtime-error ownership and isolated legacy EventBus payloads. -->
 Reaction 계층의 core 계약도 `StarCraft2Event`로 통일됩니다. `StarCraft2ReactionRuntime.handle_status_event()`만 기존 EventBus subscriber용 dict adapter로 남고 `handle_event()`가 typed 실행을 담당합니다. `StarCraft2ReactionPolicy`와 `StarCraft2ReactionMemoryRecorder`도 DTO를 직접 받으며, raw memory JSON 직렬화 직전에만 `to_dict()`를 사용합니다. `StarCraft2ReactionTTSAdapter`는 이벤트를 소유하지 않고 기존처럼 문자열 발화와 queue 취소만 담당합니다.
 <!-- #20260715_kpopmodder: Document the typed reaction policy and memory boundary. -->
 <!-- #20260715_kpopmodder: Document Facade-only SC2RuntimeContext ownership. -->

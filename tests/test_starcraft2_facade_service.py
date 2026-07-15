@@ -189,6 +189,25 @@ class StarCraft2FacadeServiceTests(unittest.TestCase):
         self.assertTrue(status["game_status"]["started"])
         self.assertTrue(stop_result["game_result"]["stopped"])
 
+    #20260715_kpopmodder: Facade-owned runtime context must keep DTO errors.
+    def test_facade_runtime_context_preserves_top_level_engine_error(self):
+        context = SC2RuntimeContext()
+        facade = self._build_facade(runtime_context=context)
+        facade.current_engine = _FakeEngine()
+
+        facade._sync_runtime_context(
+            {
+                "ok": False,
+                "running": False,
+                "status": {},
+                "error": "engine_start_failed",
+            }
+        )
+
+        snapshot = context.snapshot()
+        self.assertEqual("engine_start_failed", snapshot["runtime_error"])
+        self.assertEqual("engine_start_failed", snapshot["status"]["error"])
+
     def test_local_match_service_wraps_start_stop_status_in_common_dtos(self):
         service = self._build_local_match_service()
         command = StarCraft2LocalMatchCommand(

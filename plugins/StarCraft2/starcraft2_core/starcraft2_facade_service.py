@@ -494,20 +494,28 @@ class StarCraft2FacadeService:
     def _sync_runtime_context(self, status: Dict[str, Any] | None = None):
         if self.runtime_context is None:
             return
+        engine_running = bool(
+            self.current_engine.is_running() if self.current_engine else False
+        )
+        top_level_error = None
         if isinstance(status, dict):
+            top_level_error = status.get("error") or status.get("last_error")
             if "status" in status and isinstance(status.get("status"), dict):
                 status_payload = dict(status.get("status") or {})
                 running = bool(
                     status_payload.get("running")
                     or status.get("running")
-                    or self.current_engine.is_running()
+                    or engine_running
                 )
             else:
                 status_payload = dict(status)
                 running = bool(status_payload.get("running", False))
         else:
             status_payload = {}
-            running = bool(self.current_engine.is_running() if self.current_engine else False)
+            running = engine_running
+        if top_level_error is not None:
+            #20260715_kpopmodder: Start/stop DTOs may carry errors outside nested status.
+            status_payload.setdefault("error", str(top_level_error))
         self.runtime_context.set_status(status_payload)
         if self.current_engine is not None and running:
             if self.runtime_context.started_at is None:
@@ -526,7 +534,10 @@ class StarCraft2FacadeService:
         if self.runtime_context.stopped_at is None:
             self.runtime_context.stopped_at = time.time()
         self.runtime_context.clear_process()
-        self.runtime_context.runtime_error = None if status_payload.get("error") is None else str(status_payload.get("error"))
+        runtime_error = status_payload.get("error") or status_payload.get("last_error")
+        self.runtime_context.runtime_error = (
+            None if runtime_error is None else str(runtime_error)
+        )
 
     #20260715_kpopmodder: Keep Facade as the sole writer of local-match runtime state.
     def _sync_local_match_runtime_context(

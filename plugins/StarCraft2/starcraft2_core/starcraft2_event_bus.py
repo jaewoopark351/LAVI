@@ -104,13 +104,13 @@ class StarCraft2EventBus:
             except Exception as e:
                 log_print(f"[StarCraft2EventBus] typed event subscriber failed: {e}")
 
-        payload = None
         for subscriber in list(self._subscribers):
             if not callable(subscriber):
                 continue
             try:
-                if payload is None:
-                    payload = normalized.to_dict()
+                #20260715_kpopmodder: Keep legacy dict callbacks isolated so
+                # one subscriber cannot mutate another subscriber's payload.
+                payload = normalized.to_dict()
                 subscriber(payload)
                 delivered = True
             except Exception as e:
