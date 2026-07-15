@@ -35,6 +35,9 @@ from plugins.StarCraft2.starcraft2_core.starcraft2_local_match_service import (
     StarCraft2LocalMatchService,
     _StarCraft2LocalMatchService,
 )
+from plugins.StarCraft2.starcraft2_core.starcraft2_runtime_context import (
+    SC2RuntimeContext,
+)
 
 
 class StarCraft2FacadeServiceTests(unittest.TestCase):
@@ -211,6 +214,44 @@ class StarCraft2FacadeServiceTests(unittest.TestCase):
         self.assertEqual("starcraft2", current_status.to_dict()["game_status"]["name"])
         self.assertEqual("stop", stop_status.to_dict()["game_result"]["action"])
         self.assertIsInstance(service._last_game_status_dto, GameStatusDTO)
+
+    def test_facade_is_the_local_match_runtime_context_writer(self):
+        facade = self._build_facade()
+        facade.local_match_service = mock.Mock()
+        facade.local_match_service.start_local_match.return_value = LocalMatchRuntimeStatusDTO()
+        facade.match_config_service.local_match_config.return_value = {
+            "ports": [5677, 5678],
+            "check_hosts": ["127.0.0.1"],
+        }
+        facade.ladder_proxy.process = mock.Mock(pid=4321)
+        facade.ladder_proxy.started_at = 123.0
+        facade.ladder_proxy.get_status.return_value = {
+            "running": True,
+            "pid": 4321,
+            "stdout_tail": ["ready"],
+            "stderr_tail": [],
+            "validation": {"connect_timeout_sec": 2.5},
+        }
+
+        facade.start_local_match("proxy.exe", "runtime", "", "5677,5678")
+
+        snapshot = facade.runtime_context.snapshot()
+        self.assertEqual(4321, snapshot["process_pid"])
+        self.assertEqual("local_match_proxy", snapshot["process_role"])
+        self.assertEqual(["ready"], snapshot["stdout_tail"])
+        self.assertEqual([5677, 5678], snapshot["ports"])
+        self.assertEqual(2.5, snapshot["timeout_sec"])
+
+    def test_local_match_service_emits_exit_without_writing_runtime_context(self):
+        context = SC2RuntimeContext(status={"owner": "facade"}, process_pid=99)
+        service = self._build_local_match_service()
+        service.runtime_context = context
+
+        service._on_ladder_proxy_exit({"pid": 99, "returncode": 4})
+
+        snapshot = context.snapshot()
+        self.assertEqual({"owner": "facade"}, snapshot["status"])
+        self.assertEqual(99, snapshot["process_pid"])
 
     def _build_facade(self):
         config_manager = mock.Mock()

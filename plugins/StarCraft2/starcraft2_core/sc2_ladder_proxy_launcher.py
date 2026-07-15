@@ -30,7 +30,8 @@ class SC2LadderProxyLauncher:
         self.process = None
         self.started_at = 0.0
         self.last_error = ""
-        self.runtime_context = runtime_context
+        #20260715_kpopmodder: RuntimeContext writes belong to StarCraft2FacadeService.
+        # Keep the optional argument temporarily so older construction code does not break.
         self.stdout_tail = deque(maxlen=max(1, int(tail_size)))
         self.stderr_tail = deque(maxlen=max(1, int(tail_size)))
         self._stdout_thread = None
@@ -86,7 +87,6 @@ class SC2LadderProxyLauncher:
         validation = self.validate_config(config)
         if not validation.get("ok"):
             self.last_error = str(validation.get("error", "ladder_proxy_config_invalid"))
-            self._sync_runtime_context(config, role="local_match_proxy")
             return {"ok": False, "running": False, **validation}
 
         command_args = self._with_sc2_executable_arg(
@@ -119,12 +119,10 @@ class SC2LadderProxyLauncher:
         except Exception as e:
             self.last_error = str(e)
             log_print(f"[SC2LadderProxyLauncher] launch failed: {e}")
-            self._sync_runtime_context(config, role="local_match_proxy")
             return {"ok": False, "running": False, "error": str(e)}
 
         self.started_at = time.time()
         self.last_error = ""
-        self._sync_runtime_context(config, role="local_match_proxy")
         log_print(
             "[SC2LadderProxyLauncher] started "
             f"pid={getattr(self.process, 'pid', None)} capture_output={capture_output}"
@@ -149,13 +147,11 @@ class SC2LadderProxyLauncher:
             daemon=True,
         )
         self._monitor_thread.start()
-        self._sync_runtime_context(config, role="local_match_proxy")
         return {"ok": True, "running": True, "status": self.get_status(config)}
 
     def stop(self, timeout_sec: float = 5.0) -> Dict[str, Any]:
         process = self.process
         if process is None:
-            self._sync_runtime_context()
             return {"ok": True, "running": False, "status": self.get_status()}
 
         if self.is_running():
@@ -173,7 +169,6 @@ class SC2LadderProxyLauncher:
                 self.last_error = str(e)
                 return {"ok": False, "error": str(e), "status": self.get_status()}
         self.process = None
-        self._sync_runtime_context()
         return {"ok": True, "running": False, "status": self.get_status()}
 
     def is_running(self) -> bool:
@@ -355,14 +350,12 @@ class SC2LadderProxyLauncher:
                     continue
                 tail.append(line)
                 self._diagnostics.add_line(label, line)
-                self._sync_runtime_context()
                 if callable(callback):
                     callback(label, line)
         except Exception as e:
             message = f"{label}_read_failed: {e}"
             tail.append(message)
             log_print(f"[SC2LadderProxyLauncher] {message}")
-            self._sync_runtime_context()
 
     def _monitor_process_exit(self, process, exit_callback: Optional[ExitCallback] = None) -> None:
         if process is None:
@@ -380,7 +373,6 @@ class SC2LadderProxyLauncher:
         diagnostics = self._diagnostics.finalize(returncode)
         if isinstance(diagnostics, dict):
             self.last_error = str(diagnostics.get("launch_result") or self.last_error)
-        self._sync_runtime_context()
         if callable(exit_callback):
             try:
                 exit_callback(
@@ -401,24 +393,3 @@ class SC2LadderProxyLauncher:
 
     def _clean_path(self, value: Any) -> str:
         return os.path.normpath(str(value or "").strip().strip("\"'")) if value else ""
-
-    def _sync_runtime_context(
-        self,
-        config: Optional[Dict[str, Any]] = None,
-        role: str = "",
-    ) -> None:
-        context = self.runtime_context
-        if context is None:
-            return
-        status = self.get_status(config)
-        context.set_status(status)
-        context.set_tails(status.get("stdout_tail", []), status.get("stderr_tail", []))
-        if self.is_running():
-            context.set_process(self.process, role or getattr(context, "process_role", "") or "local_match_proxy")
-            context.started_at = self.started_at or context.started_at
-            context.stopped_at = None
-            context.runtime_error = None
-            return
-        context.clear_process()
-        context.stopped_at = time.time()
-        context.runtime_error = str(self.last_error or "") or None

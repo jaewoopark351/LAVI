@@ -46,10 +46,10 @@ class StarCraft2EngineInterface(ABC):
         status: Optional[Dict[str, Any]] = None,
         error: Optional[Any] = None,
         stopped: bool = False,
-    ) -> EngineResultDTO:
+    ) -> EngineResultDTO | Dict[str, Any]:
         normalized_running = self.is_running() if running is None else bool(running)
         status_dto = EngineStatusDTO.from_mapping(status, engine=self.engine_name)
-        return EngineResultDTO(
+        result = EngineResultDTO(
             ok=bool(ok),
             engine=self.engine_name,
             running=normalized_running,
@@ -62,6 +62,9 @@ class StarCraft2EngineInterface(ABC):
             error=None if error is None else str(error),
             stopped=bool(stopped),
         )
+        if self.uses_engine_dto_contract:
+            return result
+        return result.to_dict()
 
 
 #20260715_kpopmodder: Keep unmigrated dict engines working behind the DTO boundary.
@@ -112,7 +115,8 @@ def adapt_starcraft2_engine(engine: Any) -> StarCraft2EngineInterface:
 
 
 class InvalidStarCraft2Engine(StarCraft2EngineInterface):
-    uses_engine_dto_contract = True
+    #20260715_kpopmodder: Preserve direct registry callers until invalid-engine APIs migrate.
+    uses_engine_dto_contract = False
     #20260707_kpopmodder: Return safe errors for bad engine names without crashing UI startup.
     def __init__(self, requested_name: str, valid_names):
         self.engine_name = str(requested_name or "unknown")

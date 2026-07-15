@@ -48,6 +48,11 @@ class StarCraft2FacadeService:
             self.event_bus = getattr(engine_event_service, "event_bus", None)
         if self.runtime_context is not None and self.event_bus is not None:
             self.runtime_context.event_bus = self.event_bus
+        self._runtime_event_subscription = (
+            self.event_bus.subscribe(self._handle_runtime_event)
+            if self.event_bus is not None
+            else None
+        )
         self.current_engine = None
         self.status_event_callback = None
         self.tts = None
@@ -131,18 +136,30 @@ class StarCraft2FacadeService:
     ):
         if self.local_match_service is None:
             return self._local_match_missing_status()
-        return self.local_match_service.start_local_match(
+        result = self.local_match_service.start_local_match(
             executable_path,
             working_directory,
             args,
             proxy_ports,
             ai_race=ai_race,
         )
+        self._sync_local_match_runtime_context(
+            result=result,
+            config=self.match_config_service.local_match_config(
+                executable_path=executable_path,
+                working_directory=working_directory,
+                args=args,
+                proxy_ports=proxy_ports,
+            ),
+        )
+        return result
 
     def stop_local_match(self):
         if self.local_match_service is None:
             return self._local_match_missing_status()
-        return self.local_match_service.stop_local_match()
+        result = self.local_match_service.stop_local_match()
+        self._sync_local_match_runtime_context(result=result)
+        return result
 
     def get_local_match_status(
         self,
@@ -153,12 +170,22 @@ class StarCraft2FacadeService:
     ):
         if self.local_match_service is None:
             return self._local_match_missing_status()
-        return self.local_match_service.get_local_match_status(
+        result = self.local_match_service.get_local_match_status(
             executable_path=executable_path,
             working_directory=working_directory,
             args=args,
             proxy_ports=proxy_ports,
         )
+        self._sync_local_match_runtime_context(
+            result=result,
+            config=self.match_config_service.local_match_config(
+                executable_path=executable_path,
+                working_directory=working_directory,
+                args=args,
+                proxy_ports=proxy_ports,
+            ),
+        )
+        return result
 
     def local_match_status(self):
         return self.get_local_match_status()
@@ -168,6 +195,11 @@ class StarCraft2FacadeService:
             return
         self._shutdown = True
         self.ladder_proxy.stop()
+        self._sync_local_match_runtime_context()
+        subscription = self._runtime_event_subscription
+        if subscription is not None:
+            subscription.unsubscribe()
+            self._runtime_event_subscription = None
         try:
             self.stop()
         except Exception as e:
@@ -236,6 +268,15 @@ class StarCraft2FacadeService:
 
     def handle_engine_event(self, event):
         self.engine_event_service.update_state(event)
+
+    def _handle_runtime_event(self, event: Dict[str, Any]) -> None:
+        event_type = str(event.get("event_type") or "").strip().lower()
+        if event_type != "proxy_stopped":
+            return
+        details = event.get("details")
+        self._sync_local_match_runtime_context(
+            exit_details=details if isinstance(details, dict) else {},
+        )
 
     def on_local_match_race_change(self, race, args):
         if self.local_match_service is None:
@@ -410,6 +451,100 @@ class StarCraft2FacadeService:
             self.runtime_context.stopped_at = time.time()
         self.runtime_context.clear_process()
         self.runtime_context.runtime_error = None if status_payload.get("error") is None else str(status_payload.get("error"))
+
+    #20260715_kpopmodder: Keep Facade as the sole writer of local-match runtime state.
+    def _sync_local_match_runtime_context(
+        self,
+        result: Any = None,
+        config: Optional[Dict[str, Any]] = None,
+        exit_details: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        if self.runtime_context is None:
+            return
+        runtime_config = (
+            config
+            if isinstance(config, dict)
+            else self.match_config_service.local_match_config()
+        )
+        runtime_status = self.ladder_proxy.get_status(runtime_config)
+        self.runtime_context.set_status(runtime_status)
+        self.runtime_context.set_tails(
+            runtime_status.get("stdout_tail", []),
+            runtime_status.get("stderr_tail", []),
+        )
+        validation = runtime_status.get("validation")
+        validation = validation if isinstance(validation, dict) else {}
+        timeout = validation.get("connect_timeout_sec")
+        if timeout is not None:
+            try:
+                self.runtime_context.timeout_sec = float(timeout)
+            except (TypeError, ValueError):
+                pass
+        self.runtime_context.check_hosts = self._normalize_runtime_hosts(runtime_config)
+        ports = self._normalize_runtime_ports(runtime_status, runtime_config)
+        if ports:
+            self.runtime_context.ports = ports
+
+        if bool(runtime_status.get("running")):
+            self.runtime_context.set_process(
+                getattr(self.ladder_proxy, "process", None),
+                "local_match_proxy",
+            )
+            self.runtime_context.started_at = (
+                getattr(self.ladder_proxy, "started_at", None)
+                or self.runtime_context.started_at
+                or time.time()
+            )
+            self.runtime_context.stopped_at = None
+            self.runtime_context.runtime_error = None
+            return
+
+        self.runtime_context.clear_process()
+        self.runtime_context.stopped_at = time.time()
+        result_payload = result.to_dict() if hasattr(result, "to_dict") else result
+        result_payload = result_payload if isinstance(result_payload, dict) else {}
+        details = exit_details if isinstance(exit_details, dict) else {}
+        returncode = details.get("returncode", runtime_status.get("returncode"))
+        error = result_payload.get("error") or runtime_status.get("last_error")
+        if error:
+            self.runtime_context.runtime_error = str(error)
+        elif returncode not in (0, None):
+            self.runtime_context.runtime_error = f"proxy_exit_{returncode}"
+        else:
+            self.runtime_context.runtime_error = None
+
+    @staticmethod
+    def _normalize_runtime_hosts(config: Dict[str, Any]) -> list[str]:
+        raw_hosts = config.get("check_hosts", ["127.0.0.1"])
+        if isinstance(raw_hosts, str):
+            raw_hosts = [part.strip() for part in raw_hosts.split(",")]
+        if not isinstance(raw_hosts, (list, tuple)):
+            return ["127.0.0.1"]
+        hosts = [str(item).strip() for item in raw_hosts if str(item).strip()]
+        return hosts or ["127.0.0.1"]
+
+    @staticmethod
+    def _normalize_runtime_ports(
+        runtime_status: Dict[str, Any],
+        config: Dict[str, Any],
+    ) -> list[int]:
+        candidate = config.get("ports")
+        if candidate is None:
+            candidate = runtime_status.get("ports")
+        if candidate is None:
+            validation = runtime_status.get("validation")
+            candidate = validation.get("ports") if isinstance(validation, dict) else None
+        if isinstance(candidate, str):
+            candidate = [part.strip() for part in candidate.split(",")]
+        if not isinstance(candidate, (list, tuple)):
+            return []
+        ports = []
+        for item in candidate:
+            try:
+                ports.append(int(item))
+            except (TypeError, ValueError):
+                continue
+        return ports
 
     def _remember_start_result(self, result: StartResultDTO) -> Dict[str, Any]:
         self._last_start_result_dto = result

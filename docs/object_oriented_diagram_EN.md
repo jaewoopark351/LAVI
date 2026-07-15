@@ -645,6 +645,10 @@ classDiagram
     class ExternalJarBotEngine
     class HumanVsBotLauncher
     class SC2LadderProxyLauncher
+    class SC2RuntimeContext {
+        <<runtime state>>
+        +snapshot()
+    }
     class SC2ObservationTracker
 
     class StarCraft2Extension {
@@ -686,6 +690,7 @@ classDiagram
     StarCraft2 *-- StarCraft2LocalMatchService
     StarCraft2 *-- StarCraft2EventBus
     StarCraft2 *-- SC2LadderProxyLauncher
+    StarCraft2 *-- SC2RuntimeContext
     StarCraft2 *-- SC2ObservationTracker
     StarCraft2FacadeService --> StarCraft2EngineRegistry : start/stop/status
     StarCraft2FacadeService --> StarCraft2LocalMatchService : local match flow
@@ -693,7 +698,9 @@ classDiagram
     StarCraft2FacadeService --> GameStartResultDTO : common start result
     StarCraft2FacadeService --> GameStopResultDTO : common stop result
     StarCraft2FacadeService --> GameStatusDTO : common status
+    StarCraft2FacadeService --> SC2RuntimeContext : sole writer
     StarCraft2LocalMatchService --> SC2LadderProxyLauncher : launch/stop/status
+    StarCraft2LocalMatchService ..> SC2RuntimeContext : snapshot read only
     StarCraft2LocalMatchService --> GameStartResultDTO : common local result
     StarCraft2LocalMatchService --> GameStatusDTO : common local status
     StarCraft2LadderProxyEventService --> SC2ObservationTracker : telemetry deltas
@@ -743,10 +750,17 @@ intentionally passive: it observes ProBots/Changeling logs, parses events, and
 reuses the shared StarCraft2 status callback instead of controlling the main
 game facade. LAN Lobby remote-human code is archived/commented out in the
 current source and is not part of the live diagram.
+
+`StarCraft2FacadeService` is the sole writer of `SC2RuntimeContext`.
+`SC2LadderProxyLauncher` only reports process status, while
+`StarCraft2LocalMatchService` produces results/events and reads snapshots only
+when composing UI status DTOs. Asynchronous proxy exits return to the Facade
+through the `proxy_stopped` event on `StarCraft2EventBus`.
 <!-- #20260713_kpopmodder: Document current StarCraft2 facade/service/event split and archived LAN Lobby status. -->
 <!-- #20260715_kpopmodder: Keep public SC2 service names and legacy aliases documented with source. -->
 <!-- #20260715_kpopmodder: Document common DTO result wrappers and the SC2-to-GameEventBus bridge. -->
 <!-- #20260715_kpopmodder: Document common GameEventBus runtime monitoring. -->
+<!-- #20260715_kpopmodder: Document Facade-only SC2RuntimeContext ownership. -->
 
 ## Relationship Symbols
 

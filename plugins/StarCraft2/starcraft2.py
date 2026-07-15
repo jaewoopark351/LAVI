@@ -101,9 +101,7 @@ class StarCraft2:
         self._shutdown = False
         # self.lan_discovery = _ArchivedLanDiscoveryState()
         self._runtime_context = SC2RuntimeContext()
-        self.ladder_proxy = SC2LadderProxyLauncher(
-            runtime_context=self._runtime_context,
-        )
+        self.ladder_proxy = SC2LadderProxyLauncher()
         self.runtime_downloader = StarCraft2RuntimeDownloader()
         self.observation_tracker = SC2ObservationTracker()
         self._local_match_command_template = _LocalMatchCommandTemplate()

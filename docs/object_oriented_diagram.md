@@ -623,6 +623,10 @@ classDiagram
     class ExternalJarBotEngine
     class HumanVsBotLauncher
     class SC2LadderProxyLauncher
+    class SC2RuntimeContext {
+        <<runtime state>>
+        +snapshot()
+    }
     class SC2ObservationTracker
 
     class StarCraft2Extension {
@@ -664,6 +668,7 @@ classDiagram
     StarCraft2 *-- StarCraft2LocalMatchService
     StarCraft2 *-- StarCraft2EventBus
     StarCraft2 *-- SC2LadderProxyLauncher
+    StarCraft2 *-- SC2RuntimeContext
     StarCraft2 *-- SC2ObservationTracker
     StarCraft2FacadeService --> StarCraft2EngineRegistry : start/stop/status
     StarCraft2FacadeService --> StarCraft2LocalMatchService : local match flow
@@ -671,7 +676,9 @@ classDiagram
     StarCraft2FacadeService --> GameStartResultDTO : common start result
     StarCraft2FacadeService --> GameStopResultDTO : common stop result
     StarCraft2FacadeService --> GameStatusDTO : common status
+    StarCraft2FacadeService --> SC2RuntimeContext : sole writer
     StarCraft2LocalMatchService --> SC2LadderProxyLauncher : launch/stop/status
+    StarCraft2LocalMatchService ..> SC2RuntimeContext : snapshot read only
     StarCraft2LocalMatchService --> GameStartResultDTO : common local result
     StarCraft2LocalMatchService --> GameStatusDTO : common local status
     StarCraft2LadderProxyEventService --> SC2ObservationTracker : telemetry deltas
@@ -705,10 +712,13 @@ classDiagram
 `GameEventMonitor` is the runtime proof point for the SC2-to-common bus bridge:
 successful shared delivery appears as sampled `[GameEventMonitor] received ...`
 log lines.
+
+`SC2RuntimeContext`의 상태 변경은 `StarCraft2FacadeService`만 수행합니다. `SC2LadderProxyLauncher`는 프로세스 상태를 반환하고, `StarCraft2LocalMatchService`는 결과와 이벤트를 생성하며 UI 상태 DTO를 만들 때 snapshot만 읽습니다. 비동기 proxy 종료도 `StarCraft2EventBus`의 `proxy_stopped` 이벤트를 통해 Facade가 반영합니다.
 <!-- #20260713_kpopmodder: Document current StarCraft2 facade/service/event split and archived LAN Lobby status. -->
 <!-- #20260715_kpopmodder: Keep public SC2 service names and legacy aliases documented with source. -->
 <!-- #20260715_kpopmodder: Document common DTO result wrappers and the SC2-to-GameEventBus bridge. -->
 <!-- #20260715_kpopmodder: Document common GameEventBus runtime monitoring. -->
+<!-- #20260715_kpopmodder: Document Facade-only SC2RuntimeContext ownership. -->
 
 ## 관계 기호
 
