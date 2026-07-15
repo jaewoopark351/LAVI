@@ -559,6 +559,18 @@ classDiagram
         +subscribe_common_events(callback)
         +on_local_human_vs_changeling_click(...)
     }
+    class StarCraft2RuntimeFactory {
+        <<composition factory>>
+        +create(plugin_root, race_choices): StarCraft2RuntimeBundle
+    }
+    class StarCraft2RuntimeBundle {
+        <<dataclass>>
+        +facade_service
+        +runtime_context
+        +event_bus
+        +local_match_service
+        +ladder_proxy
+    }
     class StarCraft2GameExtension {
         <<app_core.extensions>>
         +start()
@@ -663,13 +675,16 @@ classDiagram
     StarCraft2ReactionTTSAdapter --> TTS : cancel/speak
     StarCraft2ReactionMemoryRecorder --> MemoryStore : raw event memory
 
-    StarCraft2 *-- StarCraft2EngineRegistry
-    StarCraft2 *-- StarCraft2FacadeService
-    StarCraft2 *-- StarCraft2LocalMatchService
-    StarCraft2 *-- StarCraft2EventBus
-    StarCraft2 *-- SC2LadderProxyLauncher
-    StarCraft2 *-- SC2RuntimeContext
-    StarCraft2 *-- SC2ObservationTracker
+    StarCraft2 --> StarCraft2RuntimeFactory : create runtime
+    StarCraft2RuntimeFactory --> StarCraft2RuntimeBundle : returns
+    StarCraft2 --> StarCraft2RuntimeBundle : UI references
+    StarCraft2RuntimeFactory *-- StarCraft2EngineRegistry
+    StarCraft2RuntimeFactory *-- StarCraft2FacadeService
+    StarCraft2RuntimeFactory *-- StarCraft2LocalMatchService
+    StarCraft2RuntimeFactory *-- StarCraft2EventBus
+    StarCraft2RuntimeFactory *-- SC2LadderProxyLauncher
+    StarCraft2RuntimeFactory *-- SC2RuntimeContext
+    StarCraft2RuntimeFactory *-- SC2ObservationTracker
     StarCraft2FacadeService --> StarCraft2EngineRegistry : start/stop/status
     StarCraft2FacadeService --> StarCraft2LocalMatchService : local match flow
     StarCraft2FacadeService --> StarCraft2Contracts : typed results
@@ -701,7 +716,7 @@ classDiagram
     StarCraft2Extension --> StarCraft2GameExtension : shared status callback
 ```
 
-`StarCraft2`는 이제 UI와 조립 표면입니다. Gradio 탭을 만들고 runtime 참조를 보관하지만, 실행은 `StarCraft2FacadeService`로 위임합니다. `StarCraft2FacadeService`는 start/stop/status와 Local Human vs AI 버튼 흐름을 조율하는 경계입니다. Local match 명령 생성, runtime preflight, ladder-proxy 실행, stdout/game-event 파싱, reaction TTS/memory 처리는 domain service 쪽에 남깁니다.
+`StarCraft2`는 이제 UI 바인딩 표면입니다. `StarCraft2RuntimeFactory`가 runtime 객체 그래프를 만들고 `StarCraft2RuntimeBundle` dataclass로 반환하며, UI는 bundle의 Facade와 UI 호환 참조만 보관합니다. 실행은 `StarCraft2FacadeService`로 위임합니다. `StarCraft2FacadeService`는 start/stop/status와 Local Human vs AI 버튼 흐름을 조율하는 경계입니다. Local match 명령 생성, runtime preflight, ladder-proxy 실행, stdout/game-event 파싱, reaction TTS/memory 처리는 domain service 쪽에 남깁니다.
 
 `StarCraft2FacadeService`와 `StarCraft2LocalMatchService`는 기존 SC2 result dict를 유지하면서 공통 `GameStartResultDTO`, `GameStopResultDTO`, `GameStatusDTO` wrapper를 함께 보관합니다. UI/Gradio 경계에서는 마지막에 dict/JSON으로 변환된 payload만 반환합니다. `StarCraft2EventBus`는 계속 SC2 전용 live channel이고, `StarCraft2GameEventBridge`가 연결된 공통 `GameEventBus`로 이벤트를 mirror합니다.
 
@@ -719,6 +734,7 @@ log lines.
 <!-- #20260715_kpopmodder: Document common DTO result wrappers and the SC2-to-GameEventBus bridge. -->
 <!-- #20260715_kpopmodder: Document common GameEventBus runtime monitoring. -->
 <!-- #20260715_kpopmodder: Document Facade-only SC2RuntimeContext ownership. -->
+<!-- #20260715_kpopmodder: Document StarCraft2RuntimeFactory composition ownership. -->
 
 ## 관계 기호
 

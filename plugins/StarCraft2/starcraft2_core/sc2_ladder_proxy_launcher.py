@@ -100,6 +100,12 @@ class SC2LadderProxyLauncher:
         self._diagnostics = _LocalMatchLaunchDiagnostics()
         self._diagnostics.start()
         try:
+            #20260715_kpopmodder: Log-only guardrail so old native binaries are
+            # visible before launch without changing the process command.
+            self._log_executable_diagnostics(
+                validation["executable_path"],
+                validation["working_directory"],
+            )
             log_print(
                 "[SC2LadderProxyLauncher] starting "
                 f"exe={validation['executable_path']} cwd={validation['working_directory']} "
@@ -390,6 +396,37 @@ class SC2LadderProxyLauncher:
             return float(value)
         except (TypeError, ValueError):
             return float(default)
+
+    def _log_executable_diagnostics(self, executable_path: str, working_directory: str) -> None:
+        try:
+            stat = os.stat(executable_path)
+            marker = self._binary_contains(executable_path, b"BotLaunchDiagnostics")
+            log_print(
+                "[SC2LadderProxyLauncher] executable_diagnostics "
+                f"path={executable_path} cwd={working_directory} "
+                f"size_bytes={stat.st_size} mtime={round(stat.st_mtime, 3)} "
+                f"has_bot_launch_diagnostics={marker}"
+            )
+        except Exception as e:
+            log_print(
+                "[SC2LadderProxyLauncher] executable_diagnostics_failed "
+                f"path={executable_path} error={e}"
+            )
+
+    def _binary_contains(self, path: str, marker: bytes) -> bool:
+        if not marker:
+            return False
+        overlap = max(0, len(marker) - 1)
+        previous = b""
+        with open(path, "rb") as file:
+            while True:
+                chunk = file.read(1024 * 1024)
+                if not chunk:
+                    return False
+                data = previous + chunk
+                if marker in data:
+                    return True
+                previous = data[-overlap:] if overlap else b""
 
     def _clean_path(self, value: Any) -> str:
         return os.path.normpath(str(value or "").strip().strip("\"'")) if value else ""

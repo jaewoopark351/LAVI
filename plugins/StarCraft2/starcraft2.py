@@ -1,5 +1,5 @@
 #20260707_kpopmodder: Added optional StarCraft2 facade for Windows-first engine adapter control.
-#20260713_kpopmodder: Keep this module as UI wiring plus service assembly; SC2 behavior lives in core services.
+#20260715_kpopmodder: Keep this module as UI wiring; runtime assembly lives in StarCraft2RuntimeFactory.
 from __future__ import annotations
 
 import os
@@ -7,33 +7,9 @@ from typing import Any, Dict, Optional
 
 import gradio as gr
 
-from plugins.StarCraft2.starcraft2_core.starcraft2_arg_utils import _StarCraft2ArgUtils
-from plugins.StarCraft2.starcraft2_core.starcraft2_config import StarCraft2Config
-from plugins.StarCraft2.starcraft2_core.starcraft2_engine_registry import (
-    StarCraft2EngineRegistry,
+from plugins.StarCraft2.starcraft2_core.starcraft2_runtime_factory import (
+    StarCraft2RuntimeFactory,
 )
-from plugins.StarCraft2.starcraft2_core.starcraft2_event_bus import StarCraft2EventBus
-from plugins.StarCraft2.starcraft2_core.starcraft2_event_service import (
-    StarCraft2EngineEventService,
-    StarCraft2LadderProxyEventService,
-)
-from plugins.StarCraft2.starcraft2_core.starcraft2_facade_service import (
-    StarCraft2FacadeService,
-)
-from plugins.StarCraft2.starcraft2_core.starcraft2_state import (
-    StarCraft2RuntimeState,
-)
-from plugins.StarCraft2.starcraft2_core.sc2_local_match_command_template import (
-    _LocalMatchCommandTemplate,
-)
-from plugins.StarCraft2.starcraft2_core.sc2_ladder_proxy_launcher import SC2LadderProxyLauncher
-from plugins.StarCraft2.starcraft2_core.starcraft2_match_config_service import _StarCraft2MatchConfigService
-from plugins.StarCraft2.starcraft2_core.starcraft2_observation_tracker import (
-    SC2ObservationTracker,
-)
-from plugins.StarCraft2.starcraft2_core.starcraft2_local_match_service import StarCraft2LocalMatchService
-from plugins.StarCraft2.starcraft2_core.starcraft2_runtime_downloader import StarCraft2RuntimeDownloader
-from plugins.StarCraft2.starcraft2_core.starcraft2_runtime_context import SC2RuntimeContext
 from plugins.StarCraft2.starcraft2_core.starcraft2_ui_sections import (
     _StarCraft2BotEngineSection,
     _StarCraft2LocalMatchSection,
@@ -86,62 +62,30 @@ class StarCraft2:
     #20260707_kpopmodder: Facade owns UI/config; engines own frame-level game control.
     def __init__(self):
         self.plugin_root = os.path.dirname(__file__)
-        self.config_manager = StarCraft2Config(self.plugin_root)
-        self.engine_registry = StarCraft2EngineRegistry()
-        self.state = StarCraft2RuntimeState(
-            engine=str(self.config_manager.get("engine", "internal_lav_bot")),
-            map_name=str(self.config_manager.get("map_name", "")),
-            race=str(self.config_manager.get("race", "Terran")),
-            enemy_race=str(self.config_manager.get("enemy_race", "Zerg")),
-            enemy_difficulty=str(self.config_manager.get("enemy_difficulty", "Easy")),
+        runtime = StarCraft2RuntimeFactory().create(
+            self.plugin_root,
+            SC2_RACE_CHOICES,
         )
+        self.config_manager = runtime.config_manager
+        self.engine_registry = runtime.engine_registry
+        self.state = runtime.state
         self.current_engine = None
         self.last_start_result: Dict[str, Any] = {}
         self.last_stop_result: Dict[str, Any] = {}
         self._shutdown = False
         # self.lan_discovery = _ArchivedLanDiscoveryState()
-        self._runtime_context = SC2RuntimeContext()
-        self.ladder_proxy = SC2LadderProxyLauncher()
-        self.runtime_downloader = StarCraft2RuntimeDownloader()
-        self.observation_tracker = SC2ObservationTracker()
-        self._local_match_command_template = _LocalMatchCommandTemplate()
-        self._arg_utils = _StarCraft2ArgUtils(SC2_RACE_CHOICES)
-        self._match_config_service = _StarCraft2MatchConfigService(
-            self.config_manager,
-            self.plugin_root,
-            self.runtime_downloader,
-            self._arg_utils,
-        )
-        self._event_bus = StarCraft2EventBus()
-        self._engine_event_service = StarCraft2EngineEventService(
-            self.state,
-            event_bus=self._event_bus,
-        )
-        self._local_match_service = StarCraft2LocalMatchService(
-            self._arg_utils,
-            self._match_config_service,
-            self._local_match_command_template,
-            self.ladder_proxy,
-            line_callback=self._on_ladder_proxy_line,
-            event_bus=self._event_bus,
-            runtime_context=self._runtime_context,
-        )
-        self._facade_service = StarCraft2FacadeService(
-            self.config_manager,
-            self.engine_registry,
-            self.state,
-            self.ladder_proxy,
-            self._match_config_service,
-            self._engine_event_service,
-            local_match_service=self._local_match_service,
-            event_bus=self._event_bus,
-            runtime_context=self._runtime_context,
-        )
-        self._ladder_proxy_event_service = StarCraft2LadderProxyEventService(
-            self._engine_event_service,
-            self.observation_tracker,
-            event_bus=self._event_bus,
-        )
+        self._runtime_context = runtime.runtime_context
+        self.ladder_proxy = runtime.ladder_proxy
+        self.runtime_downloader = runtime.runtime_downloader
+        self.observation_tracker = runtime.observation_tracker
+        self._local_match_command_template = runtime.local_match_command_template
+        self._arg_utils = runtime.arg_utils
+        self._match_config_service = runtime.match_config_service
+        self._event_bus = runtime.event_bus
+        self._engine_event_service = runtime.engine_event_service
+        self._local_match_service = runtime.local_match_service
+        self._facade_service = runtime.facade_service
+        self._ladder_proxy_event_service = runtime.ladder_proxy_event_service
 
     def create_ui(self):
         config = self.config_manager.snapshot()

@@ -581,6 +581,18 @@ classDiagram
         +subscribe_common_events(callback)
         +on_local_human_vs_changeling_click(...)
     }
+    class StarCraft2RuntimeFactory {
+        <<composition factory>>
+        +create(plugin_root, race_choices): StarCraft2RuntimeBundle
+    }
+    class StarCraft2RuntimeBundle {
+        <<dataclass>>
+        +facade_service
+        +runtime_context
+        +event_bus
+        +local_match_service
+        +ladder_proxy
+    }
     class StarCraft2GameExtension {
         <<app_core.extensions>>
         +start()
@@ -685,13 +697,16 @@ classDiagram
     StarCraft2ReactionTTSAdapter --> TTS : cancel/speak
     StarCraft2ReactionMemoryRecorder --> MemoryStore : raw event memory
 
-    StarCraft2 *-- StarCraft2EngineRegistry
-    StarCraft2 *-- StarCraft2FacadeService
-    StarCraft2 *-- StarCraft2LocalMatchService
-    StarCraft2 *-- StarCraft2EventBus
-    StarCraft2 *-- SC2LadderProxyLauncher
-    StarCraft2 *-- SC2RuntimeContext
-    StarCraft2 *-- SC2ObservationTracker
+    StarCraft2 --> StarCraft2RuntimeFactory : create runtime
+    StarCraft2RuntimeFactory --> StarCraft2RuntimeBundle : returns
+    StarCraft2 --> StarCraft2RuntimeBundle : UI references
+    StarCraft2RuntimeFactory *-- StarCraft2EngineRegistry
+    StarCraft2RuntimeFactory *-- StarCraft2FacadeService
+    StarCraft2RuntimeFactory *-- StarCraft2LocalMatchService
+    StarCraft2RuntimeFactory *-- StarCraft2EventBus
+    StarCraft2RuntimeFactory *-- SC2LadderProxyLauncher
+    StarCraft2RuntimeFactory *-- SC2RuntimeContext
+    StarCraft2RuntimeFactory *-- SC2ObservationTracker
     StarCraft2FacadeService --> StarCraft2EngineRegistry : start/stop/status
     StarCraft2FacadeService --> StarCraft2LocalMatchService : local match flow
     StarCraft2FacadeService --> StarCraft2Contracts : typed results
@@ -723,8 +738,10 @@ classDiagram
     StarCraft2Extension --> StarCraft2GameExtension : shared status callback
 ```
 
-`StarCraft2` is now the UI and assembly surface: it builds the Gradio tab,
-holds runtime references, and delegates execution to `StarCraft2FacadeService`.
+`StarCraft2` is now the UI binding surface. `StarCraft2RuntimeFactory` builds
+the runtime object graph and returns it as a `StarCraft2RuntimeBundle`
+dataclass. The UI keeps only the Facade and UI compatibility references from
+that bundle and delegates execution to `StarCraft2FacadeService`.
 `StarCraft2FacadeService` is the orchestration boundary for start/stop/status
 and the Local Human vs AI button flow. Local match command construction,
 runtime preflight, ladder-proxy launch, stdout/game-event parsing, and reaction
@@ -761,6 +778,7 @@ through the `proxy_stopped` event on `StarCraft2EventBus`.
 <!-- #20260715_kpopmodder: Document common DTO result wrappers and the SC2-to-GameEventBus bridge. -->
 <!-- #20260715_kpopmodder: Document common GameEventBus runtime monitoring. -->
 <!-- #20260715_kpopmodder: Document Facade-only SC2RuntimeContext ownership. -->
+<!-- #20260715_kpopmodder: Document StarCraft2RuntimeFactory composition ownership. -->
 
 ## Relationship Symbols
 
