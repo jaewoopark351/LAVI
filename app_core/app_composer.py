@@ -1,6 +1,5 @@
 #202600707_kpopmodder
 #20260705_kpopmodder: Added AppComposer to keep main.py as a thin Windows startup entry point.
-import atexit
 import logging
 import os
 import sys
@@ -15,10 +14,7 @@ from app_core.extensions import (
     GameExtensionContext,
     GameRuntimeContextRegistry,
 )
-from app_core.optional_module_manifest import get_optional_module_manifest
-from app_core.optional_plugin_loader import (
-    instantiate_optional_plugin,
-)
+from app_core.optional_plugin_composition import OptionalPluginCompositionService
 from app_core.runtime_lifecycle import RuntimeLifecycle
 from app_core.screen_router_bootstrap import build_screen_question_router
 from core.global_state import GlobalKeys, global_state
@@ -71,6 +67,9 @@ class AppComposer:
         self.game_extension_registry = ExtensionRegistry()
         self.game_extension_composition_service = GameExtensionCompositionService(
             self.game_extension_registry,
+        )
+        self.optional_plugin_composition_service = OptionalPluginCompositionService(
+            self.current_module_directory,
         )
         self.core_components = []
         self.optional_components = []
@@ -245,52 +244,28 @@ class AppComposer:
         self.core_components.append(self.llm)
 
     def create_optional_plugins(self):
-        self.optional_components = []
-        #20260630_kpopmodder: Keep direct optional plugins gated by modules.json.
-        self.song_player = self.instantiate_manifest_plugin(
-            "SongPlayer",
-        )#20260629_kpopmodder: SongPlayer is optional via modules.json.
-        self._register_startup_component(self.song_player)
-        if self.song_player is not None:
-            self.optional_components.append(self.song_player)
-        self.chess_plugin = self.instantiate_manifest_plugin(
-            "Chess",
-        )#20260628_kpopmodder: Chess is optional via modules.json and owns its web server.
+        #20260717_kpopmodder: Optional plugin construction/roles are owned by the composition service.
+        result = self.optional_plugin_composition_service.compose(
+            memory_store=self.memory_store,
+        )
+        for attribute_name, plugin in result.attribute_map().items():
+            setattr(self, attribute_name, plugin)
+        self.optional_components = list(result.optional_components)
+        for component in result.startup_components:
+            self._register_startup_component(component)
+
         #20260707_kpopmodder: Chess plugin lifecycle/callback wiring is owned by ChessGameExtension.
         self.handle_chess_ai_move_applied = None
-        self.starcraft_plugin = self.instantiate_manifest_plugin(
-            "StarCraftRemastered",
-        )#20260630_kpopmodder: StarCraft Remastered support is optional via modules.json.
-        self._register_startup_component(self.starcraft_plugin)
-        if self.starcraft_plugin is not None:
-            self.optional_components.append(self.starcraft_plugin)
-        self.starcraft116_plugin = self.instantiate_manifest_plugin(
-            "StarCraft116",
-        )#20260702_kpopmodder: StarCraft 1.16 BWAPI bot launcher is separate from Remastered.
         #20260707_kpopmodder: StarCraft116 plugin startup/watcher callback is owned by StarCraft116GameExtension.
-        self.starcraft2_plugin = self.instantiate_manifest_plugin(
-            "StarCraft2",
-        )#20260707_kpopmodder: StarCraft2 plugin lifecycle/callback wiring is owned by StarCraft2GameExtension.
-        self.screen_vision = self.instantiate_manifest_plugin(
-            "ScreenVision",
-            memory_store=self.memory_store,
-        )#20260629_kpopmodder: ScreenVision is optional via modules.json.
-        self._register_startup_component(self.screen_vision)
-        if self.screen_vision is not None:
-            self.optional_components.append(self.screen_vision)
+        #20260707_kpopmodder: StarCraft2 plugin lifecycle/callback wiring is owned by StarCraft2GameExtension.
 
     def instantiate_manifest_plugin(self, module_name, *args, **kwargs):
-        manifest = get_optional_module_manifest(module_name)
-        return instantiate_optional_plugin(
+        #20260717_kpopmodder: Compatibility facade; new code should use OptionalPluginCompositionService.
+        return self.optional_plugin_composition_service.instantiate_manifest_plugin(
             module_name,
-            manifest["module_path"],
-            manifest["class_name"],
-            manifest["default_enabled"],
-            self.current_module_directory,
             *args,
-            manifest=manifest,
             **kwargs,
-        )#20260703_kpopmodder
+        )
 
     def wire_optional_plugin_callbacks(self):
         if self.starcraft_plugin is not None:
@@ -417,9 +392,7 @@ class AppComposer:
             optional_components=self.optional_components,
             global_state_instance=global_state,
         )
-        atexit.register(self.runtime_lifecycle.shutdown)
-        self.runtime_lifecycle.start_components()
-        self.runtime_lifecycle.start_global_updates()
+        self.runtime_lifecycle.start()
 
     def launch_gradio(self):
         gradio_host = "127.0.0.1"

@@ -1,4 +1,5 @@
 #20260630_kpopmodder: Added a small lifecycle owner for shutdown and idle timer wiring.
+import atexit
 import threading
 import traceback
 
@@ -20,6 +21,7 @@ class RuntimeLifecycle:
         timer_factory=None,
         core_components=None,
         optional_components=None,
+        shutdown_register=atexit.register,
     ):
         self.managed_components = list(managed_components)
         self.llm = llm
@@ -34,6 +36,29 @@ class RuntimeLifecycle:
         self.optional_components = list(optional_components or [])
         self.app_shutdown_done = False#20260623_kpopmodder
         self._started_components = set()
+        #20260717_kpopmodder: RuntimeLifecycle owns process-exit shutdown hook registration.
+        self.shutdown_register = shutdown_register
+        self._shutdown_registered = False
+        self._runtime_started = False
+
+    def start(self):
+        #20260717_kpopmodder: Keep AppComposer from coordinating lifecycle sub-steps.
+        if self._runtime_started:
+            return
+
+        self._register_shutdown_hook()
+        self.start_components()
+        self.start_global_updates()
+        self._runtime_started = True
+
+    def _register_shutdown_hook(self):
+        if self._shutdown_registered:
+            return
+        if not callable(self.shutdown_register):
+            return
+
+        self.shutdown_register(self.shutdown)
+        self._shutdown_registered = True
 
     def shutdown(self):
         if self.app_shutdown_done:

@@ -10,6 +10,7 @@ from app_core.extensions import (
     GameExtensionCompositionResult,
     GameExtensionCompositionService,
 )
+from app_core.optional_plugin_composition import OptionalPluginCompositionResult
 
 
 class FakeQueueComponent:
@@ -95,15 +96,13 @@ class AppComposerTests(unittest.TestCase):
         composer.launch_gradio = mock.Mock()
 
         fake_runtime = mock.Mock()
-        fake_runtime.start_components.side_effect = RuntimeError("core startup failure")
-        fake_runtime.start_global_updates = mock.Mock()
+        fake_runtime.start.side_effect = RuntimeError("core startup failure")
         fake_runtime.shutdown = mock.Mock()
 
         def create_runtime_lifecycle():
             events.append("create_runtime_lifecycle")
             composer.runtime_lifecycle = fake_runtime
-            fake_runtime.start_components()
-            fake_runtime.start_global_updates()
+            fake_runtime.start()
 
         composer.create_runtime_lifecycle = mock.Mock(
             side_effect=create_runtime_lifecycle,
@@ -165,6 +164,56 @@ class AppComposerTests(unittest.TestCase):
         self.assertIsNone(composer.starcraft2_plugin)
         self.assertIsNone(composer.screen_vision)
 
+    def test_create_optional_plugins_consumes_composition_result(self):
+        composer = AppComposer()
+        song_player = object()
+        chess_plugin = object()
+        starcraft_plugin = object()
+        starcraft116_plugin = object()
+        starcraft2_plugin = object()
+        screen_vision = object()
+        composer.optional_plugin_composition_service = mock.Mock()
+        composer.optional_plugin_composition_service.compose.return_value = (
+            OptionalPluginCompositionResult(
+                song_player=song_player,
+                chess_plugin=chess_plugin,
+                starcraft_plugin=starcraft_plugin,
+                starcraft116_plugin=starcraft116_plugin,
+                starcraft2_plugin=starcraft2_plugin,
+                screen_vision=screen_vision,
+                optional_components=(
+                    song_player,
+                    starcraft_plugin,
+                    screen_vision,
+                ),
+                startup_components=(
+                    song_player,
+                    starcraft_plugin,
+                    screen_vision,
+                ),
+            )
+        )
+
+        composer.create_optional_plugins()
+
+        composer.optional_plugin_composition_service.compose.assert_called_once_with(
+            memory_store=composer.memory_store,
+        )
+        self.assertIs(song_player, composer.song_player)
+        self.assertIs(chess_plugin, composer.chess_plugin)
+        self.assertIs(starcraft_plugin, composer.starcraft_plugin)
+        self.assertIs(starcraft116_plugin, composer.starcraft116_plugin)
+        self.assertIs(starcraft2_plugin, composer.starcraft2_plugin)
+        self.assertIs(screen_vision, composer.screen_vision)
+        self.assertEqual(
+            [song_player, starcraft_plugin, screen_vision],
+            composer.optional_components,
+        )
+        self.assertEqual(
+            [song_player, starcraft_plugin, screen_vision],
+            composer._startup_components,
+        )
+
     #20260716_kpopmodder: Disabled StarCraft2 must not import/register its passive observer.
     def test_starcraft2_disabled_does_not_import_or_register_observer(self):
         registry = mock.Mock()
@@ -193,7 +242,8 @@ class AppComposerTests(unittest.TestCase):
                 return mock.Mock()
             return None
 
-        composer.instantiate_manifest_plugin = mock.Mock(
+        composition_service = composer.optional_plugin_composition_service
+        composition_service.instantiate_manifest_plugin = mock.Mock(
             side_effect=instantiate_manifest_plugin,
         )
 
@@ -293,14 +343,14 @@ class AppComposerTests(unittest.TestCase):
         composer.game_extension_registry = mock.Mock()
         composer.game_extension_registry.all.return_value = [extension]
 
-        with mock.patch("app_core.app_composer.atexit.register"):
-            with mock.patch("app_core.app_composer.RuntimeLifecycle") as lifecycle_class:
-                lifecycle = mock.Mock()
-                lifecycle_class.return_value = lifecycle
-                composer.create_runtime_lifecycle()
+        with mock.patch("app_core.app_composer.RuntimeLifecycle") as lifecycle_class:
+            lifecycle = mock.Mock()
+            lifecycle_class.return_value = lifecycle
+            composer.create_runtime_lifecycle()
 
-        lifecycle.start_components.assert_called_once()
-        lifecycle.start_global_updates.assert_called_once()
+        lifecycle.start.assert_called_once()
+        lifecycle.start_components.assert_not_called()
+        lifecycle.start_global_updates.assert_not_called()
         extension.start.assert_not_called()
 
     def test_register_game_extensions_delegates_to_composition_service(self):

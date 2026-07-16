@@ -85,6 +85,7 @@ class RuntimeLifecycleTests(unittest.TestCase):
         global_state=None,
         core_components=None,
         optional_components=None,
+        shutdown_register=None,
     ):
         timers = timers if timers is not None else []
 
@@ -93,17 +94,21 @@ class RuntimeLifecycleTests(unittest.TestCase):
             timers.append(timer)
             return timer
 
-        return RuntimeLifecycle(
-            managed_components=managed_components or [],
-            llm=FakeQueueComponent(llm_empty),
-            translate=FakeQueueComponent(translate_empty),
-            tts=FakeQueueComponent(tts_empty),
-            song_player=song_player,
-            global_state_instance=global_state or FakeGlobalState(),
-            core_components=core_components,
-            optional_components=optional_components,
-            timer_factory=timer_factory,
-        )
+        lifecycle_kwargs = {
+            "managed_components": managed_components or [],
+            "llm": FakeQueueComponent(llm_empty),
+            "translate": FakeQueueComponent(translate_empty),
+            "tts": FakeQueueComponent(tts_empty),
+            "song_player": song_player,
+            "global_state_instance": global_state or FakeGlobalState(),
+            "core_components": core_components,
+            "optional_components": optional_components,
+            "timer_factory": timer_factory,
+        }
+        if shutdown_register is not None:
+            lifecycle_kwargs["shutdown_register"] = shutdown_register
+
+        return RuntimeLifecycle(**lifecycle_kwargs)
 
     def test_update_globals_sets_idle_true_when_queues_empty(self):
         state = FakeGlobalState()
@@ -173,6 +178,43 @@ class RuntimeLifecycleTests(unittest.TestCase):
         self.assertEqual(1, first.shutdown_count)
         self.assertEqual(1, interrupting.shutdown_count)
         self.assertEqual(1, last.shutdown_count)
+
+    def test_start_registers_shutdown_and_starts_updates(self):
+        component = FakeStartComponent()
+        shutdown_hooks = []
+        state = FakeGlobalState()
+        timers = []
+        lifecycle = self.make_lifecycle(
+            managed_components=[component],
+            global_state=state,
+            timers=timers,
+            shutdown_register=shutdown_hooks.append,
+        )
+
+        lifecycle.start()
+
+        self.assertEqual([lifecycle.shutdown], shutdown_hooks)
+        self.assertEqual(1, component.start_count)
+        self.assertTrue(state.values[GlobalKeys.IS_IDLE])
+        self.assertEqual(1, len(timers))
+        self.assertTrue(timers[0].started)
+
+    def test_start_is_idempotent(self):
+        component = FakeStartComponent()
+        shutdown_hooks = []
+        timers = []
+        lifecycle = self.make_lifecycle(
+            managed_components=[component],
+            timers=timers,
+            shutdown_register=shutdown_hooks.append,
+        )
+
+        lifecycle.start()
+        lifecycle.start()
+
+        self.assertEqual(1, len(shutdown_hooks))
+        self.assertEqual(1, component.start_count)
+        self.assertEqual(1, len(timers))
 
     def test_start_components_rolls_back_required_component_failure(self):
         core_ok = FakeStartComponent()
