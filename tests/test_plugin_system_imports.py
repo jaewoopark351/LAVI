@@ -139,6 +139,141 @@ class PluginSystemImportTests(unittest.TestCase):
             with self.assertRaises(ModuleSettingsNotFound):
                 load_module_settings(root, argv=[], environ={})
 
+    def test_core_profile_discovers_null_required_providers_only(self):#20260716_kpopmodder
+        from plugin_system.loader import PluginLoader
+
+        loader = PluginLoader("plugins")
+        with mock.patch.dict("os.environ", {"LAVI_PROFILE": "Core"}):
+            loader.load_plugins()
+
+        self.assertEqual(
+            ["NullInput"],
+            [provider.name for provider in loader.plugins["input_gathering"]],
+        )
+        self.assertEqual(
+            ["NullLLM"],
+            [provider.name for provider in loader.plugins["language_model"]],
+        )
+        self.assertEqual(
+            ["NoTranslate"],
+            [provider.name for provider in loader.plugins["translation"]],
+        )
+        self.assertEqual(
+            ["NullTTS"],
+            [provider.name for provider in loader.plugins["text_to_speech"]],
+        )
+        self.assertEqual(
+            ["NullVtuber"],
+            [provider.name for provider in loader.plugins["vtuber"]],
+        )
+
+    def test_null_core_providers_construct_without_side_effects(self):#20260716_kpopmodder
+        from plugin_system.interfaces import (
+            InputPluginInterface,
+            LLMPluginInterface,
+            TTSPluginInterface,
+            VtuberPluginInterface,
+        )
+        from plugins.NullInput.NullInput import NullInput
+        from plugins.NullLLM.NullLLM import NullLLM
+        from plugins.NullTTS.NullTTS import NullTTS
+        from plugins.NullVtuber.NullVtuber import NullVtuber
+
+        null_input = NullInput()
+        null_llm = NullLLM()
+        null_tts = NullTTS()
+        null_vtuber = NullVtuber()
+
+        self.assertIsInstance(null_input, InputPluginInterface)
+        self.assertIsInstance(null_llm, LLMPluginInterface)
+        self.assertIsInstance(null_tts, TTSPluginInterface)
+        self.assertIsInstance(null_vtuber, VtuberPluginInterface)
+        self.assertEqual("", null_llm.predict("hello", [], ""))
+        self.assertIsNone(null_tts.synthesize("hello"))
+        null_vtuber.set_avatar_data(VtuberPluginInterface.AvatarData())
+
+    def test_tts_wrapper_skips_runtime_setup_for_null_tts(self):#20260716_kpopmodder
+        import TTS as tts_module
+        from plugin_system.interfaces import TTSPluginInterface
+        from plugins.NullTTS.NullTTS import NullTTS
+
+        fake_loader = mock.Mock()
+        fake_loader.interface_to_category = {
+            TTSPluginInterface: "text_to_speech",
+        }
+        fake_loader.plugins = {
+            "text_to_speech": [NullTTS()],
+        }
+
+        with mock.patch("plugin_system.selection.plugin_loader", fake_loader):
+            with mock.patch(
+                "plugin_system.selection.config_manager.load_section",
+                return_value={},
+            ):
+                with mock.patch("TTS.ensure_ffmpeg_exists") as ffmpeg_mock:
+                    with mock.patch.object(
+                        tts_module.TTS,
+                        "register_stop_hotkey",
+                    ) as hotkey_mock:
+                        with mock.patch.object(
+                            tts_module.TTS,
+                            "start_stop_hotkey_polling",
+                        ) as polling_mock:
+                            tts = tts_module.TTS()
+                            try:
+                                ffmpeg_mock.assert_not_called()
+                                hotkey_mock.assert_not_called()
+                                polling_mock.assert_not_called()
+                            finally:
+                                tts.shutdown()
+
+    def test_tts_wrapper_keeps_runtime_setup_for_real_tts(self):#20260716_kpopmodder
+        import TTS as tts_module
+        from plugin_system.interfaces import TTSPluginInterface
+
+        class FakeTTS(TTSPluginInterface):
+            def init(self):
+                pass
+
+            def synthesize(self, text):
+                return None
+
+            def create_ui(self):
+                return None
+
+        fake_loader = mock.Mock()
+        fake_loader.interface_to_category = {
+            TTSPluginInterface: "text_to_speech",
+        }
+        fake_loader.plugins = {
+            "text_to_speech": [FakeTTS()],
+        }
+
+        with mock.patch("plugin_system.selection.plugin_loader", fake_loader):
+            with mock.patch(
+                "plugin_system.selection.config_manager.load_section",
+                return_value={},
+            ):
+                with mock.patch(
+                    "TTS.ensure_ffmpeg_exists",
+                    return_value=True,
+                ) as ffmpeg_mock:
+                    with mock.patch.object(
+                        tts_module.TTS,
+                        "register_stop_hotkey",
+                    ) as hotkey_mock:
+                        with mock.patch.object(
+                            tts_module.TTS,
+                            "start_stop_hotkey_polling",
+                        ) as polling_mock:
+                            tts = tts_module.TTS()
+                            try:
+                                ffmpeg_mock.assert_called_once_with()
+                                hotkey_mock.assert_called_once_with()
+                                polling_mock.assert_called_once_with()
+                            finally:
+                                tts.shutdown()
+
     def test_selection_exports_provider_base(self):
         from plugin_system.selection import PluginSelectionBase, Provider
         from plugin_system.selection import (

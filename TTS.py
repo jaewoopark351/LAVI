@@ -14,14 +14,13 @@ from ui_core.live_textbox import LiveTextbox
 from plugin_system.interfaces import TTSPluginInterface
 import gradio as gr
 from plugin_system.selection import PluginSelectionBase
-import LAV_utils
 #from pydub import AudioSegment#20260617_kpopmodder
 #import simpleaudio as sa#20260617_kpopmodder
 #from pydub.utils import audioop#20260617_kpopmodder
 
 from core.event_manager import event_manager, EventType
 #from core.global_state import global_state, GlobalKeys#20260617_kpopmodder
-from core.logger import log_print, debug_print
+from core.logger import log_print
 from safety_filter import clean_text
 #from audio_device_manager import audio_device_manager#20260616_kpopmodder
 
@@ -106,10 +105,7 @@ class TTS(PluginSelectionBase):#20260615_kpopmodder
 
         #self.check_ffmpeg()#20260616_kpopmodder
         #ensure_ffmpeg_exists()#20260616_kpopmodder
-        ffmpeg_ready = ensure_ffmpeg_exists()#20260616_kpopmodder
-
-        if not ffmpeg_ready:#20260616_kpopmodder
-            log_print("[TTS] ffmpeg setup failed or ffmpeg is not available.")
+        self.configure_audio_runtime()#20260716_kpopmodder
 
         self._shutdown = False
         self._interrupt_subscription = event_manager.subscribe(
@@ -121,8 +117,7 @@ class TTS(PluginSelectionBase):#20260615_kpopmodder
         self.stop_hotkey_poll_stop_event = threading.Event()#20260705_kpopmodder
         self.stop_hotkey_poll_thread = None#20260705_kpopmodder
         self.last_stop_hotkey_time = 0.0#20260705_kpopmodder
-        self.register_stop_hotkey()#20260705_kpopmodder
-        self.start_stop_hotkey_polling()#20260705_kpopmodder
+        self.configure_stop_hotkey_controls()#20260716_kpopmodder
 
     def create_ui(self):
         with gr.Tab("TTS"):
@@ -1100,6 +1095,27 @@ class TTS(PluginSelectionBase):#20260615_kpopmodder
         #20260711_kpopmodder: Public TTS-only boundary cancellation used by
         # game integrations without interrupting LLM, Translate, or ScreenVision.
         return self.interrupt_controller.cancel_pending(reason=reason)
+
+    def is_null_tts_provider(self):#20260716_kpopmodder
+        current_plugin = getattr(self, "current_plugin", None)
+        return current_plugin.__class__.__name__ == "NullTTS"
+
+    def configure_audio_runtime(self):#20260716_kpopmodder
+        if self.is_null_tts_provider():
+            log_print("[TTS] audio runtime setup skipped for NullTTS provider")
+            return
+
+        ffmpeg_ready = ensure_ffmpeg_exists()#20260616_kpopmodder
+        if not ffmpeg_ready:#20260616_kpopmodder
+            log_print("[TTS] ffmpeg setup failed or ffmpeg is not available.")
+
+    def configure_stop_hotkey_controls(self):#20260716_kpopmodder
+        if self.is_null_tts_provider():
+            log_print("[TTS] stop hotkey skipped for NullTTS provider")
+            return
+
+        self.register_stop_hotkey()#20260705_kpopmodder
+        self.start_stop_hotkey_polling()#20260705_kpopmodder
 
     def register_stop_hotkey(self):#20260705_kpopmodder
         if keyboard is None:
