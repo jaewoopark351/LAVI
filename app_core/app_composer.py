@@ -217,9 +217,9 @@ class AppComposer:
     def create_core_components(self):
         from input_core.input_component import Input
         from LLM import LLM
-        from Translate import Translate
+        from translation_core.translate_component import Translate
         from TTS import TTS
-        from VTuber import Vtuber
+        from vtuber_core.vtuber_component import Vtuber
 
         self.core_components = []
         self.input = Input()

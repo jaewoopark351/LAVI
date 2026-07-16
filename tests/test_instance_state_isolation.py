@@ -19,7 +19,7 @@ class InstanceStateIsolationTests(unittest.TestCase):
     def test_queue_listener_and_textbox_state_are_not_class_assignments(self):
         project_root = Path(__file__).resolve().parents[1]
         checked_classes = {
-            "Translate.py": {
+            "translation_core/translate_component.py": {
                 "Translate": {
                     "input_queue",
                     "output_event_listeners",

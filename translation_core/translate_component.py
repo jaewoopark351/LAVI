@@ -1,10 +1,10 @@
+#20260717_kpopmodder: Moved Translate implementation out of the root legacy facade.
 #from queue import Queue#20260621_kpopmodder
 from queue import Queue, Empty#20260621_kpopmodder
 import threading
 
 from core.event_manager import event_manager, EventType#20260621_kpopmodder
 from plugin_system.interfaces import TranslationPluginInterface
-import gradio as gr
 from plugin_system.selection import PluginSelectionBase
 from ui_core.live_textbox import LiveTextbox
 import LAV_utils
@@ -12,6 +12,7 @@ from core.logger import log_print, debug_print#20260612_kpopmodder
 
 
 class Translate(PluginSelectionBase):
+    #20260717_kpopmodder: AppComposer imports this implementation directly after root Translate.py removal.
     def __init__(self) -> None:
         super().__init__(TranslationPluginInterface)
         self.input_queue = Queue()
@@ -26,6 +27,8 @@ class Translate(PluginSelectionBase):
         )#20260621_kpopmodder
 
     def create_ui(self):
+        import gradio as gr
+
         with gr.Tab("Translate"):
             super().create_plugin_selection_ui()
             # translation UI

@@ -136,9 +136,9 @@ class EventShutdownTests(unittest.TestCase):
         expected_shutdown_classes = {
             "input_core/input_component.py": "Input",
             "LLM.py": "LLM",
-            "Translate.py": "Translate",
+            "translation_core/translate_component.py": "Translate",
             "TTS.py": "TTS",
-            "VTuber.py": "Vtuber",
+            "vtuber_core/vtuber_component.py": "Vtuber",
             "plugins/ScreenVision/screenVision.py": "ScreenVision",
             "plugins/VoiceInput/voiceInput.py": "VoiceInput",
         }

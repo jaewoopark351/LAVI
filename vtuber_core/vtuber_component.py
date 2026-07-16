@@ -1,21 +1,11 @@
-import os
-from queue import Queue
-import shutil
-import threading
-import zipfile
-
-import requests
-from tqdm import tqdm
+#20260717_kpopmodder: Moved Vtuber implementation out of the removed root legacy file.
 from plugin_system.interfaces import VtuberPluginInterface
-import gradio as gr
 from plugin_system.selection import PluginSelectionBase
-import LAV_utils
-from pydub import AudioSegment
-#import simpleaudio as sa
-from core.logger import log_print, debug_print#20260612_kpopmodder
+from core.logger import log_print#20260612_kpopmodder
 
 
 class Vtuber(PluginSelectionBase):
+    #20260717_kpopmodder: AppComposer imports this implementation directly after root file removal.
     def __init__(self) -> None:
         super().__init__(VtuberPluginInterface)
         self.data = VtuberPluginInterface.AvatarData()
@@ -23,6 +13,8 @@ class Vtuber(PluginSelectionBase):
         self._shutdown = False
 
     def create_ui(self):
+        import gradio as gr
+
         with gr.Tab("Vtuber"):
             super().create_plugin_selection_ui()
             super().create_plugin_ui()
