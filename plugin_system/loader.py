@@ -2,10 +2,9 @@
 import ast
 from dataclasses import dataclass
 import importlib.util
-import json
 import os
 from pathlib import Path
-import subprocess  #20260716_kpopmodder: Kept only so older tests can assert runtime pip is unused.
+import subprocess  # noqa: F401  #20260716_kpopmodder: Kept so tests can assert runtime pip is unused.
 import sys
 
 from plugin_system.interfaces import (
@@ -17,8 +16,9 @@ from plugin_system.interfaces import (
 )
 from plugin_system.registry import plugin_registry
 
-from core.logger import log_print, debug_print#20260612_kpopmodder
+from core.logger import log_print#20260612_kpopmodder
 from core.paths import get_lavi_paths
+from core.profile_resolver import ModuleSettingsNotFound, load_module_settings
 
 plugin_directory = "plugins"
 temp_ignore = [] #["silero", "Local_LLM", "voicevox"]
@@ -150,7 +150,9 @@ class PluginLoader:
         self._settings_loaded = False
 
         self.plugin_setting_path = str(self.paths.config_path("modules.json"))
-        self.legacy_plugin_setting_path = str(self.paths.root_path("modules.json"))
+        self.production_plugin_setting_path = str(self.paths.root_path("modules.json"))
+        #20260716_kpopmodder: Compatibility alias for older tests; root modules.json is production config, not legacy policy.
+        self.legacy_plugin_setting_path = self.production_plugin_setting_path
         self.plugin_setting_example_path = str(self.paths.config_path("modules.example.json"))
         self.plugin_setting= {}
 
@@ -159,25 +161,27 @@ class PluginLoader:
         self.registry.record(name, status, kind=kind, detail=detail)
 
     def _load_module_settings(self):
-        for modules_path in (
-            self.plugin_setting_path,
-            self.legacy_plugin_setting_path,
-            self.plugin_setting_example_path,
-        ):
-            if not os.path.exists(modules_path):
-                continue
-            with open(modules_path, "r", encoding="utf-8") as json_file:
-                plugin_setting = json.load(json_file)
-            if not isinstance(plugin_setting, dict):
-                raise ValueError(f"{modules_path} root must be a JSON object")
-            return plugin_setting
-        return {}
+        default_user_path = self.paths.config_path("modules.json").resolve()
+        configured_path = Path(self.plugin_setting_path).resolve()
+        explicit_modules_config = None
+        if configured_path != default_user_path:
+            explicit_modules_config = self.plugin_setting_path
+
+        resolution = load_module_settings(
+            self.paths.project_root,
+            modules_config=explicit_modules_config,
+        )
+        return resolution.settings
 
     def _ensure_module_settings_loaded(self):
         if self._settings_loaded:
             return
         try:
             self.plugin_setting = self._load_module_settings()
+        except ModuleSettingsNotFound as e:
+            #20260716_kpopmodder: Missing production modules.json is an actionable startup error, not an example fallback.
+            log_print(f"[PluginLoader] modules.json not found: {e}")
+            raise
         except Exception as e:
             #20260630_kpopmodder: Bad modules.json isolates plugin discovery instead of hiding the error.
             log_print(f"[PluginLoader] modules.json read failed: {e}")

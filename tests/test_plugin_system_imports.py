@@ -80,6 +80,65 @@ class PluginSystemImportTests(unittest.TestCase):
             ]
             self.assertEqual(["MissingKeyPlugin"], loaded_names)
 
+    def test_modules_resolution_uses_root_production_default(self):#20260716_kpopmodder
+        from core.profile_resolver import load_module_settings
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "config").mkdir()
+            (root / "modules.json").write_text(
+                json.dumps({"RootOnly": True}),
+                encoding="utf-8",
+            )
+            (root / "config" / "modules.example.json").write_text(
+                json.dumps({"ExampleOnly": True}),
+                encoding="utf-8",
+            )
+
+            resolution = load_module_settings(root, argv=[], environ={})
+
+        self.assertEqual("production", resolution.source)
+        self.assertEqual({"RootOnly": True}, resolution.settings)
+
+    def test_modules_resolution_uses_core_config_only_when_profile_core(self):#20260716_kpopmodder
+        from core.profile_resolver import load_module_settings
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "config").mkdir()
+            (root / "modules.json").write_text(
+                json.dumps({"ProductionOnly": True}),
+                encoding="utf-8",
+            )
+            (root / "config" / "modules.core.json").write_text(
+                json.dumps({"CoreOnly": True}),
+                encoding="utf-8",
+            )
+
+            resolution = load_module_settings(
+                root,
+                argv=["--profile", "Core"],
+                environ={},
+            )
+
+        self.assertEqual("profile_core", resolution.source)
+        self.assertEqual("Core", resolution.profile)
+        self.assertEqual({"CoreOnly": True}, resolution.settings)
+
+    def test_modules_resolution_does_not_use_example_as_runtime_fallback(self):#20260716_kpopmodder
+        from core.profile_resolver import ModuleSettingsNotFound, load_module_settings
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "config").mkdir()
+            (root / "config" / "modules.example.json").write_text(
+                json.dumps({"ExampleOnly": True}),
+                encoding="utf-8",
+            )
+
+            with self.assertRaises(ModuleSettingsNotFound):
+                load_module_settings(root, argv=[], environ={})
+
     def test_selection_exports_provider_base(self):
         from plugin_system.selection import PluginSelectionBase, Provider
         from plugin_system.selection import (
