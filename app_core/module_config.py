@@ -18,4 +18,5 @@ def module_enabled(module_name, default=True, current_module_directory=None):#20
         raise
     except Exception as e:
         log_print(f"[Modules] {module_name} setting unavailable: {e}")
-        return default
+        #20260716_kpopmodder: Malformed/read-failed settings fail closed instead of honoring default_enabled=True.
+        return False

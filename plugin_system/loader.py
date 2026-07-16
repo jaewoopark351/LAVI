@@ -1,12 +1,15 @@
 #20260622_kpopmodder: Canonical plugin loading implementation.
 import ast
 from dataclasses import dataclass
+import importlib
 import importlib.util
 import os
 from pathlib import Path
 import shutil
+import socket
 import subprocess  # noqa: F401  #20260716_kpopmodder: Kept so tests can assert runtime pip is unused.
 import sys
+from urllib.parse import urlparse
 
 from plugin_system.interfaces import (
     InputPluginInterface,
@@ -19,7 +22,11 @@ from plugin_system.registry import plugin_registry
 
 from core.logger import log_print#20260612_kpopmodder
 from core.paths import get_lavi_paths
-from core.profile_resolver import ModuleSettingsNotFound, load_module_settings
+from core.profile_resolver import (
+    ModuleSettingsError,
+    ModuleSettingsNotFound,
+    load_module_settings,
+)
 
 plugin_directory = "plugins"
 temp_ignore = [] #["silero", "Local_LLM", "voicevox"]
@@ -145,40 +152,10 @@ class PluginHandle:
         if self.status in (PluginState.UNAVAILABLE, PluginState.FAILED):
             return False
 
-        missing_packages = [
-            package
-            for package in self.descriptor.required_python_packages
-            if importlib.util.find_spec(package) is None
-        ]
-        missing_files = [
-            path
-            for path in self.descriptor.required_files
-            if not self.loader.resolve_required_file(self.descriptor, path).exists()
-        ]
-        missing_executables = [
-            executable
-            for executable in self.descriptor.required_executables
-            if shutil.which(executable) is None
-        ]
-
-        if not (missing_packages or missing_files or missing_executables):
+        diagnostic = self.loader.availability_diagnostic(self.descriptor)
+        if diagnostic is None:
             return True
 
-        diagnostic = PluginDiagnostic(
-            plugin_id=self.descriptor.id,
-            state=PluginState.UNAVAILABLE,
-            reason_code="missing_static_dependency",
-            human_readable_message=(
-                f"{self.descriptor.display_name} is enabled but required "
-                "Python packages, files, or executables are missing."
-            ),
-            missing_python_packages=tuple(missing_packages),
-            missing_files=tuple(missing_files),
-            missing_executables=tuple(missing_executables),
-            missing_services=tuple(self.descriptor.required_services),
-            suggested_install_profile=self.descriptor.dependency_group,
-            suggested_command=self.loader.suggested_install_command(self.descriptor),
-        )
         self._set_state(
             PluginState.UNAVAILABLE,
             detail=diagnostic.human_readable_message,
@@ -322,10 +299,16 @@ class PluginLoader:
             #20260716_kpopmodder: Missing production modules.json is an actionable startup error, not an example fallback.
             log_print(f"[PluginLoader] modules.json not found: {e}")
             raise
+        except ModuleSettingsError as e:
+            #20260716_kpopmodder: Malformed module settings must fail closed before plugin discovery.
+            log_print(f"[PluginLoader] modules.json invalid: {e}")
+            raise
         except Exception as e:
-            #20260630_kpopmodder: Bad modules.json isolates plugin discovery instead of hiding the error.
+            #20260716_kpopmodder: Read/parse failures are actionable startup errors, not fail-open discovery.
             log_print(f"[PluginLoader] modules.json read failed: {e}")
-            self.plugin_setting = {}
+            raise ModuleSettingsError(
+                f"Unable to load module settings from {self.plugin_setting_path}: {e}"
+            ) from e
         self._settings_loaded = True
 
     def load_plugins(self):
@@ -339,7 +322,7 @@ class PluginLoader:
         self._load_plugins_from_directory(self.plugin_directory)
 
         # Next, discover plugins from subdirectories.
-        for item_name in os.listdir(self.plugin_directory):
+        for item_name in sorted(os.listdir(self.plugin_directory)):
             item_path = os.path.join(self.plugin_directory, item_name)
 
             # Check if the item is a directory.
@@ -366,7 +349,7 @@ class PluginLoader:
 
     def _load_plugins_from_directory(self, directory):
         self._ensure_module_settings_loaded()
-        for file in os.listdir(directory):
+        for file in sorted(os.listdir(directory)):
             if file.endswith('.py') and not file.startswith('_'):
                 module_path = os.path.join(directory, file)
                 self._register_descriptors_from_file(directory, module_path)
@@ -405,11 +388,12 @@ class PluginLoader:
             if category is None:
                 continue
 
-            metadata = self._metadata_from_class_node(
+            metadata, metadata_errors = self._metadata_from_class_node(
                 class_node=node,
                 plugin_name=plugin_name,
                 class_name=node.name,
                 category=category,
+                module_name=module_name,
             )
             descriptor = PluginDescriptor(
                 plugin_name=plugin_name,
@@ -425,7 +409,10 @@ class PluginLoader:
                 continue
 
             self._descriptor_keys.add(key)
-            handle = self._handle_for_descriptor(descriptor)
+            handle = self._handle_for_descriptor(
+                descriptor,
+                validation_errors=metadata_errors,
+            )
             self.plugins[category].append(handle)
             self.set_plugin_status(
                 descriptor.status_key,
@@ -434,7 +421,24 @@ class PluginLoader:
                 diagnostic=handle.diagnostic.to_dict() if handle.diagnostic else None,
             )
 
-    def _handle_for_descriptor(self, descriptor):
+    def _handle_for_descriptor(self, descriptor, validation_errors=()):
+        if validation_errors:
+            reason_code, message = validation_errors[0]
+            diagnostic = PluginDiagnostic(
+                plugin_id=descriptor.id,
+                state=PluginState.FAILED,
+                reason_code=reason_code,
+                human_readable_message="; ".join(
+                    error_message for _code, error_message in validation_errors
+                ),
+            )
+            return PluginHandle(
+                descriptor,
+                self,
+                status=PluginState.FAILED,
+                diagnostic=diagnostic,
+            )
+
         if descriptor.api_version != "1":
             diagnostic = PluginDiagnostic(
                 plugin_id=descriptor.id,
@@ -471,10 +475,133 @@ class PluginLoader:
             )
 
         self._metadata_ids[descriptor.id] = descriptor.entrypoint
+        diagnostic = self.availability_diagnostic(descriptor)
+        if diagnostic is not None:
+            return PluginHandle(
+                descriptor,
+                self,
+                status=PluginState.UNAVAILABLE,
+                diagnostic=diagnostic,
+            )
         return PluginHandle(descriptor, self)
 
-    def _metadata_from_class_node(self, class_node, plugin_name, class_name, category):
+    def availability_diagnostic(self, descriptor):
+        missing_packages = [
+            package
+            for package in descriptor.required_python_packages
+            if importlib.util.find_spec(package) is None
+        ]
+        missing_files = [
+            path
+            for path in descriptor.required_files
+            if not self.resolve_required_file(descriptor, path).exists()
+        ]
+        missing_executables = [
+            executable
+            for executable in descriptor.required_executables
+            if shutil.which(executable) is None
+        ]
+        model_missing_files = self._probe_model_file_contract(descriptor)
+        missing_services = self._probe_required_services(descriptor)
+
+        if not (
+            missing_packages
+            or missing_files
+            or missing_executables
+            or model_missing_files
+            or missing_services
+        ):
+            return None
+
+        reason_code = "missing_static_dependency"
+        message = (
+            f"{descriptor.display_name} is enabled but required Python packages, "
+            "files, executables, services, or model files are unavailable."
+        )
+        if model_missing_files:
+            reason_code = "missing_model_configuration"
+            message = (
+                f"{descriptor.display_name} is enabled but selected model files "
+                "or model configuration are missing."
+            )
+        elif missing_services and not (missing_packages or missing_files or missing_executables):
+            reason_code = "required_service_unavailable"
+            message = (
+                f"{descriptor.display_name} is enabled but a required local "
+                "service or device probe failed."
+            )
+
+        return PluginDiagnostic(
+            plugin_id=descriptor.id,
+            state=PluginState.UNAVAILABLE,
+            reason_code=reason_code,
+            human_readable_message=message,
+            missing_python_packages=tuple(missing_packages),
+            missing_files=tuple(missing_files + model_missing_files),
+            missing_executables=tuple(missing_executables),
+            missing_services=tuple(missing_services),
+            suggested_install_profile=descriptor.dependency_group,
+            suggested_command=self.suggested_install_command(descriptor),
+            log_reference=f"PluginLoader availability probe for {descriptor.status_key}",
+        )
+
+    def _probe_required_services(self, descriptor):
+        missing_services = []
+        for service in descriptor.required_services:
+            if service == "microphone_input_device":
+                if not self._probe_microphone_input_device():
+                    missing_services.append(service)
+            elif service.startswith("VTube Studio websocket "):
+                url = service.removeprefix("VTube Studio websocket ").strip()
+                if not self._probe_tcp_service(url, timeout_sec=0.25):
+                    missing_services.append(service)
+        return missing_services
+
+    def _probe_microphone_input_device(self):
+        try:
+            sounddevice = importlib.import_module("sounddevice")
+            devices = sounddevice.query_devices()
+        except Exception:
+            return False
+        try:
+            return any(int(device.get("max_input_channels", 0)) > 0 for device in devices)
+        except Exception:
+            return False
+
+    def _probe_tcp_service(self, service_url, timeout_sec=0.25):
+        parsed = urlparse(service_url)
+        host = parsed.hostname
+        port = parsed.port
+        if not host or not port:
+            return False
+        try:
+            with socket.create_connection((host, port), timeout=timeout_sec):
+                return True
+        except OSError:
+            return False
+
+    def _probe_model_file_contract(self, descriptor):
+        if descriptor.id != "GPTSoVITS":
+            return []
+        missing = []
+        ckpt_dir = self.resolve_required_file(descriptor, "plugin:gpt_sovits_ckpt_dir")
+        model_dir = self.resolve_required_file(descriptor, "plugin:gpt_sovits_model_dir")
+        if not any(ckpt_dir.glob("*.ckpt")):
+            missing.append(str(ckpt_dir / "*.ckpt"))
+        if not any(model_dir.glob("*.pth")):
+            missing.append(str(model_dir / "*.pth"))
+        return missing
+
+    def _metadata_from_class_node(
+        self,
+        class_node,
+        plugin_name,
+        class_name,
+        category,
+        module_name,
+    ):
         metadata = {}
+        errors = []
         for body_node in class_node.body:
             target_name = ""
             value_node = None
@@ -493,26 +620,199 @@ class PluginLoader:
                 continue
             try:
                 parsed = ast.literal_eval(value_node)
-            except Exception:
+            except Exception as e:
+                errors.append((
+                    "metadata_not_literal",
+                    f"{plugin_name}.{class_name} metadata must be a Python literal: {e}",
+                ))
                 parsed = {}
             if isinstance(parsed, dict):
                 metadata = parsed
+            else:
+                errors.append((
+                    "metadata_root_type",
+                    f"{plugin_name}.{class_name} metadata must be a dict",
+                ))
             break
 
+        expected_entrypoint = f"{module_name}:{class_name}"
+        metadata_category = self._optional_text(
+            metadata,
+            "category",
+            category,
+            errors,
+            plugin_name,
+            class_name,
+        )
+        if metadata_category != category:
+            errors.append((
+                "metadata_category_mismatch",
+                (
+                    f"{plugin_name}.{class_name} metadata category "
+                    f"{metadata_category!r} does not match interface category {category!r}"
+                ),
+            ))
+
+        metadata_entrypoint = self._optional_text(
+            metadata,
+            "entrypoint",
+            expected_entrypoint,
+            errors,
+            plugin_name,
+            class_name,
+        )
+        if metadata_entrypoint != expected_entrypoint:
+            errors.append((
+                "metadata_entrypoint_mismatch",
+                (
+                    f"{plugin_name}.{class_name} metadata entrypoint "
+                    f"{metadata_entrypoint!r} does not match {expected_entrypoint!r}"
+                ),
+            ))
+
+        config_schema = self._metadata_dict(
+            metadata,
+            "config_schema",
+            errors,
+            plugin_name,
+            class_name,
+        )
+        supports_offline, supports_cpu = self._metadata_supports(
+            metadata,
+            errors,
+            plugin_name,
+            class_name,
+        )
+
         return {
-            "id": str(metadata.get("id") or class_name),
-            "display_name": str(metadata.get("display_name") or class_name),
-            "api_version": str(metadata.get("api_version") or "1"),
-            "dependency_group": str(metadata.get("dependency_group") or category),
-            "capabilities": tuple(self._string_list(metadata.get("capabilities"))),
-            "config_schema": dict(metadata.get("config_schema") or {}),
-            "required_python_packages": tuple(self._string_list(metadata.get("required_python_packages"))),
-            "required_files": tuple(self._string_list(metadata.get("required_files"))),
-            "required_executables": tuple(self._string_list(metadata.get("required_executables"))),
-            "required_services": tuple(self._string_list(metadata.get("required_services"))),
-            "supports_offline": bool(metadata.get("supports_offline", False)),
-            "supports_cpu": bool(metadata.get("supports_cpu", True)),
-        }
+            "id": self._optional_text(metadata, "id", class_name, errors, plugin_name, class_name),
+            "display_name": self._optional_text(metadata, "display_name", class_name, errors, plugin_name, class_name),
+            "api_version": self._optional_text(metadata, "api_version", "1", errors, plugin_name, class_name),
+            "dependency_group": self._optional_text(metadata, "dependency_group", category, errors, plugin_name, class_name),
+            "capabilities": tuple(self._metadata_string_sequence(metadata, "capabilities", errors, plugin_name, class_name)),
+            "config_schema": config_schema,
+            "required_python_packages": tuple(self._metadata_string_sequence(metadata, "required_python_packages", errors, plugin_name, class_name)),
+            "required_files": tuple(self._metadata_string_sequence(metadata, "required_files", errors, plugin_name, class_name)),
+            "required_executables": tuple(self._metadata_string_sequence(metadata, "required_executables", errors, plugin_name, class_name)),
+            "required_services": tuple(self._metadata_string_sequence(metadata, "required_services", errors, plugin_name, class_name)),
+            "supports_offline": supports_offline,
+            "supports_cpu": supports_cpu,
+        }, tuple(errors)
+
+    def _optional_text(self, metadata, key, default, errors, plugin_name, class_name):
+        if key not in metadata:
+            return default
+        value = metadata.get(key)
+        if not isinstance(value, str) or not value.strip():
+            errors.append((
+                f"metadata_invalid_{key}",
+                f"{plugin_name}.{class_name} metadata {key} must be a non-empty string",
+            ))
+            return default
+        return value.strip()
+
+    def _metadata_dict(self, metadata, key, errors, plugin_name, class_name):
+        if key not in metadata:
+            return {}
+        value = metadata.get(key)
+        if not isinstance(value, dict):
+            errors.append((
+                f"metadata_invalid_{key}",
+                f"{plugin_name}.{class_name} metadata {key} must be an object",
+            ))
+            return {}
+        return dict(value)
+
+    def _metadata_string_sequence(self, metadata, key, errors, plugin_name, class_name):
+        if key not in metadata:
+            return []
+        value = metadata.get(key)
+        if not isinstance(value, (list, tuple)):
+            errors.append((
+                f"metadata_invalid_{key}",
+                f"{plugin_name}.{class_name} metadata {key} must be a list or tuple of strings",
+            ))
+            return []
+        items = []
+        for item in value:
+            if not isinstance(item, str) or not item.strip():
+                errors.append((
+                    f"metadata_invalid_{key}",
+                    f"{plugin_name}.{class_name} metadata {key} entries must be non-empty strings",
+                ))
+                continue
+            items.append(item.strip())
+        return items
+
+    def _metadata_supports(self, metadata, errors, plugin_name, class_name):
+        supports_offline = False
+        supports_cpu = True
+        supports = metadata.get("supports")
+        if supports is not None:
+            if not isinstance(supports, dict):
+                errors.append((
+                    "metadata_invalid_supports",
+                    f"{plugin_name}.{class_name} metadata supports must be an object",
+                ))
+            else:
+                if "offline" in supports:
+                    supports_offline = self._metadata_bool(
+                        supports,
+                        "offline",
+                        supports_offline,
+                        errors,
+                        plugin_name,
+                        class_name,
+                        "supports.offline",
+                    )
+                if "cpu" in supports:
+                    supports_cpu = self._metadata_bool(
+                        supports,
+                        "cpu",
+                        supports_cpu,
+                        errors,
+                        plugin_name,
+                        class_name,
+                        "supports.cpu",
+                    )
+        supports_offline = self._metadata_bool(
+            metadata,
+            "supports_offline",
+            supports_offline,
+            errors,
+            plugin_name,
+            class_name,
+        )
+        supports_cpu = self._metadata_bool(
+            metadata,
+            "supports_cpu",
+            supports_cpu,
+            errors,
+            plugin_name,
+            class_name,
+        )
+        return supports_offline, supports_cpu
+
+    def _metadata_bool(
+        self,
+        metadata,
+        key,
+        default,
+        errors,
+        plugin_name,
+        class_name,
+        label=None,
+    ):
+        if key not in metadata:
+            return default
+        value = metadata.get(key)
+        if not isinstance(value, bool):
+            errors.append((
+                f"metadata_invalid_{key}",
+                f"{plugin_name}.{class_name} metadata {label or key} must be a boolean",
+            ))
+            return default
+        return value
 
     def _string_list(self, value):
         if value is None:

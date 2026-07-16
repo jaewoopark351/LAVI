@@ -9,7 +9,10 @@ import importlib
 import json
 import os
 from pathlib import Path
+import queue
 import sys
+import _thread
+import threading
 import time
 import traceback
 from unittest import mock
@@ -30,6 +33,69 @@ class SmokeError(RuntimeError):
 
 class SideEffectAttempt(SmokeError):
     pass
+
+
+class SmokeTimeout(SmokeError):
+    pass
+
+
+@contextlib.contextmanager
+def startup_timeout(timeout_sec, label):
+    timeout = float(timeout_sec or 0)
+    if timeout <= 0:
+        yield
+        return
+
+    expired = {"value": False}
+
+    def interrupt_main_thread():
+        expired["value"] = True
+        _thread.interrupt_main()
+
+    timer = threading.Timer(timeout, interrupt_main_thread)
+    timer.daemon = True
+    timer.start()
+    try:
+        yield
+    except KeyboardInterrupt as exc:
+        if expired["value"]:
+            raise SmokeTimeout(
+                f"{label} exceeded timeout while running: timeout={timeout}s"
+            ) from exc
+        raise
+    finally:
+        timer.cancel()
+
+
+def run_with_timeout(timeout_sec, label, function):
+    timeout = float(timeout_sec or 0)
+    if timeout <= 0:
+        return function()
+
+    results = queue.Queue(maxsize=1)
+
+    def target():
+        try:
+            results.put(("result", function(), None))
+        except BaseException as exc:
+            results.put(("error", exc, exc.__traceback__))
+
+    worker = threading.Thread(
+        target=target,
+        name=f"{label.replace(' ', '')}TimeoutWorker",
+        daemon=True,
+    )
+    worker.start()
+    worker.join(timeout)
+    if worker.is_alive():
+        raise SmokeTimeout(
+            f"{label} exceeded timeout while running: timeout={timeout}s"
+        )
+
+    kind, value, tb = results.get_nowait()
+    if kind == "error":
+        raise value.with_traceback(tb)
+    return value
 
 
 @dataclass
@@ -163,20 +229,24 @@ class SmokeSideEffectGuard:
         import subprocess
 
         original_popen = subprocess.Popen
+        guard = self
 
-        def guarded_popen(*args, **kwargs):
-            if self._called_from_python_platform_probe():
-                return original_popen(*args, **kwargs)
-            current = self.counters.external_process_attempts
-            self.counters.external_process_attempts = current + 1
-            stack = "".join(traceback.format_stack(limit=8))
-            self.counters.record_stack("subprocess.Popen", stack)
-            raise SideEffectAttempt(
-                "subprocess.Popen attempted during smoke\n"
-                f"{stack}"
-            )
+        class GuardedPopen(original_popen):
+            #20260716_kpopmodder: Preserve Popen's class API, including Popen[bytes], while guarding calls.
+            def __init__(self, *args, **kwargs):
+                if guard._called_from_python_platform_probe():
+                    super().__init__(*args, **kwargs)
+                    return
+                current = guard.counters.external_process_attempts
+                guard.counters.external_process_attempts = current + 1
+                stack = "".join(traceback.format_stack(limit=8))
+                guard.counters.record_stack("subprocess.Popen", stack)
+                raise SideEffectAttempt(
+                    "subprocess.Popen attempted during smoke\n"
+                    f"{stack}"
+                )
 
-        self.stack.enter_context(mock.patch("subprocess.Popen", guarded_popen))
+        self.stack.enter_context(mock.patch("subprocess.Popen", GuardedPopen))
 
     def _called_from_python_platform_probe(self):
         for frame in traceback.extract_stack(limit=10):
@@ -329,6 +399,28 @@ def run_core_offline_smoke(
     offline,
     timeout_sec,
 ):
+    return run_with_timeout(
+        timeout_sec,
+        "Core smoke",
+        lambda: _run_core_offline_smoke(
+            project_root,
+            profile,
+            modules_config,
+            accelerator,
+            offline,
+            timeout_sec,
+        ),
+    )
+
+
+def _run_core_offline_smoke(
+    project_root,
+    profile,
+    modules_config,
+    accelerator,
+    offline,
+    timeout_sec,
+):
     if not offline:
         raise SmokeError("Core smoke requires --offline")
 
@@ -430,6 +522,14 @@ def _manifest_file_path(project_root, module_path):
 
 
 def run_production_config_smoke(project_root, timeout_sec):
+    return run_with_timeout(
+        timeout_sec,
+        "production config smoke",
+        lambda: _run_production_config_smoke(project_root, timeout_sec),
+    )
+
+
+def _run_production_config_smoke(project_root, timeout_sec):
     project_root = Path(project_root).resolve()
     started_at = time.monotonic()
     modules_hash_before = _assert_modules_hash(project_root)

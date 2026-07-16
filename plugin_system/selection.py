@@ -21,6 +21,8 @@ class Provider():
         self.initialized = False
         self.disabled = False
         self.init_error = ""
+        self.needs_shutdown = False
+        self.shutdown_attempted = False
 
 
 # place holder until config saving is implemented
@@ -118,7 +120,10 @@ class PluginSelectionBase():#20260622_kpopmodder
             info="",
             interactive=True)
         self.provider_dropdown.change(
-            self.on_dropdown_change, inputs=self.provider_dropdown)
+            self.on_dropdown_change,
+            inputs=self.provider_dropdown,
+            outputs=self.provider_dropdown,
+        )
 
     # Creates the custom UI from each plugin
     def create_plugin_ui(self):
@@ -169,16 +174,17 @@ class PluginSelectionBase():#20260622_kpopmodder
         provider = self.find_provider_by_name(self.provider_list, provider_name)
         if provider is None:
             log_print(f"[PluginSelection] provider not found: {provider_name}")
-            return
+            return self._current_provider_name()
         if not self.load_provider(provider.name):
             #20260630_kpopmodder: Lazy-init failures keep the previous active provider.
             log_print(
                 f"[PluginSelection] provider unavailable: {provider.name}"
             )
-            return
+            return self._current_provider_name()
 
         self.current_provider = provider
         self.current_plugin = provider.plugin
+        return self._current_provider_name()
 
     def load_provider(self, provider_name):
         # log_print(f"Loading {self.plugin_type} Module...")#20260612_kpopmodder
@@ -201,6 +207,7 @@ class PluginSelectionBase():#20260622_kpopmodder
             #20260630_kpopmodder: Bad provider contract disables only the provider.
             found_provider.disabled = True
             found_provider.init_error = "plugin does not implement interface"
+            self._cleanup_failed_provider(found_provider)
             log_print(
                 f"[PluginSelection] provider disabled: "
                 f"{found_provider.name}: {found_provider.init_error}"
@@ -209,6 +216,7 @@ class PluginSelectionBase():#20260622_kpopmodder
 
         try:
             self._mark_provider_handle(found_provider, "mark_starting")
+            found_provider.needs_shutdown = True
             found_provider.plugin.init()
         except Exception as e:
             #20260630_kpopmodder: Init crash is contained to this provider.
@@ -224,6 +232,7 @@ class PluginSelectionBase():#20260622_kpopmodder
                 f"[PluginSelection] provider init failed; disabled "
                 f"{found_provider.name}: {e}"
             )
+            self._cleanup_failed_provider(found_provider)
             return False
 
         start = getattr(found_provider.plugin, "start", None)
@@ -243,6 +252,7 @@ class PluginSelectionBase():#20260622_kpopmodder
                     f"[PluginSelection] provider start failed; disabled "
                     f"{found_provider.name}: {e}"
                 )
+                self._cleanup_failed_provider(found_provider)
                 return False
         found_provider.initialized = True
         self._mark_provider_handle(found_provider, "mark_running")
@@ -272,6 +282,7 @@ class PluginSelectionBase():#20260622_kpopmodder
             provider.init_error = provider.handle.error or "plugin construct failed"
             return None
         provider.plugin = plugin
+        provider.needs_shutdown = True
         return provider.plugin
 
     def _activate_first_available_provider(self, exclude_name=""):
@@ -306,6 +317,11 @@ class PluginSelectionBase():#20260622_kpopmodder
     def get_current_plugin(self):
         return self.current_plugin
 
+    def _current_provider_name(self):
+        if self.current_provider is not None:
+            return self.current_provider.name
+        return self.default_provider.name
+
     def _configured_default_provider_name(self):
         config = config_manager.load_section("PluginSelection")
         return (
@@ -325,21 +341,40 @@ class PluginSelectionBase():#20260622_kpopmodder
             f"available={names}"
         )
 
+    def _cleanup_failed_provider(self, provider):
+        #20260716_kpopmodder: Roll back partial init/start failures without blocking fallback provider selection.
+        self._shutdown_provider(provider, failed_cleanup=True)
+
+    def _shutdown_provider(self, provider, failed_cleanup=False):
+        if getattr(provider, "shutdown_attempted", False):
+            return
+        plugin = getattr(provider, "plugin", None)
+        if plugin is None:
+            provider.shutdown_attempted = True
+            return
+
+        cleanup = getattr(plugin, "shutdown", None)
+        if not callable(cleanup):
+            cleanup = getattr(plugin, "stop", None)
+        try:
+            if callable(cleanup):
+                cleanup()
+        except Exception as e:
+            context = "cleanup" if failed_cleanup else "shutdown"
+            log_print(
+                f"[PluginSelection] {context} failed: "
+                f"{provider.name}: {e}"
+            )
+        finally:
+            provider.shutdown_attempted = True
+            self._mark_provider_handle(provider, "mark_stopped")
+
     def shutdown(self):
         for provider in list(self.provider_list):
-            if not getattr(provider, "initialized", False):
+            if not (
+                getattr(provider, "initialized", False)
+                or getattr(provider, "needs_shutdown", False)
+            ):
                 #20260630_kpopmodder: Lazy providers that never loaded have nothing to shut down.
                 continue
-            plugin = getattr(provider, "plugin", None)
-            shutdown = getattr(plugin, "shutdown", None)
-            if not callable(shutdown):
-                continue
-
-            try:
-                shutdown()
-            except Exception as e:
-                log_print(
-                    f"[PluginSelection] shutdown failed: "
-                    f"{provider.name}: {e}"
-                )
-            self._mark_provider_handle(provider, "mark_stopped")
+            self._shutdown_provider(provider)

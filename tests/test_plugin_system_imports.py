@@ -139,6 +139,72 @@ class PluginSystemImportTests(unittest.TestCase):
             with self.assertRaises(ModuleSettingsNotFound):
                 load_module_settings(root, argv=[], environ={})
 
+    def test_module_enabled_fails_closed_on_general_settings_error(self):#20260716_kpopmodder
+        from app_core import module_config
+
+        with mock.patch.object(
+            module_config,
+            "load_module_settings",
+            side_effect=ValueError("bad json"),
+        ):
+            self.assertFalse(
+                module_config.module_enabled(
+                    "VoiceInput",
+                    default=True,
+                    current_module_directory=str(PROJECT_ROOT),
+                )
+            )
+
+    def test_loader_malformed_modules_config_fails_closed_before_plugin_import(self):#20260716_kpopmodder
+        from core.profile_resolver import ModuleSettingsError
+        from plugin_system.loader import PluginLoader
+
+        module_name = "plugins.BadConfigPlugin.BadConfigPlugin"
+        sys.modules.pop(module_name, None)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            plugin_root = Path(temp_dir) / "plugins"
+            plugin_dir = plugin_root / "BadConfigPlugin"
+            plugin_dir.mkdir(parents=True)
+            (plugin_dir / "BadConfigPlugin.py").write_text(
+                "\n".join([
+                    "from plugin_system.interfaces import LLMPluginInterface",
+                    "IMPORT_COUNT = 0",
+                    "CONSTRUCT_COUNT = 0",
+                    "INIT_COUNT = 0",
+                    "START_COUNT = 0",
+                    "IMPORT_COUNT += 1",
+                    "",
+                    "class BadConfigPlugin(LLMPluginInterface):",
+                    "    def __init__(self):",
+                    "        global CONSTRUCT_COUNT",
+                    "        CONSTRUCT_COUNT += 1",
+                    "    def init(self):",
+                    "        global INIT_COUNT",
+                    "        INIT_COUNT += 1",
+                    "    def start(self):",
+                    "        global START_COUNT",
+                    "        START_COUNT += 1",
+                    "    def predict(self, message, history):",
+                    "        return ''",
+                    "    def create_ui(self):",
+                    "        return None",
+                ]),
+                encoding="utf-8",
+            )
+            modules_path = Path(temp_dir) / "modules.json"
+            modules_path.write_text("{ malformed", encoding="utf-8")
+
+            loader = PluginLoader("plugins")
+            loader.plugin_directory = str(plugin_root)
+            loader.plugin_setting_path = str(modules_path)
+
+            with self.assertRaises(ModuleSettingsError):
+                loader.load_plugins()
+
+            self.assertEqual([], loader.plugins["language_model"])
+            self.assertNotIn(module_name, sys.modules)
+
     def test_core_profile_discovers_null_required_providers_only(self):#20260716_kpopmodder
         from plugin_system.loader import PluginLoader
 
@@ -723,6 +789,119 @@ class PluginSystemImportTests(unittest.TestCase):
         self.assertEqual("missing_static_dependency", handle.diagnostic.reason_code)
         self.assertEqual([missing_package], list(handle.diagnostic.missing_python_packages))
 
+    def test_p1a_voice_input_no_microphone_device_is_unavailable(self):#20260716_kpopmodder
+        import types
+        from plugin_system.loader import PluginLoader, PluginState
+
+        fake_sounddevice = types.SimpleNamespace(query_devices=lambda: [])
+        with tempfile.TemporaryDirectory() as temp_dir:
+            plugin_root = Path(temp_dir) / "plugins"
+            plugin_dir = plugin_root / "VoiceProbePlugin"
+            plugin_dir.mkdir(parents=True)
+            (plugin_dir / "VoiceProbePlugin.py").write_text(
+                "\n".join([
+                    "from plugin_system.interfaces import InputPluginInterface",
+                    "class VoiceProbePlugin(InputPluginInterface):",
+                    "    PLUGIN_METADATA = {",
+                    "        'id': 'VoiceInput',",
+                    "        'required_services': ['microphone_input_device'],",
+                    "    }",
+                    "    def init(self): pass",
+                    "    def create_ui(self): return None",
+                ]),
+                encoding="utf-8",
+            )
+            modules_path = Path(temp_dir) / "modules.json"
+            modules_path.write_text(json.dumps({}), encoding="utf-8")
+
+            loader = PluginLoader("plugins")
+            loader.plugin_directory = str(plugin_root)
+            loader.plugin_setting_path = str(modules_path)
+            with mock.patch.dict(sys.modules, {"sounddevice": fake_sounddevice}):
+                loader._load_plugins_from_directory(str(plugin_dir))
+
+            handle = loader.plugins["input_gathering"][0]
+
+        self.assertEqual(PluginState.UNAVAILABLE, handle.status)
+        self.assertEqual("required_service_unavailable", handle.diagnostic.reason_code)
+        self.assertEqual(["microphone_input_device"], list(handle.diagnostic.missing_services))
+
+    def test_p1a_vtube_studio_missing_websocket_is_unavailable(self):#20260716_kpopmodder
+        from plugin_system.loader import PluginLoader, PluginState
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            plugin_root = Path(temp_dir) / "plugins"
+            plugin_dir = plugin_root / "VtubeProbePlugin"
+            plugin_dir.mkdir(parents=True)
+            (plugin_dir / "VtubeProbePlugin.py").write_text(
+                "\n".join([
+                    "from plugin_system.interfaces import VtuberPluginInterface",
+                    "class VtubeProbePlugin(VtuberPluginInterface):",
+                    "    PLUGIN_METADATA = {",
+                    "        'id': 'VtubeProbePlugin',",
+                    "        'required_services': ['VTube Studio websocket ws://localhost:8001'],",
+                    "    }",
+                    "    def init(self): pass",
+                    "    def create_ui(self): return None",
+                ]),
+                encoding="utf-8",
+            )
+            modules_path = Path(temp_dir) / "modules.json"
+            modules_path.write_text(json.dumps({}), encoding="utf-8")
+
+            loader = PluginLoader("plugins")
+            loader.plugin_directory = str(plugin_root)
+            loader.plugin_setting_path = str(modules_path)
+            with mock.patch("plugin_system.loader.socket.create_connection", side_effect=OSError("refused")):
+                loader._load_plugins_from_directory(str(plugin_dir))
+
+            handle = loader.plugins["vtuber"][0]
+
+        self.assertEqual(PluginState.UNAVAILABLE, handle.status)
+        self.assertEqual("required_service_unavailable", handle.diagnostic.reason_code)
+        self.assertEqual(
+            ["VTube Studio websocket ws://localhost:8001"],
+            list(handle.diagnostic.missing_services),
+        )
+
+    def test_p1b_gpt_sovits_empty_model_dirs_are_unavailable(self):#20260716_kpopmodder
+        from plugin_system.loader import PluginLoader, PluginState
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            plugin_root = Path(temp_dir) / "plugins"
+            plugin_dir = plugin_root / "GPTProbePlugin"
+            plugin_dir.mkdir(parents=True)
+            (plugin_dir / "gpt_sovits_ckpt_dir").mkdir()
+            (plugin_dir / "gpt_sovits_model_dir").mkdir()
+            (plugin_dir / "GPTProbePlugin.py").write_text(
+                "\n".join([
+                    "from plugin_system.interfaces import TTSPluginInterface",
+                    "class GPTProbePlugin(TTSPluginInterface):",
+                    "    PLUGIN_METADATA = {",
+                    "        'id': 'GPTSoVITS',",
+                    "        'required_files': ['plugin:gpt_sovits_ckpt_dir', 'plugin:gpt_sovits_model_dir'],",
+                    "    }",
+                    "    def init(self): pass",
+                    "    def synthesize(self, text): return None",
+                    "    def create_ui(self): return None",
+                ]),
+                encoding="utf-8",
+            )
+            modules_path = Path(temp_dir) / "modules.json"
+            modules_path.write_text(json.dumps({}), encoding="utf-8")
+
+            loader = PluginLoader("plugins")
+            loader.plugin_directory = str(plugin_root)
+            loader.plugin_setting_path = str(modules_path)
+            loader._load_plugins_from_directory(str(plugin_dir))
+
+            handle = loader.plugins["text_to_speech"][0]
+
+        self.assertEqual(PluginState.UNAVAILABLE, handle.status)
+        self.assertEqual("missing_model_configuration", handle.diagnostic.reason_code)
+        self.assertTrue(any(path.endswith("*.ckpt") for path in handle.diagnostic.missing_files))
+        self.assertTrue(any(path.endswith("*.pth") for path in handle.diagnostic.missing_files))
+
     def test_p1a_api_version_mismatch_is_isolated(self):#20260716_kpopmodder
         from plugin_system.loader import PluginLoader, PluginState
 
@@ -800,6 +979,171 @@ class PluginSystemImportTests(unittest.TestCase):
 
             handles = loader.plugins["language_model"]
 
+        self.assertEqual(PluginState.READY, handles[0].status)
+        self.assertEqual(PluginState.FAILED, handles[1].status)
+        self.assertEqual("duplicate_plugin_id", handles[1].diagnostic.reason_code)
+
+    def test_p1a_metadata_category_mismatch_is_failed_plugin_only(self):#20260716_kpopmodder
+        from plugin_system.loader import PluginLoader, PluginState
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            plugin_root = Path(temp_dir) / "plugins"
+            plugin_dir = plugin_root / "CategoryPlugin"
+            plugin_dir.mkdir(parents=True)
+            (plugin_dir / "CategoryPlugin.py").write_text(
+                "\n".join([
+                    "from plugin_system.interfaces import LLMPluginInterface",
+                    "",
+                    "class CategoryPlugin(LLMPluginInterface):",
+                    "    PLUGIN_METADATA = {'id': 'CategoryPlugin', 'category': 'input_gathering'}",
+                    "    def init(self):",
+                    "        pass",
+                    "    def predict(self, message, history):",
+                    "        return ''",
+                    "    def create_ui(self):",
+                    "        return None",
+                ]),
+                encoding="utf-8",
+            )
+            modules_path = Path(temp_dir) / "modules.json"
+            modules_path.write_text(json.dumps({}), encoding="utf-8")
+
+            loader = PluginLoader("plugins")
+            loader.plugin_directory = str(plugin_root)
+            loader.plugin_setting_path = str(modules_path)
+            loader._load_plugins_from_directory(str(plugin_dir))
+
+            handle = loader.plugins["language_model"][0]
+
+        self.assertEqual(PluginState.FAILED, handle.status)
+        self.assertEqual("metadata_category_mismatch", handle.diagnostic.reason_code)
+        self.assertIsNone(handle.construct())
+
+    def test_p1a_metadata_entrypoint_mismatch_is_failed_plugin_only(self):#20260716_kpopmodder
+        from plugin_system.loader import PluginLoader, PluginState
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            plugin_root = Path(temp_dir) / "plugins"
+            plugin_dir = plugin_root / "EntrypointPlugin"
+            plugin_dir.mkdir(parents=True)
+            (plugin_dir / "EntrypointPlugin.py").write_text(
+                "\n".join([
+                    "from plugin_system.interfaces import LLMPluginInterface",
+                    "",
+                    "class EntrypointPlugin(LLMPluginInterface):",
+                    "    PLUGIN_METADATA = {",
+                    "        'id': 'EntrypointPlugin',",
+                    "        'entrypoint': 'plugins.EntrypointPlugin.EntrypointPlugin:WrongClass',",
+                    "    }",
+                    "    def init(self):",
+                    "        pass",
+                    "    def predict(self, message, history):",
+                    "        return ''",
+                    "    def create_ui(self):",
+                    "        return None",
+                ]),
+                encoding="utf-8",
+            )
+            modules_path = Path(temp_dir) / "modules.json"
+            modules_path.write_text(json.dumps({}), encoding="utf-8")
+
+            loader = PluginLoader("plugins")
+            loader.plugin_directory = str(plugin_root)
+            loader.plugin_setting_path = str(modules_path)
+            loader._load_plugins_from_directory(str(plugin_dir))
+
+            handle = loader.plugins["language_model"][0]
+
+        self.assertEqual(PluginState.FAILED, handle.status)
+        self.assertEqual("metadata_entrypoint_mismatch", handle.diagnostic.reason_code)
+        self.assertIsNone(handle.construct())
+
+    def test_p1a_malformed_config_schema_does_not_abort_load_plugins(self):#20260716_kpopmodder
+        from plugin_system.loader import PluginLoader, PluginState
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            plugin_root = Path(temp_dir) / "plugins"
+            plugin_dir = plugin_root / "SchemaPlugin"
+            plugin_dir.mkdir(parents=True)
+            (plugin_dir / "SchemaPlugin.py").write_text(
+                "\n".join([
+                    "from plugin_system.interfaces import LLMPluginInterface",
+                    "",
+                    "class BadSchemaPlugin(LLMPluginInterface):",
+                    "    PLUGIN_METADATA = {'id': 'BadSchemaPlugin', 'config_schema': ['not', 'object']}",
+                    "    def init(self):",
+                    "        pass",
+                    "    def predict(self, message, history):",
+                    "        return ''",
+                    "    def create_ui(self):",
+                    "        return None",
+                    "",
+                    "class GoodSchemaPlugin(LLMPluginInterface):",
+                    "    PLUGIN_METADATA = {'id': 'GoodSchemaPlugin', 'config_schema': {}}",
+                    "    def init(self):",
+                    "        pass",
+                    "    def predict(self, message, history):",
+                    "        return ''",
+                    "    def create_ui(self):",
+                    "        return None",
+                ]),
+                encoding="utf-8",
+            )
+            modules_path = Path(temp_dir) / "modules.json"
+            modules_path.write_text(json.dumps({}), encoding="utf-8")
+
+            loader = PluginLoader("plugins")
+            loader.plugin_directory = str(plugin_root)
+            loader.plugin_setting_path = str(modules_path)
+            loader._load_plugins_from_directory(str(plugin_dir))
+
+            handles = loader.plugins["language_model"]
+
+        self.assertEqual(["BadSchemaPlugin", "GoodSchemaPlugin"], [h.name for h in handles])
+        self.assertEqual(PluginState.FAILED, handles[0].status)
+        self.assertEqual("metadata_invalid_config_schema", handles[0].diagnostic.reason_code)
+        self.assertEqual(PluginState.READY, handles[1].status)
+
+    def test_p1a_duplicate_plugin_id_uses_sorted_discovery_order(self):#20260716_kpopmodder
+        from plugin_system.loader import PluginLoader, PluginState
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            plugin_root = Path(temp_dir) / "plugins"
+            plugin_dir = plugin_root / "SortedDuplicatePlugin"
+            plugin_dir.mkdir(parents=True)
+            (plugin_dir / "z_second.py").write_text(
+                "\n".join([
+                    "from plugin_system.interfaces import LLMPluginInterface",
+                    "class ZSecondPlugin(LLMPluginInterface):",
+                    "    PLUGIN_METADATA = {'id': 'sorted.duplicate'}",
+                    "    def init(self): pass",
+                    "    def predict(self, message, history): return ''",
+                    "    def create_ui(self): return None",
+                ]),
+                encoding="utf-8",
+            )
+            (plugin_dir / "a_first.py").write_text(
+                "\n".join([
+                    "from plugin_system.interfaces import LLMPluginInterface",
+                    "class AFirstPlugin(LLMPluginInterface):",
+                    "    PLUGIN_METADATA = {'id': 'sorted.duplicate'}",
+                    "    def init(self): pass",
+                    "    def predict(self, message, history): return ''",
+                    "    def create_ui(self): return None",
+                ]),
+                encoding="utf-8",
+            )
+            modules_path = Path(temp_dir) / "modules.json"
+            modules_path.write_text(json.dumps({}), encoding="utf-8")
+
+            loader = PluginLoader("plugins")
+            loader.plugin_directory = str(plugin_root)
+            loader.plugin_setting_path = str(modules_path)
+            loader._load_plugins_from_directory(str(plugin_dir))
+
+            handles = loader.plugins["language_model"]
+
+        self.assertEqual(["AFirstPlugin", "ZSecondPlugin"], [h.name for h in handles])
         self.assertEqual(PluginState.READY, handles[0].status)
         self.assertEqual(PluginState.FAILED, handles[1].status)
         self.assertEqual("duplicate_plugin_id", handles[1].diagnostic.reason_code)
@@ -1122,6 +1466,112 @@ class PluginSystemImportTests(unittest.TestCase):
         )
         self.assertTrue(broken_provider.disabled)
         self.assertIn("broken default", broken_provider.init_error)
+
+    def test_selection_cleans_partial_init_failure_and_shutdown_is_idempotent(self):#20260716_kpopmodder
+        from plugin_system.selection import PluginSelectionBase
+
+        class FakeSelectionInterface:
+            pass
+
+        class PartialProvider(FakeSelectionInterface):
+            def __init__(self):
+                self.resource_active = False
+                self.shutdown_count = 0
+
+            def init(self):
+                self.resource_active = True
+                raise RuntimeError("partial init")
+
+            def shutdown(self):
+                self.shutdown_count += 1
+                self.resource_active = False
+
+            def create_ui(self):
+                return None
+
+        class StableProvider(FakeSelectionInterface):
+            def __init__(self):
+                self.init_count = 0
+                self.shutdown_count = 0
+
+            def init(self):
+                self.init_count += 1
+
+            def shutdown(self):
+                self.shutdown_count += 1
+
+            def create_ui(self):
+                return None
+
+        partial = PartialProvider()
+        stable = StableProvider()
+        fake_loader = mock.Mock()
+        fake_loader.interface_to_category = {
+            FakeSelectionInterface: "fake_category",
+        }
+        fake_loader.plugins = {
+            "fake_category": [partial, stable],
+        }
+
+        with mock.patch("plugin_system.selection.plugin_loader", fake_loader):
+            with mock.patch(
+                "plugin_system.selection.config_manager.load_section",
+                return_value={"default_fake_category_provider": "PartialProvider"},
+            ):
+                selection = PluginSelectionBase(FakeSelectionInterface)
+
+        self.assertIs(selection.current_plugin, stable)
+        self.assertFalse(partial.resource_active)
+        self.assertEqual(1, partial.shutdown_count)
+        self.assertEqual(1, stable.init_count)
+
+        selection.shutdown()
+        selection.shutdown()
+
+        self.assertEqual(1, partial.shutdown_count)
+        self.assertEqual(1, stable.shutdown_count)
+
+    def test_selection_cleanup_failure_does_not_block_fallback(self):#20260716_kpopmodder
+        from plugin_system.selection import PluginSelectionBase
+
+        class FakeSelectionInterface:
+            pass
+
+        class BrokenCleanupProvider(FakeSelectionInterface):
+            def init(self):
+                raise RuntimeError("init boom")
+
+            def shutdown(self):
+                raise RuntimeError("cleanup boom")
+
+            def create_ui(self):
+                return None
+
+        class StableProvider(FakeSelectionInterface):
+            def init(self):
+                pass
+
+            def create_ui(self):
+                return None
+
+        broken = BrokenCleanupProvider()
+        stable = StableProvider()
+        fake_loader = mock.Mock()
+        fake_loader.interface_to_category = {
+            FakeSelectionInterface: "fake_category",
+        }
+        fake_loader.plugins = {
+            "fake_category": [broken, stable],
+        }
+
+        with mock.patch("plugin_system.selection.plugin_loader", fake_loader):
+            with mock.patch(
+                "plugin_system.selection.config_manager.load_section",
+                return_value={"default_fake_category_provider": "BrokenCleanupProvider"},
+            ):
+                selection = PluginSelectionBase(FakeSelectionInterface)
+
+        self.assertIs(selection.current_plugin, stable)
 
     def test_optional_plugin_loader_isolates_import_failure(self):#20260703_kpopmodder
         from app_core.optional_plugin_loader import instantiate_optional_plugin
