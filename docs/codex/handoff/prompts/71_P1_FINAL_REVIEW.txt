@@ -1,0 +1,17 @@
+# P1 final review — no commit/push
+
+logs/LAVI_Codex_Handoff_Pack_v2/docs/codex/P1_REVIEW.md 전체를 실행하라.
+
+- P0 regression green
+- metadata discovery without import
+- disabled no-import
+- enabled/unavailable diagnostics
+- constructor side effects 0
+- UI lazy construction
+- Plugin A/B isolation
+- shutdown idempotence
+- config compatibility
+- root modules.json hash 불변
+- 적용된 plugin과 미적용 plugin 명확히 구분
+
+실제 결과, 실패/미실행, diff, rollback, 다음 batch를 보고하고 멈춰라. commit/push하지 마라.

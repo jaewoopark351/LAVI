@@ -1,0 +1,33 @@
+# P0-A implementation — dependency and installer
+
+사용자가 승인한 current-state reconciliation, profile/accelerator matrix와 ExecPlan을 기준으로 P0-A만 구현하라.
+
+먼저 읽어라.
+
+- AGENTS.md
+- 저장소 `.agent/PLANS.md`가 존재하면 그 파일; 없으면 `logs/LAVI_Codex_Handoff_Pack_v2/.agent/PLANS.md`
+- docs/deployment-hardening-audit.md
+- logs/LAVI_Codex_Handoff_Pack_v2/HANDOFF_CONTRACT.md
+- logs/LAVI_Codex_Handoff_Pack_v2/docs/codex/P0_IMPLEMENTATION.md
+- logs/LAVI_Codex_Handoff_Pack_v2/docs/codex/P0_REVIEW.md
+
+범위:
+
+- approved dependency source of truth
+- approved supported lock matrix
+- Core/CPU committed lock과 installer 사용
+- 기존 approved cu130 production 경로 보존
+- scripts/install_windows.ps1의 Profile/Accelerator interface
+- idempotent install, partial retry, pip check/preflight
+- legacy switch scripts와 README 정렬
+
+금지:
+
+- P0-B runtime/smoke 변경
+- P1 plugin lifecycle/manifest
+- root modules.json 변경
+- 근거 없는 10개 lock 생성
+- lavi package entrypoint 신설
+- commit/push
+
+작업 전 modules.json hash와 git status를 기록하라. 구현 후 P0-A 관련 검증을 실행하고 diff, 실제 결과, 미실행 항목, rollback을 보고한 뒤 멈춰라.

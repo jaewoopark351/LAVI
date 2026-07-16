@@ -1,0 +1,15 @@
+# P1-B implementation — UI lazy construction and failure isolation
+
+P1-A review 승인 후 P1-B만 구현하라.
+
+- metadata-only provider listing
+- 선택 전 implementation import/constructor 0
+- 선택 후 1회 construct, rerender 중복 없음
+- Plugin A import/construct/start failure와 Plugin B 격리
+- shutdown failure 이후 다른 cleanup 계속
+- structured actionable diagnostic
+- GPTSoVITS 또는 ScreenVision 중 한 개 대표 추가; 선택 이유 보고
+
+P0/P1-A contract를 유지하라. root modules.json을 변경하지 마라. 전체 plugin rollout, subprocess isolation, package-wide refactor, commit/push 금지.
+
+테스트와 diff를 보고하고 멈춰라.

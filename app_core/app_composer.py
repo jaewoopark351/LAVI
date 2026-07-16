@@ -288,6 +288,7 @@ class AppComposer:
             manifest["default_enabled"],
             self.current_module_directory,
             *args,
+            manifest=manifest,
             **kwargs,
         )#20260703_kpopmodder
 

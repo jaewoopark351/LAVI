@@ -1,0 +1,26 @@
+# P0-C implementation — CI, tests, docs
+
+P0-A와 P0-B review가 승인된 상태에서 P0-C만 구현하라.
+
+범위:
+
+- Core와 optional profile test collection 경계
+- Windows CI의 approved lock 설치
+- Ruff, pip check, Core tests
+- Core offline smoke와 production configuration smoke
+- installer idempotence 검증 job 또는 동등한 Windows 증거
+- README CURRENT 명령 정렬
+- tracked audit의 강한 acceptance/Git evidence 유지
+- existing deployment/archive 경로의 root modules.json include contract
+
+marker만으로 top-level optional import를 숨기지 마라. 가장 작은 안전한 test path/file 분리를 선택하라.
+
+금지:
+
+- tracked audit를 pack 문서로 교체
+- P1 architecture 작업
+- formal package/release 전면 구현
+- root modules.json 변경
+- commit/push
+
+실제 CI/local 명령, diff, 미실행 항목을 보고하고 멈춰라.

@@ -1,0 +1,13 @@
+# DO NOT SEND UNTIL THE USER EXPLICITLY APPROVES P1 COMMIT/PUSH
+
+사용자가 P1 final review 결과와 diff를 승인했다.
+
+P1 범위 파일만 stage하라. P0 또는 기존 사용자 변경을 섞지 마라. commit 전에 git status, diff check/stat, modules.json diff/hash를 다시 확인하라.
+
+root modules.json이 변경되었거나 필수 regression이 실패하면 commit/push하지 말고 중단하라.
+
+권장 commit message:
+
+isolate optional plugins and standardize lifecycle
+
+main에 직접 push하지 말고 현재 P1 작업 브랜치에 push하라. commit SHA, remote, branch와 실제 결과를 보고하라.

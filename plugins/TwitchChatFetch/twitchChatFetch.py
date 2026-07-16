@@ -14,6 +14,20 @@ import LAV_utils as utils
 from core.logger import log_print, debug_print#20260612_kpopmodder
 
 class TwitchChatFetch(InputPluginInterface):
+    PLUGIN_METADATA = {
+        "id": "TwitchChatFetch",
+        "display_name": "Twitch Chat Fetch",
+        "api_version": "1",
+        "dependency_group": "Full",
+        "capabilities": ("chat_input", "twitch_chat"),
+        "required_python_packages": ("twitchio",),
+        "required_files": (),
+        "required_executables": (),
+        "required_services": ("Twitch chat API",),
+        "supports_offline": False,
+        "supports_cpu": True,
+    }
+
     twitchbot = None
     read_chat_twitch_thread = None
     read_chat_twitch_thread_running = False

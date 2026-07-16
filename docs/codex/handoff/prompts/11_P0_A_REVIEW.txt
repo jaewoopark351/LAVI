@@ -1,0 +1,14 @@
+# P0-A review only
+
+logs/LAVI_Codex_Handoff_Pack_v2/docs/codex/P0_REVIEW.md의 P0-A 항목을 실제로 검증하라.
+
+- Core/CPU installer를 같은 명령으로 두 번 실행
+- installer가 approved committed lock을 실제 사용했는지 증명
+- pip check
+- Core/CPU CUDA wheel 비강제
+- approved cu130 path 회귀 확인
+- switch scripts가 별도 Conda/Torch 환경을 만들지 않는지 확인
+- README CURRENT 명령 일치
+- modules.json hash 전후 동일
+
+실패를 skip 또는 요구 약화로 숨기지 마라. 이번 턴에서는 commit/push하지 마라. 결과와 diff를 보고하고 멈춰라.

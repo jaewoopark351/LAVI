@@ -27,6 +27,20 @@ from hybrid_openai_core.settings import HybridOpenAISettings
 
 
 class Hybrid_OpenAI_LLM(LLMPluginInterface):
+    PLUGIN_METADATA = {
+        "id": "Hybrid_OpenAI_LLM",
+        "display_name": "Hybrid OpenAI LLM",
+        "api_version": "1",
+        "dependency_group": "Full",
+        "capabilities": ("llm", "openai_chat", "memory_router"),
+        "required_python_packages": ("openai",),
+        "required_files": (),
+        "required_executables": (),
+        "required_services": ("OpenAI API",),
+        "supports_offline": False,
+        "supports_cpu": True,
+    }
+
     def init(self):
         self.base_dir = os.path.dirname(__file__)
         self.settings = HybridOpenAISettings.load()

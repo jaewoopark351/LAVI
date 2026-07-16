@@ -1,0 +1,15 @@
+# P1-C implementation — approved staged rollout only
+
+P1-A/B review가 green이고 사용자가 이번 batch를 명시적으로 승인한 경우에만 수행하라.
+
+사용자가 승인한 plugin batch에만 기존 metadata/lifecycle/UI/failure-isolation contract를 적용하라. 한 번에 모든 plugin을 전환하지 마라.
+
+각 batch마다:
+
+- P0 regression
+- no-import/availability/lifecycle tests
+- UI/failure isolation tests
+- modules hash
+- config backward compatibility
+
+package-wide sys.path 변경이나 파일 이동이 필요하면 구현하지 말고 P2 제안으로 보고하라. root modules.json 변경, subprocess isolation, commit/push 금지.

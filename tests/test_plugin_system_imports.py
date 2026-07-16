@@ -1147,6 +1147,49 @@ class PluginSystemImportTests(unittest.TestCase):
 
             self.assertIsNone(plugin)
 
+    def test_optional_plugin_loader_records_unavailable_static_dependency(self):
+        from app_core.optional_plugin_loader import instantiate_optional_plugin
+        from plugin_system.loader import PluginState
+        from plugin_system.registry import plugin_registry
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            modules_path = Path(temp_dir) / "modules.json"
+            modules_path.write_text(
+                json.dumps({"MissingOptional": True}),
+                encoding="utf-8",
+            )
+
+            plugin = instantiate_optional_plugin(
+                "MissingOptional",
+                "plugins.MissingOptional.missing_optional",
+                "MissingOptional",
+                False,
+                temp_dir,
+                manifest={
+                    "id": "MissingOptional",
+                    "display_name": "Missing Optional",
+                    "dependency_group": "Full",
+                    "required_python_packages": (
+                        "lavi_missing_package_for_static_dependency_test",
+                    ),
+                },
+            )
+
+        self.assertIsNone(plugin)
+        snapshot = plugin_registry.snapshot()
+        self.assertEqual(
+            PluginState.UNAVAILABLE,
+            snapshot["MissingOptional"]["status"],
+        )
+        self.assertEqual(
+            "missing_static_dependency",
+            snapshot["MissingOptional"]["diagnostic"]["reason_code"],
+        )
+        self.assertEqual(
+            ["lavi_missing_package_for_static_dependency_test"],
+            snapshot["MissingOptional"]["diagnostic"]["missing_python_packages"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

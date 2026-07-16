@@ -1,0 +1,38 @@
+# P1-A implementation — contract foundation
+
+전제:
+
+- P0가 실제 Windows와 CI에서 green
+- P0 commit이 존재
+- 새 P1 작업 브랜치와 새 Codex 스레드
+- 사용자 명시 승인
+
+먼저 P0 baseline을 재실행하고 green일 때만 진행하라.
+
+읽을 문서:
+
+- HANDOFF_CONTRACT.md
+- docs/codex/P1_IMPLEMENTATION.md
+- docs/codex/P1_REVIEW.md
+- current tracked audit와 current loader/descriptor code
+
+P1-A만 구현하라.
+
+- 기존 descriptor/registry를 확장하고 세 번째 loader를 추가하지 않음
+- 공통 metadata와 7-state lifecycle foundation
+- VoiceInput과 VtubeStudio 대표 적용
+- import/constructor side-effect-free
+- availability와 actionable UNAVAILABLE
+- stop/shutdown idempotence
+- same-process isolation
+
+금지:
+
+- 전체 plugin 일괄 전환
+- UI 전면 개편(P1-B)
+- package-wide sys.path restructuring
+- subprocess isolation
+- root modules.json 변경
+- commit/push
+
+P0 regression과 P1-A tests, diff, modules hash를 보고하고 멈춰라.

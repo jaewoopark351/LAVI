@@ -1,0 +1,94 @@
+# Task: Reconcile current LAVI main with the safe handoff pack
+# Review only — no implementation
+
+이번 턴은 P0 구현 전 상태 정합성 검토만 수행한다.
+
+코드와 tracked 문서를 수정하지 마라.
+dependency를 설치하지 마라.
+installer, tests, smoke, application을 실행하지 마라.
+branch를 생성하거나 전환하지 마라.
+commit/push하지 마라.
+logs 아래 handoff 파일을 수정하거나 저장소 루트/docs로 복사하지 마라.
+
+먼저 다음을 읽어라.
+
+- AGENTS.md
+- 저장소 `.agent/PLANS.md`가 존재하면 그 파일; 없으면 `logs/LAVI_Codex_Handoff_Pack_v2/.agent/PLANS.md`
+- docs/deployment-hardening-audit.md
+- logs/LAVI_Codex_Handoff_Pack_v2/HANDOFF_CONTRACT.md
+- logs/LAVI_Codex_Handoff_Pack_v2/BASELINE_CURRENT_MAIN.md
+- logs/LAVI_Codex_Handoff_Pack_v2/AUTHORITATIVE_SOURCES.md
+- logs/LAVI_Codex_Handoff_Pack_v2/docs/codex/P0_IMPLEMENTATION.md
+- logs/LAVI_Codex_Handoff_Pack_v2/docs/codex/P0_REVIEW.md
+
+현재 코드/tests/CI와 tracked audit가 pack보다 우선한다. pack audit 복사본은 없으며 tracked audit를 교체하지 않는다.
+
+root modules.json은 production/deployment default다. 삭제, 이동, migration, 자동 rewrite, Core-safe 전체 교체를 금지한다. 현재 운영자 제공 hash는 다음이다.
+
+ddffc5475ef92bd40e5b0e08bce42e0c6b2b1019
+
+실제 hash가 다르면 수정하지 말고 baseline drift로 보고한다.
+
+운영자가 확인한 현재 상태:
+
+- repository root: C:\Vtuber_Souorce_Code\LAVI
+- branch: main
+- working tree: clean
+- core/profile_resolver.py tracked
+- config/modules.core.json tracked
+- plugins/NullInput, NullLLM, NullTTS, NullVtuber tracked
+- scripts/install_windows.ps1은 아직 -Profile Core -Accelerator CPU 미지원
+- current installer는 [switch]$Dev, cu130 Torch, requirements.txt 흐름
+- lavi package/__main__.py 없음
+
+기존 파일을 새로 만들려고 하지 말고 실제 acceptance와의 차이만 조사하라. `python -m lavi`를 만들기 위한 package restructuring을 P0 계획에 넣지 마라. Core는 existing scripts 기반 doctor/smoke를 우선한다.
+
+read-only 명령만 허용한다.
+
+Get-Location
+git rev-parse --show-toplevel
+git rev-parse HEAD
+git branch --show-current
+git status --short
+git ls-files --error-unmatch modules.json
+git hash-object modules.json
+git ls-files core/profile_resolver.py
+git ls-files config/modules.core.json
+git ls-files plugins/NullInput
+git ls-files plugins/NullLLM
+git ls-files plugins/NullTTS
+git ls-files plugins/NullVtuber
+Test-Path .\lavi\__main__.py
+Test-Path .\scripts\smoke_startup.py
+
+다음을 조사하라.
+
+1. pack이 새로 만들라고 할 수 있지만 이미 존재하는 구현
+2. 존재하지만 acceptance 미검증인 구현
+3. 실제 미구현 P0 항목
+4. tracked audit와 pack의 충돌 또는 중복
+5. CURRENT/TARGET/FUTURE 명령 구분
+6. P0와 P1 경계
+7. 실제 지원 가능한 profile/accelerator matrix와 lock 유지보수 비용
+8. production configuration smoke와 --production-config-smoke 유지 방법
+9. 최소 변경 파일
+10. 사용자 결정이 필요한 사항
+
+최종 응답:
+
+1. 실행한 read-only 명령과 실제 결과
+2. baseline commit SHA
+3. current tracked audit와 pack 지시의 충돌 표
+4. P0 delta matrix
+   - Already present and verified
+   - Present but not verified
+   - Not implemented
+   - Out of scope for P0
+5. P0-A/P0-B/P0-C ExecPlan 초안
+6. 권장 profile/accelerator matrix와 근거
+7. P1로 넘길 항목
+8. 사용자 결정 필요 사항
+9. 최종 git status --short
+10. 파일을 수정하지 않았다는 확인
+
+보고한 뒤 멈춰라. 구현하지 마라.

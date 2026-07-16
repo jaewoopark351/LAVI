@@ -7,6 +7,20 @@ from core.logger import log_print, debug_print#20260612_kpopmodder
 
 
 class LocalENToJA(TranslationPluginInterface):
+    PLUGIN_METADATA = {
+        "id": "LocalENToJA",
+        "display_name": "Local EN to JA",
+        "api_version": "1",
+        "dependency_group": "Full",
+        "capabilities": ("translation", "local_translation"),
+        "required_python_packages": ("transformers", "pysbd"),
+        "required_files": (),
+        "required_executables": (),
+        "required_services": (),
+        "supports_offline": False,
+        "supports_cpu": True,
+    }
+
     def init(self):
         # current_module_directory = os.path.dirname(__file__)
         # model_path = os.path.join(

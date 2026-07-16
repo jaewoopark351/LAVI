@@ -1,0 +1,22 @@
+# DO NOT SEND UNTIL THE USER EXPLICITLY APPROVES P0 COMMIT/PUSH
+
+사용자가 P0 final review 결과와 diff를 승인했다.
+
+기존 사용자 변경을 commit에 섞지 말고 P0 범위 파일만 stage하라. commit 전에 다음을 다시 실행하라.
+
+git status --short
+git diff --check
+git diff --stat
+git diff -- modules.json
+git ls-files --error-unmatch modules.json
+git hash-object modules.json
+
+root modules.json hash가 승인된 baseline과 다르면 commit/push하지 말고 중단하라.
+
+필수 검증이 모두 성공한 경우에만 현재 P0 작업 브랜치에 commit하라. main에 직접 push하지 마라. remote/branch가 불명확하거나 protected branch, detached HEAD, 인증 실패이면 중단하고 보고하라.
+
+권장 commit message:
+
+harden Windows deployment and Core startup
+
+성공 시 commit SHA, remote, branch와 실제 push 결과를 보고하라.

@@ -1,0 +1,18 @@
+# P0-B review only
+
+logs/LAVI_Codex_Handoff_Pack_v2/docs/codex/P0_REVIEW.md의 runtime/config/smoke 항목을 실행하라.
+
+반드시 증명하라.
+
+- Core가 config/modules.core.json을 명시적으로 사용
+- 일반 실행은 사용자 override가 없으면 root modules.json 사용
+- production configuration smoke와 --production-config-smoke 유지
+- network/download/model/process attempts 0
+- disabled optional import/construct/init 0
+- selected Null provider만 필요한 범위에서 사용
+- timeout 내 shutdown
+- user override atomic write와 원본 보존
+- example config가 production fallback이 아님
+- modules.json hash 동일
+
+실패를 숨기지 말고 수정이 필요하면 P0-B 범위 안의 최소 변경만 수행하라. commit/push하지 말고 결과와 diff를 보고한 뒤 멈춰라.

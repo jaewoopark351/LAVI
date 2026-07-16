@@ -1,0 +1,23 @@
+# P0 final review — no commit/push
+
+P0-A/B/C 전체를 logs/LAVI_Codex_Handoff_Pack_v2/docs/codex/P0_REVIEW.md 기준으로 검증하라.
+
+필수:
+
+- Core/CPU installer 2회 성공
+- committed lock 실제 사용
+- pip check
+- Ruff
+- Core test collection/tests
+- Core offline smoke
+- production configuration smoke 및 --production-config-smoke
+- attempts/counters 0
+- normal shutdown
+- root modules.json tracked/hash 불변
+- user config 보존
+- README/CI 명령 일치
+- unrelated diff 없음
+
+Windows/GPU/외부 앱 때문에 실행하지 못한 검사는 미실행으로 분류하라. 성공이라고 쓰지 마라.
+
+최종 diff와 실제 결과, rollback, P1로 넘길 항목을 보고한 뒤 멈춰라. commit/push하지 마라.

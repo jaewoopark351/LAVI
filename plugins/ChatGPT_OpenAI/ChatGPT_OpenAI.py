@@ -8,6 +8,20 @@ from core.logger import log_print, debug_print#20260612_kpopmodder
 
 
 class ChatGPT_OpenAI(LLMPluginInterface):#20260610_kpopmodder
+    PLUGIN_METADATA = {
+        "id": "ChatGPT_OpenAI",
+        "display_name": "ChatGPT OpenAI",
+        "api_version": "1",
+        "dependency_group": "Full",
+        "capabilities": ("llm", "openai_chat"),
+        "required_python_packages": ("openai",),
+        "required_files": (),
+        "required_executables": (),
+        "required_services": ("OpenAI API",),
+        "supports_offline": False,
+        "supports_cpu": True,
+    }
+
     context_length = 4096
     temperature = 0.8
 

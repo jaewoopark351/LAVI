@@ -12,6 +12,20 @@ import LAV_utils
 from core.logger import log_print, debug_print#20260612_kpopmodder
 
 class YoutubeChatFetch(InputPluginInterface):
+    PLUGIN_METADATA = {
+        "id": "YoutubeChatFetch",
+        "display_name": "YouTube Chat Fetch",
+        "api_version": "1",
+        "dependency_group": "Full",
+        "capabilities": ("chat_input", "youtube_chat"),
+        "required_python_packages": ("pytchat",),
+        "required_files": (),
+        "required_executables": (),
+        "required_services": ("YouTube live chat",),
+        "supports_offline": False,
+        "supports_cpu": True,
+    }
+
     read_chat_youtube_thread = None
     read_chat_youtube_thread_running = False
 

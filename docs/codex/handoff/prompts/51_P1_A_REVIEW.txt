@@ -1,0 +1,5 @@
+# P1-A review only
+
+P0 regression을 먼저 실행하라. 그 다음 P1_REVIEW의 metadata, lifecycle, disabled no-import, unavailable, constructor side-effect, shutdown idempotence 항목을 VoiceInput과 VtubeStudio에 대해 검증하라.
+
+실패를 skip으로 숨기지 마라. root modules.json hash를 확인하라. commit/push하지 말고 결과와 diff를 보고한 뒤 멈춰라.
