@@ -104,10 +104,15 @@ class PluginSelectionBase():#20260622_kpopmodder
 
     # Creates the dropdown menu for selecting current plugin
     def create_plugin_selection_ui(self):
+        current_provider_name = (
+            self.current_provider.name
+            if self.current_provider is not None
+            else self.default_provider.name
+        )
         self.provider_dropdown = gr.Dropdown(
 
             choices=[provider.name for provider in self.provider_list],
-            value=self.default_provider.name,
+            value=current_provider_name,
             type="value",
             label="Provider: ",
             info="",
@@ -117,20 +122,48 @@ class PluginSelectionBase():#20260622_kpopmodder
 
     # Creates the custom UI from each plugin
     def create_plugin_ui(self):
+        #20260716_kpopmodder: P1-B keeps provider listing metadata-only; unselected providers stay unconstructed.
+        self._ensure_provider_ui_created(self.current_provider)
+
+    def create_all_provider_ui(self):
+        #20260716_kpopmodder: Input providers can be simultaneous sources, so keep their legacy panels visible.
         for provider in self.provider_list:
             plugin = self._ensure_provider_constructed(provider)
             if plugin is None:
                 continue
-            try:
-                provider.ui = plugin.create_ui()
-            except Exception as e:
-                #20260630_kpopmodder: UI failure disables only this provider.
-                provider.disabled = True
-                provider.init_error = str(e)
-                log_print(
-                    f"[PluginSelection] provider UI disabled: "
-                    f"{provider.name}: {e}"
-                )
+            self._create_provider_ui(provider, plugin)
+
+    def _ensure_provider_ui_created(self, provider):
+        if provider is None or provider.disabled:
+            return None
+        if provider.ui is not None:
+            return provider.ui
+        if not self.load_provider(provider.name):
+            return None
+        plugin = provider.plugin
+        return self._create_provider_ui(provider, plugin)
+
+    def _create_provider_ui(self, provider, plugin):
+        if provider.ui is not None:
+            return provider.ui
+        try:
+            provider.ui = plugin.create_ui()
+            return provider.ui
+        except Exception as e:
+            #20260630_kpopmodder: UI failure disables only this provider.
+            provider.disabled = True
+            provider.init_error = str(e)
+            self._mark_provider_handle(
+                provider,
+                "mark_failed",
+                e,
+                reason_code="ui_failed",
+            )
+            log_print(
+                f"[PluginSelection] provider UI disabled: "
+                f"{provider.name}: {e}"
+            )
+            return None
 
     def on_dropdown_change(self, provider_name):
         provider = self.find_provider_by_name(self.provider_list, provider_name)

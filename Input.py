@@ -1,10 +1,8 @@
-import inspect
 from plugin_system.interfaces import InputPluginInterface
 import gradio as gr
 from plugin_system.selection import PluginSelectionBase
-import os
 
-from core.logger import log_print, debug_print#20260612_kpopmodder
+from core.logger import log_print#20260612_kpopmodder
 
 class Input(PluginSelectionBase):
     def __init__(self) -> None:
@@ -19,7 +17,8 @@ class Input(PluginSelectionBase):
             with gr.Blocks():
                 super().create_plugin_selection_ui()
 
-            super().create_plugin_ui()
+            #20260716_kpopmodder: Keep Twitch/Youtube chat panels visible; input providers can run as simultaneous sources.
+            super().create_all_provider_ui()
 
     def send_output(self, output):
         log_print(output)#20260612_kpopmodder

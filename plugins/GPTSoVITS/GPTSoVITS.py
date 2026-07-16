@@ -16,6 +16,37 @@ from plugins.GPTSoVITS.gpt_sovits_core.tts_synthesis_service import TTSSynthesis
 from plugins.GPTSoVITS.gpt_sovits_core.gpt_sovits_settings_controller import GPTSoVITSSettingsController#20260616_kpopmodder
 
 class GPTSoVITS(TTSPluginInterface):#20260615_kpopmodder
+    #20260716_kpopmodder: P1-B representative metadata; discovery must not start the GPT-SoVITS server.
+    PLUGIN_METADATA = {
+        "id": "GPTSoVITS",
+        "display_name": "GPT-SoVITS",
+        "api_version": "1",
+        "category": "text_to_speech",
+        "entrypoint": "plugins.GPTSoVITS.GPTSoVITS:GPTSoVITS",
+        "dependency_group": "Full",
+        "capabilities": [
+            "text_to_speech",
+            "gpt_sovits_api_server",
+            "model_weight_switching",
+        ],
+        "config_schema": {
+            "GPTSoVITS": {
+                "gpt_sovits_root": "",
+                "cuda_visible_devices": "1",
+                "api_url": "http://127.0.0.1:9880/tts",
+            },
+        },
+        "required_python_packages": ["requests"],
+        "required_files": [
+            "plugin:gpt_sovits_ckpt_dir",
+            "plugin:gpt_sovits_model_dir",
+        ],
+        "required_executables": [],
+        "required_services": ["GPT-SoVITS API server http://127.0.0.1:9880"],
+        "supports_offline": True,
+        "supports_cpu": False,
+    }
+
     current_module_directory = os.path.dirname(__file__)
 
     def init(self):

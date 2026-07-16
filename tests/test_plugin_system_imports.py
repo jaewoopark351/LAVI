@@ -326,22 +326,26 @@ class PluginSystemImportTests(unittest.TestCase):
         class SelectedProvider(FakeSelectionInterface):
             def __init__(self):
                 self.init_count = 0
+                self.ui_count = 0
 
             def init(self):
                 self.init_count += 1
 
             def create_ui(self):
-                return None
+                self.ui_count += 1
+                return object()
 
         class LazyProvider(FakeSelectionInterface):
             def __init__(self):
                 self.init_count = 0
+                self.ui_count = 0
 
             def init(self):
                 self.init_count += 1
 
             def create_ui(self):
-                return None
+                self.ui_count += 1
+                return object()
 
         selected = SelectedProvider()
         lazy = LazyProvider()
@@ -637,6 +641,42 @@ class PluginSystemImportTests(unittest.TestCase):
         self.assertNotIn(voice_module, sys.modules)
         self.assertNotIn(vtube_module, sys.modules)
 
+    def test_p1b_gpt_sovits_metadata_is_discovered_without_import(self):#20260716_kpopmodder
+        from plugin_system.loader import PluginLoader
+
+        module_name = "plugins.GPTSoVITS.GPTSoVITS"
+        sys.modules.pop(module_name, None)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            modules_path = Path(temp_dir) / "modules.json"
+            modules_path.write_text(
+                json.dumps({"GPTSoVITS": True}),
+                encoding="utf-8",
+            )
+            loader = PluginLoader("plugins")
+            loader.plugin_setting_path = str(modules_path)
+
+            loader._load_plugins_from_directory(
+                str(PROJECT_ROOT / "plugins" / "GPTSoVITS")
+            )
+
+        handle = loader.plugins["text_to_speech"][0]
+
+        self.assertEqual("GPTSoVITS", handle.descriptor.id)
+        self.assertEqual("GPT-SoVITS", handle.descriptor.display_name)
+        self.assertEqual("Full", handle.descriptor.dependency_group)
+        self.assertIn("requests", handle.descriptor.required_python_packages)
+        self.assertIn("plugin:gpt_sovits_ckpt_dir", handle.descriptor.required_files)
+        self.assertIn(
+            "GPT-SoVITS API server http://127.0.0.1:9880",
+            handle.descriptor.required_services,
+        )
+        self.assertEqual(
+            "plugins.GPTSoVITS.GPTSoVITS:GPTSoVITS",
+            handle.descriptor.entrypoint,
+        )
+        self.assertNotIn(module_name, sys.modules)
+
     def test_p1a_missing_static_dependency_becomes_unavailable_without_import(self):#20260716_kpopmodder
         from plugin_system.loader import PluginLoader, PluginState
         from plugin_system.interfaces import LLMPluginInterface
@@ -806,22 +846,26 @@ class PluginSystemImportTests(unittest.TestCase):
         class SelectedProvider(FakeSelectionInterface):
             def __init__(self):
                 self.init_count = 0
+                self.ui_count = 0
 
             def init(self):
                 self.init_count += 1
 
             def create_ui(self):
-                return None
+                self.ui_count += 1
+                return object()
 
         class LazyProvider(FakeSelectionInterface):
             def __init__(self):
                 self.init_count = 0
+                self.ui_count = 0
 
             def init(self):
                 self.init_count += 1
 
             def create_ui(self):
-                return None
+                self.ui_count += 1
+                return object()
 
         class FakeHandle:
             def __init__(self, name, plugin):
@@ -861,6 +905,174 @@ class PluginSystemImportTests(unittest.TestCase):
         self.assertEqual(0, lazy_handle.construct_count)
         self.assertEqual(1, selected.init_count)
         self.assertEqual(0, lazy.init_count)
+
+        selection.create_plugin_ui()
+        selection.create_plugin_ui()
+
+        self.assertEqual(1, selected_handle.construct_count)
+        self.assertEqual(0, lazy_handle.construct_count)
+        self.assertEqual(1, selected.ui_count)
+        self.assertEqual(0, lazy.ui_count)
+
+        selection.on_dropdown_change("LazyProvider")
+        selection.on_dropdown_change("LazyProvider")
+
+        self.assertIs(selection.current_plugin, lazy)
+        self.assertEqual(1, lazy_handle.construct_count)
+        self.assertEqual(1, lazy.init_count)
+
+    def test_input_shared_ui_can_render_lazy_provider_panels(self):#20260716_kpopmodder
+        from plugin_system.selection import PluginSelectionBase
+
+        class FakeInputInterface:
+            pass
+
+        class VoiceProvider(FakeInputInterface):
+            def __init__(self):
+                self.init_count = 0
+                self.ui_count = 0
+
+            def init(self):
+                self.init_count += 1
+
+            def create_ui(self):
+                self.ui_count += 1
+                return object()
+
+        class ChatProvider(FakeInputInterface):
+            def __init__(self):
+                self.init_count = 0
+                self.ui_count = 0
+
+            def init(self):
+                self.init_count += 1
+
+            def create_ui(self):
+                self.ui_count += 1
+                return object()
+
+        class FakeHandle:
+            def __init__(self, name, plugin):
+                self.name = name
+                self.plugin = plugin
+                self.construct_count = 0
+                self.error = ""
+
+            def construct(self, expected_interface=None):
+                self.construct_count += 1
+                return self.plugin
+
+            def mark_running(self):
+                pass
+
+        voice = VoiceProvider()
+        chat = ChatProvider()
+        voice_handle = FakeHandle("VoiceProvider", voice)
+        chat_handle = FakeHandle("ChatProvider", chat)
+        fake_loader = mock.Mock()
+        fake_loader.interface_to_category = {
+            FakeInputInterface: "input_gathering",
+        }
+        fake_loader.plugins = {
+            "input_gathering": [voice_handle, chat_handle],
+        }
+
+        with mock.patch("plugin_system.selection.plugin_loader", fake_loader):
+            with mock.patch(
+                "plugin_system.selection.config_manager.load_section",
+                return_value={},
+            ):
+                selection = PluginSelectionBase(FakeInputInterface)
+
+        selection.create_all_provider_ui()
+        selection.create_all_provider_ui()
+
+        self.assertEqual(1, voice_handle.construct_count)
+        self.assertEqual(1, chat_handle.construct_count)
+        self.assertEqual(1, voice.init_count)
+        self.assertEqual(0, chat.init_count)
+        self.assertEqual(1, voice.ui_count)
+        self.assertEqual(1, chat.ui_count)
+
+    def test_p1b_ui_failure_isolates_other_provider(self):#20260716_kpopmodder
+        from plugin_system.selection import PluginSelectionBase
+
+        class FakeSelectionInterface:
+            pass
+
+        class BrokenUiProvider(FakeSelectionInterface):
+            def __init__(self):
+                self.init_count = 0
+
+            def init(self):
+                self.init_count += 1
+
+            def create_ui(self):
+                raise RuntimeError("ui boom")
+
+        class StableProvider(FakeSelectionInterface):
+            def __init__(self):
+                self.init_count = 0
+
+            def init(self):
+                self.init_count += 1
+
+            def create_ui(self):
+                return object()
+
+        class FakeHandle:
+            def __init__(self, name, plugin):
+                self.name = name
+                self.plugin = plugin
+                self.construct_count = 0
+                self.failed_reason_code = ""
+                self.error = ""
+
+            def construct(self, expected_interface=None):
+                self.construct_count += 1
+                return self.plugin
+
+            def mark_running(self):
+                pass
+
+            def mark_failed(self, error, reason_code="plugin_failed"):
+                self.error = str(error)
+                self.failed_reason_code = reason_code
+
+        broken = BrokenUiProvider()
+        stable = StableProvider()
+        broken_handle = FakeHandle("BrokenUiProvider", broken)
+        stable_handle = FakeHandle("StableProvider", stable)
+        fake_loader = mock.Mock()
+        fake_loader.interface_to_category = {
+            FakeSelectionInterface: "fake_category",
+        }
+        fake_loader.plugins = {
+            "fake_category": [broken_handle, stable_handle],
+        }
+
+        with mock.patch("plugin_system.selection.plugin_loader", fake_loader):
+            with mock.patch(
+                "plugin_system.selection.config_manager.load_section",
+                return_value={},
+            ):
+                selection = PluginSelectionBase(FakeSelectionInterface)
+
+        selection.create_plugin_ui()
+        broken_provider = selection.find_provider_by_name(
+            selection.provider_list,
+            "BrokenUiProvider",
+        )
+
+        self.assertTrue(broken_provider.disabled)
+        self.assertEqual("ui_failed", broken_handle.failed_reason_code)
+        self.assertEqual(0, stable_handle.construct_count)
+
+        selection.on_dropdown_change("StableProvider")
+
+        self.assertIs(selection.current_plugin, stable)
+        self.assertEqual(1, stable_handle.construct_count)
+        self.assertEqual(1, stable.init_count)
 
     def test_selection_falls_back_when_configured_provider_fails(self):#20260716_kpopmodder
         from plugin_system.selection import PluginSelectionBase
