@@ -134,7 +134,7 @@ class EventShutdownTests(unittest.TestCase):
     def test_runtime_components_define_shutdown_methods(self):
         project_root = Path(__file__).resolve().parents[1]
         expected_shutdown_classes = {
-            "Input.py": "Input",
+            "input_core/input_component.py": "Input",
             "LLM.py": "LLM",
             "Translate.py": "Translate",
             "TTS.py": "TTS",

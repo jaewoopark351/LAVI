@@ -1,10 +1,12 @@
+#20260717_kpopmodder: Moved Input implementation out of the root legacy facade.
 from plugin_system.interfaces import InputPluginInterface
-import gradio as gr
 from plugin_system.selection import PluginSelectionBase
 
 from core.logger import log_print#20260612_kpopmodder
 
+
 class Input(PluginSelectionBase):
+    #20260717_kpopmodder: Root Input.py now re-exports this compatibility implementation.
     def __init__(self) -> None:
         super().__init__(InputPluginInterface)
         self._shutdown = False
@@ -12,6 +14,8 @@ class Input(PluginSelectionBase):
         self._sync_provider_listeners()
 
     def create_ui(self):
+        import gradio as gr
+
         with gr.Tab("Input"):
             with gr.Blocks():
                 super().create_plugin_selection_ui()

@@ -215,7 +215,7 @@ class AppComposer:
         }
 
     def create_core_components(self):
-        from Input import Input
+        from input_core.input_component import Input
         from LLM import LLM
         from Translate import Translate
         from TTS import TTS

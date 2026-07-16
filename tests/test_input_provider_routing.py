@@ -27,7 +27,7 @@ class InputProviderRoutingTests(unittest.TestCase):
                 "plugin_system.selection.config_manager.load_section",
                 return_value=config or {},
             ):
-                from Input import Input
+                from input_core.input_component import Input
 
                 return Input()
 
