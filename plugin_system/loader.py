@@ -18,6 +18,14 @@ from plugin_system.interfaces import (
     TTSPluginInterface,
     VtuberPluginInterface,
 )
+from plugin_system.contracts import (
+    AvailabilityProbeContract,
+    PluginDiagnostic,
+    PluginDiagnosticSnapshot,
+    PluginRuntimeContract,
+    PluginState,
+    PluginSupports,
+)
 from plugin_system.registry import plugin_registry
 
 from core.logger import log_print#20260612_kpopmodder
@@ -32,54 +40,9 @@ plugin_directory = "plugins"
 temp_ignore = [] #["silero", "Local_LLM", "voicevox"]
 
 
-class PluginState:
-    #20260716_kpopmodder: Track plugin lifecycle without constructing every provider.
-    DISABLED = "DISABLED"
-    UNAVAILABLE = "UNAVAILABLE"
-    READY = "READY"
-    STARTING = "STARTING"
-    RUNNING = "RUNNING"
-    FAILED = "FAILED"
-    STOPPED = "STOPPED"
-    BROKEN = FAILED  #20260716_kpopmodder: Backward-compatible alias for older tests/log checks.
-
-
 class PluginLoadError(RuntimeError):
     #20260716_kpopmodder: Clear plugin load error used by lazy handles.
     pass
-
-
-@dataclass(frozen=True)
-class PluginDiagnostic:
-    #20260716_kpopmodder: Structured P1 diagnostic without exposing credential values.
-    plugin_id: str
-    state: str
-    reason_code: str
-    human_readable_message: str
-    missing_python_packages: tuple = ()
-    missing_files: tuple = ()
-    missing_executables: tuple = ()
-    missing_services: tuple = ()
-    missing_environment_variables: tuple = ()
-    suggested_install_profile: str = ""
-    suggested_command: str = ""
-    log_reference: str = ""
-
-    def to_dict(self):
-        return {
-            "plugin_id": self.plugin_id,
-            "state": self.state,
-            "reason_code": self.reason_code,
-            "human_readable_message": self.human_readable_message,
-            "missing_python_packages": list(self.missing_python_packages),
-            "missing_files": list(self.missing_files),
-            "missing_executables": list(self.missing_executables),
-            "missing_services": list(self.missing_services),
-            "missing_environment_variables": list(self.missing_environment_variables),
-            "suggested_install_profile": self.suggested_install_profile,
-            "suggested_command": self.suggested_command,
-            "log_reference": self.log_reference,
-        }
 
 
 @dataclass(frozen=True)
@@ -103,6 +66,7 @@ class PluginDescriptor:
     required_services: tuple = ()
     supports_offline: bool = False
     supports_cpu: bool = True
+    requires_gpu: bool = False
 
     @property
     def status_key(self):
@@ -111,6 +75,34 @@ class PluginDescriptor:
     @property
     def entrypoint(self):
         return f"{self.module_name}:{self.class_name}"
+
+    @property
+    def runtime_contract(self):
+        return PluginRuntimeContract(
+            plugin_id=self.id,
+            manifest={
+                "id": self.id,
+                "display_name": self.display_name,
+                "api_version": self.api_version,
+                "category": self.category,
+                "entrypoint": self.entrypoint,
+                "dependency_group": self.dependency_group,
+            },
+            config_schema=self.config_schema,
+            availability_probe=AvailabilityProbeContract(
+                required_python_packages=self.required_python_packages,
+                required_files=self.required_files,
+                required_executables=self.required_executables,
+                required_services=self.required_services,
+                log_reference=f"PluginLoader availability probe for {self.status_key}",
+            ),
+            capabilities=self.capabilities,
+            supports=PluginSupports(
+                offline=self.supports_offline,
+                cpu=self.supports_cpu,
+                requires_gpu=self.requires_gpu,
+            ),
+        )
 
     def __post_init__(self):
         if self.config_schema is None:
@@ -137,6 +129,21 @@ class PluginHandle:
     def name(self):
         return self.descriptor.class_name
 
+    @property
+    def runtime_contract(self):
+        return self.descriptor.runtime_contract
+
+    def diagnostic_snapshot(self):
+        return PluginDiagnosticSnapshot(
+            plugin_id=self.descriptor.id,
+            name=self.name,
+            category=self.descriptor.category,
+            state=self.status,
+            detail=self.error,
+            diagnostic=self.diagnostic,
+            runtime_contract=self.runtime_contract,
+        ).to_dict()
+
     def _set_state(self, state, detail="", diagnostic=None):
         self.status = state
         self.error = str(detail or "")
@@ -146,6 +153,7 @@ class PluginHandle:
             state,
             detail=detail,
             diagnostic=diagnostic.to_dict() if diagnostic else None,
+            runtime_contract=self.runtime_contract.to_dict(),
         )
 
     def check_availability(self):
@@ -267,7 +275,15 @@ class PluginLoader:
         self.plugin_setting_example_path = str(self.paths.config_path("modules.example.json"))
         self.plugin_setting= {}
 
-    def set_plugin_status(self, name, status, kind="core", detail="", diagnostic=None):
+    def set_plugin_status(
+        self,
+        name,
+        status,
+        kind="core",
+        detail="",
+        diagnostic=None,
+        runtime_contract=None,
+    ):
         self.plugin_status[name] = status
         self.registry.record(
             name,
@@ -275,7 +291,26 @@ class PluginLoader:
             kind=kind,
             detail=detail,
             diagnostic=diagnostic,
+            runtime_contract=runtime_contract,
         )
+
+    def get_runtime_contracts(self):
+        return {
+            category: [
+                handle.runtime_contract.to_dict()
+                for handle in handles
+            ]
+            for category, handles in self.plugins.items()
+        }
+
+    def get_diagnostics(self):
+        return {
+            category: [
+                handle.diagnostic_snapshot()
+                for handle in handles
+            ]
+            for category, handles in self.plugins.items()
+        }
 
     def _load_module_settings(self):
         default_user_path = self.paths.config_path("modules.json").resolve()
@@ -419,6 +454,7 @@ class PluginLoader:
                 handle.status,
                 detail=handle.error,
                 diagnostic=handle.diagnostic.to_dict() if handle.diagnostic else None,
+                runtime_contract=descriptor.runtime_contract.to_dict(),
             )
 
     def _handle_for_descriptor(self, descriptor, validation_errors=()):
@@ -677,7 +713,7 @@ class PluginLoader:
             plugin_name,
             class_name,
         )
-        supports_offline, supports_cpu = self._metadata_supports(
+        supports_offline, supports_cpu, requires_gpu = self._metadata_supports(
             metadata,
             errors,
             plugin_name,
@@ -697,6 +733,7 @@ class PluginLoader:
             "required_services": tuple(self._metadata_string_sequence(metadata, "required_services", errors, plugin_name, class_name)),
             "supports_offline": supports_offline,
             "supports_cpu": supports_cpu,
+            "requires_gpu": requires_gpu,
         }, tuple(errors)
 
     def _optional_text(self, metadata, key, default, errors, plugin_name, class_name):
@@ -747,6 +784,7 @@ class PluginLoader:
     def _metadata_supports(self, metadata, errors, plugin_name, class_name):
         supports_offline = False
         supports_cpu = True
+        requires_gpu = False
         supports = metadata.get("supports")
         if supports is not None:
             if not isinstance(supports, dict):
@@ -775,6 +813,16 @@ class PluginLoader:
                         class_name,
                         "supports.cpu",
                     )
+                if "requires_gpu" in supports:
+                    requires_gpu = self._metadata_bool(
+                        supports,
+                        "requires_gpu",
+                        requires_gpu,
+                        errors,
+                        plugin_name,
+                        class_name,
+                        "supports.requires_gpu",
+                    )
         supports_offline = self._metadata_bool(
             metadata,
             "supports_offline",
@@ -791,7 +839,15 @@ class PluginLoader:
             plugin_name,
             class_name,
         )
-        return supports_offline, supports_cpu
+        requires_gpu = self._metadata_bool(
+            metadata,
+            "requires_gpu",
+            requires_gpu,
+            errors,
+            plugin_name,
+            class_name,
+        )
+        return supports_offline, supports_cpu, requires_gpu
 
     def _metadata_bool(
         self,

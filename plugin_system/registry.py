@@ -10,6 +10,7 @@ class PluginRegistryEntry:
     kind: str = "core"
     detail: str = ""
     diagnostic: dict = field(default_factory=dict)
+    runtime_contract: dict = field(default_factory=dict)
 
 
 class PluginRegistry:
@@ -17,13 +18,22 @@ class PluginRegistry:
     def __init__(self):
         self._entries = {}
 
-    def record(self, name, status, kind="core", detail="", diagnostic=None):
+    def record(
+        self,
+        name,
+        status,
+        kind="core",
+        detail="",
+        diagnostic=None,
+        runtime_contract=None,
+    ):
         self._entries[name] = PluginRegistryEntry(
             name=name,
             status=status,
             kind=kind,
             detail=str(detail or ""),
             diagnostic=dict(diagnostic or {}),
+            runtime_contract=dict(runtime_contract or {}),
         )
 
     def snapshot(self):
@@ -33,6 +43,7 @@ class PluginRegistry:
                 "kind": entry.kind,
                 "detail": entry.detail,
                 "diagnostic": entry.diagnostic,
+                "runtime_contract": entry.runtime_contract,
             }
             for name, entry in sorted(self._entries.items())
         }

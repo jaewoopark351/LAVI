@@ -95,6 +95,7 @@ OPTIONAL_MODULE_MANIFEST = {
         "required_services": (),
         "supports_offline": False,
         "supports_cpu": False,
+        "requires_gpu": True,
     },
 }
 

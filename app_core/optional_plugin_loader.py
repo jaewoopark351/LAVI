@@ -7,7 +7,13 @@ import traceback
 
 from app_core.module_config import module_enabled
 from core.logger import log_print
-from plugin_system.loader import PluginDiagnostic, PluginState
+from plugin_system.contracts import (
+    AvailabilityProbeContract,
+    PluginDiagnostic,
+    PluginRuntimeContract,
+    PluginState,
+    PluginSupports,
+)
 from plugin_system.registry import plugin_registry
 
 
@@ -21,15 +27,27 @@ def instantiate_optional_plugin(
     manifest=None,
     **kwargs,
 ):
+    manifest = dict(manifest or {})
+    runtime_contract = _optional_runtime_contract(
+        plugin_name,
+        module_path,
+        class_name,
+        manifest,
+    ).to_dict()
+
     if not module_enabled(plugin_name, default_enabled, project_root):
-        plugin_registry.record(plugin_name, PluginState.DISABLED, kind="optional")
+        plugin_registry.record(
+            plugin_name,
+            PluginState.DISABLED,
+            kind="optional",
+            runtime_contract=runtime_contract,
+        )
         log_print(
             f"[Startup][DISABLED] [{plugin_name}] optional plugin disabled in modules.json "
             f"(default_enabled={default_enabled})"
         )
         return None
 
-    manifest = dict(manifest or {})
     diagnostic = _optional_unavailable_diagnostic(
         plugin_name,
         module_path,
@@ -43,6 +61,7 @@ def instantiate_optional_plugin(
             kind="optional",
             detail=diagnostic.human_readable_message,
             diagnostic=diagnostic.to_dict(),
+            runtime_contract=runtime_contract,
         )
         log_print(
             f"[Startup][UNAVAILABLE] [{plugin_name}] optional plugin skipped: "
@@ -66,6 +85,7 @@ def instantiate_optional_plugin(
             kind="optional",
             detail=e,
             diagnostic=diagnostic.to_dict(),
+            runtime_contract=runtime_contract,
         )
         log_print(
             f"[Startup][BROKEN] [{plugin_name}] enabled plugin module import failed: "
@@ -89,6 +109,7 @@ def instantiate_optional_plugin(
             kind="optional",
             detail=e,
             diagnostic=diagnostic.to_dict(),
+            runtime_contract=runtime_contract,
         )
         log_print(
             f"[Startup][BROKEN] [{plugin_name}] enabled plugin missing class '{class_name}': "
@@ -98,7 +119,12 @@ def instantiate_optional_plugin(
 
     try:
         plugin = plugin_class(*args, **kwargs)
-        plugin_registry.record(plugin_name, PluginState.READY, kind="optional")
+        plugin_registry.record(
+            plugin_name,
+            PluginState.READY,
+            kind="optional",
+            runtime_contract=runtime_contract,
+        )
         return plugin
     except KeyboardInterrupt:
         log_print(
@@ -119,12 +145,73 @@ def instantiate_optional_plugin(
             kind="optional",
             detail=e,
             diagnostic=diagnostic.to_dict(),
+            runtime_contract=runtime_contract,
         )
         log_print(
             f"[Startup][BROKEN] [{plugin_name}] enabled plugin constructor failed: "
             f"{type(e).__name__}: {e}\n{trace}"
         )
         return None
+
+
+def _optional_runtime_contract(plugin_name, module_path, class_name, manifest):
+    entrypoint = str(
+        manifest.get("entrypoint")
+        or f"{module_path}:{class_name}"
+    )
+    category = str(manifest.get("category") or "optional")
+    dependency_group = str(manifest.get("dependency_group") or "Full")
+    supports = manifest.get("supports")
+    if not isinstance(supports, dict):
+        supports = {}
+
+    return PluginRuntimeContract(
+        plugin_id=str(manifest.get("id") or plugin_name),
+        manifest={
+            "id": str(manifest.get("id") or plugin_name),
+            "display_name": str(manifest.get("display_name") or plugin_name),
+            "api_version": str(manifest.get("api_version") or "1"),
+            "category": category,
+            "entrypoint": entrypoint,
+            "dependency_group": dependency_group,
+        },
+        config_schema=dict(manifest.get("config_schema") or {}),
+        availability_probe=AvailabilityProbeContract(
+            required_python_packages=_string_tuple(
+                manifest.get("required_python_packages")
+            ),
+            required_files=_string_tuple(manifest.get("required_files")),
+            required_executables=_string_tuple(
+                manifest.get("required_executables")
+            ),
+            required_services=_string_tuple(manifest.get("required_services")),
+            log_reference=f"Optional plugin availability probe for {plugin_name}",
+        ),
+        capabilities=_string_tuple(manifest.get("capabilities")),
+        supports=PluginSupports(
+            offline=_manifest_bool(
+                manifest,
+                supports,
+                "supports_offline",
+                "offline",
+                False,
+            ),
+            cpu=_manifest_bool(
+                manifest,
+                supports,
+                "supports_cpu",
+                "cpu",
+                True,
+            ),
+            requires_gpu=_manifest_bool(
+                manifest,
+                supports,
+                "requires_gpu",
+                "requires_gpu",
+                False,
+            ),
+        ),
+    )
 
 
 def _optional_unavailable_diagnostic(plugin_name, module_path, manifest, project_root):
@@ -199,6 +286,14 @@ def _string_tuple(value):
     if isinstance(value, (list, tuple)):
         return tuple(str(item) for item in value if str(item))
     return ()
+
+
+def _manifest_bool(manifest, supports, legacy_key, supports_key, default):
+    if legacy_key in manifest:
+        return bool(manifest.get(legacy_key))
+    if supports_key in supports:
+        return bool(supports.get(supports_key))
+    return default
 
 
 def _suggested_install_command():

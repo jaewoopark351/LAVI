@@ -45,6 +45,7 @@ class GPTSoVITS(TTSPluginInterface):#20260615_kpopmodder
         "required_services": ["GPT-SoVITS API server http://127.0.0.1:9880"],
         "supports_offline": True,
         "supports_cpu": False,
+        "requires_gpu": True,
     }
 
     current_module_directory = os.path.dirname(__file__)

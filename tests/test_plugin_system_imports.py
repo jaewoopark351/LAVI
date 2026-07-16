@@ -13,6 +13,216 @@ if str(PROJECT_ROOT) not in sys.path:
 
 
 class PluginSystemImportTests(unittest.TestCase):
+    def test_plugin_contracts_are_shared_and_serializable(self):#20260716_kpopmodder
+        from plugin_system import (
+            AvailabilityProbeContract,
+            PluginDiagnostic,
+            PluginDiagnosticSnapshot,
+            PluginRuntimeContract,
+            PluginState,
+            PluginSupports,
+        )
+        from plugin_system.contracts import (
+            PluginDiagnostic as ContractDiagnostic,
+            PluginState as ContractState,
+        )
+        from plugin_system.loader import (
+            PluginDiagnostic as LoaderDiagnostic,
+            PluginState as LoaderState,
+        )
+
+        self.assertIs(PluginState, ContractState)
+        self.assertIs(PluginState, LoaderState)
+        self.assertIs(PluginDiagnostic, ContractDiagnostic)
+        self.assertIs(PluginDiagnostic, LoaderDiagnostic)
+        self.assertEqual("FAILED", PluginState.BROKEN)
+
+        contract = PluginRuntimeContract(
+            plugin_id="Example",
+            manifest={"entrypoint": "plugins.Example.Example:Example"},
+            config_schema={"type": "object"},
+            availability_probe=AvailabilityProbeContract(
+                required_services=("microphone_input_device",),
+                timeout_sec=0.1,
+                log_reference="test probe",
+            ),
+            capabilities=("input",),
+            supports=PluginSupports(offline=True, cpu=True, requires_gpu=False),
+        )
+
+        self.assertEqual(
+            {
+                "plugin_id": "Example",
+                "manifest": {"entrypoint": "plugins.Example.Example:Example"},
+                "config_schema": {"type": "object"},
+                "availability_probe": {
+                    "required_python_packages": [],
+                    "required_files": [],
+                    "required_executables": [],
+                    "required_services": ["microphone_input_device"],
+                    "timeout_sec": 0.1,
+                    "log_reference": "test probe",
+                },
+                "lifecycle_methods": ["init", "start", "stop", "shutdown"],
+                "capabilities": ["input"],
+                "supports": {
+                    "offline": True,
+                    "cpu": True,
+                    "requires_gpu": False,
+                },
+            },
+            contract.to_dict(),
+        )
+
+        snapshot = PluginDiagnosticSnapshot(
+            plugin_id="Example",
+            name="ExamplePlugin",
+            category="input_gathering",
+            state=PluginState.READY,
+            detail="ready",
+            diagnostic=PluginDiagnostic(
+                plugin_id="Example",
+                state=PluginState.READY,
+                reason_code="ok",
+                human_readable_message="ready",
+            ),
+            runtime_contract=contract,
+        )
+
+        self.assertEqual(
+            {
+                "plugin_id": "Example",
+                "name": "ExamplePlugin",
+                "category": "input_gathering",
+                "state": PluginState.READY,
+                "detail": "ready",
+                "diagnostic": {
+                    "plugin_id": "Example",
+                    "state": PluginState.READY,
+                    "reason_code": "ok",
+                    "human_readable_message": "ready",
+                    "missing_python_packages": [],
+                    "missing_files": [],
+                    "missing_executables": [],
+                    "missing_services": [],
+                    "missing_environment_variables": [],
+                    "suggested_install_profile": "",
+                    "suggested_command": "",
+                    "log_reference": "",
+                },
+                "runtime_contract": contract.to_dict(),
+            },
+            snapshot.to_dict(),
+        )
+
+    def test_plugin_descriptor_exposes_runtime_contract(self):#20260716_kpopmodder
+        from plugin_system.loader import PluginDescriptor
+
+        descriptor = PluginDescriptor(
+            plugin_name="Example",
+            class_name="ExamplePlugin",
+            category="text_to_speech",
+            interface_name="TTSPluginInterface",
+            module_name="plugins.Example.Example",
+            module_path=str(PROJECT_ROOT / "plugins" / "Example" / "Example.py"),
+            id="example.tts",
+            display_name="Example TTS",
+            api_version="1",
+            dependency_group="tts",
+            capabilities=("synthesize",),
+            config_schema={"type": "object"},
+            required_python_packages=("requests",),
+            required_files=("plugin:model.pth",),
+            required_executables=("ffmpeg",),
+            required_services=("http://127.0.0.1:9880",),
+            supports_offline=False,
+            supports_cpu=False,
+            requires_gpu=True,
+        )
+
+        contract = descriptor.runtime_contract.to_dict()
+
+        self.assertEqual("example.tts", contract["plugin_id"])
+        self.assertEqual(
+            {
+                "id": "example.tts",
+                "display_name": "Example TTS",
+                "api_version": "1",
+                "category": "text_to_speech",
+                "entrypoint": "plugins.Example.Example:ExamplePlugin",
+                "dependency_group": "tts",
+            },
+            contract["manifest"],
+        )
+        self.assertEqual(["synthesize"], contract["capabilities"])
+        self.assertEqual(
+            ["requests"],
+            contract["availability_probe"]["required_python_packages"],
+        )
+        self.assertEqual(
+            {
+                "offline": False,
+                "cpu": False,
+                "requires_gpu": True,
+            },
+            contract["supports"],
+        )
+
+    def test_loader_exposes_contract_diagnostics_without_importing_plugin(self):#20260716_kpopmodder
+        from plugin_system.loader import PluginLoader, PluginState
+
+        module_name = "plugins.ContractDiagnostics.ContractDiagnosticsPlugin"
+        sys.modules.pop(module_name, None)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            plugin_root = Path(temp_dir) / "plugins"
+            plugin_dir = plugin_root / "ContractDiagnostics"
+            plugin_dir.mkdir(parents=True)
+            (plugin_dir / "ContractDiagnosticsPlugin.py").write_text(
+                "\n".join([
+                    "from plugin_system.interfaces import LLMPluginInterface",
+                    "IMPORT_COUNT = 0",
+                    "IMPORT_COUNT += 1",
+                    "class ContractDiagnosticsPlugin(LLMPluginInterface):",
+                    "    PLUGIN_METADATA = {",
+                    "        'id': 'contract.diagnostics',",
+                    "        'display_name': 'Contract Diagnostics',",
+                    "        'api_version': '1',",
+                    "        'capabilities': ['llm', 'diagnostics'],",
+                    "        'supports': {",
+                    "            'offline': True,",
+                    "            'cpu': True,",
+                    "            'requires_gpu': False,",
+                    "        },",
+                    "    }",
+                    "    def init(self): pass",
+                    "    def predict(self, message, history): return ''",
+                    "    def create_ui(self): return None",
+                ]),
+                encoding="utf-8",
+            )
+            modules_path = Path(temp_dir) / "modules.json"
+            modules_path.write_text(json.dumps({}), encoding="utf-8")
+
+            loader = PluginLoader("plugins")
+            loader.plugin_directory = str(plugin_root)
+            loader.plugin_setting_path = str(modules_path)
+            loader._load_plugins_from_directory(str(plugin_dir))
+
+        self.assertNotIn(module_name, sys.modules)
+        contract = loader.get_runtime_contracts()["language_model"][0]
+        diagnostics = loader.get_diagnostics()["language_model"][0]
+
+        self.assertEqual("contract.diagnostics", contract["plugin_id"])
+        self.assertEqual(
+            "plugins.ContractDiagnostics.ContractDiagnosticsPlugin:ContractDiagnosticsPlugin",
+            contract["manifest"]["entrypoint"],
+        )
+        self.assertEqual(["llm", "diagnostics"], contract["capabilities"])
+        self.assertEqual(PluginState.READY, diagnostics["state"])
+        self.assertEqual(contract, diagnostics["runtime_contract"])
+        self.assertEqual({}, diagnostics["diagnostic"])
+
     def test_interfaces_export_plugin_contracts(self):
         from plugin_system.interfaces import (
             InputPluginInterface,
@@ -741,7 +951,60 @@ class PluginSystemImportTests(unittest.TestCase):
             "plugins.GPTSoVITS.GPTSoVITS:GPTSoVITS",
             handle.descriptor.entrypoint,
         )
+        self.assertTrue(handle.descriptor.requires_gpu)
         self.assertNotIn(module_name, sys.modules)
+
+    def test_metadata_supports_requires_gpu_contract(self):#20260716_kpopmodder
+        from plugin_system.loader import PluginLoader
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            plugin_root = Path(temp_dir) / "plugins"
+            plugin_dir = plugin_root / "GpuContractPlugin"
+            plugin_dir.mkdir(parents=True)
+            (plugin_dir / "GpuContractPlugin.py").write_text(
+                "\n".join([
+                    "from plugin_system.interfaces import LLMPluginInterface",
+                    "",
+                    "class GpuContractPlugin(LLMPluginInterface):",
+                    "    PLUGIN_METADATA = {",
+                    "        'id': 'GpuContractPlugin',",
+                    "        'api_version': '1',",
+                    "        'supports': {",
+                    "            'offline': True,",
+                    "            'cpu': False,",
+                    "            'requires_gpu': True,",
+                    "        },",
+                    "    }",
+                    "    def init(self):",
+                    "        pass",
+                    "    def predict(self, message, history):",
+                    "        return ''",
+                    "    def create_ui(self):",
+                    "        return None",
+                ]),
+                encoding="utf-8",
+            )
+            modules_path = Path(temp_dir) / "modules.json"
+            modules_path.write_text(json.dumps({}), encoding="utf-8")
+
+            loader = PluginLoader("plugins")
+            loader.plugin_directory = str(plugin_root)
+            loader.plugin_setting_path = str(modules_path)
+            loader._load_plugins_from_directory(str(plugin_dir))
+
+        handle = loader.plugins["language_model"][0]
+
+        self.assertTrue(handle.descriptor.supports_offline)
+        self.assertFalse(handle.descriptor.supports_cpu)
+        self.assertTrue(handle.descriptor.requires_gpu)
+        self.assertEqual(
+            {
+                "offline": True,
+                "cpu": False,
+                "requires_gpu": True,
+            },
+            handle.descriptor.runtime_contract.to_dict()["supports"],
+        )
 
     def test_p1a_missing_static_dependency_becomes_unavailable_without_import(self):#20260716_kpopmodder
         from plugin_system.loader import PluginLoader, PluginState
@@ -1638,6 +1901,20 @@ class PluginSystemImportTests(unittest.TestCase):
         self.assertEqual(
             ["lavi_missing_package_for_static_dependency_test"],
             snapshot["MissingOptional"]["diagnostic"]["missing_python_packages"],
+        )
+        self.assertEqual(
+            "MissingOptional",
+            snapshot["MissingOptional"]["runtime_contract"]["plugin_id"],
+        )
+        self.assertEqual(
+            "plugins.MissingOptional.missing_optional:MissingOptional",
+            snapshot["MissingOptional"]["runtime_contract"]["manifest"]["entrypoint"],
+        )
+        self.assertEqual(
+            ["lavi_missing_package_for_static_dependency_test"],
+            snapshot["MissingOptional"]["runtime_contract"]["availability_probe"][
+                "required_python_packages"
+            ],
         )
 
 
