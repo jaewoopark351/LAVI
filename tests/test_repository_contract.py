@@ -1,12 +1,13 @@
 #20260716_kpopmodder: Regression tests for install, config, and CI portability contracts.
 import json
 import os
-import re
 import subprocess
 import unittest
 from pathlib import Path
+import tempfile
 from unittest import mock
 
+import core.config_manager as config_manager_module
 from core.paths import LaviPaths
 
 
@@ -110,6 +111,56 @@ class RepositoryContractTests(unittest.TestCase):
             self.assertEqual(
                 temp_root / "로컬 설정",
                 paths.config_dir,
+            )
+
+    def test_config_manager_resolves_relative_paths_from_project_root(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            with mock.patch.object(
+                config_manager_module,
+                "PROJECT_ROOT",
+                str(temp_root),
+            ):
+                manager = config_manager_module.ConfigManager(
+                    "nested/config.ini",
+                )
+
+            self.assertEqual(
+                temp_root / "nested" / "config.ini",
+                Path(manager.config_file),
+            )
+
+    def test_config_manager_default_file_can_be_redirected_by_environment(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            config_file = temp_root / "isolated.ini"
+            with mock.patch.dict(
+                os.environ,
+                {"LAVI_CONFIG_FILE": str(config_file)},
+            ):
+                manager = config_manager_module.ConfigManager()
+
+            self.assertEqual(config_file, Path(manager.config_file))
+
+    def test_config_manager_atomic_write_preserves_existing_file_on_replace_failure(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            target_path = Path(temp_dir) / "config.ini"
+            target_path.write_text(
+                "[LLM]\nspeech_style = polite\n",
+                encoding="utf-8",
+            )
+            manager = config_manager_module.ConfigManager(target_path)
+
+            with mock.patch(
+                "core.config_manager.os.replace",
+                side_effect=RuntimeError("replace failed"),
+            ):
+                with self.assertRaises(RuntimeError):
+                    manager.save_config("LLM", "speech_style", "casual")
+
+            self.assertEqual(
+                "[LLM]\nspeech_style = polite\n",
+                target_path.read_text(encoding="utf-8"),
             )
 
 

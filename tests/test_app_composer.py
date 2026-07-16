@@ -115,6 +115,22 @@ class AppComposerTests(unittest.TestCase):
         self.assertEqual(1, fake_runtime.shutdown.call_count)
         self.assertEqual(1, events.count("create_runtime_lifecycle"))
 
+    def test_log_gpu_startup_skips_gpu_preflight_for_core_profile(self):
+        composer = AppComposer()
+
+        with mock.patch.dict("os.environ", {"LAVI_PROFILE": "Core"}):
+            with mock.patch(
+                "app_core.app_composer.gpu_device_manager.log_startup_summary",
+            ) as summary_mock:
+                with mock.patch(
+                    "app_core.app_composer.gpu_device_manager."
+                    "log_startup_vram_preflight",
+                ) as preflight_mock:
+                    composer.log_gpu_startup()
+
+        summary_mock.assert_not_called()
+        preflight_mock.assert_not_called()
+
     def test_receive_screen_vision_input_blocks_when_song_playing(self):
         composer = AppComposer()
         composer.llm = mock.Mock()

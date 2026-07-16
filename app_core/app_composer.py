@@ -24,6 +24,7 @@ from app_core.screen_router_bootstrap import build_screen_question_router
 from core.global_state import GlobalKeys, global_state
 from core.gpu_device_manager import gpu_device_manager
 from core.logger import log_print
+from core.profile_resolver import active_profile
 from plugin_system.loader import plugin_loader
 
 
@@ -148,6 +149,11 @@ class AppComposer:
         plugin_loader.load_plugins()
 
     def log_gpu_startup(self):
+        if active_profile() == "Core":
+            log_print(
+                "[GPUDeviceManager] startup GPU preflight skipped for Core profile"
+            )#20260716_kpopmodder
+            return
         gpu_device_manager.log_startup_summary(#20260626_kpopmodder
             ("VoiceInput", "ScreenVision", "GPTSoVITS")
         )

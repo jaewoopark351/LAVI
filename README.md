@@ -312,7 +312,13 @@ call venv\Scripts\activate.bat
 Reproducible Windows install path:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install_windows.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install_windows.ps1 -Profile Core -Accelerator CPU
+```
+
+기존 전체 CUDA 13.0 환경을 설치하려면 아래 명령을 사용합니다. 인자를 생략해도 이 Full/cu130 경로가 기본값입니다.
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install_windows.ps1 -Profile Full -Accelerator cu130
 ```
 
 `run.bat` is now runtime-only. It uses `venv\Scripts\python.exe`, runs `scripts\preflight.py`, and exits with a non-zero code if the venv or preflight fails.
@@ -340,6 +346,8 @@ python -m pip install cmake
 
 ## 6. PyTorch 설치 (CUDA 13.0)
 
+일반 사용자는 위의 `install_windows.ps1 -Profile Full -Accelerator cu130` 명령을 사용하세요. 아래 명령은 수동 복구나 문제 조사용입니다.
+
 ```bat
 python -m pip install torch==2.13.0+cu130 torchvision==0.28.0+cu130 torchaudio==2.11.0+cu130 --index-url https://download.pytorch.org/whl/cu130
 ```
@@ -355,6 +363,8 @@ python -m pip install git+https://github.com/chameleon-ai/LangSegment-0.3.5-back
 ---
 
 ## 8. requirements.txt 설치
+
+일반 사용자는 위의 `install_windows.ps1` 명령을 사용하세요. 아래 명령은 수동 복구나 문제 조사용 compatibility entrypoint입니다.
 
 ```bat
 python -m pip install -r requirements.txt
@@ -1206,6 +1216,7 @@ findstr /V /R /I ^
 ```
 
 Current dependency management uses grouped files under `requirements\`.
+The canonical Windows installer uses committed locks under `requirements\locks\`.
 Do not regenerate `requirements.txt` from `pip freeze` unless you are intentionally updating the frozen snapshot.
 
 ---

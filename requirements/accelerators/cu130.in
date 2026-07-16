@@ -1,0 +1,2 @@
+#20260716_kpopmodder: CUDA 13.0 accelerator source; install with the PyTorch cu130 index.
+-r ../constraints-windows-py314-cu130.txt

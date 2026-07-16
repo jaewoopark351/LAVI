@@ -1,0 +1,3 @@
+#20260716_kpopmodder: Core profile source; keep torch out of Core/CPU installs.
+-r ../base.txt
+-r ../windows.txt

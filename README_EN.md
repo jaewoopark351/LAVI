@@ -310,10 +310,16 @@ call venv\Scripts\activate.bat
 
 If `(venv)` appears, it is working.
 
-For the reproducible Windows install path, use the project-local installer instead of `run.bat`:
+For the minimal reproducible Windows install path, use the project-local installer instead of `run.bat`:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install_windows.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install_windows.ps1 -Profile Core -Accelerator CPU
+```
+
+For the existing full CUDA 13.0 runtime path, use this command. Omitting both parameters keeps this Full/cu130 path as the compatibility default.
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install_windows.ps1 -Profile Full -Accelerator cu130
 ```
 
 `run.bat` is only a runtime launcher. It uses `venv\Scripts\python.exe`, runs `scripts\preflight.py`, and exits non-zero when the venv or preflight is not ready.
@@ -339,6 +345,8 @@ python -m pip install cmake
 
 ## 6. Install PyTorch (CUDA 13.0)
 
+For normal setup, prefer `install_windows.ps1 -Profile Full -Accelerator cu130`. The command below is for manual recovery or troubleshooting.
+
 ```bat
 python -m pip install torch==2.13.0+cu130 torchvision==0.28.0+cu130 torchaudio==2.11.0+cu130 --index-url https://download.pytorch.org/whl/cu130
 ```
@@ -354,6 +362,8 @@ python -m pip install git+https://github.com/chameleon-ai/LangSegment-0.3.5-back
 ---
 
 ## 8. Install requirements.txt
+
+For normal setup, prefer `install_windows.ps1`. The command below is a manual compatibility entrypoint.
 
 ```bat
 python -m pip install -r requirements.txt
@@ -1192,6 +1202,7 @@ requirements/dev.txt
 
 The known-good frozen environment snapshot remains in `requirements_full.txt`.
 The CUDA 13.0 PyTorch wheel pins are in `requirements/constraints-windows-py314-cu130.txt` and must be installed with the dedicated `cu130` index URL.
+The canonical Windows installer uses committed locks under `requirements/locks/`.
 
 ---
 

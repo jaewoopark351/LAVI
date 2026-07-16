@@ -1,0 +1,5 @@
+#20260716_kpopmodder: Full profile source preserving the current runtime groups.
+-r core.in
+-r ../voice.txt
+-r ../vision.txt
+-r ../games.txt

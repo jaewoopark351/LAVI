@@ -1,19 +1,51 @@
 #20260716_kpopmodder: Preflight keeps startup failures explicit before run.bat launches the app.
 from __future__ import annotations
 
+import argparse
 import importlib
-import os
 import sys
 from pathlib import Path
 
 
 EXPECTED_PYTHON = (3, 14)
 EXPECTED_TORCH_CUDA_TAG = "cu130"
+SUPPORTED_PROFILES = ("Core", "Full")
+SUPPORTED_ACCELERATORS = ("CPU", "cu130")
 EXPECTED_TORCH_PACKAGES = {
     "torch": "2.13.0+cu130",
     "torchvision": "0.28.0+cu130",
     "torchaudio": "2.11.0+cu130",
 }
+
+
+def _normalize_choice(value: str, allowed: tuple[str, ...], label: str) -> str:
+    for item in allowed:
+        if value.lower() == item.lower():
+            return item
+    valid = ", ".join(allowed)
+    raise argparse.ArgumentTypeError(f"invalid {label}: {value!r}; expected one of {valid}")
+
+
+def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Run LAVI startup preflight checks.")
+    parser.add_argument(
+        "--profile",
+        default="Full",
+        type=lambda value: _normalize_choice(value, SUPPORTED_PROFILES, "profile"),
+        help="Install/runtime profile to validate.",
+    )
+    parser.add_argument(
+        "--accelerator",
+        default="cu130",
+        type=lambda value: _normalize_choice(value, SUPPORTED_ACCELERATORS, "accelerator"),
+        help="Accelerator wheel set to validate.",
+    )
+    parser.add_argument(
+        "--offline",
+        action="store_true",
+        help="Document that this preflight must not perform network or model setup.",
+    )
+    return parser.parse_args(argv)
 
 
 def _repo_root() -> Path:
@@ -70,7 +102,11 @@ def _check_import(module_name: str, errors: list[str]) -> object | None:
         return None
 
 
-def _check_torch(errors: list[str]) -> None:
+def _check_torch(errors: list[str], accelerator: str) -> None:
+    if accelerator == "CPU":
+        _info("torch check skipped for Accelerator=CPU")
+        return
+
     torch = _check_import("torch", errors)
     torchvision = _check_import("torchvision", errors)
     torchaudio = _check_import("torchaudio", errors)
@@ -128,18 +164,20 @@ def _check_required_runtime_imports(errors: list[str]) -> None:
         _check_import(module_name, errors)
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
+    args = _parse_args(argv)
     root = _repo_root()
     errors: list[str] = []
 
     _info(f"repo_root={root}")
     _info(f"python={Path(sys.executable).resolve()}")
     _info(f"version={sys.version.split()[0]}")
+    _info(f"profile={args.profile} accelerator={args.accelerator} offline={args.offline}")
 
     _check_python_version(errors)
     _check_repo_venv(errors, root)
     _check_required_runtime_imports(errors)
-    _check_torch(errors)
+    _check_torch(errors, args.accelerator)
 
     if errors:
         for message in errors:

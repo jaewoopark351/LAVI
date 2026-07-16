@@ -1,6 +1,10 @@
 # #20260716_kpopmodder: Project-local Windows installer; never installs system tools or edits registry.
 [CmdletBinding()]
 param(
+    [ValidateSet("Core", "Full")]
+    [string]$Profile = "Full",
+    [ValidateSet("CPU", "cu130")]
+    [string]$Accelerator = "cu130",
     [switch]$Dev
 )
 
@@ -11,13 +15,10 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RepoRoot = Resolve-Path -LiteralPath (Join-Path $ScriptDir "..")
 $VenvDir = Join-Path $RepoRoot "venv"
 $VenvPython = Join-Path $VenvDir "Scripts\python.exe"
-$TorchIndexUrl = "https://download.pytorch.org/whl/cu130"
-
-$TorchPackages = @(
-    "torch==2.13.0+cu130",
-    "torchvision==0.28.0+cu130",
-    "torchaudio==2.11.0+cu130"
-)
+$SupportedLocks = @{
+    "Core|CPU" = "requirements\locks\windows-py314-core-cpu.txt"
+    "Full|cu130" = "requirements\locks\windows-py314-full-cu130.txt"
+}
 
 function Invoke-LaviCommand {
     param(
@@ -46,8 +47,34 @@ function Assert-Python314 {
     }
 }
 
+function Get-LaviInstallLock {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$SelectedProfile,
+        [Parameter(Mandatory = $true)]
+        [string]$SelectedAccelerator
+    )
+
+    $key = "$SelectedProfile|$SelectedAccelerator"
+    if (-not $SupportedLocks.ContainsKey($key)) {
+        $supported = ($SupportedLocks.Keys | Sort-Object) -join ", "
+        throw "Unsupported install matrix: Profile=$SelectedProfile Accelerator=$SelectedAccelerator. Supported: $supported"
+    }
+
+    $relativeLockPath = $SupportedLocks[$key]
+    $lockPath = Join-Path $RepoRoot $relativeLockPath
+    if (-not (Test-Path -LiteralPath $lockPath)) {
+        throw "Committed install lock not found: $lockPath"
+    }
+    return $relativeLockPath
+}
+
 Push-Location $RepoRoot
 try {
+    $InstallLock = Get-LaviInstallLock $Profile $Accelerator
+    Write-Host "[LAVI install] Profile=$Profile Accelerator=$Accelerator"
+    Write-Host "[LAVI install] Using committed lock: $InstallLock"
+
     if (-not (Test-Path -LiteralPath $VenvPython)) {
         $pyLauncher = Get-Command py -ErrorAction SilentlyContinue
         if (-not $pyLauncher) {
@@ -59,15 +86,14 @@ try {
     Assert-Python314 $VenvPython
 
     Invoke-LaviCommand $VenvPython "-m" "pip" "--version"
-    Invoke-LaviCommand $VenvPython "-m" "pip" "install" "--index-url" $TorchIndexUrl @TorchPackages
-    Invoke-LaviCommand $VenvPython "-m" "pip" "install" "-r" "requirements.txt"
+    Invoke-LaviCommand $VenvPython "-m" "pip" "install" "-r" $InstallLock
 
     if ($Dev) {
         Invoke-LaviCommand $VenvPython "-m" "pip" "install" "-r" "requirements\dev.txt"
     }
 
     Invoke-LaviCommand $VenvPython "-m" "pip" "check"
-    Invoke-LaviCommand $VenvPython "scripts\preflight.py"
+    Invoke-LaviCommand $VenvPython "scripts\preflight.py" "--profile" $Profile "--accelerator" $Accelerator
 }
 finally {
     Pop-Location
