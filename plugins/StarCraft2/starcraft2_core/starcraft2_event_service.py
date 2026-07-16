@@ -19,8 +19,8 @@ class StarCraft2EngineEventService:
 
     def set_status_event_callback(self, callback):
         #20260714_kpopmodder: Keep API compatibility for legacy callers,
-        # but route callback through subscribe path only.
-        if self.event_bus is not None and callback is not None:
+        # but route callback through subscribe path only. None clears it.
+        if self.event_bus is not None:
             self.event_bus.set_status_event_callback(callback)
 
     def update_state(self, event: StarCraft2Event) -> None:

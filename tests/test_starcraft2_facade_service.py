@@ -208,6 +208,52 @@ class StarCraft2FacadeServiceTests(unittest.TestCase):
         self.assertEqual("engine_start_failed", snapshot["runtime_error"])
         self.assertEqual("engine_start_failed", snapshot["status"]["error"])
 
+    #20260716_kpopmodder: Explicit running=False must win over a stale truthy engine poll.
+    def test_facade_runtime_context_preserves_explicit_running_false(self):
+        context = SC2RuntimeContext()
+        context.set_process(mock.Mock(pid=123), "engine:fake")
+        facade = self._build_facade(runtime_context=context)
+        facade.current_engine = _FakeEngine()
+        facade.current_engine.running = True
+
+        with mock.patch(
+            "plugins.StarCraft2.starcraft2_core.starcraft2_facade_service.time.time",
+            return_value=42.0,
+        ):
+            facade._sync_runtime_context(
+                {
+                    "ok": True,
+                    "running": False,
+                    "status": {"running": False},
+                }
+            )
+
+        snapshot = context.snapshot()
+        self.assertFalse(snapshot["status"]["running"])
+        self.assertIsNone(snapshot["process_pid"])
+        self.assertEqual(42.0, snapshot["stopped_at"])
+
+    #20260716_kpopmodder: Legacy setter accepts None so shutdown can clear callbacks.
+    def test_facade_status_event_callback_none_clears_subscription(self):
+        event_bus = StarCraft2EventBus()
+        engine_event_service = StarCraft2EngineEventService(
+            _FakeState(),
+            event_bus=event_bus,
+        )
+        facade = self._build_facade(event_bus=event_bus)
+        facade.engine_event_service = engine_event_service
+        callback = mock.Mock()
+
+        facade.set_status_event_callback(callback)
+        event_bus.emit(StarCraft2Event("unit_produced", {"unit_type_id": "104"}))
+        callback.assert_called_once()
+
+        facade.set_status_event_callback(None)
+        event_bus.emit(StarCraft2Event("unit_produced", {"unit_type_id": "105"}))
+
+        callback.assert_called_once()
+        self.assertIsNone(facade.status_event_callback)
+
     def test_local_match_service_wraps_start_stop_status_in_common_dtos(self):
         service = self._build_local_match_service()
         command = StarCraft2LocalMatchCommand(

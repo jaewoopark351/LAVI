@@ -475,7 +475,12 @@ class StarCraft2FacadeService:
             self.state.mark_error(e)
             return
         if isinstance(status, dict):
-            self.state.running = bool(status.get("running", self.current_engine.is_running()))
+            nested_status = status.get("status")
+            self.state.running = self._running_from_status(
+                nested_status if isinstance(nested_status, dict) else None,
+                status,
+                fallback=self.current_engine.is_running(),
+            )
             self.state.last_error = status.get("last_error") or self.state.last_error
             self.state.last_event = status.get("last_event") or self.state.last_event
             self.state.process_pid = status.get("process_pid")
@@ -502,14 +507,17 @@ class StarCraft2FacadeService:
             top_level_error = status.get("error") or status.get("last_error")
             if "status" in status and isinstance(status.get("status"), dict):
                 status_payload = dict(status.get("status") or {})
-                running = bool(
-                    status_payload.get("running")
-                    or status.get("running")
-                    or engine_running
+                running = self._running_from_status(
+                    status_payload,
+                    status,
+                    fallback=engine_running,
                 )
             else:
                 status_payload = dict(status)
-                running = bool(status_payload.get("running", False))
+                running = self._running_from_status(
+                    status_payload,
+                    fallback=False,
+                )
         else:
             status_payload = {}
             running = engine_running
@@ -538,6 +546,18 @@ class StarCraft2FacadeService:
         self.runtime_context.runtime_error = (
             None if runtime_error is None else str(runtime_error)
         )
+
+    @staticmethod
+    def _running_from_status(
+        primary: Dict[str, Any] | None,
+        secondary: Dict[str, Any] | None = None,
+        fallback: bool = False,
+    ) -> bool:
+        #20260716_kpopmodder: Preserve explicit running=False instead of losing it to truthy fallbacks.
+        for payload in (primary, secondary):
+            if isinstance(payload, dict) and "running" in payload:
+                return bool(payload.get("running"))
+        return bool(fallback)
 
     #20260715_kpopmodder: Keep Facade as the sole writer of local-match runtime state.
     def _sync_local_match_runtime_context(

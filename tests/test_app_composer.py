@@ -6,7 +6,10 @@ from unittest import mock
 
 from app_core import optional_plugin_loader
 from app_core.app_composer import AppComposer
-from app_core.extensions import GameExtensionCompositionResult
+from app_core.extensions import (
+    GameExtensionCompositionResult,
+    GameExtensionCompositionService,
+)
 
 
 class FakeQueueComponent:
@@ -145,6 +148,26 @@ class AppComposerTests(unittest.TestCase):
         self.assertIsNone(composer.starcraft116_plugin)
         self.assertIsNone(composer.starcraft2_plugin)
         self.assertIsNone(composer.screen_vision)
+
+    #20260716_kpopmodder: Disabled StarCraft2 must not import/register its passive observer.
+    def test_starcraft2_disabled_does_not_import_or_register_observer(self):
+        registry = mock.Mock()
+        service = GameExtensionCompositionService(registry)
+        real_import = __import__
+
+        def import_or_fail(name, *args, **kwargs):
+            if name == "plugins.StarCraft2.starcraft2_core.sc2_extension":
+                raise AssertionError("StarCraft2 observer should not be imported")
+            return real_import(name, *args, **kwargs)
+
+        with mock.patch("builtins.__import__", side_effect=import_or_fail):
+            result = service.compose(context=object(), starcraft2_plugin=None)
+
+        self.assertIsNone(result.starcraft2_game_extension)
+        self.assertIsNone(result.starcraft2_changeling_observer_extension)
+        self.assertEqual([], result.registered_extensions)
+        registry.register.assert_not_called()
+        registry.initialize.assert_not_called()
 
     def test_starcraft116_extension_owns_callback_import_during_startup(self):
         composer = AppComposer()

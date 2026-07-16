@@ -54,6 +54,8 @@ class GameExtensionCompositionService:
         result.starcraft2_changeling_observer_extension = self._register_starcraft2_observer(
             result.starcraft2_changeling_observer_extension,
             result,
+            enabled=starcraft2_plugin is not None
+            or result.starcraft2_game_extension is not None,
         )
         result.chess_game_extension = self._register_chess(
             chess_plugin,
@@ -107,7 +109,10 @@ class GameExtensionCompositionService:
             )
             return None
 
-    def _register_starcraft2_observer(self, existing, result):
+    def _register_starcraft2_observer(self, existing, result, enabled=False):
+        #20260716_kpopmodder: Keep the passive observer gated by the main StarCraft2 module.
+        if not enabled:
+            return None
         if existing is not None:
             return existing
         try:
@@ -166,4 +171,3 @@ class GameExtensionCompositionService:
             return
         lookup = self.registry.get(name) is not None
         self.logger(f"[AppComposer] registry lookup {name}: {lookup}")
-
