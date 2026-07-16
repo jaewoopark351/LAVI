@@ -175,11 +175,18 @@ class PluginSelectionBase():#20260622_kpopmodder
             return False
 
         try:
+            self._mark_provider_handle(found_provider, "mark_starting")
             found_provider.plugin.init()
         except Exception as e:
             #20260630_kpopmodder: Init crash is contained to this provider.
             found_provider.disabled = True
             found_provider.init_error = str(e)
+            self._mark_provider_handle(
+                found_provider,
+                "mark_failed",
+                e,
+                reason_code="init_failed",
+            )
             log_print(
                 f"[PluginSelection] provider init failed; disabled "
                 f"{found_provider.name}: {e}"
@@ -193,19 +200,30 @@ class PluginSelectionBase():#20260622_kpopmodder
             except Exception as e:
                 found_provider.disabled = True
                 found_provider.init_error = str(e)
+                self._mark_provider_handle(
+                    found_provider,
+                    "mark_failed",
+                    e,
+                    reason_code="start_failed",
+                )
                 log_print(
                     f"[PluginSelection] provider start failed; disabled "
                     f"{found_provider.name}: {e}"
                 )
                 return False
         found_provider.initialized = True
-        provider_handle = getattr(found_provider, "handle", None)
-        if provider_handle is not None:
-            provider_handle.mark_running()
+        self._mark_provider_handle(found_provider, "mark_running")
         log_print(
             f"[PluginSelection] provider initialized: {found_provider.name}"
         )
         return True
+
+    def _mark_provider_handle(self, provider, method_name, *args, **kwargs):
+        handle = getattr(provider, "handle", None)
+        method = getattr(handle, method_name, None)
+        if not callable(method):
+            return
+        method(*args, **kwargs)
 
     def _ensure_provider_constructed(self, provider):
         if provider.plugin is not None:
@@ -291,3 +309,4 @@ class PluginSelectionBase():#20260622_kpopmodder
                     f"[PluginSelection] shutdown failed: "
                     f"{provider.name}: {e}"
                 )
+            self._mark_provider_handle(provider, "mark_stopped")

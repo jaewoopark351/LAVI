@@ -1,5 +1,5 @@
 #20260716_kpopmodder: Shared plugin status registry for core and optional providers.
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass
@@ -9,6 +9,7 @@ class PluginRegistryEntry:
     status: str
     kind: str = "core"
     detail: str = ""
+    diagnostic: dict = field(default_factory=dict)
 
 
 class PluginRegistry:
@@ -16,12 +17,13 @@ class PluginRegistry:
     def __init__(self):
         self._entries = {}
 
-    def record(self, name, status, kind="core", detail=""):
+    def record(self, name, status, kind="core", detail="", diagnostic=None):
         self._entries[name] = PluginRegistryEntry(
             name=name,
             status=status,
             kind=kind,
             detail=str(detail or ""),
+            diagnostic=dict(diagnostic or {}),
         )
 
     def snapshot(self):
@@ -30,6 +32,7 @@ class PluginRegistry:
                 "status": entry.status,
                 "kind": entry.kind,
                 "detail": entry.detail,
+                "diagnostic": entry.diagnostic,
             }
             for name, entry in sorted(self._entries.items())
         }

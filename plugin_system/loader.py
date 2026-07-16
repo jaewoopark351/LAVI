@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import importlib.util
 import os
 from pathlib import Path
+import shutil
 import subprocess  # noqa: F401  #20260716_kpopmodder: Kept so tests can assert runtime pip is unused.
 import sys
 
@@ -27,14 +28,51 @@ temp_ignore = [] #["silero", "Local_LLM", "voicevox"]
 class PluginState:
     #20260716_kpopmodder: Track plugin lifecycle without constructing every provider.
     DISABLED = "DISABLED"
-    BROKEN = "BROKEN"
+    UNAVAILABLE = "UNAVAILABLE"
     READY = "READY"
+    STARTING = "STARTING"
     RUNNING = "RUNNING"
+    FAILED = "FAILED"
+    STOPPED = "STOPPED"
+    BROKEN = FAILED  #20260716_kpopmodder: Backward-compatible alias for older tests/log checks.
 
 
 class PluginLoadError(RuntimeError):
     #20260716_kpopmodder: Clear plugin load error used by lazy handles.
     pass
+
+
+@dataclass(frozen=True)
+class PluginDiagnostic:
+    #20260716_kpopmodder: Structured P1 diagnostic without exposing credential values.
+    plugin_id: str
+    state: str
+    reason_code: str
+    human_readable_message: str
+    missing_python_packages: tuple = ()
+    missing_files: tuple = ()
+    missing_executables: tuple = ()
+    missing_services: tuple = ()
+    missing_environment_variables: tuple = ()
+    suggested_install_profile: str = ""
+    suggested_command: str = ""
+    log_reference: str = ""
+
+    def to_dict(self):
+        return {
+            "plugin_id": self.plugin_id,
+            "state": self.state,
+            "reason_code": self.reason_code,
+            "human_readable_message": self.human_readable_message,
+            "missing_python_packages": list(self.missing_python_packages),
+            "missing_files": list(self.missing_files),
+            "missing_executables": list(self.missing_executables),
+            "missing_services": list(self.missing_services),
+            "missing_environment_variables": list(self.missing_environment_variables),
+            "suggested_install_profile": self.suggested_install_profile,
+            "suggested_command": self.suggested_command,
+            "log_reference": self.log_reference,
+        }
 
 
 @dataclass(frozen=True)
@@ -46,29 +84,119 @@ class PluginDescriptor:
     interface_name: str
     module_name: str
     module_path: str
+    id: str = ""
+    display_name: str = ""
+    api_version: str = "1"
+    dependency_group: str = ""
+    capabilities: tuple = ()
+    config_schema: dict = None
+    required_python_packages: tuple = ()
+    required_files: tuple = ()
+    required_executables: tuple = ()
+    required_services: tuple = ()
+    supports_offline: bool = False
+    supports_cpu: bool = True
 
     @property
     def status_key(self):
         return f"{self.plugin_name}.{self.class_name}"
 
+    @property
+    def entrypoint(self):
+        return f"{self.module_name}:{self.class_name}"
+
+    def __post_init__(self):
+        if self.config_schema is None:
+            object.__setattr__(self, "config_schema", {})
+        if not self.id:
+            object.__setattr__(self, "id", self.class_name)
+        if not self.display_name:
+            object.__setattr__(self, "display_name", self.class_name)
+        if not self.dependency_group:
+            object.__setattr__(self, "dependency_group", self.category)
+
 
 class PluginHandle:
     #20260716_kpopmodder: Lazy provider handle; imports and constructs only when selected.
-    def __init__(self, descriptor, loader):
+    def __init__(self, descriptor, loader, status=PluginState.READY, diagnostic=None):
         self.descriptor = descriptor
         self.loader = loader
         self.instance = None
-        self.status = PluginState.READY
+        self.status = status
         self.error = ""
+        self.diagnostic = diagnostic
 
     @property
     def name(self):
         return self.descriptor.class_name
 
+    def _set_state(self, state, detail="", diagnostic=None):
+        self.status = state
+        self.error = str(detail or "")
+        self.diagnostic = diagnostic
+        self.loader.set_plugin_status(
+            self.descriptor.status_key,
+            state,
+            detail=detail,
+            diagnostic=diagnostic.to_dict() if diagnostic else None,
+        )
+
+    def check_availability(self):
+        if self.status in (PluginState.UNAVAILABLE, PluginState.FAILED):
+            return False
+
+        missing_packages = [
+            package
+            for package in self.descriptor.required_python_packages
+            if importlib.util.find_spec(package) is None
+        ]
+        missing_files = [
+            path
+            for path in self.descriptor.required_files
+            if not self.loader.resolve_required_file(self.descriptor, path).exists()
+        ]
+        missing_executables = [
+            executable
+            for executable in self.descriptor.required_executables
+            if shutil.which(executable) is None
+        ]
+
+        if not (missing_packages or missing_files or missing_executables):
+            return True
+
+        diagnostic = PluginDiagnostic(
+            plugin_id=self.descriptor.id,
+            state=PluginState.UNAVAILABLE,
+            reason_code="missing_static_dependency",
+            human_readable_message=(
+                f"{self.descriptor.display_name} is enabled but required "
+                "Python packages, files, or executables are missing."
+            ),
+            missing_python_packages=tuple(missing_packages),
+            missing_files=tuple(missing_files),
+            missing_executables=tuple(missing_executables),
+            missing_services=tuple(self.descriptor.required_services),
+            suggested_install_profile=self.descriptor.dependency_group,
+            suggested_command=self.loader.suggested_install_command(self.descriptor),
+        )
+        self._set_state(
+            PluginState.UNAVAILABLE,
+            detail=diagnostic.human_readable_message,
+            diagnostic=diagnostic,
+        )
+        log_print(
+            "[PluginLoader] plugin unavailable; "
+            f"skipped {self.descriptor.status_key}: "
+            f"{diagnostic.human_readable_message}"
+        )#20260716_kpopmodder
+        return False
+
     def construct(self, expected_interface=None):
         if self.instance is not None:
             return self.instance
-        if self.status == PluginState.BROKEN:
+        if self.status in (PluginState.UNAVAILABLE, PluginState.FAILED):
+            return None
+        if not self.check_availability():
             return None
 
         try:
@@ -95,25 +223,30 @@ class PluginHandle:
             self.error = ""
             return self.instance
         except Exception as e:
-            self.status = PluginState.BROKEN
-            self.error = str(e)
-            self.loader.set_plugin_status(
-                self.descriptor.status_key,
-                PluginState.BROKEN,
-                detail=e,
-            )
+            self.mark_failed(e, reason_code="construct_failed")
             log_print(
                 "[PluginLoader] plugin construct failed; "
                 f"skipped {self.descriptor.status_key}: {e}"
             )#20260716_kpopmodder
             return None
 
+    def mark_starting(self):
+        self._set_state(PluginState.STARTING)
+
     def mark_running(self):
-        self.status = PluginState.RUNNING
-        self.loader.set_plugin_status(
-            self.descriptor.status_key,
-            PluginState.RUNNING,
+        self._set_state(PluginState.RUNNING)
+
+    def mark_failed(self, error, reason_code="plugin_failed"):
+        diagnostic = PluginDiagnostic(
+            plugin_id=self.descriptor.id,
+            state=PluginState.FAILED,
+            reason_code=reason_code,
+            human_readable_message=str(error),
         )
+        self._set_state(PluginState.FAILED, detail=error, diagnostic=diagnostic)
+
+    def mark_stopped(self):
+        self._set_state(PluginState.STOPPED)
 
 
 class PluginLoader:
@@ -146,6 +279,7 @@ class PluginLoader:
         self.plugin_status = {}
         self.registry = plugin_registry
         self._descriptor_keys = set()
+        self._metadata_ids = {}
         self._loaded = False
         self._settings_loaded = False
 
@@ -156,9 +290,15 @@ class PluginLoader:
         self.plugin_setting_example_path = str(self.paths.config_path("modules.example.json"))
         self.plugin_setting= {}
 
-    def set_plugin_status(self, name, status, kind="core", detail=""):
+    def set_plugin_status(self, name, status, kind="core", detail="", diagnostic=None):
         self.plugin_status[name] = status
-        self.registry.record(name, status, kind=kind, detail=detail)
+        self.registry.record(
+            name,
+            status,
+            kind=kind,
+            detail=detail,
+            diagnostic=diagnostic,
+        )
 
     def _load_module_settings(self):
         default_user_path = self.paths.config_path("modules.json").resolve()
@@ -265,6 +405,12 @@ class PluginLoader:
             if category is None:
                 continue
 
+            metadata = self._metadata_from_class_node(
+                class_node=node,
+                plugin_name=plugin_name,
+                class_name=node.name,
+                category=category,
+            )
             descriptor = PluginDescriptor(
                 plugin_name=plugin_name,
                 class_name=node.name,
@@ -272,14 +418,125 @@ class PluginLoader:
                 interface_name=interface_name,
                 module_name=module_name,
                 module_path=str(Path(module_path).resolve()),
+                **metadata,
             )
             key = (descriptor.module_path, descriptor.class_name)
             if key in self._descriptor_keys:
                 continue
 
             self._descriptor_keys.add(key)
-            self.plugins[category].append(PluginHandle(descriptor, self))
-            self.set_plugin_status(descriptor.status_key, PluginState.READY)
+            handle = self._handle_for_descriptor(descriptor)
+            self.plugins[category].append(handle)
+            self.set_plugin_status(
+                descriptor.status_key,
+                handle.status,
+                detail=handle.error,
+                diagnostic=handle.diagnostic.to_dict() if handle.diagnostic else None,
+            )
+
+    def _handle_for_descriptor(self, descriptor):
+        if descriptor.api_version != "1":
+            diagnostic = PluginDiagnostic(
+                plugin_id=descriptor.id,
+                state=PluginState.FAILED,
+                reason_code="api_version_mismatch",
+                human_readable_message=(
+                    f"Unsupported plugin API version {descriptor.api_version!r}; "
+                    "expected '1'."
+                ),
+            )
+            return PluginHandle(
+                descriptor,
+                self,
+                status=PluginState.FAILED,
+                diagnostic=diagnostic,
+            )
+
+        duplicate = self._metadata_ids.get(descriptor.id)
+        if duplicate is not None:
+            diagnostic = PluginDiagnostic(
+                plugin_id=descriptor.id,
+                state=PluginState.FAILED,
+                reason_code="duplicate_plugin_id",
+                human_readable_message=(
+                    f"Duplicate plugin id {descriptor.id!r}; "
+                    f"first seen at {duplicate}."
+                ),
+            )
+            return PluginHandle(
+                descriptor,
+                self,
+                status=PluginState.FAILED,
+                diagnostic=diagnostic,
+            )
+
+        self._metadata_ids[descriptor.id] = descriptor.entrypoint
+        return PluginHandle(descriptor, self)
+
+    def _metadata_from_class_node(self, class_node, plugin_name, class_name, category):
+        metadata = {}
+        for body_node in class_node.body:
+            target_name = ""
+            value_node = None
+            if isinstance(body_node, ast.Assign):
+                for target in body_node.targets:
+                    if isinstance(target, ast.Name):
+                        target_name = target.id
+                        value_node = body_node.value
+                        break
+            elif isinstance(body_node, ast.AnnAssign):
+                if isinstance(body_node.target, ast.Name):
+                    target_name = body_node.target.id
+                    value_node = body_node.value
+
+            if target_name not in ("PLUGIN_METADATA", "plugin_metadata"):
+                continue
+            try:
+                parsed = ast.literal_eval(value_node)
+            except Exception:
+                parsed = {}
+            if isinstance(parsed, dict):
+                metadata = parsed
+            break
+
+        return {
+            "id": str(metadata.get("id") or class_name),
+            "display_name": str(metadata.get("display_name") or class_name),
+            "api_version": str(metadata.get("api_version") or "1"),
+            "dependency_group": str(metadata.get("dependency_group") or category),
+            "capabilities": tuple(self._string_list(metadata.get("capabilities"))),
+            "config_schema": dict(metadata.get("config_schema") or {}),
+            "required_python_packages": tuple(self._string_list(metadata.get("required_python_packages"))),
+            "required_files": tuple(self._string_list(metadata.get("required_files"))),
+            "required_executables": tuple(self._string_list(metadata.get("required_executables"))),
+            "required_services": tuple(self._string_list(metadata.get("required_services"))),
+            "supports_offline": bool(metadata.get("supports_offline", False)),
+            "supports_cpu": bool(metadata.get("supports_cpu", True)),
+        }
+
+    def _string_list(self, value):
+        if value is None:
+            return []
+        if isinstance(value, str):
+            return [value]
+        if isinstance(value, (list, tuple)):
+            return [str(item) for item in value if str(item)]
+        return []
+
+    def resolve_required_file(self, descriptor, required_path):
+        path = Path(required_path)
+        if path.is_absolute():
+            return path
+        if required_path.startswith("plugin:"):
+            plugin_dir = Path(descriptor.module_path).resolve().parent
+            return plugin_dir / required_path.removeprefix("plugin:")
+        return self.paths.project_root / path
+
+    def suggested_install_command(self, descriptor):
+        group = descriptor.dependency_group
+        if group.lower() in ("core", "input_gathering", "voice"):
+            return ".\\scripts\\install_windows.ps1 -Profile Full -Accelerator cu130"
+        return ".\\scripts\\install_windows.ps1 -Profile Full -Accelerator cu130"
 
     def _category_from_class_node(self, class_node):
         for base_node in class_node.bases:

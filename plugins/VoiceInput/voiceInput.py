@@ -26,6 +26,37 @@ from .voice_input_core.voice_input_hotkey_controller import VoiceInputHotkeyCont
 
 
 class VoiceInput(InputPluginInterface):#20260618_kpopmodder
+    #20260716_kpopmodder: P1-A static metadata is parsed by PluginLoader without importing this module.
+    PLUGIN_METADATA = {
+        "id": "VoiceInput",
+        "display_name": "Voice Input",
+        "api_version": "1",
+        "category": "input_gathering",
+        "entrypoint": "plugins.VoiceInput.voiceInput:VoiceInput",
+        "dependency_group": "Full",
+        "capabilities": ["microphone_input", "speech_to_text", "speaker_identification"],
+        "config_schema": {
+            "VoiceInput": {
+                "stt_backend": "transformers_whisper",
+                "whisper_model": "openai/whisper-large-v3-turbo",
+                "language": "ko",
+                "device": "auto",
+            },
+        },
+        "required_python_packages": [
+            "numpy",
+            "sounddevice",
+            "soundfile",
+            "torch",
+            "transformers",
+        ],
+        "required_files": [],
+        "required_executables": [],
+        "required_services": ["microphone_input_device"],
+        "supports_offline": False,
+        "supports_cpu": True,
+    }
+
     current_module_directory = os.path.dirname(__file__)
 
     key_to_bind = "ctrl+shift+alt+q"#20260618_kpopmodder

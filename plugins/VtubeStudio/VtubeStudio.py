@@ -1,9 +1,6 @@
 import json
-import threading
-import time
 import os
 import gradio as gr
-import websocket
 
 from plugin_system.interfaces import VtuberPluginInterface
 from core.logger import log_print
@@ -176,6 +173,29 @@ def _config_float(value, default, value_range):
 
 
 class VtubeStudio(VtuberPluginInterface):#20260614_kpopmodder
+    #20260716_kpopmodder: P1-A static metadata is parsed by PluginLoader without importing this module.
+    PLUGIN_METADATA = {
+        "id": "VtubeStudio",
+        "display_name": "VTube Studio",
+        "api_version": "1",
+        "category": "vtuber",
+        "entrypoint": "plugins.VtubeStudio.VtubeStudio:VtubeStudio",
+        "dependency_group": "Full",
+        "capabilities": ["vtube_studio_websocket", "mouth_sync", "expression_control"],
+        "config_schema": {
+            "service": {
+                "websocket_url": "ws://localhost:8001",
+                "token_path": "plugins/VtubeStudio/token.txt",
+            },
+        },
+        "required_python_packages": ["websocket"],
+        "required_files": [],
+        "required_executables": [],
+        "required_services": ["VTube Studio websocket ws://localhost:8001"],
+        "supports_offline": False,
+        "supports_cpu": True,
+    }
+
     def init(self):
         self.current_module_directory = os.path.dirname(__file__)
         self.token_path = os.path.join(self.current_module_directory, "token.txt")

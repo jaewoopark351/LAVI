@@ -596,6 +596,174 @@ class PluginSystemImportTests(unittest.TestCase):
             loaded = loader.plugins["language_model"][0].construct()
             self.assertTrue(loaded.__class__.__module__.endswith(".policy"))
 
+    def test_p1a_representative_metadata_is_discovered_without_imports(self):#20260716_kpopmodder
+        from plugin_system.loader import PluginLoader
+
+        voice_module = "plugins.VoiceInput.voiceInput"
+        vtube_module = "plugins.VtubeStudio.VtubeStudio"
+        sys.modules.pop(voice_module, None)
+        sys.modules.pop(vtube_module, None)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            modules_path = Path(temp_dir) / "modules.json"
+            modules_path.write_text(
+                json.dumps({"VoiceInput": True, "VtubeStudio": True}),
+                encoding="utf-8",
+            )
+            loader = PluginLoader("plugins")
+            loader.plugin_setting_path = str(modules_path)
+
+            loader._load_plugins_from_directory(str(PROJECT_ROOT / "plugins" / "VoiceInput"))
+            loader._load_plugins_from_directory(str(PROJECT_ROOT / "plugins" / "VtubeStudio"))
+
+        voice_handle = loader.plugins["input_gathering"][0]
+        vtube_handle = loader.plugins["vtuber"][0]
+
+        self.assertEqual("VoiceInput", voice_handle.descriptor.id)
+        self.assertEqual("Voice Input", voice_handle.descriptor.display_name)
+        self.assertEqual("Full", voice_handle.descriptor.dependency_group)
+        self.assertIn("torch", voice_handle.descriptor.required_python_packages)
+        self.assertFalse(voice_handle.descriptor.supports_offline)
+        self.assertEqual(
+            "plugins.VoiceInput.voiceInput:VoiceInput",
+            voice_handle.descriptor.entrypoint,
+        )
+        self.assertEqual("VtubeStudio", vtube_handle.descriptor.id)
+        self.assertIn("websocket", vtube_handle.descriptor.required_python_packages)
+        self.assertIn(
+            "VTube Studio websocket ws://localhost:8001",
+            vtube_handle.descriptor.required_services,
+        )
+        self.assertNotIn(voice_module, sys.modules)
+        self.assertNotIn(vtube_module, sys.modules)
+
+    def test_p1a_missing_static_dependency_becomes_unavailable_without_import(self):#20260716_kpopmodder
+        from plugin_system.loader import PluginLoader, PluginState
+        from plugin_system.interfaces import LLMPluginInterface
+
+        missing_package = "definitely_missing_lavi_p1a_package"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            plugin_root = Path(temp_dir) / "plugins"
+            plugin_dir = plugin_root / "UnavailablePlugin"
+            plugin_dir.mkdir(parents=True)
+            (plugin_dir / "UnavailablePlugin.py").write_text(
+                "\n".join([
+                    "from plugin_system.interfaces import LLMPluginInterface",
+                    "",
+                    "class UnavailablePlugin(LLMPluginInterface):",
+                    "    PLUGIN_METADATA = {",
+                    "        'id': 'UnavailablePlugin',",
+                    "        'api_version': '1',",
+                    "        'dependency_group': 'Voice',",
+                    f"        'required_python_packages': ['{missing_package}'],",
+                    "    }",
+                    "    def init(self):",
+                    "        pass",
+                    "    def predict(self, message, history):",
+                    "        return ''",
+                    "    def create_ui(self):",
+                    "        return None",
+                ]),
+                encoding="utf-8",
+            )
+            modules_path = Path(temp_dir) / "modules.json"
+            modules_path.write_text(json.dumps({}), encoding="utf-8")
+
+            loader = PluginLoader("plugins")
+            loader.plugin_directory = str(plugin_root)
+            loader.plugin_setting_path = str(modules_path)
+            loader._load_plugins_from_directory(str(plugin_dir))
+
+            handle = loader.plugins["language_model"][0]
+            module_name = handle.descriptor.module_name
+            self.assertIsNone(handle.construct(LLMPluginInterface))
+
+        self.assertEqual(PluginState.UNAVAILABLE, handle.status)
+        self.assertNotIn(module_name, sys.modules)
+        self.assertEqual("missing_static_dependency", handle.diagnostic.reason_code)
+        self.assertEqual([missing_package], list(handle.diagnostic.missing_python_packages))
+
+    def test_p1a_api_version_mismatch_is_isolated(self):#20260716_kpopmodder
+        from plugin_system.loader import PluginLoader, PluginState
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            plugin_root = Path(temp_dir) / "plugins"
+            plugin_dir = plugin_root / "VersionPlugin"
+            plugin_dir.mkdir(parents=True)
+            (plugin_dir / "VersionPlugin.py").write_text(
+                "\n".join([
+                    "from plugin_system.interfaces import LLMPluginInterface",
+                    "",
+                    "class VersionPlugin(LLMPluginInterface):",
+                    "    PLUGIN_METADATA = {'id': 'VersionPlugin', 'api_version': '999'}",
+                    "    def init(self):",
+                    "        pass",
+                    "    def predict(self, message, history):",
+                    "        return ''",
+                    "    def create_ui(self):",
+                    "        return None",
+                ]),
+                encoding="utf-8",
+            )
+            modules_path = Path(temp_dir) / "modules.json"
+            modules_path.write_text(json.dumps({}), encoding="utf-8")
+
+            loader = PluginLoader("plugins")
+            loader.plugin_directory = str(plugin_root)
+            loader.plugin_setting_path = str(modules_path)
+            loader._load_plugins_from_directory(str(plugin_dir))
+
+            handle = loader.plugins["language_model"][0]
+
+        self.assertEqual(PluginState.FAILED, handle.status)
+        self.assertEqual("api_version_mismatch", handle.diagnostic.reason_code)
+        self.assertIsNone(handle.construct())
+
+    def test_p1a_duplicate_plugin_id_is_isolated(self):#20260716_kpopmodder
+        from plugin_system.loader import PluginLoader, PluginState
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            plugin_root = Path(temp_dir) / "plugins"
+            plugin_dir = plugin_root / "DuplicatePlugin"
+            plugin_dir.mkdir(parents=True)
+            (plugin_dir / "DuplicatePlugin.py").write_text(
+                "\n".join([
+                    "from plugin_system.interfaces import LLMPluginInterface",
+                    "",
+                    "class FirstPlugin(LLMPluginInterface):",
+                    "    PLUGIN_METADATA = {'id': 'duplicate.plugin'}",
+                    "    def init(self):",
+                    "        pass",
+                    "    def predict(self, message, history):",
+                    "        return ''",
+                    "    def create_ui(self):",
+                    "        return None",
+                    "",
+                    "class SecondPlugin(LLMPluginInterface):",
+                    "    PLUGIN_METADATA = {'id': 'duplicate.plugin'}",
+                    "    def init(self):",
+                    "        pass",
+                    "    def predict(self, message, history):",
+                    "        return ''",
+                    "    def create_ui(self):",
+                    "        return None",
+                ]),
+                encoding="utf-8",
+            )
+            modules_path = Path(temp_dir) / "modules.json"
+            modules_path.write_text(json.dumps({}), encoding="utf-8")
+
+            loader = PluginLoader("plugins")
+            loader.plugin_directory = str(plugin_root)
+            loader.plugin_setting_path = str(modules_path)
+            loader._load_plugins_from_directory(str(plugin_dir))
+
+            handles = loader.plugins["language_model"]
+
+        self.assertEqual(PluginState.READY, handles[0].status)
+        self.assertEqual(PluginState.FAILED, handles[1].status)
+        self.assertEqual("duplicate_plugin_id", handles[1].diagnostic.reason_code)
+
     def test_loader_is_idempotent(self):#20260716_kpopmodder
         from plugin_system.loader import PluginLoader
 
