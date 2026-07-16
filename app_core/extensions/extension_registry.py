@@ -71,6 +71,10 @@ class ExtensionRegistry:
                     f"({extension.name}): {type(e).__name__}: {e}"
                 )
 
+    def start(self) -> None:
+        #20260717_kpopmodder: RuntimeLifecycle adapter for extension startup.
+        self.start_all()
+
     def stop_all(self) -> None:
         for extension in reversed(self.all()):
             try:
@@ -80,4 +84,8 @@ class ExtensionRegistry:
                     "[GameExtension] stop failed "
                     f"({extension.name}): {type(e).__name__}: {e}"
                 )
+
+    def shutdown(self) -> None:
+        #20260717_kpopmodder: RuntimeLifecycle adapter for extension shutdown.
+        self.stop_all()
 

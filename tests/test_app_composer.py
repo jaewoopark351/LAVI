@@ -236,15 +236,47 @@ class AppComposerTests(unittest.TestCase):
         composer.chess_game_extension = object()
         composer.starcraft116_game_extension = object()
         composer.starcraft2_game_extension = object()
+        #20260717_kpopmodder: Verify AppComposer tracks only the registry as lifecycle owner.
+        composer.game_extension_registry = mock.Mock()
+        composer.game_extension_registry.all.return_value = [
+            composer.chess_game_extension,
+            composer.starcraft116_game_extension,
+            composer.starcraft2_game_extension,
+        ]
 
         composer.build_managed_components()
 
         self.assertNotIn(composer.chess_plugin, composer.managed_components)
         self.assertNotIn(composer.starcraft116_plugin, composer.managed_components)
         self.assertNotIn(composer.starcraft2_plugin, composer.managed_components)
-        self.assertIn(composer.chess_game_extension, composer.managed_components)
-        self.assertIn(composer.starcraft116_game_extension, composer.managed_components)
-        self.assertIn(composer.starcraft2_game_extension, composer.managed_components)
+        self.assertNotIn(composer.chess_game_extension, composer.managed_components)
+        self.assertNotIn(
+            composer.starcraft116_game_extension,
+            composer.managed_components,
+        )
+        self.assertNotIn(composer.starcraft2_game_extension, composer.managed_components)
+        self.assertIn(composer.game_extension_registry, composer.managed_components)
+        self.assertIn(composer.game_extension_registry, composer.optional_components)
+
+    def test_game_extension_registry_keeps_extension_lifecycle_out_of_app_composer(self):
+        #20260717_kpopmodder: AppComposer must not directly start or stop extensions.
+        composer = AppComposer()
+        composer.input = object()
+        composer.llm = object()
+        composer.translate = object()
+        composer.tts = object()
+        composer.vtuber = object()
+        extension = mock.Mock()
+        extension.name = "fake_game"
+        composer.game_extension_registry = mock.Mock()
+        composer.game_extension_registry.all.return_value = [extension]
+
+        composer.build_managed_components()
+
+        self.assertEqual(1, composer.managed_components.count(composer.game_extension_registry))
+        self.assertEqual(1, composer.optional_components.count(composer.game_extension_registry))
+        extension.start.assert_not_called()
+        extension.stop.assert_not_called()
 
     def test_create_runtime_lifecycle_does_not_start_registry_extensions_again(self):
         composer = AppComposer()

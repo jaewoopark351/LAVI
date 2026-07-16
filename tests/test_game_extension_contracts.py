@@ -2,6 +2,7 @@
 import unittest
 
 from app_core.extensions import (
+    ExtensionRegistry,
     GameCommandDTO,
     GameEventBus,
     GameEventDTO,
@@ -215,6 +216,17 @@ class GameExtensionContractsTests(unittest.TestCase):
             snapshot["resources"]["launcher"]["type"],
         )
 
+    def test_extension_registry_exposes_runtime_lifecycle_adapter(self):
+        #20260717_kpopmodder: Registry adapts RuntimeLifecycle calls to extension start/stop.
+        registry = ExtensionRegistry()
+        extension = _FakeLifecycleExtension("fake_game")
+        registry.register(extension)
+
+        registry.start()
+        registry.shutdown()
+
+        self.assertEqual(["start", "stop"], extension.events)
+
 
 class _FakeChessPlugin:
     server_url = "http://127.0.0.1:8765"
@@ -265,6 +277,24 @@ class _FakeStarCraft116StatusReader:
 
 class _FakeStarCraft116RuntimeState:
     pass
+
+
+class _FakeLifecycleExtension(ChessGameExtension):
+    #20260717_kpopmodder: Minimal extension double for registry lifecycle tests.
+    def __init__(self, name):
+        super().__init__(plugin=_FakeChessPlugin())
+        self._name = name
+        self.events = []
+
+    @property
+    def name(self):
+        return self._name
+
+    def start(self):
+        self.events.append("start")
+
+    def stop(self):
+        self.events.append("stop")
 
 
 if __name__ == "__main__":

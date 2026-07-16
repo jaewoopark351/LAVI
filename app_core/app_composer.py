@@ -400,29 +400,11 @@ class AppComposer:
             self.managed_components.insert(-1, self.song_player)#20260629_kpopmodder
         if self.starcraft_plugin is not None:
             self.managed_components.insert(-1, self.starcraft_plugin)#20260630_kpopmodder
-        if self.starcraft116_game_extension is not None:
-            self.optional_components.append(self.starcraft116_game_extension)
-            self._register_startup_component(self.starcraft116_game_extension)
-            self.managed_components.insert(-1, self.starcraft116_game_extension)
-        if self.starcraft2_game_extension is not None:
-            self.optional_components.append(self.starcraft2_game_extension)
-            self._register_startup_component(self.starcraft2_game_extension)
-            self.managed_components.insert(-1, self.starcraft2_game_extension)
-        if self.starcraft2_changeling_observer_extension is not None:
-            self.optional_components.append(
-                self.starcraft2_changeling_observer_extension
-            )
-            self._register_startup_component(
-                self.starcraft2_changeling_observer_extension
-            )
-            self.managed_components.insert(
-                -1,
-                self.starcraft2_changeling_observer_extension,
-            )
-        if self.chess_game_extension is not None:
-            self.optional_components.append(self.chess_game_extension)
-            self._register_startup_component(self.chess_game_extension)
-            self.managed_components.insert(-1, self.chess_game_extension)
+        if self.game_extension_registry.all():
+            #20260717_kpopmodder: RuntimeLifecycle starts/stops game extensions through the registry.
+            self.optional_components.append(self.game_extension_registry)
+            self._register_startup_component(self.game_extension_registry)
+            self.managed_components.insert(-1, self.game_extension_registry)
 
     def create_runtime_lifecycle(self):
         self.runtime_lifecycle = RuntimeLifecycle(#20260630_kpopmodder
