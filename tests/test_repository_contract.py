@@ -38,6 +38,30 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertIn("EXPECTED_PYTHON = (3, 14)", preflight_text)
         self.assertNotRegex(install_text, r"Python\s+3\.10")
 
+    def test_windows_ci_uses_committed_core_lock_and_smoke_gates(self):
+        #20260716_kpopmodder: Keep CI aligned with the P0-C Core collection boundary.
+        workflow_text = (
+            PROJECT_ROOT / ".github" / "workflows" / "windows-ci.yml"
+        ).read_text(encoding="utf-8")
+
+        self.assertEqual(2, workflow_text.count("install_windows.ps1 -Profile Core -Accelerator CPU -Dev"))
+        self.assertIn("-m pip check", workflow_text)
+        self.assertIn("-m ruff check", workflow_text)
+        self.assertIn("tests\\test_app_composer.py", workflow_text)
+        self.assertIn("tests\\test_repository_contract.py", workflow_text)
+        self.assertIn("tests\\test_smoke_startup.py", workflow_text)
+        self.assertIn("tests\\test_plugin_system_imports.py", workflow_text)
+        self.assertIn("--profile Core", workflow_text)
+        self.assertIn("--modules-config config\\modules.core.json", workflow_text)
+        self.assertIn("--production-config-smoke", workflow_text)
+        self.assertNotIn('pytest -m "not gpu and not integration and not network and not slow"', workflow_text)
+
+    def test_root_modules_json_is_tracked_for_deployment_artifacts(self):
+        #20260716_kpopmodder: Release/archive jobs must include the production default config.
+        tracked = set(self._git_ls_files())
+
+        self.assertIn("modules.json", tracked)
+
     def test_actual_local_config_files_are_not_tracked(self):
         tracked = set(self._git_ls_files())
         local_config_paths = {

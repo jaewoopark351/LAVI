@@ -2,7 +2,7 @@
 import gradio as gr
 
 from core.config_manager import config_manager#20260627_kpopmodder
-from core.logger import log_print, debug_print#20260612_kpopmodder
+from core.logger import log_print  #20260612_kpopmodder
 from plugin_system.loader import plugin_loader
 
 
