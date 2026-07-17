@@ -1,76 +1,76 @@
-'''
-Defines the set of symbols used in text input to the model.
-'''
+# '''
+# Defines the set of symbols used in text input to the model.
+# '''
 
-# japanese_cleaners
-# _pad        = '_'
-# _punctuation = ',.!?-'
-# _letters = 'AEINOQUabdefghijkmnoprstuvwyzʃʧ↓↑ '
-
-
-'''# japanese_cleaners2
-_pad        = '_'
-_punctuation = ',.!?-~…'
-_letters = 'AEINOQUabdefghijkmnoprstuvwyzʃʧʦ↓↑ '
-'''
+# # japanese_cleaners
+# # _pad        = '_'
+# # _punctuation = ',.!?-'
+# # _letters = 'AEINOQUabdefghijkmnoprstuvwyzʃʧ↓↑ '
 
 
-'''# korean_cleaners
-_pad        = '_'
-_punctuation = ',.!?…~'
-_letters = 'ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊㅋㅌㅍㅎㄲㄸㅃㅆㅉㅏㅓㅗㅜㅡㅣㅐㅔ '
-'''
-
-'''# chinese_cleaners
-_pad        = '_'
-_punctuation = '，。！？—…'
-_letters = 'ㄅㄆㄇㄈㄉㄊㄋㄌㄍㄎㄏㄐㄑㄒㄓㄔㄕㄖㄗㄘㄙㄚㄛㄜㄝㄞㄟㄠㄡㄢㄣㄤㄥㄦㄧㄨㄩˉˊˇˋ˙ '
-'''
-
-# # zh_ja_mixture_cleaners
+# '''# japanese_cleaners2
 # _pad        = '_'
 # _punctuation = ',.!?-~…'
-# _letters = 'AEINOQUabdefghijklmnoprstuvwyzʃʧʦɯɹəɥ⁼ʰ`→↓↑ '
+# _letters = 'AEINOQUabdefghijkmnoprstuvwyzʃʧʦ↓↑ '
+# '''
 
 
-'''# sanskrit_cleaners
-_pad        = '_'
-_punctuation = '।'
-_letters = 'ँंःअआइईउऊऋएऐओऔकखगघङचछजझञटठडढणतथदधनपफबभमयरलळवशषसहऽािीुूृॄेैोौ्ॠॢ '
-'''
+# '''# korean_cleaners
+# _pad        = '_'
+# _punctuation = ',.!?…~'
+# _letters = 'ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊㅋㅌㅍㅎㄲㄸㅃㅆㅉㅏㅓㅗㅜㅡㅣㅐㅔ '
+# '''
 
-'''# cjks_cleaners
-_pad        = '_'
-_punctuation = ',.!?-~…'
-_letters = 'NQabdefghijklmnopstuvwxyzʃʧʥʦɯɹəɥçɸɾβŋɦː⁼ʰ`^#*=→↓↑ '
-'''
+# '''# chinese_cleaners
+# _pad        = '_'
+# _punctuation = '，。！？—…'
+# _letters = 'ㄅㄆㄇㄈㄉㄊㄋㄌㄍㄎㄏㄐㄑㄒㄓㄔㄕㄖㄗㄘㄙㄚㄛㄜㄝㄞㄟㄠㄡㄢㄣㄤㄥㄦㄧㄨㄩˉˊˇˋ˙ '
+# '''
 
-'''# thai_cleaners
-_pad        = '_'
-_punctuation = '.!? '
-_letters = 'กขฃคฆงจฉชซฌญฎฏฐฑฒณดตถทธนบปผฝพฟภมยรฤลวศษสหฬอฮฯะัาำิีึืุูเแโใไๅๆ็่้๊๋์'
-'''
-
-# # cjke_cleaners2
-_pad        = '_'
-_punctuation = ',.!?-~…'
-_letters = 'NQabdefghijklmnopstuvwxyzɑæʃʑçɯɪɔɛɹðəɫɥɸʊɾʒθβŋɦ⁼ʰ`^#*=ˈˌ→↓↑ '
+# # # zh_ja_mixture_cleaners
+# # _pad        = '_'
+# # _punctuation = ',.!?-~…'
+# # _letters = 'AEINOQUabdefghijklmnoprstuvwyzʃʧʦɯɹəɥ⁼ʰ`→↓↑ '
 
 
-'''# shanghainese_cleaners
-_pad        = '_'
-_punctuation = ',.!?…'
-_letters = 'abdfghiklmnopstuvyzøŋȵɑɔɕəɤɦɪɿʑʔʰ̩̃ᴀᴇ15678 '
-'''
+# '''# sanskrit_cleaners
+# _pad        = '_'
+# _punctuation = '।'
+# _letters = 'ँंःअआइईउऊऋएऐओऔकखगघङचछजझञटठडढणतथदधनपफबभमयरलळवशषसहऽािीुूृॄेैोौ्ॠॢ '
+# '''
 
-'''# chinese_dialect_cleaners
-_pad        = '_'
-_punctuation = ',.!?~…─'
-_letters = '#Nabdefghijklmnoprstuvwxyzæçøŋœȵɐɑɒɓɔɕɗɘəɚɛɜɣɤɦɪɭɯɵɷɸɻɾɿʂʅʊʋʌʏʑʔʦʮʰʷˀː˥˦˧˨˩̥̩̃̚ᴀᴇ↑↓∅ⱼ '
-'''
+# '''# cjks_cleaners
+# _pad        = '_'
+# _punctuation = ',.!?-~…'
+# _letters = 'NQabdefghijklmnopstuvwxyzʃʧʥʦɯɹəɥçɸɾβŋɦː⁼ʰ`^#*=→↓↑ '
+# '''
 
-# Export all symbols:
-symbols = [_pad] + list(_punctuation) + list(_letters)
+# '''# thai_cleaners
+# _pad        = '_'
+# _punctuation = '.!? '
+# _letters = 'กขฃคฆงจฉชซฌญฎฏฐฑฒณดตถทธนบปผฝพฟภมยรฤลวศษสหฬอฮฯะัาำิีึืุูเแโใไๅๆ็่้๊๋์'
+# '''
 
-# Special symbol ids
-SPACE_ID = symbols.index(" ")
+# # # cjke_cleaners2
+# _pad        = '_'
+# _punctuation = ',.!?-~…'
+# _letters = 'NQabdefghijklmnopstuvwxyzɑæʃʑçɯɪɔɛɹðəɫɥɸʊɾʒθβŋɦ⁼ʰ`^#*=ˈˌ→↓↑ '
+
+
+# '''# shanghainese_cleaners
+# _pad        = '_'
+# _punctuation = ',.!?…'
+# _letters = 'abdfghiklmnopstuvyzøŋȵɑɔɕəɤɦɪɿʑʔʰ̩̃ᴀᴇ15678 '
+# '''
+
+# '''# chinese_dialect_cleaners
+# _pad        = '_'
+# _punctuation = ',.!?~…─'
+# _letters = '#Nabdefghijklmnoprstuvwxyzæçøŋœȵɐɑɒɓɔɕɗɘəɚɛɜɣɤɦɪɭɯɵɷɸɻɾɿʂʅʊʋʌʏʑʔʦʮʰʷˀː˥˦˧˨˩̥̩̃̚ᴀᴇ↑↓∅ⱼ '
+# '''
+
+# # Export all symbols:
+# symbols = [_pad] + list(_punctuation) + list(_letters)
+
+# # Special symbol ids
+# SPACE_ID = symbols.index(" ")
