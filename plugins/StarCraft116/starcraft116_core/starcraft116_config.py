@@ -79,6 +79,7 @@ DEFAULT_CONFIG = {
     "monster_log_path": "",
     "bwapi_proxy_events_enabled": True,
     "bwapi_proxy_events_tts_enabled": True,
+    "bwapi_proxy_events_log_sample_rate": 25,
     "bwapi_proxy_events_path": "",
     "bwapi_event_exporter_enabled": False,
     "bwapi_event_exporter_build_config": "Release",

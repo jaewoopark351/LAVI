@@ -2577,3 +2577,76 @@ class StarCraft116PluginTests(unittest.TestCase):
             [("bwapi_proxy_events.jsonl", 6)],
             owner.bwapi_proxy_event_tailer.calls,
         )
+
+    def test_bwapi_proxy_event_logging_is_sampled_without_blocking_emits(self):
+        from types import SimpleNamespace
+
+        from plugins.StarCraft116.starcraft116_core.starcraft116_event_poller import (
+            StarCraft116EventPoller,
+        )
+
+        class Config:
+            def get_bool(self, key, default=False):
+                values = {
+                    "bwapi_proxy_events_tts_enabled": True,
+                }
+                return values.get(key, default)
+
+            def get_int(self, key, default):
+                values = {
+                    "game_events_max_events_per_poll": 30,
+                    "bwapi_proxy_events_log_sample_rate": 25,
+                }
+                return values.get(key, default)
+
+            def get_active_profile_name(self):
+                return "monster"
+
+            def resolve_bwapi_proxy_events_path(self):
+                return "bwapi_proxy_events.jsonl"
+
+        class Tailer:
+            def read_new_events(self, path, max_events):
+                return SimpleNamespace(
+                    events=[
+                        {
+                            "event_type": "unit_created",
+                            "summary": f"unit created {index}",
+                            "tts_eligible": True,
+                        }
+                        for index in range(30)
+                    ],
+                    errors=[],
+                )
+
+        class Owner:
+            def __init__(self):
+                self.config_manager = Config()
+                self.bwapi_proxy_event_tailer = Tailer()
+                self.emitted = []
+
+            def _is_bwapi_proxy_events_active(self):
+                return True
+
+            def _is_noisy_unknown_enemy_destroyed_event(self, raw_event):
+                return False
+
+            def _maybe_emit_game_event(self, event, use_global_cooldown=True):
+                self.emitted.append(event)
+                return True
+
+        owner = Owner()
+
+        with mock.patch(
+            "plugins.StarCraft116.starcraft116_core.starcraft116_event_poller.log_print"
+        ) as log_mock:
+            emitted = StarCraft116EventPoller(owner).poll_bwapi_proxy_events()
+
+        event_logs = [
+            call.args[0]
+            for call in log_mock.call_args_list
+            if "[StarCraft116BWAPIProxyEvents] event:" in str(call.args[0])
+        ]
+        self.assertEqual(30, emitted)
+        self.assertEqual(30, len(owner.emitted))
+        self.assertEqual(2, len(event_logs))

@@ -8,6 +8,7 @@ class StarCraft116EventPoller:
     #20260706_kpopmodder: Owns game/Monster/BWAPI polling while StarCraft116 keeps public lifecycle methods.
     def __init__(self, owner):
         self.owner = owner
+        self._bwapi_proxy_log_seen = 0
 
     def poll_game_events(self):
         owner = self.owner
@@ -126,11 +127,12 @@ class StarCraft116EventPoller:
         )
         for raw_event in result.events:
             event_type = str(raw_event.get("event_type", "") or "")
-            log_print(
-                "[StarCraft116BWAPIProxyEvents] event: "
-                f"type={event_type} "
-                f"severity={raw_event.get('severity', '')}"
-            )
+            if self._should_log_bwapi_proxy_event(raw_event):
+                log_print(
+                    "[StarCraft116BWAPIProxyEvents] event: "
+                    f"type={event_type} "
+                    f"severity={raw_event.get('severity', '')}"
+                )
             if not tts_enabled or not raw_event.get("tts_eligible", False):
                 continue
             if owner._is_noisy_unknown_enemy_destroyed_event(raw_event):
@@ -155,3 +157,21 @@ class StarCraft116EventPoller:
             ):
                 emitted += 1
         return emitted
+
+    def _should_log_bwapi_proxy_event(self, raw_event):
+        #20260717_kpopmodder: Keep StarCraft116 event delivery unchanged while
+        # sampling noisy BWAPI proxy logs during unrelated SC2 test runs.
+        severity = str(raw_event.get("severity", "") or "").strip().lower()
+        if severity in {"warning", "error", "critical"}:
+            return True
+
+        self._bwapi_proxy_log_seen += 1
+        sample_rate = self.owner.config_manager.get_int(
+            "bwapi_proxy_events_log_sample_rate",
+            25,
+        )
+        if sample_rate <= 0:
+            return False
+        if sample_rate <= 1:
+            return True
+        return self._bwapi_proxy_log_seen == 1 or self._bwapi_proxy_log_seen % sample_rate == 0

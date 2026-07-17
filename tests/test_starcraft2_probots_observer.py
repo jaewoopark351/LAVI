@@ -9,6 +9,7 @@ from app_core.extensions.game_extension_context import GameExtensionContext
 from app_core.extensions.starcraft2_game_extension import (
     STARCRAFT2_LOG_EVENT_ORIGIN,
     STARCRAFT2_STATUS_EVENT_CALLBACK_RESOURCE,
+    STARCRAFT2_TERMINAL_EVENT_OBSERVER_RESOURCE,
     StarCraft2GameExtension,
 )
 from plugins.StarCraft2.starcraft2_core.probots_launcher import ProBotsLauncher
@@ -440,6 +441,31 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
         self.assertTrue(callable(callback))
         reaction_callback.assert_called_once_with(event)
         tts.receive_input.assert_not_called()
+
+    def test_main_extension_notifies_shared_terminal_observer(self):
+        plugin = mock.Mock()
+        context = GameExtensionContext(llm=mock.Mock(), tts=mock.Mock())
+        terminal_observer = mock.Mock()
+        reaction_callback = mock.Mock(return_value=False)
+        context.set_shared(
+            STARCRAFT2_TERMINAL_EVENT_OBSERVER_RESOURCE,
+            terminal_observer,
+        )
+        extension = StarCraft2GameExtension(plugin=plugin)
+
+        with mock.patch.object(
+            extension,
+            "_build_status_callback",
+            return_value=reaction_callback,
+        ):
+            extension.initialize(context)
+
+        callback = context.get_shared(STARCRAFT2_STATUS_EVENT_CALLBACK_RESOURCE)
+        event = {"event_type": "game_ended", "details": {"source": "ladder_proxy"}}
+        callback(event)
+
+        terminal_observer.assert_called_once_with(event)
+        reaction_callback.assert_called_once_with(event)
 
     def test_shared_callback_routes_upgrade_and_strategy_but_mutes_build_train(self):
         status_callback = mock.Mock()
@@ -1277,6 +1303,57 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
         self.assertTrue(status["started"])
         watcher_start.assert_called_once()
         launcher_start.assert_not_called()
+
+    #20260717_kpopmodder: Log-file observer should not republish aiohttp
+    # transport reset noise after a terminal SC2 line.
+    def test_extension_mutes_transport_reset_after_terminal_event(self):
+        extension = StarCraft2Extension(plugin_root="C:\\fake\\StarCraft2", config_path="missing.json")
+
+        before_end = extension._is_terminal_shutdown_noise_line(
+            "aiohttp.client_exceptions.ClientConnectionResetError: Cannot write to closing transport"
+        )
+        terminal = extension._is_terminal_shutdown_noise_line(
+            "changeling : Client changed status from in_game to ended"
+        )
+        after_end = extension._is_terminal_shutdown_noise_line(
+            "aiohttp.client_exceptions.ClientConnectionResetError: Cannot write to closing transport"
+        )
+
+        self.assertFalse(before_end)
+        self.assertFalse(terminal)
+        self.assertTrue(after_end)
+
+    def test_extension_mutes_transport_reset_after_shared_terminal_event(self):
+        status_callback = mock.Mock()
+        context = GameExtensionContext(tts=mock.Mock())
+        context.set_shared(
+            STARCRAFT2_STATUS_EVENT_CALLBACK_RESOURCE,
+            status_callback,
+        )
+        extension = StarCraft2Extension(
+            plugin_root="C:\\fake\\StarCraft2",
+            config_path="missing.json",
+        )
+        extension.initialize(context)
+        terminal_observer = context.get_shared(
+            STARCRAFT2_TERMINAL_EVENT_OBSERVER_RESOURCE
+        )
+
+        terminal_observer({"event_type": "game_ended"})
+        with mock.patch("plugins.StarCraft2.starcraft2_core.sc2_extension.log_print") as log_print:
+            extension._on_log_line(
+                "stderr.log",
+                "aiohttp.client_exceptions.ClientConnectionResetError: Cannot write to closing transport",
+            )
+
+        self.assertTrue(callable(terminal_observer))
+        status_callback.assert_not_called()
+        self.assertFalse(
+            any(
+                "[StarCraft2LogCommentary]" in str(call.args[0])
+                for call in log_print.call_args_list
+            )
+        )
 
     def test_extension_can_launch_sc2aiapp_by_explicit_command(self):
         extension = StarCraft2Extension(plugin_root="C:\\fake\\StarCraft2", config_path="missing.json")

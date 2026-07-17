@@ -16,6 +16,7 @@
   "monster_log_path": "",
   "bwapi_proxy_events_enabled": true,
   "bwapi_proxy_events_tts_enabled": true,
+  "bwapi_proxy_events_log_sample_rate": 25,
   "bwapi_proxy_events_path": "",
   "bwapi_event_exporter_enabled": false,
   "bwapi_event_exporter_build_config": "Release",

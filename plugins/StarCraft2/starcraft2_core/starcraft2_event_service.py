@@ -169,6 +169,9 @@ class StarCraft2LadderProxyEventService:
 
         shutdown_followup_markers = (
             "[pyi-",
+            "clientconnectionreseterror",
+            "cannot write to closing transport",
+            "closing transport",
             "failed to execute script",
             "unhandled exception",
             "unclosed client session",

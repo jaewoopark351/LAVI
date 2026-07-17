@@ -29,16 +29,22 @@ def test_tts_core_exports_component_class():
     assert TTS is ComponentTTS
 
 
-def test_app_composer_imports_llm_and_tts_from_core_packages():
+def test_app_composer_delegates_core_component_imports():
     project_root = Path(__file__).resolve().parents[1]
-    source = (project_root / "app_core" / "app_composer.py").read_text(
+    app_composer_source = (project_root / "app_core" / "app_composer.py").read_text(
         encoding="utf-8",
     )
+    composition_source = (
+        project_root / "app_core" / "core_component_composition.py"
+    ).read_text(encoding="utf-8")
 
-    assert "from llm_core.llm_component import LLM" in source
-    assert "from tts_core.tts_component import TTS" in source
-    assert "from LLM import LLM" not in source
-    assert "from TTS import TTS" not in source
+    assert "from llm_core.llm_component import LLM" not in app_composer_source
+    assert "from tts_core.tts_component import TTS" not in app_composer_source
+    assert "CoreComponentCompositionService" in app_composer_source
+    assert "from llm_core.llm_component import LLM" in composition_source
+    assert "from tts_core.tts_component import TTS" in composition_source
+    assert "from LLM import LLM" not in app_composer_source + composition_source
+    assert "from TTS import TTS" not in app_composer_source + composition_source
 
 
 def test_legacy_root_component_files_are_removed():

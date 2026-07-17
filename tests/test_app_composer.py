@@ -2,10 +2,15 @@
 #20260706_kpopmodder: Add startup lifecycle regression tests for AppComposer.
 import unittest
 from queue import Queue
+from types import ModuleType
 from unittest import mock
 
 from app_core import optional_plugin_loader
 from app_core.app_composer import AppComposer
+from app_core.core_component_composition import (
+    CoreComponentCompositionResult,
+    CoreComponentCompositionService,
+)
 from app_core.extensions import (
     GameExtensionCompositionResult,
     GameExtensionCompositionService,
@@ -212,6 +217,130 @@ class AppComposerTests(unittest.TestCase):
         self.assertEqual(
             [song_player, starcraft_plugin, screen_vision],
             composer._startup_components,
+        )
+
+    def test_create_core_components_consumes_composition_result(self):
+        composer = AppComposer()
+        composer.memory_context_builder = object()
+        composer.memory_command_handler = object()
+        composer.screen_question_router = object()
+        input_component = object()
+        llm = object()
+        translate = object()
+        tts = object()
+        vtuber = object()
+        composer.core_component_composition_service = mock.Mock()
+        composer.core_component_composition_service.compose.return_value = (
+            CoreComponentCompositionResult(
+                input=input_component,
+                llm=llm,
+                translate=translate,
+                tts=tts,
+                vtuber=vtuber,
+                core_components=(input_component, translate, tts, vtuber, llm),
+                startup_components=(input_component, translate, tts, vtuber, llm),
+            )
+        )
+
+        composer.create_core_components()
+
+        composer.core_component_composition_service.compose.assert_called_once_with(
+            memory_context_builder=composer.memory_context_builder,
+            memory_command_handler=composer.memory_command_handler,
+            screen_question_router=composer.screen_question_router,
+        )
+        self.assertIs(input_component, composer.input)
+        self.assertIs(llm, composer.llm)
+        self.assertIs(translate, composer.translate)
+        self.assertIs(tts, composer.tts)
+        self.assertIs(vtuber, composer.vtuber)
+        self.assertEqual(
+            [input_component, translate, tts, vtuber, llm],
+            composer.core_components,
+        )
+        self.assertEqual(
+            [input_component, translate, tts, vtuber, llm],
+            composer._startup_components,
+        )
+
+    def test_core_component_composition_service_builds_core_components(self):
+        class FakeInput:
+            pass
+
+        class FakeTranslate:
+            pass
+
+        class FakeTTS:
+            pass
+
+        class FakeVtuber:
+            pass
+
+        class FakeLLM:
+            def __init__(
+                self,
+                memory_context_builder=None,
+                memory_command_handler=None,
+                screen_question_router=None,
+            ):
+                self.memory_context_builder = memory_context_builder
+                self.memory_command_handler = memory_command_handler
+                self.screen_question_router = screen_question_router
+
+        def module_with(module_name, class_name, class_value):
+            module = ModuleType(module_name)
+            setattr(module, class_name, class_value)
+            return module
+
+        memory_context_builder = object()
+        memory_command_handler = object()
+        screen_question_router = object()
+        fake_modules = {
+            "input_core.input_component": module_with(
+                "input_core.input_component",
+                "Input",
+                FakeInput,
+            ),
+            "llm_core.llm_component": module_with(
+                "llm_core.llm_component",
+                "LLM",
+                FakeLLM,
+            ),
+            "translation_core.translate_component": module_with(
+                "translation_core.translate_component",
+                "Translate",
+                FakeTranslate,
+            ),
+            "tts_core.tts_component": module_with(
+                "tts_core.tts_component",
+                "TTS",
+                FakeTTS,
+            ),
+            "vtuber_core.vtuber_component": module_with(
+                "vtuber_core.vtuber_component",
+                "Vtuber",
+                FakeVtuber,
+            ),
+        }
+
+        with mock.patch.dict("sys.modules", fake_modules):
+            result = CoreComponentCompositionService().compose(
+                memory_context_builder=memory_context_builder,
+                memory_command_handler=memory_command_handler,
+                screen_question_router=screen_question_router,
+            )
+
+        self.assertIsInstance(result.input, FakeInput)
+        self.assertIsInstance(result.translate, FakeTranslate)
+        self.assertIsInstance(result.tts, FakeTTS)
+        self.assertIsInstance(result.vtuber, FakeVtuber)
+        self.assertIsInstance(result.llm, FakeLLM)
+        self.assertIs(result.llm.memory_context_builder, memory_context_builder)
+        self.assertIs(result.llm.memory_command_handler, memory_command_handler)
+        self.assertIs(result.llm.screen_question_router, screen_question_router)
+        self.assertEqual(
+            (result.input, result.translate, result.tts, result.vtuber, result.llm),
+            result.startup_components,
         )
 
     #20260716_kpopmodder: Disabled StarCraft2 must not import/register its passive observer.

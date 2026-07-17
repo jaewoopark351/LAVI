@@ -18,6 +18,7 @@ from .starcraft2_config import StarCraft2Config
 
 
 STARCRAFT2_STATUS_EVENT_CALLBACK_RESOURCE = "starcraft2_status_event_callback"
+STARCRAFT2_TERMINAL_EVENT_OBSERVER_RESOURCE = "starcraft2_terminal_event_observer"
 STARCRAFT2_LOG_EVENT_ORIGIN = "starcraft2_log_observer"
 SHARED_LOG_ONLY_CATEGORIES = {
     #20260714_kpopmodder: These parser categories overlap ladder proxy telemetry
@@ -120,6 +121,9 @@ class StarCraft2Extension(GameExtensionInterface):
         #20260716_kpopmodder: Tracks short SC2 shutdown windows so terminal
         # protocol cleanup noise does not become shared engine_error events.
         self._terminal_shutdown_error_ignore_until = 0.0
+        #20260717_kpopmodder: Log files can be tailed tens of seconds after
+        # the ladder proxy emits game_ended/proxy_stopped.
+        self._terminal_shutdown_log_grace_sec = 90.0
 
     @property
     def name(self) -> str:
@@ -128,6 +132,7 @@ class StarCraft2Extension(GameExtensionInterface):
     def initialize(self, context: GameExtensionContext) -> None:
         super().initialize(context)
         self._context = context
+        self._publish_terminal_event_observer(context)
         self._refresh_status_event_callback()
         self._is_initialized = True
         self._last_status_message = "initialized"
@@ -384,6 +389,9 @@ class StarCraft2Extension(GameExtensionInterface):
 
         shutdown_followup_markers = (
             "[pyi-",
+            "clientconnectionreseterror",
+            "cannot write to closing transport",
+            "closing transport",
             "failed to execute script",
             "unhandled exception",
             "unclosed client session",
@@ -460,6 +468,33 @@ class StarCraft2Extension(GameExtensionInterface):
             return callback
         self._status_event_callback = None
         return None
+
+    def _publish_terminal_event_observer(self, context: Optional[GameExtensionContext]) -> None:
+        set_shared = getattr(context, "set_shared", None)
+        if callable(set_shared):
+            set_shared(
+                STARCRAFT2_TERMINAL_EVENT_OBSERVER_RESOURCE,
+                self.observe_terminal_status_event,
+            )
+
+    def observe_terminal_status_event(self, event: Any) -> None:
+        #20260717_kpopmodder: Ladder proxy and log-file observer are separate
+        # streams; share terminal state so late stderr cleanup stays log-only.
+        if hasattr(event, "event_type"):
+            event_type = str(getattr(event, "event_type", "") or "")
+        elif isinstance(event, dict):
+            event_type = str(event.get("event_type", "") or "")
+        else:
+            event_type = ""
+        event_type = event_type.strip().lower()
+        if event_type == "game_started":
+            self._terminal_shutdown_error_ignore_until = 0.0
+            return
+        if event_type in {"game_ended", "game_won", "game_lost", "proxy_stopped"}:
+            self._terminal_shutdown_error_ignore_until = max(
+                self._terminal_shutdown_error_ignore_until,
+                time.time() + self._terminal_shutdown_log_grace_sec,
+            )
 
     def _publish_status_event(self, callback, source: str, event, event_type: str = "") -> bool:
         category = str(event_type or getattr(event, "category", "") or "").strip().lower()

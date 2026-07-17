@@ -128,6 +128,26 @@ class StarCraft2EventContractTests(unittest.TestCase):
         self.assertEqual([], protocol_error)
         self.assertEqual([], pyi_tail)
 
+    #20260717_kpopmodder: aiohttp transport resets after game end are shutdown
+    # tail noise, but the same error before game end should still surface.
+    def test_terminal_transport_reset_cleanup_stays_log_only_after_game_end(self):
+        service, _, _, _ = self.make_service()
+
+        before_end = service.parse_line(
+            "stderr",
+            "aiohttp.client_exceptions.ClientConnectionResetError: Cannot write to closing transport",
+        )
+        service.parse_line(
+            "stdout", "changeling : Client changed status from in_game to ended"
+        )
+        after_end = service.parse_line(
+            "stderr",
+            "aiohttp.client_exceptions.ClientConnectionResetError: Cannot write to closing transport",
+        )
+
+        self.assertEqual(["engine_error"], [event.event_type for event in before_end])
+        self.assertEqual([], after_end)
+
     def test_engine_service_updates_state_and_bus_with_typed_event(self):
         service, state, bus, _ = self.make_service()
         bus.emit = mock.Mock(return_value=True)

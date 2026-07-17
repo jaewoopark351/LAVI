@@ -13,6 +13,7 @@ from .starcraft2_worker import StarCraft2Worker
 
 STARCRAFT2_STATUS_EVENT_CALLBACK_RESOURCE = "starcraft2_status_event_callback"
 STARCRAFT2_LOG_EVENT_ORIGIN = "starcraft2_log_observer"
+STARCRAFT2_TERMINAL_EVENT_OBSERVER_RESOURCE = "starcraft2_terminal_event_observer"
 
 
 class _StarCraft2StatusEventSubscription:
@@ -172,8 +173,29 @@ class StarCraft2GameExtension(GameExtensionInterface):
 
     def _on_status_event(self, event: Any) -> None:
         event = dict(event or {}) if isinstance(event, dict) else {}
+        self._notify_terminal_event_observer(event)
         if callable(self._reaction_callback):
             self._reaction_callback(event)
+
+    def _notify_terminal_event_observer(self, event: Dict[str, Any]) -> None:
+        #20260717_kpopmodder: Let the passive SC2 log observer learn ladder
+        # proxy terminal events before it tails delayed stderr cleanup lines.
+        context = self._context
+        get_shared = getattr(context, "get_shared", None)
+        observer = (
+            get_shared(STARCRAFT2_TERMINAL_EVENT_OBSERVER_RESOURCE)
+            if callable(get_shared)
+            else None
+        )
+        if not callable(observer):
+            return
+        try:
+            observer(event)
+        except Exception as e:
+            log_print(
+                "[StarCraft2GameExtension] terminal observer notification failed: "
+                f"{e}"
+            )
 
     def _build_status_callback(self, context: Optional[GameExtensionContext]):
         if context is None:

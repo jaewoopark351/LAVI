@@ -5,6 +5,7 @@ import os
 import sys
 
 from app_core.gradio_launch import find_available_port
+from app_core.core_component_composition import CoreComponentCompositionService
 from app_core.memory_bootstrap import bootstrap_memory
 from app_core.extensions import (
     ExtensionRegistry,
@@ -68,6 +69,7 @@ class AppComposer:
         self.game_extension_composition_service = GameExtensionCompositionService(
             self.game_extension_registry,
         )
+        self.core_component_composition_service = CoreComponentCompositionService()
         self.optional_plugin_composition_service = OptionalPluginCompositionService(
             self.current_module_directory,
         )
@@ -215,33 +217,16 @@ class AppComposer:
         }
 
     def create_core_components(self):
-        from input_core.input_component import Input
-        from llm_core.llm_component import LLM
-        from translation_core.translate_component import Translate
-        from tts_core.tts_component import TTS
-        from vtuber_core.vtuber_component import Vtuber
-
-        self.core_components = []
-        self.input = Input()
-        self._register_startup_component(self.input)
-        self.core_components.append(self.input)
-        #llm = LLM()#20260621_kpopmodder
-        self.translate = Translate()
-        self._register_startup_component(self.translate)
-        self.core_components.append(self.translate)
-        self.tts = TTS()
-        self._register_startup_component(self.tts)
-        self.core_components.append(self.tts)
-        self.vtuber = Vtuber()
-        self._register_startup_component(self.vtuber)
-        self.core_components.append(self.vtuber)
-        self.llm = LLM(#20260621_kpopmodder
+        result = self.core_component_composition_service.compose(
             memory_context_builder=self.memory_context_builder,
             memory_command_handler=self.memory_command_handler,
             screen_question_router=self.screen_question_router,#20260628_kpopmodder
         )
-        self._register_startup_component(self.llm)
-        self.core_components.append(self.llm)
+        for attribute_name, component in result.attribute_map().items():
+            setattr(self, attribute_name, component)
+        self.core_components = list(result.core_components)
+        for component in result.startup_components:
+            self._register_startup_component(component)
 
     def create_optional_plugins(self):
         #20260717_kpopmodder: Optional plugin construction/roles are owned by the composition service.
