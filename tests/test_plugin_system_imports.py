@@ -19,6 +19,7 @@ class PluginSystemImportTests(unittest.TestCase):
             PluginContractIssue,
             PluginDiagnostic,
             PluginDiagnosticSnapshot,
+            PluginRuntimeRequirements,
             PluginRuntimeContract,
             PluginState,
             PluginSupports,
@@ -106,6 +107,28 @@ class PluginSystemImportTests(unittest.TestCase):
             contract.to_dict(),
         )
         self.assertEqual([], list(contract.validation_errors()))
+        #20260717_kpopmodder
+        requirements = PluginRuntimeRequirements(
+            required_capabilities=("input",),
+            supports_offline=True,
+            supports_cpu=True,
+            requires_gpu=False,
+        )
+        self.assertTrue(requirements.matches(contract))
+        self.assertEqual(
+            {
+                "required_capabilities": ["input"],
+                "supports_offline": True,
+                "supports_cpu": True,
+                "requires_gpu": False,
+            },
+            requirements.to_dict(),
+        )
+        self.assertFalse(
+            PluginRuntimeRequirements(
+                required_capabilities=("text_to_speech",),
+            ).matches(contract)
+        )
 
         snapshot = PluginDiagnosticSnapshot(
             plugin_id="Example",
@@ -1763,6 +1786,152 @@ class PluginSystemImportTests(unittest.TestCase):
         self.assertIs(selection.current_plugin, lazy)
         self.assertEqual(1, lazy_handle.construct_count)
         self.assertEqual(1, lazy.init_count)
+
+    def test_selection_uses_runtime_contract_requirements_without_constructing_skipped_provider(self):#20260717_kpopmodder
+        from plugin_system.contracts import (
+            AvailabilityProbeContract,
+            PluginRuntimeContract,
+            PluginRuntimeRequirements,
+            PluginState,
+            PluginSupports,
+        )
+        from plugin_system.selection import PluginSelectionBase
+
+        class FakeSelectionInterface:
+            pass
+
+        class GpuOnlyProvider(FakeSelectionInterface):
+            def init(self):
+                pass
+
+            def create_ui(self):
+                return None
+
+        class OfflineProvider(FakeSelectionInterface):
+            def __init__(self):
+                self.init_count = 0
+
+            def init(self):
+                self.init_count += 1
+
+            def create_ui(self):
+                return None
+
+        def runtime_contract(plugin_id, capabilities, supports):
+            return PluginRuntimeContract(
+                plugin_id=plugin_id,
+                manifest={
+                    "id": plugin_id,
+                    "display_name": plugin_id,
+                    "api_version": "1",
+                    "category": "fake_category",
+                    "entrypoint": f"plugins.{plugin_id}:{plugin_id}",
+                    "dependency_group": "test",
+                },
+                availability_probe=AvailabilityProbeContract(),
+                capabilities=capabilities,
+                supports=supports,
+            )
+
+        class FakeHandle:
+            def __init__(self, name, plugin, contract):
+                self.name = name
+                self.plugin = plugin
+                self.runtime_contract = contract
+                self.construct_count = 0
+                self.error = ""
+                self.status = PluginState.READY
+
+            def construct(self, expected_interface=None):
+                self.construct_count += 1
+                return self.plugin
+
+            def mark_running(self):
+                self.status = PluginState.RUNNING
+
+            def diagnostic_snapshot(self):
+                return {
+                    "plugin_id": self.name,
+                    "name": self.name,
+                    "category": "fake_category",
+                    "state": self.status,
+                    "detail": self.error,
+                    "diagnostic": {},
+                    "runtime_contract": self.runtime_contract.to_dict(),
+                }
+
+        gpu_plugin = GpuOnlyProvider()
+        offline_plugin = OfflineProvider()
+        gpu_handle = FakeHandle(
+            "GpuOnlyProvider",
+            gpu_plugin,
+            runtime_contract(
+                "GpuOnlyProvider",
+                ("llm",),
+                PluginSupports(offline=False, cpu=False, requires_gpu=True),
+            ),
+        )
+        offline_handle = FakeHandle(
+            "OfflineProvider",
+            offline_plugin,
+            runtime_contract(
+                "OfflineProvider",
+                ("llm", "offline"),
+                PluginSupports(offline=True, cpu=True, requires_gpu=False),
+            ),
+        )
+        fake_loader = mock.Mock()
+        fake_loader.interface_to_category = {
+            FakeSelectionInterface: "fake_category",
+        }
+        fake_loader.plugins = {
+            "fake_category": [gpu_handle, offline_handle],
+        }
+
+        requirements = PluginRuntimeRequirements(
+            required_capabilities=("llm",),
+            supports_offline=True,
+            supports_cpu=True,
+            requires_gpu=False,
+        )
+        with mock.patch("plugin_system.selection.plugin_loader", fake_loader):
+            with mock.patch(
+                "plugin_system.selection.config_manager.load_section",
+                return_value={},
+            ):
+                selection = PluginSelectionBase(
+                    FakeSelectionInterface,
+                    runtime_requirements=requirements,
+                )
+
+        self.assertIs(selection.current_plugin, offline_plugin)
+        self.assertEqual(0, gpu_handle.construct_count)
+        self.assertEqual(1, offline_handle.construct_count)
+        self.assertEqual(1, offline_plugin.init_count)
+
+        matching_names = [
+            provider.name
+            for provider in selection.providers_matching(requirements)
+        ]
+        self.assertEqual(["OfflineProvider"], matching_names)
+        self.assertEqual(
+            ["GpuOnlyProvider", "OfflineProvider"],
+            list(selection.get_provider_contracts().keys()),
+        )
+        self.assertEqual(0, gpu_handle.construct_count)
+
+        selected_names = [
+            diagnostic["name"]
+            for diagnostic in selection.get_provider_diagnostics()
+            if diagnostic["selected"]
+        ]
+        self.assertEqual(["OfflineProvider"], selected_names)
+
+        self.assertEqual(
+            "OfflineProvider",
+            selection.on_dropdown_change("GpuOnlyProvider"),
+        )
+        self.assertEqual(0, gpu_handle.construct_count)
 
     def test_input_shared_ui_can_render_lazy_provider_panels(self):#20260716_kpopmodder
         from plugin_system.selection import PluginSelectionBase

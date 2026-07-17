@@ -1232,7 +1232,188 @@ When refactoring:
 
 ---
 
-## 29.1 Game Extension Migration Rule
+## 29.1 File and Type Separation Rule
+
+Production code must follow a one-primary-type-or-responsibility-per-file rule.
+
+The purpose of this rule is to keep classes, types, and modules independently maintainable without changing existing runtime behavior.
+
+### Common Rules
+
+* One source file must contain only one primary class, type, or module responsibility.
+* Independently reusable classes or types must be placed in separate files.
+* The file name must correspond to the primary class or type name, following the language and existing repository naming convention.
+* Do not place multiple independent classes in one file merely to reduce the number of files.
+* When adding a new independent class or type, create a new file instead of appending it to an unrelated existing file.
+* When splitting a file, update all affected imports, includes, package declarations, namespaces, public exports, build files, and tests.
+* If a split introduces a circular dependency, extract the shared interface, data type, callback type, or constant into a separate file.
+* Do not create a giant static class, utility class, or miscellaneous helper file to avoid proper separation.
+* Preserve existing public APIs, class names, config keys, runtime behavior, and compatibility paths unless the user explicitly approves a change.
+
+### Python
+
+Python production code must follow the one-class-per-file rule.
+
+* A `.py` file may define at most one top-level project class.
+* If a module already contains a class, do not add a second top-level class to that module.
+* Move each additional class into its own `.py` file and import it where needed.
+* Use `PascalCase` for class names and `snake_case.py` for module names.
+* Functions, constants, and type aliases that do not belong to a class may remain in a class-free module organized by responsibility.
+* A small class must still be separated when it has independent state or responsibility.
+
+Examples:
+
+```text
+PluginManager       -> plugin_manager.py
+ExtensionRegistry   -> extension_registry.py
+MemoryRouter        -> memory_router.py
+GameWorker          -> game_worker.py
+```
+
+For this rule, Python classes include:
+
+* regular classes
+* `@dataclass` classes
+* abstract base classes
+* protocol classes
+* enums declared as classes
+* exception classes
+* helper classes
+* compatibility wrapper classes
+
+When creating a new Python class file, keep the required project-history marker near the top:
+
+```python
+#YYYYMMDD_kpopmodder: Added this module to keep one project class per Python file.
+```
+
+### C
+
+C does not provide class syntax, so one `.h` / `.c` file pair must represent one primary structure or one cohesive module responsibility.
+
+* One `.h` / `.c` pair must own one primary `struct` or one clearly defined module.
+* Declare the primary structure and its public API in the `.h` file.
+* Place the corresponding implementation in the matching `.c` file.
+* Do not declare multiple independent primary structures in one header.
+* Do not collect unrelated global functions in one `.c` file.
+* Small `enum` values, constants, callback typedefs, and private helper types directly owned by the primary module may remain with that module.
+* Shared `enum` values, constants, typedefs, callback contracts, or data structures used by multiple modules must be placed in separate headers.
+* Keep private implementation helpers `static` inside the owning `.c` file when they are not independently reusable.
+
+Examples:
+
+```text
+audio_manager.h
+audio_manager.c        -> AudioManager structure and related functions
+
+event_bus.h
+event_bus.c             -> EventBus structure and related functions
+```
+
+When creating a new C header or source file, keep the required project-history marker near the top:
+
+```c
+//YYYYMMDD_kpopmodder: Added this module to isolate one C structure or module responsibility.
+```
+
+### C++
+
+One `.h` / `.hpp` and `.cpp` file pair must represent one primary class or independently reusable type.
+
+* Give each primary class its own header and implementation file.
+* The header and implementation base names must correspond to the primary class or type name.
+* Do not declare multiple independent classes in one header.
+* Do not implement member functions for multiple independent classes in one `.cpp` file.
+* Interfaces, abstract classes, independently reusable `enum class` types, and public helper classes must be placed in separate files.
+* A small nested class, private implementation type, or internal helper may remain with the owning class only when it is not referenced independently.
+* A PImpl implementation class may remain private inside the owning `.cpp` file.
+* Template implementation may remain in the owning header or matching implementation header when required by C++ compilation rules.
+
+Examples:
+
+```text
+AudioManager.h
+AudioManager.cpp       -> AudioManager
+
+PluginRegistry.h
+PluginRegistry.cpp     -> PluginRegistry
+
+EventBus.h
+EventBus.cpp           -> EventBus
+```
+
+When creating a new C++ header or source file, keep the required project-history marker near the top:
+
+```cpp
+//YYYYMMDD_kpopmodder: Added this class file to keep one primary C++ class per file pair.
+```
+
+### Java
+
+Java production code must follow the one-top-level-type-per-file rule.
+
+* A `.java` file may contain only one primary top-level project type.
+* The file name must exactly match the primary `class`, `interface`, `enum`, `record`, or `@interface` name.
+* Do not place multiple independent package-private top-level classes in one file.
+* Each independent `class`, `interface`, `enum`, `record`, or annotation type must have its own `.java` file.
+* A small nested class may remain inside the owning class only when it is used exclusively by that class and has no independent responsibility.
+* Move a nested class into its own file when it grows, is referenced externally, or becomes independently testable or reusable.
+
+Examples:
+
+```text
+AudioManager.java      -> AudioManager
+PluginRegistry.java    -> PluginRegistry
+EventBus.java           -> EventBus
+Plugin.java             -> Plugin interface
+PluginState.java        -> PluginState enum
+```
+
+When creating a new Java type file, keep the required project-history marker near the top:
+
+```java
+//YYYYMMDD_kpopmodder: Added this type file to keep one primary Java type per file.
+```
+
+### Allowed Exceptions
+
+The following exceptions are allowed only when the additional type has no independent responsibility and is not independently referenced:
+
+* Python `__init__.py` files used only for imports and public exports
+* modules containing functions, constants, or type aliases without a class
+* short nested classes used only by their owning class
+* C++ PImpl implementation types
+* C or C++ private helper types used only inside one implementation file
+* language-required template implementation kept with its owning C++ template
+* lambdas, anonymous classes, and local classes
+* small test fixtures or local test doubles tightly coupled to one isolated test
+* generated code
+* vendored or third-party code that should remain unmodified
+
+Do not use an exception merely because a class or type is small.
+Do not use an exception to hide a second independent responsibility in an existing file.
+
+### Refactoring Existing Files
+
+When an existing file contains multiple independent classes or primary types:
+
+1. List every class or primary type and its current file.
+2. Propose the exact new file paths before moving code.
+3. Split one package, component, or responsibility group at a time.
+4. Preserve public names, behavior, configuration, and compatibility paths.
+5. Move each independent class or type into its own file or matching header/source pair.
+6. Update imports, includes, package declarations, namespaces, exports, build settings, and tests.
+7. Check for circular dependencies and extract shared contracts when necessary.
+8. Run syntax or compile checks and the smallest relevant tests.
+9. Inspect `git diff` and report any runtime testing that remains necessary.
+
+Do not perform a repository-wide class split in one uncontrolled change.
+Do not combine file separation with unrelated feature work or large architectural redesign.
+
+---
+
+
+## 29.2 Game Extension Migration Rule
 
 New games must be added as `GameExtension` implementations and integrated through `ExtensionRegistry`.
 

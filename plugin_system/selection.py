@@ -3,6 +3,7 @@ import gradio as gr
 
 from core.config_manager import config_manager#20260627_kpopmodder
 from core.logger import log_print  #20260612_kpopmodder
+from plugin_system.contracts import PluginRuntimeRequirements
 from plugin_system.loader import plugin_loader
 
 
@@ -24,6 +25,26 @@ class Provider():
         self.needs_shutdown = False
         self.shutdown_attempted = False
 
+    #20260717_kpopmodder
+    @property
+    def runtime_contract(self):
+        contract = getattr(self.handle, "runtime_contract", None)
+        if contract is not None:
+            return contract
+        return getattr(self.plugin, "runtime_contract", None)
+
+    def runtime_contract_dict(self):
+        contract = self.runtime_contract
+        if hasattr(contract, "to_dict"):
+            return contract.to_dict()
+        if isinstance(contract, dict):
+            return dict(contract)
+        return {}
+
+    def matches_requirements(self, requirements):
+        requirements = _coerce_runtime_requirements(requirements)
+        return requirements.matches(self.runtime_contract)
+
 
 # place holder until config saving is implemented
 #temp_default = ["Local_EN_to_JA", "voicevox", "VoiceInput","RanaLLM"]no_translate
@@ -35,8 +56,45 @@ CATEGORY_DEFAULT_PROVIDERS = {
 }
 
 
-def select_default_provider(providers, category_name, configured_default_name=""):
-    providers = list(providers or [])
+#20260717_kpopmodder
+def _coerce_runtime_requirements(requirements=None, **overrides):
+    if isinstance(requirements, PluginRuntimeRequirements):
+        base = requirements
+    elif isinstance(requirements, dict):
+        base = PluginRuntimeRequirements(**requirements)
+    elif requirements is None:
+        base = PluginRuntimeRequirements()
+    else:
+        raise TypeError("runtime requirements must be a PluginRuntimeRequirements or dict")
+
+    values = base.to_dict()
+    for key, value in overrides.items():
+        if value is not None:
+            values[key] = value
+    return PluginRuntimeRequirements(**values)
+
+
+def _provider_matches_requirements(provider, requirements):
+    requirements = _coerce_runtime_requirements(requirements)
+    if requirements.is_empty():
+        return True
+    matcher = getattr(provider, "matches_requirements", None)
+    if callable(matcher):
+        return matcher(requirements)
+    return False
+
+
+def select_default_provider(
+    providers,
+    category_name,
+    configured_default_name="",
+    runtime_requirements=None,
+):
+    providers = [
+        provider
+        for provider in list(providers or [])
+        if _provider_matches_requirements(provider, runtime_requirements)
+    ]
     empty_provider = Provider()
     if not providers:
         return empty_provider, "empty"
@@ -64,11 +122,12 @@ def select_default_provider(providers, category_name, configured_default_name=""
 
 
 class PluginSelectionBase():#20260622_kpopmodder
-    def __init__(self, plugin_type) -> None:
+    def __init__(self, plugin_type, runtime_requirements=None) -> None:
         # load plugin
         self.provider_list = []
         self.plugin_type = plugin_type
         self.category_name = plugin_loader.interface_to_category[self.plugin_type]
+        self.runtime_requirements = _coerce_runtime_requirements(runtime_requirements)
         for plugin_entry in plugin_loader.plugins[self.category_name]:
             provider = Provider()
             if hasattr(plugin_entry, "construct"):
@@ -84,6 +143,7 @@ class PluginSelectionBase():#20260622_kpopmodder
                 self.provider_list,
                 self.category_name,
                 self._configured_default_provider_name(),
+                runtime_requirements=self.runtime_requirements,
             )
         )
         self.current_provider = None
@@ -196,6 +256,14 @@ class PluginSelectionBase():#20260622_kpopmodder
             return False
         if found_provider.disabled:
             return False
+        #20260717_kpopmodder
+        if not self._provider_matches_runtime_requirements(found_provider):
+            found_provider.init_error = "provider does not meet runtime requirements"
+            log_print(
+                f"[PluginSelection] provider skipped by runtime requirements: "
+                f"{found_provider.name}: {self.runtime_requirements.to_dict()}"
+            )
+            return False
         if found_provider.initialized:
             return True
         # log_print(f"Found {found_provider} .")#20260612_kpopmodder
@@ -286,7 +354,7 @@ class PluginSelectionBase():#20260622_kpopmodder
         return provider.plugin
 
     def _activate_first_available_provider(self, exclude_name=""):
-        for provider in self.provider_list:
+        for provider in self.providers_matching(self.runtime_requirements):
             if provider.name == exclude_name:
                 continue
             if not self.load_provider(provider.name):
@@ -316,6 +384,60 @@ class PluginSelectionBase():#20260622_kpopmodder
 
     def get_current_plugin(self):
         return self.current_plugin
+
+    #20260717_kpopmodder
+    def get_provider_contracts(self):
+        return {
+            provider.name: provider.runtime_contract_dict()
+            for provider in self.provider_list
+        }
+
+    def get_provider_diagnostics(self):
+        diagnostics = []
+        for provider in self.provider_list:
+            handle = getattr(provider, "handle", None)
+            diagnostic_snapshot = getattr(handle, "diagnostic_snapshot", None)
+            if callable(diagnostic_snapshot):
+                snapshot = diagnostic_snapshot()
+            else:
+                snapshot = {
+                    "plugin_id": provider.name,
+                    "name": provider.name,
+                    "category": self.category_name,
+                    "state": "RUNNING" if provider.initialized else "READY",
+                    "detail": provider.init_error,
+                    "diagnostic": {},
+                    "runtime_contract": provider.runtime_contract_dict(),
+                }
+            snapshot["selected"] = provider is self.current_provider
+            snapshot["initialized"] = bool(provider.initialized)
+            snapshot["disabled"] = bool(provider.disabled)
+            diagnostics.append(snapshot)
+        return diagnostics
+
+    def providers_matching(
+        self,
+        runtime_requirements=None,
+        required_capabilities=(),
+        supports_offline=None,
+        supports_cpu=None,
+        requires_gpu=None,
+    ):
+        requirements = _coerce_runtime_requirements(
+            runtime_requirements,
+            required_capabilities=required_capabilities,
+            supports_offline=supports_offline,
+            supports_cpu=supports_cpu,
+            requires_gpu=requires_gpu,
+        )
+        return [
+            provider
+            for provider in self.provider_list
+            if _provider_matches_requirements(provider, requirements)
+        ]
+
+    def _provider_matches_runtime_requirements(self, provider):
+        return _provider_matches_requirements(provider, self.runtime_requirements)
 
     def _current_provider_name(self):
         if self.current_provider is not None:
