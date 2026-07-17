@@ -262,7 +262,10 @@ class ScreenQuestionMainWiringTests(unittest.TestCase):
         composer_path = project_root / "app_core" / "app_composer.py"
         module = ast.parse(composer_path.read_text(encoding="utf-8-sig"))
         core_composition_path = (
-            project_root / "app_core" / "core_component_composition.py"
+            project_root
+            / "app_core"
+            / "composition_core"
+            / "core_component_composition_service.py"
         )
         core_module = ast.parse(
             core_composition_path.read_text(encoding="utf-8-sig")

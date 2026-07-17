@@ -34,17 +34,24 @@ def test_app_composer_delegates_core_component_imports():
     app_composer_source = (project_root / "app_core" / "app_composer.py").read_text(
         encoding="utf-8",
     )
-    composition_source = (
+    composition_facade_source = (
         project_root / "app_core" / "core_component_composition.py"
+    ).read_text(encoding="utf-8")
+    composition_service_source = (
+        project_root
+        / "app_core"
+        / "composition_core"
+        / "core_component_composition_service.py"
     ).read_text(encoding="utf-8")
 
     assert "from llm_core.llm_component import LLM" not in app_composer_source
     assert "from tts_core.tts_component import TTS" not in app_composer_source
     assert "CoreComponentCompositionService" in app_composer_source
-    assert "from llm_core.llm_component import LLM" in composition_source
-    assert "from tts_core.tts_component import TTS" in composition_source
-    assert "from LLM import LLM" not in app_composer_source + composition_source
-    assert "from TTS import TTS" not in app_composer_source + composition_source
+    assert "from llm_core.llm_component import LLM" in composition_service_source
+    assert "from tts_core.tts_component import TTS" in composition_service_source
+    checked_source = app_composer_source + composition_facade_source + composition_service_source
+    assert "from LLM import LLM" not in checked_source
+    assert "from TTS import TTS" not in checked_source
 
 
 def test_legacy_root_component_files_are_removed():

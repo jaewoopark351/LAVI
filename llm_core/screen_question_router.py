@@ -3,7 +3,10 @@ import json
 import logging
 import re
 import time
-from dataclasses import dataclass
+
+from llm_core.screen_question_router_core.screen_question_decision import (
+    ScreenQuestionDecision,
+)
 
 
 SCREEN_ROUTER_LOGGER_NAME = "LAV.llm_core"
@@ -13,15 +16,6 @@ SCREEN_ROUTER_PROVIDER_NAMES = {
     "chatgpt_openai",
     "openai_router",
 }
-
-
-@dataclass
-class ScreenQuestionDecision:#20260628_kpopmodder: Small route result passed per request.
-    intent: str
-    need_screen: bool
-    reason: str
-    confidence: float = 0.0
-    fallback_used: bool = False
 
 
 class ScreenQuestionRouter:#20260628_kpopmodder: AI/rule intent gate for latest screen context.

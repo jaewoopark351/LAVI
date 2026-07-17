@@ -6,7 +6,8 @@ import re
 import time
 
 MEMORY_LOGGER_NAME = "LAV.memory_core"#20260627_kpopmodder
-from dataclasses import dataclass, field
+
+from memory_core.memory_router_core.memory_route_decision import MemoryRouteDecision
 
 
 DEFAULT_MEMORY_SCOPE = ["working", "derived", "long_term"]
@@ -17,17 +18,6 @@ OPENAI_PROVIDER_NAMES = {
     "chatgpt_openai",
     "openai_router",
 }
-
-
-@dataclass
-class MemoryRouteDecision:
-    intent: str
-    need_memory: bool
-    reason: str
-    queries: list[str] = field(default_factory=list)
-    memory_scope: list[str] = field(default_factory=list)
-    max_items: int = 0
-    fallback_used: bool = False
 
 
 class MemoryRouter:

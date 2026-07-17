@@ -2,17 +2,8 @@
 import re
 import threading
 import time
-from dataclasses import dataclass
 
-
-@dataclass
-class NormalizedInput:#20260621_kpopmodder
-    text: str
-    display_text: str
-    remember_history: bool = True
-    kind: str = "user"
-    source: str = ""
-    observation: str = ""
+from llm_core.interaction_context_core.normalized_input import NormalizedInput
 
 
 class LLMInteractionContext:#20260621_kpopmodder
