@@ -38,6 +38,7 @@ from core.profile_resolver import (
 
 plugin_directory = "plugins"
 temp_ignore = [] #["silero", "Local_LLM", "voicevox"]
+_MISSING = object()
 
 
 class PluginLoadError(RuntimeError):
@@ -64,6 +65,8 @@ class PluginDescriptor:
     required_files: tuple = ()
     required_executables: tuple = ()
     required_services: tuple = ()
+    availability_probe_timeout_sec: float = 0.25
+    availability_probe_log_reference: str = ""
     supports_offline: bool = False
     supports_cpu: bool = True
     requires_gpu: bool = False
@@ -94,7 +97,11 @@ class PluginDescriptor:
                 required_files=self.required_files,
                 required_executables=self.required_executables,
                 required_services=self.required_services,
-                log_reference=f"PluginLoader availability probe for {self.status_key}",
+                timeout_sec=self.availability_probe_timeout_sec,
+                log_reference=(
+                    self.availability_probe_log_reference
+                    or f"PluginLoader availability probe for {self.status_key}"
+                ),
             ),
             capabilities=self.capabilities,
             supports=PluginSupports(
@@ -492,6 +499,19 @@ class PluginLoader:
                 diagnostic=diagnostic,
             )
 
+        contract_errors = descriptor.runtime_contract.validation_errors()
+        if contract_errors:
+            diagnostic = self._contract_issue_diagnostic(
+                descriptor,
+                contract_errors,
+            )
+            return PluginHandle(
+                descriptor,
+                self,
+                status=PluginState.FAILED,
+                diagnostic=diagnostic,
+            )
+
         duplicate = self._metadata_ids.get(descriptor.id)
         if duplicate is not None:
             diagnostic = PluginDiagnostic(
@@ -520,6 +540,17 @@ class PluginLoader:
                 diagnostic=diagnostic,
             )
         return PluginHandle(descriptor, self)
+
+    def _contract_issue_diagnostic(self, descriptor, issues):
+        return PluginDiagnostic(
+            plugin_id=descriptor.id,
+            state=PluginState.FAILED,
+            reason_code=issues[0].code,
+            human_readable_message="; ".join(
+                issue.message for issue in issues
+            ),
+            log_reference=f"PluginLoader contract validation for {descriptor.status_key}",
+        )
 
     def availability_diagnostic(self, descriptor):
         missing_packages = [
@@ -671,14 +702,31 @@ class PluginLoader:
                 ))
             break
 
-        expected_entrypoint = f"{module_name}:{class_name}"
-        metadata_category = self._optional_text(
+        manifest = self._metadata_dict(
             metadata,
+            "manifest",
+            errors,
+            plugin_name,
+            class_name,
+        )
+        availability_probe = self._metadata_dict(
+            metadata,
+            "availability_probe",
+            errors,
+            plugin_name,
+            class_name,
+        )
+
+        expected_entrypoint = f"{module_name}:{class_name}"
+        metadata_category = self._contract_text(
+            metadata,
+            manifest,
             "category",
             category,
             errors,
             plugin_name,
             class_name,
+            "manifest",
         )
         if metadata_category != category:
             errors.append((
@@ -689,13 +737,15 @@ class PluginLoader:
                 ),
             ))
 
-        metadata_entrypoint = self._optional_text(
+        metadata_entrypoint = self._contract_text(
             metadata,
+            manifest,
             "entrypoint",
             expected_entrypoint,
             errors,
             plugin_name,
             class_name,
+            "manifest",
         )
         if metadata_entrypoint != expected_entrypoint:
             errors.append((
@@ -721,20 +771,109 @@ class PluginLoader:
         )
 
         return {
-            "id": self._optional_text(metadata, "id", class_name, errors, plugin_name, class_name),
-            "display_name": self._optional_text(metadata, "display_name", class_name, errors, plugin_name, class_name),
-            "api_version": self._optional_text(metadata, "api_version", "1", errors, plugin_name, class_name),
-            "dependency_group": self._optional_text(metadata, "dependency_group", category, errors, plugin_name, class_name),
+            "id": self._contract_text(metadata, manifest, "id", class_name, errors, plugin_name, class_name, "manifest"),
+            "display_name": self._contract_text(metadata, manifest, "display_name", class_name, errors, plugin_name, class_name, "manifest"),
+            "api_version": self._contract_text(metadata, manifest, "api_version", "1", errors, plugin_name, class_name, "manifest"),
+            "dependency_group": self._contract_text(metadata, manifest, "dependency_group", category, errors, plugin_name, class_name, "manifest"),
             "capabilities": tuple(self._metadata_string_sequence(metadata, "capabilities", errors, plugin_name, class_name)),
             "config_schema": config_schema,
-            "required_python_packages": tuple(self._metadata_string_sequence(metadata, "required_python_packages", errors, plugin_name, class_name)),
-            "required_files": tuple(self._metadata_string_sequence(metadata, "required_files", errors, plugin_name, class_name)),
-            "required_executables": tuple(self._metadata_string_sequence(metadata, "required_executables", errors, plugin_name, class_name)),
-            "required_services": tuple(self._metadata_string_sequence(metadata, "required_services", errors, plugin_name, class_name)),
+            "required_python_packages": tuple(self._contract_string_sequence(metadata, availability_probe, "required_python_packages", errors, plugin_name, class_name, "availability_probe")),
+            "required_files": tuple(self._contract_string_sequence(metadata, availability_probe, "required_files", errors, plugin_name, class_name, "availability_probe")),
+            "required_executables": tuple(self._contract_string_sequence(metadata, availability_probe, "required_executables", errors, plugin_name, class_name, "availability_probe")),
+            "required_services": tuple(self._contract_string_sequence(metadata, availability_probe, "required_services", errors, plugin_name, class_name, "availability_probe")),
+            "availability_probe_timeout_sec": self._contract_positive_number(metadata, availability_probe, "timeout_sec", 0.25, errors, plugin_name, class_name, "availability_probe"),
+            "availability_probe_log_reference": self._contract_text(metadata, availability_probe, "log_reference", "", errors, plugin_name, class_name, "availability_probe"),
             "supports_offline": supports_offline,
             "supports_cpu": supports_cpu,
             "requires_gpu": requires_gpu,
         }, tuple(errors)
+
+    def _contract_value(self, metadata, nested, key, errors, plugin_name, class_name, section_name):
+        has_top_level = key in metadata
+        has_nested = key in nested
+        if (
+            has_top_level
+            and has_nested
+            and not self._metadata_values_equal(metadata.get(key), nested.get(key))
+        ):
+            errors.append((
+                f"metadata_conflicting_{section_name}_{key}",
+                (
+                    f"{plugin_name}.{class_name} metadata {key} and "
+                    f"{section_name}.{key} must not disagree"
+                ),
+            ))
+        if has_nested:
+            return nested.get(key), f"{section_name}.{key}"
+        if has_top_level:
+            return metadata.get(key), key
+        return _MISSING, ""
+
+    def _metadata_values_equal(self, left, right):
+        if isinstance(left, (list, tuple)) and isinstance(right, (list, tuple)):
+            return list(left) == list(right)
+        return left == right
+
+    def _contract_text(self, metadata, nested, key, default, errors, plugin_name, class_name, section_name):
+        value, label = self._contract_value(
+            metadata,
+            nested,
+            key,
+            errors,
+            plugin_name,
+            class_name,
+            section_name,
+        )
+        if value is _MISSING:
+            return default
+        if not isinstance(value, str) or not value.strip():
+            errors.append((
+                f"metadata_invalid_{key}",
+                f"{plugin_name}.{class_name} metadata {label} must be a non-empty string",
+            ))
+            return default
+        return value.strip()
+
+    def _contract_string_sequence(self, metadata, nested, key, errors, plugin_name, class_name, section_name):
+        value, label = self._contract_value(
+            metadata,
+            nested,
+            key,
+            errors,
+            plugin_name,
+            class_name,
+            section_name,
+        )
+        if value is _MISSING:
+            return []
+        return self._validate_string_sequence_value(
+            value,
+            key,
+            label,
+            errors,
+            plugin_name,
+            class_name,
+        )
+
+    def _contract_positive_number(self, metadata, nested, key, default, errors, plugin_name, class_name, section_name):
+        value, label = self._contract_value(
+            metadata,
+            nested,
+            key,
+            errors,
+            plugin_name,
+            class_name,
+            section_name,
+        )
+        if value is _MISSING:
+            return default
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or value <= 0:
+            errors.append((
+                f"metadata_invalid_{key}",
+                f"{plugin_name}.{class_name} metadata {label} must be a positive number",
+            ))
+            return default
+        return float(value)
 
     def _optional_text(self, metadata, key, default, errors, plugin_name, class_name):
         if key not in metadata:
@@ -763,11 +902,20 @@ class PluginLoader:
     def _metadata_string_sequence(self, metadata, key, errors, plugin_name, class_name):
         if key not in metadata:
             return []
-        value = metadata.get(key)
+        return self._validate_string_sequence_value(
+            metadata.get(key),
+            key,
+            key,
+            errors,
+            plugin_name,
+            class_name,
+        )
+
+    def _validate_string_sequence_value(self, value, key, label, errors, plugin_name, class_name):
         if not isinstance(value, (list, tuple)):
             errors.append((
                 f"metadata_invalid_{key}",
-                f"{plugin_name}.{class_name} metadata {key} must be a list or tuple of strings",
+                f"{plugin_name}.{class_name} metadata {label} must be a list or tuple of strings",
             ))
             return []
         items = []
@@ -775,7 +923,7 @@ class PluginLoader:
             if not isinstance(item, str) or not item.strip():
                 errors.append((
                     f"metadata_invalid_{key}",
-                    f"{plugin_name}.{class_name} metadata {key} entries must be non-empty strings",
+                    f"{plugin_name}.{class_name} metadata {label} entries must be non-empty strings",
                 ))
                 continue
             items.append(item.strip())

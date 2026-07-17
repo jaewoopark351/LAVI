@@ -86,6 +86,64 @@ class StarCraft2ConfigTests(unittest.TestCase):
                 os.path.normcase(config.resolve_path_value(legacy_value)),
             )
 
+    def test_runtime_paths_refresh_stale_sc2_base_after_update(self):
+        with mock.patch.object(
+            StarCraft2Config,
+            "_migrate_legacy_config_if_missing",
+            lambda self: None,
+        ):
+            config = StarCraft2Config(
+                str(PROJECT_ROOT / "plugins" / "StarCraft2"),
+                config_path=str(PROJECT_ROOT / "missing_starcraft2_config.json"),
+            )
+        install_path = os.path.normpath(r"C:\Program Files (x86)\StarCraft II")
+        versions_dir = os.path.join(install_path, "Versions")
+        stale_base = os.path.join(versions_dir, "Base97425")
+        fresh_base = os.path.join(versions_dir, "Base97563")
+        stale_exe = os.path.join(stale_base, "SC2_x64.exe")
+        fresh_exe = os.path.join(fresh_base, "SC2_x64.exe")
+        support64_path = os.path.join(install_path, "Support64")
+        config.config.update(
+            {
+                "starcraft2_install_path": install_path,
+                "starcraft2_support64_path": support64_path,
+            }
+        )
+        directories = {install_path, versions_dir, stale_base, fresh_base, support64_path}
+        files = {fresh_exe}
+
+        def fake_isdir(path):
+            return os.path.normpath(path) in directories
+
+        def fake_isfile(path):
+            return os.path.normpath(path) in files
+
+        def fake_listdir(path):
+            if os.path.normpath(path) == versions_dir:
+                return ["Base97425", "Base97563"]
+            return []
+
+        with mock.patch(
+            "plugins.StarCraft2.starcraft2_core.starcraft2_config.os.path.isdir",
+            side_effect=fake_isdir,
+        ), mock.patch(
+            "plugins.StarCraft2.starcraft2_core.starcraft2_config.os.path.isfile",
+            side_effect=fake_isfile,
+        ), mock.patch(
+            "plugins.StarCraft2.starcraft2_core.starcraft2_config.os.listdir",
+            side_effect=fake_listdir,
+        ):
+            result = config.resolve_starcraft2_runtime_paths(
+                {
+                    "starcraft2_exe_path": stale_exe,
+                    "starcraft2_base_path": stale_base,
+                }
+            )
+
+        self.assertEqual(fresh_exe, result["starcraft2_exe_path"])
+        self.assertEqual(fresh_base, result["starcraft2_base_path"])
+        self.assertEqual(support64_path, result["starcraft2_support64_path"])
+
 
 if __name__ == "__main__":
     unittest.main()

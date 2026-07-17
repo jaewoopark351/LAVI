@@ -16,6 +16,7 @@ class PluginSystemImportTests(unittest.TestCase):
     def test_plugin_contracts_are_shared_and_serializable(self):#20260716_kpopmodder
         from plugin_system import (
             AvailabilityProbeContract,
+            PluginContractIssue,
             PluginDiagnostic,
             PluginDiagnosticSnapshot,
             PluginRuntimeContract,
@@ -35,11 +36,32 @@ class PluginSystemImportTests(unittest.TestCase):
         self.assertIs(PluginState, LoaderState)
         self.assertIs(PluginDiagnostic, ContractDiagnostic)
         self.assertIs(PluginDiagnostic, LoaderDiagnostic)
+        self.assertEqual(
+            {
+                "code": "example",
+                "message": "message",
+                "path": "manifest.id",
+                "severity": "warning",
+            },
+            PluginContractIssue(
+                code="example",
+                message="message",
+                path="manifest.id",
+                severity="warning",
+            ).to_dict(),
+        )
         self.assertEqual("FAILED", PluginState.BROKEN)
 
         contract = PluginRuntimeContract(
             plugin_id="Example",
-            manifest={"entrypoint": "plugins.Example.Example:Example"},
+            manifest={
+                "id": "Example",
+                "display_name": "Example",
+                "api_version": "1",
+                "category": "input_gathering",
+                "entrypoint": "plugins.Example.Example:Example",
+                "dependency_group": "Core",
+            },
             config_schema={"type": "object"},
             availability_probe=AvailabilityProbeContract(
                 required_services=("microphone_input_device",),
@@ -53,7 +75,14 @@ class PluginSystemImportTests(unittest.TestCase):
         self.assertEqual(
             {
                 "plugin_id": "Example",
-                "manifest": {"entrypoint": "plugins.Example.Example:Example"},
+                "manifest": {
+                    "id": "Example",
+                    "display_name": "Example",
+                    "api_version": "1",
+                    "category": "input_gathering",
+                    "entrypoint": "plugins.Example.Example:Example",
+                    "dependency_group": "Core",
+                },
                 "config_schema": {"type": "object"},
                 "availability_probe": {
                     "required_python_packages": [],
@@ -73,6 +102,7 @@ class PluginSystemImportTests(unittest.TestCase):
             },
             contract.to_dict(),
         )
+        self.assertEqual([], list(contract.validation_errors()))
 
         snapshot = PluginDiagnosticSnapshot(
             plugin_id="Example",
@@ -1006,6 +1036,111 @@ class PluginSystemImportTests(unittest.TestCase):
             handle.descriptor.runtime_contract.to_dict()["supports"],
         )
 
+    def test_metadata_nested_contract_is_discovered_without_import(self):#20260717_kpopmodder
+        from plugin_system.loader import PluginLoader, PluginState
+
+        module_name = "plugins.NestedContractPlugin.NestedContractPlugin"
+        sys.modules.pop(module_name, None)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            plugin_root = Path(temp_dir) / "plugins"
+            plugin_dir = plugin_root / "NestedContractPlugin"
+            plugin_dir.mkdir(parents=True)
+            (plugin_dir / "NestedContractPlugin.py").write_text(
+                "\n".join([
+                    "from plugin_system.interfaces import LLMPluginInterface",
+                    "IMPORT_COUNT = 0",
+                    "IMPORT_COUNT += 1",
+                    "class NestedContractPlugin(LLMPluginInterface):",
+                    "    PLUGIN_METADATA = {",
+                    "        'manifest': {",
+                    "            'id': 'nested.contract',",
+                    "            'display_name': 'Nested Contract',",
+                    "            'api_version': '1',",
+                    "            'category': 'language_model',",
+                    "            'entrypoint': 'plugins.NestedContractPlugin.NestedContractPlugin:NestedContractPlugin',",
+                    "            'dependency_group': 'Full',",
+                    "        },",
+                    "        'capabilities': ['llm', 'nested_contract'],",
+                    "        'config_schema': {'type': 'object'},",
+                    "        'availability_probe': {",
+                    "            'required_python_packages': ['json'],",
+                    "            'required_files': [],",
+                    "            'required_executables': [],",
+                    "            'required_services': [],",
+                    "            'timeout_sec': 0.5,",
+                    "            'log_reference': 'nested probe',",
+                    "        },",
+                    "        'supports': {",
+                    "            'offline': True,",
+                    "            'cpu': True,",
+                    "            'requires_gpu': False,",
+                    "        },",
+                    "    }",
+                    "    def init(self): pass",
+                    "    def predict(self, message, history): return ''",
+                    "    def create_ui(self): return None",
+                ]),
+                encoding="utf-8",
+            )
+            modules_path = Path(temp_dir) / "modules.json"
+            modules_path.write_text(json.dumps({}), encoding="utf-8")
+
+            loader = PluginLoader("plugins")
+            loader.plugin_directory = str(plugin_root)
+            loader.plugin_setting_path = str(modules_path)
+            loader._load_plugins_from_directory(str(plugin_dir))
+
+        handle = loader.plugins["language_model"][0]
+        contract = handle.runtime_contract.to_dict()
+
+        self.assertNotIn(module_name, sys.modules)
+        self.assertEqual(PluginState.READY, handle.status)
+        self.assertEqual("nested.contract", handle.descriptor.id)
+        self.assertEqual("Nested Contract", handle.descriptor.display_name)
+        self.assertEqual(["llm", "nested_contract"], contract["capabilities"])
+        self.assertEqual(
+            ["json"],
+            contract["availability_probe"]["required_python_packages"],
+        )
+        self.assertEqual(0.5, contract["availability_probe"]["timeout_sec"])
+        self.assertEqual("nested probe", contract["availability_probe"]["log_reference"])
+        self.assertEqual([], list(handle.runtime_contract.validation_errors()))
+
+    def test_metadata_invalid_nested_availability_probe_is_failed_plugin_only(self):#20260717_kpopmodder
+        from plugin_system.loader import PluginLoader, PluginState
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            plugin_root = Path(temp_dir) / "plugins"
+            plugin_dir = plugin_root / "BadNestedProbePlugin"
+            plugin_dir.mkdir(parents=True)
+            (plugin_dir / "BadNestedProbePlugin.py").write_text(
+                "\n".join([
+                    "from plugin_system.interfaces import LLMPluginInterface",
+                    "class BadNestedProbePlugin(LLMPluginInterface):",
+                    "    PLUGIN_METADATA = {'availability_probe': ['not', 'object']}",
+                    "    def init(self): pass",
+                    "    def predict(self, message, history): return ''",
+                    "    def create_ui(self): return None",
+                ]),
+                encoding="utf-8",
+            )
+            modules_path = Path(temp_dir) / "modules.json"
+            modules_path.write_text(json.dumps({}), encoding="utf-8")
+
+            loader = PluginLoader("plugins")
+            loader.plugin_directory = str(plugin_root)
+            loader.plugin_setting_path = str(modules_path)
+            loader._load_plugins_from_directory(str(plugin_dir))
+
+        handle = loader.plugins["language_model"][0]
+
+        self.assertEqual(PluginState.FAILED, handle.status)
+        self.assertEqual(
+            "metadata_invalid_availability_probe",
+            handle.diagnostic.reason_code,
+        )
+
     def test_p1a_missing_static_dependency_becomes_unavailable_without_import(self):#20260716_kpopmodder
         from plugin_system.loader import PluginLoader, PluginState
         from plugin_system.interfaces import LLMPluginInterface
@@ -1915,6 +2050,59 @@ class PluginSystemImportTests(unittest.TestCase):
             snapshot["MissingOptional"]["runtime_contract"]["availability_probe"][
                 "required_python_packages"
             ],
+        )
+
+    def test_optional_plugin_loader_accepts_nested_contract_probe_metadata(self):#20260717_kpopmodder
+        from app_core.optional_plugin_loader import instantiate_optional_plugin
+        from plugin_system.loader import PluginState
+        from plugin_system.registry import plugin_registry
+
+        missing_package = "lavi_missing_nested_optional_contract_package"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            modules_path = Path(temp_dir) / "modules.json"
+            modules_path.write_text(
+                json.dumps({"NestedOptional": True}),
+                encoding="utf-8",
+            )
+
+            plugin = instantiate_optional_plugin(
+                "NestedOptional",
+                "plugins.NestedOptional.nested_optional",
+                "NestedOptional",
+                False,
+                temp_dir,
+                manifest={
+                    "manifest": {
+                        "id": "nested.optional",
+                        "display_name": "Nested Optional",
+                        "api_version": "1",
+                        "dependency_group": "Full",
+                    },
+                    "availability_probe": {
+                        "required_python_packages": (missing_package,),
+                    },
+                },
+            )
+
+        self.assertIsNone(plugin)
+        snapshot = plugin_registry.snapshot()
+        self.assertEqual(
+            PluginState.UNAVAILABLE,
+            snapshot["NestedOptional"]["status"],
+        )
+        self.assertEqual(
+            "nested.optional",
+            snapshot["NestedOptional"]["runtime_contract"]["plugin_id"],
+        )
+        self.assertEqual(
+            [missing_package],
+            snapshot["NestedOptional"]["runtime_contract"]["availability_probe"][
+                "required_python_packages"
+            ],
+        )
+        self.assertEqual(
+            [missing_package],
+            snapshot["NestedOptional"]["diagnostic"]["missing_python_packages"],
         )
 
 

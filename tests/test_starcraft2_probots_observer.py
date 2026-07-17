@@ -1047,6 +1047,55 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
             result["args"],
         )
 
+    def test_starcraft2_local_match_config_refreshes_stale_sc2_base_path(self):
+        facade = StarCraft2()
+        install_path = os.path.normpath(r"C:\Program Files (x86)\StarCraft II")
+        versions_dir = os.path.join(install_path, "Versions")
+        stale_base = os.path.join(versions_dir, "Base97425")
+        fresh_base = os.path.join(versions_dir, "Base97563")
+        stale_exe = os.path.join(stale_base, "SC2_x64.exe")
+        fresh_exe = os.path.join(fresh_base, "SC2_x64.exe")
+        support64_path = os.path.join(install_path, "Support64")
+        facade.config_manager.config["starcraft2_install_path"] = install_path
+        facade.config_manager.config["starcraft2_support64_path"] = support64_path
+        facade.config_manager.config["local_match"] = {
+            "executable_path": "C:\\Tools\\LavHumanVsBot.exe",
+            "working_directory": "C:\\Tools",
+            "args": ["--bot", "changeling"],
+            "ports": [5677, 5678],
+            "starcraft2_exe_path": stale_exe,
+            "starcraft2_base_path": stale_base,
+        }
+        directories = {install_path, versions_dir, stale_base, fresh_base, support64_path}
+        files = {fresh_exe}
+
+        def fake_isdir(path):
+            return os.path.normpath(path) in directories
+
+        def fake_isfile(path):
+            return os.path.normpath(path) in files
+
+        def fake_listdir(path):
+            if os.path.normpath(path) == versions_dir:
+                return ["Base97425", "Base97563"]
+            return []
+
+        with mock.patch(
+            "plugins.StarCraft2.starcraft2_core.starcraft2_config.os.path.isdir",
+            side_effect=fake_isdir,
+        ), mock.patch(
+            "plugins.StarCraft2.starcraft2_core.starcraft2_config.os.path.isfile",
+            side_effect=fake_isfile,
+        ), mock.patch(
+            "plugins.StarCraft2.starcraft2_core.starcraft2_config.os.listdir",
+            side_effect=fake_listdir,
+        ):
+            result = facade._local_match_config()
+
+        self.assertEqual(fresh_exe, result["starcraft2_exe_path"])
+        self.assertEqual(fresh_base, result["starcraft2_base_path"])
+        self.assertEqual(support64_path, result["starcraft2_support64_path"])
+
     def test_starcraft2_local_match_race_change_replaces_race_arg(self):
         facade = StarCraft2()
         cases = (

@@ -52,6 +52,7 @@ class _StarCraft2MatchConfigService:
         )
         for field in ("starcraft2_exe_path", "starcraft2_support64_path", "starcraft2_base_path"):
             config[field] = self.config_manager.resolve_path_value(config.get(field, ""))
+        self._refresh_starcraft2_runtime_paths(config)
         return config
 
     def local_match_config(
@@ -124,7 +125,25 @@ class _StarCraft2MatchConfigService:
             config["bot_profile_validation"] = profile.validate(bot_root)
         for field in ("starcraft2_exe_path", "starcraft2_support64_path", "starcraft2_base_path"):
             config[field] = self.config_manager.resolve_path_value(config.get(field, ""))
+        self._refresh_starcraft2_runtime_paths(config)
         return config
+
+    def _refresh_starcraft2_runtime_paths(self, config: Dict[str, Any]) -> None:
+        #20260717_kpopmodder: Keep local-match launchers resilient to SC2 Base
+        # folder changes after Blizzard updates.
+        resolver = getattr(self.config_manager, "resolve_starcraft2_runtime_paths", None)
+        if not callable(resolver):
+            return
+        resolved = resolver(config)
+        if not isinstance(resolved, dict):
+            return
+        for field in (
+            "starcraft2_exe_path",
+            "starcraft2_support64_path",
+            "starcraft2_base_path",
+        ):
+            if resolved.get(field):
+                config[field] = resolved[field]
 
     def ensure_local_match_runtime(self, config: Dict[str, Any]) -> Dict[str, Any]:
         runtime_dir = self.config_manager.resolve_path_value(

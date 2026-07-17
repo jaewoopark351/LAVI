@@ -282,6 +282,48 @@ class StarCraft2Config:
                 candidates.append(resolved)
         return candidates
 
+    def resolve_starcraft2_runtime_paths(
+        self, section: Dict[str, Any] | None = None
+    ) -> Dict[str, str]:
+        #20260717_kpopmodder: SC2 updates move SC2_x64.exe between Versions\Base*
+        # folders; keep launch configs from getting stuck on a stale Base path.
+        section = section if isinstance(section, dict) else {}
+        support64_path = self._resolve_optional_path(
+            section.get("starcraft2_support64_path")
+            or self.config.get("starcraft2_support64_path")
+        )
+        base_path = self._resolve_optional_path(
+            section.get("starcraft2_base_path")
+            or self.config.get("starcraft2_base_path")
+        )
+        exe_path = self._resolve_optional_path(
+            section.get("starcraft2_exe_path")
+            or self.config.get("starcraft2_exe_path")
+        )
+        if exe_path and os.path.isfile(exe_path):
+            install_path = self._infer_install_path_from_executable(exe_path)
+            return self._runtime_paths_from_executable(
+                exe_path,
+                support64_path=support64_path,
+                base_path=base_path,
+                install_path=install_path,
+            )
+
+        discovered = self._discover_starcraft2_executable(
+            self._starcraft2_install_candidates(section, exe_path, base_path)
+        )
+        if discovered:
+            return self._runtime_paths_from_executable(
+                discovered,
+                support64_path=support64_path,
+            )
+
+        return {
+            "starcraft2_exe_path": exe_path,
+            "starcraft2_support64_path": support64_path,
+            "starcraft2_base_path": base_path,
+        }
+
     def config_message(self) -> str:
         if self.load_error:
             return f"StarCraft2 config load failed: {self.load_error}"
@@ -317,6 +359,122 @@ class StarCraft2Config:
             value = self._migrate_old_repo_root(value)
             return os.path.normpath(value)
         return os.path.normpath(str(self.paths.root_path(value)))
+
+    def _resolve_optional_path(self, value: Any) -> str:
+        text = str(value or "").strip().strip("\"'")
+        return self.resolve_path_value(text) if text else ""
+
+    def _runtime_paths_from_executable(
+        self,
+        executable: str,
+        *,
+        support64_path: str = "",
+        base_path: str = "",
+        install_path: str = "",
+    ) -> Dict[str, str]:
+        executable = os.path.normpath(executable)
+        actual_base_path = os.path.normpath(os.path.dirname(executable))
+        actual_install_path = install_path or self._infer_install_path_from_executable(executable)
+        actual_support64_path = support64_path
+        if not actual_support64_path and actual_install_path:
+            candidate = os.path.join(actual_install_path, "Support64")
+            if os.path.isdir(candidate):
+                actual_support64_path = os.path.normpath(candidate)
+        return {
+            "starcraft2_exe_path": executable,
+            "starcraft2_support64_path": os.path.normpath(actual_support64_path)
+            if actual_support64_path
+            else "",
+            "starcraft2_base_path": actual_base_path or os.path.normpath(base_path),
+        }
+
+    def _starcraft2_install_candidates(
+        self,
+        section: Dict[str, Any],
+        exe_path: str,
+        base_path: str,
+    ) -> List[str]:
+        raw_candidates = [
+            section.get("starcraft2_install_path"),
+            self.config.get("starcraft2_install_path"),
+            section.get("starcraft2_path"),
+            self.config.get("starcraft2_path"),
+            self.sc2path_env(),
+            DEFAULT_STARCRAFT2_PATH,
+            self._infer_install_path_from_executable(exe_path),
+            self._infer_install_path_from_base(base_path),
+        ]
+        candidates: List[str] = []
+        for value in raw_candidates:
+            resolved = self._resolve_optional_path(value)
+            if resolved and resolved not in candidates:
+                candidates.append(resolved)
+        return candidates
+
+    def _discover_starcraft2_executable(self, candidates: List[str]) -> str:
+        versioned_candidates = []
+        for candidate in candidates:
+            if os.path.isfile(candidate):
+                if os.path.basename(candidate).lower() in {"sc2_x64.exe", "sc2.exe"}:
+                    return os.path.normpath(candidate)
+                continue
+            direct = self._first_existing_sc2_executable(candidate)
+            if direct:
+                return direct
+            versions_dir = os.path.join(candidate, "Versions")
+            if not os.path.isdir(versions_dir):
+                continue
+            try:
+                version_names = os.listdir(versions_dir)
+            except OSError:
+                continue
+            for name in version_names:
+                version_path = os.path.join(versions_dir, name)
+                executable = self._first_existing_sc2_executable(version_path)
+                if executable:
+                    versioned_candidates.append(
+                        (self._version_sort_key(name, executable), executable)
+                    )
+        if not versioned_candidates:
+            return ""
+        versioned_candidates.sort(key=lambda item: item[0], reverse=True)
+        return versioned_candidates[0][1]
+
+    def _first_existing_sc2_executable(self, directory: str) -> str:
+        if not directory or not os.path.isdir(directory):
+            return ""
+        for filename in ("SC2_x64.exe", "SC2.exe"):
+            path = os.path.join(directory, filename)
+            if os.path.isfile(path):
+                return os.path.normpath(path)
+        return ""
+
+    def _version_sort_key(self, name: str, executable: str):
+        digits = "".join(char for char in str(name) if char.isdigit())
+        try:
+            version_number = int(digits or "0")
+        except ValueError:
+            version_number = 0
+        try:
+            modified_time = os.path.getmtime(executable)
+        except OSError:
+            modified_time = 0.0
+        return (version_number, modified_time)
+
+    def _infer_install_path_from_executable(self, value: str) -> str:
+        if not value:
+            return ""
+        base_path = os.path.dirname(os.path.normpath(value))
+        return self._infer_install_path_from_base(base_path)
+
+    def _infer_install_path_from_base(self, value: str) -> str:
+        if not value:
+            return ""
+        base_path = os.path.normpath(value)
+        versions_dir = os.path.dirname(base_path)
+        if os.path.basename(versions_dir).lower() == "versions":
+            return os.path.dirname(versions_dir)
+        return ""
 
     def _legacy_config_paths(self) -> List[str]:
         return [

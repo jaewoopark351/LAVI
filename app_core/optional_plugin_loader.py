@@ -28,12 +28,33 @@ def instantiate_optional_plugin(
     **kwargs,
 ):
     manifest = dict(manifest or {})
-    runtime_contract = _optional_runtime_contract(
+    contract = _optional_runtime_contract(
         plugin_name,
         module_path,
         class_name,
         manifest,
-    ).to_dict()
+    )
+    runtime_contract = contract.to_dict()
+    contract_errors = contract.validation_errors()
+    if contract_errors:
+        diagnostic = _optional_contract_issue_diagnostic(
+            plugin_name,
+            manifest,
+            contract_errors,
+        )
+        plugin_registry.record(
+            plugin_name,
+            PluginState.FAILED,
+            kind="optional",
+            detail=diagnostic.human_readable_message,
+            diagnostic=diagnostic.to_dict(),
+            runtime_contract=runtime_contract,
+        )
+        log_print(
+            f"[Startup][BROKEN] [{plugin_name}] optional plugin contract invalid: "
+            f"{diagnostic.human_readable_message}"
+        )
+        return None
 
     if not module_enabled(plugin_name, default_enabled, project_root):
         plugin_registry.record(
@@ -155,36 +176,51 @@ def instantiate_optional_plugin(
 
 
 def _optional_runtime_contract(plugin_name, module_path, class_name, manifest):
-    entrypoint = str(
-        manifest.get("entrypoint")
-        or f"{module_path}:{class_name}"
+    entrypoint = _contract_text(
+        manifest,
+        "entrypoint",
+        f"{module_path}:{class_name}",
     )
-    category = str(manifest.get("category") or "optional")
-    dependency_group = str(manifest.get("dependency_group") or "Full")
+    category = _contract_text(manifest, "category", "optional")
+    dependency_group = _contract_text(manifest, "dependency_group", "Full")
     supports = manifest.get("supports")
     if not isinstance(supports, dict):
         supports = {}
 
     return PluginRuntimeContract(
-        plugin_id=str(manifest.get("id") or plugin_name),
+        plugin_id=_contract_text(manifest, "id", plugin_name),
         manifest={
-            "id": str(manifest.get("id") or plugin_name),
-            "display_name": str(manifest.get("display_name") or plugin_name),
-            "api_version": str(manifest.get("api_version") or "1"),
+            "id": _contract_text(manifest, "id", plugin_name),
+            "display_name": _contract_text(
+                manifest,
+                "display_name",
+                plugin_name,
+            ),
+            "api_version": _contract_text(manifest, "api_version", "1"),
             "category": category,
             "entrypoint": entrypoint,
             "dependency_group": dependency_group,
         },
-        config_schema=dict(manifest.get("config_schema") or {}),
+        config_schema=_contract_dict(manifest, "config_schema"),
         availability_probe=AvailabilityProbeContract(
-            required_python_packages=_string_tuple(
-                manifest.get("required_python_packages")
+            required_python_packages=_availability_tuple(
+                manifest,
+                "required_python_packages",
             ),
-            required_files=_string_tuple(manifest.get("required_files")),
-            required_executables=_string_tuple(
-                manifest.get("required_executables")
+            required_files=_availability_tuple(manifest, "required_files"),
+            required_executables=_availability_tuple(
+                manifest,
+                "required_executables",
             ),
-            required_services=_string_tuple(manifest.get("required_services")),
+            required_services=_availability_tuple(
+                manifest,
+                "required_services",
+            ),
+            timeout_sec=_availability_positive_number(
+                manifest,
+                "timeout_sec",
+                0.25,
+            ),
             log_reference=f"Optional plugin availability probe for {plugin_name}",
         ),
         capabilities=_string_tuple(manifest.get("capabilities")),
@@ -217,12 +253,12 @@ def _optional_runtime_contract(plugin_name, module_path, class_name, manifest):
 def _optional_unavailable_diagnostic(plugin_name, module_path, manifest, project_root):
     missing_packages = [
         package
-        for package in _string_tuple(manifest.get("required_python_packages"))
+        for package in _availability_tuple(manifest, "required_python_packages")
         if importlib.util.find_spec(package) is None
     ]
     missing_files = [
         required_path
-        for required_path in _string_tuple(manifest.get("required_files"))
+        for required_path in _availability_tuple(manifest, "required_files")
         if not _resolve_required_file(
             module_path,
             required_path,
@@ -231,16 +267,16 @@ def _optional_unavailable_diagnostic(plugin_name, module_path, manifest, project
     ]
     missing_executables = [
         executable
-        for executable in _string_tuple(manifest.get("required_executables"))
+        for executable in _availability_tuple(manifest, "required_executables")
         if shutil.which(executable) is None
     ]
 
     if not (missing_packages or missing_files or missing_executables):
         return None
 
-    display_name = str(manifest.get("display_name") or plugin_name)
+    display_name = _contract_text(manifest, "display_name", plugin_name)
     return PluginDiagnostic(
-        plugin_id=str(manifest.get("id") or plugin_name),
+        plugin_id=_contract_text(manifest, "id", plugin_name),
         state=PluginState.UNAVAILABLE,
         reason_code="missing_static_dependency",
         human_readable_message=(
@@ -250,20 +286,43 @@ def _optional_unavailable_diagnostic(plugin_name, module_path, manifest, project
         missing_python_packages=tuple(missing_packages),
         missing_files=tuple(missing_files),
         missing_executables=tuple(missing_executables),
-        missing_services=tuple(_string_tuple(manifest.get("required_services"))),
-        suggested_install_profile=str(manifest.get("dependency_group") or "Full"),
+        missing_services=tuple(_availability_tuple(manifest, "required_services")),
+        suggested_install_profile=_contract_text(
+            manifest,
+            "dependency_group",
+            "Full",
+        ),
+        suggested_command=_suggested_install_command(),
+    )
+
+
+def _optional_contract_issue_diagnostic(plugin_name, manifest, issues):
+    return PluginDiagnostic(
+        plugin_id=_contract_text(manifest, "id", plugin_name),
+        state=PluginState.FAILED,
+        reason_code=issues[0].code,
+        human_readable_message="; ".join(issue.message for issue in issues),
+        suggested_install_profile=_contract_text(
+            manifest,
+            "dependency_group",
+            "Full",
+        ),
         suggested_command=_suggested_install_command(),
     )
 
 
 def _optional_failure_diagnostic(plugin_name, manifest, reason_code, message):
     return PluginDiagnostic(
-        plugin_id=str(manifest.get("id") or plugin_name),
+        plugin_id=_contract_text(manifest, "id", plugin_name),
         state=PluginState.FAILED,
         reason_code=reason_code,
         human_readable_message=message,
-        missing_services=tuple(_string_tuple(manifest.get("required_services"))),
-        suggested_install_profile=str(manifest.get("dependency_group") or "Full"),
+        missing_services=tuple(_availability_tuple(manifest, "required_services")),
+        suggested_install_profile=_contract_text(
+            manifest,
+            "dependency_group",
+            "Full",
+        ),
         suggested_command=_suggested_install_command(),
     )
 
@@ -286,6 +345,59 @@ def _string_tuple(value):
     if isinstance(value, (list, tuple)):
         return tuple(str(item) for item in value if str(item))
     return ()
+
+
+def _manifest_section(manifest):
+    section = manifest.get("manifest")
+    if isinstance(section, dict):
+        return section
+    return {}
+
+
+def _availability_section(manifest):
+    section = manifest.get("availability_probe")
+    if isinstance(section, dict):
+        return section
+    return {}
+
+
+def _contract_value(manifest, key, default=None):
+    section = _manifest_section(manifest)
+    if key in section:
+        return section.get(key)
+    return manifest.get(key, default)
+
+
+def _contract_text(manifest, key, default):
+    value = _contract_value(manifest, key, default)
+    if value is None:
+        return str(default)
+    return str(value)
+
+
+def _contract_dict(manifest, key):
+    value = manifest.get(key) or {}
+    if isinstance(value, dict):
+        return dict(value)
+    return {}
+
+
+def _availability_value(manifest, key, default=None):
+    section = _availability_section(manifest)
+    if key in section:
+        return section.get(key)
+    return manifest.get(key, default)
+
+
+def _availability_tuple(manifest, key):
+    return _string_tuple(_availability_value(manifest, key))
+
+
+def _availability_positive_number(manifest, key, default):
+    value = _availability_value(manifest, key, default)
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or value <= 0:
+        return default
+    return float(value)
 
 
 def _manifest_bool(manifest, supports, legacy_key, supports_key, default):
