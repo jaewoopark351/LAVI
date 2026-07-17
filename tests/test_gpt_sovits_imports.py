@@ -17,14 +17,26 @@ from plugins.GPTSoVITS.GPTSoVITS_TTS import GPTSoVITSTTS
 from plugins.GPTSoVITS.gpt_sovits_core.gpt_sovits_api_client import (
     GPTSoVITSApiClient,
 )
+from plugins.GPTSoVITS.gpt_sovits_core.gpt_sovits_client import (
+    GPTSoVITSClient,
+)
+from plugins.GPTSoVITS.gpt_sovits_core.gpt_sovits_config import (
+    GPTSoVITSConfig,
+)
 from plugins.GPTSoVITS.gpt_sovits_core.gpt_sovits_config_manager import (
     GPTSoVITSConfigManager,
 )
 from plugins.GPTSoVITS.gpt_sovits_core.gpt_sovits_model_manager import (
     GPTSoVITSModelManager,
 )
+from plugins.GPTSoVITS.gpt_sovits_core.gpt_sovits_process_manager import (
+    GPTSoVITSProcessManager,
+)
 from plugins.GPTSoVITS.gpt_sovits_core.gpt_sovits_server_manager import (
     GPTSoVITSServerManager,
+)
+from plugins.GPTSoVITS.gpt_sovits_core.gpt_sovits_tts_provider import (
+    GPTSoVITSTTSProvider,
 )
 
 
@@ -35,11 +47,35 @@ class GPTSoVITSImportTests(unittest.TestCase):
     def test_tts_uses_core_helper_classes(self):
         tts = GPTSoVITSTTS()
 
+        self.assertIsInstance(tts.config, GPTSoVITSConfig)
         self.assertIsInstance(tts.config_manager, GPTSoVITSConfigManager)
-        self.assertIsInstance(tts.server_manager, GPTSoVITSServerManager)
+        self.assertIsInstance(tts.process_manager, GPTSoVITSProcessManager)
+        self.assertIs(tts.server_manager, tts.process_manager)
         self.assertIsInstance(tts.model_manager, GPTSoVITSModelManager)
+        self.assertIsInstance(tts.api_client, GPTSoVITSClient)
         self.assertIsInstance(tts.api_client, GPTSoVITSApiClient)
         self.assertEqual(tts.server_manager.cuda_visible_devices, "1")
+
+    def test_legacy_server_manager_name_wraps_process_manager(self):
+        manager = GPTSoVITSServerManager(
+            config_manager=Mock(),
+            gpt_sovits_url="http://127.0.0.1:9880/tts",
+            cuda_visible_devices="1",
+        )
+
+        self.assertIsInstance(manager, GPTSoVITSProcessManager)
+
+    def test_tts_construction_does_not_probe_or_launch_server(self):
+        with patch(
+            "plugins.GPTSoVITS.gpt_sovits_core.gpt_sovits_process_manager.requests.get",
+        ) as requests_get:
+            with patch(
+                "plugins.GPTSoVITS.gpt_sovits_core.gpt_sovits_process_manager.launch_process",
+            ) as launch_process:
+                GPTSoVITSTTS()
+
+        requests_get.assert_not_called()
+        launch_process.assert_not_called()
 
     def test_url_change_is_propagated_without_starting_server(self):
         tts = GPTSoVITSTTS()
@@ -54,7 +90,7 @@ class GPTSoVITSImportTests(unittest.TestCase):
     def test_server_manager_passes_cuda_visible_devices_to_child_env(self):#20260626_kpopmodder
         config_manager = Mock()
         config_manager.check_install.return_value = True
-        manager = GPTSoVITSServerManager(
+        manager = GPTSoVITSProcessManager(
             config_manager=config_manager,
             gpt_sovits_url="http://127.0.0.1:9880/tts",
             cuda_visible_devices="1",
@@ -65,21 +101,21 @@ class GPTSoVITSImportTests(unittest.TestCase):
 
         with patch.object(manager, "is_server_alive", return_value=False):
             with patch(
-                "plugins.GPTSoVITS.gpt_sovits_core.gpt_sovits_server_manager.requests.get",
+                "plugins.GPTSoVITS.gpt_sovits_core.gpt_sovits_process_manager.requests.get",
                 return_value=response,
             ):
                 with patch(
-                    "plugins.GPTSoVITS.gpt_sovits_core.gpt_sovits_server_manager.subprocess.Popen"
-                ) as popen_mock:
+                    "plugins.GPTSoVITS.gpt_sovits_core.gpt_sovits_process_manager.launch_process"
+                ) as launch_mock:
                     manager.start_server("C:\\GPT-SoVITS")
 
-        env = popen_mock.call_args.kwargs["env"]
+        env = launch_mock.call_args.kwargs["env"]
         self.assertEqual(env["CUDA_VISIBLE_DEVICES"], "1")
 
     def test_server_manager_blocks_start_without_cuda_visible_devices(self):#20260627_kpopmodder
         config_manager = Mock()
         config_manager.check_install.return_value = True
-        manager = GPTSoVITSServerManager(
+        manager = GPTSoVITSProcessManager(
             config_manager=config_manager,
             gpt_sovits_url="http://127.0.0.1:9880/tts",
             cuda_visible_devices=None,
@@ -88,20 +124,42 @@ class GPTSoVITSImportTests(unittest.TestCase):
         with patch.object(manager, "is_server_alive") as alive_mock:
             with patch(
                 "plugins.GPTSoVITS.gpt_sovits_core."
-                "gpt_sovits_server_manager.log_print"
+                "gpt_sovits_process_manager.log_print"
             ) as log_mock:
                 with patch(
                     "plugins.GPTSoVITS.gpt_sovits_core."
-                    "gpt_sovits_server_manager.subprocess.Popen"
-                ) as popen_mock:
+                    "gpt_sovits_process_manager.launch_process"
+                ) as launch_mock:
                     manager.start_server("C:\\GPT-SoVITS")
 
         alive_mock.assert_not_called()
-        popen_mock.assert_not_called()
+        launch_mock.assert_not_called()
         self.assertIsNone(manager.gpt_sovits_process)
         logged = "\n".join(str(call.args[0]) for call in log_mock.call_args_list)
         self.assertIn("ERROR", logged)
         self.assertIn("GPU 0", logged)
+
+    def test_tts_provider_delegates_runtime_lifecycle(self):
+        runtime = Mock()
+        runtime.synthesize_to_bytes.return_value = b"wav"
+        runtime.gpt_sovits_url = "http://127.0.0.1:9880/tts"
+        runtime.gpt_sovits_root = "C:\\GPT-SoVITS"
+        runtime.process_manager = Mock()
+        runtime.process_manager.is_process_running.return_value = True
+        runtime.process_manager.cuda_visible_devices = "1"
+        provider = GPTSoVITSTTSProvider(runtime)
+
+        provider.init()
+        result = provider.synthesize("hello")
+        diagnostics = provider.diagnostics()
+        provider.shutdown()
+
+        runtime.init.assert_called_once()
+        runtime.synthesize_to_bytes.assert_called_once_with("hello")
+        runtime.stop_server.assert_called_once()
+        self.assertEqual(b"wav", result)
+        self.assertTrue(diagnostics["initialized"])
+        self.assertTrue(diagnostics["process_running"])
 
     def test_config_manager_validates_local_cuda_visible_devices(self):#20260626_kpopmodder
         temp_dir = tempfile.TemporaryDirectory()

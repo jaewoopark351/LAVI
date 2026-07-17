@@ -301,6 +301,7 @@ class PluginSystemImportTests(unittest.TestCase):
         self.assertIs(TTSPluginInterface, CanonicalTTS)
         self.assertIs(VtuberPluginInterface, CanonicalVtuber)
         from plugin_system.contracts import PLUGIN_LIFECYCLE_METHODS, validate_plugin_lifecycle
+        from plugin_system.runtime_plugin_mixin import RuntimePluginContractMixin
 
         for interface_class in (
             InputPluginInterface,
@@ -317,6 +318,50 @@ class PluginSystemImportTests(unittest.TestCase):
                     [],
                     list(validate_plugin_lifecycle(instance, interface_class.__name__)),
                 )
+                self.assertIsInstance(instance, RuntimePluginContractMixin)
+
+    def test_plugin_interface_instances_expose_contract_facade(self):
+        from plugin_system.interfaces import TTSPluginInterface
+
+        class ExampleTTS(TTSPluginInterface):
+            PLUGIN_METADATA = {
+                "id": "example.tts",
+                "display_name": "Example TTS",
+                "api_version": "1",
+                "category": "text_to_speech",
+                "entrypoint": "tests.example:ExampleTTS",
+                "dependency_group": "Core",
+                "capabilities": ["text_to_speech", "offline"],
+                "config_schema": {"ExampleTTS": {"voice": "default"}},
+                "availability_probe": {
+                    "required_python_packages": ["requests"],
+                    "timeout_sec": 0.5,
+                },
+                "supports": {
+                    "offline": True,
+                    "cpu": True,
+                    "requires_gpu": False,
+                },
+            }
+
+            def synthesize(self, text):
+                return b""
+
+        plugin = ExampleTTS()
+        contract = plugin.runtime_contract
+        diagnostics = plugin.diagnostics()
+
+        self.assertEqual("example.tts", plugin.manifest["id"])
+        self.assertEqual({"ExampleTTS": {"voice": "default"}}, plugin.config_schema)
+        self.assertEqual(("text_to_speech", "offline"), plugin.capabilities)
+        self.assertTrue(plugin.supports_offline)
+        self.assertTrue(plugin.supports_cpu)
+        self.assertFalse(plugin.requires_gpu)
+        self.assertEqual(["requests"], plugin.availability_probe["required_python_packages"])
+        self.assertEqual(0.5, plugin.availability_probe["timeout_sec"])
+        self.assertEqual([], list(contract.validation_errors()))
+        self.assertEqual("example.tts", diagnostics["plugin_id"])
+        self.assertEqual("runtime_instance_ready", diagnostics["reason_code"])
 
     def test_plugin_lifecycle_validator_reports_missing_callable(self):#20260717_kpopmodder
         from plugin_system.contracts import validate_plugin_lifecycle

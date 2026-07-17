@@ -1,5 +1,8 @@
 #20260622_kpopmodder: Canonical plugin interface definitions.
-class InputPluginInterface:
+from plugin_system.runtime_plugin_mixin import RuntimePluginContractMixin
+
+
+class InputPluginInterface(RuntimePluginContractMixin):
     def __init__(self):
         self.input_event_listeners = []
 
@@ -26,7 +29,7 @@ class InputPluginInterface:
             listener(input)
 
 
-class LLMPluginInterface:#20260622_kpopmodder
+class LLMPluginInterface(RuntimePluginContractMixin):#20260622_kpopmodder
     def init(self):
         pass
 
@@ -46,7 +49,7 @@ class LLMPluginInterface:#20260622_kpopmodder
         pass
 
 
-class TranslationPluginInterface:
+class TranslationPluginInterface(RuntimePluginContractMixin):
     def init(self):
         pass
 
@@ -73,7 +76,7 @@ class TranslationPluginInterface:
         pass
 
 
-class TTSPluginInterface:
+class TTSPluginInterface(RuntimePluginContractMixin):
     def init(self):
         pass
 
@@ -93,7 +96,7 @@ class TTSPluginInterface:
         pass
 
 
-class VtuberPluginInterface:
+class VtuberPluginInterface(RuntimePluginContractMixin):
     class AvatarData():
         mouth_open = 0
         # TODO current emotion, current pheonome etc

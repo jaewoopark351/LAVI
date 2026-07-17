@@ -31,7 +31,10 @@ class Provider():
         contract = getattr(self.handle, "runtime_contract", None)
         if contract is not None:
             return contract
-        return getattr(self.plugin, "runtime_contract", None)
+        contract = getattr(self.plugin, "runtime_contract", None)
+        if callable(contract):
+            return contract()
+        return contract
 
     def runtime_contract_dict(self):
         contract = self.runtime_contract
@@ -409,11 +412,33 @@ class PluginSelectionBase():#20260622_kpopmodder
                     "diagnostic": {},
                     "runtime_contract": provider.runtime_contract_dict(),
                 }
+            plugin_diagnostic = self._plugin_diagnostic_dict(provider)
+            if plugin_diagnostic:
+                snapshot["diagnostic"] = plugin_diagnostic
             snapshot["selected"] = provider is self.current_provider
             snapshot["initialized"] = bool(provider.initialized)
             snapshot["disabled"] = bool(provider.disabled)
             diagnostics.append(snapshot)
         return diagnostics
+
+    def _plugin_diagnostic_dict(self, provider):
+        #20260717_kpopmodder: Prefer provider-owned diagnostics after construction without forcing lazy providers to load.
+        plugin = getattr(provider, "plugin", None)
+        diagnostics = getattr(plugin, "diagnostics", None)
+        if not callable(diagnostics):
+            return {}
+        try:
+            value = diagnostics()
+        except Exception as e:
+            return {
+                "reason_code": "diagnostics_failed",
+                "human_readable_message": str(e),
+            }
+        if hasattr(value, "to_dict"):
+            return value.to_dict()
+        if isinstance(value, dict):
+            return dict(value)
+        return {"human_readable_message": str(value)}
 
     def providers_matching(
         self,
@@ -475,21 +500,25 @@ class PluginSelectionBase():#20260622_kpopmodder
             provider.shutdown_attempted = True
             return
 
-        cleanup = getattr(plugin, "shutdown", None)
-        if not callable(cleanup):
-            cleanup = getattr(plugin, "stop", None)
-        try:
-            if callable(cleanup):
+        context = "cleanup" if failed_cleanup else "shutdown"
+        seen_methods = set()
+        for method_name in ("stop", "shutdown", "cleanup"):
+            cleanup = getattr(plugin, method_name, None)
+            if not callable(cleanup):
+                continue
+            method_key = id(cleanup)
+            if method_key in seen_methods:
+                continue
+            seen_methods.add(method_key)
+            try:
                 cleanup()
-        except Exception as e:
-            context = "cleanup" if failed_cleanup else "shutdown"
-            log_print(
-                f"[PluginSelection] {context} failed: "
-                f"{provider.name}: {e}"
-            )
-        finally:
-            provider.shutdown_attempted = True
-            self._mark_provider_handle(provider, "mark_stopped")
+            except Exception as e:
+                log_print(
+                    f"[PluginSelection] {context} {method_name} failed: "
+                    f"{provider.name}: {e}"
+                )
+        provider.shutdown_attempted = True
+        self._mark_provider_handle(provider, "mark_stopped")
 
     def shutdown(self):
         for provider in list(self.provider_list):

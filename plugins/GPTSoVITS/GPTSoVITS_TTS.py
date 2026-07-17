@@ -1,10 +1,11 @@
 import os
 
 #20260620_kpopmodder: Import grouped GPTSoVITS helpers from gpt_sovits_core.
-from plugins.GPTSoVITS.gpt_sovits_core.gpt_sovits_api_client import GPTSoVITSApiClient
+from plugins.GPTSoVITS.gpt_sovits_core.gpt_sovits_client import GPTSoVITSClient
+from plugins.GPTSoVITS.gpt_sovits_core.gpt_sovits_config import GPTSoVITSConfig
 from plugins.GPTSoVITS.gpt_sovits_core.gpt_sovits_config_manager import GPTSoVITSConfigManager
 from plugins.GPTSoVITS.gpt_sovits_core.gpt_sovits_model_manager import GPTSoVITSModelManager
-from plugins.GPTSoVITS.gpt_sovits_core.gpt_sovits_server_manager import GPTSoVITSServerManager
+from plugins.GPTSoVITS.gpt_sovits_core.gpt_sovits_process_manager import GPTSoVITSProcessManager
 
 
 class GPTSoVITSTTS:#20260615_kpopmodder
@@ -34,11 +35,13 @@ class GPTSoVITSTTS:#20260615_kpopmodder
     )
 
     def __init__(self):
-        self._gpt_sovits_url = "http://127.0.0.1:9880/tts"
+        #20260717_kpopmodder: Keep static path/default decisions in GPTSoVITSConfig.
+        self.config = GPTSoVITSConfig(self.current_module_directory)
+        self._gpt_sovits_url = self.config.default_api_url
         self.gpt_sovits_root = ""
         #20260626_kpopmodder: Pass GPU pinning to the GPT-SoVITS child process only.
         self.cuda_visible_devices = str(
-            self.default_config.get("cuda_visible_devices", "1")
+            self.config.default_config.get("cuda_visible_devices", "1")
         ).strip()#20260626_kpopmodder
 
         self.text_language = "ko"
@@ -49,28 +52,25 @@ class GPTSoVITSTTS:#20260615_kpopmodder
             "이 방송 이후로 1년이 지났지만 여전히 최고의 기억입니다."
         )
 
-        self.ref_audio_path = os.path.join(
-            self.base_dir,
-            "voices",
-            "ref.wav"
-        )
+        self.ref_audio_path = self.config.default_ref_audio_path
 
         self.config_manager = GPTSoVITSConfigManager(
-            config_dir=self.config_dir,
-            config_path=self.config_path,
-            default_config=self.default_config
+            config_dir=self.config.config_dir,
+            config_path=self.config.config_path,
+            default_config=self.config.default_config
         )
-        self.server_manager = GPTSoVITSServerManager(
+        self.process_manager = GPTSoVITSProcessManager(
             config_manager=self.config_manager,
             gpt_sovits_url=self._gpt_sovits_url,
             cuda_visible_devices=self.cuda_visible_devices#20260626_kpopmodder
         )
+        self.server_manager = self.process_manager
         self.model_manager = GPTSoVITSModelManager(
-            gpt_sovits_ckpt_dir=self.gpt_sovits_ckpt_dir,
-            gpt_sovits_model_dir=self.gpt_sovits_model_dir,
+            gpt_sovits_ckpt_dir=self.config.gpt_sovits_ckpt_dir,
+            gpt_sovits_model_dir=self.config.gpt_sovits_model_dir,
             gpt_sovits_url=self._gpt_sovits_url
         )
-        self.api_client = GPTSoVITSApiClient(
+        self.api_client = GPTSoVITSClient(
             current_module_directory=self.current_module_directory,
             gpt_sovits_url=self._gpt_sovits_url
         )
@@ -268,3 +268,13 @@ class GPTSoVITSTTS:#20260615_kpopmodder
 
     def stop_server(self):
         self.server_manager.stop_server()
+
+    def diagnostics(self):
+        #20260717_kpopmodder: Diagnostics avoid HTTP probes unless process_manager.probe() is called explicitly.
+        return {
+            "api_url": self.gpt_sovits_url,
+            "gpt_sovits_root_configured": bool(self.gpt_sovits_root),
+            "process_running": self.process_manager.is_process_running(),
+            "cuda_visible_devices": self.cuda_visible_devices,
+            "config": self.config.to_dict(),
+        }

@@ -14,6 +14,7 @@ from plugins.GPTSoVITS.GPTSoVITS_TTS import GPTSoVITSTTS
 from plugins.GPTSoVITS.gpt_sovits_core.tts_synthesis_service import TTSSynthesisService#20260616_kpopmodder
 
 from plugins.GPTSoVITS.gpt_sovits_core.gpt_sovits_settings_controller import GPTSoVITSSettingsController#20260616_kpopmodder
+from plugins.GPTSoVITS.gpt_sovits_core.gpt_sovits_tts_provider import GPTSoVITSTTSProvider
 
 class GPTSoVITS(TTSPluginInterface):#20260615_kpopmodder
     #20260716_kpopmodder: P1-B representative metadata; discovery must not start the GPT-SoVITS server.
@@ -51,8 +52,10 @@ class GPTSoVITS(TTSPluginInterface):#20260615_kpopmodder
     current_module_directory = os.path.dirname(__file__)
 
     def init(self):
-        self.gpt_sovits = GPTSoVITSTTS()
-        self.gpt_sovits.init()
+        #20260717_kpopmodder: The plugin facade owns UI wiring; GPTSoVITSTTSProvider owns provider startup/shutdown.
+        self.gpt_sovits_provider = GPTSoVITSTTSProvider(GPTSoVITSTTS())
+        self.gpt_sovits = self.gpt_sovits_provider.runtime
+        self.gpt_sovits_provider.init()
 
         #self.rvc = RVCPostProcess()#20260617_kpopmodder
         #self.rvc.init()#20260617_kpopmodder
@@ -455,17 +458,36 @@ class GPTSoVITS(TTSPluginInterface):#20260615_kpopmodder
 
     def __del__(self):
         try:
-            if hasattr(self, "gpt_sovits"):
+            if hasattr(self, "gpt_sovits_provider"):
+                self.gpt_sovits_provider.shutdown()
+            elif hasattr(self, "gpt_sovits"):
                 self.gpt_sovits.stop_server()
         except Exception:
             pass
 
     def cleanup(self):
         try:
-            if hasattr(self, "gpt_sovits"):
+            if hasattr(self, "gpt_sovits_provider"):
+                self.gpt_sovits_provider.shutdown()
+            elif hasattr(self, "gpt_sovits"):
                 self.gpt_sovits.stop_server()
         except Exception as e:
             log_print(f"[GPTSoVITS] cleanup failed: {e}")
+
+    def stop(self):
+        #20260717_kpopmodder: Provider lifecycle must release the GPT-SoVITS child process before shutdown.
+        self.cleanup()
+
+    def shutdown(self):
+        #20260717_kpopmodder: Keep shutdown idempotent for RuntimeLifecycle and PluginSelection cleanup paths.
+        self.cleanup()
+
+    def diagnostics(self):
+        diagnostics = super().diagnostics()
+        provider = getattr(self, "gpt_sovits_provider", None)
+        if provider is not None:
+            diagnostics["provider"] = provider.diagnostics()
+        return diagnostics
 
     # def set_use_rvc(self, value):#20260616_kpopmodder
     #     self.use_rvc = value

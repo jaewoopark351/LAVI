@@ -10,6 +10,7 @@ from plugin_system.contracts import (
     PluginSupports,
     validate_plugin_lifecycle,
 )
+from plugin_system.runtime_plugin_mixin import RuntimePluginContractMixin
 
 __all__ = [
     "AvailabilityProbeContract",
@@ -20,5 +21,6 @@ __all__ = [
     "PluginRuntimeContract",
     "PluginState",
     "PluginSupports",
+    "RuntimePluginContractMixin",
     "validate_plugin_lifecycle",
 ]
