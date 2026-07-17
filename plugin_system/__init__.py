@@ -7,6 +7,7 @@ from plugin_system.contracts import (
     PluginRuntimeContract,
     PluginState,
     PluginSupports,
+    validate_plugin_lifecycle,
 )
 
 __all__ = [
@@ -17,4 +18,5 @@ __all__ = [
     "PluginRuntimeContract",
     "PluginState",
     "PluginSupports",
+    "validate_plugin_lifecycle",
 ]

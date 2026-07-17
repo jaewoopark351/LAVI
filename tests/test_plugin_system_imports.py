@@ -22,10 +22,12 @@ class PluginSystemImportTests(unittest.TestCase):
             PluginRuntimeContract,
             PluginState,
             PluginSupports,
+            validate_plugin_lifecycle,
         )
         from plugin_system.contracts import (
             PluginDiagnostic as ContractDiagnostic,
             PluginState as ContractState,
+            validate_plugin_lifecycle as ContractLifecycleValidator,
         )
         from plugin_system.loader import (
             PluginDiagnostic as LoaderDiagnostic,
@@ -36,6 +38,7 @@ class PluginSystemImportTests(unittest.TestCase):
         self.assertIs(PluginState, LoaderState)
         self.assertIs(PluginDiagnostic, ContractDiagnostic)
         self.assertIs(PluginDiagnostic, LoaderDiagnostic)
+        self.assertIs(validate_plugin_lifecycle, ContractLifecycleValidator)
         self.assertEqual(
             {
                 "code": "example",
@@ -274,6 +277,47 @@ class PluginSystemImportTests(unittest.TestCase):
         self.assertIs(TranslationPluginInterface, CanonicalTranslation)
         self.assertIs(TTSPluginInterface, CanonicalTTS)
         self.assertIs(VtuberPluginInterface, CanonicalVtuber)
+        from plugin_system.contracts import PLUGIN_LIFECYCLE_METHODS, validate_plugin_lifecycle
+
+        for interface_class in (
+            InputPluginInterface,
+            LLMPluginInterface,
+            TranslationPluginInterface,
+            TTSPluginInterface,
+            VtuberPluginInterface,
+        ):
+            with self.subTest(interface=interface_class.__name__):
+                instance = interface_class()
+                for method_name in PLUGIN_LIFECYCLE_METHODS:
+                    self.assertTrue(callable(getattr(instance, method_name, None)))
+                self.assertEqual(
+                    [],
+                    list(validate_plugin_lifecycle(instance, interface_class.__name__)),
+                )
+
+    def test_plugin_lifecycle_validator_reports_missing_callable(self):#20260717_kpopmodder
+        from plugin_system.contracts import validate_plugin_lifecycle
+
+        class BrokenLifecycle:
+            def init(self):
+                pass
+
+            start = None
+
+            def shutdown(self):
+                pass
+
+        issues = validate_plugin_lifecycle(BrokenLifecycle(), "broken")
+
+        self.assertEqual(2, len(issues))
+        self.assertEqual(
+            ["lifecycle.start", "lifecycle.stop"],
+            [issue.path for issue in issues],
+        )
+        self.assertEqual(
+            {"contract_missing_lifecycle_callable"},
+            {issue.code for issue in issues},
+        )
 
     def test_loader_exports_plugin_loader_singleton(self):
         from plugin_system.loader import PluginLoader, plugin_loader
@@ -871,6 +915,61 @@ class PluginSystemImportTests(unittest.TestCase):
             self.assertEqual(PluginState.READY, handles[0].status)
             self.assertIsNone(handles[0].construct(LLMPluginInterface))
             self.assertEqual(PluginState.BROKEN, handles[0].status)
+            self.assertIsNotNone(handles[1].construct(LLMPluginInterface))
+
+    def test_loader_rejects_plugin_with_broken_lifecycle_callable(self):#20260717_kpopmodder
+        from plugin_system.interfaces import LLMPluginInterface
+        from plugin_system.loader import PluginLoader, PluginState
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            plugin_root = Path(temp_dir) / "plugins"
+            plugin_dir = plugin_root / "LifecyclePlugin"
+            plugin_dir.mkdir(parents=True)
+            (plugin_dir / "LifecyclePlugin.py").write_text(
+                "\n".join([
+                    "from plugin_system.interfaces import LLMPluginInterface",
+                    "",
+                    "class BrokenLifecyclePlugin(LLMPluginInterface):",
+                    "    start = None",
+                    "    def init(self):",
+                    "        pass",
+                    "    def predict(self, message, history):",
+                    "        return ''",
+                    "    def create_ui(self):",
+                    "        return None",
+                    "",
+                    "class GoodLifecyclePlugin(LLMPluginInterface):",
+                    "    def init(self):",
+                    "        pass",
+                    "    def predict(self, message, history):",
+                    "        return ''",
+                    "    def create_ui(self):",
+                    "        return None",
+                ]),
+                encoding="utf-8",
+            )
+            modules_path = Path(temp_dir) / "modules.json"
+            modules_path.write_text(json.dumps({}), encoding="utf-8")
+
+            loader = PluginLoader("plugins")
+            loader.plugin_directory = str(plugin_root)
+            loader.plugin_setting_path = str(modules_path)
+            loader._load_plugins_from_directory(str(plugin_dir))
+
+            handles = loader.plugins["language_model"]
+            loaded_names = [plugin.name for plugin in handles]
+
+            self.assertEqual(
+                ["BrokenLifecyclePlugin", "GoodLifecyclePlugin"],
+                loaded_names,
+            )
+            self.assertIsNone(handles[0].construct(LLMPluginInterface))
+            self.assertEqual(PluginState.FAILED, handles[0].status)
+            self.assertEqual(
+                "lifecycle_contract_failed",
+                handles[0].diagnostic.reason_code,
+            )
+            self.assertIn("start must be callable", handles[0].error)
             self.assertIsNotNone(handles[1].construct(LLMPluginInterface))
 
     def test_loader_module_name_keeps_policy_suffix(self):#20260703_kpopmodder

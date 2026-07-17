@@ -6,6 +6,12 @@ class InputPluginInterface:
     def init(self):
         pass
 
+    def start(self):
+        pass
+
+    def stop(self):
+        pass
+
     def create_ui(self):
         pass
 
@@ -24,6 +30,12 @@ class LLMPluginInterface:#20260622_kpopmodder
     def init(self):
         pass
 
+    def start(self):
+        pass
+
+    def stop(self):
+        pass
+
     def predict(self, message, history):
         raise NotImplementedError
 
@@ -36,6 +48,12 @@ class LLMPluginInterface:#20260622_kpopmodder
 
 class TranslationPluginInterface:
     def init(self):
+        pass
+
+    def start(self):
+        pass
+
+    def stop(self):
         pass
 
     def translate(self, text):
@@ -59,6 +77,12 @@ class TTSPluginInterface:
     def init(self):
         pass
 
+    def start(self):
+        pass
+
+    def stop(self):
+        pass
+
     def synthesize(self, text):
         raise NotImplementedError
 
@@ -77,6 +101,12 @@ class VtuberPluginInterface:
     avatar_data = AvatarData()
 
     def init(self):
+        pass
+
+    def start(self):
+        pass
+
+    def stop(self):
         pass
 
     def create_ui(self):

@@ -40,6 +40,23 @@ def _add_text_sequence_issues(issues, value, path):
             ))
 
 
+def validate_plugin_lifecycle(target, plugin_id="", required_methods=PLUGIN_LIFECYCLE_METHODS):
+    #20260717_kpopmodder: Runtime plugin instances must expose the common lifecycle surface.
+    issues = []
+    target_name = getattr(target, "__name__", target.__class__.__name__)
+    label = str(plugin_id or target_name or "plugin")
+    for method_name in required_methods:
+        method = getattr(target, method_name, None)
+        if callable(method):
+            continue
+        issues.append(PluginContractIssue(
+            code="contract_missing_lifecycle_callable",
+            message=f"{label}.{method_name} must be callable",
+            path=f"lifecycle.{method_name}",
+        ))
+    return tuple(issues)
+
+
 @dataclass(frozen=True)
 class PluginContractIssue:
     #20260717_kpopmodder: Typed issue DTO for validating plugin runtime contracts.

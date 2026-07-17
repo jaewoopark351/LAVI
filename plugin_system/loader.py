@@ -25,6 +25,7 @@ from plugin_system.contracts import (
     PluginRuntimeContract,
     PluginState,
     PluginSupports,
+    validate_plugin_lifecycle,
 )
 from plugin_system.registry import plugin_registry
 
@@ -211,6 +212,30 @@ class PluginHandle:
                     f"{self.descriptor.class_name} does not implement {expected_interface.__name__}"
                 )
             self.instance = plugin_class()
+            lifecycle_issues = validate_plugin_lifecycle(
+                self.instance,
+                plugin_id=self.descriptor.id,
+            )
+            if lifecycle_issues:
+                diagnostic = PluginDiagnostic(
+                    plugin_id=self.descriptor.id,
+                    state=PluginState.FAILED,
+                    reason_code="lifecycle_contract_failed",
+                    human_readable_message="; ".join(
+                        issue.message for issue in lifecycle_issues
+                    ),
+                    log_reference=(
+                        "PluginLoader lifecycle validation for "
+                        f"{self.descriptor.status_key}"
+                    ),
+                )
+                self.instance = None
+                self._set_state(
+                    PluginState.FAILED,
+                    detail=diagnostic.human_readable_message,
+                    diagnostic=diagnostic,
+                )
+                return None
             self.status = PluginState.READY
             self.error = ""
             return self.instance
