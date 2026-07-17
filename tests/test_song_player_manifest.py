@@ -675,9 +675,7 @@ class SongPlaybackControllerTests(unittest.TestCase):
                 output_callback=lambda value: None,
             )
 
-            with mock.patch(
-                "plugins.SongPlayer.song_player_core.song_playback_controller.winsound.PlaySound"
-            ) as play_sound:
+            with mock.patch("tts_core.winsound_player.winsound.PlaySound") as play_sound:
                 timer = threading.Timer(0.02, controller.stop_event.set)
                 timer.start()
                 try:
@@ -707,9 +705,7 @@ class SongPlaybackControllerTests(unittest.TestCase):
         thread = _JoinInterruptedThread()
         controller.thread = thread
 
-        with mock.patch(
-            "plugins.SongPlayer.song_player_core.song_playback_controller.winsound.PlaySound"
-        ):
+        with mock.patch("tts_core.winsound_player.winsound.PlaySound"):
             controller.stop(join=True)
 
         self.assertEqual(1, thread.join_count)

@@ -9,6 +9,11 @@ OPTIONAL_MODULE_MANIFEST = {
         "default_enabled": True,
         "dependency_group": "Full",
         "capabilities": ("song_playback", "vtuber_expression"),
+        "config_schema": {
+            "SongPlayer": {
+                "manifest_path": "plugins/SongPlayer/config/song_player_songs.json",
+            },
+        },
         "required_python_packages": (),
         "required_files": (),
         "required_executables": (),
@@ -25,6 +30,14 @@ OPTIONAL_MODULE_MANIFEST = {
         "default_enabled": False,
         "dependency_group": "Full",
         "capabilities": ("game_extension", "chess"),
+        "config_schema": {
+            "Chess": {
+                "config_path": "plugins/Chess/config/chess_config.json",
+                "lc0_path": "",
+                "weights_path": "",
+                "web_server_port": 8790,
+            },
+        },
         "required_python_packages": ("chess",),
         "required_files": (),
         "required_executables": (),
@@ -41,6 +54,11 @@ OPTIONAL_MODULE_MANIFEST = {
         "default_enabled": False,
         "dependency_group": "Full",
         "capabilities": ("game_extension", "starcraft_remastered"),
+        "config_schema": {
+            "StarCraftRemastered": {
+                "enabled": False,
+            },
+        },
         "required_python_packages": (),
         "required_files": (),
         "required_executables": (),
@@ -57,6 +75,13 @@ OPTIONAL_MODULE_MANIFEST = {
         "default_enabled": False,
         "dependency_group": "Full",
         "capabilities": ("game_extension", "starcraft116"),
+        "config_schema": {
+            "StarCraft116": {
+                "config_path": "plugins/StarCraft116/config/starcraft116_config.json",
+                "enabled": False,
+                "active_profile": "saida",
+            },
+        },
         "required_python_packages": (),
         "required_files": (),
         "required_executables": (),
@@ -73,6 +98,13 @@ OPTIONAL_MODULE_MANIFEST = {
         "default_enabled": False,
         "dependency_group": "Full",
         "capabilities": ("game_extension", "starcraft2"),
+        "config_schema": {
+            "StarCraft2": {
+                "config_path": "plugins/StarCraft2/config/starcraft2_config.json",
+                "enabled": False,
+                "race": "Protoss",
+            },
+        },
         "required_python_packages": (),
         "required_files": (),
         "required_executables": (),
@@ -89,6 +121,13 @@ OPTIONAL_MODULE_MANIFEST = {
         "default_enabled": True,
         "dependency_group": "Full",
         "capabilities": ("screen_observation", "vision_context"),
+        "config_schema": {
+            "ScreenVision": {
+                "model": "Qwen/Qwen2.5-VL-3B-Instruct",
+                "device": "auto",
+                "auto_watch_enabled": True,
+            },
+        },
         "required_python_packages": ("PIL", "torch", "transformers"),
         "required_files": (),
         "required_executables": (),

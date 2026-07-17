@@ -9,6 +9,7 @@ from collections import deque
 from typing import Any, Dict, Iterable, List, Optional
 
 from core.logger import log_print
+from core.process import launch_process
 
 from .starcraft2_contracts import (
     EngineResultDTO,
@@ -67,7 +68,7 @@ class ExternalProcessBotEngine(StarCraft2EngineInterface):
             )
 
         try:
-            self.process = subprocess.Popen(
+            self.process = launch_process(
                 command,
                 cwd=working_directory or None,
                 stdout=subprocess.PIPE,

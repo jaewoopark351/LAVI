@@ -11,8 +11,9 @@ import gradio as gr
 import librosa
 import webbrowser
 
+from core.gpu_device_manager import gpu_device_manager
 from text import text_to_sequence, _clean_text
-device = "cuda:0" if torch.cuda.is_available() else "cpu"
+device = gpu_device_manager.get_device("VitsTTS", default="cuda:0")#20260717_kpopmodder
 import logging
 logging.getLogger("PIL").setLevel(logging.WARNING)
 logging.getLogger("urllib3").setLevel(logging.WARNING)

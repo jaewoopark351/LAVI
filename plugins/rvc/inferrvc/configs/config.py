@@ -6,6 +6,7 @@ from multiprocessing import cpu_count
 
 import torch
 
+from core.gpu_device_manager import gpu_device_manager
 from core.logger import log_print, debug_print#20260612_kpopmodder
 
 # try:
@@ -139,8 +140,13 @@ class Config:
     #I don't think this is used for inference but we will see.
     def device_config(self) -> tuple:
         log_print(f"device_config called")#20260612_kpopmodder
-        if torch.cuda.is_available():
-            log_print(f"torch.cuda.is_available()")#20260612_kpopmodder
+        resolved_device = gpu_device_manager.get_device(
+            "rvc",
+            default=self.device,
+        )#20260717_kpopmodder
+        if str(resolved_device).startswith("cuda"):
+            self.device = resolved_device
+            log_print(f"GPUDeviceManager resolved CUDA")#20260717_kpopmodder
             if self.has_xpu():
                 log_print(f"self.has_xpu()")#20260612_kpopmodder
                 self.device = self.instead = "xpu:0"

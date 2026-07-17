@@ -3,7 +3,20 @@ import os
 import subprocess
 
 
-def launch_process(command, *, cwd=None, env=None, stdout=None, stderr=None, stdin=None):
+def launch_process(
+    command,
+    *,
+    cwd=None,
+    env=None,
+    stdout=None,
+    stderr=None,
+    stdin=None,
+    text=None,
+    encoding=None,
+    errors=None,
+    bufsize=None,
+    shell=None,
+):
     #20260717_kpopmodder: Keep Windows process flags in one place while preserving subprocess.Popen semantics.
     kwargs = {
         "cwd": cwd,
@@ -11,6 +24,11 @@ def launch_process(command, *, cwd=None, env=None, stdout=None, stderr=None, std
         "stdout": stdout,
         "stderr": stderr,
         "stdin": stdin,
+        "text": text,
+        "encoding": encoding,
+        "errors": errors,
+        "bufsize": bufsize,
+        "shell": shell,
     }
     kwargs = {key: value for key, value in kwargs.items() if value is not None}
     if os.name == "nt":

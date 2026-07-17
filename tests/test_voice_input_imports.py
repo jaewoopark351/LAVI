@@ -5,7 +5,7 @@ import unittest
 import warnings
 from pathlib import Path
 from threading import Lock
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -182,9 +182,11 @@ class VoiceInputImportTests(unittest.TestCase):
             "torch_dtype": "float16",
         }
 
-        with patch(
-            "plugins.VoiceInput.voiceInput.TransformersWhisperBackend"
-        ) as backend_class:
+        backend_class = MagicMock()
+        with patch.dict(
+            VoiceInput.build_stt_backend.__globals__,
+            {"TransformersWhisperBackend": backend_class},
+        ):#20260717_kpopmodder: Patch the class globals directly because plugin loader tests may reload this module.
             backend = voice_input.build_stt_backend(
                 settings=settings,
                 resolved_device="cuda:1",

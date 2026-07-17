@@ -23,6 +23,7 @@ class PluginSystemImportTests(unittest.TestCase):
             PluginRuntimeContract,
             PluginState,
             PluginSupports,
+            ProviderDiagnosticDTO,
             validate_plugin_lifecycle,
         )
         from plugin_system.contracts import (
@@ -40,6 +41,27 @@ class PluginSystemImportTests(unittest.TestCase):
         self.assertIs(PluginDiagnostic, ContractDiagnostic)
         self.assertIs(PluginDiagnostic, LoaderDiagnostic)
         self.assertIs(validate_plugin_lifecycle, ContractLifecycleValidator)
+        self.assertEqual(
+            {
+                "plugin_id": "Example",
+                "name": "ExampleProvider",
+                "category": "input_gathering",
+                "state": "READY",
+                "detail": "",
+                "diagnostic": {},
+                "runtime_contract": {},
+                "selected": True,
+                "initialized": False,
+                "disabled": False,
+            },
+            ProviderDiagnosticDTO(
+                plugin_id="Example",
+                name="ExampleProvider",
+                category="input_gathering",
+                state="READY",
+                selected=True,
+            ).to_dict(),
+        )
         self.assertEqual(
             {
                 "code": "example",

@@ -149,6 +149,31 @@ class GPUDeviceManagerTests(unittest.TestCase):#20260626_kpopmodder
         with self._patch_torch_cuda(manager, available=True, count=1):
             self.assertIsNone(manager.get_cuda_visible_devices("GPTSoVITS"))
 
+    def test_apply_cuda_visible_devices_updates_child_env(self):#20260717_kpopmodder
+        manager = self._manager_with_config({})
+        env = {}
+
+        with self._patch_torch_cuda(manager, available=True, count=2):
+            resolved = manager.apply_cuda_visible_devices(
+                env,
+                "Chess",
+                "1",
+            )
+
+        self.assertEqual("1", resolved)
+        self.assertEqual("1", env["CUDA_VISIBLE_DEVICES"])
+
+        env = {}
+        resolved = manager.apply_cuda_visible_devices(
+            env,
+            "GPTSoVITS",
+            "1",
+            validate=False,
+        )
+
+        self.assertEqual("1", resolved)
+        self.assertEqual("1", env["CUDA_VISIBLE_DEVICES"])
+
     def test_cuda_unavailable_uses_cpu_safe_fallbacks(self):#20260626_kpopmodder
         manager = self._manager_with_config({
             "VoiceInput": {

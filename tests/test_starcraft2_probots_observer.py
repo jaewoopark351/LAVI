@@ -543,7 +543,7 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
     def test_launcher_reports_missing_path_without_spawning_process(self):
         launcher = ProBotsLauncher()
 
-        with mock.patch("plugins.StarCraft2.starcraft2_core.probots_launcher.subprocess.Popen") as popen:
+        with mock.patch("plugins.StarCraft2.starcraft2_core.probots_launcher.launch_process") as popen:
             result = launcher.start(app_path="C:\\missing\\SC2AIApp.exe")
 
         self.assertFalse(result["ok"])
@@ -576,7 +576,7 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
             with mock.patch("plugins.StarCraft2.starcraft2_core.probots_launcher.os.path.isdir", return_value=True):
                 with mock.patch("plugins.StarCraft2.starcraft2_core.probots_launcher.subprocess.run") as run:
                     with mock.patch(
-                        "plugins.StarCraft2.starcraft2_core.probots_launcher.subprocess.Popen",
+                        "plugins.StarCraft2.starcraft2_core.probots_launcher.launch_process",
                         return_value=process,
                     ) as popen:
                         result = launcher.start_sc2aiapp(config, capture_output=False)
@@ -606,7 +606,7 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
             with mock.patch("plugins.StarCraft2.starcraft2_core.probots_launcher.os.path.isdir", return_value=True):
                 with mock.patch("plugins.StarCraft2.starcraft2_core.probots_launcher.subprocess.run") as run:
                     with mock.patch(
-                        "plugins.StarCraft2.starcraft2_core.probots_launcher.subprocess.Popen",
+                        "plugins.StarCraft2.starcraft2_core.probots_launcher.launch_process",
                         return_value=process,
                     ):
                         result = launcher.start_sc2aiapp(config, capture_output=False)
@@ -617,7 +617,7 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
     def test_ladder_proxy_launcher_reports_missing_executable(self):
         launcher = SC2LadderProxyLauncher()
 
-        with mock.patch("plugins.StarCraft2.starcraft2_core.sc2_ladder_proxy_launcher.subprocess.Popen") as popen:
+        with mock.patch("plugins.StarCraft2.starcraft2_core.sc2_ladder_proxy_launcher.launch_process") as popen:
             result = launcher.start(LocalMatchLaunchConfigDTO())
 
         self.assertIsInstance(result, LadderProxyResultDTO)
@@ -646,7 +646,7 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
         with mock.patch("plugins.StarCraft2.starcraft2_core.sc2_ladder_proxy_launcher.os.path.isfile", return_value=True):
             with mock.patch("plugins.StarCraft2.starcraft2_core.sc2_ladder_proxy_launcher.os.path.isdir", return_value=True):
                 with mock.patch(
-                    "plugins.StarCraft2.starcraft2_core.sc2_ladder_proxy_launcher.subprocess.Popen",
+                    "plugins.StarCraft2.starcraft2_core.sc2_ladder_proxy_launcher.launch_process",
                     return_value=process,
                 ) as popen:
                     result = launcher.start(command)
@@ -717,7 +717,7 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
             with mock.patch("plugins.StarCraft2.starcraft2_core.sc2_ladder_proxy_launcher.os.path.isfile", return_value=True):
                 with mock.patch("plugins.StarCraft2.starcraft2_core.sc2_ladder_proxy_launcher.os.path.isdir", return_value=True):
                     with mock.patch(
-                        "plugins.StarCraft2.starcraft2_core.sc2_ladder_proxy_launcher.subprocess.Popen",
+                        "plugins.StarCraft2.starcraft2_core.sc2_ladder_proxy_launcher.launch_process",
                         return_value=replacement_process,
                     ) as popen:
                         result = launcher.start(command)

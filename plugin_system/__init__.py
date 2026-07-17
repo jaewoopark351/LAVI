@@ -8,6 +8,7 @@ from plugin_system.contracts import (
     PluginRuntimeContract,
     PluginState,
     PluginSupports,
+    ProviderDiagnosticDTO,
     validate_plugin_lifecycle,
 )
 from plugin_system.runtime_plugin_mixin import RuntimePluginContractMixin
@@ -21,6 +22,7 @@ __all__ = [
     "PluginRuntimeContract",
     "PluginState",
     "PluginSupports",
+    "ProviderDiagnosticDTO",
     "RuntimePluginContractMixin",
     "validate_plugin_lifecycle",
 ]

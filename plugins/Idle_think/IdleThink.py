@@ -13,6 +13,22 @@ from core.global_state import GlobalKeys, global_state
 from core.logger import log_print, debug_print#20260612_kpopmodder
 
 class IdleThink(InputPluginInterface):
+    PLUGIN_METADATA = {
+        "id": "IdleThink",
+        "display_name": "Idle Think",
+        "api_version": "1",
+        "category": "input_gathering",
+        "entrypoint": "plugins.Idle_think.IdleThink:IdleThink",
+        "dependency_group": "Full",
+        "capabilities": ("idle_prompt_input",),
+        "required_python_packages": (),
+        "required_files": (),
+        "required_executables": (),
+        "required_services": (),
+        "supports_offline": True,
+        "supports_cpu": True,
+    }
+
     idle_elapsed_time = 0
     idle_dialog_trigger_time = 20
 

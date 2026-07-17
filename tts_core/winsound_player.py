@@ -6,6 +6,19 @@ import traceback
 from core.logger import log_print
 
 
+def play_wav_file_async(path):
+    #20260717_kpopmodder: Shared Windows async WAV playback path for non-TTS audio adapters too.
+    winsound.PlaySound(
+        path,
+        winsound.SND_FILENAME | winsound.SND_ASYNC,
+    )
+
+
+def stop_winsound_playback():
+    #20260717_kpopmodder: Keep direct winsound stop calls behind one helper.
+    winsound.PlaySound(None, 0)
+
+
 class WinSoundAudioPlayer:#20260617_kpopmodder
     def __init__(self, interrupt_event, mouth_animator=None):
         self.interrupt_event = interrupt_event
@@ -58,7 +71,7 @@ class WinSoundAudioPlayer:#20260617_kpopmodder
 
     def stop(self):
         try:
-            winsound.PlaySound(None, 0)
+            stop_winsound_playback()
 
         except Exception as e:
             log_print(f"[TTS playback] winsound stop error: {e}")

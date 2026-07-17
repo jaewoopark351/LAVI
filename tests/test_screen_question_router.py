@@ -261,6 +261,12 @@ class ScreenQuestionMainWiringTests(unittest.TestCase):
         project_root = Path(__file__).resolve().parents[1]
         composer_path = project_root / "app_core" / "app_composer.py"
         module = ast.parse(composer_path.read_text(encoding="utf-8-sig"))
+        core_composition_path = (
+            project_root / "app_core" / "core_component_composition.py"
+        )
+        core_module = ast.parse(
+            core_composition_path.read_text(encoding="utf-8-sig")
+        )
 
         screen_router_bootstrap_calls = [
             node
@@ -272,7 +278,7 @@ class ScreenQuestionMainWiringTests(unittest.TestCase):
 
         llm_calls = [
             node
-            for node in ast.walk(module)
+            for node in ast.walk(core_module)
             if isinstance(node, ast.Call)
             and getattr(node.func, "id", "") == "LLM"
         ]

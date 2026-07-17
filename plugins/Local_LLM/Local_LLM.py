@@ -8,6 +8,23 @@ from core.logger import log_print, debug_print#20260612_kpopmodder
 
 
 class LocalLLM(LLMPluginInterface):
+    PLUGIN_METADATA = {
+        "id": "LocalLLM",
+        "display_name": "Local GGUF LLM",
+        "api_version": "1",
+        "category": "language_model",
+        "entrypoint": "plugins.Local_LLM.Local_LLM:LocalLLM",
+        "dependency_group": "Full",
+        "capabilities": ("llm", "local_gguf"),
+        "required_python_packages": ("llama_cpp", "requests", "tqdm"),
+        "required_files": (),
+        "required_executables": (),
+        "required_services": (),
+        "supports_offline": False,
+        "supports_cpu": False,
+        "requires_gpu": True,
+    }
+
     context_length = 4096
 
     def init(self):

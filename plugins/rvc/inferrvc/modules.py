@@ -15,14 +15,15 @@ import torch
 import numpy as np
 import logging
 import os
+from core.gpu_device_manager import gpu_device_manager
 from core.logger import log_print, debug_print#20260612_kpopmodder
 
 logger = logging.getLogger(__name__)
 
 
 _cpu = torch.device('cpu')
-_gpu = torch.device('cuda:0')
-_devgp = dev = _gpu if torch.cuda.is_available() else _cpu
+_rvc_device = gpu_device_manager.get_device("rvc", default="cuda:0")#20260717_kpopmodder
+_devgp = dev = torch.device(_rvc_device)
 
 
 def download_models():

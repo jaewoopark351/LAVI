@@ -3,7 +3,10 @@ import gradio as gr
 
 from core.config_manager import config_manager#20260627_kpopmodder
 from core.logger import log_print  #20260612_kpopmodder
-from plugin_system.contracts import PluginRuntimeRequirements
+from plugin_system.contracts import (
+    PluginRuntimeRequirements,
+    ProviderDiagnosticDTO,
+)
 from plugin_system.loader import plugin_loader
 
 
@@ -415,10 +418,14 @@ class PluginSelectionBase():#20260622_kpopmodder
             plugin_diagnostic = self._plugin_diagnostic_dict(provider)
             if plugin_diagnostic:
                 snapshot["diagnostic"] = plugin_diagnostic
-            snapshot["selected"] = provider is self.current_provider
-            snapshot["initialized"] = bool(provider.initialized)
-            snapshot["disabled"] = bool(provider.disabled)
-            diagnostics.append(snapshot)
+            diagnostics.append(
+                ProviderDiagnosticDTO.from_snapshot(
+                    snapshot,
+                    selected=provider is self.current_provider,
+                    initialized=bool(provider.initialized),
+                    disabled=bool(provider.disabled),
+                ).to_dict()
+            )
         return diagnostics
 
     def _plugin_diagnostic_dict(self, provider):
@@ -462,7 +469,12 @@ class PluginSelectionBase():#20260622_kpopmodder
         ]
 
     def _provider_matches_runtime_requirements(self, provider):
-        return _provider_matches_requirements(provider, self.runtime_requirements)
+        requirements = getattr(
+            self,
+            "runtime_requirements",
+            PluginRuntimeRequirements(),
+        )
+        return _provider_matches_requirements(provider, requirements)
 
     def _current_provider_name(self):
         if self.current_provider is not None:

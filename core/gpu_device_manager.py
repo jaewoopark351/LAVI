@@ -459,6 +459,29 @@ class GPUDeviceManager:#20260626_kpopmodder
             default=default,
         )
 
+    def apply_cuda_visible_devices(
+        self,
+        env,
+        plugin_name,
+        value,
+        default=None,
+        validate=True,
+    ):#20260717_kpopmodder: Centralize child-process CUDA_VISIBLE_DEVICES env mutation.
+        if validate:
+            resolved = self.validate_cuda_visible_devices(
+                value,
+                plugin_name,
+                default=default,
+            )
+        else:
+            resolved = str(value or "").strip()
+        if resolved is None:
+            return None
+        if not resolved:
+            return None
+        env["CUDA_VISIBLE_DEVICES"] = resolved
+        return resolved
+
     def log_startup_vram_preflight(
         self,
         plugin_names=("VoiceInput", "ScreenVision", "GPTSoVITS"),

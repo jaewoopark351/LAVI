@@ -8,6 +8,23 @@ from core.logger import log_print, debug_print#20260612_kpopmodder
 
 
 class KoreaChatLLM(LLMPluginInterface):#20260610_kpopmodder
+    PLUGIN_METADATA = {
+        "id": "KoreaChatLLM",
+        "display_name": "Korea Chat GGUF",
+        "api_version": "1",
+        "category": "language_model",
+        "entrypoint": "plugins.Korea_Chat_GGUF.KoreaChatGGUF:KoreaChatLLM",
+        "dependency_group": "Full",
+        "capabilities": ("llm", "local_gguf", "korean_chat"),
+        "required_python_packages": ("llama_cpp", "requests", "tqdm"),
+        "required_files": (),
+        "required_executables": (),
+        "required_services": (),
+        "supports_offline": False,
+        "supports_cpu": False,
+        "requires_gpu": True,
+    }
+
     context_length = 32768
     temperature = 0.9
     def init(self):

@@ -5,6 +5,7 @@ import os
 import sys
 
 from app_core.gradio_launch import find_available_port
+from app_core.component_wiring_composition import AppComponentWiringService
 from app_core.core_component_composition import CoreComponentCompositionService
 from app_core.memory_bootstrap import bootstrap_memory
 from app_core.extensions import (
@@ -69,6 +70,7 @@ class AppComposer:
         self.game_extension_composition_service = GameExtensionCompositionService(
             self.game_extension_registry,
         )
+        self.component_wiring_service = AppComponentWiringService()
         self.core_component_composition_service = CoreComponentCompositionService()
         self.optional_plugin_composition_service = OptionalPluginCompositionService(
             self.current_module_directory,
@@ -253,12 +255,10 @@ class AppComposer:
         )
 
     def wire_optional_plugin_callbacks(self):
-        if self.starcraft_plugin is not None:
-            self.starcraft_plugin.set_screen_observation_provider(
-                lambda: getattr(self.screen_vision, "last_screen_observation", "")
-                if self.screen_vision is not None
-                else ""
-            )#20260630_kpopmodder
+        self.component_wiring_service.wire_optional_plugin_callbacks(
+            starcraft_plugin=self.starcraft_plugin,
+            screen_vision=self.screen_vision,
+        )
 
     def _register_game_extensions(self):
         result = self.game_extension_composition_service.compose(
@@ -306,30 +306,17 @@ class AppComposer:
                     self.screen_vision.create_ui()#20260620_kpopmodder
 
     def wire_event_listeners(self):
-        self.input.add_output_event_listener(self.llm.receive_input)
-        self.llm.add_output_event_listener(self.translate.receive_input)
-        self.translate.add_output_event_listener(self.tts.receive_input)
-        self.tts.add_output_event_listener(self.vtuber.receive_input)
-        if self.song_player is not None:
-            self.song_player.add_output_event_listener(
-                self.vtuber.receive_input,
-            )#20260628_kpopmodder
-            self.song_player.add_expression_event_listener(
-                self.vtuber.receive_song_expression
-            )#20260628_kpopmodder
-        if self.starcraft_plugin is not None:
-            self.starcraft_plugin.add_output_event_listener(
-                self.llm.receive_input,
-            )#20260630_kpopmodder
-            self.llm.add_output_event_listener(
-                self.starcraft_plugin.receive_coach_response,
-                full_response=True,
-            )#20260630_kpopmodder
-
-        if self.screen_vision is not None:
-            self.screen_vision.add_output_event_listener(
-                self.receive_screen_vision_input,
-            )#20260620_kpopmodder
+        self.component_wiring_service.wire_event_listeners(
+            input_component=self.input,
+            llm=self.llm,
+            translate=self.translate,
+            tts=self.tts,
+            vtuber=self.vtuber,
+            song_player=self.song_player,
+            starcraft_plugin=self.starcraft_plugin,
+            screen_vision=self.screen_vision,
+            screen_vision_input_callback=self.receive_screen_vision_input,
+        )
 
     def receive_screen_vision_input(self, text):#20260628_kpopmodder
         if global_state.get_value(GlobalKeys.IS_SONG_PLAYING, False):
@@ -340,31 +327,23 @@ class AppComposer:
         self.llm.receive_input(text)
 
     def build_managed_components(self):
-        self.managed_components = [
-            self.input,
-            self.llm,
-            self.translate,
-            self.tts,
-            self.vtuber,
-        ]#20260623_kpopmodder
-        self.core_components = [
-            self.input,
-            self.llm,
-            self.translate,
-            self.tts,
-            self.vtuber,
-        ]
-        if self.screen_vision is not None:
-            self.managed_components.insert(0, self.screen_vision)#20260629_kpopmodder
-        if self.song_player is not None:
-            self.managed_components.insert(-1, self.song_player)#20260629_kpopmodder
-        if self.starcraft_plugin is not None:
-            self.managed_components.insert(-1, self.starcraft_plugin)#20260630_kpopmodder
-        if self.game_extension_registry.all():
-            #20260717_kpopmodder: RuntimeLifecycle starts/stops game extensions through the registry.
-            self.optional_components.append(self.game_extension_registry)
-            self._register_startup_component(self.game_extension_registry)
-            self.managed_components.insert(-1, self.game_extension_registry)
+        result = self.component_wiring_service.build_managed_components(
+            input_component=self.input,
+            llm=self.llm,
+            translate=self.translate,
+            tts=self.tts,
+            vtuber=self.vtuber,
+            screen_vision=self.screen_vision,
+            song_player=self.song_player,
+            starcraft_plugin=self.starcraft_plugin,
+            game_extension_registry=self.game_extension_registry,
+            optional_components=self.optional_components,
+        )
+        self.managed_components = list(result.managed_components)
+        self.core_components = list(result.core_components)
+        self.optional_components = list(result.optional_components)
+        for component in result.startup_components:
+            self._register_startup_component(component)
 
     def create_runtime_lifecycle(self):
         self.runtime_lifecycle = RuntimeLifecycle(#20260630_kpopmodder

@@ -1,4 +1,3 @@
-import subprocess
 import time
 import zipfile
 import gradio as gr
@@ -7,9 +6,26 @@ from tqdm import tqdm
 from plugin_system.interfaces import TTSPluginInterface
 import os
 from core.logger import log_print, debug_print#20260612_kpopmodder
+from core.process import launch_process
 
 
 class VoiceVox(TTSPluginInterface):
+    PLUGIN_METADATA = {
+        "id": "VoiceVox",
+        "display_name": "VOICEVOX",
+        "api_version": "1",
+        "category": "text_to_speech",
+        "entrypoint": "plugins.voicevox.voicevox:VoiceVox",
+        "dependency_group": "Full",
+        "capabilities": ("text_to_speech", "voicevox_engine"),
+        "required_python_packages": ("requests", "tqdm"),
+        "required_files": (),
+        "required_executables": (),
+        "required_services": ("VOICEVOX engine http://127.0.0.1:50021",),
+        "supports_offline": True,
+        "supports_cpu": True,
+    }
+
     voicevox_server_started = False
     current_module_directory = os.path.dirname(__file__)
     voicevox_engine_directory = os.path.join(
@@ -115,7 +131,7 @@ class VoiceVox(TTSPluginInterface):
         if (self.voicevox_server_started):
             return
         # start voicevox server
-        subprocess.Popen(self.executable_path)
+        launch_process([self.executable_path])
         self.voicevox_server_started = True
 
     def initialize_speakers(self):

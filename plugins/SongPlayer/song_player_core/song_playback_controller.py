@@ -3,11 +3,14 @@ import struct
 import threading
 import time
 import traceback
-import winsound
 import wave
 
 from core.global_state import global_state, GlobalKeys
 from core.logger import log_print
+from tts_core.winsound_player import (
+    play_wav_file_async,
+    stop_winsound_playback,
+)
 from plugins.SongPlayer.song_player_core.song_mouth_animator import (
     SongMouthAnimator,
 )
@@ -262,10 +265,7 @@ class SongPlaybackController:#20260628_kpopmodder
 
     def _play_audio_until_stopped(self, audio_path):
         duration_sec = self._get_wav_duration_sec(audio_path)
-        winsound.PlaySound(
-            audio_path,
-            winsound.SND_FILENAME | winsound.SND_ASYNC,
-        )
+        play_wav_file_async(audio_path)
 
         deadline = time.monotonic() + max(0.0, duration_sec)
         while not self.stop_event.is_set():
@@ -284,7 +284,7 @@ class SongPlaybackController:#20260628_kpopmodder
 
     def _stop_winsound(self):
         try:
-            winsound.PlaySound(None, 0)
+            stop_winsound_playback()
         except Exception as e:
             log_print(f"[SongPlayer] winsound stop error: {e}")
 

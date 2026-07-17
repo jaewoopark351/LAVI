@@ -231,7 +231,7 @@ class StarCraft116PluginTests(unittest.TestCase):
         fake_process.pid = 116
 
         with mock.patch(
-            "plugins.StarCraft116.starcraft116_core.starcraft116_launcher.subprocess.Popen",
+            "plugins.StarCraft116.starcraft116_core.starcraft116_launch_executor.launch_process",
             return_value=fake_process,
         ) as popen_mock:
             result = launcher.launch()
@@ -361,7 +361,7 @@ class StarCraft116PluginTests(unittest.TestCase):
         fake_process.pid = 1161
 
         with mock.patch(
-            "plugins.StarCraft116.starcraft116_core.starcraft116_launcher.subprocess.Popen"
+            "plugins.StarCraft116.starcraft116_core.starcraft116_launch_executor.launch_process"
         ) as popen_mock, mock.patch.object(
             launcher,
             "_launch_elevated",
@@ -400,7 +400,7 @@ class StarCraft116PluginTests(unittest.TestCase):
         launcher = StarCraft116Launcher(StarCraft116Config(str(plugin_root)))
 
         with mock.patch(
-            "plugins.StarCraft116.starcraft116_core.starcraft116_launcher.subprocess.Popen"
+            "plugins.StarCraft116.starcraft116_core.starcraft116_launch_executor.launch_process"
         ) as popen_mock:
             result = launcher.launch()
 

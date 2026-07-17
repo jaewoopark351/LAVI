@@ -4,6 +4,7 @@ import time
 
 import requests
 
+from core.gpu_device_manager import gpu_device_manager
 from core.logger import log_print
 from core.process import launch_process
 
@@ -82,7 +83,21 @@ class GPTSoVITSProcessManager:
 
             log_print("[GPTSoVITS_TTS] Starting new GPT-SoVITS API server...")#20260616_kpopmodder
             env = os.environ.copy()#20260626_kpopmodder
-            env["CUDA_VISIBLE_DEVICES"] = cuda_visible_devices#20260626_kpopmodder
+            resolved_cuda_visible_devices = (
+                gpu_device_manager.apply_cuda_visible_devices(
+                    env,
+                    "GPTSoVITS",
+                    cuda_visible_devices,
+                    validate=False,
+                )
+            )#20260717_kpopmodder
+            if not resolved_cuda_visible_devices:
+                log_print(
+                    "[GPTSoVITS_TTS] ERROR: CUDA_VISIBLE_DEVICES is invalid. "
+                    "Refusing to start GPT-SoVITS."
+                )#20260717_kpopmodder
+                self.gpt_sovits_process = None
+                return
             log_print(
                 f"[GPTSoVITS_TTS] CUDA_VISIBLE_DEVICES="
                 f"{env['CUDA_VISIBLE_DEVICES']}"

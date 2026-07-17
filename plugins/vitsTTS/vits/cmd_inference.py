@@ -22,7 +22,9 @@ import commons
 import scipy.io.wavfile as wavf
 import os
 
-device = "cuda:0" if torch.cuda.is_available() else "cpu"
+from core.gpu_device_manager import gpu_device_manager
+
+device = gpu_device_manager.get_device("VitsTTS", default="cuda:0")#20260717_kpopmodder
 
 language_marks = {
     "Japanese": "",
@@ -73,7 +75,7 @@ if __name__ == "__main__":
     noise_scale_w = args.noise_scale_w
     length = args.length_scale
     output_name = args.output_name
-    
+
     hps = utils.get_hparams_from_file(config_path)
     net_g = SynthesizerTrn(
         len(hps.symbols),
@@ -83,7 +85,7 @@ if __name__ == "__main__":
         **hps.model).to(device)
     _ = net_g.eval()
     _ = utils.load_checkpoint(model_path, net_g, None)
-    
+
     speaker_ids = hps.speakers
 
 
@@ -100,7 +102,3 @@ if __name__ == "__main__":
         del stn_tst, x_tst, x_tst_lengths, sid
 
         wavf.write(str(output_dir)+"/"+output_name+".wav",hps.data.sampling_rate,audio)
-    
-
-    
-    

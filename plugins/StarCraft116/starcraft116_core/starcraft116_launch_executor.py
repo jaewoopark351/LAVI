@@ -4,6 +4,8 @@ import os
 import subprocess
 from ctypes import wintypes
 
+from core.process import launch_process
+
 
 class StarCraft116StartedProcess:
     def __init__(self, label, process, command):
@@ -45,7 +47,7 @@ class StarCraft116ProcessLauncherRuntime:
         if launch_command["run_as_admin"]:
             return self._launch_elevated(launch_command)
 
-        return subprocess.Popen(
+        return launch_process(
             launch_command["command"],
             cwd=launch_command["cwd"] or None,
             shell=False,

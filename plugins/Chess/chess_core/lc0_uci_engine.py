@@ -5,6 +5,8 @@ import threading
 import time
 
 from core.logger import log_print
+from core.gpu_device_manager import gpu_device_manager
+from core.process import launch_process
 
 
 #20260628_kpopmodder: Added LC0 UCI wrapper so Chess never implements an engine.
@@ -63,19 +65,19 @@ class LC0UCIEngine:
 
         env = os.environ.copy()
         if self.cuda_visible_devices:
-            env["CUDA_VISIBLE_DEVICES"] = self.cuda_visible_devices
+            gpu_device_manager.apply_cuda_visible_devices(
+                env,
+                "Chess",
+                self.cuda_visible_devices,
+            )
 
         log_print(
             f"[Chess] LC0 start requested: path={self.lc0_path} "
             f"weights={self.weights_path} backend={self.backend}"
         )
 
-        creationflags = 0
-        if os.name == "nt":
-            creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-
         try:
-            self.process = subprocess.Popen(
+            self.process = launch_process(
                 [self.lc0_path],
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
@@ -86,7 +88,6 @@ class LC0UCIEngine:
                 encoding="utf-8",
                 errors="replace",
                 bufsize=1,
-                creationflags=creationflags,
             )
         except Exception as e:
             self.process = None

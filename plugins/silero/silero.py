@@ -1,15 +1,32 @@
 import os
-import subprocess
+import sys
 import time
 import gradio as gr
 import requests
 from plugin_system.interfaces import TTSPluginInterface
 from core.logger import log_print, debug_print#20260612_kpopmodder
+from core.process import launch_process
 
 # speaker bookmarks: en_18, en_21, en_37, en_39, en_43, en_72
 
 
 class Silero(TTSPluginInterface):
+    PLUGIN_METADATA = {
+        "id": "Silero",
+        "display_name": "Silero TTS",
+        "api_version": "1",
+        "category": "text_to_speech",
+        "entrypoint": "plugins.silero.silero:Silero",
+        "dependency_group": "Full",
+        "capabilities": ("text_to_speech", "silero_api_server"),
+        "required_python_packages": ("requests",),
+        "required_files": (),
+        "required_executables": (),
+        "required_services": ("Silero API server http://127.0.0.1:8435",),
+        "supports_offline": True,
+        "supports_cpu": True,
+    }
+
     silero_server_started = False
     SILERO_URL_LOCAL = "127.0.0.1"
     PORT = "8435"
@@ -69,8 +86,8 @@ class Silero(TTSPluginInterface):
             return
 
         # start silero server
-        command = f"python -m silero_api_server -p {self.PORT}"
-        subprocess.Popen(command, shell=True)
+        command = [sys.executable, "-m", "silero_api_server", "-p", str(self.PORT)]
+        launch_process(command)
         self.silero_server_started = True
 
     def init_session(self, session_path):

@@ -60,7 +60,7 @@ class StarCraft2ExternalEnginesTests(unittest.TestCase):
         }
 
         with mock.patch(
-            "plugins.StarCraft2.starcraft2_core.external_exe_bot_engine.subprocess.Popen",
+            "plugins.StarCraft2.starcraft2_core.external_exe_bot_engine.launch_process",
             return_value=fake_process,
         ) as popen:
             start_result = engine.start(config)
@@ -94,7 +94,7 @@ class StarCraft2ExternalEnginesTests(unittest.TestCase):
         }
 
         with mock.patch(
-            "plugins.StarCraft2.starcraft2_core.external_exe_bot_engine.subprocess.Popen",
+            "plugins.StarCraft2.starcraft2_core.external_exe_bot_engine.launch_process",
             return_value=fake_process,
         ) as popen:
             start_result = engine.start(config)
@@ -133,7 +133,7 @@ class StarCraft2ExternalEnginesTests(unittest.TestCase):
             return os.path.normpath(path) in {exe_path, bot_config_path}
 
         with mock.patch(
-            "plugins.StarCraft2.starcraft2_core.external_exe_bot_engine.subprocess.Popen",
+            "plugins.StarCraft2.starcraft2_core.external_exe_bot_engine.launch_process",
             return_value=fake_process,
         ) as popen, mock.patch(
             "plugins.StarCraft2.starcraft2_core.micromachine_bot_engine.os.path.isfile",
@@ -197,7 +197,7 @@ class StarCraft2ExternalEnginesTests(unittest.TestCase):
             return []
 
         with mock.patch(
-            "plugins.StarCraft2.starcraft2_core.external_exe_bot_engine.subprocess.Popen",
+            "plugins.StarCraft2.starcraft2_core.external_exe_bot_engine.launch_process",
             return_value=fake_process,
         ) as popen, mock.patch(
             "plugins.StarCraft2.starcraft2_core.micromachine_bot_engine.os.path.isfile",
@@ -232,7 +232,7 @@ class StarCraft2ExternalEnginesTests(unittest.TestCase):
             return os.path.normpath(path) == exe_path
 
         with mock.patch(
-            "plugins.StarCraft2.starcraft2_core.external_exe_bot_engine.subprocess.Popen",
+            "plugins.StarCraft2.starcraft2_core.external_exe_bot_engine.launch_process",
         ) as popen, mock.patch(
             "plugins.StarCraft2.starcraft2_core.micromachine_bot_engine.os.path.isfile",
             side_effect=fake_isfile,
@@ -269,7 +269,7 @@ class StarCraft2ExternalEnginesTests(unittest.TestCase):
             return os.path.normpath(path) in {script_path, python_path}
 
         with mock.patch(
-            "plugins.StarCraft2.starcraft2_core.external_exe_bot_engine.subprocess.Popen",
+            "plugins.StarCraft2.starcraft2_core.external_exe_bot_engine.launch_process",
             return_value=fake_process,
         ) as popen, mock.patch(
             "plugins.StarCraft2.starcraft2_core.ares_sc2_bot_engine.os.path.isfile",
@@ -310,7 +310,7 @@ class StarCraft2ExternalEnginesTests(unittest.TestCase):
         config = {"ares_sc2": {"script_path": "C:\\Bots\\AresBot\\run.py"}}
 
         with mock.patch(
-            "plugins.StarCraft2.starcraft2_core.external_exe_bot_engine.subprocess.Popen",
+            "plugins.StarCraft2.starcraft2_core.external_exe_bot_engine.launch_process",
         ) as popen, mock.patch(
             "plugins.StarCraft2.starcraft2_core.ares_sc2_bot_engine.os.path.isfile",
             return_value=False,
@@ -334,7 +334,7 @@ class StarCraft2ExternalEnginesTests(unittest.TestCase):
         }
 
         with mock.patch(
-            "plugins.StarCraft2.starcraft2_core.external_exe_bot_engine.subprocess.Popen",
+            "plugins.StarCraft2.starcraft2_core.external_exe_bot_engine.launch_process",
         ) as popen, mock.patch(
             "plugins.StarCraft2.starcraft2_core.ares_sc2_bot_engine.os.path.isfile",
             return_value=True,
@@ -365,7 +365,7 @@ class StarCraft2ExternalEnginesTests(unittest.TestCase):
         }
 
         with mock.patch(
-            "plugins.StarCraft2.starcraft2_core.external_exe_bot_engine.subprocess.Popen",
+            "plugins.StarCraft2.starcraft2_core.external_exe_bot_engine.launch_process",
             return_value=fake_process,
         ):
             result = engine.start(config, event_callback=events.append)

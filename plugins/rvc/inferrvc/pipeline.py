@@ -15,15 +15,18 @@ import traceback
 
 import torchaudio.functional
 
+from core.gpu_device_manager import gpu_device_manager
+from core.paths import get_lavi_paths
+
 logger = logging.getLogger(__name__)
 
 
-now_dir = os.getcwd()
+now_dir = str(get_lavi_paths().project_root)#20260717_kpopmodder: Resolve legacy RVC imports from repo root instead of process cwd.
 sys.path.append(now_dir)
 
 _cpu = torch.device("cpu")
-_gpu = torch.device("cuda:0")
-_devgp = dev = _gpu if torch.cuda.is_available() else _cpu
+_rvc_device = gpu_device_manager.get_device("rvc", default="cuda:0")#20260717_kpopmodder
+_devgp = dev = torch.device(_rvc_device)
 
 bh, ah = signal.butter(N=5, Wn=48, btype="high", fs=16000)
 bh, ah = torch.from_numpy(bh).to(_devgp, non_blocking=True), torch.from_numpy(

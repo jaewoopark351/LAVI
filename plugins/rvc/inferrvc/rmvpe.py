@@ -23,6 +23,7 @@ from scipy.signal import get_window
 
 from . import jit
 
+from core.gpu_device_manager import gpu_device_manager
 from core.logger import log_print, debug_print#20260612_kpopmodder
 
 logger = logging.getLogger(__name__)
@@ -500,7 +501,9 @@ class RMVPE:
         self.resample_kernel = {}
         self.is_half = is_half
         if device is None:
-            device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
+            device = torch.device(
+                gpu_device_manager.get_device("rvc", default="cuda:0")
+            )#20260717_kpopmodder
         self.device = device
         self.mel_extractor = MelSpectrogram(
             is_half, 128, 16000, 1024, 160, None, 30, 8000
@@ -663,7 +666,7 @@ if __name__ == "__main__":
         audio = librosa.resample(audio, orig_sr=sampling_rate, target_sr=16000)
     model_path = r"D:\BaiduNetdiskDownload\RVC-beta-v2-0727AMD_realtime\rmvpe.pt"
     thred = 0.03  # 0.01
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = gpu_device_manager.get_device("rvc", default="cuda:0")#20260717_kpopmodder
     rmvpe = RMVPE(model_path, is_half=False, device=device)
     t0 = ttime()
     f0 = rmvpe.infer_from_audio(audio, thred=thred)

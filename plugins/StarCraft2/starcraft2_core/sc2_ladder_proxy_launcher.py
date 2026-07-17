@@ -12,6 +12,7 @@ from collections.abc import Iterable
 from typing import Any, Callable, Dict, List, Optional
 
 from core.logger import log_print
+from core.process import launch_process
 from .starcraft2_contracts import (
     LadderProxyExitEventDTO,
     LadderProxyPortCheckDTO,
@@ -130,7 +131,7 @@ class SC2LadderProxyLauncher:
                 f"exe={validation['executable_path']} cwd={validation['working_directory']} "
                 f"args={command_args}"
             )
-            self.process = subprocess.Popen(
+            self.process = launch_process(
                 process_command,
                 cwd=validation["working_directory"] or None,
                 stdout=stdout,
