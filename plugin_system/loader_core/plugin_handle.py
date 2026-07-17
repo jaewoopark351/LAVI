@@ -53,9 +53,18 @@ class PluginHandle:
     def check_availability(self):
         if self.status in (PluginState.UNAVAILABLE, PluginState.FAILED):
             return False
+        return self.refresh_availability()
+
+    def refresh_availability(self, force=False):
+        #20260718_kpopmodder: Allow explicit UNAVAILABLE re-probes while keeping FAILED sticky.
+        if self.status == PluginState.FAILED:
+            return False
+        if self.status == PluginState.UNAVAILABLE and not force:
+            return False
 
         diagnostic = self.loader.availability_diagnostic(self.descriptor)
         if diagnostic is None:
+            self._set_state(PluginState.READY)
             return True
 
         self._set_state(
@@ -122,8 +131,7 @@ class PluginHandle:
                     diagnostic=diagnostic,
                 )
                 return None
-            self.status = PluginState.READY
-            self.error = ""
+            self._set_state(PluginState.READY)
             return self.instance
         except Exception as e:
             self.mark_failed(e, reason_code="construct_failed")
@@ -134,9 +142,13 @@ class PluginHandle:
             return None
 
     def mark_starting(self):
+        if self.status == PluginState.FAILED:
+            return
         self._set_state(PluginState.STARTING)
 
     def mark_running(self):
+        if self.status == PluginState.FAILED:
+            return
         self._set_state(PluginState.RUNNING)
 
     def mark_failed(self, error, reason_code="plugin_failed"):
@@ -149,4 +161,6 @@ class PluginHandle:
         self._set_state(PluginState.FAILED, detail=error, diagnostic=diagnostic)
 
     def mark_stopped(self):
+        if self.status == PluginState.FAILED:
+            return
         self._set_state(PluginState.STOPPED)

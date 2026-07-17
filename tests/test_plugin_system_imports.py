@@ -2501,6 +2501,303 @@ class PluginSystemImportTests(unittest.TestCase):
             snapshot["NestedOptional"]["diagnostic"]["missing_python_packages"],
         )
 
+    def test_selection_preserves_failed_state_after_init_cleanup_failure(self):
+        #20260718_kpopmodder: Failed provider cleanup must not overwrite the original init failure.
+        from plugin_system.interfaces import LLMPluginInterface
+        from plugin_system.loader import PluginState
+        from plugin_system.selection import PluginSelectionBase
+        from plugin_system.selection_core.provider import Provider
+
+        class RecordingHandle:
+            def __init__(self):
+                self.status = PluginState.READY
+                self.error = ""
+                self.reason_code = ""
+
+            def mark_starting(self):
+                self.status = PluginState.STARTING
+
+            def mark_running(self):
+                self.status = PluginState.RUNNING
+
+            def mark_failed(self, error, reason_code="plugin_failed"):
+                self.status = PluginState.FAILED
+                self.error = str(error)
+                self.reason_code = reason_code
+
+            def mark_stopped(self):
+                self.status = PluginState.STOPPED
+                self.reason_code = "stopped"
+
+        class InitFailPlugin(LLMPluginInterface):
+            def init(self):
+                raise RuntimeError("init boom")
+
+            def stop(self):
+                raise RuntimeError("cleanup boom")
+
+            def predict(self, message, history):
+                return ""
+
+            def create_ui(self):
+                return None
+
+        handle = RecordingHandle()
+        provider = Provider()
+        provider.name = "InitFailPlugin"
+        provider.plugin = InitFailPlugin()
+        provider.handle = handle
+
+        selection = object.__new__(PluginSelectionBase)
+        selection.provider_list = [provider]
+        selection.plugin_type = LLMPluginInterface
+
+        self.assertFalse(selection.load_provider("InitFailPlugin"))
+        self.assertEqual(PluginState.FAILED, handle.status)
+        self.assertEqual("init_failed", handle.reason_code)
+        self.assertIn("init boom", handle.error)
+
+    def test_selection_preserves_failed_state_after_start_cleanup_failure(self):
+        #20260718_kpopmodder: Start failure diagnostics must survive cleanup failures.
+        from plugin_system.interfaces import LLMPluginInterface
+        from plugin_system.loader import PluginState
+        from plugin_system.selection import PluginSelectionBase
+        from plugin_system.selection_core.provider import Provider
+
+        class RecordingHandle:
+            def __init__(self):
+                self.status = PluginState.READY
+                self.error = ""
+                self.reason_code = ""
+
+            def mark_starting(self):
+                self.status = PluginState.STARTING
+
+            def mark_running(self):
+                self.status = PluginState.RUNNING
+
+            def mark_failed(self, error, reason_code="plugin_failed"):
+                self.status = PluginState.FAILED
+                self.error = str(error)
+                self.reason_code = reason_code
+
+            def mark_stopped(self):
+                self.status = PluginState.STOPPED
+                self.reason_code = "stopped"
+
+        class StartFailPlugin(LLMPluginInterface):
+            def init(self):
+                pass
+
+            def start(self):
+                raise RuntimeError("start boom")
+
+            def stop(self):
+                raise RuntimeError("cleanup boom")
+
+            def predict(self, message, history):
+                return ""
+
+            def create_ui(self):
+                return None
+
+        handle = RecordingHandle()
+        provider = Provider()
+        provider.name = "StartFailPlugin"
+        provider.plugin = StartFailPlugin()
+        provider.handle = handle
+
+        selection = object.__new__(PluginSelectionBase)
+        selection.provider_list = [provider]
+        selection.plugin_type = LLMPluginInterface
+
+        self.assertFalse(selection.load_provider("StartFailPlugin"))
+        self.assertEqual(PluginState.FAILED, handle.status)
+        self.assertEqual("start_failed", handle.reason_code)
+        self.assertIn("start boom", handle.error)
+
+    def test_plugin_handle_refreshes_unavailable_provider_to_ready(self):
+        #20260718_kpopmodder: UNAVAILABLE providers can be explicitly re-probed after dependencies appear.
+        from plugin_system.interfaces import LLMPluginInterface
+        from plugin_system.loader import PluginLoader, PluginState
+        from plugin_system.registry import PluginRegistry
+
+        missing_package = "lavi_missing_refresh_probe_package"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            plugin_root = Path(temp_dir) / "plugins"
+            plugin_dir = plugin_root / "RefreshPlugin"
+            plugin_dir.mkdir(parents=True)
+            (plugin_dir / "RefreshPlugin.py").write_text(
+                "\n".join([
+                    "from plugin_system.interfaces import LLMPluginInterface",
+                    "class RefreshPlugin(LLMPluginInterface):",
+                    "    PLUGIN_METADATA = {",
+                    "        'id': 'RefreshPlugin',",
+                    f"        'required_python_packages': ['{missing_package}'],",
+                    "    }",
+                    "    def init(self): pass",
+                    "    def predict(self, message, history): return ''",
+                    "    def create_ui(self): return None",
+                ]),
+                encoding="utf-8",
+            )
+            modules_path = Path(temp_dir) / "modules.json"
+            modules_path.write_text(json.dumps({}), encoding="utf-8")
+
+            loader = PluginLoader("plugins")
+            loader.registry = PluginRegistry()
+            loader.plugin_directory = str(plugin_root)
+            loader.plugin_setting_path = str(modules_path)
+            loader._load_plugins_from_directory(str(plugin_dir))
+
+            handle = loader.plugins["language_model"][0]
+            status_key = handle.descriptor.status_key
+            self.assertEqual(PluginState.UNAVAILABLE, handle.status)
+
+            with mock.patch.object(loader, "availability_diagnostic", return_value=None):
+                self.assertTrue(handle.refresh_availability(force=True))
+                constructed = handle.construct(LLMPluginInterface)
+
+            self.assertEqual(PluginState.READY, handle.status)
+            self.assertEqual(PluginState.READY, loader.plugin_status[status_key])
+            self.assertEqual(
+                PluginState.READY,
+                loader.registry.snapshot()[status_key]["status"],
+            )
+            self.assertIsNotNone(constructed)
+
+    def test_plugin_handle_construct_success_resyncs_registry(self):
+        #20260718_kpopmodder: Construct success must refresh stale registry state.
+        from plugin_system.interfaces import LLMPluginInterface
+        from plugin_system.loader import PluginLoader, PluginState
+        from plugin_system.registry import PluginRegistry
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            plugin_root = Path(temp_dir) / "plugins"
+            plugin_dir = plugin_root / "RegistrySyncPlugin"
+            plugin_dir.mkdir(parents=True)
+            (plugin_dir / "RegistrySyncPlugin.py").write_text(
+                "\n".join([
+                    "from plugin_system.interfaces import LLMPluginInterface",
+                    "class RegistrySyncPlugin(LLMPluginInterface):",
+                    "    def init(self): pass",
+                    "    def predict(self, message, history): return ''",
+                    "    def create_ui(self): return None",
+                ]),
+                encoding="utf-8",
+            )
+            modules_path = Path(temp_dir) / "modules.json"
+            modules_path.write_text(json.dumps({}), encoding="utf-8")
+
+            loader = PluginLoader("plugins")
+            loader.registry = PluginRegistry()
+            loader.plugin_directory = str(plugin_root)
+            loader.plugin_setting_path = str(modules_path)
+            loader._load_plugins_from_directory(str(plugin_dir))
+
+            handle = loader.plugins["language_model"][0]
+            status_key = handle.descriptor.status_key
+            loader.set_plugin_status(status_key, PluginState.UNAVAILABLE, detail="stale")
+
+            self.assertIsNotNone(handle.construct(LLMPluginInterface))
+
+            self.assertEqual(PluginState.READY, handle.status)
+            self.assertEqual(PluginState.READY, loader.plugin_status[status_key])
+            self.assertEqual(
+                PluginState.READY,
+                loader.registry.snapshot()[status_key]["status"],
+            )
+
+    def test_plugin_handle_registry_state_matches_state_changes(self):
+        #20260718_kpopmodder: Handle and registry status should not drift across lifecycle transitions.
+        from plugin_system.interfaces import LLMPluginInterface
+        from plugin_system.loader import PluginLoader, PluginState
+        from plugin_system.registry import PluginRegistry
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            plugin_root = Path(temp_dir) / "plugins"
+            plugin_dir = plugin_root / "StateSyncPlugin"
+            plugin_dir.mkdir(parents=True)
+            (plugin_dir / "StateSyncPlugin.py").write_text(
+                "\n".join([
+                    "from plugin_system.interfaces import LLMPluginInterface",
+                    "class StateSyncPlugin(LLMPluginInterface):",
+                    "    def init(self): pass",
+                    "    def predict(self, message, history): return ''",
+                    "    def create_ui(self): return None",
+                ]),
+                encoding="utf-8",
+            )
+            modules_path = Path(temp_dir) / "modules.json"
+            modules_path.write_text(json.dumps({}), encoding="utf-8")
+
+            loader = PluginLoader("plugins")
+            loader.registry = PluginRegistry()
+            loader.plugin_directory = str(plugin_root)
+            loader.plugin_setting_path = str(modules_path)
+            loader._load_plugins_from_directory(str(plugin_dir))
+
+            handle = loader.plugins["language_model"][0]
+            status_key = handle.descriptor.status_key
+
+            for method_name, expected_state in (
+                ("mark_starting", PluginState.STARTING),
+                ("mark_running", PluginState.RUNNING),
+                ("mark_stopped", PluginState.STOPPED),
+            ):
+                getattr(handle, method_name)()
+                self.assertEqual(expected_state, handle.status)
+                self.assertEqual(expected_state, loader.plugin_status[status_key])
+                self.assertEqual(
+                    expected_state,
+                    loader.registry.snapshot()[status_key]["status"],
+                )
+
+            handle.mark_failed(RuntimeError("first failure"), reason_code="first_failure")
+            handle.mark_stopped()
+
+            self.assertEqual(PluginState.FAILED, handle.status)
+            self.assertEqual(PluginState.FAILED, loader.plugin_status[status_key])
+            self.assertEqual(
+                PluginState.FAILED,
+                loader.registry.snapshot()[status_key]["status"],
+            )
+            self.assertEqual("first_failure", handle.diagnostic.reason_code)
+
+    def test_missing_plugin_directory_raises_plugin_load_error_with_diagnostic(self):
+        #20260718_kpopmodder: Missing plugin roots should produce actionable loader diagnostics.
+        from plugin_system.loader import PluginLoadError, PluginLoader, PluginState
+        from plugin_system.registry import PluginRegistry
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            modules_path = Path(temp_dir) / "modules.json"
+            modules_path.write_text(json.dumps({}), encoding="utf-8")
+            missing_directory = Path(temp_dir) / "missing_plugins"
+
+            loader = PluginLoader("plugins")
+            loader.registry = PluginRegistry()
+            loader.plugin_directory = str(missing_directory)
+            loader.plugin_setting_path = str(modules_path)
+
+            with self.assertRaises(PluginLoadError):
+                loader.load_plugins()
+
+        matching_keys = [
+            key
+            for key in loader.plugin_status
+            if key.startswith("plugin_directory:")
+        ]
+        self.assertEqual(1, len(matching_keys))
+        status_key = matching_keys[0]
+        snapshot = loader.registry.snapshot()[status_key]
+
+        self.assertEqual(PluginState.FAILED, loader.plugin_status[status_key])
+        self.assertEqual(PluginState.FAILED, snapshot["status"])
+        self.assertEqual(
+            "plugin_directory_unavailable",
+            snapshot["diagnostic"]["reason_code"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

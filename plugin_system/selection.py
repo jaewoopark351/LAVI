@@ -500,7 +500,8 @@ class PluginSelectionBase():#20260622_kpopmodder
                     f"{provider.name}: {e}"
                 )
         provider.shutdown_attempted = True
-        self._mark_provider_handle(provider, "mark_stopped")
+        if not failed_cleanup:
+            self._mark_provider_handle(provider, "mark_stopped")
 
     def shutdown(self):
         for provider in list(self.provider_list):

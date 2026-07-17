@@ -162,7 +162,7 @@ class PluginLoader:
         self._load_plugins_from_directory(self.plugin_directory)
 
         # Next, discover plugins from subdirectories.
-        for item_name in sorted(os.listdir(self.plugin_directory)):
+        for item_name in self._list_plugin_directory(self.plugin_directory):
             item_path = os.path.join(self.plugin_directory, item_name)
 
             # Check if the item is a directory.
@@ -189,10 +189,32 @@ class PluginLoader:
 
     def _load_plugins_from_directory(self, directory):
         self._ensure_module_settings_loaded()
-        for file in sorted(os.listdir(directory)):
+        for file in self._list_plugin_directory(directory):
             if file.endswith('.py') and not file.startswith('_'):
                 module_path = os.path.join(directory, file)
                 self._register_descriptors_from_file(directory, module_path)
+
+    def _list_plugin_directory(self, directory):
+        try:
+            return sorted(os.listdir(directory))
+        except OSError as e:
+            message = f"Plugin directory unavailable: {directory}: {e}"
+            diagnostic = PluginDiagnostic(
+                plugin_id="plugin_directory",
+                state=PluginState.FAILED,
+                reason_code="plugin_directory_unavailable",
+                human_readable_message=message,
+                missing_files=(str(directory),),
+                log_reference="PluginLoader plugin directory discovery",
+            )
+            self.set_plugin_status(
+                f"plugin_directory:{directory}",
+                PluginState.FAILED,
+                detail=message,
+                diagnostic=diagnostic.to_dict(),
+            )
+            log_print(f"[PluginLoader] {message}")#20260718_kpopmodder
+            raise PluginLoadError(message) from e
 
     def _register_descriptors_from_file(self, directory, module_path):
         plugin_name = os.path.basename(directory)

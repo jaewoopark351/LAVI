@@ -1,6 +1,8 @@
 #20260716_kpopmodder: Regression tests for install, config, and CI portability contracts.
+import ast
 import json
 import os
+import re
 import subprocess
 import unittest
 from pathlib import Path
@@ -15,6 +17,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 class RepositoryContractTests(unittest.TestCase):
+    PACKAGE_NAME_ALIASES = {
+        "pil": "pillow",
+        "websocket": "websocket-client",
+    }
+
     def _git_ls_files(self):
         result = subprocess.run(
             ["git", "ls-files"],
@@ -25,6 +32,60 @@ class RepositoryContractTests(unittest.TestCase):
             encoding="utf-8",
         )
         return [line.strip().replace("\\", "/") for line in result.stdout.splitlines() if line.strip()]
+
+    def _requirement_names(self, relative_path):
+        names = set()
+        for line in (PROJECT_ROOT / relative_path).read_text(encoding="utf-8").splitlines():
+            text = line.strip()
+            if not text or text.startswith("#") or text.startswith("--"):
+                continue
+            name = re.split(r"[<>=!~; ]+", text, maxsplit=1)[0]
+            names.add(self._canonical_package_name(name))
+        return names
+
+    def _canonical_package_name(self, name):
+        normalized = str(name).strip().lower().replace("_", "-")
+        return self.PACKAGE_NAME_ALIASES.get(normalized, normalized)
+
+    def _plugin_metadata_from_file(self, path):
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        except SyntaxError:
+            return []
+        metadata_items = []
+        for node in tree.body:
+            if not isinstance(node, ast.ClassDef):
+                continue
+            for statement in node.body:
+                if not isinstance(statement, ast.Assign):
+                    continue
+                has_metadata_target = any(
+                    isinstance(target, ast.Name)
+                    and target.id in {"PLUGIN_METADATA", "plugin_metadata"}
+                    for target in statement.targets
+                )
+                if not has_metadata_target:
+                    continue
+                value = ast.literal_eval(statement.value)
+                if isinstance(value, dict):
+                    metadata_items.append((node.name, value))
+                break
+        return metadata_items
+
+    def _required_python_packages_from_metadata(self, metadata):
+        availability_probe = metadata.get("availability_probe")
+        if not isinstance(availability_probe, dict):
+            availability_probe = {}
+        value = (
+            metadata.get("required_python_packages")
+            or availability_probe.get("required_python_packages")
+            or ()
+        )
+        if isinstance(value, str):
+            return (value,)
+        if isinstance(value, (list, tuple)):
+            return tuple(str(item) for item in value if str(item))
+        return ()
 
     def test_readme_and_install_scripts_agree_on_python_314(self):
         readme_text = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
@@ -55,6 +116,52 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertIn("--modules-config config\\modules.core.json", workflow_text)
         self.assertIn("--production-config-smoke", workflow_text)
         self.assertNotIn('pytest -m "not gpu and not integration and not network and not slow"', workflow_text)
+
+    def test_full_cu130_lock_covers_active_plugin_python_dependencies(self):
+        #20260718_kpopmodder: Full install lock must cover enabled plugin metadata without using requirements_full.txt.
+        active_modules = json.loads(
+            (PROJECT_ROOT / "modules.json").read_text(encoding="utf-8")
+        )
+        locked_packages = self._requirement_names(
+            "requirements/locks/windows-py314-full-cu130.txt"
+        )
+        missing = []
+
+        for plugin_dir in sorted((PROJECT_ROOT / "plugins").iterdir()):
+            if not plugin_dir.is_dir() or active_modules.get(plugin_dir.name) is not True:
+                continue
+            for python_file in sorted(plugin_dir.glob("*.py")):
+                if python_file.name.startswith("_"):
+                    continue
+                for class_name, metadata in self._plugin_metadata_from_file(python_file):
+                    for package in self._required_python_packages_from_metadata(metadata):
+                        canonical_name = self._canonical_package_name(package)
+                        if canonical_name not in locked_packages:
+                            missing.append(
+                                f"{plugin_dir.name}.{class_name}: {package}"
+                            )
+
+        from app_core.optional_module_manifest import OPTIONAL_MODULE_MANIFEST
+
+        for module_name, manifest in OPTIONAL_MODULE_MANIFEST.items():
+            if active_modules.get(module_name) is not True:
+                continue
+            for package in self._required_python_packages_from_metadata(manifest):
+                canonical_name = self._canonical_package_name(package)
+                if canonical_name not in locked_packages:
+                    missing.append(f"{module_name}: {package}")
+
+        self.assertEqual([], missing)
+
+    def test_windows_installer_uses_committed_locks_not_requirements_full(self):
+        #20260718_kpopmodder: requirements_full.txt is historical, not the canonical installer lock.
+        install_text = (
+            PROJECT_ROOT / "scripts" / "install_windows.ps1"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("requirements\\locks\\windows-py314-full-cu130.txt", install_text)
+        self.assertIn("requirements\\locks\\windows-py314-core-cpu.txt", install_text)
+        self.assertNotIn("requirements_full.txt", install_text)
 
     def test_root_modules_json_is_tracked_for_deployment_artifacts(self):
         #20260716_kpopmodder: Release/archive jobs must include the production default config.

@@ -51,6 +51,39 @@ class VoiceInputImportTests(unittest.TestCase):
     def test_plugin_entry_class_imports(self):
         self.assertTrue(issubclass(VoiceInput, InputPluginInterface))
 
+    def test_voice_input_metadata_declares_speaker_identifier_dependencies(self):
+        #20260718_kpopmodder: Keep static availability metadata aligned with speaker recognition imports.
+        import ast
+
+        speaker_identifier_path = (
+            PROJECT_ROOT
+            / "plugins"
+            / "VoiceInput"
+            / "voice_input_core"
+            / "speaker_identifier.py"
+        )
+        tree = ast.parse(
+            speaker_identifier_path.read_text(encoding="utf-8"),
+            filename=str(speaker_identifier_path),
+        )
+        imported_modules = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                imported_modules.update(
+                    alias.name.split(".", maxsplit=1)[0]
+                    for alias in node.names
+                )
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                imported_modules.add(node.module.split(".", maxsplit=1)[0])
+
+        required_packages = {
+            str(package).lower()
+            for package in VoiceInput.PLUGIN_METADATA["required_python_packages"]
+        }
+
+        self.assertIn("resemblyzer", imported_modules)
+        self.assertIn("resemblyzer", required_packages)
+
     def test_state_defaults_are_preserved(self):
         first_state = VoiceInputState()
         second_state = VoiceInputState()

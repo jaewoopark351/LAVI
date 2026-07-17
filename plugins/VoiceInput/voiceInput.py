@@ -45,6 +45,7 @@ class VoiceInput(InputPluginInterface):#20260618_kpopmodder
         },
         "required_python_packages": [
             "numpy",
+            "resemblyzer",
             "sounddevice",
             "soundfile",
             "torch",
