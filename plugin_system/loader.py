@@ -1,6 +1,5 @@
 #20260622_kpopmodder: Canonical plugin loading implementation.
 import ast
-from dataclasses import dataclass
 import importlib
 import importlib.util
 import os
@@ -19,14 +18,12 @@ from plugin_system.interfaces import (
     VtuberPluginInterface,
 )
 from plugin_system.contracts import (
-    AvailabilityProbeContract,
     PluginDiagnostic,
-    PluginDiagnosticSnapshot,
-    PluginRuntimeContract,
     PluginState,
-    PluginSupports,
-    validate_plugin_lifecycle,
 )
+from plugin_system.loader_core.plugin_descriptor import PluginDescriptor
+from plugin_system.loader_core.plugin_handle import PluginHandle
+from plugin_system.loader_core.plugin_load_error import PluginLoadError
 from plugin_system.registry import plugin_registry
 
 from core.logger import log_print#20260612_kpopmodder
@@ -40,230 +37,6 @@ from core.profile_resolver import (
 plugin_directory = "plugins"
 temp_ignore = [] #["silero", "Local_LLM", "voicevox"]
 _MISSING = object()
-
-
-class PluginLoadError(RuntimeError):
-    #20260716_kpopmodder: Clear plugin load error used by lazy handles.
-    pass
-
-
-@dataclass(frozen=True)
-class PluginDescriptor:
-    #20260716_kpopmodder: Describes a provider discovered without importing it.
-    plugin_name: str
-    class_name: str
-    category: str
-    interface_name: str
-    module_name: str
-    module_path: str
-    id: str = ""
-    display_name: str = ""
-    api_version: str = "1"
-    dependency_group: str = ""
-    capabilities: tuple = ()
-    config_schema: dict = None
-    required_python_packages: tuple = ()
-    required_files: tuple = ()
-    required_executables: tuple = ()
-    required_services: tuple = ()
-    availability_probe_timeout_sec: float = 0.25
-    availability_probe_log_reference: str = ""
-    supports_offline: bool = False
-    supports_cpu: bool = True
-    requires_gpu: bool = False
-
-    @property
-    def status_key(self):
-        return f"{self.plugin_name}.{self.class_name}"
-
-    @property
-    def entrypoint(self):
-        return f"{self.module_name}:{self.class_name}"
-
-    @property
-    def runtime_contract(self):
-        return PluginRuntimeContract(
-            plugin_id=self.id,
-            manifest={
-                "id": self.id,
-                "display_name": self.display_name,
-                "api_version": self.api_version,
-                "category": self.category,
-                "entrypoint": self.entrypoint,
-                "dependency_group": self.dependency_group,
-            },
-            config_schema=self.config_schema,
-            availability_probe=AvailabilityProbeContract(
-                required_python_packages=self.required_python_packages,
-                required_files=self.required_files,
-                required_executables=self.required_executables,
-                required_services=self.required_services,
-                timeout_sec=self.availability_probe_timeout_sec,
-                log_reference=(
-                    self.availability_probe_log_reference
-                    or f"PluginLoader availability probe for {self.status_key}"
-                ),
-            ),
-            capabilities=self.capabilities,
-            supports=PluginSupports(
-                offline=self.supports_offline,
-                cpu=self.supports_cpu,
-                requires_gpu=self.requires_gpu,
-            ),
-        )
-
-    def __post_init__(self):
-        if self.config_schema is None:
-            object.__setattr__(self, "config_schema", {})
-        if not self.id:
-            object.__setattr__(self, "id", self.class_name)
-        if not self.display_name:
-            object.__setattr__(self, "display_name", self.class_name)
-        if not self.dependency_group:
-            object.__setattr__(self, "dependency_group", self.category)
-
-
-class PluginHandle:
-    #20260716_kpopmodder: Lazy provider handle; imports and constructs only when selected.
-    def __init__(self, descriptor, loader, status=PluginState.READY, diagnostic=None):
-        self.descriptor = descriptor
-        self.loader = loader
-        self.instance = None
-        self.status = status
-        self.error = ""
-        self.diagnostic = diagnostic
-
-    @property
-    def name(self):
-        return self.descriptor.class_name
-
-    @property
-    def runtime_contract(self):
-        return self.descriptor.runtime_contract
-
-    def diagnostic_snapshot(self):
-        return PluginDiagnosticSnapshot(
-            plugin_id=self.descriptor.id,
-            name=self.name,
-            category=self.descriptor.category,
-            state=self.status,
-            detail=self.error,
-            diagnostic=self.diagnostic,
-            runtime_contract=self.runtime_contract,
-        ).to_dict()
-
-    def _set_state(self, state, detail="", diagnostic=None):
-        self.status = state
-        self.error = str(detail or "")
-        self.diagnostic = diagnostic
-        self.loader.set_plugin_status(
-            self.descriptor.status_key,
-            state,
-            detail=detail,
-            diagnostic=diagnostic.to_dict() if diagnostic else None,
-            runtime_contract=self.runtime_contract.to_dict(),
-        )
-
-    def check_availability(self):
-        if self.status in (PluginState.UNAVAILABLE, PluginState.FAILED):
-            return False
-
-        diagnostic = self.loader.availability_diagnostic(self.descriptor)
-        if diagnostic is None:
-            return True
-
-        self._set_state(
-            PluginState.UNAVAILABLE,
-            detail=diagnostic.human_readable_message,
-            diagnostic=diagnostic,
-        )
-        log_print(
-            "[PluginLoader] plugin unavailable; "
-            f"skipped {self.descriptor.status_key}: "
-            f"{diagnostic.human_readable_message}"
-        )#20260716_kpopmodder
-        return False
-
-    def construct(self, expected_interface=None):
-        if self.instance is not None:
-            return self.instance
-        if self.status in (PluginState.UNAVAILABLE, PluginState.FAILED):
-            return None
-        if not self.check_availability():
-            return None
-
-        try:
-            module = self.loader.import_descriptor_module(self.descriptor)
-            plugin_class = getattr(module, self.descriptor.class_name)
-            if not isinstance(plugin_class, type):
-                raise PluginLoadError(
-                    f"{self.descriptor.class_name} is not a class"
-                )
-            if plugin_class.__module__ != module.__name__:
-                raise PluginLoadError(
-                    f"{self.descriptor.class_name} is imported, not defined in {module.__name__}"
-                )
-            if expected_interface is None:
-                expected_interface = self.loader.interface_name_to_class[
-                    self.descriptor.interface_name
-                ]
-            if not issubclass(plugin_class, expected_interface):
-                raise PluginLoadError(
-                    f"{self.descriptor.class_name} does not implement {expected_interface.__name__}"
-                )
-            self.instance = plugin_class()
-            lifecycle_issues = validate_plugin_lifecycle(
-                self.instance,
-                plugin_id=self.descriptor.id,
-            )
-            if lifecycle_issues:
-                diagnostic = PluginDiagnostic(
-                    plugin_id=self.descriptor.id,
-                    state=PluginState.FAILED,
-                    reason_code="lifecycle_contract_failed",
-                    human_readable_message="; ".join(
-                        issue.message for issue in lifecycle_issues
-                    ),
-                    log_reference=(
-                        "PluginLoader lifecycle validation for "
-                        f"{self.descriptor.status_key}"
-                    ),
-                )
-                self.instance = None
-                self._set_state(
-                    PluginState.FAILED,
-                    detail=diagnostic.human_readable_message,
-                    diagnostic=diagnostic,
-                )
-                return None
-            self.status = PluginState.READY
-            self.error = ""
-            return self.instance
-        except Exception as e:
-            self.mark_failed(e, reason_code="construct_failed")
-            log_print(
-                "[PluginLoader] plugin construct failed; "
-                f"skipped {self.descriptor.status_key}: {e}"
-            )#20260716_kpopmodder
-            return None
-
-    def mark_starting(self):
-        self._set_state(PluginState.STARTING)
-
-    def mark_running(self):
-        self._set_state(PluginState.RUNNING)
-
-    def mark_failed(self, error, reason_code="plugin_failed"):
-        diagnostic = PluginDiagnostic(
-            plugin_id=self.descriptor.id,
-            state=PluginState.FAILED,
-            reason_code=reason_code,
-            human_readable_message=str(error),
-        )
-        self._set_state(PluginState.FAILED, detail=error, diagnostic=diagnostic)
-
-    def mark_stopped(self):
-        self._set_state(PluginState.STOPPED)
 
 
 class PluginLoader:

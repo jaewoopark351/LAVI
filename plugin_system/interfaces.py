@@ -1,122 +1,17 @@
-#20260622_kpopmodder: Canonical plugin interface definitions.
-from plugin_system.runtime_plugin_mixin import RuntimePluginContractMixin
+#20260622_kpopmodder: Compatibility exports for canonical plugin interfaces.
+from plugin_system.interfaces_core.input_plugin_interface import InputPluginInterface
+from plugin_system.interfaces_core.llm_plugin_interface import LLMPluginInterface
+from plugin_system.interfaces_core.translation_plugin_interface import (
+    TranslationPluginInterface,
+)
+from plugin_system.interfaces_core.tts_plugin_interface import TTSPluginInterface
+from plugin_system.interfaces_core.vtuber_plugin_interface import VtuberPluginInterface
 
 
-class InputPluginInterface(RuntimePluginContractMixin):
-    def __init__(self):
-        self.input_event_listeners = []
-
-    def init(self):
-        pass
-
-    def start(self):
-        pass
-
-    def stop(self):
-        pass
-
-    def create_ui(self):
-        pass
-
-    def shutdown(self):
-        pass
-
-    # call this function to send your gathered input to next component
-    def process_input(self, input: str):
-        if not hasattr(self, "input_event_listeners"):
-            self.input_event_listeners = []
-        for listener in self.input_event_listeners:
-            listener(input)
-
-
-class LLMPluginInterface(RuntimePluginContractMixin):#20260622_kpopmodder
-    def init(self):
-        pass
-
-    def start(self):
-        pass
-
-    def stop(self):
-        pass
-
-    def predict(self, message, history):
-        raise NotImplementedError
-
-    def create_ui(self):
-        pass
-
-    def shutdown(self):
-        pass
-
-
-class TranslationPluginInterface(RuntimePluginContractMixin):
-    def init(self):
-        pass
-
-    def start(self):
-        pass
-
-    def stop(self):
-        pass
-
-    def translate(self, text):
-        raise NotImplementedError
-
-    # Use the two letter language codes from here: https://en.wikipedia.org/wiki/List_of_ISO_639_language_codes
-    def get_input_language_code(self):
-        raise NotImplementedError
-
-    def get_output_language_code(self):
-        raise NotImplementedError
-
-    def create_ui(self):
-        pass
-
-    def shutdown(self):
-        pass
-
-
-class TTSPluginInterface(RuntimePluginContractMixin):
-    def init(self):
-        pass
-
-    def start(self):
-        pass
-
-    def stop(self):
-        pass
-
-    def synthesize(self, text):
-        raise NotImplementedError
-
-    def create_ui(self):
-        pass
-
-    def shutdown(self):
-        pass
-
-
-class VtuberPluginInterface(RuntimePluginContractMixin):
-    class AvatarData():
-        mouth_open = 0
-        # TODO current emotion, current pheonome etc
-
-    avatar_data = AvatarData()
-
-    def init(self):
-        pass
-
-    def start(self):
-        pass
-
-    def stop(self):
-        pass
-
-    def create_ui(self):
-        pass
-
-    def shutdown(self):
-        pass
-
-    def set_avatar_data(self, data):
-        self.avatar_data = data
+__all__ = [
+    "InputPluginInterface",
+    "LLMPluginInterface",
+    "TranslationPluginInterface",
+    "TTSPluginInterface",
+    "VtuberPluginInterface",
+]

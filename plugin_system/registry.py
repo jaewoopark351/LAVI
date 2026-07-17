@@ -1,16 +1,5 @@
 #20260716_kpopmodder: Shared plugin status registry for core and optional providers.
-from dataclasses import dataclass, field
-
-
-@dataclass
-class PluginRegistryEntry:
-    #20260716_kpopmodder: Keep registry entries simple and serializable for diagnostics.
-    name: str
-    status: str
-    kind: str = "core"
-    detail: str = ""
-    diagnostic: dict = field(default_factory=dict)
-    runtime_contract: dict = field(default_factory=dict)
+from plugin_system.registry_core.plugin_registry_entry import PluginRegistryEntry
 
 
 class PluginRegistry:

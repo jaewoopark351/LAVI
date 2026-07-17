@@ -8,48 +8,11 @@ from plugin_system.contracts import (
     ProviderDiagnosticDTO,
 )
 from plugin_system.loader import plugin_loader
-
-
-class PluginStartupError(RuntimeError):
-    #20260716_kpopmodder: Raise readable startup errors when required categories have no usable provider.
-    pass
-
-
-class Provider():
-    #20260630_kpopmodder: Track lazy init state per provider so startup does not load every backend.
-    def __init__(self):
-        self.plugin = None
-        self.handle = None
-        self.name = ""
-        self.ui = None
-        self.initialized = False
-        self.disabled = False
-        self.init_error = ""
-        self.needs_shutdown = False
-        self.shutdown_attempted = False
-
-    #20260717_kpopmodder
-    @property
-    def runtime_contract(self):
-        contract = getattr(self.handle, "runtime_contract", None)
-        if contract is not None:
-            return contract
-        contract = getattr(self.plugin, "runtime_contract", None)
-        if callable(contract):
-            return contract()
-        return contract
-
-    def runtime_contract_dict(self):
-        contract = self.runtime_contract
-        if hasattr(contract, "to_dict"):
-            return contract.to_dict()
-        if isinstance(contract, dict):
-            return dict(contract)
-        return {}
-
-    def matches_requirements(self, requirements):
-        requirements = _coerce_runtime_requirements(requirements)
-        return requirements.matches(self.runtime_contract)
+from plugin_system.selection_core.plugin_startup_error import PluginStartupError
+from plugin_system.selection_core.provider import Provider
+from plugin_system.selection_core.selection_requirements import (
+    _coerce_runtime_requirements,
+)
 
 
 # place holder until config saving is implemented
@@ -60,24 +23,6 @@ temp_default = ["NoTranslate", "gpt_sovits", "VoiceInput","AyaLLM"]
 CATEGORY_DEFAULT_PROVIDERS = {
     "language_model": "Hybrid_OpenAI_LLM",
 }
-
-
-#20260717_kpopmodder
-def _coerce_runtime_requirements(requirements=None, **overrides):
-    if isinstance(requirements, PluginRuntimeRequirements):
-        base = requirements
-    elif isinstance(requirements, dict):
-        base = PluginRuntimeRequirements(**requirements)
-    elif requirements is None:
-        base = PluginRuntimeRequirements()
-    else:
-        raise TypeError("runtime requirements must be a PluginRuntimeRequirements or dict")
-
-    values = base.to_dict()
-    for key, value in overrides.items():
-        if value is not None:
-            values[key] = value
-    return PluginRuntimeRequirements(**values)
 
 
 def _provider_matches_requirements(provider, requirements):
