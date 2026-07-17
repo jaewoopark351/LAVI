@@ -3,7 +3,7 @@ import unittest
 from queue import Queue
 from unittest import mock
 
-from TTS import TTS
+from tts_core import TTS
 from tts_core.tts_interrupt_controller import TTSInterruptController
 from tts_core.tts_queue_worker import TTSQueueWorker
 

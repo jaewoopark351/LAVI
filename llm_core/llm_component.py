@@ -1,3 +1,4 @@
+#20260717_kpopmodder: Moved LLM component implementation out of the removed root module.
 #20260620_kpopmodder: Queue and response handling imports moved to llm_core helper classes.
 # import inspect
 # from queue import Queue

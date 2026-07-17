@@ -1,7 +1,7 @@
 #20260628_kpopmodder: Added focused tests for LLM speech style prompt composition.
 import unittest
 
-from LLM import LLM
+from llm_core import LLM
 
 
 class LLMSpeechStyleTests(unittest.TestCase):

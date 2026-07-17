@@ -1,3 +1,4 @@
+#20260717_kpopmodder: Moved TTS component implementation out of the removed root module.
 #import io#20260617_kpopmodder
 #import os#20260616_kpopmodder
 from queue import Queue, Empty

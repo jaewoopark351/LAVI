@@ -135,9 +135,9 @@ class EventShutdownTests(unittest.TestCase):
         project_root = Path(__file__).resolve().parents[1]
         expected_shutdown_classes = {
             "input_core/input_component.py": "Input",
-            "LLM.py": "LLM",
+            "llm_core/llm_component.py": "LLM",
             "translation_core/translate_component.py": "Translate",
-            "TTS.py": "TTS",
+            "tts_core/tts_component.py": "TTS",
             "vtuber_core/vtuber_component.py": "Vtuber",
             "plugins/ScreenVision/screenVision.py": "ScreenVision",
             "plugins/VoiceInput/voiceInput.py": "VoiceInput",

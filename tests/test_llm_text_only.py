@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from LLM import LLM
+from llm_core import LLM
 
 
 class FakeResponsePipeline:

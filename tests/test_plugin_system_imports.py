@@ -542,8 +542,8 @@ class PluginSystemImportTests(unittest.TestCase):
         self.assertIsNone(null_tts.synthesize("hello"))
         null_vtuber.set_avatar_data(VtuberPluginInterface.AvatarData())
 
-    def test_tts_wrapper_skips_runtime_setup_for_null_tts(self):#20260716_kpopmodder
-        import TTS as tts_module
+    def test_tts_component_skips_runtime_setup_for_null_tts(self):#20260716_kpopmodder
+        import tts_core as tts_module
         from plugin_system.interfaces import TTSPluginInterface
         from plugins.NullTTS.NullTTS import NullTTS
 
@@ -560,7 +560,9 @@ class PluginSystemImportTests(unittest.TestCase):
                 "plugin_system.selection.config_manager.load_section",
                 return_value={},
             ):
-                with mock.patch("TTS.ensure_ffmpeg_exists") as ffmpeg_mock:
+                with mock.patch(
+                    "tts_core.tts_component.ensure_ffmpeg_exists",
+                ) as ffmpeg_mock:
                     with mock.patch.object(
                         tts_module.TTS,
                         "register_stop_hotkey",
@@ -577,8 +579,8 @@ class PluginSystemImportTests(unittest.TestCase):
                             finally:
                                 tts.shutdown()
 
-    def test_tts_wrapper_keeps_runtime_setup_for_real_tts(self):#20260716_kpopmodder
-        import TTS as tts_module
+    def test_tts_component_keeps_runtime_setup_for_real_tts(self):#20260716_kpopmodder
+        import tts_core as tts_module
         from plugin_system.interfaces import TTSPluginInterface
 
         class FakeTTS(TTSPluginInterface):
@@ -605,7 +607,7 @@ class PluginSystemImportTests(unittest.TestCase):
                 return_value={},
             ):
                 with mock.patch(
-                    "TTS.ensure_ffmpeg_exists",
+                    "tts_core.tts_component.ensure_ffmpeg_exists",
                     return_value=True,
                 ) as ffmpeg_mock:
                     with mock.patch.object(

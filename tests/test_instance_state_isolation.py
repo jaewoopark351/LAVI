@@ -28,7 +28,7 @@ class InstanceStateIsolationTests(unittest.TestCase):
                     "queue_live_textbox",
                 },
             },
-            "TTS.py": {
+            "tts_core/tts_component.py": {
                 "TTS": {
                     "log_live_textbox",
                     "process_queue_live_textbox",
