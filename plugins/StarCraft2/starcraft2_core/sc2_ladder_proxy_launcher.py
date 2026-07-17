@@ -4,7 +4,6 @@ from __future__ import annotations
 import os
 import shlex
 import socket
-import subprocess
 import threading
 import time
 from collections import deque
@@ -12,7 +11,7 @@ from collections.abc import Iterable
 from typing import Any, Callable, Dict, List, Optional
 
 from core.logger import log_print
-from core.process import launch_process
+from core.process import PIPE, TimeoutExpired, launch_process
 from .starcraft2_contracts import (
     LadderProxyExitEventDTO,
     LadderProxyPortCheckDTO,
@@ -115,8 +114,8 @@ class SC2LadderProxyLauncher:
         )
 
         process_command = [validation["executable_path"]] + command_args
-        stdout = subprocess.PIPE if command.capture_output else None
-        stderr = subprocess.PIPE if command.capture_output else None
+        stdout = PIPE if command.capture_output else None
+        stderr = PIPE if command.capture_output else None
         self._diagnostics = _LocalMatchLaunchDiagnostics()
         self._diagnostics.start()
         try:
@@ -202,7 +201,7 @@ class SC2LadderProxyLauncher:
                 )
                 process.terminate()
                 process.wait(timeout=max(0.1, float(timeout_sec)))
-            except subprocess.TimeoutExpired:
+            except TimeoutExpired:
                 process.kill()
                 process.wait(timeout=1.0)
             except Exception as e:

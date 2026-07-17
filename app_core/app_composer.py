@@ -2,11 +2,13 @@
 #20260705_kpopmodder: Added AppComposer to keep main.py as a thin Windows startup entry point.
 import logging
 import os
-import sys
 
-from app_core.gradio_launch import find_available_port
 from app_core.component_wiring_composition import AppComponentWiringService
+from app_core.composition_core.app_ui_composition_service import (
+    AppUiCompositionService,
+)
 from app_core.core_component_composition import CoreComponentCompositionService
+from app_core.gradio_runtime_launcher import GradioRuntimeLauncher
 from app_core.memory_bootstrap import bootstrap_memory
 from app_core.extensions import (
     ExtensionRegistry,
@@ -21,6 +23,7 @@ from app_core.runtime_lifecycle import RuntimeLifecycle
 from app_core.screen_router_bootstrap import build_screen_question_router
 from core.global_state import GlobalKeys, global_state
 from core.gpu_device_manager import gpu_device_manager
+from core.import_path import ensure_import_path
 from core.logger import log_print
 from core.profile_resolver import active_profile
 from plugin_system.loader import plugin_loader
@@ -71,6 +74,8 @@ class AppComposer:
             self.game_extension_registry,
         )
         self.component_wiring_service = AppComponentWiringService()
+        self.ui_composition_service = AppUiCompositionService()
+        self.gradio_runtime_launcher = GradioRuntimeLauncher()
         self.core_component_composition_service = CoreComponentCompositionService()
         self.optional_plugin_composition_service = OptionalPluginCompositionService(
             self.current_module_directory,
@@ -143,9 +148,8 @@ class AppComposer:
         logging.basicConfig(level=logging.WARNING)
 
     def prepare_plugin_path(self):
-        # allow relative imports in plugins folder
-        if self.plugin_directory not in sys.path:
-            sys.path.append(self.plugin_directory)
+        #20260718_kpopmodder: Route legacy plugin path mutation through one helper.
+        ensure_import_path(self.plugin_directory)
 
     def load_plugins(self):
         # load plugins
@@ -281,29 +285,19 @@ class AppComposer:
         self.chess_game_extension = result.chess_game_extension
 
     def create_component_ui(self):
-        import gradio as gr
-        from audio_device_manager import audio_device_manager
-
-        self.input.create_ui()
-        self.llm.create_ui()
-        self.translate.create_ui()
-        self.tts.create_ui()
-        if self.song_player is not None:
-            self.song_player.create_ui()#20260628_kpopmodder
-        if self.chess_plugin is not None:
-            self.chess_plugin.create_ui()#20260628_kpopmodder
-        if self.starcraft_plugin is not None:
-            self.starcraft_plugin.create_ui()#20260630_kpopmodder
-        if self.starcraft116_plugin is not None:
-            self.starcraft116_plugin.create_ui()#20260702_kpopmodder
-        if self.starcraft2_plugin is not None:
-            self.starcraft2_plugin.create_ui()#20260707_kpopmodder
-        with gr.Tab("Setting"):#20260629_kpopmodder: Group operational settings under one top-level tab.#Setting 아래에 설정 GUI 생성
-            with gr.Tabs():
-                self.vtuber.create_ui()
-                audio_device_manager.create_ui()#20260614_kpopmodder
-                if self.screen_vision is not None:
-                    self.screen_vision.create_ui()#20260620_kpopmodder
+        self.ui_composition_service.create_component_ui(
+            input_component=self.input,
+            llm=self.llm,
+            translate=self.translate,
+            tts=self.tts,
+            vtuber=self.vtuber,
+            song_player=self.song_player,
+            chess_plugin=self.chess_plugin,
+            starcraft_plugin=self.starcraft_plugin,
+            starcraft116_plugin=self.starcraft116_plugin,
+            starcraft2_plugin=self.starcraft2_plugin,
+            screen_vision=self.screen_vision,
+        )
 
     def wire_event_listeners(self):
         self.component_wiring_service.wire_event_listeners(
@@ -359,20 +353,7 @@ class AppComposer:
         self.runtime_lifecycle.start()
 
     def launch_gradio(self):
-        gradio_host = "127.0.0.1"
-        gradio_port = find_available_port(host=gradio_host, start_port=7860)
-        #20260620_kpopmodder: Move to the next local port when Gradio's default port is already occupied.
-        log_print(f"[Gradio] Starting at http://{gradio_host}:{gradio_port}/")
-        #main_interface.queue().launch()#20260615_kpopmodder
-        try:
-            self.main_interface.queue().launch(#20260615_kpopmodder
-                server_name=gradio_host,
-                server_port=gradio_port,
-                share=False,
-                #show_api=False#20260616_kpopmodder
-            )
-        except KeyboardInterrupt:
-            log_print("[Gradio] KeyboardInterrupt received; shutting down.")#20260630_kpopmodder
-        finally:
-            if self.runtime_lifecycle is not None:
-                self.runtime_lifecycle.shutdown()
+        self.gradio_runtime_launcher.launch(
+            self.main_interface,
+            runtime_lifecycle=self.runtime_lifecycle,
+        )

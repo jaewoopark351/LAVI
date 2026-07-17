@@ -4,14 +4,13 @@
 from __future__ import annotations
 
 import os
-import subprocess
 import threading
 import time
 from collections import deque
 from typing import Any, Dict, Iterable, List, Optional
 
 from core.logger import log_print
-from core.process import launch_process as _default_launch_process
+from core.process import PIPE, TimeoutExpired, launch_process as _default_launch_process
 
 from .starcraft2_contracts import (
     EngineResultDTO,
@@ -72,8 +71,8 @@ class ExternalProcessBotEngine(StarCraft2EngineInterface):
             self.process = _compat_launch_process(
                 command,
                 cwd=working_directory or None,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                stdout=PIPE,
+                stderr=PIPE,
                 text=True,
                 bufsize=1,
             )
@@ -98,7 +97,7 @@ class ExternalProcessBotEngine(StarCraft2EngineInterface):
             try:
                 process.terminate()
                 process.wait(timeout=self._stop_timeout_sec)
-            except subprocess.TimeoutExpired:
+            except TimeoutExpired:
                 try:
                     process.kill()
                     process.wait(timeout=1.0)

@@ -1,8 +1,8 @@
 #20260703_kpopmodder: Reads external StarCraft 1.16/BWAPI status without touching game memory.
 import os
-import subprocess
 import time
 
+from core.process import CalledProcessError
 from .starcraft116_exporter import StarCraft116ExporterManager
 from .starcraft116_status_io import (
     basename_starcraft116_path,
@@ -103,7 +103,7 @@ class StarCraft116StatusReader:
         for process_name in self.PROCESS_NAMES:
             try:
                 matches[process_name] = self._tasklist_rows(process_name)
-            except subprocess.CalledProcessError as e:
+            except CalledProcessError as e:
                 message = str(e)
                 if e.output:
                     message = str(e.output).strip()

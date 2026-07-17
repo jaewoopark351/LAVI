@@ -1,10 +1,10 @@
 #20260717_kpopmodder: Split from legacy multi-class module for AGENTS 29.1 file/type separation.
 
-import subprocess
 import os
 import time
-from dataclasses import dataclass, field
+
 #20260702_kpopmodder: Launches user-installed StarCraft 1.16/BWAPI tooling only.
+from core.process import command_line
 from .starcraft116_launch_executor import (
     StarCraft116ProcessLauncherRuntime,
     StarCraft116StartedProcess,
@@ -15,6 +15,7 @@ from .starcraft116_launch_paths import (
 
 
 from .starcraft116_launch_result import StarCraft116LaunchResult
+
 
 class StarCraft116Launcher:
     #20260702_kpopmodder: Keeps BWAPI-era launch order configurable per bot profile.
@@ -28,7 +29,7 @@ class StarCraft116Launcher:
         return self.path_builder.build_launch_plan(profile)
 
     def build_command_display(self, command):
-        return subprocess.list2cmdline([str(part) for part in command])
+        return command_line(command)
 
     def _coerce_arguments(self, value):
         return self.path_builder._coerce_arguments(value)

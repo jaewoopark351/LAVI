@@ -2,11 +2,8 @@
 
 #20260706_kpopmodder: Keeps low-level StarCraft launch process creation isolated from policy logic.
 import ctypes
-import os
-import subprocess
 from ctypes import wintypes
 
-from core.process import launch_process
 
 class StarCraft116ShellProcess:
     #20260703_kpopmodder: Wraps ShellExecuteEx handles from UAC-elevated launches.

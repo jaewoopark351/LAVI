@@ -1,16 +1,15 @@
 import os
-import sys
 
 import gradio as gr
 
+from core.import_path import ensure_import_path
 from plugin_system.interfaces import LLMPluginInterface
 from core.logger import log_print
 from core.event_manager import event_manager, EventType
 
 
 current_module_directory = os.path.dirname(__file__)
-if current_module_directory not in sys.path:
-    sys.path.insert(0, current_module_directory)
+ensure_import_path(current_module_directory, prepend=True)
 
 
 from hybrid_openai_core.engine import RouterFirstHybridEngine

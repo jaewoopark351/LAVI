@@ -3,10 +3,9 @@
 #20260706_kpopmodder: Keeps low-level StarCraft launch process creation isolated from policy logic.
 import ctypes
 import os
-import subprocess
 from ctypes import wintypes
 
-from core.process import launch_process as _default_launch_process
+from core.process import command_line, launch_process as _default_launch_process
 
 from .starcraft116_shell_process import StarCraft116ShellProcess
 from .starcraft116_started_process import StarCraft116StartedProcess
@@ -29,9 +28,7 @@ class StarCraft116ProcessLauncherRuntime:
             raise PermissionError("run_as_admin is only supported on Windows.")
 
         executable = str(launch_command["command"][0])
-        parameters = subprocess.list2cmdline(
-            [str(part) for part in launch_command["command"][1:]]
-        )
+        parameters = command_line(launch_command["command"][1:])
         cwd = launch_command["cwd"] or os.path.dirname(executable)
 
         class ShellExecuteInfo(ctypes.Structure):

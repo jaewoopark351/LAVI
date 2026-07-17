@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-import subprocess
 from typing import Any, Callable, Dict, Optional, Union
 
 from app_core.extensions import (
@@ -12,6 +11,7 @@ from app_core.extensions import (
     GameStopResultDTO,
 )
 from core.logger import log_print
+from core.process import command_line
 from .starcraft2_contracts import (
     LadderProxyExitEventDTO,
     LadderProxyResultDTO,
@@ -93,13 +93,13 @@ class StarCraft2LocalMatchService:
         )
         normalized_args = self.arg_utils.strip_ladder_args(normalized_args, {"--race"})
         normalized_args.extend(["--race", selected_race])
-        return subprocess.list2cmdline(normalized_args)
+        return command_line(normalized_args)
 
     def on_local_match_ai_race_change(self, ai_race, args):
         normalized_args = self.arg_utils.strip_local_match_args(
             self.arg_utils.normalize_ladder_args(args)
         )
-        return subprocess.list2cmdline(normalized_args)
+        return command_line(normalized_args)
 
     def start_local_match(
         self,

@@ -4,7 +4,8 @@ import io
 import json
 import locale
 import os
-import subprocess
+
+from core.process import STDOUT, check_output
 
 
 def read_starcraft116_ini_values(path):
@@ -46,7 +47,7 @@ def read_latest_starcraft116_jsonl_event(path, line_count=80):
 
 
 def starcraft116_tasklist_rows(process_name):
-    output = subprocess.check_output(
+    output = check_output(
         [
             "tasklist",
             "/FI",
@@ -55,7 +56,7 @@ def starcraft116_tasklist_rows(process_name):
             "CSV",
             "/NH",
         ],
-        stderr=subprocess.STDOUT,
+        stderr=STDOUT,
         timeout=2,
         text=True,
         encoding="mbcs",

@@ -574,7 +574,11 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
 
         with mock.patch("plugins.StarCraft2.starcraft2_core.probots_launcher.os.path.isfile", return_value=True):
             with mock.patch("plugins.StarCraft2.starcraft2_core.probots_launcher.os.path.isdir", return_value=True):
-                with mock.patch("plugins.StarCraft2.starcraft2_core.probots_launcher.subprocess.run") as run:
+                with mock.patch(
+                    "plugins.StarCraft2.starcraft2_core.probots_launcher."
+                    "kill_process_by_image",
+                ) as kill_process_by_image:
+                    kill_process_by_image.return_value.returncode = 0
                     with mock.patch(
                         "plugins.StarCraft2.starcraft2_core.probots_launcher.launch_process",
                         return_value=process,
@@ -582,7 +586,7 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
                         result = launcher.start_sc2aiapp(config, capture_output=False)
 
         self.assertTrue(result["ok"])
-        self.assertEqual(2, run.call_count)
+        self.assertEqual(2, kill_process_by_image.call_count)
         popen.assert_called_once()
         _, kwargs = popen.call_args
         self.assertEqual(
@@ -604,7 +608,10 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
 
         with mock.patch("plugins.StarCraft2.starcraft2_core.probots_launcher.os.path.isfile", return_value=True):
             with mock.patch("plugins.StarCraft2.starcraft2_core.probots_launcher.os.path.isdir", return_value=True):
-                with mock.patch("plugins.StarCraft2.starcraft2_core.probots_launcher.subprocess.run") as run:
+                with mock.patch(
+                    "plugins.StarCraft2.starcraft2_core.probots_launcher."
+                    "kill_process_by_image",
+                ) as kill_process_by_image:
                     with mock.patch(
                         "plugins.StarCraft2.starcraft2_core.probots_launcher.launch_process",
                         return_value=process,
@@ -612,7 +619,7 @@ class StarCraft2ProBotsObserverTests(unittest.TestCase):
                         result = launcher.start_sc2aiapp(config, capture_output=False)
 
         self.assertTrue(result["ok"])
-        run.assert_not_called()
+        kill_process_by_image.assert_not_called()
 
     def test_ladder_proxy_launcher_reports_missing_executable(self):
         launcher = SC2LadderProxyLauncher()

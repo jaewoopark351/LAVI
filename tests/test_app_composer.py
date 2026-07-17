@@ -263,6 +263,50 @@ class AppComposerTests(unittest.TestCase):
             composer._startup_components,
         )
 
+    def test_create_component_ui_delegates_to_ui_composition_service(self):
+        composer = AppComposer()
+        composer.input = object()
+        composer.llm = object()
+        composer.translate = object()
+        composer.tts = object()
+        composer.vtuber = object()
+        composer.song_player = object()
+        composer.chess_plugin = object()
+        composer.starcraft_plugin = object()
+        composer.starcraft116_plugin = object()
+        composer.starcraft2_plugin = object()
+        composer.screen_vision = object()
+        composer.ui_composition_service = mock.Mock()
+
+        composer.create_component_ui()
+
+        composer.ui_composition_service.create_component_ui.assert_called_once_with(
+            input_component=composer.input,
+            llm=composer.llm,
+            translate=composer.translate,
+            tts=composer.tts,
+            vtuber=composer.vtuber,
+            song_player=composer.song_player,
+            chess_plugin=composer.chess_plugin,
+            starcraft_plugin=composer.starcraft_plugin,
+            starcraft116_plugin=composer.starcraft116_plugin,
+            starcraft2_plugin=composer.starcraft2_plugin,
+            screen_vision=composer.screen_vision,
+        )
+
+    def test_launch_gradio_delegates_to_runtime_launcher(self):
+        composer = AppComposer()
+        composer.main_interface = object()
+        composer.runtime_lifecycle = object()
+        composer.gradio_runtime_launcher = mock.Mock()
+
+        composer.launch_gradio()
+
+        composer.gradio_runtime_launcher.launch.assert_called_once_with(
+            composer.main_interface,
+            runtime_lifecycle=composer.runtime_lifecycle,
+        )
+
     def test_core_component_composition_service_builds_core_components(self):
         class FakeInput:
             pass

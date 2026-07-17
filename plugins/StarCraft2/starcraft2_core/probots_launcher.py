@@ -2,14 +2,18 @@
 from __future__ import annotations
 
 import os
-import subprocess
 import threading
 import time
 from collections import deque
 from typing import Any, Callable, Dict, Iterable, List, Optional
 
 from core.logger import log_print
-from core.process import launch_process
+from core.process import (
+    PIPE,
+    TimeoutExpired,
+    kill_process_by_image,
+    launch_process,
+)
 
 
 LineCallback = Callable[[str, str], None]
@@ -75,8 +79,8 @@ class ProBotsLauncher:
         app_path = validation["path"]
         cwd = self._resolve_working_directory(app_path)
         command = [app_path] + list(self.args)
-        stdout = subprocess.PIPE if capture_output else None
-        stderr = subprocess.PIPE if capture_output else None
+        stdout = PIPE if capture_output else None
+        stderr = PIPE if capture_output else None
 
         try:
             self.process = launch_process(
@@ -193,7 +197,7 @@ class ProBotsLauncher:
             try:
                 process.terminate()
                 process.wait(timeout=max(0.1, float(timeout_sec)))
-            except subprocess.TimeoutExpired:
+            except TimeoutExpired:
                 process.kill()
                 process.wait(timeout=1.0)
             except Exception as e:
@@ -247,17 +251,12 @@ class ProBotsLauncher:
             if not name:
                 continue
             try:
-                completed = subprocess.run(
-                    ["taskkill", "/IM", name, "/F"],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    check=False,
-                )
+                completed = kill_process_by_image(name)
                 results.append(
                     {
                         "process": name,
-                        "returncode": completed.returncode,
-                        "ok": completed.returncode == 0,
+                        "returncode": completed.returncode if completed else None,
+                        "ok": bool(completed and completed.returncode == 0),
                     }
                 )
             except Exception as e:
