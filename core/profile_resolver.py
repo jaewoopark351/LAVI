@@ -4,6 +4,7 @@ from core.profile_resolver_core.module_settings_not_found import ModuleSettingsN
 from core.profile_resolver_core.module_settings_resolution import (
     ModuleSettingsResolution,
 )
+from core.profile_resolver_core.module_settings_snapshot import ModuleSettingsSnapshot
 from core.profile_resolver_core.module_settings_resolver import (
     MODULES_CONFIG_ENV_VAR,
     PROFILE_ENV_VAR,
@@ -23,6 +24,7 @@ __all__ = [
     "ModuleSettingsError",
     "ModuleSettingsNotFound",
     "ModuleSettingsResolution",
+    "ModuleSettingsSnapshot",
     "active_profile",
     "explicit_modules_config",
     "load_module_settings",

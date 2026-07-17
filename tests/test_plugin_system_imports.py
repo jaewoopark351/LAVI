@@ -21,6 +21,7 @@ class PluginSystemImportTests(unittest.TestCase):
             PluginDiagnosticSnapshot,
             PluginRuntimeRequirements,
             PluginRuntimeContract,
+            PluginSelectionSnapshotDTO,
             PluginState,
             PluginSupports,
             ProviderDiagnosticDTO,
@@ -60,6 +61,24 @@ class PluginSystemImportTests(unittest.TestCase):
                 category="input_gathering",
                 state="READY",
                 selected=True,
+            ).to_dict(),
+        )
+        self.assertEqual(
+            {
+                "category": "text_to_speech",
+                "selected_provider": "Example",
+                "default_provider": "Example",
+                "default_provider_source": "legacy",
+                "available_providers": ["Example"],
+                "provider_diagnostics": [],
+                "runtime_requirements": {},
+            },
+            PluginSelectionSnapshotDTO(
+                category="text_to_speech",
+                selected_provider="Example",
+                default_provider="Example",
+                default_provider_source="legacy",
+                available_providers=("Example",),
             ).to_dict(),
         )
         self.assertEqual(
@@ -192,6 +211,46 @@ class PluginSystemImportTests(unittest.TestCase):
             },
             snapshot.to_dict(),
         )
+
+    def test_plugin_selection_snapshot_keeps_provider_results_typed(self):
+        #20260718_kpopmodder: Selection state can be consumed as DTOs before legacy dict serialization.
+        from plugin_system import PluginRuntimeRequirements, PluginSelectionSnapshotDTO
+        from plugin_system.selection import PluginSelectionBase
+        from plugin_system.selection_core.provider import Provider
+
+        provider = Provider()
+        provider.name = "GPTSoVITS"
+        provider.initialized = True
+
+        fallback = Provider()
+        fallback.name = "NullTTS"
+        fallback.disabled = True
+        fallback.init_error = "disabled by test"
+
+        selection = object.__new__(PluginSelectionBase)
+        selection.provider_list = [provider, fallback]
+        selection.category_name = "text_to_speech"
+        selection.current_provider = provider
+        selection.default_provider = provider
+        selection.default_provider_source = "first_available"
+        selection.runtime_requirements = PluginRuntimeRequirements(
+            required_capabilities=("text_to_speech",),
+        )
+
+        snapshot = selection.selection_snapshot()
+        payload = selection.get_selection_snapshot()
+
+        self.assertIsInstance(snapshot, PluginSelectionSnapshotDTO)
+        self.assertEqual("GPTSoVITS", snapshot.selected_provider)
+        self.assertEqual(("GPTSoVITS", "NullTTS"), snapshot.available_providers)
+        self.assertEqual("GPTSoVITS", payload["selected_provider"])
+        self.assertEqual(
+            ["text_to_speech"],
+            payload["runtime_requirements"]["required_capabilities"],
+        )
+        self.assertTrue(payload["provider_diagnostics"][0]["selected"])
+        self.assertTrue(payload["provider_diagnostics"][0]["initialized"])
+        self.assertTrue(payload["provider_diagnostics"][1]["disabled"])
 
     def test_plugin_descriptor_exposes_runtime_contract(self):#20260716_kpopmodder
         from plugin_system.loader import PluginDescriptor

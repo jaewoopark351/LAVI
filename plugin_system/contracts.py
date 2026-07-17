@@ -24,6 +24,9 @@ from plugin_system.contracts_core.plugin_runtime_contract import PluginRuntimeCo
 from plugin_system.contracts_core.plugin_runtime_requirements import (
     PluginRuntimeRequirements,
 )
+from plugin_system.contracts_core.plugin_selection_snapshot_dto import (
+    PluginSelectionSnapshotDTO,
+)
 from plugin_system.contracts_core.plugin_state import PluginState
 from plugin_system.contracts_core.plugin_supports import PluginSupports
 from plugin_system.contracts_core.provider_diagnostic_dto import ProviderDiagnosticDTO
@@ -39,6 +42,7 @@ __all__ = [
     "PluginDiagnosticSnapshot",
     "PluginRuntimeContract",
     "PluginRuntimeRequirements",
+    "PluginSelectionSnapshotDTO",
     "PluginState",
     "PluginSupports",
     "ProviderDiagnosticDTO",

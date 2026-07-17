@@ -5,6 +5,7 @@ from core.config_manager import config_manager#20260627_kpopmodder
 from core.logger import log_print  #20260612_kpopmodder
 from plugin_system.contracts import (
     PluginRuntimeRequirements,
+    PluginSelectionSnapshotDTO,
     ProviderDiagnosticDTO,
 )
 from plugin_system.loader import plugin_loader
@@ -344,34 +345,58 @@ class PluginSelectionBase():#20260622_kpopmodder
         }
 
     def get_provider_diagnostics(self):
+        return [
+            diagnostic.to_dict()
+            for diagnostic in self.provider_diagnostics()
+        ]
+
+    def provider_diagnostics(self):
         diagnostics = []
         for provider in self.provider_list:
-            handle = getattr(provider, "handle", None)
-            diagnostic_snapshot = getattr(handle, "diagnostic_snapshot", None)
-            if callable(diagnostic_snapshot):
-                snapshot = diagnostic_snapshot()
-            else:
-                snapshot = {
-                    "plugin_id": provider.name,
-                    "name": provider.name,
-                    "category": self.category_name,
-                    "state": "RUNNING" if provider.initialized else "READY",
-                    "detail": provider.init_error,
-                    "diagnostic": {},
-                    "runtime_contract": provider.runtime_contract_dict(),
-                }
-            plugin_diagnostic = self._plugin_diagnostic_dict(provider)
-            if plugin_diagnostic:
-                snapshot["diagnostic"] = plugin_diagnostic
-            diagnostics.append(
-                ProviderDiagnosticDTO.from_snapshot(
-                    snapshot,
-                    selected=provider is self.current_provider,
-                    initialized=bool(provider.initialized),
-                    disabled=bool(provider.disabled),
-                ).to_dict()
-            )
+            diagnostics.append(self._provider_diagnostic_dto(provider))
         return diagnostics
+
+    def _provider_diagnostic_dto(self, provider):
+        #20260718_kpopmodder: Keep provider diagnostics typed until the legacy UI/API edge.
+        handle = getattr(provider, "handle", None)
+        diagnostic_snapshot = getattr(handle, "diagnostic_snapshot", None)
+        if callable(diagnostic_snapshot):
+            snapshot = diagnostic_snapshot()
+        else:
+            snapshot = {
+                "plugin_id": provider.name,
+                "name": provider.name,
+                "category": self.category_name,
+                "state": "RUNNING" if provider.initialized else "READY",
+                "detail": provider.init_error,
+                "diagnostic": {},
+                "runtime_contract": provider.runtime_contract_dict(),
+            }
+        plugin_diagnostic = self._plugin_diagnostic_dict(provider)
+        if plugin_diagnostic:
+            snapshot["diagnostic"] = plugin_diagnostic
+        return ProviderDiagnosticDTO.from_snapshot(
+            snapshot,
+            selected=provider is self.current_provider,
+            initialized=bool(provider.initialized),
+            disabled=bool(provider.disabled),
+        )
+
+    def selection_snapshot(self):
+        return PluginSelectionSnapshotDTO(
+            category=self.category_name,
+            selected_provider=self._current_provider_name(),
+            default_provider=self.default_provider.name,
+            default_provider_source=self.default_provider_source,
+            available_providers=tuple(
+                provider.name for provider in self.provider_list
+            ),
+            provider_diagnostics=tuple(self.provider_diagnostics()),
+            runtime_requirements=self.runtime_requirements,
+        )
+
+    def get_selection_snapshot(self):
+        return self.selection_snapshot().to_dict()
 
     def _plugin_diagnostic_dict(self, provider):
         #20260717_kpopmodder: Prefer provider-owned diagnostics after construction without forcing lazy providers to load.
