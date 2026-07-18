@@ -1,0 +1,17 @@
+{
+  "name": "Silero VAD ONNX 16k op15",
+  "file_name": "silero_vad_16k_op15.onnx",
+  "project_model_path": "models/vad/silero_vad_16k_op15.onnx",
+  "upstream_repository": "https://github.com/snakers4/silero-vad",
+  "download_url": "https://raw.githubusercontent.com/snakers4/silero-vad/master/src/silero_vad/data/silero_vad_16k_op15.onnx",
+  "version_note": "ONNX opset 15 model from the official Silero VAD repository, current master raw file",
+  "license": "MIT",
+  "sha256": "7ed98ddbad84ccac4cd0aeb3099049280713df825c610a8ed34543318f1b2c49",
+  "runtime_notes": [
+    "CPUExecutionProvider only",
+    "16000 Hz mono float32 input",
+    "512 samples per frame",
+    "Downloaded into the project only when the configured model file is missing"
+  ],
+  "recorded_by": "20260718_kpopmodder"
+}

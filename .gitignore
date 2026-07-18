@@ -166,3 +166,5 @@ ai_character_system_prompt.txt
 
 plugins/StarCraft2/runtime/
 plugins/StarCraft2/runtime.Zip
+#20260718_kpopmodder: Ignore local StarCraft 1.16 bot runtime/vendor bundles.
+plugins/StarCraft116/Bots/

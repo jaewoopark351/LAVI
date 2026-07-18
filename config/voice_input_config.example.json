@@ -4,6 +4,21 @@
     "whisper_model": "openai/whisper-large-v3",
     "language": "ko",
     "torch_dtype": "auto",
-    "device": ""
+    "device": "",
+    "vad": {
+      "enabled": true,
+      "auto_download": true,
+      "legacy_fallback_enabled": false,
+      "model_path": "models/vad/silero_vad_16k_op15.onnx",
+      "model_url": "https://raw.githubusercontent.com/snakers4/silero-vad/master/src/silero_vad/data/silero_vad_16k_op15.onnx",
+      "model_sha256": "7ed98ddbad84ccac4cd0aeb3099049280713df825c610a8ed34543318f1b2c49",
+      "speech_threshold": 0.45,
+      "release_threshold": 0.30,
+      "start_confirm_frames": 3,
+      "min_speech_duration_ms": 128,
+      "min_silence_duration_ms": 450,
+      "pre_roll_ms": 256,
+      "post_roll_ms": 160
+    }
   }
 }

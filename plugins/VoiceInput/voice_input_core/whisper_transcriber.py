@@ -1,5 +1,6 @@
 #20260620_kpopmodder: VoiceInput helper modules are grouped under voice_input_core without changing behavior.
 import os
+import re
 import tempfile
 
 from core.logger import log_print
@@ -213,6 +214,17 @@ class WhisperTranscriber:#20260616_kpopmodder
                 )#20260625_kpopmodder
                 return None
 
+            if self._is_repeated_numeric_hallucination(transcribed_text):
+                self.liveTextbox.print(
+                    f"{prefix} repeated numeric STT ignored: "
+                    f"text={transcribed_text!r}"
+                )#20260718_kpopmodder
+                log_print(
+                    f"[WhisperTranscriber {prefix}] "
+                    f"repeated numeric STT ignored: text={transcribed_text!r}"
+                )#20260718_kpopmodder
+                return None
+
             log_print(
                 f"looking for {transcribed_text.strip().lower()} in {self.filter_list}"
             )
@@ -242,3 +254,23 @@ class WhisperTranscriber:#20260616_kpopmodder
                     os.remove(temp_path)
                 except Exception:
                     pass
+
+    def _is_repeated_numeric_hallucination(self, text):
+        tokens = re.findall(r"\d+|[A-Za-z]+|[가-힣]+", str(text or ""))
+        if len(tokens) < 12:
+            return False
+
+        numeric_tokens = [token for token in tokens if token.isdigit()]
+        if len(numeric_tokens) / float(len(tokens)) < 0.8:
+            return False
+
+        unique_numbers = set(numeric_tokens)
+        if len(unique_numbers) > 3:
+            return False
+
+        transitions = sum(
+            1
+            for index in range(1, len(numeric_tokens))
+            if numeric_tokens[index] != numeric_tokens[index - 1]
+        )
+        return transitions >= max(3, len(numeric_tokens) // 3)

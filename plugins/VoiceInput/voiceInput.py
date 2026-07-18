@@ -8,6 +8,7 @@ from core.config_manager import config_manager
 from core.gpu_device_manager import gpu_device_manager#20260626_kpopmodder
 from core.global_state import global_state, GlobalKeys#20260628_kpopmodder
 from core.logger import log_print#20260626_kpopmodder
+from core.paths import get_lavi_paths#20260718_kpopmodder
 
 #20260620_kpopmodder: Import grouped VoiceInput helpers from voice_input_core.
 from .voice_input_core.languages import LANGUAGES
@@ -23,6 +24,12 @@ from .voice_input_core.voice_input_state import VoiceInputState
 from .voice_input_core.voice_input_ui_controller import VoiceInputUiController
 from .voice_input_core.voice_input_runtime_controller import VoiceInputRuntimeController
 from .voice_input_core.voice_input_hotkey_controller import VoiceInputHotkeyController
+from .voice_input_core.vad import (
+    SileroOnnxVad,
+    VadModelDownloader,
+    VadSettings,
+    VadStateMachine,
+)#20260718_kpopmodder
 
 
 class VoiceInput(InputPluginInterface):#20260618_kpopmodder
@@ -41,10 +48,33 @@ class VoiceInput(InputPluginInterface):#20260618_kpopmodder
                 "whisper_model": "openai/whisper-large-v3",
                 "language": "ko",
                 "device": "auto",
+                "vad": {
+                    "enabled": True,
+                    "auto_download": True,
+                    "legacy_fallback_enabled": False,
+                    "model_path": "models/vad/silero_vad_16k_op15.onnx",
+                    "model_url": (
+                        "https://raw.githubusercontent.com/snakers4/"
+                        "silero-vad/master/src/silero_vad/data/"
+                        "silero_vad_16k_op15.onnx"
+                    ),
+                    "model_sha256": (
+                        "7ed98ddbad84ccac4cd0aeb3099049280713df825"
+                        "c610a8ed34543318f1b2c49"
+                    ),
+                    "speech_threshold": 0.45,
+                    "release_threshold": 0.30,
+                    "start_confirm_frames": 3,
+                    "min_speech_duration_ms": 128,
+                    "min_silence_duration_ms": 450,
+                    "pre_roll_ms": 256,
+                    "post_roll_ms": 160,
+                },
             },
         },
         "required_python_packages": [
             "numpy",
+            "onnxruntime",
             "resemblyzer",
             "sounddevice",
             "soundfile",
@@ -120,6 +150,11 @@ class VoiceInput(InputPluginInterface):#20260618_kpopmodder
             "device": config.get("device") or "",
         }
 
+    def load_vad_settings(self):#20260718_kpopmodder
+        config = self.load_stt_json_settings()
+        config.update(config_manager.load_section("VoiceInput"))
+        return VadSettings.from_config(config)
+
     def normalize_stt_language(self, language):#20260707_kpopmodder
         text = str(language or "").strip()
 
@@ -183,10 +218,71 @@ class VoiceInput(InputPluginInterface):#20260618_kpopmodder
             language=settings.get("language"),
         )
 
+    def build_vad_components(self, settings):#20260718_kpopmodder
+        if not settings.enabled:
+            log_print("[VoiceInputVAD] disabled by config")
+            return None, None, False, ""
+
+        paths = get_lavi_paths()
+        model_path = paths.resolve_path(settings.model_path)
+        if model_path is None:
+            message = "vad_model_path_missing"
+            log_print(f"[VoiceInputVAD] initialization failed: {message}")
+            return None, None, not settings.legacy_fallback_enabled, message
+
+        downloader = VadModelDownloader()
+        download_result = downloader.ensure_model(
+            model_path=model_path,
+            url=settings.model_url,
+            expected_sha256=settings.model_sha256,
+            timeout_sec=settings.download_timeout_sec,
+            project_root=paths.project_root,
+            enabled=settings.auto_download,
+        )
+        if not download_result.get("ok"):
+            message = str(
+                download_result.get("message")
+                or download_result.get("error")
+                or "vad_model_unavailable"
+            )
+            log_print(
+                "[VoiceInputVAD] initialization failed: "
+                f"path={model_path}, error={message}, result={download_result}"
+            )
+            return None, None, not settings.legacy_fallback_enabled, message
+
+        try:
+            vad_model = SileroOnnxVad(
+                str(model_path),
+                sample_rate=settings.sample_rate,
+                frame_samples=settings.frame_samples,
+                inter_op_num_threads=settings.inter_op_num_threads,
+                intra_op_num_threads=settings.intra_op_num_threads,
+            )
+            vad_model.warm_up()
+            state_machine = VadStateMachine(settings)
+        except Exception as e:
+            message = str(e)
+            log_print(
+                "[VoiceInputVAD] initialization failed: "
+                f"path={model_path}, error={message}"
+            )
+            return None, None, not settings.legacy_fallback_enabled, message
+
+        log_print(
+            "[VoiceInputVAD] initialized: "
+            f"path={model_path}, downloaded={download_result.get('downloaded')}, "
+            "provider=CPUExecutionProvider, "
+            f"speech_threshold={settings.speech_threshold:.2f}, "
+            f"release_threshold={settings.release_threshold:.2f}"
+        )
+        return vad_model, state_machine, True, ""
+
     def init(self):
         self.liveTextbox = LiveTextbox()
         self.state = VoiceInputState()
         self.stt_settings = self.load_stt_settings()
+        self.vad_settings = self.load_vad_settings()#20260718_kpopmodder
         self.state.input_language = self.stt_language_to_ui_value(
             self.stt_settings.get("language")
         )#20260707_kpopmodder
@@ -241,11 +337,22 @@ class VoiceInput(InputPluginInterface):#20260618_kpopmodder
             "so,"
         ]
 
+        (
+            self.vad_model,
+            self.vad_state_machine,
+            self.vad_required,
+            self.vad_error,
+        ) = self.build_vad_components(self.vad_settings)#20260718_kpopmodder
+
         self.recorder = MicrophoneRecorder(
             input_device_index=self.state.input_device_index,
             mic_lock=self.state.mic_lock,
             liveTextbox=self.liveTextbox,
-            input_device_index_callback=self.get_configured_input_device_index#20260625_kpopmodder
+            input_device_index_callback=self.get_configured_input_device_index,#20260625_kpopmodder
+            vad_model=self.vad_model,
+            vad_state_machine=self.vad_state_machine,
+            vad_required=self.vad_required,
+            vad_error=self.vad_error,
         )
 
         self.transcriber = WhisperTranscriber(
