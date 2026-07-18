@@ -8,6 +8,7 @@ import subprocess  # noqa: F401  #20260716_kpopmodder: Kept so tests can assert 
 import sys
 
 from plugin_system.availability_probe_service import AvailabilityProbeService
+from plugin_system.availability_diagnostic_service import AvailabilityDiagnosticService
 from plugin_system.interfaces import (
     InputPluginInterface,
     LLMPluginInterface,
@@ -78,6 +79,9 @@ class PluginLoader:
         self.plugin_setting_example_path = str(self.paths.config_path("modules.example.json"))
         self.plugin_setting= {}
         self.availability_probe_service = AvailabilityProbeService()
+        self.availability_diagnostic_service = AvailabilityDiagnosticService(
+            self.availability_probe_service,
+        )
 
     def set_plugin_status(
         self,
@@ -373,59 +377,14 @@ class PluginLoader:
 
     def availability_diagnostic(self, descriptor):
         availability_probe = descriptor.runtime_contract.availability_probe
-        missing_packages = self.availability_probe_service.missing_python_packages(
-            availability_probe.required_python_packages,
-        )
-        missing_files = self.availability_probe_service.missing_files(
-            availability_probe.required_files,
-            lambda path: self.resolve_required_file(descriptor, path),
-        )
-        missing_executables = self.availability_probe_service.missing_executables(
-            availability_probe.required_executables,
-        )
         model_missing_files = self._probe_model_file_contract(descriptor)
-        missing_services = self.availability_probe_service.missing_services(
-            availability_probe.required_services,
-            timeout_sec=availability_probe.timeout_sec,
-        )
-
-        if not (
-            missing_packages
-            or missing_files
-            or missing_executables
-            or model_missing_files
-            or missing_services
-        ):
-            return None
-
-        reason_code = "missing_static_dependency"
-        message = (
-            f"{descriptor.display_name} is enabled but required Python packages, "
-            "files, executables, services, or model files are unavailable."
-        )
-        if model_missing_files:
-            reason_code = "missing_model_configuration"
-            message = (
-                f"{descriptor.display_name} is enabled but selected model files "
-                "or model configuration are missing."
-            )
-        elif missing_services and not (missing_packages or missing_files or missing_executables):
-            reason_code = "required_service_unavailable"
-            message = (
-                f"{descriptor.display_name} is enabled but a required local "
-                "service or device probe failed."
-            )
-
-        return PluginDiagnostic(
+        return self.availability_diagnostic_service.build_diagnostic(
             plugin_id=descriptor.id,
-            state=PluginState.UNAVAILABLE,
-            reason_code=reason_code,
-            human_readable_message=message,
-            missing_python_packages=tuple(missing_packages),
-            missing_files=tuple(missing_files + model_missing_files),
-            missing_executables=tuple(missing_executables),
-            missing_services=tuple(missing_services),
-            suggested_install_profile=descriptor.dependency_group,
+            display_name=descriptor.display_name,
+            availability_probe=availability_probe,
+            resolve_file=lambda path: self.resolve_required_file(descriptor, path),
+            extra_missing_files=tuple(model_missing_files),
+            dependency_group=descriptor.dependency_group,
             suggested_command=self.suggested_install_command(descriptor),
             log_reference=f"PluginLoader availability probe for {descriptor.status_key}",
         )

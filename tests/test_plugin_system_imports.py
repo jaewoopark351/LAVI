@@ -1555,6 +1555,44 @@ class PluginSystemImportTests(unittest.TestCase):
         self.assertEqual([], service.missing_services(("tcp localhost:25575",)))
         tcp_connector.assert_called_once_with(("localhost", 25575), timeout=0.25)
 
+    def test_availability_diagnostic_service_builds_shared_service_diagnostic(self):
+        #20260718_kpopmodder: Provider and optional loaders should share unavailable reason rules.
+        from plugin_system import AvailabilityProbeContract
+        from plugin_system.availability_diagnostic_service import (
+            AvailabilityDiagnosticService,
+        )
+        from plugin_system.availability_probe_service import AvailabilityProbeService
+        from plugin_system.loader import PluginState
+
+        probe_service = AvailabilityProbeService(
+            tcp_connector=mock.Mock(side_effect=OSError("refused")),
+        )
+        diagnostic_service = AvailabilityDiagnosticService(probe_service)
+
+        diagnostic = diagnostic_service.build_diagnostic(
+            plugin_id="ServiceOnlyPlugin",
+            display_name="Service Only Plugin",
+            availability_probe=AvailabilityProbeContract(
+                required_services=("tcp://127.0.0.1:25575",),
+                timeout_sec=0.1,
+            ),
+            resolve_file=lambda path: Path(path),
+            dependency_group="Full",
+            suggested_command="install command",
+            log_reference="test diagnostic",
+        )
+
+        self.assertEqual(PluginState.UNAVAILABLE, diagnostic.state)
+        self.assertEqual("required_service_unavailable", diagnostic.reason_code)
+        self.assertEqual(
+            ["tcp://127.0.0.1:25575"],
+            list(diagnostic.missing_services),
+        )
+        self.assertIn("required local service", diagnostic.human_readable_message)
+        self.assertEqual("Full", diagnostic.suggested_install_profile)
+        self.assertEqual("install command", diagnostic.suggested_command)
+        self.assertEqual("test diagnostic", diagnostic.log_reference)
+
     def test_required_local_http_service_is_unavailable_without_tcp_endpoint(self):
         #20260718_kpopmodder: Generic URL-like services should share the same probe path.
         from plugin_system.loader import PluginLoader, PluginState
@@ -1592,6 +1630,10 @@ class PluginSystemImportTests(unittest.TestCase):
 
         self.assertEqual(PluginState.UNAVAILABLE, handle.status)
         self.assertEqual("required_service_unavailable", handle.diagnostic.reason_code)
+        self.assertIn(
+            "required local service",
+            handle.diagnostic.human_readable_message,
+        )
         self.assertEqual(
             ["VOICEVOX engine http://127.0.0.1:50021"],
             list(handle.diagnostic.missing_services),
@@ -2686,6 +2728,12 @@ class PluginSystemImportTests(unittest.TestCase):
         self.assertEqual(
             "required_service_unavailable",
             snapshot["ServiceOnlyOptional"]["diagnostic"]["reason_code"],
+        )
+        self.assertIn(
+            "required local service",
+            snapshot["ServiceOnlyOptional"]["diagnostic"][
+                "human_readable_message"
+            ],
         )
         self.assertEqual(
             ["tcp://127.0.0.1:25575"],

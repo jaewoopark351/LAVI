@@ -5,6 +5,7 @@ import traceback
 
 from app_core.module_config import module_enabled
 from core.logger import log_print
+from plugin_system.availability_diagnostic_service import AvailabilityDiagnosticService
 from plugin_system.availability_probe_service import AvailabilityProbeService
 from plugin_system.contracts import (
     AvailabilityProbeContract,
@@ -16,6 +17,9 @@ from plugin_system.contracts import (
 from plugin_system.registry import plugin_registry
 
 _AVAILABILITY_PROBE_SERVICE = AvailabilityProbeService()
+_AVAILABILITY_DIAGNOSTIC_SERVICE = AvailabilityDiagnosticService(
+    _AVAILABILITY_PROBE_SERVICE,
+)
 
 
 def instantiate_optional_plugin(
@@ -269,61 +273,22 @@ def _optional_unavailable_diagnostic(plugin_name, module_path, manifest, project
             0.25,
         ),
     )
-    missing_packages = _AVAILABILITY_PROBE_SERVICE.missing_python_packages(
-        availability_probe.required_python_packages,
-    )
-    missing_files = _AVAILABILITY_PROBE_SERVICE.missing_files(
-        availability_probe.required_files,
-        lambda path: _resolve_required_file(module_path, path, project_root),
-    )
-    missing_executables = _AVAILABILITY_PROBE_SERVICE.missing_executables(
-        availability_probe.required_executables,
-    )
-    missing_services = _AVAILABILITY_PROBE_SERVICE.missing_services(
-        availability_probe.required_services,
-        timeout_sec=availability_probe.timeout_sec,
-    )
-
-    if not (
-        missing_packages
-        or missing_files
-        or missing_executables
-        or missing_services
-    ):
-        return None
-
-    display_name = _contract_text(manifest, "display_name", plugin_name)
-    reason_code = "missing_static_dependency"
-    message = (
-        f"{display_name} is enabled but required Python packages, files, "
-        "executables, or services are missing."
-    )
-    if missing_services and not (
-        missing_packages
-        or missing_files
-        or missing_executables
-    ):
-        reason_code = "required_service_unavailable"
-        message = (
-            f"{display_name} is enabled but a required local service "
-            "or device probe failed."
-        )
-
-    return PluginDiagnostic(
+    return _AVAILABILITY_DIAGNOSTIC_SERVICE.build_diagnostic(
         plugin_id=_contract_text(manifest, "id", plugin_name),
-        state=PluginState.UNAVAILABLE,
-        reason_code=reason_code,
-        human_readable_message=message,
-        missing_python_packages=tuple(missing_packages),
-        missing_files=tuple(missing_files),
-        missing_executables=tuple(missing_executables),
-        missing_services=tuple(missing_services),
-        suggested_install_profile=_contract_text(
+        display_name=_contract_text(manifest, "display_name", plugin_name),
+        availability_probe=availability_probe,
+        resolve_file=lambda path: _resolve_required_file(
+            module_path,
+            path,
+            project_root,
+        ),
+        dependency_group=_contract_text(
             manifest,
             "dependency_group",
             "Full",
         ),
         suggested_command=_suggested_install_command(),
+        log_reference=f"Optional plugin availability probe for {plugin_name}",
     )
 
 

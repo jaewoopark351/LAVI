@@ -12,9 +12,11 @@ from plugin_system.contracts import (
     ProviderDiagnosticDTO,
     validate_plugin_lifecycle,
 )
+from plugin_system.availability_diagnostic_service import AvailabilityDiagnosticService
 from plugin_system.runtime_plugin_mixin import RuntimePluginContractMixin
 
 __all__ = [
+    "AvailabilityDiagnosticService",
     "AvailabilityProbeContract",
     "PluginContractIssue",
     "PluginDiagnostic",
