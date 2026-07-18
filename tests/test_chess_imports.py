@@ -36,8 +36,10 @@ class ChessImportTests(unittest.TestCase):
         html = plugin._iframe_html()
         self.assertIn("iframe", html)
         self.assertIn(plugin.server_url, html)
+        self.assertIn("?v=", html)
         self.assertIn("height:800px", html)
         self.assertIn("border:0", html)
+        self.assertIn("background:#0d1117", html)
 
     def test_chess_web_uses_committed_local_vendor_files(self):
         repo_root = os.path.dirname(os.path.dirname(__file__))
@@ -85,6 +87,29 @@ class ChessImportTests(unittest.TestCase):
 
 
 class ChessWebServerTests(unittest.TestCase):
+    def test_static_responses_disable_cache(self):
+        controller = ChessGameController()
+        static_dir = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "plugins",
+            "Chess",
+            "web",
+            "static",
+        )
+        server = ChessWebServer(
+            controller=controller,
+            static_dir=static_dir,
+            port=18991,
+        )
+        url = server.start()
+        try:
+            response = urllib.request.urlopen(url + "?v=test", timeout=3)
+            html = response.read().decode("utf-8")
+            self.assertIn("<title>LAV Chess</title>", html)
+            self.assertIn("no-store", response.headers.get("Cache-Control", ""))
+        finally:
+            server.shutdown()
+
     def test_invalid_json_post_returns_json_error(self):
         controller = ChessGameController()
         static_dir = os.path.join(

@@ -111,6 +111,16 @@ class ChessWebServer:
             def log_message(self, format, *args):
                 return
 
+            def end_headers(self):
+                #20260718_kpopmodder: Prevent Gradio iframe/browser cache from keeping old Chess UI themes.
+                self.send_header(
+                    "Cache-Control",
+                    "no-store, no-cache, must-revalidate, max-age=0",
+                )
+                self.send_header("Pragma", "no-cache")
+                self.send_header("Expires", "0")
+                super().end_headers()
+
             def _read_json(self):
                 length = int(self.headers.get("Content-Length", "0") or 0)
                 if length <= 0:

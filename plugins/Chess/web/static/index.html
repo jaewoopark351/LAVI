@@ -8,12 +8,22 @@
   <link rel="stylesheet" href="./vendor/cm-chessboard/assets/chessboard.css">
   <style>
     :root {
-      --border: #d0d7de;
-      --text: #24292f;
-      --muted: #57606a;
-      --panel: #f6f8fa;
-      --accent: #0969da;
-      --danger: #cf222e;
+      color-scheme: dark;
+      --border: #30363d;
+      --text: #f0f6fc;
+      --muted: #9da7b3;
+      --panel: #161b22;
+      --surface: #0d1117;
+      --field: #0b1016;
+      --button: #151b23;
+      --button-hover: #1f2933;
+      --accent: #58a6ff;
+      --danger: #ff7b72;
+      --board-light: #aeb8c6;
+      --board-dark: #25313c;
+      --board-border: #27313c;
+      --board-coord-light: #e6edf3;
+      --board-coord-dark: #202832;
     }
 
     * {
@@ -28,7 +38,7 @@
       margin: 0;
       font-family: Segoe UI, Arial, sans-serif;
       color: var(--text);
-      background: #ffffff;
+      background: var(--surface);
     }
 
     .shell {
@@ -51,7 +61,9 @@
       width: min(640px, calc(100vw - 32px), calc(100vh - 120px));
       max-width: 100%;
       aspect-ratio: 1 / 1;
-      border: 1px solid var(--border);
+      border: 1px solid var(--board-border);
+      background: var(--field);
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.3);
       overflow: hidden;
     }
 
@@ -64,14 +76,14 @@
       position: sticky;
       bottom: 0;
       z-index: 10;
-      background: rgba(255, 255, 255, 0.96);
-      border-top: 1px solid rgba(208, 215, 222, 0.7);
+      background: rgba(13, 17, 23, 0.96);
+      border-top: 1px solid rgba(48, 54, 61, 0.85);
     }
 
     button {
       height: 34px;
       border: 1px solid var(--border);
-      background: #ffffff;
+      background: var(--button);
       color: var(--text);
       border-radius: 6px;
       cursor: pointer;
@@ -81,6 +93,18 @@
 
     button:hover {
       border-color: var(--accent);
+      background: var(--button-hover);
+    }
+
+    button:disabled {
+      color: var(--muted);
+      cursor: not-allowed;
+      opacity: 0.68;
+    }
+
+    button:disabled:hover {
+      border-color: var(--border);
+      background: var(--button);
     }
 
     button.danger {
@@ -113,7 +137,8 @@
       margin: 0;
       padding: 8px;
       border: 1px solid var(--border);
-      background: #ffffff;
+      background: var(--field);
+      color: var(--text);
       border-radius: 6px;
       font-family: Consolas, monospace;
       font-size: 12px;
@@ -125,6 +150,42 @@
       min-height: 150px;
       max-height: 220px;
       overflow: auto;
+    }
+
+    /* #20260718_kpopmodder: Keep Chess UI dark without editing vendored cm-chessboard CSS. */
+    .cm-chessboard.default .board .square.white {
+      fill: var(--board-light);
+    }
+
+    .cm-chessboard.default .board .square.black {
+      fill: var(--board-dark);
+    }
+
+    .cm-chessboard.default.border-type-thin .board .border,
+    .cm-chessboard.default.border-type-none .board .border {
+      stroke: var(--board-border);
+      fill: var(--board-border);
+    }
+
+    .cm-chessboard.default.border-type-frame .board .border {
+      fill: var(--board-light);
+    }
+
+    .cm-chessboard.default.border-type-frame .board .border-inner {
+      fill: var(--board-dark);
+      stroke: var(--board-border);
+    }
+
+    .cm-chessboard.default .coordinates .coordinate {
+      fill: var(--board-coord-dark);
+    }
+
+    .cm-chessboard.default .coordinates .coordinate.black {
+      fill: var(--board-coord-light);
+    }
+
+    .cm-chessboard.default .coordinates .coordinate.white {
+      fill: var(--board-coord-dark);
     }
 
     @media (max-width: 900px) {

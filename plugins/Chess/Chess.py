@@ -1,6 +1,7 @@
 import json
 import os
 from html import escape
+from urllib.parse import urlencode
 
 import gradio as gr
 
@@ -213,13 +214,26 @@ class Chess:
     def _iframe_html(self):
         if not self.server_url:
             return "<div>Chess web server is not ready.</div>"
-        server_url = escape(self.server_url, quote=True)
+        server_url = escape(self._iframe_url(), quote=True)
         return (
             '<iframe src="'
             + server_url
-            + '" style="width:100%;height:800px;border:0;background:#fff;" '
+            + '" style="width:100%;height:800px;border:0;background:#0d1117;" '
             + 'title="Chess Board"></iframe>'
         )
+
+    #20260718_kpopmodder: Cache-bust iframe URL so Gradio reloads updated Chess static UI.
+    def _iframe_url(self):
+        version = self._static_version()
+        separator = "&" if "?" in self.server_url else "?"
+        return self.server_url + separator + urlencode({"v": version})
+
+    def _static_version(self):
+        index_path = os.path.join(self.static_dir, "index.html")
+        try:
+            return str(int(os.path.getmtime(index_path)))
+        except Exception:
+            return "0"
 
     def _config_bool(self, key, default):
         value = self.config.get(key, default)
