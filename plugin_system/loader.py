@@ -4,12 +4,10 @@ import importlib
 import importlib.util
 import os
 from pathlib import Path
-import shutil
-import socket
 import subprocess  # noqa: F401  #20260716_kpopmodder: Kept so tests can assert runtime pip is unused.
 import sys
-from urllib.parse import urlparse
 
+from plugin_system.availability_probe_service import AvailabilityProbeService
 from plugin_system.interfaces import (
     InputPluginInterface,
     LLMPluginInterface,
@@ -79,6 +77,7 @@ class PluginLoader:
         self.legacy_plugin_setting_path = self.production_plugin_setting_path
         self.plugin_setting_example_path = str(self.paths.config_path("modules.example.json"))
         self.plugin_setting= {}
+        self.availability_probe_service = AvailabilityProbeService()
 
     def set_plugin_status(
         self,
@@ -373,23 +372,22 @@ class PluginLoader:
         )
 
     def availability_diagnostic(self, descriptor):
-        missing_packages = [
-            package
-            for package in descriptor.required_python_packages
-            if importlib.util.find_spec(package) is None
-        ]
-        missing_files = [
-            path
-            for path in descriptor.required_files
-            if not self.resolve_required_file(descriptor, path).exists()
-        ]
-        missing_executables = [
-            executable
-            for executable in descriptor.required_executables
-            if shutil.which(executable) is None
-        ]
+        availability_probe = descriptor.runtime_contract.availability_probe
+        missing_packages = self.availability_probe_service.missing_python_packages(
+            availability_probe.required_python_packages,
+        )
+        missing_files = self.availability_probe_service.missing_files(
+            availability_probe.required_files,
+            lambda path: self.resolve_required_file(descriptor, path),
+        )
+        missing_executables = self.availability_probe_service.missing_executables(
+            availability_probe.required_executables,
+        )
         model_missing_files = self._probe_model_file_contract(descriptor)
-        missing_services = self._probe_required_services(descriptor)
+        missing_services = self.availability_probe_service.missing_services(
+            availability_probe.required_services,
+            timeout_sec=availability_probe.timeout_sec,
+        )
 
         if not (
             missing_packages
@@ -431,41 +429,6 @@ class PluginLoader:
             suggested_command=self.suggested_install_command(descriptor),
             log_reference=f"PluginLoader availability probe for {descriptor.status_key}",
         )
-
-    def _probe_required_services(self, descriptor):
-        missing_services = []
-        for service in descriptor.required_services:
-            if service == "microphone_input_device":
-                if not self._probe_microphone_input_device():
-                    missing_services.append(service)
-            elif service.startswith("VTube Studio websocket "):
-                url = service.removeprefix("VTube Studio websocket ").strip()
-                if not self._probe_tcp_service(url, timeout_sec=0.25):
-                    missing_services.append(service)
-        return missing_services
-
-    def _probe_microphone_input_device(self):
-        try:
-            sounddevice = importlib.import_module("sounddevice")
-            devices = sounddevice.query_devices()
-        except Exception:
-            return False
-        try:
-            return any(int(device.get("max_input_channels", 0)) > 0 for device in devices)
-        except Exception:
-            return False
-
-    def _probe_tcp_service(self, service_url, timeout_sec=0.25):
-        parsed = urlparse(service_url)
-        host = parsed.hostname
-        port = parsed.port
-        if not host or not port:
-            return False
-        try:
-            with socket.create_connection((host, port), timeout=timeout_sec):
-                return True
-        except OSError:
-            return False
 
     def _probe_model_file_contract(self, descriptor):
         if descriptor.id != "GPTSoVITS":

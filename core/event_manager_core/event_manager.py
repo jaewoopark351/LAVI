@@ -1,8 +1,11 @@
 #20260717_kpopmodder: Isolates event dispatch state from event DTO and subscription classes.
+import logging
 import threading
 
 from .event_subscription import EventSubscription
 from .event_type import EventType
+
+_LOGGER = logging.getLogger("LAV")
 
 
 class EventManager:
@@ -87,4 +90,12 @@ class EventManager:
                 still_subscribed = callback in self._events.get(event_name, [])
 
             if still_subscribed:
-                callback(*args, **kwargs)
+                try:
+                    callback(*args, **kwargs)
+                except Exception:
+                    #20260718_kpopmodder: Keep one plugin listener failure from blocking later subscribers.
+                    _LOGGER.exception(
+                        "Event callback failed: event=%r callback=%r",
+                        event_name,
+                        callback,
+                    )

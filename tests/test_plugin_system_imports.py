@@ -1,4 +1,5 @@
 import json
+import subprocess
 import sys
 #20260622_kpopmodder: Verify canonical plugin_system imports after removing root modules.
 import tempfile
@@ -13,6 +14,29 @@ if str(PROJECT_ROOT) not in sys.path:
 
 
 class PluginSystemImportTests(unittest.TestCase):
+    def test_main_import_does_not_depend_on_loader_import_side_effects(self):
+        #20260718_kpopmodder: Fresh process import catches importlib.util side-effect regressions.
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-B",
+                "-c",
+                "import main; print('main import ok')",
+            ],
+            cwd=PROJECT_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=15,
+            check=False,
+        )
+
+        self.assertEqual(
+            0,
+            result.returncode,
+            result.stdout + result.stderr,
+        )
+        self.assertIn("main import ok", result.stdout)
+
     def test_plugin_contracts_are_shared_and_serializable(self):#20260716_kpopmodder
         from plugin_system import (
             AvailabilityProbeContract,
@@ -1500,8 +1524,10 @@ class PluginSystemImportTests(unittest.TestCase):
             loader = PluginLoader("plugins")
             loader.plugin_directory = str(plugin_root)
             loader.plugin_setting_path = str(modules_path)
-            with mock.patch("plugin_system.loader.socket.create_connection", side_effect=OSError("refused")):
-                loader._load_plugins_from_directory(str(plugin_dir))
+            loader.availability_probe_service.tcp_connector = mock.Mock(
+                side_effect=OSError("refused"),
+            )
+            loader._load_plugins_from_directory(str(plugin_dir))
 
             handle = loader.plugins["vtuber"][0]
 
@@ -1511,6 +1537,174 @@ class PluginSystemImportTests(unittest.TestCase):
             ["VTube Studio websocket ws://localhost:8001"],
             list(handle.diagnostic.missing_services),
         )
+
+    def test_availability_probe_accepts_local_tcp_service_syntax(self):
+        #20260718_kpopmodder: Future local game bridges can declare tcp localhost:port services.
+        from plugin_system.availability_probe_service import AvailabilityProbeService
+
+        class FakeConnection:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc_value, traceback):
+                return False
+
+        tcp_connector = mock.Mock(return_value=FakeConnection())
+        service = AvailabilityProbeService(tcp_connector=tcp_connector)
+
+        self.assertEqual([], service.missing_services(("tcp localhost:25575",)))
+        tcp_connector.assert_called_once_with(("localhost", 25575), timeout=0.25)
+
+    def test_required_local_http_service_is_unavailable_without_tcp_endpoint(self):
+        #20260718_kpopmodder: Generic URL-like services should share the same probe path.
+        from plugin_system.loader import PluginLoader, PluginState
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            plugin_root = Path(temp_dir) / "plugins"
+            plugin_dir = plugin_root / "LocalApiProbePlugin"
+            plugin_dir.mkdir(parents=True)
+            (plugin_dir / "LocalApiProbePlugin.py").write_text(
+                "\n".join([
+                    "from plugin_system.interfaces import TTSPluginInterface",
+                    "class LocalApiProbePlugin(TTSPluginInterface):",
+                    "    PLUGIN_METADATA = {",
+                    "        'id': 'LocalApiProbePlugin',",
+                    "        'required_services': ['VOICEVOX engine http://127.0.0.1:50021'],",
+                    "    }",
+                    "    def init(self): pass",
+                    "    def synthesize(self, text): return None",
+                    "    def create_ui(self): return None",
+                ]),
+                encoding="utf-8",
+            )
+            modules_path = Path(temp_dir) / "modules.json"
+            modules_path.write_text(json.dumps({}), encoding="utf-8")
+
+            loader = PluginLoader("plugins")
+            loader.plugin_directory = str(plugin_root)
+            loader.plugin_setting_path = str(modules_path)
+            loader.availability_probe_service.tcp_connector = mock.Mock(
+                side_effect=OSError("refused"),
+            )
+            loader._load_plugins_from_directory(str(plugin_dir))
+
+            handle = loader.plugins["text_to_speech"][0]
+
+        self.assertEqual(PluginState.UNAVAILABLE, handle.status)
+        self.assertEqual("required_service_unavailable", handle.diagnostic.reason_code)
+        self.assertEqual(
+            ["VOICEVOX engine http://127.0.0.1:50021"],
+            list(handle.diagnostic.missing_services),
+        )
+
+    def test_managed_gpt_sovits_service_does_not_block_provider_selection(self):
+        #20260718_kpopmodder: GPTSoVITS owns server startup, so discovery must not require a running port.
+        from plugin_system.loader import PluginLoader, PluginState
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            plugin_root = Path(temp_dir) / "plugins"
+            plugin_dir = plugin_root / "ManagedGPTProbePlugin"
+            plugin_dir.mkdir(parents=True)
+            (plugin_dir / "ManagedGPTProbePlugin.py").write_text(
+                "\n".join([
+                    "from plugin_system.interfaces import TTSPluginInterface",
+                    "class ManagedGPTProbePlugin(TTSPluginInterface):",
+                    "    PLUGIN_METADATA = {",
+                    "        'id': 'ManagedGPTProbePlugin',",
+                    "        'required_services': ['GPT-SoVITS API server http://127.0.0.1:9880'],",
+                    "    }",
+                    "    def init(self): pass",
+                    "    def synthesize(self, text): return None",
+                    "    def create_ui(self): return None",
+                ]),
+                encoding="utf-8",
+            )
+            modules_path = Path(temp_dir) / "modules.json"
+            modules_path.write_text(json.dumps({}), encoding="utf-8")
+
+            loader = PluginLoader("plugins")
+            loader.plugin_directory = str(plugin_root)
+            loader.plugin_setting_path = str(modules_path)
+            loader.availability_probe_service.tcp_connector = mock.Mock(
+                side_effect=OSError("refused"),
+            )
+            loader._load_plugins_from_directory(str(plugin_dir))
+
+            handle = loader.plugins["text_to_speech"][0]
+
+        self.assertEqual(PluginState.READY, handle.status)
+        self.assertIsNone(handle.diagnostic)
+
+    def test_openai_service_is_deferred_to_plugin_runtime_configuration(self):
+        #20260718_kpopmodder: OpenAI keys may come from config/UI, so discovery must not require env.
+        from plugin_system.loader import PluginLoader, PluginState
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            plugin_root = Path(temp_dir) / "plugins"
+            plugin_dir = plugin_root / "OpenAIProbePlugin"
+            plugin_dir.mkdir(parents=True)
+            (plugin_dir / "OpenAIProbePlugin.py").write_text(
+                "\n".join([
+                    "from plugin_system.interfaces import LLMPluginInterface",
+                    "class OpenAIProbePlugin(LLMPluginInterface):",
+                    "    PLUGIN_METADATA = {",
+                    "        'id': 'OpenAIProbePlugin',",
+                    "        'required_services': ['OpenAI API'],",
+                    "    }",
+                    "    def init(self): pass",
+                    "    def predict(self, message, history): return ''",
+                    "    def create_ui(self): return None",
+                ]),
+                encoding="utf-8",
+            )
+            modules_path = Path(temp_dir) / "modules.json"
+            modules_path.write_text(json.dumps({}), encoding="utf-8")
+
+            with mock.patch.dict("os.environ", {}, clear=True):
+                loader = PluginLoader("plugins")
+                loader.plugin_directory = str(plugin_root)
+                loader.plugin_setting_path = str(modules_path)
+                loader._load_plugins_from_directory(str(plugin_dir))
+
+            handle = loader.plugins["language_model"][0]
+
+        self.assertEqual(PluginState.READY, handle.status)
+        self.assertIsNone(handle.diagnostic)
+
+    def test_openai_service_can_be_ready_with_environment_key(self):
+        from plugin_system.loader import PluginLoader, PluginState
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            plugin_root = Path(temp_dir) / "plugins"
+            plugin_dir = plugin_root / "OpenAIReadyProbePlugin"
+            plugin_dir.mkdir(parents=True)
+            (plugin_dir / "OpenAIReadyProbePlugin.py").write_text(
+                "\n".join([
+                    "from plugin_system.interfaces import LLMPluginInterface",
+                    "class OpenAIReadyProbePlugin(LLMPluginInterface):",
+                    "    PLUGIN_METADATA = {",
+                    "        'id': 'OpenAIReadyProbePlugin',",
+                    "        'required_services': ['OpenAI API'],",
+                    "    }",
+                    "    def init(self): pass",
+                    "    def predict(self, message, history): return ''",
+                    "    def create_ui(self): return None",
+                ]),
+                encoding="utf-8",
+            )
+            modules_path = Path(temp_dir) / "modules.json"
+            modules_path.write_text(json.dumps({}), encoding="utf-8")
+
+            with mock.patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}, clear=True):
+                loader = PluginLoader("plugins")
+                loader.plugin_directory = str(plugin_root)
+                loader.plugin_setting_path = str(modules_path)
+                loader._load_plugins_from_directory(str(plugin_dir))
+
+            handle = loader.plugins["language_model"][0]
+
+        self.assertEqual(PluginState.READY, handle.status)
+        self.assertIsNone(handle.diagnostic)
 
     def test_p1b_gpt_sovits_empty_model_dirs_are_unavailable(self):#20260716_kpopmodder
         from plugin_system.loader import PluginLoader, PluginState
@@ -2448,6 +2642,56 @@ class PluginSystemImportTests(unittest.TestCase):
             ],
         )
 
+    def test_optional_plugin_loader_records_unavailable_service_only_probe(self):
+        #20260718_kpopmodder: Optional availability must use required_services in the unavailable decision.
+        import app_core.optional_plugin_loader as optional_loader
+        from app_core.optional_plugin_loader import instantiate_optional_plugin
+        from plugin_system.loader import PluginState
+        from plugin_system.registry import plugin_registry
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            modules_path = Path(temp_dir) / "modules.json"
+            modules_path.write_text(
+                json.dumps({"ServiceOnlyOptional": True}),
+                encoding="utf-8",
+            )
+
+            with mock.patch.object(
+                optional_loader._AVAILABILITY_PROBE_SERVICE,
+                "tcp_connector",
+                side_effect=OSError("refused"),
+            ), mock.patch(
+                "app_core.optional_plugin_loader.importlib.import_module",
+            ) as import_module:
+                plugin = instantiate_optional_plugin(
+                    "ServiceOnlyOptional",
+                    "plugins.ServiceOnly.optional",
+                    "ServiceOnlyOptional",
+                    False,
+                    temp_dir,
+                    manifest={
+                        "id": "ServiceOnlyOptional",
+                        "display_name": "Service Only Optional",
+                        "required_services": ("tcp://127.0.0.1:25575",),
+                    },
+                )
+
+        self.assertIsNone(plugin)
+        import_module.assert_not_called()
+        snapshot = plugin_registry.snapshot()
+        self.assertEqual(
+            PluginState.UNAVAILABLE,
+            snapshot["ServiceOnlyOptional"]["status"],
+        )
+        self.assertEqual(
+            "required_service_unavailable",
+            snapshot["ServiceOnlyOptional"]["diagnostic"]["reason_code"],
+        )
+        self.assertEqual(
+            ["tcp://127.0.0.1:25575"],
+            snapshot["ServiceOnlyOptional"]["diagnostic"]["missing_services"],
+        )
+
     def test_optional_plugin_loader_accepts_nested_contract_probe_metadata(self):#20260717_kpopmodder
         from app_core.optional_plugin_loader import instantiate_optional_plugin
         from plugin_system.loader import PluginState
@@ -2710,7 +2954,6 @@ class PluginSystemImportTests(unittest.TestCase):
 
     def test_plugin_handle_registry_state_matches_state_changes(self):
         #20260718_kpopmodder: Handle and registry status should not drift across lifecycle transitions.
-        from plugin_system.interfaces import LLMPluginInterface
         from plugin_system.loader import PluginLoader, PluginState
         from plugin_system.registry import PluginRegistry
 

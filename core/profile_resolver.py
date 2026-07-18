@@ -8,9 +8,6 @@ from core.profile_resolver_core.module_settings_snapshot import ModuleSettingsSn
 from core.profile_resolver_core.module_settings_resolver import (
     MODULES_CONFIG_ENV_VAR,
     PROFILE_ENV_VAR,
-    _arg_value,
-    _clean,
-    _resolve_path,
     active_profile,
     explicit_modules_config,
     load_module_settings,

@@ -17,7 +17,9 @@ class SmokeStartupTests(unittest.TestCase):
         result = run_production_config_smoke(PROJECT_ROOT, timeout_sec=30)
 
         self.assertEqual("production", result["modules_config_source"])
+        self.assertEqual("configuration_only", result["validation_scope"])
         self.assertEqual(PROJECT_ROOT / "modules.json", Path(result["modules_config_path"]))
+        self.assertFalse(result["plugin_import_attempted"])
         self.assertFalse(result["resource_start_attempted"])
         self.assertTrue(result["shutdown_completed"])
         self.assertEqual(

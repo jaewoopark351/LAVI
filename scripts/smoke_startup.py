@@ -3,9 +3,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
-from dataclasses import dataclass, field
 import hashlib
-import importlib
 import json
 import os
 from pathlib import Path
@@ -14,7 +12,6 @@ import sys
 import _thread
 import threading
 import time
-import traceback
 from unittest import mock
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -26,7 +23,7 @@ from core.profile_resolver import load_module_settings  # noqa: E402
 
 EXPECTED_MODULES_JSON_HASH = "ddffc5475ef92bd40e5b0e08bce42e0c6b2b1019"
 
-from scripts.smoke_startup_core import (
+from scripts.smoke_startup_core import (  # noqa: E402
     AttemptCounters,
     SideEffectAttempt,
     SmokeError,
@@ -35,6 +32,18 @@ from scripts.smoke_startup_core import (
     SmokeTimer,
     _install_original_import_module_marker,
 )
+
+__all__ = [
+    "AttemptCounters",
+    "SideEffectAttempt",
+    "SmokeError",
+    "SmokeSideEffectGuard",
+    "SmokeTimeout",
+    "SmokeTimer",
+    "_install_original_import_module_marker",
+    "run_core_offline_smoke",
+    "run_production_config_smoke",
+]
 
 
 
@@ -397,12 +406,14 @@ def _run_production_config_smoke(project_root, timeout_sec):
     modules_hash_after = _assert_modules_hash(project_root)
     return {
         "mode": "production_config_smoke",
+        "validation_scope": "configuration_only",
         "modules_config_path": str(resolution.path),
         "modules_config_source": resolution.source,
         "modules_json_hash_before": modules_hash_before,
         "modules_json_hash_after": modules_hash_after,
         "module_count": len(resolution.settings),
         "optional_status": optional_status,
+        "plugin_import_attempted": False,
         "resource_start_attempted": False,
         "shutdown_completed": True,
         "elapsed_sec": round(elapsed_sec, 3),

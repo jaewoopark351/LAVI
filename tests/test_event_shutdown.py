@@ -50,6 +50,52 @@ class EventShutdownTests(unittest.TestCase):
 
         self.assertEqual(["first"], calls)
 
+    def test_callback_exception_is_logged_and_later_callbacks_continue(self):
+        #20260718_kpopmodder: Common EventManager should isolate normal listener failures.
+        from core.event_manager import EventManager, EventType
+
+        manager = EventManager()
+        calls = []
+
+        def first():
+            calls.append("first")
+            raise RuntimeError("listener failed")
+
+        def second():
+            calls.append("second")
+
+        manager.subscribe(EventType.INTERRUPT, first)
+        manager.subscribe(EventType.INTERRUPT, second)
+
+        with self.assertLogs("LAV", level="ERROR") as logs:
+            manager.trigger(EventType.INTERRUPT)
+
+        self.assertEqual(["first", "second"], calls)
+        self.assertTrue(
+            any("Event callback failed" in message for message in logs.output)
+        )
+
+    def test_keyboard_interrupt_from_callback_is_not_swallowed(self):
+        from core.event_manager import EventManager, EventType
+
+        manager = EventManager()
+        calls = []
+
+        def first():
+            calls.append("first")
+            raise KeyboardInterrupt()
+
+        def second():
+            calls.append("second")
+
+        manager.subscribe(EventType.INTERRUPT, first)
+        manager.subscribe(EventType.INTERRUPT, second)
+
+        with self.assertRaises(KeyboardInterrupt):
+            manager.trigger(EventType.INTERRUPT)
+
+        self.assertEqual(["first"], calls)
+
     def test_hybrid_openai_llm_interrupt_subscription_is_shutdown_owned(self):
         from core.event_manager import EventType, event_manager
         from plugins.Hybrid_OpenAI_LLM.Hybrid_OpenAI_LLM import (

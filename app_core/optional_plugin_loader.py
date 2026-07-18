@@ -1,12 +1,11 @@
 #20260703_kpopmodder: Added helpers to isolate optional direct plugin imports during startup.
 import importlib
-import importlib.util
 from pathlib import Path
-import shutil
 import traceback
 
 from app_core.module_config import module_enabled
 from core.logger import log_print
+from plugin_system.availability_probe_service import AvailabilityProbeService
 from plugin_system.contracts import (
     AvailabilityProbeContract,
     PluginDiagnostic,
@@ -15,6 +14,8 @@ from plugin_system.contracts import (
     PluginSupports,
 )
 from plugin_system.registry import plugin_registry
+
+_AVAILABILITY_PROBE_SERVICE = AvailabilityProbeService()
 
 
 def instantiate_optional_plugin(
@@ -251,42 +252,72 @@ def _optional_runtime_contract(plugin_name, module_path, class_name, manifest):
 
 
 def _optional_unavailable_diagnostic(plugin_name, module_path, manifest, project_root):
-    missing_packages = [
-        package
-        for package in _availability_tuple(manifest, "required_python_packages")
-        if importlib.util.find_spec(package) is None
-    ]
-    missing_files = [
-        required_path
-        for required_path in _availability_tuple(manifest, "required_files")
-        if not _resolve_required_file(
-            module_path,
-            required_path,
-            project_root,
-        ).exists()
-    ]
-    missing_executables = [
-        executable
-        for executable in _availability_tuple(manifest, "required_executables")
-        if shutil.which(executable) is None
-    ]
+    availability_probe = AvailabilityProbeContract(
+        required_python_packages=_availability_tuple(
+            manifest,
+            "required_python_packages",
+        ),
+        required_files=_availability_tuple(manifest, "required_files"),
+        required_executables=_availability_tuple(
+            manifest,
+            "required_executables",
+        ),
+        required_services=_availability_tuple(manifest, "required_services"),
+        timeout_sec=_availability_positive_number(
+            manifest,
+            "timeout_sec",
+            0.25,
+        ),
+    )
+    missing_packages = _AVAILABILITY_PROBE_SERVICE.missing_python_packages(
+        availability_probe.required_python_packages,
+    )
+    missing_files = _AVAILABILITY_PROBE_SERVICE.missing_files(
+        availability_probe.required_files,
+        lambda path: _resolve_required_file(module_path, path, project_root),
+    )
+    missing_executables = _AVAILABILITY_PROBE_SERVICE.missing_executables(
+        availability_probe.required_executables,
+    )
+    missing_services = _AVAILABILITY_PROBE_SERVICE.missing_services(
+        availability_probe.required_services,
+        timeout_sec=availability_probe.timeout_sec,
+    )
 
-    if not (missing_packages or missing_files or missing_executables):
+    if not (
+        missing_packages
+        or missing_files
+        or missing_executables
+        or missing_services
+    ):
         return None
 
     display_name = _contract_text(manifest, "display_name", plugin_name)
+    reason_code = "missing_static_dependency"
+    message = (
+        f"{display_name} is enabled but required Python packages, files, "
+        "executables, or services are missing."
+    )
+    if missing_services and not (
+        missing_packages
+        or missing_files
+        or missing_executables
+    ):
+        reason_code = "required_service_unavailable"
+        message = (
+            f"{display_name} is enabled but a required local service "
+            "or device probe failed."
+        )
+
     return PluginDiagnostic(
         plugin_id=_contract_text(manifest, "id", plugin_name),
         state=PluginState.UNAVAILABLE,
-        reason_code="missing_static_dependency",
-        human_readable_message=(
-            f"{display_name} is enabled but required Python packages, files, "
-            "or executables are missing."
-        ),
+        reason_code=reason_code,
+        human_readable_message=message,
         missing_python_packages=tuple(missing_packages),
         missing_files=tuple(missing_files),
         missing_executables=tuple(missing_executables),
-        missing_services=tuple(_availability_tuple(manifest, "required_services")),
+        missing_services=tuple(missing_services),
         suggested_install_profile=_contract_text(
             manifest,
             "dependency_group",
