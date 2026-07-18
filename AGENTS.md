@@ -1215,9 +1215,11 @@ Before adding new logic:
 * Check whether an existing module, helper, service, manager, controller, or utility file already handles similar behavior.
 * Avoid putting too much logic into one large file or one large class.
 * If a function, class, or file becomes too large, propose a small safe extraction instead of continuing to expand it.
-* Keep related code grouped together by responsibility.
-* Do not create random new folders or files unless they clearly improve maintainability.
-* Prefer clear boundaries between UI, core logic, game integration, memory, audio, TTS, STT, vision, and configuration logic.
+* Keep related code grouped together by responsibility, feature, domain, or component.
+* Evaluate folder and package placement during every production code change, not only during class or file separation.
+* Create or reorganize folders when the current structure does not clearly represent responsibility, feature, domain, or component boundaries.
+* Do not create arbitrary folders that add depth without establishing a meaningful ownership boundary.
+* Prefer clear boundaries between UI, application logic, core logic, game integration, memory, audio, TTS, STT, vision, configuration, infrastructure, and adapters.
 * Preserve existing behavior while improving structure.
 * Refactor only in small, safe steps.
 
@@ -1232,7 +1234,430 @@ When refactoring:
 
 ---
 
-## 29.1 File and Type Separation Rule
+## 29.1 Folder and Package Organization Rule
+
+Production files must be grouped into folders and packages by responsibility, feature, domain, or component boundary.
+
+Folder organization is a continuous code-structure rule. It is not a subordinate task that applies only when classes are split into separate files.
+
+Whenever Codex creates, modifies, splits, moves, or reorganizes production code, it must evaluate whether the affected files are located in the correct folder or package. If the current structure does not clearly represent ownership and responsibility, Codex must include the necessary folder organization in the same structural change, limited to the directly affected component.
+
+### Core Principle
+
+Use this structure principle:
+
+```text
+One primary class, type, or responsibility per file.
+Related files grouped by responsibility, feature, domain, or component.
+```
+
+Files must not be grouped only by file extension, class suffix, or implementation type.
+
+Prefer feature-oriented or component-oriented folders over global type-oriented folders.
+
+Preferred:
+
+```text
+audio/
+    devices/
+        audio_device_manager.py
+        input_device_resolver.py
+    playback/
+        audio_player.py
+        playback_controller.py
+
+memory/
+    routing/
+        memory_router.py
+        memory_need_classifier.py
+    storage/
+        derived_memory_store.py
+        long_term_memory_store.py
+
+games/
+    starcraft/
+        extension/
+            starcraft_extension.py
+        bridge/
+            starcraft_bridge.py
+        adapters/
+            bwapi_adapter.py
+```
+
+Avoid grouping unrelated code into global dumping-ground folders such as:
+
+```text
+classes/
+managers/
+controllers/
+services/
+helpers/
+utils/
+common/
+misc/
+```
+
+A generic folder may be used only when its contents are genuinely shared across multiple features and the folder has one clearly explainable responsibility.
+
+For example:
+
+```text
+audio/devices/audio_device_manager.py
+memory/routing/memory_router.py
+games/starcraft/bridge/starcraft_bridge.py
+```
+
+are preferred over:
+
+```text
+managers/audio_device_manager.py
+services/memory_router.py
+adapters/starcraft_bridge.py
+```
+
+### Required Folder Evaluation
+
+During every production code change, Codex must check:
+
+1. Which responsibility, feature, domain, or component owns each affected file.
+2. Whether an appropriate existing folder or package already exists.
+3. Whether the current folder mixes unrelated responsibilities.
+4. Whether related files should be grouped into a clearer package boundary.
+5. Whether a new folder would clarify ownership or merely add unnecessary depth.
+6. Which imports, exports, tests, configuration references, dynamic import paths, build files, and documentation would be affected.
+7. Whether the proposed structure would introduce circular dependencies.
+8. Whether backward-compatible import or loading paths must be preserved.
+
+Do not leave a file in an unrelated folder merely because moving it was not explicitly requested.
+
+Do not perform unrelated repository-wide folder reorganization during a small feature, bug-fix, or maintenance task.
+
+### When Folder Organization Is Required
+
+Create or reorganize folders when one or more of the following conditions apply:
+
+* Files with different responsibilities are mixed in the same folder.
+* A new feature, domain, component, plugin, adapter, or external integration boundary is being introduced.
+* Several related files form one independently understandable, testable, replaceable, removable, or extensible component.
+* A flat folder has grown enough that related files are difficult to locate or understand.
+* The folder name no longer accurately describes all files contained within it.
+* UI, application logic, domain logic, infrastructure, and external integration code are mixed without clear boundaries.
+* Multiple files share a responsibility or feature relationship that is not represented by the directory structure.
+* New code would otherwise be added to an unrelated existing folder.
+* A class, function, interface, event, adapter, worker, controller, configuration module, or other production unit is being separated and needs a clearer package boundary.
+
+Folder organization must be performed when it is necessary for maintainability, portability, extensibility, or clear responsibility boundaries.
+
+Do not postpone an obviously necessary folder separation merely because the current task is not explicitly named as a refactoring task.
+
+### When a New Folder Must Not Be Created
+
+Do not create a new folder merely because:
+
+* One new file was added.
+* One class was moved into its own file.
+* Every individual class could technically have its own directory.
+* More directories would make the repository appear organized.
+* The folder would contain only one file without representing a meaningful component boundary.
+* The new directory would increase navigation depth without clarifying ownership.
+* An appropriate existing folder already represents the responsibility.
+
+Folders represent groups of related responsibilities or components, not individual classes.
+
+Avoid:
+
+```text
+memory_router/
+    memory_router.py
+
+audio_player/
+    audio_player.py
+```
+
+unless each folder represents a real component with closely related implementation, interface, configuration, resource, or test files.
+
+### Folder Boundary Guidelines
+
+Recommended major responsibility boundaries may include:
+
+```text
+application/
+core/
+interfaces/
+events/
+plugins/
+extensions/
+audio/
+stt/
+tts/
+vision/
+memory/
+games/
+config/
+ui/
+infrastructure/
+adapters/
+```
+
+These are examples, not mandatory fixed directories.
+
+Inspect and reuse the repository's existing structure before creating a new boundary.
+
+Do not create parallel folders with overlapping meanings, such as:
+
+```text
+audio/
+audios/
+sound/
+playback_audio/
+```
+
+Choose one clear ownership boundary and place related files beneath it.
+
+A folder must have one concise and explainable responsibility.
+
+### Required Plan Before Folder Creation or Reorganization
+
+Before creating a new production folder or moving existing production files, Codex must print:
+
+```text
+Current structure:
+- <current path>: <responsibility>
+
+Proposed structure:
+- <proposed path>: <responsibility>
+
+Files to create:
+- <exact path>
+
+Files to move:
+- <current path> -> <new path>
+
+References to update:
+- imports
+- package exports
+- tests
+- configuration paths
+- dynamic imports
+- plugin registration
+- build or packaging files
+- documentation
+
+Reason:
+- <why the proposed folder represents a clearer responsibility, feature, domain, or component boundary>
+```
+
+All source and destination paths must resolve inside the active repository root.
+
+Creating an empty folder does not require separate approval, but moving or renaming existing files remains subject to the repository safety rules. Before any move or rename, print the exact source and destination paths and stop for user confirmation unless the user's latest instruction already explicitly approves those exact paths.
+
+### Imports, Exports, and Compatibility
+
+When creating or reorganizing folders, update all affected:
+
+* Python imports
+* Python `__init__.py` files
+* package public exports
+* relative and absolute imports
+* dynamic import strings
+* plugin and extension registration paths
+* mock and patch target paths
+* configuration module paths
+* test imports
+* C and C++ include paths
+* Java package declarations
+* build and packaging files
+* documentation examples
+
+Do not consider folder organization complete while broken or outdated references remain.
+
+For Python packages, create `__init__.py` when required by the existing repository convention.
+
+Use `__init__.py` for package initialization and deliberate public exports. Do not place unrelated runtime logic in it.
+
+When an existing public import path may still be used, preserve compatibility where practical by re-exporting the moved type from the old path.
+
+Example:
+
+```python
+#YYYYMMDD_kpopmodder: Compatibility export after moving MemoryRouter.
+from memory.routing.memory_router import MemoryRouter
+
+__all__ = ["MemoryRouter"]
+```
+
+Do not remove a compatibility path until repository-wide references have been checked and the user has approved its removal.
+
+### Circular Dependency Prevention
+
+Folder organization must not create circular dependencies.
+
+When multiple components require the same contract, extract it into an appropriate independent module.
+
+Shared contracts may include:
+
+* interfaces
+* protocols
+* abstract base classes
+* event types
+* callback types
+* DTOs
+* enums
+* shared data structures
+
+Example:
+
+```text
+memory/
+    interfaces/
+        memory_store_interface.py
+    routing/
+        memory_router.py
+    storage/
+        derived_memory_store.py
+```
+
+Do not hide circular dependencies through duplicated types, unrelated utility modules, or scattered runtime imports when a clear shared contract can be extracted.
+
+### Incremental Scope
+
+Folder organization must be incremental.
+
+Limit each structural change to the directly affected:
+
+* feature
+* package
+* plugin
+* extension
+* game integration
+* component
+* responsibility group
+
+Do not reorganize the entire repository in one uncontrolled change.
+
+Do not combine folder reorganization with unrelated:
+
+* dependency upgrades
+* configuration format changes
+* public API renames
+* feature additions outside the affected component
+* large architectural rewrites
+
+A file or class split and the directly required folder organization may be performed together because they belong to the same structural change.
+
+### Validation
+
+After creating or reorganizing folders, Codex must:
+
+1. List all created folders.
+2. List all created and moved files.
+3. Search for references to old paths.
+4. Verify package exports.
+5. Check for circular imports.
+6. Run syntax or compile checks.
+7. Run the smallest relevant tests.
+8. Verify plugin, extension, and dynamic import paths.
+9. Inspect `git diff`.
+10. Report any remaining runtime validation.
+
+Recommended Python checks:
+
+```bat
+python -m compileall <changed_package>
+python -m pytest <smallest_relevant_test_path>
+git diff --check
+git status --short
+```
+
+Syntax checks alone are not sufficient when the affected code uses dynamic imports, plugin discovery, configuration-based loading, UI registration, or runtime extension loading.
+
+### Forbidden Folderization Patterns
+
+Do not create a folder containing unrelated classes:
+
+```text
+classes/
+    audio_device_manager.py
+    memory_router.py
+    starcraft_worker.py
+    gradio_controller.py
+```
+
+Do not organize the entire repository globally by class suffix:
+
+```text
+managers/
+controllers/
+workers/
+services/
+adapters/
+```
+
+Do not create meaningless dumping grounds:
+
+```text
+utils/
+helpers/
+common/
+misc/
+temp/
+```
+
+Do not create excessive directory depth without a real responsibility boundary:
+
+```text
+src/core/modules/components/services/managers/
+```
+
+Do not mix unrelated responsibilities inside a feature folder:
+
+```text
+games/starcraft/
+    starcraft_extension.py
+    memory_router.py
+    audio_player.py
+    gradio_ui_controller.py
+```
+
+### Required Completion Report
+
+After folder organization, Codex must report:
+
+```text
+Created folders:
+- <folder path>: <responsibility>
+
+Created files:
+- <file path>: <responsibility>
+
+Moved files:
+- <old path> -> <new path>
+
+Updated references:
+- imports
+- exports
+- tests
+- configuration
+- dynamic loading
+- build or packaging files
+
+Compatibility preserved:
+- <old import or API path>
+
+Validation completed:
+- <command>: <result>
+
+Runtime validation still required:
+- <remaining manual or integration test>
+```
+
+Folder organization is not complete merely because directories and files were created.
+
+It is complete only after responsibility boundaries, references, backward compatibility, tests, and runtime loading paths have been verified.
+
+---
+
+## 29.2 File and Type Separation Rule
 
 Production code must follow a one-primary-type-or-responsibility-per-file rule.
 
@@ -1413,7 +1838,7 @@ Do not combine file separation with unrelated feature work or large architectura
 ---
 
 
-## 29.2 Game Extension Migration Rule
+## 29.3 Game Extension Migration Rule
 
 New games must be added as `GameExtension` implementations and integrated through `ExtensionRegistry`.
 
