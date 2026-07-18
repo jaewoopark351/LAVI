@@ -9,8 +9,35 @@ from pathlib import Path
 
 EXPECTED_PYTHON = (3, 14)
 EXPECTED_TORCH_CUDA_TAG = "cu130"
-SUPPORTED_PROFILES = ("Core", "Full")
+SUPPORTED_PROFILES = ("Core", "Voice", "Vision", "Games", "Full")
 SUPPORTED_ACCELERATORS = ("CPU", "cu130")
+PROFILE_REQUIRED_IMPORTS = {
+    "Core": (),
+    "Voice": (
+        "librosa",
+        "resemblyzer",
+        "speechbrain",
+        "transformers",
+    ),
+    "Vision": (
+        "accelerate",
+        "PIL",
+        "transformers",
+    ),
+    "Games": (
+        "chess",
+        "pytchat",
+        "twitchio",
+        "websocket",
+    ),
+}
+PROFILE_REQUIRED_IMPORTS["Full"] = tuple(
+    dict.fromkeys(
+        PROFILE_REQUIRED_IMPORTS["Voice"]
+        + PROFILE_REQUIRED_IMPORTS["Vision"]
+        + PROFILE_REQUIRED_IMPORTS["Games"],
+    ),
+)
 EXPECTED_TORCH_PACKAGES = {
     "torch": "2.13.0+cu130",
     "torchvision": "0.28.0+cu130",
@@ -164,6 +191,11 @@ def _check_required_runtime_imports(errors: list[str]) -> None:
         _check_import(module_name, errors)
 
 
+def _check_profile_imports(errors: list[str], profile: str) -> None:
+    for module_name in PROFILE_REQUIRED_IMPORTS[profile]:
+        _check_import(module_name, errors)
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
     root = _repo_root()
@@ -178,6 +210,7 @@ def main(argv: list[str] | None = None) -> int:
     _check_repo_venv(errors, root)
     _check_required_runtime_imports(errors)
     _check_torch(errors, args.accelerator)
+    _check_profile_imports(errors, args.profile)
 
     if errors:
         for message in errors:

@@ -24,7 +24,7 @@ class GPTSoVITS(TTSPluginInterface):#20260615_kpopmodder
         "api_version": "1",
         "category": "text_to_speech",
         "entrypoint": "plugins.GPTSoVITS.GPTSoVITS:GPTSoVITS",
-        "dependency_group": "Full",
+        "dependency_group": "Voice",
         "capabilities": [
             "text_to_speech",
             "gpt_sovits_api_server",

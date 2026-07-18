@@ -27,6 +27,28 @@ class SmokeStartupTests(unittest.TestCase):
             result["modules_json_hash_after"],
         )
 
+    def test_production_readiness_smoke_checks_contracts_without_starting_resources(self):
+        from scripts.smoke_startup import run_production_readiness_smoke
+
+        result = run_production_readiness_smoke(PROJECT_ROOT, timeout_sec=30)
+
+        self.assertEqual("production", result["modules_config_source"])
+        self.assertEqual(
+            "contract_and_availability_without_start",
+            result["validation_scope"],
+        )
+        self.assertGreater(result["provider_count"], 0)
+        self.assertGreater(result["optional_count"], 0)
+        self.assertIn("provider_status_counts", result)
+        self.assertIn("optional_status_counts", result)
+        self.assertFalse(result["plugin_import_attempted"])
+        self.assertFalse(result["resource_start_attempted"])
+        self.assertTrue(result["shutdown_completed"])
+        self.assertEqual(
+            result["modules_json_hash_before"],
+            result["modules_json_hash_after"],
+        )
+
     def test_side_effect_guard_blocks_network_attempts(self):
         from scripts.smoke_startup import (
             AttemptCounters,

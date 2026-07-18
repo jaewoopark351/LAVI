@@ -1205,7 +1205,7 @@ class PluginSystemImportTests(unittest.TestCase):
 
         self.assertEqual("VoiceInput", voice_handle.descriptor.id)
         self.assertEqual("Voice Input", voice_handle.descriptor.display_name)
-        self.assertEqual("Full", voice_handle.descriptor.dependency_group)
+        self.assertEqual("Voice", voice_handle.descriptor.dependency_group)
         self.assertIn("torch", voice_handle.descriptor.required_python_packages)
         self.assertFalse(voice_handle.descriptor.supports_offline)
         self.assertEqual(
@@ -1244,7 +1244,7 @@ class PluginSystemImportTests(unittest.TestCase):
 
         self.assertEqual("GPTSoVITS", handle.descriptor.id)
         self.assertEqual("GPT-SoVITS", handle.descriptor.display_name)
-        self.assertEqual("Full", handle.descriptor.dependency_group)
+        self.assertEqual("Voice", handle.descriptor.dependency_group)
         self.assertIn("requests", handle.descriptor.required_python_packages)
         self.assertIn("plugin:gpt_sovits_ckpt_dir", handle.descriptor.required_files)
         self.assertIn(

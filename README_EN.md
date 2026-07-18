@@ -316,6 +316,16 @@ For the minimal reproducible Windows install path, use the project-local install
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install_windows.ps1 -Profile Core -Accelerator CPU
 ```
 
+Supported installer profiles:
+
+| Profile | Accelerator | Lock file |
+|---|---|---|
+| Core | CPU | `requirements/locks/windows-py314-core-cpu.txt` |
+| Voice | cu130 | `requirements/locks/windows-py314-voice-cu130.txt` |
+| Vision | cu130 | `requirements/locks/windows-py314-vision-cu130.txt` |
+| Games | CPU | `requirements/locks/windows-py314-games-cpu.txt` |
+| Full | cu130 | `requirements/locks/windows-py314-full-cu130.txt` |
+
 For the existing full CUDA 13.0 runtime path, use this command. Omitting both parameters keeps this Full/cu130 path as the compatibility default.
 
 ```powershell
@@ -1203,6 +1213,7 @@ requirements/dev.txt
 The known-good frozen environment snapshot remains in `requirements_full.txt`.
 The CUDA 13.0 PyTorch wheel pins are in `requirements/constraints-windows-py314-cu130.txt` and must be installed with the dedicated `cu130` index URL.
 The canonical Windows installer uses committed locks under `requirements/locks/`.
+Profile source files live under `requirements/profiles/`; accelerator wheel pins live under `requirements/accelerators/`.
 
 ---
 

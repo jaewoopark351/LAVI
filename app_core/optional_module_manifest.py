@@ -28,7 +28,7 @@ OPTIONAL_MODULE_MANIFEST = {
         "module_path": "plugins.Chess.Chess",
         "class_name": "Chess",
         "default_enabled": False,
-        "dependency_group": "Full",
+        "dependency_group": "Games",
         "capabilities": ("game_extension", "chess"),
         "config_schema": {
             "Chess": {
@@ -52,7 +52,7 @@ OPTIONAL_MODULE_MANIFEST = {
         "module_path": "plugins.StarCraftRemastered.starcraft_remastered",
         "class_name": "StarCraftRemastered",
         "default_enabled": False,
-        "dependency_group": "Full",
+        "dependency_group": "Games",
         "capabilities": ("game_extension", "starcraft_remastered"),
         "config_schema": {
             "StarCraftRemastered": {
@@ -73,7 +73,7 @@ OPTIONAL_MODULE_MANIFEST = {
         "module_path": "plugins.StarCraft116.starcraft116",
         "class_name": "StarCraft116",
         "default_enabled": False,
-        "dependency_group": "Full",
+        "dependency_group": "Games",
         "capabilities": ("game_extension", "starcraft116"),
         "config_schema": {
             "StarCraft116": {
@@ -96,7 +96,7 @@ OPTIONAL_MODULE_MANIFEST = {
         "module_path": "plugins.StarCraft2.starcraft2",
         "class_name": "StarCraft2",
         "default_enabled": False,
-        "dependency_group": "Full",
+        "dependency_group": "Games",
         "capabilities": ("game_extension", "starcraft2"),
         "config_schema": {
             "StarCraft2": {
@@ -119,7 +119,7 @@ OPTIONAL_MODULE_MANIFEST = {
         "module_path": "plugins.ScreenVision.screenVision",
         "class_name": "ScreenVision",
         "default_enabled": True,
-        "dependency_group": "Full",
+        "dependency_group": "Vision",
         "capabilities": ("screen_observation", "vision_context"),
         "config_schema": {
             "ScreenVision": {

@@ -1,9 +1,8 @@
 
 from plugin_system.interfaces import TranslationPluginInterface
 from transformers import MarianMTModel, MarianTokenizer
-import os
 import pysbd
-from core.logger import log_print, debug_print#20260612_kpopmodder
+from core.logger import log_print#20260612_kpopmodder
 
 
 class LocalENToJA(TranslationPluginInterface):
@@ -11,7 +10,7 @@ class LocalENToJA(TranslationPluginInterface):
         "id": "LocalENToJA",
         "display_name": "Local EN to JA",
         "api_version": "1",
-        "dependency_group": "Full",
+        "dependency_group": "Voice",
         "capabilities": ("translation", "local_translation"),
         "required_python_packages": ("transformers", "pysbd"),
         "required_files": (),

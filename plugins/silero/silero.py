@@ -4,7 +4,7 @@ import time
 import gradio as gr
 import requests
 from plugin_system.interfaces import TTSPluginInterface
-from core.logger import log_print, debug_print#20260612_kpopmodder
+from core.logger import log_print#20260612_kpopmodder
 from core.process import launch_process
 
 # speaker bookmarks: en_18, en_21, en_37, en_39, en_43, en_72
@@ -17,7 +17,7 @@ class Silero(TTSPluginInterface):
         "api_version": "1",
         "category": "text_to_speech",
         "entrypoint": "plugins.silero.silero:Silero",
-        "dependency_group": "Full",
+        "dependency_group": "Voice",
         "capabilities": ("text_to_speech", "silero_api_server"),
         "required_python_packages": ("requests",),
         "required_files": (),
@@ -99,7 +99,7 @@ class Silero(TTSPluginInterface):
                 }
                 response = requests.request("POST", url, json=data)
                 break
-            except:
+            except Exception:
                 log_print("Waiting for silero to start... ")#20260612_kpopmodder
                 time.sleep(0.5)
         log_print("session init result")#20260612_kpopmodder

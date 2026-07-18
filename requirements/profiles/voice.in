@@ -1,0 +1,3 @@
+#20260718_kpopmodder: Voice profile source for STT/TTS without vision or game extras.
+-r core.in
+-r ../voice.txt

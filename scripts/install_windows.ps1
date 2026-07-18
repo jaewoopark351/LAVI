@@ -1,7 +1,7 @@
 # #20260716_kpopmodder: Project-local Windows installer; never installs system tools or edits registry.
 [CmdletBinding()]
 param(
-    [ValidateSet("Core", "Full")]
+    [ValidateSet("Core", "Voice", "Vision", "Games", "Full")]
     [string]$Profile = "Full",
     [ValidateSet("CPU", "cu130")]
     [string]$Accelerator = "cu130",
@@ -17,6 +17,9 @@ $VenvDir = Join-Path $RepoRoot "venv"
 $VenvPython = Join-Path $VenvDir "Scripts\python.exe"
 $SupportedLocks = @{
     "Core|CPU" = "requirements\locks\windows-py314-core-cpu.txt"
+    "Voice|cu130" = "requirements\locks\windows-py314-voice-cu130.txt"
+    "Vision|cu130" = "requirements\locks\windows-py314-vision-cu130.txt"
+    "Games|CPU" = "requirements\locks\windows-py314-games-cpu.txt"
     "Full|cu130" = "requirements\locks\windows-py314-full-cu130.txt"
 }
 

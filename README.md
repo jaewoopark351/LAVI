@@ -315,6 +315,16 @@ Reproducible Windows install path:
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install_windows.ps1 -Profile Core -Accelerator CPU
 ```
 
+Supported installer profiles:
+
+| Profile | Accelerator | Lock file |
+|---|---|---|
+| Core | CPU | `requirements\locks\windows-py314-core-cpu.txt` |
+| Voice | cu130 | `requirements\locks\windows-py314-voice-cu130.txt` |
+| Vision | cu130 | `requirements\locks\windows-py314-vision-cu130.txt` |
+| Games | CPU | `requirements\locks\windows-py314-games-cpu.txt` |
+| Full | cu130 | `requirements\locks\windows-py314-full-cu130.txt` |
+
 기존 전체 CUDA 13.0 환경을 설치하려면 아래 명령을 사용합니다. 인자를 생략해도 이 Full/cu130 경로가 기본값입니다.
 
 ```powershell
@@ -1217,6 +1227,7 @@ findstr /V /R /I ^
 
 Current dependency management uses grouped files under `requirements\`.
 The canonical Windows installer uses committed locks under `requirements\locks\`.
+Profile source files live under `requirements\profiles\`; accelerator wheel pins live under `requirements\accelerators\`.
 Do not regenerate `requirements.txt` from `pip freeze` unless you are intentionally updating the frozen snapshot.
 
 ---

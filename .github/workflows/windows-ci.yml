@@ -69,3 +69,8 @@ jobs:
           .\venv\Scripts\python.exe scripts\smoke_startup.py
           --production-config-smoke
           --timeout-sec 30
+      - name: Run production readiness smoke
+        run: >
+          .\venv\Scripts\python.exe scripts\smoke_startup.py
+          --production-readiness-smoke
+          --timeout-sec 30

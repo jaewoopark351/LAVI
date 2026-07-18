@@ -33,7 +33,7 @@ class VoiceInput(InputPluginInterface):#20260618_kpopmodder
         "api_version": "1",
         "category": "input_gathering",
         "entrypoint": "plugins.VoiceInput.voiceInput:VoiceInput",
-        "dependency_group": "Full",
+        "dependency_group": "Voice",
         "capabilities": ["microphone_input", "speech_to_text", "speaker_identification"],
         "config_schema": {
             "VoiceInput": {

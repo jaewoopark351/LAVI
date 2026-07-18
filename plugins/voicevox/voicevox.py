@@ -5,7 +5,7 @@ import requests
 from tqdm import tqdm
 from plugin_system.interfaces import TTSPluginInterface
 import os
-from core.logger import log_print, debug_print#20260612_kpopmodder
+from core.logger import log_print#20260612_kpopmodder
 from core.process import launch_process
 
 
@@ -16,7 +16,7 @@ class VoiceVox(TTSPluginInterface):
         "api_version": "1",
         "category": "text_to_speech",
         "entrypoint": "plugins.voicevox.voicevox:VoiceVox",
-        "dependency_group": "Full",
+        "dependency_group": "Voice",
         "capabilities": ("text_to_speech", "voicevox_engine"),
         "required_python_packages": ("requests", "tqdm"),
         "required_files": (),
@@ -140,7 +140,7 @@ class VoiceVox(TTSPluginInterface):
             try:
                 response = requests.request("GET", url)
                 break
-            except:
+            except Exception:
                 log_print("Waiting for voicevox to start... ")#20260612_kpopmodder
                 time.sleep(0.5)
         self.speakersResponse = response.json()

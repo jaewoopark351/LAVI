@@ -115,6 +115,7 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertIn("--profile Core", workflow_text)
         self.assertIn("--modules-config config\\modules.core.json", workflow_text)
         self.assertIn("--production-config-smoke", workflow_text)
+        self.assertIn("--production-readiness-smoke", workflow_text)
         self.assertNotIn('pytest -m "not gpu and not integration and not network and not slow"', workflow_text)
 
     def test_full_cu130_lock_covers_active_plugin_python_dependencies(self):
@@ -163,6 +164,146 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertIn("requirements\\locks\\windows-py314-core-cpu.txt", install_text)
         self.assertNotIn("requirements_full.txt", install_text)
 
+    def test_windows_installer_exposes_profile_specific_locks(self):
+        #20260718_kpopmodder: Optional runtime groups must stay installable without collapsing into Full.
+        install_text = (
+            PROJECT_ROOT / "scripts" / "install_windows.ps1"
+        ).read_text(encoding="utf-8")
+        preflight_text = (PROJECT_ROOT / "scripts" / "preflight.py").read_text(encoding="utf-8")
+
+        expected_locks = {
+            "Core|CPU": "requirements\\locks\\windows-py314-core-cpu.txt",
+            "Voice|cu130": "requirements\\locks\\windows-py314-voice-cu130.txt",
+            "Vision|cu130": "requirements\\locks\\windows-py314-vision-cu130.txt",
+            "Games|CPU": "requirements\\locks\\windows-py314-games-cpu.txt",
+            "Full|cu130": "requirements\\locks\\windows-py314-full-cu130.txt",
+        }
+        for matrix_key, lock_path in expected_locks.items():
+            with self.subTest(matrix_key=matrix_key):
+                self.assertIn(f'"{matrix_key}" = "{lock_path}"', install_text)
+                self.assertTrue((PROJECT_ROOT / lock_path).exists())
+
+        for profile in ("Core", "Voice", "Vision", "Games", "Full"):
+            self.assertIn(f'"{profile}"', install_text)
+            self.assertIn(f'"{profile}"', preflight_text)
+
+    def test_preflight_checks_profile_specific_imports(self):
+        #20260718_kpopmodder: Installer preflight should verify the selected profile after pip install.
+        preflight_text = (PROJECT_ROOT / "scripts" / "preflight.py").read_text(encoding="utf-8")
+
+        self.assertIn("PROFILE_REQUIRED_IMPORTS", preflight_text)
+        for module_name in (
+            "librosa",
+            "resemblyzer",
+            "speechbrain",
+            "accelerate",
+            "PIL",
+            "chess",
+            "pytchat",
+            "twitchio",
+            "websocket",
+        ):
+            with self.subTest(module_name=module_name):
+                self.assertIn(f'"{module_name}"', preflight_text)
+        self.assertIn("_check_profile_imports(errors, args.profile)", preflight_text)
+
+    def test_profile_locks_cover_grouped_requirement_files(self):
+        #20260718_kpopmodder: Profile locks must cover their source dependency groups.
+        profile_locks = {
+            "voice": "requirements/locks/windows-py314-voice-cu130.txt",
+            "vision": "requirements/locks/windows-py314-vision-cu130.txt",
+            "games": "requirements/locks/windows-py314-games-cpu.txt",
+        }
+
+        missing = []
+        for group_name, lock_path in profile_locks.items():
+            required = self._requirement_names(f"requirements/{group_name}.txt")
+            locked = self._requirement_names(lock_path)
+            for package in sorted(required - locked):
+                missing.append(f"{group_name}: {package}")
+
+        self.assertEqual([], missing)
+
+    def test_optional_manifest_uses_specific_dependency_groups(self):
+        #20260718_kpopmodder: Game and vision optional plugins should not collapse back into Full.
+        from app_core.optional_module_manifest import OPTIONAL_MODULE_MANIFEST
+
+        expected_groups = {
+            "Chess": "Games",
+            "StarCraftRemastered": "Games",
+            "StarCraft116": "Games",
+            "StarCraft2": "Games",
+            "ScreenVision": "Vision",
+        }
+        actual_groups = {
+            module_name: OPTIONAL_MODULE_MANIFEST[module_name]["dependency_group"]
+            for module_name in expected_groups
+        }
+
+        self.assertEqual(expected_groups, actual_groups)
+
+    def test_provider_metadata_uses_specific_dependency_groups(self):
+        #20260718_kpopmodder: Provider diagnostics should suggest the narrow install profile when possible.
+        expected_groups = {
+            "plugins/VoiceInput/voiceInput.py": {"VoiceInput": "Voice"},
+            "plugins/GPTSoVITS/GPTSoVITS.py": {"GPTSoVITS": "Voice"},
+            "plugins/Local_EN_to_JA/Local_EN_to_JA.py": {"LocalENToJA": "Voice"},
+            "plugins/silero/silero.py": {"Silero": "Voice"},
+            "plugins/voicevox/voicevox.py": {"VoiceVox": "Voice"},
+            "plugins/YoutubeChatFetch/youtubeChatFetch.py": {"YoutubeChatFetch": "Games"},
+            "plugins/TwitchChatFetch/twitchChatFetch.py": {"TwitchChatFetch": "Games"},
+        }
+
+        actual_groups = {}
+        for relative_path, expected_by_class in expected_groups.items():
+            metadata_by_class = dict(self._plugin_metadata_from_file(PROJECT_ROOT / relative_path))
+            for class_name in expected_by_class:
+                actual_groups.setdefault(relative_path, {})[class_name] = (
+                    metadata_by_class[class_name]["dependency_group"]
+                )
+
+        self.assertEqual(expected_groups, actual_groups)
+
+    def test_profile_locks_cover_plugin_metadata_dependency_groups(self):
+        #20260718_kpopmodder: Narrow profile suggestions must point at locks that contain the plugin deps.
+        from app_core.optional_module_manifest import OPTIONAL_MODULE_MANIFEST
+
+        lock_by_group = {
+            "Voice": "requirements/locks/windows-py314-voice-cu130.txt",
+            "Vision": "requirements/locks/windows-py314-vision-cu130.txt",
+            "Games": "requirements/locks/windows-py314-games-cpu.txt",
+        }
+        packages_by_group = {
+            group_name: self._requirement_names(lock_path)
+            for group_name, lock_path in lock_by_group.items()
+        }
+        missing = []
+
+        for relative_path in self._git_ls_files():
+            if not relative_path.startswith("plugins/") or not relative_path.endswith(".py"):
+                continue
+            for class_name, metadata in self._plugin_metadata_from_file(
+                PROJECT_ROOT / relative_path,
+            ):
+                group_name = metadata.get("dependency_group")
+                if group_name not in lock_by_group:
+                    continue
+                for package in self._required_python_packages_from_metadata(metadata):
+                    canonical_name = self._canonical_package_name(package)
+                    if canonical_name not in packages_by_group[group_name]:
+                        missing.append(f"{relative_path}:{class_name}: {package}")
+
+        for module_name, manifest in OPTIONAL_MODULE_MANIFEST.items():
+            group_name = manifest.get("dependency_group")
+            if group_name not in lock_by_group:
+                continue
+            for package in self._required_python_packages_from_metadata(manifest):
+                canonical_name = self._canonical_package_name(package)
+                if canonical_name not in packages_by_group[group_name]:
+                    missing.append(f"{module_name}: {package}")
+
+        self.assertEqual([], missing)
+
     def test_root_modules_json_is_tracked_for_deployment_artifacts(self):
         #20260716_kpopmodder: Release/archive jobs must include the production default config.
         tracked = set(self._git_ls_files())
@@ -186,6 +327,28 @@ class RepositoryContractTests(unittest.TestCase):
 
     def test_zero_byte_root_python_file_is_not_tracked(self):
         self.assertNotIn("python", set(self._git_ls_files()))
+
+    def test_production_python_files_have_one_top_level_class(self):
+        #20260718_kpopmodder: Keep production modules aligned with AGENTS one-class-per-file rule.
+        offenders = []
+        for relative_path in self._git_ls_files():
+            if not relative_path.endswith(".py") or relative_path.startswith("tests/"):
+                continue
+            path = PROJECT_ROOT / relative_path
+            try:
+                tree = ast.parse(path.read_text(encoding="utf-8-sig"), filename=relative_path)
+            except SyntaxError as exc:
+                self.fail(f"{relative_path} cannot be parsed: {exc}")
+
+            class_names = [
+                node.name
+                for node in tree.body
+                if isinstance(node, ast.ClassDef)
+            ]
+            if len(class_names) > 1:
+                offenders.append(f"{relative_path}: {', '.join(class_names)}")
+
+        self.assertEqual([], offenders)
 
     def test_portable_runtime_files_do_not_contain_private_absolute_paths(self):
         tracked = self._git_ls_files()

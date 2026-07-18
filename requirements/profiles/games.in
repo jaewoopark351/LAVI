@@ -1,0 +1,3 @@
+#20260718_kpopmodder: Games profile source for optional game/chat integrations without voice or vision extras.
+-r core.in
+-r ../games.txt

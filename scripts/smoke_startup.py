@@ -43,6 +43,7 @@ __all__ = [
     "_install_original_import_module_marker",
     "run_core_offline_smoke",
     "run_production_config_smoke",
+    "run_production_readiness_smoke",
 ]
 
 
@@ -349,6 +350,36 @@ def _manifest_file_path(project_root, module_path):
     return Path(project_root).joinpath(*module_path.split(".")).with_suffix(".py")
 
 
+def _assert_production_resolution(project_root):
+    resolution = load_module_settings(project_root, argv=[], environ={})
+    if resolution.source != "production":
+        raise SmokeError(
+            "production smoke requires root modules.json; "
+            f"resolved source={resolution.source} path={resolution.path}"
+        )
+    if not resolution.settings:
+        raise SmokeError("production modules.json is empty")
+    return resolution
+
+
+def _assert_valid_module_settings(settings):
+    invalid_entries = {
+        key: value
+        for key, value in settings.items()
+        if not isinstance(key, str) or not key or not isinstance(value, bool)
+    }
+    if invalid_entries:
+        raise SmokeError(f"invalid modules.json entries: {invalid_entries}")
+
+
+def _status_counts(entries):
+    counts = {}
+    for entry in entries:
+        status = str(entry.get("status") or "UNKNOWN")
+        counts[status] = counts.get(status, 0) + 1
+    return dict(sorted(counts.items()))
+
+
 def run_production_config_smoke(project_root, timeout_sec):
     return run_with_timeout(
         timeout_sec,
@@ -361,22 +392,8 @@ def _run_production_config_smoke(project_root, timeout_sec):
     project_root = Path(project_root).resolve()
     started_at = time.monotonic()
     modules_hash_before = _assert_modules_hash(project_root)
-    resolution = load_module_settings(project_root, argv=[], environ={})
-    if resolution.source != "production":
-        raise SmokeError(
-            "production config smoke requires root modules.json; "
-            f"resolved source={resolution.source} path={resolution.path}"
-        )
-    if not resolution.settings:
-        raise SmokeError("production modules.json is empty")
-
-    invalid_entries = {
-        key: value
-        for key, value in resolution.settings.items()
-        if not isinstance(key, str) or not key or not isinstance(value, bool)
-    }
-    if invalid_entries:
-        raise SmokeError(f"invalid modules.json entries: {invalid_entries}")
+    resolution = _assert_production_resolution(project_root)
+    _assert_valid_module_settings(resolution.settings)
 
     from app_core.optional_module_manifest import OPTIONAL_MODULE_MANIFEST
 
@@ -420,6 +437,136 @@ def _run_production_config_smoke(project_root, timeout_sec):
     }
 
 
+def run_production_readiness_smoke(project_root, timeout_sec):
+    return run_with_timeout(
+        timeout_sec,
+        "production readiness smoke",
+        lambda: _run_production_readiness_smoke(project_root, timeout_sec),
+    )
+
+
+def _run_production_readiness_smoke(project_root, timeout_sec):
+    project_root = Path(project_root).resolve()
+    started_at = time.monotonic()
+    modules_hash_before = _assert_modules_hash(project_root)
+    resolution = _assert_production_resolution(project_root)
+    _assert_valid_module_settings(resolution.settings)
+
+    from app_core.optional_module_manifest import OPTIONAL_MODULE_MANIFEST
+    from app_core.optional_plugin_loader import (
+        _optional_runtime_contract,
+        _optional_unavailable_diagnostic,
+    )
+    from plugin_system.loader import PluginLoader
+    from plugin_system.registry import PluginRegistry
+
+    loader = PluginLoader("plugins")
+    loader.registry = PluginRegistry()
+    loader.plugin_setting_path = str(project_root / "modules.json")
+    loader.load_plugins()
+
+    provider_entries = []
+    for category, diagnostics in loader.get_diagnostics().items():
+        for diagnostic in diagnostics:
+            entry = dict(diagnostic)
+            entry["category"] = category
+            provider_entries.append(entry)
+
+    optional_entries = []
+    for module_name, manifest in OPTIONAL_MODULE_MANIFEST.items():
+        enabled = resolution.settings.get(module_name) is True
+        module_path = manifest["module_path"]
+        class_name = manifest["class_name"]
+        module_file = _manifest_file_path(project_root, module_path)
+        contract = _optional_runtime_contract(
+            module_name,
+            module_path,
+            class_name,
+            dict(manifest),
+        )
+        runtime_contract = contract.to_dict()
+        contract_errors = list(contract.validation_errors())
+        diagnostic = None
+        status = "DISABLED"
+        detail = ""
+        if enabled:
+            if contract_errors:
+                status = "FAILED"
+                detail = "; ".join(issue.message for issue in contract_errors)
+            elif not module_file.exists():
+                status = "UNAVAILABLE"
+                detail = f"optional plugin module file missing: {module_file}"
+            else:
+                diagnostic = _optional_unavailable_diagnostic(
+                    module_name,
+                    module_path,
+                    manifest,
+                    project_root,
+                )
+                if diagnostic is None:
+                    status = "READY_TO_IMPORT"
+                else:
+                    status = "UNAVAILABLE"
+                    detail = diagnostic.human_readable_message
+
+        optional_entries.append({
+            "plugin_id": manifest.get("id", module_name),
+            "name": module_name,
+            "enabled": enabled,
+            "status": status,
+            "detail": detail,
+            "module_path": module_path,
+            "module_file_exists": module_file.exists(),
+            "diagnostic": diagnostic.to_dict() if diagnostic else {},
+            "runtime_contract": runtime_contract,
+        })
+
+    broken_providers = [
+        entry
+        for entry in provider_entries
+        if entry.get("state") == "FAILED"
+    ]
+    broken_optional = [
+        entry
+        for entry in optional_entries
+        if entry.get("status") == "FAILED"
+    ]
+    if broken_providers or broken_optional:
+        raise SmokeError(
+            "production readiness contract failures: "
+            f"providers={len(broken_providers)} optional={len(broken_optional)}"
+        )
+
+    elapsed_sec = time.monotonic() - started_at
+    if elapsed_sec > float(timeout_sec):
+        raise SmokeError(
+            f"production readiness smoke exceeded timeout: "
+            f"elapsed={elapsed_sec:.2f}s timeout={timeout_sec}s"
+        )
+
+    modules_hash_after = _assert_modules_hash(project_root)
+    return {
+        "mode": "production_readiness_smoke",
+        "validation_scope": "contract_and_availability_without_start",
+        "modules_config_path": str(resolution.path),
+        "modules_config_source": resolution.source,
+        "modules_json_hash_before": modules_hash_before,
+        "modules_json_hash_after": modules_hash_after,
+        "provider_count": len(provider_entries),
+        "provider_status_counts": _status_counts(
+            {"status": entry.get("state")} for entry in provider_entries
+        ),
+        "optional_count": len(optional_entries),
+        "optional_status_counts": _status_counts(optional_entries),
+        "provider_diagnostics": provider_entries,
+        "optional_status": optional_entries,
+        "plugin_import_attempted": False,
+        "resource_start_attempted": False,
+        "shutdown_completed": True,
+        "elapsed_sec": round(elapsed_sec, 3),
+    }
+
+
 def build_parser():
     parser = argparse.ArgumentParser(description="Run LAVI startup smoke checks.")
     parser.add_argument(
@@ -436,13 +583,19 @@ def build_parser():
     parser.add_argument("--offline", action="store_true")
     parser.add_argument("--timeout-sec", type=float, default=30.0)
     parser.add_argument("--production-config-smoke", action="store_true")
+    parser.add_argument("--production-readiness-smoke", action="store_true")
     return parser
 
 
 def main(argv=None):
     args = build_parser().parse_args(argv)
     try:
-        if args.production_config_smoke:
+        if args.production_readiness_smoke:
+            result = run_production_readiness_smoke(
+                PROJECT_ROOT,
+                timeout_sec=args.timeout_sec,
+            )
+        elif args.production_config_smoke:
             result = run_production_config_smoke(
                 PROJECT_ROOT,
                 timeout_sec=args.timeout_sec,

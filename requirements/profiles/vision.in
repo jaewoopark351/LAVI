@@ -1,0 +1,3 @@
+#20260718_kpopmodder: Vision profile source for screen/camera analysis without voice or game extras.
+-r core.in
+-r ../vision.txt

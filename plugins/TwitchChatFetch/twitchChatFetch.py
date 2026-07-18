@@ -11,14 +11,14 @@ import gradio as gr
 from queue import Queue
 from core.global_state import global_state, GlobalKeys
 import LAV_utils as utils
-from core.logger import log_print, debug_print#20260612_kpopmodder
+from core.logger import log_print#20260612_kpopmodder
 
 class TwitchChatFetch(InputPluginInterface):
     PLUGIN_METADATA = {
         "id": "TwitchChatFetch",
         "display_name": "Twitch Chat Fetch",
         "api_version": "1",
-        "dependency_group": "Full",
+        "dependency_group": "Games",
         "capabilities": ("chat_input", "twitch_chat"),
         "required_python_packages": ("twitchio",),
         "required_files": (),
@@ -147,7 +147,7 @@ class TwitchChatFetch(InputPluginInterface):
                     with open(file_path, "r") as file:
                         content = file.read()
                         self.excluded_users_list = content.split("\n")
-                except:
+                except Exception:
                     log_print(f"Unable to load {file_path}.")#20260612_kpopmodder
                     log_print(traceback.format_exc())#20260612_kpopmodder
                 time.sleep(10)  # Sleep for 30 seconds before reloading

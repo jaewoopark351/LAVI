@@ -9,14 +9,14 @@ import gradio as gr
 from ui_core.live_textbox import LiveTextbox
 from core.global_state import global_state, GlobalKeys
 import LAV_utils
-from core.logger import log_print, debug_print#20260612_kpopmodder
+from core.logger import log_print#20260612_kpopmodder
 
 class YoutubeChatFetch(InputPluginInterface):
     PLUGIN_METADATA = {
         "id": "YoutubeChatFetch",
         "display_name": "YouTube Chat Fetch",
         "api_version": "1",
-        "dependency_group": "Full",
+        "dependency_group": "Games",
         "capabilities": ("chat_input", "youtube_chat"),
         "required_python_packages": ("pytchat",),
         "required_files": (),
@@ -68,7 +68,7 @@ class YoutubeChatFetch(InputPluginInterface):
         try:
             chat = pytchat.create(
                 video_id=youtube_video_id, interruptable=False, topchat_only=True)
-        except:
+        except Exception:
             log_print("failed to fetch chat")#20260612_kpopmodder
             log_print(traceback.format_exc())#20260612_kpopmodder
             return
