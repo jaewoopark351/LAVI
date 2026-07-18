@@ -116,6 +116,31 @@ class StarCraft116Launcher:
         profile_name = self.config_manager.get_active_profile_name()
         profile = self.config_manager.get_active_profile()
         env["LAV_STARCRAFT116_PROFILE"] = profile_name
+        self._set_env_path(
+            env,
+            "LAV_STARCRAFT116_BWAPI_BUNDLE_DIR",
+            self.config_manager.resolve_profile_bwapi_bundle_dir(profile_name),
+        )
+        self._set_env_path(
+            env,
+            "LAV_STARCRAFT116_STARCRAFT_DIR",
+            self.config_manager.resolve_profile_bwapi_starcraft_dir(profile_name),
+        )
+        self._set_env_path(
+            env,
+            "LAV_STARCRAFT116_BWAPI_DATA_DIR",
+            self._resolve_runtime_bwapi_data_dir(profile_name),
+        )
+        self._set_env_path(
+            env,
+            "LAV_STARCRAFT116_BWAPI_PROXY_EVENTS_PATH",
+            self.config_manager.resolve_bwapi_proxy_events_path(profile_name),
+        )
+        self._set_env_path(
+            env,
+            "LAV_STARCRAFT116_MONSTER_DIR",
+            self._resolve_monster_dir(profile),
+        )
         profile_environment = profile.get("environment", {})
         if isinstance(profile_environment, dict):
             for key, value in profile_environment.items():
@@ -123,3 +148,36 @@ class StarCraft116Launcher:
                 if key:
                     env[key] = str(value)
         return env
+
+    @staticmethod
+    def _set_env_path(env, key, value):
+        value = str(value or "").strip()
+        if value:
+            env[key] = value
+
+    def _resolve_monster_dir(self, profile):
+        working_dir = self.config_manager.resolve_profile_path(
+            profile,
+            "bot_process_working_dir",
+        )
+        if working_dir:
+            return working_dir
+
+        bot_path = self.config_manager.resolve_profile_path(
+            profile,
+            "bot_process_path",
+        )
+        if bot_path:
+            return os.path.dirname(bot_path)
+        return ""
+
+    def _resolve_runtime_bwapi_data_dir(self, profile_name):
+        #20260718_kpopmodder: Match helper processes to the bwapi-data folder loaded by the selected StarCraft GamePath.
+        resolver = getattr(
+            self.config_manager,
+            "resolve_profile_runtime_bwapi_data_dir",
+            None,
+        )
+        if callable(resolver):
+            return resolver(profile_name)
+        return self.config_manager.resolve_profile_bwapi_data_dir(profile_name)

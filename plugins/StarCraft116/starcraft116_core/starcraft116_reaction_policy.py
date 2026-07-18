@@ -58,6 +58,9 @@ STARCRAFT116_REACTION_SYSTEM_PROMPT = build_starcraft116_reaction_system_prompt(
 LOG_ONLY_STATUS_PHASES = {
     #20260705_kpopmodder: Normal running checks should stay in logs instead of being spoken as TTS.
     "launcher_waiting_for_start",
+    #20260718_kpopmodder: Monster observer health is diagnostic only; gameplay events still drive TTS.
+    "monster_observer_connected",
+    "monster_observer_waiting",
 }
 
 
@@ -77,6 +80,8 @@ SPEAKABLE_PHASES = {
     "launcher_waiting_for_start",
     "last_run_completed_or_exited",
     "last_launcher_log_only",
+    "monster_observer_connected",
+    "monster_observer_waiting",
 }
 
 

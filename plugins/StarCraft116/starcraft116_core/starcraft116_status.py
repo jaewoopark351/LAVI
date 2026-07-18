@@ -33,10 +33,22 @@ class StarCraft116StatusReader:
             profile,
             exporter,
             skip_required=is_monster_profile,
+            profile_name=profile_name,
         )
         chaoslauncher_log = self.chaoslauncher_log_snapshot(profile)
         game_events = self.game_events_snapshot(exporter)
-        readiness = self._readiness(processes, bwapi_ini, chaoslauncher_log, game_events)
+        monster_log = (
+            self.monster_log_snapshot(profile_name)
+            if is_monster_profile
+            else {}
+        )
+        readiness = self._readiness(
+            processes,
+            bwapi_ini,
+            chaoslauncher_log,
+            game_events,
+            monster_log,
+        )
         return {
             "profile": profile_name,
             "generated_at": time.time(),
@@ -44,6 +56,7 @@ class StarCraft116StatusReader:
             "bwapi_ini": bwapi_ini,
             "bwapi_event_exporter": exporter,
             "game_events": game_events,
+            "monster_log": monster_log,
             "chaoslauncher_log": chaoslauncher_log,
             "readiness": readiness,
             "summary": self._summary(
@@ -85,7 +98,7 @@ class StarCraft116StatusReader:
 
         return {
             "profile": profile_name,
-            "bwapi_ini": self._bwapi_ini_path(profile),
+            "bwapi_ini": self._bwapi_ini_path(profile, profile_name),
             "chaoslauncher_folder": chaoslauncher_folder,
             "starcraft_folder": starcraft_folder,
         }
@@ -117,8 +130,14 @@ class StarCraft116StatusReader:
             "errors": errors,
         }
 
-    def bwapi_ini_snapshot(self, profile, exporter=None, skip_required=False):
-        path = self._bwapi_ini_path(profile)
+    def bwapi_ini_snapshot(
+        self,
+        profile,
+        exporter=None,
+        skip_required=False,
+        profile_name=None,
+    ):
+        path = self._bwapi_ini_path(profile, profile_name)
         exporter = exporter or {}
         result = {
             "path": path,
@@ -261,10 +280,77 @@ class StarCraft116StatusReader:
         )
         return result
 
-    def _readiness(self, processes, bwapi_ini, chaoslauncher_log, game_events=None):
+    def monster_log_snapshot(self, profile_name=None):
+        #20260718_kpopmodder: Monster uses a standalone BWAPI observer, so its log is runtime evidence.
+        path = self._monster_log_path(profile_name)
+        result = {
+            "path": path,
+            "exists": bool(path and os.path.isfile(path)),
+            "modified_at": None,
+            "latest_age_seconds": None,
+            "latest_relevant_marker": "",
+            "latest_relevant_line": "",
+            "runtime_event_recent": False,
+            "observer_connected": False,
+            "joined_game_seen": False,
+            "disconnected_seen": False,
+            "ended_seen": False,
+            "recent_relevant_lines": [],
+            "error": "",
+        }
+        if not result["exists"]:
+            return result
+
+        try:
+            result["modified_at"] = os.path.getmtime(path)
+            lines = self._read_tail_lines(path)
+        except Exception as e:
+            result["error"] = str(e)
+            return result
+
+        markers = []
+        for line in lines:
+            marker = self._monster_log_marker(line)
+            if marker:
+                markers.append((marker, line))
+
+        result["recent_relevant_lines"] = [line for _, line in markers][-12:]
+        if markers:
+            latest_marker, latest_line = markers[-1]
+            result["latest_relevant_marker"] = latest_marker
+            result["latest_relevant_line"] = latest_line
+
+        result["latest_age_seconds"] = max(0.0, time.time() - result["modified_at"])
+        result["joined_game_seen"] = any(marker == "joined_game" for marker, _ in markers)
+        result["disconnected_seen"] = any(
+            marker == "disconnected" for marker, _ in markers
+        )
+        result["ended_seen"] = any(
+            marker in {"game_ended", "exit_code"} for marker, _ in markers
+        )
+        result["observer_connected"] = result["latest_relevant_marker"] in {
+            "connected",
+            "joined_game",
+            "lav_event",
+        }
+        result["runtime_event_recent"] = bool(
+            result["observer_connected"]
+            and result["latest_age_seconds"] <= 180
+        )
+        return result
+
+    def _readiness(
+        self,
+        processes,
+        bwapi_ini,
+        chaoslauncher_log,
+        game_events=None,
+        monster_log=None,
+    ):
         matches = processes.get("matches", {})
         markers = chaoslauncher_log.get("markers", {})
         game_events = game_events or {}
+        monster_log = monster_log or {}
         return {
             "starcraft_process_running": bool(matches.get("StarCraft.exe")),
             "chaoslauncher_process_running": bool(matches.get("Chaoslauncher.exe")),
@@ -285,6 +371,14 @@ class StarCraft116StatusReader:
             ),
             "bwapi_runtime_event_seen": bool(
                 game_events.get("runtime_event_recent")
+            ),
+            "monster_log_present": bool(monster_log.get("exists")),
+            "monster_log_recent": bool(monster_log.get("runtime_event_recent")),
+            "monster_observer_connected": bool(
+                monster_log.get("observer_connected")
+            ),
+            "monster_joined_game_seen": bool(
+                monster_log.get("joined_game_seen")
             ),
             "wmode_ready": bool(
                 markers.get("wmode_loaded") or markers.get("wmode_patch_applied")
@@ -341,12 +435,28 @@ class StarCraft116StatusReader:
             next_actions.append("Confirm active_profile and bwapi.ini use the same bot DLL.")
 
         if readiness.get("starcraft_process_running"):
-            phase = "game_running"
-            if readiness.get("bwapi_release_patch_applied"):
+            if is_monster_profile:
+                if readiness.get("monster_observer_connected"):
+                    phase = "monster_observer_connected"
+                    messages.append(
+                        "Monster standalone BWAPI observer is connected."
+                    )
+                else:
+                    phase = "monster_observer_waiting"
+                    messages.append(
+                        "StarCraft is running; waiting for Monster standalone observer log evidence."
+                    )
+                    next_actions.append(
+                        "If Monster does not join, check BWAPI 4.2.0 Client Connection and W-MODE 1.02, then press Start."
+                    )
+            elif readiness.get("bwapi_release_patch_applied"):
+                phase = "game_running"
                 messages.append("StarCraft is running with BWAPI release patch evidence.")
             elif readiness.get("bwapi_runtime_event_seen"):
+                phase = "game_running"
                 messages.append("StarCraft is running with BWAPI runtime event evidence.")
             else:
+                phase = "game_running"
                 severity = "warning" if severity == "ok" else severity
                 messages.append("StarCraft is running, but BWAPI patch evidence is missing.")
                 next_actions.append("Refresh after Chaoslauncher finishes applying plugins.")
@@ -437,7 +547,17 @@ class StarCraft116StatusReader:
     def _is_monster_profile(profile_name):
         return str(profile_name or "").strip().lower() == "monster"
 
-    def _bwapi_ini_path(self, profile):
+    def _bwapi_ini_path(self, profile, profile_name=None):
+        runtime_resolver = getattr(
+            self.config_manager,
+            "resolve_profile_runtime_bwapi_data_dir",
+            None,
+        )
+        if callable(runtime_resolver):
+            bwapi_data_dir = runtime_resolver(profile_name)
+            if bwapi_data_dir:
+                return os.path.join(bwapi_data_dir, "bwapi.ini")
+
         bwapi_data_dir = self.config_manager.resolve_profile_path(
             profile,
             "bwapi_data_dir",
@@ -468,6 +588,38 @@ class StarCraft116StatusReader:
         if not working_dir:
             return ""
         return os.path.join(working_dir, "Chaoslauncher.log")
+
+    def _monster_log_path(self, profile_name=None):
+        resolver = getattr(self.config_manager, "resolve_monster_log_path", None)
+        if not callable(resolver):
+            return ""
+        try:
+            return resolver(profile_name)
+        except TypeError:
+            return resolver()
+
+    @staticmethod
+    def _monster_log_marker(line):
+        lowered = str(line or "").strip().lower()
+        if not lowered:
+            return ""
+        if lowered.startswith("[lav_event]") or lowered.startswith("lav_event"):
+            return "lav_event"
+        if lowered in {
+            "connected",
+            "connection successful",
+            "connected to bwapi.",
+        }:
+            return "connected"
+        if lowered == "joined a game.":
+            return "joined_game"
+        if lowered == "disconnected":
+            return "disconnected"
+        if lowered == "game ended.":
+            return "game_ended"
+        if "exit code" in lowered:
+            return "exit_code"
+        return ""
 
     def _read_ini_values(self, path):
         #20260706_kpopmodder: Preserve private method for tests while IO parsing lives in helper.

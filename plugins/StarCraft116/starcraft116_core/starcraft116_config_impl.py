@@ -6,10 +6,22 @@ import json
 import os
 from dataclasses import dataclass, field
 
+from .starcraft116_ai_bundle_downloader import (
+    DEFAULT_STARCRAFT116_AI_BUNDLE_DIR,
+    DEFAULT_STARCRAFT116_AI_BUNDLE_REMOTE_SUBDIR,
+    DEFAULT_STARCRAFT116_AI_BUNDLE_REPO_ID,
+    DEFAULT_STARCRAFT116_AI_BUNDLE_REPO_TYPE,
+    DEFAULT_STARCRAFT116_AI_BUNDLE_REVISION,
+    DEFAULT_STARCRAFT116_AI_REQUIRED_FILES,
+    StarCraft116AIBundleDownloader,
+)
+
 
 DEFAULT_PROFILE = {
     "display_name": "",
     "starcraft_116_dir": "",
+    "bwapi_bundle_dir": "",
+    "bwapi_starcraft_dir": "",
     "bwapi_data_dir": "",
     "bot_binary_path": "",
     "start_chaoslauncher": True,
@@ -33,6 +45,16 @@ DEFAULT_PROFILE = {
     "observer_process_working_dir": "",
     "observer_process_run_as_admin": False,
     "environment": {},
+}
+
+
+DEFAULT_BWAPI_BUNDLE_DIRS = {
+    #20260718_kpopmodder: Keep BWAPI runtime bundles project-local while leaving StarCraft.exe configurable.
+    "saida": "plugins\\StarCraft116\\BWAPI_APP\\BWAPI_4_4_0\\Release_Binary",
+    "monster": "plugins\\StarCraft116\\BWAPI_APP\\BWAPI_420",
+    "stardust": "plugins\\StarCraft116\\BWAPI_APP\\BWAPI_4_4_0\\Release_Binary",
+    "crona": "plugins\\StarCraft116\\BWAPI_APP\\BWAPI_4_4_0\\Release_Binary",
+    "terminus": "plugins\\StarCraft116\\BWAPI_APP\\BWAPI_4_4_0\\Release_Binary",
 }
 
 
@@ -65,9 +87,15 @@ KNOWN_BOT_PROFILES = {
 
 DEFAULT_CONFIG = {
     "enabled": False,
-    "active_profile": "saida",
+    "active_profile": "monster",
     "auto_launch": False,
     "terminate_on_stop": False,
+    "ai_bundle_download_enabled": True,
+    "ai_bundle_dir": str(DEFAULT_STARCRAFT116_AI_BUNDLE_DIR),
+    "ai_bundle_repo_id": DEFAULT_STARCRAFT116_AI_BUNDLE_REPO_ID,
+    "ai_bundle_repo_type": DEFAULT_STARCRAFT116_AI_BUNDLE_REPO_TYPE,
+    "ai_bundle_revision": DEFAULT_STARCRAFT116_AI_BUNDLE_REVISION,
+    "ai_bundle_remote_subdir": DEFAULT_STARCRAFT116_AI_BUNDLE_REMOTE_SUBDIR,
     "write_state_log": True,
     "state_log_path": "logs\\starcraft116_state.jsonl",
     "openai_reactions_enabled": True,
@@ -83,6 +111,11 @@ DEFAULT_CONFIG = {
     "bwapi_proxy_events_tts_enabled": True,
     "bwapi_proxy_events_log_sample_rate": 25,
     "bwapi_proxy_events_path": "",
+    "bwapi_proxy_events_prefer_starcraft_path": True,
+    "bwapi_launch_config_prefer_starcraft_path": True,
+    "bwapi_proxy_dll_auto_install": True,
+    "bwapi_proxy_dll_project_only": True,
+    "bwapi_proxy_dll_source_path": "plugins\\StarCraft116\\BWAPI.dll",
     "bwapi_event_exporter_enabled": False,
     "bwapi_event_exporter_build_config": "Release",
     "bwapi_event_exporter_source_dll_path": "",
@@ -198,11 +231,11 @@ class StarCraft116Config:
         return display_name or profile_name
 
     def get_active_profile_name(self):
-        profile_name = str(self.config.get("active_profile", "saida") or "saida")
+        profile_name = str(self.config.get("active_profile", "monster") or "monster")
         if profile_name in self.config.get("profiles", {}):
             return profile_name
         names = self.profile_names()
-        return names[0] if names else "saida"
+        return names[0] if names else "monster"
 
     def set_active_profile(self, profile_name):
         profile_name = str(profile_name or "").strip()
@@ -257,6 +290,49 @@ class StarCraft116Config:
             return path
         return os.path.join(self.project_root, "logs", "starcraft116_game_events.jsonl")
 
+    def resolve_ai_bundle_dir(self):
+        path = self.resolve_path_value(str(self.config.get("ai_bundle_dir", "")))
+        if path:
+            return path
+        return os.path.join(self.project_root, *DEFAULT_STARCRAFT116_AI_BUNDLE_DIR.parts)
+
+    def ensure_ai_bundle(self):
+        #20260718_kpopmodder: Keep bundled StarCraft 1.16 AI files project-local and recoverable.
+        downloader = StarCraft116AIBundleDownloader()
+        remote_subdir = self.config.get(
+            "ai_bundle_remote_subdir",
+            DEFAULT_STARCRAFT116_AI_BUNDLE_REMOTE_SUBDIR,
+        )
+        if remote_subdir is None:
+            remote_subdir = DEFAULT_STARCRAFT116_AI_BUNDLE_REMOTE_SUBDIR
+        return downloader.ensure_bundle(
+            self.resolve_ai_bundle_dir(),
+            enabled=self.get_bool("ai_bundle_download_enabled", True),
+            repo_id=str(
+                self.config.get(
+                    "ai_bundle_repo_id",
+                    DEFAULT_STARCRAFT116_AI_BUNDLE_REPO_ID,
+                )
+                or DEFAULT_STARCRAFT116_AI_BUNDLE_REPO_ID
+            ),
+            repo_type=str(
+                self.config.get(
+                    "ai_bundle_repo_type",
+                    DEFAULT_STARCRAFT116_AI_BUNDLE_REPO_TYPE,
+                )
+                or DEFAULT_STARCRAFT116_AI_BUNDLE_REPO_TYPE
+            ),
+            revision=str(
+                self.config.get(
+                    "ai_bundle_revision",
+                    DEFAULT_STARCRAFT116_AI_BUNDLE_REVISION,
+                )
+                or DEFAULT_STARCRAFT116_AI_BUNDLE_REVISION
+            ),
+            remote_subdir=str(remote_subdir),
+            required_files=DEFAULT_STARCRAFT116_AI_REQUIRED_FILES,
+        )
+
     def resolve_monster_log_path(self, profile_name=None):
         #20260705_kpopmodder: Monster.exe is a standalone client, so its text log is the event source.
         path = self.resolve_path_value(str(self.config.get("monster_log_path", "")))
@@ -281,16 +357,111 @@ class StarCraft116Config:
         if path:
             return path
 
-        profile = self.get_profile(profile_name or self.get_active_profile_name())
-        for key in ("bwapi_data_dir", "starcraft_working_dir", "starcraft_116_dir"):
+        profile_name = profile_name or self.get_active_profile_name()
+        profile = self.get_profile(profile_name)
+        if (
+            str(profile_name or "").strip().lower() == "monster"
+            and self.get_bool("bwapi_proxy_events_prefer_starcraft_path", True)
+        ):
+            path = self._resolve_bwapi_proxy_events_from_starcraft_path(profile)
+            if path:
+                return path
+
+        bwapi_data_dir = self.resolve_profile_bwapi_data_dir(profile_name)
+        if bwapi_data_dir:
+            return os.path.join(bwapi_data_dir, "bwapi_proxy_events.jsonl")
+
+        path = self._resolve_bwapi_proxy_events_from_starcraft_path(profile)
+        if path:
+            return path
+
+        return ""
+
+    def _resolve_bwapi_proxy_events_from_starcraft_path(self, profile):
+        bwapi_data_dir = self._resolve_bwapi_data_dir_from_starcraft_path(profile)
+        if bwapi_data_dir:
+            return os.path.join(bwapi_data_dir, "bwapi_proxy_events.jsonl")
+        return ""
+
+    def resolve_profile_runtime_bwapi_data_dir(self, profile_name=None):
+        #20260718_kpopmodder: DLL bots must update the bwapi-data folder loaded by the actual StarCraft GamePath.
+        profile_name = profile_name or self.get_active_profile_name()
+        profile = self.get_profile(profile_name)
+        if self.get_bool("bwapi_launch_config_prefer_starcraft_path", True):
+            path = self._resolve_bwapi_data_dir_from_starcraft_path(profile)
+            if path:
+                return path
+        return self.resolve_profile_bwapi_data_dir(profile_name)
+
+    def _resolve_bwapi_data_dir_from_starcraft_path(self, profile):
+        #20260718_kpopmodder: Chaoslauncher can load StarCraft from an external GamePath while BWAPI_APP stays project-local.
+        directories = []
+        for key in ("starcraft_working_dir", "starcraft_116_dir"):
             directory = self.resolve_profile_path(profile, key)
-            if not directory:
+            if directory:
+                directories.append(directory)
+
+        starcraft_exe_path = self.resolve_profile_path(profile, "starcraft_exe_path")
+        if starcraft_exe_path:
+            directories.append(os.path.dirname(starcraft_exe_path))
+
+        seen = set()
+        for directory in directories:
+            normalized = os.path.normcase(os.path.normpath(directory))
+            if not normalized or normalized in seen:
                 continue
+            seen.add(normalized)
             if os.path.basename(directory).lower() == "bwapi-data":
-                return os.path.join(directory, "bwapi_proxy_events.jsonl")
+                return os.path.normpath(directory)
             candidate = os.path.join(directory, "bwapi-data")
             if os.path.isdir(candidate):
-                return os.path.join(candidate, "bwapi_proxy_events.jsonl")
+                return os.path.normpath(candidate)
+        return ""
+
+    def resolve_profile_bwapi_bundle_dir(self, profile_name=None):
+        profile_name = profile_name or self.get_active_profile_name()
+        profile = self.get_profile(profile_name)
+        path = self.resolve_profile_path(profile, "bwapi_bundle_dir")
+        if path:
+            return path
+
+        default_path = DEFAULT_BWAPI_BUNDLE_DIRS.get(
+            str(profile_name or "").strip().lower(),
+            "",
+        )
+        return self.resolve_path_value(default_path)
+
+    def resolve_profile_bwapi_starcraft_dir(self, profile_name=None):
+        profile_name = profile_name or self.get_active_profile_name()
+        profile = self.get_profile(profile_name)
+        path = self.resolve_profile_path(profile, "bwapi_starcraft_dir")
+        if path:
+            return path
+
+        bwapi_data_dir = self.resolve_profile_path(profile, "bwapi_data_dir")
+        if bwapi_data_dir and os.path.basename(bwapi_data_dir).lower() == "bwapi-data":
+            return os.path.dirname(bwapi_data_dir)
+
+        for key in ("starcraft_working_dir", "starcraft_116_dir"):
+            directory = self.resolve_profile_path(profile, key)
+            if directory and os.path.isdir(os.path.join(directory, "bwapi-data")):
+                return directory
+
+        bundle_dir = self.resolve_profile_bwapi_bundle_dir(profile_name)
+        if bundle_dir:
+            return os.path.join(bundle_dir, "Starcraft")
+        return ""
+
+    def resolve_profile_bwapi_data_dir(self, profile_name=None):
+        profile_name = profile_name or self.get_active_profile_name()
+        profile = self.get_profile(profile_name)
+        path = self.resolve_profile_path(profile, "bwapi_data_dir")
+        if path:
+            return path
+
+        starcraft_dir = self.resolve_profile_bwapi_starcraft_dir(profile_name)
+        if starcraft_dir:
+            return os.path.join(starcraft_dir, "bwapi-data")
         return ""
 
     def resolve_profile_path(self, profile, key):
@@ -320,6 +491,20 @@ class StarCraft116Config:
             self.set_active_profile(profile_name)
         profile_name = self.get_active_profile_name()
         profile = self.get_profile(profile_name)
+        if self._profile_uses_ai_bundle(profile):
+            bundle_result = self.ensure_ai_bundle()
+            if not bundle_result.get("ok"):
+                validation = bundle_result.get("validation") or {}
+                missing_files = validation.get("missing_files") or []
+                detail = ", ".join(missing_files[:5])
+                if len(missing_files) > 5:
+                    detail += f", ... (+{len(missing_files) - 5})"
+                messages.append(
+                    "StarCraft 1.16 AI bundle is not ready: "
+                    f"{bundle_result.get('error', 'unknown_error')} "
+                    f"{bundle_result.get('bundle_dir', '')}"
+                    + (f" missing={detail}" if detail else "")
+                )
         launch_checks = (
             (
                 "start_chaoslauncher",
@@ -355,6 +540,8 @@ class StarCraft116Config:
 
         optional_checks = (
             ("starcraft_116_dir", "directory", "StarCraft 1.16 directory"),
+            ("bwapi_bundle_dir", "directory", "BWAPI bundle directory"),
+            ("bwapi_starcraft_dir", "directory", "BWAPI Starcraft directory"),
             ("bwapi_data_dir", "directory", "BWAPI data directory"),
             ("bot_binary_path", "file", "BWAPI bot binary"),
             ("chaoslauncher_working_dir", "directory", "Chaoslauncher working dir"),
@@ -536,6 +723,24 @@ class StarCraft116Config:
             messages.append(f"{label} does not exist: {path}")
         elif path_type == "file" and not os.path.isfile(path):
             messages.append(f"{label} does not exist: {path}")
+
+    def _profile_uses_ai_bundle(self, profile):
+        bundle_dir = self.resolve_ai_bundle_dir()
+        if not bundle_dir:
+            return False
+        bundle_root = os.path.normcase(os.path.normpath(bundle_dir))
+        for key in (
+            "bot_binary_path",
+            "bot_process_path",
+            "bot_process_working_dir",
+        ):
+            path = self.resolve_profile_path(profile, key)
+            if not path:
+                continue
+            normalized = os.path.normcase(os.path.normpath(path))
+            if normalized == bundle_root or normalized.startswith(bundle_root + os.sep):
+                return True
+        return False
 
     def _default_config(self):
         config = copy.deepcopy(DEFAULT_CONFIG)

@@ -6,10 +6,18 @@ REM Copy this file beside Monster.exe and rename it to run_monster_robust_log.ba
 REM It keeps Monster.exe alive across games by restarting after disconnects.
 
 set "MONSTER_DIR=%~dp0"
+if defined LAV_STARCRAFT116_MONSTER_DIR set "MONSTER_DIR=%LAV_STARCRAFT116_MONSTER_DIR%"
 if "%MONSTER_DIR:~-1%"=="\" set "MONSTER_DIR=%MONSTER_DIR:~0,-1%"
 
-REM Default StarCraft folder: ..\StarCraft relative to the Monster folder.
-set "STAR_DIR=%MONSTER_DIR%\..\StarCraft"
+REM #20260718_kpopmodder: Prefer project-local BWAPI_APP so Monster events stay inside LAVI.
+set "STAR_DIR="
+if defined LAV_STARCRAFT116_STARCRAFT_DIR set "STAR_DIR=%LAV_STARCRAFT116_STARCRAFT_DIR%"
+if not defined STAR_DIR if exist "%MONSTER_DIR%\..\..\BWAPI_APP\BWAPI_420\Starcraft" set "STAR_DIR=%MONSTER_DIR%\..\..\BWAPI_APP\BWAPI_420\Starcraft"
+if not defined STAR_DIR set "STAR_DIR=%MONSTER_DIR%\..\StarCraft"
+set "BWAPI_DATA_DIR=%STAR_DIR%\bwapi-data"
+if defined LAV_STARCRAFT116_BWAPI_DATA_DIR set "BWAPI_DATA_DIR=%LAV_STARCRAFT116_BWAPI_DATA_DIR%"
+set "BWAPI_PROXY_EVENTS_PATH=%BWAPI_DATA_DIR%\bwapi_proxy_events.jsonl"
+if defined LAV_STARCRAFT116_BWAPI_PROXY_EVENTS_PATH set "BWAPI_PROXY_EVENTS_PATH=%LAV_STARCRAFT116_BWAPI_PROXY_EVENTS_PATH%"
 set "LOG_FILE=%MONSTER_DIR%\monster_log.txt"
 set "MONSTER_RESTART_DELAY_SEC=15"
 set "MONSTER_RUN_ONCE=%~1"
@@ -25,6 +33,8 @@ echo ===============================================
 echo Monster launcher with robust log and restart loop
 echo MonsterDir: %MONSTER_DIR%
 echo StarDir:    %STAR_DIR%
+echo BwapiData:  %BWAPI_DATA_DIR%
+echo BwapiEvents:%BWAPI_PROXY_EVENTS_PATH%
 echo LogFile:    %LOG_FILE%
 echo ===============================================
 echo.
@@ -34,6 +44,8 @@ echo.
 >> "%LOG_FILE%" echo MonsterDir: %MONSTER_DIR%
 >> "%LOG_FILE%" echo WorkingDir: %CD%
 >> "%LOG_FILE%" echo StarDir: %STAR_DIR%
+>> "%LOG_FILE%" echo BwapiDataDir: %BWAPI_DATA_DIR%
+>> "%LOG_FILE%" echo BwapiEvents: %BWAPI_PROXY_EVENTS_PATH%
 >> "%LOG_FILE%" echo ===============================
 
 if not exist "%MONSTER_DIR%\Monster.exe" (
@@ -54,33 +66,35 @@ if not exist "%MONSTER_DIR%\sc.dat" (
 )
 
 REM Create likely BWAPI data folders. Some bots change/search paths after BWAPI connects.
-if exist "%STAR_DIR%" (
-    if not exist "%STAR_DIR%\bwapi-data" mkdir "%STAR_DIR%\bwapi-data" >nul 2>nul
-    if not exist "%STAR_DIR%\bwapi-data\AI" mkdir "%STAR_DIR%\bwapi-data\AI" >nul 2>nul
-    if not exist "%STAR_DIR%\bwapi-data\read" mkdir "%STAR_DIR%\bwapi-data\read" >nul 2>nul
+if exist "%STAR_DIR%" if not exist "%BWAPI_DATA_DIR%" mkdir "%BWAPI_DATA_DIR%" >nul 2>nul
+if exist "%BWAPI_DATA_DIR%" (
+    if not exist "%BWAPI_DATA_DIR%\AI" mkdir "%BWAPI_DATA_DIR%\AI" >nul 2>nul
+    if not exist "%BWAPI_DATA_DIR%\read" mkdir "%BWAPI_DATA_DIR%\read" >nul 2>nul
 
     echo Copying Monster data files to StarCraft fallback folders...
     >> "%LOG_FILE%" echo Copying Monster data files to fallback folders...
 
     for %%F in (sc.dat fp.dat wt_*.dat) do (
         if exist "%MONSTER_DIR%\%%F" (
-            copy /Y "%MONSTER_DIR%\%%F" "%STAR_DIR%\" >nul 2>nul
-            copy /Y "%MONSTER_DIR%\%%F" "%STAR_DIR%\bwapi-data\" >nul 2>nul
-            copy /Y "%MONSTER_DIR%\%%F" "%STAR_DIR%\bwapi-data\AI\" >nul 2>nul
-            copy /Y "%MONSTER_DIR%\%%F" "%STAR_DIR%\bwapi-data\read\" >nul 2>nul
+            if exist "%STAR_DIR%" copy /Y "%MONSTER_DIR%\%%F" "%STAR_DIR%\" >nul 2>nul
+            copy /Y "%MONSTER_DIR%\%%F" "%BWAPI_DATA_DIR%\" >nul 2>nul
+            copy /Y "%MONSTER_DIR%\%%F" "%BWAPI_DATA_DIR%\AI\" >nul 2>nul
+            copy /Y "%MONSTER_DIR%\%%F" "%BWAPI_DATA_DIR%\read\" >nul 2>nul
         )
     )
 
     >> "%LOG_FILE%" echo --- sc.dat locations after copy ---
     if exist "%MONSTER_DIR%\sc.dat" >> "%LOG_FILE%" echo OK MonsterDir sc.dat
     if exist "%STAR_DIR%\sc.dat" >> "%LOG_FILE%" echo OK StarDir sc.dat
-    if exist "%STAR_DIR%\bwapi-data\sc.dat" >> "%LOG_FILE%" echo OK bwapi-data sc.dat
-    if exist "%STAR_DIR%\bwapi-data\AI\sc.dat" >> "%LOG_FILE%" echo OK bwapi-data\AI sc.dat
-    if exist "%STAR_DIR%\bwapi-data\read\sc.dat" >> "%LOG_FILE%" echo OK bwapi-data\read sc.dat
+    if exist "%BWAPI_DATA_DIR%\sc.dat" >> "%LOG_FILE%" echo OK BWAPI_DATA_DIR sc.dat
+    if exist "%BWAPI_DATA_DIR%\AI\sc.dat" >> "%LOG_FILE%" echo OK BWAPI_DATA_DIR\AI sc.dat
+    if exist "%BWAPI_DATA_DIR%\read\sc.dat" >> "%LOG_FILE%" echo OK BWAPI_DATA_DIR\read sc.dat
 ) else (
-    echo WARNING: StarCraft folder was not found: "%STAR_DIR%"
+    echo WARNING: BWAPI data folder was not found: "%BWAPI_DATA_DIR%"
+    if not exist "%STAR_DIR%" echo WARNING: StarCraft folder was not found: "%STAR_DIR%"
     echo Only running from Monster folder.
-    >> "%LOG_FILE%" echo WARNING: StarCraft folder not found. Only running from Monster folder.
+    >> "%LOG_FILE%" echo WARNING: BWAPI data folder not found. Only running from Monster folder.
+    if not exist "%STAR_DIR%" >> "%LOG_FILE%" echo WARNING: StarCraft folder not found: "%STAR_DIR%"
 )
 
 echo Starting Monster.exe...

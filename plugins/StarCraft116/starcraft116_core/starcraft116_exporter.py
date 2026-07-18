@@ -1,5 +1,6 @@
 #20260703_kpopmodder: Tracks the optional BWAPI AIModule proxy that emits StarCraft 1.16 JSONL events.
 import os
+import shutil
 
 
 class StarCraft116ExporterManager:
@@ -13,7 +14,7 @@ class StarCraft116ExporterManager:
     def status(self, profile_name=None):
         profile_name = self._profile_name(profile_name)
         profile = self.config_manager.get_profile(profile_name)
-        paths = self.paths(profile)
+        paths = self.paths(profile, profile_name)
         config_values = self.read_exporter_ini(paths["target_ini_path"])
         wrapped_ai = os.path.basename(config_values.get("wrapped_ai", ""))
         expected_wrapped_ai = os.path.basename(profile.get("bot_binary_path", ""))
@@ -55,7 +56,7 @@ class StarCraft116ExporterManager:
             "config_values": config_values,
         }
 
-    def paths(self, profile):
+    def paths(self, profile, profile_name=None):
         source_dir = os.path.join(
             self.config_manager.plugin_root,
             "bwapi_event_exporter",
@@ -79,7 +80,7 @@ class StarCraft116ExporterManager:
                 self.EXPORTER_DLL_NAME,
             )
 
-        ai_dir = self._ai_dir(profile)
+        ai_dir = self._ai_dir(profile, profile_name)
         target_dll = os.path.join(ai_dir, self.EXPORTER_DLL_NAME) if ai_dir else ""
         target_ini = os.path.join(ai_dir, self.EXPORTER_INI_NAME) if ai_dir else ""
         return {
@@ -96,7 +97,7 @@ class StarCraft116ExporterManager:
     def build_ini_text(self, profile_name=None):
         profile_name = self._profile_name(profile_name)
         profile = self.config_manager.get_profile(profile_name)
-        wrapped_ai = self._wrapped_ai_value(profile)
+        wrapped_ai = self._wrapped_ai_value(profile, profile_name)
         lines = [
             "#20260703_kpopmodder: LAV StarCraft 1.16 BWAPI event exporter config.",
             f"wrapped_ai={wrapped_ai}",
@@ -111,26 +112,42 @@ class StarCraft116ExporterManager:
     def write_ini(self, profile_name=None):
         profile_name = self._profile_name(profile_name)
         profile = self.config_manager.get_profile(profile_name)
-        target_ini = self.paths(profile)["target_ini_path"]
+        paths = self.paths(profile, profile_name)
+        source_dll = paths["source_dll_path"]
+        target_dll = paths["target_dll_path"]
+        target_ini = paths["target_ini_path"]
         if not target_ini:
             return False, "LAVEventExporter.ini target path is not configured."
+        if not source_dll or not os.path.isfile(source_dll):
+            return False, f"LAVEventExporter.dll source does not exist: {source_dll}"
+        if not target_dll:
+            return False, "LAVEventExporter.dll target path is not configured."
 
         target_dir = os.path.dirname(target_ini)
         if target_dir:
             os.makedirs(target_dir, exist_ok=True)
+        #20260718_kpopmodder: BWAPI loads the exporter DLL from bwapi-data/AI, not from the build output folder.
+        shutil.copy2(source_dll, target_dll)
         with open(target_ini, "w", encoding="utf-8", newline="\n") as file:
             file.write(self.build_ini_text(profile_name))
-        return True, f"Updated LAVEventExporter.ini for {profile_name}: {target_ini}"
+        return True, (
+            f"Updated LAVEventExporter for {profile_name}: "
+            f"ini={target_ini}, dll={target_dll}"
+        )
 
     def write_bwapi_ini_ai(self, profile_name=None, use_exporter=None):
         #20260704_kpopmodder: BWAPI reads this file for DLL bots, so set ai/ai_dbg to the selected profile before launch.
         profile_name = self._profile_name(profile_name)
         profile = self.config_manager.get_profile(profile_name)
-        ai_value = self._bwapi_ai_value(profile, use_exporter=use_exporter)
+        ai_value = self._bwapi_ai_value(
+            profile,
+            use_exporter=use_exporter,
+            profile_name=profile_name,
+        )
         if not ai_value:
             return True, "Skipped bwapi.ini AI update for standalone BWAPI client bot."
 
-        bwapi_ini = self._bwapi_ini_path(profile)
+        bwapi_ini = self._bwapi_ini_path(profile, profile_name)
         if not bwapi_ini:
             return False, "bwapi.ini target path is not configured."
         if not os.path.isfile(bwapi_ini):
@@ -146,7 +163,7 @@ class StarCraft116ExporterManager:
         )
         return True, f"Updated bwapi.ini AI for {profile_name}: {ai_value}"
 
-    def _wrapped_ai_value(self, profile):
+    def _wrapped_ai_value(self, profile, profile_name=None):
         bot_path = self.config_manager.resolve_profile_path(
             profile,
             "bot_binary_path",
@@ -154,7 +171,7 @@ class StarCraft116ExporterManager:
         if not bot_path:
             return "Stardust.dll"
 
-        ai_dir = self._ai_dir(profile)
+        ai_dir = self._ai_dir(profile, profile_name)
         if ai_dir:
             try:
                 bot_dir = os.path.normcase(os.path.dirname(bot_path))
@@ -165,7 +182,7 @@ class StarCraft116ExporterManager:
                 pass
         return bot_path
 
-    def _bwapi_ai_value(self, profile, use_exporter=None):
+    def _bwapi_ai_value(self, profile, use_exporter=None, profile_name=None):
         bot_path = self.config_manager.resolve_profile_path(
             profile,
             "bot_binary_path",
@@ -186,7 +203,7 @@ class StarCraft116ExporterManager:
         if not bot_path:
             return ""
 
-        ai_dir = self._ai_dir(profile)
+        ai_dir = self._ai_dir(profile, profile_name)
         if ai_dir:
             try:
                 bot_dir = os.path.normcase(os.path.dirname(bot_path))
@@ -197,7 +214,11 @@ class StarCraft116ExporterManager:
                 pass
         return bot_path
 
-    def _bwapi_ini_path(self, profile):
+    def _bwapi_ini_path(self, profile, profile_name=None):
+        runtime_bwapi_data_dir = self._runtime_bwapi_data_dir(profile_name)
+        if runtime_bwapi_data_dir:
+            return os.path.join(runtime_bwapi_data_dir, "bwapi.ini")
+
         bwapi_data_dir = self.config_manager.resolve_profile_path(
             profile,
             "bwapi_data_dir",
@@ -280,7 +301,11 @@ class StarCraft116ExporterManager:
             return profile_name
         return self.config_manager.get_active_profile_name()
 
-    def _ai_dir(self, profile):
+    def _ai_dir(self, profile, profile_name=None):
+        runtime_bwapi_data_dir = self._runtime_bwapi_data_dir(profile_name)
+        if runtime_bwapi_data_dir:
+            return os.path.join(runtime_bwapi_data_dir, "AI")
+
         bwapi_data_dir = self.config_manager.resolve_profile_path(
             profile,
             "bwapi_data_dir",
@@ -293,4 +318,14 @@ class StarCraft116ExporterManager:
         )
         if starcraft_dir:
             return os.path.join(starcraft_dir, "bwapi-data", "AI")
+        return ""
+
+    def _runtime_bwapi_data_dir(self, profile_name):
+        resolver = getattr(
+            self.config_manager,
+            "resolve_profile_runtime_bwapi_data_dir",
+            None,
+        )
+        if callable(resolver):
+            return resolver(profile_name)
         return ""

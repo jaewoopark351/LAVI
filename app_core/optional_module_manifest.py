@@ -79,7 +79,7 @@ OPTIONAL_MODULE_MANIFEST = {
             "StarCraft116": {
                 "config_path": "plugins/StarCraft116/config/starcraft116_config.json",
                 "enabled": False,
-                "active_profile": "saida",
+                "active_profile": "monster",
             },
         },
         "required_python_packages": (),

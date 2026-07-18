@@ -1,0 +1,11 @@
+/bin/
+.classpath
+.project
+*.iml
+*.eml
+/.idea
+.idea/
+*.dll
+.settings/
+target/
+/src/main/java/org/monster/macro

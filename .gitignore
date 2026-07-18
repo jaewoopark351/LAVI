@@ -168,3 +168,5 @@ plugins/StarCraft2/runtime/
 plugins/StarCraft2/runtime.Zip
 #20260718_kpopmodder: Ignore local StarCraft 1.16 bot runtime/vendor bundles.
 plugins/StarCraft116/Bots/
+plugins/StarCraft116/StarCraft_1_16_Bots/
+plugins/StarCraft116/BWAPI_APP/

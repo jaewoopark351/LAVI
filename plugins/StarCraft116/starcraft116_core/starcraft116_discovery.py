@@ -10,6 +10,8 @@ from dataclasses import dataclass, field
 DEFAULT_PROFILE = {
     "display_name": "",
     "starcraft_116_dir": "",
+    "bwapi_bundle_dir": "",
+    "bwapi_starcraft_dir": "",
     "bwapi_data_dir": "",
     "bot_binary_path": "",
     "start_chaoslauncher": True,
@@ -65,7 +67,7 @@ KNOWN_BOT_PROFILES = {
 
 DEFAULT_CONFIG = {
     "enabled": False,
-    "active_profile": "saida",
+    "active_profile": "monster",
     "auto_launch": False,
     "terminate_on_stop": False,
     "write_state_log": True,
@@ -83,6 +85,11 @@ DEFAULT_CONFIG = {
     "bwapi_proxy_events_tts_enabled": True,
     "bwapi_proxy_events_log_sample_rate": 25,
     "bwapi_proxy_events_path": "",
+    "bwapi_proxy_events_prefer_starcraft_path": True,
+    "bwapi_launch_config_prefer_starcraft_path": True,
+    "bwapi_proxy_dll_auto_install": True,
+    "bwapi_proxy_dll_project_only": True,
+    "bwapi_proxy_dll_source_path": "plugins\\StarCraft116\\BWAPI.dll",
     "bwapi_event_exporter_enabled": False,
     "bwapi_event_exporter_build_config": "Release",
     "bwapi_event_exporter_source_dll_path": "",

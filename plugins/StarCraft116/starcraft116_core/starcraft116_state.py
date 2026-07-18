@@ -5,7 +5,7 @@ import time
 
 class StarCraft116RuntimeState:
     #20260702_kpopmodder: Stores process ids without owning external game shutdown.
-    def __init__(self, profile="saida"):
+    def __init__(self, profile="monster"):
         self.profile = profile
         self.running = False
         self.processes = []

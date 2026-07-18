@@ -1,6 +1,7 @@
 #20260705_kpopmodder: Added this helper to isolate StarCraft116 BWAPI launch config sync.
 
 from core.logger import log_print
+from .starcraft116_bwapi_proxy_installer import StarCraft116BWAPIProxyInstaller
 
 
 class StarCraft116LaunchConfigSync:
@@ -9,6 +10,7 @@ class StarCraft116LaunchConfigSync:
         self.config_manager = config_manager
         self.exporter_manager = exporter_manager
         self.is_monster_profile = is_monster_profile
+        self.bwapi_proxy_installer = StarCraft116BWAPIProxyInstaller(config_manager)
 
     def sync(self, profile_name):
         messages = []
@@ -16,7 +18,13 @@ class StarCraft116LaunchConfigSync:
         try:
             if self.is_monster_profile(profile_name):
                 #20260705_kpopmodder: Monster.exe is an external BWAPI client; keep DLL bot config untouched.
-                return True, "Monster profile uses a standalone BWAPI observer; skipped BWAPI exporter config."
+                proxy_result = self.bwapi_proxy_installer.ensure_installed(profile_name)
+                if not proxy_result.get("ok"):
+                    return False, proxy_result.get("message", "")
+                return True, "\n".join([
+                    "Monster profile uses a standalone BWAPI observer; skipped BWAPI exporter config.",
+                    proxy_result.get("message", ""),
+                ]).strip()
 
             #20260704_kpopmodder: Keep bwapi.ini synced before launch so BWAPI does not fall back to ExampleAIModule.dll.
             if self.config_manager.get_bool("bwapi_event_exporter_enabled", False):
