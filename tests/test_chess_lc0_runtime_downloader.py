@@ -12,12 +12,12 @@ from plugins.Chess.chess_core.lc0_runtime_downloader import (
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-TEST_TMP_ROOT = PROJECT_ROOT / ".test_tmp"
+TEST_TMP_ROOT = PROJECT_ROOT / "test" / "test_Isolation" / "tmp"
 
 
 class ChessLC0RuntimeDownloaderTests(unittest.TestCase):
     def _make_temp_dir(self) -> Path:
-        TEST_TMP_ROOT.mkdir(exist_ok=True)
+        TEST_TMP_ROOT.mkdir(parents=True, exist_ok=True)
         path = TEST_TMP_ROOT / f"chess_lc0_runtime_{uuid.uuid4().hex}"
         path.mkdir()
         self.addCleanup(lambda: shutil.rmtree(path, ignore_errors=True))

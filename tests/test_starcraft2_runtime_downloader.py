@@ -14,12 +14,12 @@ from plugins.StarCraft2.starcraft2_core.starcraft2_runtime_downloader import (
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-TEST_TMP_ROOT = PROJECT_ROOT / ".test_tmp"
+TEST_TMP_ROOT = PROJECT_ROOT / "test" / "test_Isolation" / "tmp"
 
 
 class StarCraft2RuntimeDownloaderTests(unittest.TestCase):
     def _make_temp_dir(self) -> Path:
-        TEST_TMP_ROOT.mkdir(exist_ok=True)
+        TEST_TMP_ROOT.mkdir(parents=True, exist_ok=True)
         path = TEST_TMP_ROOT / f"starcraft2_runtime_{uuid.uuid4().hex}"
         path.mkdir()
         self.addCleanup(lambda: shutil.rmtree(path, ignore_errors=True))

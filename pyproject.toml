@@ -8,8 +8,6 @@ norecursedirs = [
     ".codex_tmp",
     ".codex_pycache",
     ".dotnet_home",
-    ".test_tmp",
-    ".tmp-tests",
     "test/test_Isolation",
     "tests/tmp*",
 ]

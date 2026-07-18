@@ -19,8 +19,6 @@ plugins/StarCraft116/bwapi_observer_client/bin/Release/*.pdb
 .codex_pycache/
 .codex_tmp/
 .dotnet_home/
-.test_tmp/
-.tmp-tests/
 plugins/StarCraft2/native/**/.dotnet_home/
 plugins/StarCraft2/native/**/.travis/
 plugins/StarCraft2/native/**/.travis.yml
