@@ -38,7 +38,7 @@ class VoiceInput(InputPluginInterface):#20260618_kpopmodder
         "config_schema": {
             "VoiceInput": {
                 "stt_backend": "transformers_whisper",
-                "whisper_model": "openai/whisper-large-v3-turbo",
+                "whisper_model": "openai/whisper-large-v3",
                 "language": "ko",
                 "device": "auto",
             },
@@ -111,7 +111,7 @@ class VoiceInput(InputPluginInterface):#20260618_kpopmodder
             ),
             "whisper_model": (
                 config.get("whisper_model")
-                or "openai/whisper-large-v3-turbo"
+                or "openai/whisper-large-v3"
             ),
             "language": self.normalize_stt_language(
                 config.get("language") or "ko"

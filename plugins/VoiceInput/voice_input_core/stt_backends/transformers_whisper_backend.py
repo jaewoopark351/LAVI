@@ -10,12 +10,12 @@ from .base import STTInfo, STTResult, STTSegment
 class TransformersWhisperBackend:
     def __init__(
         self,
-        model_id: str = "openai/whisper-large-v3-turbo",
+        model_id: str = "openai/whisper-large-v3",
         device: str = "cuda:0",
         torch_dtype: str = "auto",
         language: str = "ko",
     ):
-        self.model_id = model_id or "openai/whisper-large-v3-turbo"
+        self.model_id = model_id or "openai/whisper-large-v3"
         self.device = device or "cpu"
         self.torch_dtype_name = torch_dtype or "auto"
         self.language = language or "ko"

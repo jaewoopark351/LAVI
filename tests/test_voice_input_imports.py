@@ -210,7 +210,7 @@ class VoiceInputImportTests(unittest.TestCase):
         voice_input = VoiceInput()
         settings = {
             "stt_backend": "transformers_whisper",
-            "whisper_model": "openai/whisper-large-v3-turbo",
+            "whisper_model": "openai/whisper-large-v3",
             "language": "ko",
             "torch_dtype": "float16",
         }
@@ -227,7 +227,7 @@ class VoiceInputImportTests(unittest.TestCase):
 
         self.assertIs(backend, backend_class.return_value)
         backend_class.assert_called_once_with(
-            model_id="openai/whisper-large-v3-turbo",
+            model_id="openai/whisper-large-v3",
             device="cuda:1",
             torch_dtype="float16",
             language="ko",
@@ -240,13 +240,13 @@ class VoiceInputImportTests(unittest.TestCase):
             return_value=None,
         ):
             backend = TransformersWhisperBackend(
-                model_id="openai/whisper-large-v3-turbo",
+                model_id="openai/whisper-large-v3",
                 device="cuda:1",
                 torch_dtype="auto",
                 language="ko",
             )
 
-        self.assertEqual(backend.model_id, "openai/whisper-large-v3-turbo")
+        self.assertEqual(backend.model_id, "openai/whisper-large-v3")
         self.assertEqual(backend.device, "cuda:1")
         self.assertEqual(backend.torch_dtype_name, "auto")
         self.assertEqual(backend.language, "ko")
@@ -258,7 +258,7 @@ class VoiceInputImportTests(unittest.TestCase):
             return_value=None,
         ):
             backend = TransformersWhisperBackend(
-                model_id="openai/whisper-large-v3-turbo",
+                model_id="openai/whisper-large-v3",
                 device="cuda:1",
                 torch_dtype="auto",
                 language="ko",

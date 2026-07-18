@@ -1,7 +1,7 @@
 {
   "VoiceInput": {
     "stt_backend": "transformers_whisper",
-    "whisper_model": "openai/whisper-large-v3-turbo",
+    "whisper_model": "openai/whisper-large-v3",
     "language": "ko",
     "torch_dtype": "auto",
     "device": ""
