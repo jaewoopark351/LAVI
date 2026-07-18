@@ -35,6 +35,7 @@ class AudioDeviceManager:  # 20260614_kpopmodder
 
         self.output_device_label = None
         self.input_device_label = None
+        self.tts_volume_percent = 100
 
         #20260620_kpopmodder: Playback state moved to AudioPlaybackController.
         # self.play_lock = threading.RLock()
@@ -183,6 +184,28 @@ class AudioDeviceManager:  # 20260614_kpopmodder
         log_print(f"[AudioDeviceManager] input device set: {label}")
         self.save_config()
 
+    def set_tts_volume_percent(self, value):
+        normalized_volume = self.clamp_tts_volume_percent(value)
+        if normalized_volume == self.tts_volume_percent:
+            return
+
+        self.tts_volume_percent = normalized_volume
+        log_print(
+            f"[AudioDeviceManager] LAVI voice volume set: "
+            f"{self.tts_volume_percent}%"
+        )
+        self.save_config()
+
+    def clamp_tts_volume_percent(self, value):
+        try:
+            volume = int(round(float(value)))
+        except Exception:
+            volume = 100
+        return min(200, max(0, volume))
+
+    def get_tts_volume_scale(self):
+        return self.clamp_tts_volume_percent(self.tts_volume_percent) / 100.0
+
     def get_default_output_value(self):
         output_choices = self.list_output_devices()
 
@@ -237,6 +260,16 @@ class AudioDeviceManager:  # 20260614_kpopmodder
                     "Refresh Audio Devices"
                 )
 
+            with gr.Accordion("LAVI Voice", open=True):
+                self.tts_volume_slider = gr.Slider(
+                    minimum=0,
+                    maximum=200,
+                    value=self.tts_volume_percent,
+                    step=5,
+                    label="LAVI Voice Volume (%)",
+                    interactive=True,
+                )
+
             self.output_device_dropdown.change(
                 self.set_output_device,
                 inputs=self.output_device_dropdown,
@@ -255,6 +288,17 @@ class AudioDeviceManager:  # 20260614_kpopmodder
                     self.output_device_dropdown,
                     self.input_device_dropdown,
                 ],
+            )
+
+            self.tts_volume_slider.change(
+                self.set_tts_volume_percent,
+                inputs=self.tts_volume_slider,
+                outputs=[],
+            )
+            self.tts_volume_slider.input(
+                self.set_tts_volume_percent,
+                inputs=self.tts_volume_slider,
+                outputs=[],
             )
 
     def refresh_ui(self):
@@ -360,7 +404,8 @@ class AudioDeviceManager:  # 20260614_kpopmodder
     def save_config(self):
         self.config_store.save(
             output_device_label=self.output_device_label,
-            input_device_label=self.input_device_label
+            input_device_label=self.input_device_label,
+            tts_volume_percent=self.tts_volume_percent,
         )
 
         #20260620_kpopmodder: Audio device config persistence moved to AudioDeviceConfigStore.
@@ -386,8 +431,12 @@ class AudioDeviceManager:  # 20260614_kpopmodder
     def load_config(self):
         (
             self.output_device_label,
-            self.input_device_label
+            self.input_device_label,
+            self.tts_volume_percent,
         ) = self.config_store.load()
+        self.tts_volume_percent = self.clamp_tts_volume_percent(
+            self.tts_volume_percent
+        )
 
         self.output_device_id = self.parse_device_id(self.output_device_label)
         self.input_device_id = None#20260625_kpopmodder: Validate saved input label against current devices before use.

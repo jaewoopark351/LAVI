@@ -93,6 +93,7 @@ class TTS(PluginSelectionBase):#20260615_kpopmodder
         self.audio_player = WinSoundAudioPlayer(#20260617_kpopmodder
             interrupt_event=self.interrupt_event,
             mouth_animator=self.mouth_animator,
+            volume_scale_getter=self.get_tts_volume_scale,
         )
         self.output_min_interval = 0.08  #20260617_kpopmodder - safer 12.5fps
 
@@ -644,6 +645,14 @@ class TTS(PluginSelectionBase):#20260615_kpopmodder
         playback_ok = self.audio_player.play_from_bytes(audio_data)
         self.send_output(0)
         return playback_ok
+
+    def get_tts_volume_scale(self):
+        try:
+            from audio_device_manager import audio_device_manager
+            return audio_device_manager.get_tts_volume_scale()
+        except Exception as e:
+            log_print(f"[TTS playback] volume config unavailable: {e}")
+            return 1.0
 
     # def write_temp_wav_file(self, audio_data):#20260617_kpopmodder
     #     fd, temp_wav_path = tempfile.mkstemp(

@@ -1,7 +1,9 @@
+import io
 import os
 import tempfile
-import winsound
 import traceback
+import wave
+import winsound
 
 from core.logger import log_print
 
@@ -20,9 +22,10 @@ def stop_winsound_playback():
 
 
 class WinSoundAudioPlayer:#20260617_kpopmodder
-    def __init__(self, interrupt_event, mouth_animator=None):
+    def __init__(self, interrupt_event, mouth_animator=None, volume_scale_getter=None):
         self.interrupt_event = interrupt_event
         self.mouth_animator = mouth_animator
+        self.volume_scale_getter = volume_scale_getter
 
     def play_from_bytes(self, audio_data):
         if audio_data is None:
@@ -34,15 +37,16 @@ class WinSoundAudioPlayer:#20260617_kpopmodder
             if self.interrupt_event.is_set():
                 return False
 
-            temp_wav_path = self.write_temp_wav_file(audio_data)
+            playback_audio_data = self.apply_volume(audio_data)
+            temp_wav_path = self.write_temp_wav_file(playback_audio_data)
 
             log_print(
                 f"[TTS playback] using winsound for stability. "
-                f"bytes={len(audio_data)}, file={temp_wav_path}"
+                f"bytes={len(playback_audio_data)}, file={temp_wav_path}"
             )
 
             if self.mouth_animator is not None:
-                self.mouth_animator.start(audio_data)
+                self.mouth_animator.start(playback_audio_data)
 
             winsound.PlaySound(
                 temp_wav_path,
@@ -75,6 +79,80 @@ class WinSoundAudioPlayer:#20260617_kpopmodder
 
         except Exception as e:
             log_print(f"[TTS playback] winsound stop error: {e}")
+
+    def apply_volume(self, audio_data):
+        scale = self.get_volume_scale()
+        if scale == 1.0:
+            return audio_data
+        return self.scale_wav_audio(audio_data, scale)
+
+    def get_volume_scale(self):
+        if self.volume_scale_getter is None:
+            return 1.0
+
+        try:
+            scale = float(self.volume_scale_getter())
+        except Exception as e:
+            log_print(f"[TTS playback] volume getter error: {e}")
+            return 1.0
+
+        return min(2.0, max(0.0, scale))
+
+    def scale_wav_audio(self, audio_data, scale):
+        try:
+            with wave.open(io.BytesIO(audio_data), "rb") as source:
+                params = source.getparams()
+                frames = source.readframes(source.getnframes())
+
+            scaled_frames = self.scale_pcm_frames(
+                frames,
+                sample_width=params.sampwidth,
+                scale=scale,
+            )
+
+            output = io.BytesIO()
+            with wave.open(output, "wb") as target:
+                target.setparams(params)
+                target.writeframes(scaled_frames)
+            return output.getvalue()
+
+        except Exception as e:
+            log_print(f"[TTS playback] volume apply failed: {e}")
+            return audio_data
+
+    def scale_pcm_frames(self, frames, sample_width, scale):
+        if sample_width not in (1, 2, 3, 4):
+            return frames
+
+        output = bytearray()
+        frame_end = len(frames) - (len(frames) % sample_width)
+
+        for index in range(0, frame_end, sample_width):
+            chunk = frames[index:index + sample_width]
+            if sample_width == 1:
+                sample = int(chunk[0]) - 128
+                scaled = int(round(sample * scale))
+                scaled = min(127, max(-128, scaled))
+                output.append(scaled + 128)
+                continue
+
+            sample = int.from_bytes(chunk, byteorder="little", signed=True)
+            max_value = (1 << (sample_width * 8 - 1)) - 1
+            min_value = -(1 << (sample_width * 8 - 1))
+            scaled = int(round(sample * scale))
+            scaled = min(max_value, max(min_value, scaled))
+            output.extend(
+                int(scaled).to_bytes(
+                    sample_width,
+                    byteorder="little",
+                    signed=True,
+                )
+            )
+
+        if frame_end < len(frames):
+            output.extend(frames[frame_end:])
+
+        return bytes(output)
 
     def write_temp_wav_file(self, audio_data):
         fd, temp_wav_path = tempfile.mkstemp(
