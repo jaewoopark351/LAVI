@@ -258,22 +258,72 @@
     let moveInputColor = null;
     let renderedFen = null;
     let renderedOrientation = null;
+    const controls = {
+      newGame: document.getElementById("new-game"),
+      startEngine: document.getElementById("start-engine"),
+      stopEngine: document.getElementById("stop-engine"),
+      aiMove: document.getElementById("ai-move"),
+      reset: document.getElementById("reset")
+    };
 
-    function configureMoveInput(humanColor) {
+    function disableMoveInput() {
       if (!chessboard) {
+        return;
+      }
+      if (moveInputEnabled && typeof chessboard.disableMoveInput === "function") {
+        chessboard.disableMoveInput();
+      }
+      moveInputEnabled = false;
+      moveInputColor = null;
+    }
+
+    function configureMoveInput(humanColor, enabled) {
+      if (!chessboard) {
+        return;
+      }
+      if (!enabled) {
+        disableMoveInput();
         return;
       }
       if (moveInputEnabled && moveInputColor === humanColor) {
         return;
       }
       if (moveInputEnabled && typeof chessboard.disableMoveInput === "function") {
-        chessboard.disableMoveInput();
-        moveInputEnabled = false;
-        moveInputColor = null;
+        disableMoveInput();
       }
       chessboard.enableMoveInput(inputHandler, humanColor);
       moveInputEnabled = true;
       moveInputColor = humanColor;
+    }
+
+    function canHumanMoveForState(state) {
+      if (!state || state.game_over || state.ai_thinking || state.engine_starting) {
+        return false;
+      }
+      if (state.engine_ready !== true) {
+        return false;
+      }
+      return state.turn === state.human_color;
+    }
+
+    function syncControls(state) {
+      const engineReady = state && state.engine_ready === true;
+      const engineStarting = state && state.engine_starting === true;
+      const thinking = state && state.ai_thinking === true;
+      const gameOver = state && state.game_over === true;
+      const aiTurn = state && state.turn === state.ai_color;
+      const canHumanMove = boardAvailable && !busy && canHumanMoveForState(state);
+
+      controls.newGame.disabled = busy || engineStarting;
+      controls.startEngine.disabled = busy || engineStarting || engineReady;
+      controls.stopEngine.disabled = busy || engineStarting || !engineReady;
+      controls.aiMove.disabled = busy || engineStarting || !engineReady || thinking || gameOver || !aiTurn;
+      controls.reset.disabled = busy || engineStarting;
+
+      if (boardAvailable) {
+        const humanColor = state && state.human_color === "black" ? COLOR.black : COLOR.white;
+        configureMoveInput(humanColor, canHumanMove);
+      }
     }
 
     function updateState(state, options = {}) {
@@ -289,11 +339,10 @@
         chessboard.setOrientation(humanColor);
         renderedOrientation = humanColor;
       }
-      if (boardAvailable) {
-        configureMoveInput(humanColor);
-      }
       const thinkingText = state.ai_thinking ? " | AI thinking" : "";
-      const engineText = `${state.engine_status || "unknown"}${thinkingText} | turn: ${state.turn || "unknown"} | human: ${state.human_color || "white"}`;
+      const readyText = state.engine_ready ? " | ready" : "";
+      const startingText = state.engine_starting ? " | starting" : "";
+      const engineText = `${state.engine_status || "unknown"}${startingText}${readyText}${thinkingText} | turn: ${state.turn || "unknown"} | human: ${state.human_color || "white"}`;
       setText("engine-status", engineText);
       setText("fen", state.fen);
       setText("pgn", state.pgn || state.move_history || "");
@@ -302,6 +351,7 @@
       setText("result", state.result);
       setText("engine-log", state.engine_log);
       setText("message", state.message);
+      syncControls(state);
     }
 
     async function getState() {
@@ -311,6 +361,7 @@
 
     async function postJson(path, payload = {}) {
       busy = true;
+      syncControls(currentState);
       const previousFen = currentState ? currentState.fen : null;
       try {
         const response = await fetch(path, {
@@ -328,6 +379,7 @@
         }
       } finally {
         busy = false;
+        syncControls(currentState);
       }
     }
 
@@ -364,7 +416,7 @@
     }
 
     function canMoveNow() {
-      if (busy || !currentState || currentState.game_over || currentState.ai_thinking) {
+      if (busy || !currentState || !canHumanMoveForState(currentState)) {
         return false;
       }
       if (!boardAvailable) {
@@ -375,6 +427,9 @@
 
     async function sendMove(move) {
       if (!move || !move.from || !move.to) {
+        return;
+      }
+      if (!canMoveNow()) {
         return;
       }
       const promotion = promotionFor(move.from, move.to);
@@ -390,6 +445,9 @@
         return canMoveNow();
       }
       if (event.type === INPUT_EVENT_TYPE.validateMoveInput) {
+        if (!canMoveNow()) {
+          return false;
+        }
         pendingMove = {
           from: event.squareFrom,
           to: event.squareTo

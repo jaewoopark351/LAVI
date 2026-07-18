@@ -56,6 +56,19 @@ class BlockingEngine(FakeEngine):
         return self.bestmove_value
 
 
+class BlockingStartEngine(FakeEngine):
+    def __init__(self, bestmove="e7e5"):
+        super().__init__(bestmove)
+        self.start_entered = threading.Event()
+        self.release_start = threading.Event()
+
+    def start(self):
+        self.start_entered.set()
+        if not self.release_start.wait(2):
+            raise RuntimeError("test start was not released")
+        return super().start()
+
+
 class FailingEngine(FakeEngine):#20260630_kpopmodder
     def bestmove(self, fen, movetime_ms):
         self.bestmove_fens.append(fen)
@@ -113,6 +126,34 @@ class ChessGameControllerTests(unittest.TestCase):
         worker.join(1)
         self.assertFalse(worker.is_alive())
         self.assertEqual("e7e5", result[0]["last_move"])
+
+    def test_human_move_is_rejected_while_engine_is_starting(self):
+        engine = BlockingStartEngine("e7e5")
+        controller = ChessGameController(engine=engine)
+        start_result = []
+        starter = threading.Thread(
+            target=lambda: start_result.append(controller.start_engine()),
+            daemon=True,
+        )
+        starter.start()
+        self.assertTrue(engine.start_entered.wait(1))
+
+        state = controller.apply_human_move("e2", "e4")
+
+        self.assertFalse(state["ok"])
+        self.assertTrue(state["engine_starting"])
+        self.assertFalse(state["engine_ready"])
+        self.assertEqual(chess.Board().fen(), state["fen"])
+        self.assertIn("still starting", state["message"])
+
+        engine.release_start.set()
+        starter.join(1)
+        self.assertFalse(starter.is_alive())
+        self.assertTrue(start_result[0]["engine_ready"])
+
+        ready_state = controller.apply_human_move("e2", "e4")
+        self.assertTrue(ready_state["ok"])
+        self.assertEqual("e7e5", ready_state["last_move"])
 
     def test_ai_bestmove_is_discarded_if_board_changes_while_thinking(self):
         events = []
@@ -188,6 +229,7 @@ class ChessGameControllerTests(unittest.TestCase):
             on_ai_move_applied=events.append,
         )
 
+        controller.start_engine()
         state = controller.new_game()
 
         self.assertTrue(state["ok"])
@@ -202,6 +244,7 @@ class ChessGameControllerTests(unittest.TestCase):
         engine = FakeEngine()
         controller = ChessGameController(engine=engine)
 
+        controller.start_engine()
         controller.new_game()
         controller.reset_or_resign()
 
@@ -222,6 +265,7 @@ class ChessGameControllerTests(unittest.TestCase):
             ai_side="white",
             on_ai_move_applied=events.append,
         )
+        controller.start_engine()
         controller.board = chess.Board("7k/8/8/8/8/8/R7/7K w - - 0 1")
 
         state = controller.apply_ai_move()
@@ -240,6 +284,7 @@ class ChessGameControllerTests(unittest.TestCase):
             on_ai_move_applied=events.append,
         )
 
+        controller.start_engine()
         state = controller.new_game()
 
         self.assertTrue(state["ok"])
@@ -252,6 +297,7 @@ class ChessGameControllerTests(unittest.TestCase):
             human_side="black",
             ai_side="white",
         )
+        controller.start_engine()
         controller.new_game()
         old_event_id = controller.ai_move_event_id
         controller.reset_or_resign()

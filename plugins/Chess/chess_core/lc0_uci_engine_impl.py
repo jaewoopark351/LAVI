@@ -24,6 +24,8 @@ class LC0UCIEngine:
         move_timeout_sec=10.0,
         stop_timeout_sec=2.0,
         log_limit=80,
+        runtime_downloader=None,
+        runtime_download_config=None,
     ):
         self.lc0_path = str(lc0_path or "").strip()
         self.weights_path = str(weights_path or "").strip()
@@ -38,6 +40,8 @@ class LC0UCIEngine:
         self.output_queue = queue.Queue()
         self.write_lock = threading.RLock()
         self.log_lines = []
+        self.runtime_downloader = runtime_downloader
+        self.runtime_download_config = dict(runtime_download_config or {})
 
     @staticmethod
     def parse_bestmove(line):
@@ -54,6 +58,7 @@ class LC0UCIEngine:
             return "LC0 already running."
 
         self._drain_stale_output()
+        self._ensure_runtime_available()
         if not self.lc0_path or not os.path.exists(self.lc0_path):
             raise LC0EngineError(f"lc0.exe not found: {self.lc0_path}")
         if not self.weights_path or not os.path.exists(self.weights_path):
@@ -113,6 +118,21 @@ class LC0UCIEngine:
 
         log_print("[Chess] LC0 ready.")
         return "LC0 ready."
+
+    def _ensure_runtime_available(self):
+        if self.runtime_downloader is None:
+            return None
+        try:
+            result = self.runtime_downloader.ensure_runtime(
+                **self.runtime_download_config
+            )
+        except Exception as e:
+            raise LC0EngineError(f"LC0 runtime download failed: {e}") from e
+        if not result.get("ok", False):
+            raise LC0EngineError(f"LC0 runtime download failed: {result}")
+        if result.get("downloaded"):
+            log_print(f"[Chess] LC0 runtime ready: {result}")
+        return result
 
     def bestmove(self, fen, movetime_ms):
         if not self.is_running():

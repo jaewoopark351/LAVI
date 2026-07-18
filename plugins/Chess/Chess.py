@@ -5,14 +5,25 @@ from html import escape
 import gradio as gr
 
 from core.logger import log_print
+from core.paths import LaviPaths
 from plugins.Chess.chess_core.chess_game_controller import ChessGameController
 from plugins.Chess.chess_core.lc0_uci_engine import LC0UCIEngine
+from plugins.Chess.chess_core.lc0_runtime_downloader import (
+    DEFAULT_LC0_DOWNLOAD_FILES,
+    DEFAULT_LC0_DOWNLOAD_REPO_ID,
+    DEFAULT_LC0_DOWNLOAD_REVISION,
+    DEFAULT_LC0_DOWNLOAD_SUBDIR,
+    DEFAULT_LC0_REQUIRED_FILES,
+    DEFAULT_LC0_RUNTIME_DIR,
+    LC0RuntimeDownloader,
+)
 from plugins.Chess.web.chess_web_server import ChessWebServer
 
 
 #20260628_kpopmodder: Added this plugin as an optional iframe-based Chess UI.
 class Chess:
     def __init__(self):
+        self.paths = LaviPaths()
         self.plugin_root = os.path.dirname(__file__)
         self.config_dir = os.path.join(self.plugin_root, "config")
         self.config_path = os.path.join(self.config_dir, "chess_config.json")
@@ -23,6 +34,7 @@ class Chess:
         self.static_dir = os.path.join(self.plugin_root, "web", "static")
         self.config = self._load_config()
         self.config_message = self._config_message()
+        self.runtime_downloader = LC0RuntimeDownloader()
         self.engine = self._build_engine()
         self.controller = ChessGameController(
             engine=self.engine,
@@ -130,8 +142,8 @@ class Chess:
             return None
 
         return LC0UCIEngine(
-            lc0_path=str(self.config.get("lc0_path", "")),
-            weights_path=str(self.config.get("weights_path", "")),
+            lc0_path=self._resolve_config_path("lc0_path"),
+            weights_path=self._resolve_config_path("weights_path"),
             backend=str(self.config.get("backend", "cuda")),
             cuda_visible_devices=str(
                 self.config.get("cuda_visible_devices", "")
@@ -139,7 +151,56 @@ class Chess:
             init_timeout_sec=self._config_float("init_timeout_sec", 15.0),
             move_timeout_sec=self._config_float("move_timeout_sec", 10.0),
             stop_timeout_sec=self._config_float("stop_timeout_sec", 2.0),
+            runtime_downloader=self.runtime_downloader,
+            runtime_download_config=self._runtime_download_config(),
         )
+
+    def _resolve_config_path(self, key):
+        resolved = self.paths.resolve_path(self.config.get(key, ""))
+        return str(resolved or "")
+
+    def _runtime_download_config(self):
+        return {
+            "runtime_dir": self._lc0_runtime_dir(),
+            "enabled": self._config_bool("auto_download_lc0", True),
+            "repo_id": str(
+                self.config.get(
+                    "lc0_download_repo_id",
+                    DEFAULT_LC0_DOWNLOAD_REPO_ID,
+                )
+                or DEFAULT_LC0_DOWNLOAD_REPO_ID
+            ),
+            "revision": str(
+                self.config.get(
+                    "lc0_download_revision",
+                    DEFAULT_LC0_DOWNLOAD_REVISION,
+                )
+                or DEFAULT_LC0_DOWNLOAD_REVISION
+            ),
+            "subdir": str(
+                self.config.get(
+                    "lc0_download_subdir",
+                    DEFAULT_LC0_DOWNLOAD_SUBDIR,
+                )
+                or DEFAULT_LC0_DOWNLOAD_SUBDIR
+            ),
+            "files": self._config_list(
+                "lc0_download_files",
+                DEFAULT_LC0_DOWNLOAD_FILES,
+            ),
+            "required_files": DEFAULT_LC0_REQUIRED_FILES,
+            "timeout_sec": self._config_float("lc0_download_timeout_sec", 120.0),
+        }
+
+    def _lc0_runtime_dir(self):
+        configured = str(self.config.get("lc0_runtime_dir", "") or "").strip()
+        if configured:
+            resolved = self.paths.resolve_path(configured)
+            return str(resolved or "")
+        lc0_path = self._resolve_config_path("lc0_path")
+        if lc0_path:
+            return os.path.dirname(lc0_path)
+        return str(self.paths.root_path(*DEFAULT_LC0_RUNTIME_DIR.parts))
 
     def _status_markdown(self):
         lines = [
@@ -175,3 +236,11 @@ class Chess:
             return float(self.config.get(key, default))
         except Exception:
             return float(default)
+
+    def _config_list(self, key, default):
+        value = self.config.get(key, default)
+        if isinstance(value, (list, tuple)):
+            return tuple(str(item).strip() for item in value if str(item).strip())
+        if isinstance(value, str):
+            return tuple(part.strip() for part in value.split(",") if part.strip())
+        return tuple(default)

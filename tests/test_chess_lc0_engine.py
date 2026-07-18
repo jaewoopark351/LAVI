@@ -46,6 +46,16 @@ class FakeUCIEngine(LC0UCIEngine):
         return "fake restarted"
 
 
+class FakeRuntimeDownloader:
+    def __init__(self, result):
+        self.result = dict(result)
+        self.calls = []
+
+    def ensure_runtime(self, **kwargs):
+        self.calls.append(kwargs)
+        return dict(self.result)
+
+
 class ChessLC0EngineTests(unittest.TestCase):
     def test_parse_bestmove_with_ponder(self):
         self.assertEqual(
@@ -93,6 +103,43 @@ class ChessLC0EngineTests(unittest.TestCase):
         state = controller.start_engine()
         self.assertFalse(state["ok"])
         self.assertIn("LC0 start failed", state["message"])
+
+    def test_start_ensures_runtime_before_file_checks(self):
+        downloader = FakeRuntimeDownloader({"ok": True, "downloaded": True})
+        engine = LC0UCIEngine(
+            lc0_path=r"C:\missing\lc0.exe",
+            weights_path=r"C:\missing\BT4-it332.pb.gz",
+            runtime_downloader=downloader,
+            runtime_download_config={"runtime_dir": "plugins/Chess/lc0"},
+        )
+
+        with self.assertRaises(LC0EngineError):
+            engine.start()
+
+        self.assertEqual(
+            [{"runtime_dir": "plugins/Chess/lc0"}],
+            downloader.calls,
+        )
+
+    def test_runtime_download_failure_is_actionable(self):
+        downloader = FakeRuntimeDownloader(
+            {
+                "ok": False,
+                "downloaded": False,
+                "error": "lc0_runtime_download_disabled",
+            }
+        )
+        engine = LC0UCIEngine(
+            lc0_path=r"C:\missing\lc0.exe",
+            weights_path=r"C:\missing\BT4-it332.pb.gz",
+            runtime_downloader=downloader,
+            runtime_download_config={"runtime_dir": "plugins/Chess/lc0"},
+        )
+
+        with self.assertRaises(LC0EngineError) as context:
+            engine._ensure_runtime_available()
+
+        self.assertIn("LC0 runtime download failed", str(context.exception))
 
 
 def chess_start_fen():

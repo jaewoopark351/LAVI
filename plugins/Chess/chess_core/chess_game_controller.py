@@ -77,6 +77,8 @@ class ChessGameController:
         self.ai_reaction = ""
         self.ai_move_event_id = 0
         self.ai_thinking = False
+        self.engine_starting = False
+        self.engine_ready = False
         self.on_ai_move_applied = on_ai_move_applied
         self.message = "New game ready."
         self.lock = threading.RLock()
@@ -111,6 +113,10 @@ class ChessGameController:
             if self.board.turn != self.human_color:
                 self.message = "It is not the human turn."
                 return self._state_locked(ok=False)
+            if self.engine is not None and not self._engine_ready_locked():
+                self.message = self._engine_not_ready_message_locked("Human move")
+                log_print(f"[Chess] {self.message}", level="warning")
+                return self._state_locked(ok=False)
 
             move = self._resolve_legal_move(from_square, to_square, promotion)
             if move is None:
@@ -136,6 +142,11 @@ class ChessGameController:
     def apply_human_fen(self, fen):
         ai_move_event = None
         with self.lock:
+            if self.engine is not None and not self._engine_ready_locked():
+                self.message = self._engine_not_ready_message_locked("Human move")
+                log_print(f"[Chess] {self.message}", level="warning")
+                return self._state_locked(ok=False)
+
             move = self._find_legal_move_for_fen_locked(fen)
             if move is None:
                 self.message = "GUI FEN did not match a legal move."
@@ -167,15 +178,28 @@ class ChessGameController:
             if self.engine is None:
                 self.message = "LC0 engine is not configured."
                 return self._state_locked(ok=False)
+            if self.engine_starting:
+                self.message = "LC0 engine is already starting."
+                return self._state_locked(ok=False)
+            if self._engine_ready_locked():
+                self.message = "LC0 already ready."
+                return self._state_locked()
+            self.engine_starting = True
+            self.engine_ready = False
+            self.message = "LC0 starting..."
             engine = self.engine
 
         try:
             message = engine.start()
         except Exception as e:
             with self.lock:
+                self.engine_starting = False
+                self.engine_ready = False
                 self.message = f"LC0 start failed: {e}"
                 return self._state_locked(ok=False)
         with self.lock:
+            self.engine_starting = False
+            self.engine_ready = True
             self.message = message
             return self._state_locked()
 
@@ -184,6 +208,10 @@ class ChessGameController:
             if self.engine is None:
                 self.message = "LC0 engine is not configured."
                 return self._state_locked(ok=False)
+            if self.engine_starting:
+                self.message = "LC0 stop skipped: LC0 engine is still starting."
+                return self._state_locked(ok=False)
+            self.engine_ready = False
             engine = self.engine
 
         try:
@@ -242,8 +270,10 @@ class ChessGameController:
             "human_color": color_name(self.human_color),
             "ai_color": color_name(self.ai_color),
             "ai_thinking": self.ai_thinking,
+            "engine_starting": self.engine_starting,
+            "engine_ready": self._engine_ready_locked(),
             "message": self.message,
-            "engine_status": self.engine_status(),
+            "engine_status": self._engine_status_locked(),
             "engine_log": self.engine_log(),
         }
 
@@ -281,9 +311,8 @@ class ChessGameController:
         return self.board.result(claim_draw=True)
 
     def engine_status(self):
-        if self.engine is None:
-            return "not configured"
-        return self.engine.status_text()
+        with self.lock:
+            return self._engine_status_locked()
 
     def engine_log(self):
         if self.engine is None:
@@ -306,9 +335,10 @@ class ChessGameController:
             return True
 
     def _notify_engine_new_game(self):
-        engine = self.engine
-        if engine is None:
-            return
+        with self.lock:
+            if not self._engine_ready_locked():
+                return
+            engine = self.engine
 
         new_game = getattr(engine, "new_game", None)
         if not callable(new_game):
@@ -334,6 +364,10 @@ class ChessGameController:
                 self.message = "AI move skipped: LC0 engine is not configured."
                 log_print(f"[Chess] {self.message}", level="warning")
                 return self._state_locked(), ai_move_event
+            if not self._engine_ready_locked():
+                self.message = self._engine_not_ready_message_locked("AI move")
+                log_print(f"[Chess] {self.message}", level="warning")
+                return self._state_locked(ok=False), ai_move_event
             if self.ai_thinking:
                 self.message = "AI move skipped: LC0 is already thinking."
                 log_print(f"[Chess] {self.message}", level="warning")
@@ -519,3 +553,31 @@ class ChessGameController:
             callback(dict(event))
         except Exception as e:
             log_print(f"[Chess] AI move callback failed: {e}", level="warning")
+
+    def _engine_ready_locked(self):
+        if self.engine is None or self.engine_starting:
+            return False
+
+        is_running = getattr(self.engine, "is_running", None)
+        if callable(is_running):
+            try:
+                if not is_running():
+                    self.engine_ready = False
+                    return False
+            except Exception:
+                self.engine_ready = False
+                return False
+
+        return bool(self.engine_ready)
+
+    def _engine_status_locked(self):
+        if self.engine is None:
+            return "not configured"
+        if self.engine_starting:
+            return "starting"
+        return self.engine.status_text()
+
+    def _engine_not_ready_message_locked(self, action):
+        if self.engine_starting:
+            return f"{action} skipped: LC0 engine is still starting."
+        return f"{action} skipped: LC0 engine is not ready."

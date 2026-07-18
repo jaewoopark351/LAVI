@@ -118,6 +118,7 @@ plugins/SongPlayer/config/song_player_songs.json
 plugins/SongPlayer/songs/
 plugins/Chess/config/chess_config.json
 plugins/Chess/**/*.pb.gz
+plugins/Chess/lc0-v0.32.1-windows-gpu-nvidia-cuda12/
 plugins/StarCraftRemastered/config/starcraft_remastered_config.json
 plugins/StarCraft116/config/starcraft116_config.json
 plugins/StarCraft2/config_starcraft2.json
