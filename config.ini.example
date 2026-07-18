@@ -39,3 +39,12 @@ enabled = true
 provider = rule
 timeout_sec = 2
 fallback_to_keyword = true
+
+[Gradio]
+; #20260718_kpopmodder: Keep the UI port configurable while preserving the old default.
+server_name = 127.0.0.1
+server_port = 47860
+auto_increment_port = true
+port_max_attempts = 100
+open_browser_on_start = true
+share = false

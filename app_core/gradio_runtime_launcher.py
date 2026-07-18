@@ -1,5 +1,12 @@
 #20260718_kpopmodder: Keep Gradio runtime launch/shutdown ownership outside AppComposer.
-from app_core.gradio_launch import find_available_port
+from app_core.gradio_launch import (
+    DEFAULT_GRADIO_HOST,
+    DEFAULT_GRADIO_OPEN_BROWSER,
+    DEFAULT_GRADIO_PORT_MAX_ATTEMPTS,
+    DEFAULT_GRADIO_SHARE,
+    DEFAULT_GRADIO_START_PORT,
+    find_available_port,
+)
 from core.logger import log_print
 
 
@@ -14,17 +21,24 @@ class GradioRuntimeLauncher:
         interface,
         *,
         runtime_lifecycle=None,
-        host="127.0.0.1",
-        start_port=7860,
-        share=False,
+        host=DEFAULT_GRADIO_HOST,
+        start_port=DEFAULT_GRADIO_START_PORT,
+        max_attempts=DEFAULT_GRADIO_PORT_MAX_ATTEMPTS,
+        open_browser=DEFAULT_GRADIO_OPEN_BROWSER,
+        share=DEFAULT_GRADIO_SHARE,
     ):
-        port = self.port_finder(host=host, start_port=start_port)
+        port = self.port_finder(
+            host=host,
+            start_port=start_port,
+            max_attempts=max_attempts,
+        )
         self.logger(f"[Gradio] Starting at http://{host}:{port}/")
         try:
             interface.queue().launch(
                 server_name=host,
                 server_port=port,
                 share=share,
+                inbrowser=open_browser,
             )
         except KeyboardInterrupt:
             self.logger("[Gradio] KeyboardInterrupt received; shutting down.")

@@ -8,6 +8,7 @@ from app_core.composition_core.app_ui_composition_service import (
     AppUiCompositionService,
 )
 from app_core.core_component_composition import CoreComponentCompositionService
+from app_core.gradio_launch import load_gradio_launch_options
 from app_core.gradio_runtime_launcher import GradioRuntimeLauncher
 from app_core.memory_bootstrap import bootstrap_memory
 from app_core.extensions import (
@@ -22,6 +23,7 @@ from app_core.optional_plugin_composition import OptionalPluginCompositionServic
 from app_core.runtime_lifecycle import RuntimeLifecycle
 from app_core.screen_router_bootstrap import build_screen_question_router
 from core.global_state import GlobalKeys, global_state
+from core.config_manager import config_manager
 from core.gpu_device_manager import gpu_device_manager
 from core.import_path import ensure_import_path
 from core.logger import log_print
@@ -76,6 +78,7 @@ class AppComposer:
         self.component_wiring_service = AppComponentWiringService()
         self.ui_composition_service = AppUiCompositionService()
         self.gradio_runtime_launcher = GradioRuntimeLauncher()
+        self.gradio_launch_config_loader = config_manager.load_section
         self.core_component_composition_service = CoreComponentCompositionService()
         self.optional_plugin_composition_service = OptionalPluginCompositionService(
             self.current_module_directory,
@@ -353,7 +356,11 @@ class AppComposer:
         self.runtime_lifecycle.start()
 
     def launch_gradio(self):
+        gradio_launch_options = load_gradio_launch_options(
+            self.gradio_launch_config_loader("Gradio")
+        )
         self.gradio_runtime_launcher.launch(
             self.main_interface,
             runtime_lifecycle=self.runtime_lifecycle,
+            **gradio_launch_options,
         )

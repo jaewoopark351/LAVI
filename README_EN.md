@@ -1130,10 +1130,12 @@ Set-Location "C:\Vtuber_Souorce_Code\LAVI"
 python main.py
 ```
 
-Open:
+The browser opens automatically.
+If you need to open the UI manually, use the default address below.
+If the port is already in use, LAVI automatically moves to the next port such as 47861 or 47862.
 
 ```text
-http://127.0.0.1:7860
+http://127.0.0.1:47860
 ```
 
 ---

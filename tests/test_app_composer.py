@@ -299,12 +299,28 @@ class AppComposerTests(unittest.TestCase):
         composer.main_interface = object()
         composer.runtime_lifecycle = object()
         composer.gradio_runtime_launcher = mock.Mock()
+        composer.gradio_launch_config_loader = mock.Mock(
+            return_value={
+                "server_name": "127.0.0.1",
+                "server_port": "47865",
+                "auto_increment_port": "true",
+                "port_max_attempts": "7",
+                "open_browser_on_start": "true",
+                "share": "false",
+            },
+        )
 
         composer.launch_gradio()
 
+        composer.gradio_launch_config_loader.assert_called_once_with("Gradio")
         composer.gradio_runtime_launcher.launch.assert_called_once_with(
             composer.main_interface,
             runtime_lifecycle=composer.runtime_lifecycle,
+            host="127.0.0.1",
+            start_port=47865,
+            max_attempts=7,
+            open_browser=True,
+            share=False,
         )
 
     def test_core_component_composition_service_builds_core_components(self):
