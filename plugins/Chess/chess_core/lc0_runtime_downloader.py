@@ -46,6 +46,11 @@ DEFAULT_LC0_REQUIRED_FILES = (
     "mimalloc-redirect.dll",
 )
 
+DOWNLOAD_CHUNK_SIZE_BYTES = 1024 * 1024
+DOWNLOAD_PROGRESS_BAR_WIDTH = 10
+DOWNLOAD_PROGRESS_PERCENT_STEP = 10
+DOWNLOAD_PROGRESS_UNKNOWN_TOTAL_STEP_BYTES = 50 * 1024 * 1024
+
 
 class LC0RuntimeDownloader:
     #20260718_kpopmodder: Keeps LC0 binaries out of git while repairing the repo-local runtime on demand.
@@ -228,14 +233,115 @@ class LC0RuntimeDownloader:
             urllib.request.urlopen(request, timeout=float(timeout_sec)) as response,
             open(temp_path, "wb") as output,
         ):
+            total_bytes = self._response_content_length(response)
+            downloaded_bytes = 0
+            last_logged_percent = -1
+            last_logged_bytes = 0
             while True:
-                chunk = response.read(1024 * 1024)
+                chunk = response.read(DOWNLOAD_CHUNK_SIZE_BYTES)
                 if not chunk:
                     break
                 output.write(chunk)
+                downloaded_bytes += len(chunk)
+                last_logged_percent, last_logged_bytes = (
+                    self._log_download_progress_if_needed(
+                        filename=destination_path.name,
+                        downloaded_bytes=downloaded_bytes,
+                        total_bytes=total_bytes,
+                        last_logged_percent=last_logged_percent,
+                        last_logged_bytes=last_logged_bytes,
+                    )
+                )
+            self._log_download_progress_if_needed(
+                filename=destination_path.name,
+                downloaded_bytes=downloaded_bytes,
+                total_bytes=total_bytes,
+                last_logged_percent=last_logged_percent,
+                last_logged_bytes=last_logged_bytes,
+                force=True,
+            )
         if not self._file_ready(temp_path):
             raise RuntimeError(f"downloaded_empty_file: {destination_path.name}")
         os.replace(temp_path, destination_path)
+
+    def _response_content_length(self, response: Any) -> Optional[int]:
+        try:
+            value = response.headers.get("Content-Length")
+        except Exception:
+            try:
+                value = response.getheader("Content-Length")
+            except Exception:
+                value = None
+        try:
+            total = int(str(value or "").strip())
+        except (TypeError, ValueError):
+            return None
+        return total if total > 0 else None
+
+    def _log_download_progress_if_needed(
+        self,
+        *,
+        filename: str,
+        downloaded_bytes: int,
+        total_bytes: Optional[int],
+        last_logged_percent: int,
+        last_logged_bytes: int,
+        force: bool = False,
+    ) -> tuple[int, int]:
+        if total_bytes:
+            percent = min(100, int(downloaded_bytes * 100 / total_bytes))
+            milestone = min(
+                100,
+                (percent // DOWNLOAD_PROGRESS_PERCENT_STEP)
+                * DOWNLOAD_PROGRESS_PERCENT_STEP,
+            )
+            if force:
+                milestone = 100
+            if milestone <= 0 or milestone <= last_logged_percent:
+                return last_logged_percent, last_logged_bytes
+            log_print(
+                self._format_progress_line(
+                    filename,
+                    milestone,
+                    downloaded_bytes,
+                    total_bytes,
+                )
+            )
+            return milestone, last_logged_bytes
+
+        if (
+            not force
+            and downloaded_bytes - last_logged_bytes
+            < DOWNLOAD_PROGRESS_UNKNOWN_TOTAL_STEP_BYTES
+        ):
+            return last_logged_percent, last_logged_bytes
+
+        log_print(
+            "[ChessLC0RuntimeDownloader] "
+            f"{filename} downloaded {self._format_mb(downloaded_bytes)}"
+        )
+        return last_logged_percent, downloaded_bytes
+
+    def _format_progress_line(
+        self,
+        filename: str,
+        percent: int,
+        downloaded_bytes: int,
+        total_bytes: int,
+    ) -> str:
+        filled = min(
+            DOWNLOAD_PROGRESS_BAR_WIDTH,
+            max(0, int(percent * DOWNLOAD_PROGRESS_BAR_WIDTH / 100)),
+        )
+        bar = "#" * filled + "-" * (DOWNLOAD_PROGRESS_BAR_WIDTH - filled)
+        return (
+            "[ChessLC0RuntimeDownloader] "
+            f"{filename} [{bar}] {percent}% "
+            f"{self._format_mb(downloaded_bytes)} / {self._format_mb(total_bytes)}"
+        )
+
+    def _format_mb(self, value_bytes: int) -> str:
+        return f"{int(round(max(0, int(value_bytes)) / (1024 * 1024)))} MB"
 
     def _safe_destination(
         self,

@@ -3,6 +3,7 @@ import shutil
 import unittest
 import uuid
 from pathlib import Path
+from unittest import mock
 
 from plugins.Chess.chess_core.lc0_runtime_downloader import (
     DEFAULT_LC0_DOWNLOAD_REPO_ID,
@@ -99,6 +100,62 @@ class ChessLC0RuntimeDownloaderTests(unittest.TestCase):
 
         self.assertFalse(result["ok"])
         self.assertEqual("lc0_runtime_download_failed", result["error"])
+
+    def test_download_file_logs_percent_progress_bar(self):
+        runtime_dir = self._make_temp_dir()
+        destination = runtime_dir / "cublasLt64_12.dll"
+        chunks = [b"a" * 30, b"b" * 30, b"c" * 40]
+
+        class FakeResponse:
+            def __init__(self):
+                self.headers = {"Content-Length": "100"}
+                self._chunks = list(chunks)
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, traceback):
+                return False
+
+            def read(self, size):
+                if not self._chunks:
+                    return b""
+                return self._chunks.pop(0)
+
+        logged = []
+
+        with (
+            mock.patch(
+                "plugins.Chess.chess_core.lc0_runtime_downloader.urllib.request.urlopen",
+                return_value=FakeResponse(),
+            ),
+            mock.patch(
+                "plugins.Chess.chess_core.lc0_runtime_downloader.log_print",
+                side_effect=logged.append,
+            ),
+        ):
+            LC0RuntimeDownloader()._download_file(
+                url="https://example.test/cublasLt64_12.dll",
+                destination=str(destination),
+                timeout_sec=1,
+            )
+
+        self.assertEqual(b"a" * 30 + b"b" * 30 + b"c" * 40, destination.read_bytes())
+        self.assertIn(
+            "[ChessLC0RuntimeDownloader] cublasLt64_12.dll "
+            "[###-------] 30% 0 MB / 0 MB",
+            logged,
+        )
+        self.assertIn(
+            "[ChessLC0RuntimeDownloader] cublasLt64_12.dll "
+            "[######----] 60% 0 MB / 0 MB",
+            logged,
+        )
+        self.assertIn(
+            "[ChessLC0RuntimeDownloader] cublasLt64_12.dll "
+            "[##########] 100% 0 MB / 0 MB",
+            logged,
+        )
 
 
 if __name__ == "__main__":
