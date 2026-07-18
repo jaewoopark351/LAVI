@@ -8,6 +8,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from plugins.Chess.chess_core.chess_reaction_policy import (
     CHESS_AI_REACTION_SYSTEM_PROMPT,
     build_chess_ai_reaction_tts_text,
+    build_chess_ai_reaction_system_prompt,
     build_chess_fallback_reaction,
     should_request_openai_chess_reaction,
 )
@@ -56,8 +57,7 @@ class ChessReactionPolicyTests(unittest.TestCase):
             build_chess_ai_reaction_tts_text(event, "cold line: rook a3"),
         )
 
-    def test_check_prompt_requests_cold_banmal_tone(self):
-        self.assertIn("casual banmal", CHESS_AI_REACTION_SYSTEM_PROMPT)
+    def test_check_prompt_requests_cold_game_tone(self):
         self.assertIn("cold", CHESS_AI_REACTION_SYSTEM_PROMPT)
         self.assertIn("ruthless", CHESS_AI_REACTION_SYSTEM_PROMPT)
         self.assertIn("No warm praise", CHESS_AI_REACTION_SYSTEM_PROMPT)
@@ -73,6 +73,15 @@ class ChessReactionPolicyTests(unittest.TestCase):
         self.assertIn("개잘 핵", CHESS_AI_REACTION_SYSTEM_PROMPT)
         self.assertIn("허접", CHESS_AI_REACTION_SYSTEM_PROMPT)
         self.assertIn("수 읽는 척은 그만해", CHESS_AI_REACTION_SYSTEM_PROMPT)
+
+    def test_check_prompt_follows_selected_speech_style(self):
+        polite_prompt = build_chess_ai_reaction_system_prompt("polite")
+        casual_prompt = build_chess_ai_reaction_system_prompt("casual")
+
+        self.assertIn("존댓말", polite_prompt)
+        self.assertIn("반말", casual_prompt)
+        self.assertIn("Return exactly one short Korean sentence", polite_prompt)
+        self.assertIn("Return exactly one short Korean sentence", casual_prompt)
 
     def test_check_fallback_reaction_says_check_before_move(self):
         reaction = build_chess_fallback_reaction({

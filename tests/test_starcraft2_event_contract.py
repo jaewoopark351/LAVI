@@ -243,6 +243,22 @@ class StarCraft2EventContractTests(unittest.TestCase):
         self.assertEqual("game_won", stored.event_type)
         tts_adapter.speak.assert_called_once_with("내가 이번 경기를 이겼어요.")
 
+    def test_reaction_runtime_applies_casual_speech_style(self):
+        llm = mock.Mock()
+        llm.speech_style_mode = "casual"
+        tts_adapter = mock.Mock()
+        tts_adapter.speak.return_value = True
+        runtime = StarCraft2ReactionRuntime(
+            llm=llm,
+            tts=None,
+            policy=StarCraft2ReactionPolicy(min_interval_sec=0),
+            tts_adapter=tts_adapter,
+        )
+
+        runtime.handle_event(StarCraft2Event("game_won", {"result": "Player2Win"}))
+
+        tts_adapter.speak.assert_called_once_with("내가 이번 경기를 이겼어.")
+
     def test_legacy_status_callback_delegates_to_typed_core(self):
         runtime = StarCraft2ReactionRuntime(llm=None, tts=None)
         runtime.handle_event = mock.Mock(return_value=True)

@@ -2,6 +2,10 @@
 import unittest
 
 from llm_core import LLM
+from llm_core.speech_style import (
+    apply_game_reaction_speech_style,
+    build_game_reaction_system_prompt,
+)
 
 
 class LLMSpeechStyleTests(unittest.TestCase):
@@ -19,6 +23,8 @@ class LLMSpeechStyleTests(unittest.TestCase):
         self.assertIn("기본 프롬프트", prompt)
         self.assertIn("[Speech Style]", prompt)
         self.assertIn("존댓말", prompt)
+        self.assertIn("캐릭터 프롬프트의 기본 말투와 예시보다 우선", prompt)
+        self.assertIn("반말 종결을 쓰지 말고", prompt)
 
     def test_casual_mode_appends_casual_instruction(self):
         llm = self.make_llm_without_plugins("casual")
@@ -28,6 +34,7 @@ class LLMSpeechStyleTests(unittest.TestCase):
         self.assertIn("기본 프롬프트", prompt)
         self.assertIn("[Speech Style]", prompt)
         self.assertIn("반말", prompt)
+        self.assertIn("캐릭터 프롬프트의 기본 말투와 예시보다 우선", prompt)
 
     def test_runtime_abilities_are_appended_even_without_base_prompt(self):
         llm = self.make_llm_without_plugins("casual")
@@ -49,6 +56,28 @@ class LLMSpeechStyleTests(unittest.TestCase):
 
         self.assertEqual("casual", llm.normalize_speech_style("반말"))
         self.assertEqual("polite", llm.normalize_speech_style("존댓말"))
+
+    def test_game_reaction_prompt_uses_selected_speech_style(self):
+        polite_prompt = build_game_reaction_system_prompt("base", "polite")
+        casual_prompt = build_game_reaction_system_prompt("base", "casual")
+
+        self.assertIn("base", polite_prompt)
+        self.assertIn("존댓말", polite_prompt)
+        self.assertIn("반말", casual_prompt)
+
+    def test_game_reaction_text_can_be_polished_or_relaxed(self):
+        self.assertEqual(
+            "제가 이번 경기를 이겼어요.",
+            apply_game_reaction_speech_style("내가 이번 경기를 이겼어.", "polite"),
+        )
+        self.assertEqual(
+            "제 드라군이 포지를 박살내고 있어요.",
+            apply_game_reaction_speech_style("내 드라군이 포지를 박살내고 있어.", "polite"),
+        )
+        self.assertEqual(
+            "내가 이번 경기를 이겼어.",
+            apply_game_reaction_speech_style("내가 이번 경기를 이겼어요.", "casual"),
+        )
 
 
 if __name__ == "__main__":

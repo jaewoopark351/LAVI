@@ -4,6 +4,8 @@ import json
 import re
 import time
 
+from llm_core.speech_style import build_game_reaction_system_prompt
+
 from .starcraft116_reaction_units import (
     find_starcraft116_unit_mention as _find_starcraft116_unit_mention,
     starcraft116_base_type as _starcraft116_base_type,
@@ -12,9 +14,9 @@ from .starcraft116_reaction_units import (
 )
 
 
-STARCRAFT116_REACTION_SYSTEM_PROMPT = (
+_STARCRAFT116_REACTION_BASE_SYSTEM_PROMPT = (
     "You are LAV's Korean AI VTuber reacting to StarCraft 1.16 BWAPI status.\n"
-    "Return exactly one short Korean sentence in casual banmal.\n"
+    "Return exactly one short Korean sentence.\n"
     "Do not include JSON, process IDs, file paths, or long analysis.\n"
     "For game_event, speak as if you are the one playing through Stardust/BWAPI, "
     "not as a spectator coaching the user.\n"
@@ -40,6 +42,17 @@ STARCRAFT116_REACTION_SYSTEM_PROMPT = (
     "Never claim the bot is playing well unless the event only says the game "
     "is running; this status does not include strategy or map control."
 )
+
+
+def build_starcraft116_reaction_system_prompt(speech_style_source=None):
+    return build_game_reaction_system_prompt(
+        _STARCRAFT116_REACTION_BASE_SYSTEM_PROMPT,
+        speech_style_source,
+        default_mode="casual",
+    )
+
+
+STARCRAFT116_REACTION_SYSTEM_PROMPT = build_starcraft116_reaction_system_prompt("casual")
 
 
 LOG_ONLY_STATUS_PHASES = {

@@ -1,9 +1,10 @@
 #20260630_kpopmodder: Keep Chess reaction prompt and TTS wording policy isolated from the Gradio main wiring.
+from llm_core.speech_style import build_game_reaction_system_prompt
 
 
-CHESS_AI_REACTION_SYSTEM_PROMPT = (
+_CHESS_AI_REACTION_BASE_SYSTEM_PROMPT = (
     "You are LAV's Korean AI VTuber reacting to a chess check or checkmate.\n"
-    "Return exactly one short Korean sentence in casual banmal.\n"
+    "Return exactly one short Korean sentence.\n"
     "Your tone is cold, ruthless, and dry. No warm praise.\n"
     "Taunting is allowed for check and checkmate.\n"
     "If you mention the move, use display_text exactly.\n"
@@ -21,6 +22,16 @@ CHESS_AI_REACTION_SYSTEM_PROMPT = (
     "'체크메이트. 판 읽는 속도가 너무 늦어.'\n"
     "For check, include the Korean word '체크' before the taunt."
 )
+
+def build_chess_ai_reaction_system_prompt(speech_style_source=None):
+    return build_game_reaction_system_prompt(
+        _CHESS_AI_REACTION_BASE_SYSTEM_PROMPT,
+        speech_style_source,
+        default_mode="casual",
+    )
+
+
+CHESS_AI_REACTION_SYSTEM_PROMPT = build_chess_ai_reaction_system_prompt("casual")
 
 
 def should_request_openai_chess_reaction(event):

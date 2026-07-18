@@ -1298,6 +1298,33 @@ class StarCraft116PluginTests(unittest.TestCase):
             "스타 떴어, Stardust도 제대로 물렸네."
         )
 
+    def test_starcraft116_reaction_runtime_applies_polite_speech_style(self):
+        from plugins.StarCraft116.starcraft116_core.starcraft116_reaction_runtime import (
+            run_starcraft116_status_reaction,
+        )
+
+        llm = mock.Mock()
+        llm.speech_style_mode = "polite"
+        llm.generate_text_only.return_value = "스타 떴어, Stardust도 제대로 물렸네."
+        tts = mock.Mock()
+        event = {
+            "phase": "game_running",
+            "severity": "ok",
+            "configured_ai_binary": "Stardust.dll",
+            "readiness": {},
+            "messages": [],
+            "next_actions": [],
+            "recent_relevant_lines": [],
+        }
+
+        run_starcraft116_status_reaction(llm, tts, event)
+
+        system_prompt = llm.generate_text_only.call_args.args[1]
+        self.assertIn("존댓말", system_prompt)
+        tts.receive_input.assert_called_once_with(
+            "스타 떴어요, Stardust도 제대로 물렸네요."
+        )
+
     def test_starcraft116_reaction_runtime_keeps_active_warning_idempotent(self):
         from plugins.StarCraft116.starcraft116_core.starcraft116_reaction_runtime import (
             run_starcraft116_status_reaction,

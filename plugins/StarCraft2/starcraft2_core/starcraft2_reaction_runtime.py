@@ -2,6 +2,7 @@
 from __future__ import annotations
 from typing import Any, Dict, Union
 from core.logger import log_print
+from llm_core.speech_style import apply_game_reaction_speech_style
 from .sc2_telemetry_registry import (
     SC2_BUILDING_UNIT_TYPE_IDS,
     unit_speak_name,
@@ -105,6 +106,7 @@ class StarCraft2ReactionRuntime:
         text = build_starcraft2_reaction_text(normalized)
         if not text:
             text = str(normalized.details.get("message") or "").strip()
+        text = apply_game_reaction_speech_style(text, self.llm)
         spoken = self.tts_adapter.speak(text)
         if spoken and event_type in self.RESULT_EVENT_TYPES:
             self._spoken_result_event_type = event_type

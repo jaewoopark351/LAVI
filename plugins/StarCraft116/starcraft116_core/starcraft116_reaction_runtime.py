@@ -3,10 +3,11 @@ import threading
 
 from core.event_manager import event_manager, EventType
 from core.logger import log_print
+from llm_core.speech_style import apply_game_reaction_speech_style
 from .starcraft116_reaction_policy import (
-    STARCRAFT116_REACTION_SYSTEM_PROMPT,
     build_starcraft116_fallback_reaction,
     build_starcraft116_reaction_tts_text,
+    build_starcraft116_reaction_system_prompt,
     build_starcraft116_reaction_user_message,
     should_speak_starcraft116_event,
 )
@@ -53,7 +54,13 @@ def _handle_starcraft116_reaction_boundary(event):#20260705_kpopmodder
         event_manager.trigger(EventType.INTERRUPT)
 
 
-def speak_starcraft116_reaction(tts, event, reaction, reaction_generation=None):
+def speak_starcraft116_reaction(
+    tts,
+    event,
+    reaction,
+    reaction_generation=None,
+    speech_style_source=None,
+):
     if tts is None:
         return
     if (
@@ -71,6 +78,10 @@ def speak_starcraft116_reaction(tts, event, reaction, reaction_generation=None):
         return
 
     tts_text = build_starcraft116_reaction_tts_text(event, reaction)
+    tts_text = apply_game_reaction_speech_style(
+        tts_text,
+        speech_style_source,
+    )
     if not tts_text:
         return
 
@@ -85,7 +96,7 @@ def run_starcraft116_status_reaction(llm, tts, event, reaction_generation=None):
     try:
         raw_reaction = llm.generate_text_only(
             build_starcraft116_reaction_user_message(event),
-            STARCRAFT116_REACTION_SYSTEM_PROMPT,
+            build_starcraft116_reaction_system_prompt(llm),
             preferred_provider_name="Hybrid_OpenAI_LLM",
         )
         if not raw_reaction or str(raw_reaction).startswith("[Hybrid_OpenAI_LLM"):
@@ -106,6 +117,7 @@ def run_starcraft116_status_reaction(llm, tts, event, reaction_generation=None):
             event,
             reaction,
             reaction_generation=reaction_generation,
+            speech_style_source=llm,
         )
     except Exception as e:
         if (
@@ -124,6 +136,7 @@ def run_starcraft116_status_reaction(llm, tts, event, reaction_generation=None):
             event,
             fallback_reaction,
             reaction_generation=reaction_generation,
+            speech_style_source=llm,
         )
 
 
