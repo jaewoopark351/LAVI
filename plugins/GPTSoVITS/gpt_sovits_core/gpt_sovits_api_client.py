@@ -21,7 +21,8 @@ class GPTSoVITSApiClient:#20260619_kpopmodder
         text_language,
         ref_audio_path,
         prompt_text,
-        prompt_language
+        prompt_language,
+        inference_options=None
     ):
         text = text.strip()
 
@@ -46,6 +47,7 @@ class GPTSoVITSApiClient:#20260619_kpopmodder
             "media_type": "wav",
             "streaming_mode": "false"
         }
+        params.update(self._clean_inference_options(inference_options))
 
         log_print(f"[GPTSoVITS_TTS] Requesting GPT-SoVITS: {self.gpt_sovits_url}")
 
@@ -72,7 +74,8 @@ class GPTSoVITSApiClient:#20260619_kpopmodder
         text_language,
         ref_audio_path,
         prompt_text,
-        prompt_language
+        prompt_language,
+        inference_options=None
     ):
         wav_filename = os.path.join(
             self.current_module_directory,
@@ -86,7 +89,8 @@ class GPTSoVITSApiClient:#20260619_kpopmodder
                 text_language=text_language,
                 ref_audio_path=ref_audio_path,
                 prompt_text=prompt_text,
-                prompt_language=prompt_language
+                prompt_language=prompt_language,
+                inference_options=inference_options
             )
 
             audio = AudioSegment.from_wav(wav_filename)
@@ -102,3 +106,25 @@ class GPTSoVITSApiClient:#20260619_kpopmodder
                     log_print(f"[GPTSoVITS_TTS] temp deleted: {wav_filename}")
             except Exception as e:
                 log_print(f"[GPTSoVITS_TTS] temp delete failed: {e}")
+
+    def _clean_inference_options(self, inference_options):
+        if not inference_options:
+            return {}
+
+        cleaned = {}
+        float_keys = (
+            "speed_factor",
+            "top_p",
+            "temperature",
+            "repetition_penalty",
+        )
+        for key in float_keys:
+            value = inference_options.get(key)
+            if value is not None:
+                cleaned[key] = float(value)
+
+        top_k = inference_options.get("top_k")
+        if top_k is not None:
+            cleaned["top_k"] = int(top_k)
+
+        return cleaned

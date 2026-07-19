@@ -46,6 +46,12 @@ class GPTSoVITSTTS:#20260615_kpopmodder
 
         self.text_language = "ko"
         self.prompt_language = "ko"
+        #20260720_kpopmodder: Expose GPT-SoVITS API inference controls without changing server defaults.
+        self.speed_factor = 1.0
+        self.top_k = 15
+        self.top_p = 1.0
+        self.temperature = 1.0
+        self.repetition_penalty = 1.35
 
         self.prompt_text = (
             "진짜 이때만큼 흥분했던 기억이 없는 것 같아요.\n"
@@ -248,7 +254,8 @@ class GPTSoVITSTTS:#20260615_kpopmodder
             text_language=self.text_language,
             ref_audio_path=self.ref_audio_path,
             prompt_text=self.prompt_text,
-            prompt_language=self.prompt_language
+            prompt_language=self.prompt_language,
+            inference_options=self.inference_options()
         )
 
     def synthesize_to_bytes(self, text):
@@ -257,8 +264,37 @@ class GPTSoVITSTTS:#20260615_kpopmodder
             text_language=self.text_language,
             ref_audio_path=self.ref_audio_path,
             prompt_text=self.prompt_text,
-            prompt_language=self.prompt_language
+            prompt_language=self.prompt_language,
+            inference_options=self.inference_options()
         )
+
+    def set_inference_options(
+        self,
+        speed_factor=None,
+        temperature=None,
+        top_p=None,
+        top_k=None,
+        repetition_penalty=None
+    ):
+        if speed_factor is not None:
+            self.speed_factor = float(speed_factor)
+        if temperature is not None:
+            self.temperature = float(temperature)
+        if top_p is not None:
+            self.top_p = float(top_p)
+        if top_k is not None:
+            self.top_k = int(top_k)
+        if repetition_penalty is not None:
+            self.repetition_penalty = float(repetition_penalty)
+
+    def inference_options(self):
+        return {
+            "speed_factor": self.speed_factor,
+            "top_k": self.top_k,
+            "top_p": self.top_p,
+            "temperature": self.temperature,
+            "repetition_penalty": self.repetition_penalty,
+        }
 
     def set_gpt_weight_by_name(self, name):
         self.model_manager.set_gpt_weight_by_name(name)

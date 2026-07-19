@@ -57,6 +57,22 @@ class GPTSoVITSSettingsController:#20260616_kpopmodder
     def on_prompt_text_change(self, value):
         self.gpt_sovits.prompt_text = value.strip()
 
+    def on_inference_options_change(
+        self,
+        speed_factor,
+        temperature,
+        top_p,
+        top_k,
+        repetition_penalty
+    ):
+        self.gpt_sovits.set_inference_options(
+            speed_factor=speed_factor,
+            temperature=temperature,
+            top_p=top_p,
+            top_k=top_k,
+            repetition_penalty=repetition_penalty
+        )
+
     def on_use_rvc_change(self, use):
         self.set_use_rvc_callback(use)
         log_print(f"[GPTSoVITSSettingsController] use_rvc={use}")

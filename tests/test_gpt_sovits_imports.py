@@ -1,6 +1,6 @@
 import sys
-import tempfile
 import unittest
+import uuid
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -9,6 +9,16 @@ from unittest.mock import Mock, patch
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+
+TEST_TEMP_ROOT = PROJECT_ROOT / "test" / "test_Isolation"
+
+
+def make_test_temp_dir():
+    #20260720_kpopmodder: Keep GPT-SoVITS test artifacts inside the repo isolation directory.
+    TEST_TEMP_ROOT.mkdir(parents=True, exist_ok=True)
+    temp_path = TEST_TEMP_ROOT / f"gpt_sovits_imports_{uuid.uuid4().hex}"
+    temp_path.mkdir()
+    return temp_path
 
 
 from plugin_system.interfaces import TTSPluginInterface
@@ -87,6 +97,86 @@ class GPTSoVITSImportTests(unittest.TestCase):
         self.assertEqual(tts.model_manager.gpt_sovits_url, new_url)
         self.assertEqual(tts.api_client.gpt_sovits_url, new_url)
 
+    def test_tts_has_gpt_sovits_api_inference_defaults(self):
+        tts = GPTSoVITSTTS()
+
+        self.assertEqual(1.0, tts.speed_factor)
+        self.assertEqual(15, tts.top_k)
+        self.assertEqual(1.0, tts.top_p)
+        self.assertEqual(1.0, tts.temperature)
+        self.assertEqual(1.35, tts.repetition_penalty)
+
+    def test_tts_passes_inference_options_to_api_client(self):
+        tts = GPTSoVITSTTS()
+        tts.api_client = Mock()
+        tts.api_client.synthesize_to_bytes.return_value = b"wav"
+
+        tts.set_inference_options(
+            speed_factor=0.92,
+            temperature=0.8,
+            top_p=0.9,
+            top_k=12,
+            repetition_penalty=1.35,
+        )
+        result = tts.synthesize_to_bytes("hello")
+
+        self.assertEqual(b"wav", result)
+        tts.api_client.synthesize_to_bytes.assert_called_once_with(
+            text="hello",
+            text_language="ko",
+            ref_audio_path=tts.ref_audio_path,
+            prompt_text=tts.prompt_text,
+            prompt_language="ko",
+            inference_options={
+                "speed_factor": 0.92,
+                "top_k": 12,
+                "top_p": 0.9,
+                "temperature": 0.8,
+                "repetition_penalty": 1.35,
+            },
+        )
+
+    def test_api_client_sends_inference_options(self):
+        temp_path = make_test_temp_dir()
+        ref_path = temp_path / "ref.wav"
+        output_path = temp_path / "out.wav"
+        ref_path.write_bytes(b"ref")
+
+        response = Mock()
+        response.status_code = 200
+        response.content = b"wav"
+        client = GPTSoVITSApiClient(
+            current_module_directory=str(temp_path),
+            gpt_sovits_url="http://127.0.0.1:9880/tts",
+        )
+
+        with patch(
+            "plugins.GPTSoVITS.gpt_sovits_core.gpt_sovits_api_client.requests.get",
+            return_value=response,
+        ) as get_mock:
+            client.synthesize_to_file(
+                text="hello",
+                output_path=str(output_path),
+                text_language="ko",
+                ref_audio_path=str(ref_path),
+                prompt_text="prompt",
+                prompt_language="ko",
+                inference_options={
+                    "speed_factor": 0.92,
+                    "top_k": 12,
+                    "top_p": 0.9,
+                    "temperature": 0.8,
+                    "repetition_penalty": 1.35,
+                },
+            )
+
+        params = get_mock.call_args.kwargs["params"]
+        self.assertEqual(0.92, params["speed_factor"])
+        self.assertEqual(12, params["top_k"])
+        self.assertEqual(0.9, params["top_p"])
+        self.assertEqual(0.8, params["temperature"])
+        self.assertEqual(1.35, params["repetition_penalty"])
+
     def test_server_manager_passes_cuda_visible_devices_to_child_env(self):#20260626_kpopmodder
         config_manager = Mock()
         config_manager.check_install.return_value = True
@@ -162,9 +252,7 @@ class GPTSoVITSImportTests(unittest.TestCase):
         self.assertTrue(diagnostics["process_running"])
 
     def test_config_manager_validates_local_cuda_visible_devices(self):#20260626_kpopmodder
-        temp_dir = tempfile.TemporaryDirectory()
-        self.addCleanup(temp_dir.cleanup)
-        config_dir = Path(temp_dir.name)
+        config_dir = make_test_temp_dir()
         config_path = config_dir / "gpt_sovits_config.json"
         config_path.write_text(
             '{"gpt_sovits_root": "", "cuda_visible_devices": "1"}',
@@ -198,9 +286,7 @@ class GPTSoVITSImportTests(unittest.TestCase):
         )
 
     def test_config_manager_prefers_gpt_sovits_root_env(self):#20260627_kpopmodder
-        temp_dir = tempfile.TemporaryDirectory()
-        self.addCleanup(temp_dir.cleanup)
-        config_dir = Path(temp_dir.name)
+        config_dir = make_test_temp_dir()
         config_path = config_dir / "gpt_sovits_config.json"
         config_path.write_text(
             '{"gpt_sovits_root": "", "cuda_visible_devices": "1"}',

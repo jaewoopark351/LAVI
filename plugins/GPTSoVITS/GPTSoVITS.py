@@ -151,6 +151,48 @@ class GPTSoVITS(TTSPluginInterface):#20260615_kpopmodder
                     lines=2
                 )
 
+            with gr.Row():
+                self.speed_factor_slider = gr.Slider(
+                    value=self.gpt_sovits.speed_factor,
+                    minimum=0.80,
+                    maximum=1.20,
+                    step=0.01,
+                    label="Speed Factor"
+                )
+
+                self.temperature_slider = gr.Slider(
+                    value=self.gpt_sovits.temperature,
+                    minimum=0.10,
+                    maximum=1.50,
+                    step=0.05,
+                    label="Temperature"
+                )
+
+            with gr.Row():
+                self.top_p_slider = gr.Slider(
+                    value=self.gpt_sovits.top_p,
+                    minimum=0.10,
+                    maximum=1.00,
+                    step=0.01,
+                    label="Top P"
+                )
+
+                self.top_k_slider = gr.Slider(
+                    value=self.gpt_sovits.top_k,
+                    minimum=1,
+                    maximum=50,
+                    step=1,
+                    label="Top K"
+                )
+
+                self.repetition_penalty_slider = gr.Slider(
+                    value=self.gpt_sovits.repetition_penalty,
+                    minimum=1.00,
+                    maximum=2.00,
+                    step=0.01,
+                    label="Repetition Penalty"
+                )
+
             #gr.Markdown("### RVC Optional Post Process")#20260617_kpopmodder
 
             # with gr.Row():#20260617_kpopmodder
@@ -266,6 +308,21 @@ class GPTSoVITS(TTSPluginInterface):#20260615_kpopmodder
                 inputs=self.prompt_text_input,
                 outputs=[]
             )
+
+            self.inference_controls = [
+                self.speed_factor_slider,
+                self.temperature_slider,
+                self.top_p_slider,
+                self.top_k_slider,
+                self.repetition_penalty_slider,
+            ]
+
+            for control in self.inference_controls:
+                control.change(
+                    self.settings_controller.on_inference_options_change,
+                    inputs=self.inference_controls,
+                    outputs=[]
+                )
 
             # self.use_rvc_checkbox.change(#20260617_kpopmodder
             #     #self.on_use_rvc_change,#20260616_kpopomodder

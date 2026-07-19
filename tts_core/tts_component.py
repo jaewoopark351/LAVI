@@ -131,10 +131,10 @@ class TTS(PluginSelectionBase):#20260615_kpopmodder
                 outputs=[gr.Audio(label="Synthesized Voice")],
                 #allow_flagging="never",#20260615_kpopmodder
                 flagging_mode="never",#20260615_kpopmodder
-                examples=[
-                    "すぅ…はぁ——おはようさん、朝の空気は清々しくて気持ちええなぁ、深呼吸して頭もすっきりや。",
-                    "金魚飼ったことある？大人しゅうて、めっちゃ可愛ええんや。",
-                    "全身ポカポカで気持ちええわぁ～、浮いとるみたい。",
+                examples=[#20260720_kpopmodder
+                    "안녕하세요",
+                    "반갑습니다.",
+                    "저 멀리 보이는 산이 참 아름답네요.",
                     "Ah... *yawns* Good morning. The morning air is the freshest. Come on, take a few extra breaths — it'll make you smarter~",
                     "Have you ever kept goldfish as pets? They're very cute.",
                     "Ah, this is great! I feel so relaxed all over, I could almost float away.",
