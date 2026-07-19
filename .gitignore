@@ -184,3 +184,10 @@ plugins/StarCraft2/runtime.Zip
 plugins/StarCraft116/Bots/
 plugins/StarCraft116/StarCraft_1_16_Bots/
 plugins/StarCraft116/BWAPI_APP/
+
+#20260719_kpopmodder: Track the minimal BWAPI release executables used by StarCraft116 bwapi_Code profiles.
+!plugins/StarCraft116/bwapi_Code/**/Release_Binary/Chaoslauncher/Chaoslauncher.exe
+!plugins/StarCraft116/bwapi_Code/**/Release_Binary/Chaoslauncher/Chaoslauncher - MultiInstance.exe
+!plugins/StarCraft116/bwapi_Code/**/Release_Binary/Chaoslauncher/Chaosupdater.exe
+!plugins/StarCraft116/bwapi_Code/**/Release_Binary/Chaoslauncher/RWAUtils.exe
+!plugins/StarCraft116/bwapi_Code/**/Release_Binary/Starcraft/bwapi-data/bwapi.ini

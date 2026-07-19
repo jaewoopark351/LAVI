@@ -39,3 +39,13 @@ apps/cygwin/
 apps/http*
 BWAPI.7z
 
+#20260719_kpopmodder: Keep the runtime release files used by LAVI StarCraft116 profiles trackable.
+!Release_Binary/Chaoslauncher/Plugins/BWAPI_PluginInjector.bwl
+!Release_Binary/Chaoslauncher/Plugins/BWAPI_PluginInjector.txt
+!Release_Binary/Chaoslauncher/Plugins/BWAPI_PluginInjectord.bwl
+!Release_Binary/Chaoslauncher/Plugins/BWAPI_PluginInjectord.txt
+!Release_Binary/Starcraft/SNP_DirectIP.snp
+!Release_Binary/Starcraft/bwapi-data/BWAPI.dll
+!Release_Binary/Starcraft/bwapi-data/BWAPId.dll
+!Release_Binary/Starcraft/bwapi-data/BWAPI_real.dll
+

@@ -52,11 +52,11 @@ DEFAULT_PROFILE = {
 
 DEFAULT_BWAPI_BUNDLE_DIRS = {
     #20260718_kpopmodder: Keep BWAPI runtime bundles project-local while leaving StarCraft.exe configurable.
-    "saida": "plugins\\StarCraft116\\BWAPI_APP\\BWAPI_4_4_0\\Release_Binary",
-    "monster": "plugins\\StarCraft116\\BWAPI_APP\\BWAPI_420",
-    "stardust": "plugins\\StarCraft116\\BWAPI_APP\\BWAPI_4_4_0\\Release_Binary",
-    "crona": "plugins\\StarCraft116\\BWAPI_APP\\BWAPI_4_4_0\\Release_Binary",
-    "terminus": "plugins\\StarCraft116\\BWAPI_APP\\BWAPI_4_4_0\\Release_Binary",
+    "saida": "plugins\\StarCraft116\\bwapi_Code\\bwapi-4.4.0\\Release_Binary",
+    "monster": "plugins\\StarCraft116\\bwapi_Code\\bwapi-4.2.0\\Release_Binary",
+    "stardust": "plugins\\StarCraft116\\bwapi_Code\\bwapi-4.4.0\\Release_Binary",
+    "crona": "plugins\\StarCraft116\\bwapi_Code\\bwapi-4.4.0\\Release_Binary",
+    "terminus": "plugins\\StarCraft116\\bwapi_Code\\bwapi-4.4.0\\Release_Binary",
 }
 
 
@@ -401,7 +401,7 @@ class StarCraft116Config:
         return self.resolve_profile_bwapi_data_dir(profile_name)
 
     def _resolve_bwapi_data_dir_from_starcraft_path(self, profile):
-        #20260718_kpopmodder: Chaoslauncher can load StarCraft from an external GamePath while BWAPI_APP stays project-local.
+        #20260718_kpopmodder: Chaoslauncher can load StarCraft from an external GamePath while BWAPI code stays project-local.
         directories = []
         for key in ("starcraft_working_dir", "starcraft_116_dir"):
             directory = self.resolve_profile_path(profile, key)

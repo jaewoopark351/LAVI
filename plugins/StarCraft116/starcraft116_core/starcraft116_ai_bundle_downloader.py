@@ -31,7 +31,7 @@ DEFAULT_STARCRAFT116_MONSTER_LAUNCHER_TEMPLATE = Path(
     "run_monster_robust_log.example.bat",
 )
 DEFAULT_STARCRAFT116_MONSTER_LAUNCHER_MARKER = (
-    "LAV_STARCRAFT116_BWAPI_DATA_DIR"
+    "bwapi_Code\\bwapi-4.2.0\\Release_Binary\\Starcraft"
 )
 
 
@@ -235,7 +235,7 @@ class StarCraft116AIBundleDownloader:
             return False
 
     def _repair_monster_launcher(self, target_dir: Path) -> Dict[str, Any]:
-        #20260718_kpopmodder: Keep downloaded Monster launcher aligned with project-local BWAPI_APP.
+        #20260718_kpopmodder: Keep downloaded Monster launcher aligned with project-local BWAPI code release.
         destination = self._safe_destination(
             target_dir,
             DEFAULT_STARCRAFT116_MONSTER_LAUNCHER_PATH,

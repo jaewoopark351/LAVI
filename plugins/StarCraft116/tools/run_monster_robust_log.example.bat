@@ -9,10 +9,10 @@ set "MONSTER_DIR=%~dp0"
 if defined LAV_STARCRAFT116_MONSTER_DIR set "MONSTER_DIR=%LAV_STARCRAFT116_MONSTER_DIR%"
 if "%MONSTER_DIR:~-1%"=="\" set "MONSTER_DIR=%MONSTER_DIR:~0,-1%"
 
-REM #20260718_kpopmodder: Prefer project-local BWAPI_APP so Monster events stay inside LAVI.
+REM #20260718_kpopmodder: Prefer project-local official BWAPI code release so Monster events stay inside LAVI.
 set "STAR_DIR="
 if defined LAV_STARCRAFT116_STARCRAFT_DIR set "STAR_DIR=%LAV_STARCRAFT116_STARCRAFT_DIR%"
-if not defined STAR_DIR if exist "%MONSTER_DIR%\..\..\BWAPI_APP\BWAPI_420\Starcraft" set "STAR_DIR=%MONSTER_DIR%\..\..\BWAPI_APP\BWAPI_420\Starcraft"
+if not defined STAR_DIR if exist "%MONSTER_DIR%\..\..\bwapi_Code\bwapi-4.2.0\Release_Binary\Starcraft" set "STAR_DIR=%MONSTER_DIR%\..\..\bwapi_Code\bwapi-4.2.0\Release_Binary\Starcraft"
 if not defined STAR_DIR set "STAR_DIR=%MONSTER_DIR%\..\StarCraft"
 set "BWAPI_DATA_DIR=%STAR_DIR%\bwapi-data"
 if defined LAV_STARCRAFT116_BWAPI_DATA_DIR set "BWAPI_DATA_DIR=%LAV_STARCRAFT116_BWAPI_DATA_DIR%"
