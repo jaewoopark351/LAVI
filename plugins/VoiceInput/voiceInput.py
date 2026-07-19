@@ -319,23 +319,9 @@ class VoiceInput(InputPluginInterface):#20260618_kpopmodder
             f"torch_dtype={self.stt_settings.get('torch_dtype')}"
         )#20260707_kpopmodder
 
-        self.whisper_filter_list = [
-            "you",
-            "thank you.",
-            "thanks for watching.",
-            "Thank you for watching.",
-            "감사합니다",
-            "감사합니다.",
-            "시청해 주셔서 감사합니다.",
-            "시청해주셔서 감사합니다.",
-            "1.5%",
-            "I'm going to put it in the fridge.",
-            "I",
-            ".",
-            "okay.",
-            "bye.",
-            "so,"
-        ]
+        #20260719_kpopmodder: Disable the legacy exact-text Whisper hallucination list;
+        # it can keep noisy STT candidates visible instead of letting VAD/confidence gates decide.
+        self.whisper_filter_list = []
 
         (
             self.vad_model,

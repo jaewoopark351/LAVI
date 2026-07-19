@@ -225,17 +225,18 @@ class WhisperTranscriber:#20260616_kpopmodder
                 )#20260718_kpopmodder
                 return None
 
-            log_print(
-                f"looking for {transcribed_text.strip().lower()} in {self.filter_list}"
-            )
-
-            if transcribed_text.strip().lower() in self.filter_list:
-                self.liveTextbox.print(f"Input {transcribed_text} was filtered.")
+            if self.filter_list:
                 log_print(
-                    f"[WhisperTranscriber {prefix}] "
-                    f"filtered STT ignored: text={transcribed_text!r}"
-                )#20260625_kpopmodder
-                return None
+                    f"looking for {transcribed_text.strip().lower()} in {self.filter_list}"
+                )
+
+                if transcribed_text.strip().lower() in self.filter_list:
+                    self.liveTextbox.print(f"Input {transcribed_text} was filtered.")
+                    log_print(
+                        f"[WhisperTranscriber {prefix}] "
+                        f"filtered STT ignored: text={transcribed_text!r}"
+                    )#20260625_kpopmodder
+                    return None
 
             log_print(
                 f"[WhisperTranscriber {prefix}] "
