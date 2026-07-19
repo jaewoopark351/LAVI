@@ -3,6 +3,7 @@
 #20260706_kpopmodder: Keeps low-level StarCraft launch process creation isolated from policy logic.
 import ctypes
 import os
+import subprocess
 from ctypes import wintypes
 
 from core.process import command_line, launch_process as _default_launch_process
@@ -16,11 +17,16 @@ class StarCraft116ProcessLauncherRuntime:
         if launch_command["run_as_admin"]:
             return self._launch_elevated(launch_command)
 
+        creationflags = None
+        if launch_command.get("show_window") and os.name == "nt":
+            creationflags = getattr(subprocess, "CREATE_NEW_CONSOLE", 0)
+
         return _compat_launch_process(
             launch_command["command"],
             cwd=launch_command["cwd"] or None,
             shell=False,
             env=env,
+            creationflags=creationflags,
         )
 
     def _launch_elevated(self, launch_command):
@@ -85,6 +91,7 @@ class StarCraft116ProcessLauncherRuntime:
             "launch_delay_sec": float(
                 getattr(launch_command, "launch_delay_sec", 0.0) or 0.0
             ),
+            "show_window": bool(getattr(launch_command, "show_window", False)),
         }
 
 

@@ -879,9 +879,101 @@ Do not commit local VTube Studio tokens.
 
 ## 19. Config Rules
 
+Project configuration files are part of the repository and must be tracked in Git by default.
+
+Configuration files required to install, run, test, reproduce, or maintain the project must be committed and uploaded to the remote Git repository.
+
+This includes, but is not limited to:
+
+```text
+config/
+plugins/**/config.json
+*.config.json
+default_config.json
+settings.default.json
+configuration schemas
+configuration migration files
+configuration documentation
+```
+
+Do not add the entire `config/` directory or broad configuration-file patterns to `.gitignore` merely because settings may differ between computers.
+
+When creating or modifying a configuration file, Codex must:
+
+1. Keep the configuration structure, keys, safe defaults, and documentation in Git.
+2. Verify that the configuration file is tracked unless it contains secrets or private credentials.
+3. Replace secrets with empty values, safe placeholders, or environment-variable references before staging or committing.
+4. Preserve backward compatibility for existing configuration keys and loading behavior when possible.
+5. Check `.gitignore`, `git status --short`, and `git ls-files` to ensure required configuration files are not accidentally excluded.
+6. Report any required configuration file that is currently ignored or untracked.
+
+Safe tracked values may include:
+
+```json
+{
+  "memory_router_enabled": true,
+  "memory_router_timeout_sec": 3,
+  "memory_router_max_items": 5,
+  "openai_api_key": "",
+  "huggingface_token": "",
+  "external_model_path": ""
+}
+```
+
+Safe placeholders include:
+
+```text
+""
+null
+"YOUR_API_KEY_HERE"
+"${OPENAI_API_KEY}"
+"${HUGGINGFACE_TOKEN}"
+```
+
+The following values must not be committed:
+
+```text
+real API keys
+access tokens
+passwords
+private credentials
+VTube Studio authentication tokens
+personal access tokens
+private server credentials
+sensitive private network addresses
+private user information embedded in paths or values
+```
+
+When a configuration file requires secrets or private machine-specific values, use a tracked base configuration and a local override structure where practical:
+
+```text
+config/config.json          # tracked project configuration
+config/config.schema.json   # tracked configuration schema
+config/local_config.json    # ignored only when it contains private values
+.env.example                # tracked environment-variable template
+.env                        # ignored secret values
+```
+
+A configuration file must not be excluded from Git solely because it is a configuration file.
+
+Only a secret-bearing or privacy-sensitive local override may remain untracked. When such an override exists, the repository must still contain a tracked default, template, schema, or example that preserves every required key and explains how to configure the project.
+
+If an existing configuration file mixes shareable settings with secrets, Codex must not ignore the entire configuration system. Instead, Codex must:
+
+1. Keep shareable settings and the complete configuration structure in a tracked file.
+2. Move secrets to environment variables or an explicitly ignored local override.
+3. Preserve existing runtime behavior and compatibility where practical.
+4. Update `.gitignore`, README, and configuration-loading logic when required.
+5. Explain which files are tracked and which values remain local.
+
 Do not overwrite user configuration files casually.
 
-When editing config defaults, explain the impact.
+When editing configuration defaults:
+
+* Explain the runtime impact.
+* Preserve existing configuration keys when possible.
+* Maintain backward compatibility.
+* Do not replace real user values with defaults during application startup.
 
 Be careful with files under:
 
@@ -891,9 +983,11 @@ plugins/
 voices/
 ```
 
-Do not hardcode absolute local paths unless the project already uses them and the user confirms.
+Do not hardcode private absolute local paths.
 
-Prefer configurable paths when possible.
+Repository-internal paths should use repository-relative paths.
+
+External paths may use absolute paths when required by runtime behavior, but tracked defaults should use safe examples, empty values, or documented placeholders when the real value contains private information.
 
 ---
 

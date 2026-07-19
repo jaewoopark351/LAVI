@@ -1,0 +1,18 @@
+{
+  "enabled": true,
+  "profile": "bwmetaai",
+  "starcraft_x86_dir": "C:\\Program Files (x86)\\StarCraft\\x86",
+  "samase_exe_path": "C:\\Program Files (x86)\\StarCraft\\x86\\samase-0.8.31.exe",
+  "starcraft_exe_path": "C:\\Program Files (x86)\\StarCraft\\x86\\StarCraft.exe",
+  "mod_argument": "custom",
+  "custom_scripts_dir": "C:\\Program Files (x86)\\StarCraft\\x86\\custom\\scripts",
+  "aiscript_bin_path": "C:\\Program Files (x86)\\StarCraft\\x86\\custom\\scripts\\aiscript.bin",
+  "auto_launch": false,
+  "launch_timeout_sec": 15,
+  "enable_screenvision_coach": true,
+  "coach_language": "ko",
+  "coach_style": "short_tsundere",
+  "observation_interval_sec": 5,
+  "write_state_log": true,
+  "state_log_path": "logs\\starcraft_remastered_state.jsonl"
+}

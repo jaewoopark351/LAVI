@@ -36,6 +36,7 @@ def launch_process(
     errors=None,
     bufsize=None,
     shell=None,
+    creationflags=None,
 ):
     #20260717_kpopmodder: Keep Windows process flags in one place while preserving subprocess.Popen semantics.
     kwargs = {
@@ -49,6 +50,7 @@ def launch_process(
         "errors": errors,
         "bufsize": bufsize,
         "shell": shell,
+        "creationflags": creationflags,
     }
     kwargs = {key: value for key, value in kwargs.items() if value is not None}
     kwargs = _windows_process_kwargs(kwargs)

@@ -12,11 +12,35 @@ if "%MONSTER_DIR:~-1%"=="\" set "MONSTER_DIR=%MONSTER_DIR:~0,-1%"
 REM Default StarCraft folder: ..\StarCraft relative to Monster folder
 set "STAR_DIR=%MONSTER_DIR%\..\StarCraft"
 set "LOG_FILE=%MONSTER_DIR%\monster_log.txt"
+set "LOCK_DIR=%MONSTER_DIR%\.monster_launcher.lock"
 
 pushd "%MONSTER_DIR%" || (
     echo Failed to enter Monster folder: "%MONSTER_DIR%"
     pause
     exit /b 1
+)
+
+REM #20260719_kpopmodder: Avoid multiple Monster launchers fighting over monster_log.txt.
+if exist "%LOCK_DIR%" (
+    tasklist /FI "IMAGENAME eq Monster.exe" 2>nul | find /I "Monster.exe" >nul
+    if not errorlevel 1 (
+        echo Monster launcher already appears to be running.
+        echo Existing lock: %LOCK_DIR%
+        echo Close the existing Monster launcher/Monster.exe before starting another one.
+        popd
+        pause
+        exit /b 0
+    )
+    rmdir "%LOCK_DIR%" >nul 2>nul
+)
+
+mkdir "%LOCK_DIR%" >nul 2>nul
+if errorlevel 1 (
+    echo Monster launcher lock is busy: %LOCK_DIR%
+    echo Close the existing Monster launcher, or remove the stale lock if no Monster.exe is running.
+    popd
+    pause
+    exit /b 0
 )
 
 echo.
@@ -38,6 +62,7 @@ echo.
 if not exist "%MONSTER_DIR%\Monster.exe" (
     echo ERROR: Monster.exe not found in "%MONSTER_DIR%"
     >> "%LOG_FILE%" echo ERROR: Monster.exe not found.
+    rmdir "%LOCK_DIR%" >nul 2>nul
     popd
     pause
     exit /b 1
@@ -47,6 +72,7 @@ if not exist "%MONSTER_DIR%\sc.dat" (
     echo ERROR: sc.dat not found beside Monster.exe.
     echo Put this bat in the folder that contains Monster.exe and sc.dat.
     >> "%LOG_FILE%" echo ERROR: sc.dat not found beside Monster.exe.
+    rmdir "%LOCK_DIR%" >nul 2>nul
     popd
     pause
     exit /b 1
@@ -120,6 +146,7 @@ timeout /t %MONSTER_RESTART_DELAY_SEC% /nobreak >nul
 goto monster_loop
 
 :monster_done
+rmdir "%LOCK_DIR%" >nul 2>nul
 popd
 pause
 exit /b %EXITCODE%

@@ -454,6 +454,7 @@ class StarCraft116PluginTests(unittest.TestCase):
             {
                 "enabled": True,
                 "active_profile": "stardust",
+                "bwapi_event_exporter_stardust_enabled": False,
                 "profiles": {
                     "stardust": {
                         "starcraft_116_dir": str(game_dir),
@@ -788,6 +789,184 @@ class StarCraft116PluginTests(unittest.TestCase):
         self.assertIn("wrapped_ai=Stardust.dll", text)
         self.assertIn(f"events_path={plugin_root / 'events.jsonl'}", text)
         self.assertIn("snapshot_interval_frames=144", text)
+
+    def test_exporter_manager_prefers_runtime_stardust_sidecar_copy(self):
+        from plugins.StarCraft116.starcraft116_core.starcraft116_config import StarCraft116Config
+        from plugins.StarCraft116.starcraft116_core.starcraft116_exporter import (
+            StarCraft116ExporterManager,
+        )
+
+        plugin_root = self.make_plugin_root()
+        game_dir = plugin_root / "External StarCraft"
+        runtime_bwapi_dir = game_dir / "bwapi-data"
+        runtime_ai_dir = runtime_bwapi_dir / "AI"
+        internal_bwapi_dir = plugin_root / "BWAPI_APP" / "BWAPI_4_4_0" / "Starcraft" / "bwapi-data"
+        bundle_ai_dir = plugin_root / "StarCraft_1_16_Bots" / "Stardust" / "bwapi-data" / "AI"
+        runtime_ai_dir.mkdir(parents=True)
+        internal_bwapi_dir.mkdir(parents=True)
+        bundle_ai_dir.mkdir(parents=True)
+        (runtime_ai_dir / "Stardust.dll").write_text("", encoding="utf-8")
+        bot_path = bundle_ai_dir / "Stardust.dll"
+        bot_path.write_text("", encoding="utf-8")
+        self.write_config(
+            plugin_root,
+            {
+                "enabled": True,
+                "active_profile": "stardust",
+                "profiles": {
+                    "stardust": {
+                        "starcraft_116_dir": str(game_dir),
+                        "bwapi_data_dir": str(internal_bwapi_dir),
+                        "bot_binary_path": str(bot_path),
+                    },
+                },
+            },
+        )
+        manager = StarCraft116ExporterManager(StarCraft116Config(str(plugin_root)))
+
+        text = manager.build_ini_text("stardust")
+
+        self.assertIn("wrapped_ai=Stardust.dll", text)
+        self.assertNotIn(f"wrapped_ai={bot_path}", text)
+
+    def test_exporter_manager_ensures_stardust_runtime_write_dirs(self):
+        from plugins.StarCraft116.starcraft116_core.starcraft116_config import StarCraft116Config
+        from plugins.StarCraft116.starcraft116_core.starcraft116_exporter import (
+            StarCraft116ExporterManager,
+        )
+
+        plugin_root = self.make_plugin_root()
+        game_dir = plugin_root / "External StarCraft"
+        runtime_bwapi_dir = game_dir / "bwapi-data"
+        runtime_ai_dir = runtime_bwapi_dir / "AI"
+        internal_bwapi_dir = plugin_root / "BWAPI_APP" / "BWAPI_4_4_0" / "Starcraft" / "bwapi-data"
+        bundle_ai_dir = plugin_root / "StarCraft_1_16_Bots" / "Stardust" / "bwapi-data" / "AI"
+        source_dir = plugin_root / "bwapi_event_exporter" / "bin" / "Release"
+        runtime_ai_dir.mkdir(parents=True)
+        internal_bwapi_dir.mkdir(parents=True)
+        bundle_ai_dir.mkdir(parents=True)
+        source_dir.mkdir(parents=True)
+        (source_dir / "LAVEventExporter.dll").write_bytes(b"lav-exporter")
+        (runtime_ai_dir / "Stardust.dll").write_text("", encoding="utf-8")
+        bot_path = bundle_ai_dir / "Stardust.dll"
+        bot_path.write_text("", encoding="utf-8")
+        self.write_config(
+            plugin_root,
+            {
+                "enabled": True,
+                "active_profile": "stardust",
+                "profiles": {
+                    "stardust": {
+                        "starcraft_116_dir": str(game_dir),
+                        "bwapi_data_dir": str(internal_bwapi_dir),
+                        "bot_binary_path": str(bot_path),
+                    },
+                },
+            },
+        )
+        manager = StarCraft116ExporterManager(StarCraft116Config(str(plugin_root)))
+
+        ok, _message = manager.write_ini("stardust")
+
+        self.assertTrue(ok)
+        self.assertTrue((runtime_bwapi_dir / "read").is_dir())
+        self.assertTrue((runtime_bwapi_dir / "write").is_dir())
+        self.assertTrue((runtime_bwapi_dir / "write" / "cvis").is_dir())
+
+    def test_exporter_manager_defaults_to_wrapping_supported_dll_profiles(self):
+        from plugins.StarCraft116.starcraft116_core.starcraft116_config import StarCraft116Config
+        from plugins.StarCraft116.starcraft116_core.starcraft116_exporter import (
+            StarCraft116ExporterManager,
+        )
+
+        plugin_root = self.make_plugin_root()
+        self.write_config(
+            plugin_root,
+            {
+                "enabled": True,
+                "profiles": {
+                    "saida": {},
+                    "stardust": {},
+                    "crona": {},
+                    "terminus": {},
+                },
+            },
+        )
+        manager = StarCraft116ExporterManager(StarCraft116Config(str(plugin_root)))
+
+        self.assertFalse(manager.should_use_exporter("saida"))
+        self.assertTrue(manager.should_use_exporter("stardust"))
+        self.assertTrue(manager.should_use_exporter("crona"))
+        self.assertTrue(manager.should_use_exporter("terminus"))
+
+    def test_exporter_manager_profile_toggle_can_disable_default_wrapper(self):
+        from plugins.StarCraft116.starcraft116_core.starcraft116_config import StarCraft116Config
+        from plugins.StarCraft116.starcraft116_core.starcraft116_exporter import (
+            StarCraft116ExporterManager,
+        )
+
+        plugin_root = self.make_plugin_root()
+        self.write_config(
+            plugin_root,
+            {
+                "enabled": True,
+                "bwapi_event_exporter_crona_enabled": False,
+                "profiles": {
+                    "crona": {},
+                    "terminus": {},
+                },
+            },
+        )
+        manager = StarCraft116ExporterManager(StarCraft116Config(str(plugin_root)))
+
+        self.assertFalse(manager.should_use_exporter("crona"))
+        self.assertTrue(manager.should_use_exporter("terminus"))
+
+    def test_exporter_manager_status_distinguishes_bananabrain_profiles(self):
+        from plugins.StarCraft116.starcraft116_core.starcraft116_config import StarCraft116Config
+        from plugins.StarCraft116.starcraft116_core.starcraft116_exporter import (
+            StarCraft116ExporterManager,
+        )
+
+        plugin_root = self.make_plugin_root()
+        game_dir = plugin_root / "External StarCraft"
+        runtime_bwapi_dir = game_dir / "bwapi-data"
+        runtime_ai_dir = runtime_bwapi_dir / "AI"
+        crona_path = plugin_root / "StarCraft_1_16_Bots" / "Crona" / "BananaBrain.dll"
+        terminus_path = plugin_root / "StarCraft_1_16_Bots" / "Terminus" / "BananaBrain.dll"
+        runtime_ai_dir.mkdir(parents=True)
+        crona_path.parent.mkdir(parents=True)
+        terminus_path.parent.mkdir(parents=True)
+        crona_path.write_text("", encoding="utf-8")
+        terminus_path.write_text("", encoding="utf-8")
+        (runtime_ai_dir / "LAVEventExporter.ini").write_text(
+            f"wrapped_ai={crona_path}\n",
+            encoding="utf-8",
+        )
+        self.write_config(
+            plugin_root,
+            {
+                "enabled": True,
+                "profiles": {
+                    "crona": {
+                        "starcraft_116_dir": str(game_dir),
+                        "bot_binary_path": str(crona_path),
+                    },
+                    "terminus": {
+                        "starcraft_116_dir": str(game_dir),
+                        "bot_binary_path": str(terminus_path),
+                    },
+                },
+            },
+        )
+        manager = StarCraft116ExporterManager(StarCraft116Config(str(plugin_root)))
+
+        crona_status = manager.status("crona")
+        terminus_status = manager.status("terminus")
+
+        self.assertTrue(crona_status["wrapped_ai_matches_profile"])
+        self.assertFalse(terminus_status["wrapped_ai_matches_profile"])
+        self.assertEqual(str(crona_path), terminus_status["configured_wrapped_ai_path"])
 
     def test_exporter_manager_uses_absolute_wrapped_ai_for_external_bot(self):
         from plugins.StarCraft116.starcraft116_core.starcraft116_config import StarCraft116Config
@@ -2120,6 +2299,199 @@ class StarCraft116PluginTests(unittest.TestCase):
         self.assertTrue(result["installed"])
         self.assertEqual(b"lav-proxy", target_bwapi.read_bytes())
         self.assertEqual(b"original-bwapi", target_real.read_bytes())
+
+    def test_bwapi_runtime_sync_restores_stardust_family_bwapi_dlls(self):
+        from plugins.StarCraft116.starcraft116_core.starcraft116_bwapi_runtime_sync import (
+            StarCraft116BWAPIRuntimeSync,
+        )
+        from plugins.StarCraft116.starcraft116_core.starcraft116_config import StarCraft116Config
+
+        temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(temp_dir.cleanup)
+        project_root = Path(temp_dir.name)
+        plugin_root = project_root / "plugins" / "StarCraft116"
+        source_dir = (
+            plugin_root
+            / "BWAPI_APP"
+            / "BWAPI_4_4_0"
+            / "Release_Binary"
+            / "Starcraft"
+            / "bwapi-data"
+        )
+        target_dir = project_root / "ExternalStarCraft" / "bwapi-data"
+        plugin_root.joinpath("config").mkdir(parents=True)
+        source_dir.mkdir(parents=True)
+        target_dir.mkdir(parents=True)
+        source_dir.joinpath("BWAPI.dll").write_bytes(b"bwapi-440")
+        source_dir.joinpath("BWAPId.dll").write_bytes(b"bwapid-440")
+        target_dir.joinpath("BWAPI.dll").write_bytes(b"old-bwapi")
+        target_dir.joinpath("BWAPId.dll").write_bytes(b"old-bwapid")
+        self.write_config(
+            plugin_root,
+            {
+                "enabled": True,
+                "active_profile": "stardust",
+                "profiles": {
+                    "stardust": {
+                        "starcraft_116_dir": str(target_dir.parent),
+                        "bwapi_starcraft_dir": str(source_dir.parent),
+                        "bwapi_data_dir": str(target_dir),
+                    },
+                },
+            },
+        )
+
+        result = StarCraft116BWAPIRuntimeSync(
+            StarCraft116Config(str(plugin_root))
+        ).sync("stardust")
+
+        self.assertTrue(result["ok"])
+        self.assertTrue(result["synced"])
+        self.assertEqual(b"bwapi-440", target_dir.joinpath("BWAPI.dll").read_bytes())
+        self.assertEqual(b"bwapid-440", target_dir.joinpath("BWAPId.dll").read_bytes())
+        self.assertEqual(
+            b"old-bwapi",
+            target_dir.joinpath("BWAPI.dll.lav_runtime_sync_backup").read_bytes(),
+        )
+
+    def test_bwapi_runtime_sync_restores_monster_proxy_bwapi_dlls(self):
+        from plugins.StarCraft116.starcraft116_core.starcraft116_bwapi_runtime_sync import (
+            StarCraft116BWAPIRuntimeSync,
+        )
+        from plugins.StarCraft116.starcraft116_core.starcraft116_config import StarCraft116Config
+
+        temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(temp_dir.cleanup)
+        project_root = Path(temp_dir.name)
+        plugin_root = project_root / "plugins" / "StarCraft116"
+        source_dir = (
+            plugin_root
+            / "BWAPI_APP"
+            / "BWAPI_420"
+            / "Starcraft"
+            / "bwapi-data"
+        )
+        target_dir = project_root / "ExternalStarCraft" / "bwapi-data"
+        plugin_root.joinpath("config").mkdir(parents=True)
+        source_dir.mkdir(parents=True)
+        target_dir.mkdir(parents=True)
+        source_dir.joinpath("BWAPI.dll").write_bytes(b"monster-proxy")
+        source_dir.joinpath("BWAPI_real.dll").write_bytes(b"monster-real-420")
+        source_dir.joinpath("BWAPId.dll").write_bytes(b"monster-bwapid-420")
+        source_dir.joinpath("bwapi.ini").write_text(
+            "[ai]\n"
+            "ai     = bwapi-data/AI/ExampleAIModule.dll\n"
+            "ai_dbg = bwapi-data/AI/ExampleAIModuled.dll\n",
+            encoding="utf-8",
+        )
+        target_dir.joinpath("BWAPI.dll").write_bytes(b"bwapi-440")
+        target_dir.joinpath("BWAPId.dll").write_bytes(b"bwapid-440")
+        target_dir.joinpath("bwapi.ini").write_bytes(b"stardust-bwapi-ini")
+        self.write_config(
+            plugin_root,
+            {
+                "enabled": True,
+                "active_profile": "monster",
+                "profiles": {
+                    "monster": {
+                        "starcraft_116_dir": str(target_dir.parent),
+                        "bwapi_starcraft_dir": str(source_dir.parent),
+                        "bwapi_data_dir": str(target_dir),
+                    },
+                },
+            },
+        )
+
+        result = StarCraft116BWAPIRuntimeSync(
+            StarCraft116Config(str(plugin_root))
+        ).sync("monster")
+
+        self.assertTrue(result["ok"])
+        self.assertTrue(result["synced"])
+        self.assertEqual(b"monster-proxy", target_dir.joinpath("BWAPI.dll").read_bytes())
+        self.assertEqual(
+            b"monster-real-420",
+            target_dir.joinpath("BWAPI_real.dll").read_bytes(),
+        )
+        self.assertEqual(
+            b"monster-bwapid-420",
+            target_dir.joinpath("BWAPId.dll").read_bytes(),
+        )
+        self.assertIn(
+            "ai     =\nai_dbg =",
+            target_dir.joinpath("bwapi.ini").read_text(encoding="utf-8"),
+        )
+
+    def test_monster_launch_plan_starts_standalone_client_batch(self):
+        from plugins.StarCraft116.starcraft116_core.starcraft116_config import StarCraft116Config
+        from plugins.StarCraft116.starcraft116_core.starcraft116_launcher import StarCraft116Launcher
+
+        plugin_root = self.make_plugin_root()
+        game_dir = plugin_root / "ExternalStarCraft"
+        bwapi_dir = game_dir / "bwapi-data"
+        chaos_dir = plugin_root / "BWAPI_APP" / "BWAPI_420" / "Chaoslauncher"
+        monster_dir = plugin_root / "StarCraft_1_16_Bots" / "Monster"
+        bwapi_dir.mkdir(parents=True)
+        chaos_dir.mkdir(parents=True)
+        monster_dir.mkdir(parents=True)
+        chaos_dir.joinpath("Chaoslauncher.exe").write_text("", encoding="utf-8")
+        monster_dir.joinpath("run_monster_robust_log.bat").write_text("", encoding="utf-8")
+        self.write_config(
+            plugin_root,
+            {
+                "enabled": True,
+                "active_profile": "monster",
+                "profiles": {
+                    "monster": {
+                        "starcraft_116_dir": str(game_dir),
+                        "bwapi_data_dir": str(bwapi_dir),
+                        "start_chaoslauncher": True,
+                        "chaoslauncher_path": str(chaos_dir / "Chaoslauncher.exe"),
+                        "chaoslauncher_working_dir": str(chaos_dir),
+                        "start_bot_process": True,
+                        "bot_process_path": str(monster_dir / "run_monster_robust_log.bat"),
+                        "bot_process_working_dir": str(monster_dir),
+                        "bot_process_launch_delay_sec": 2.0,
+                        "bot_process_show_window": True,
+                    },
+                },
+            },
+        )
+
+        plan = StarCraft116Launcher(StarCraft116Config(str(plugin_root))).build_launch_plan()
+
+        self.assertEqual(["chaoslauncher", "bot"], [command.label for command in plan])
+        self.assertEqual(2.0, plan[1].launch_delay_sec)
+        self.assertTrue(plan[1].show_window)
+
+    def test_launcher_uses_new_console_for_visible_bot_process(self):
+        from plugins.StarCraft116.starcraft116_core.starcraft116_launch_command import (
+            StarCraft116LaunchCommand,
+        )
+        from plugins.StarCraft116.starcraft116_core.starcraft116_process_launcher_runtime import (
+            StarCraft116ProcessLauncherRuntime,
+        )
+
+        runtime = StarCraft116ProcessLauncherRuntime()
+        command = StarCraft116LaunchCommand(
+            label="bot",
+            command=["run_monster_robust_log.bat"],
+            cwd="C:\\Monster",
+            show_window=True,
+        )
+        fake_process = mock.Mock()
+        fake_process.pid = 116
+
+        with mock.patch(
+            "plugins.StarCraft116.starcraft116_core.starcraft116_launch_executor.launch_process",
+            return_value=fake_process,
+        ) as popen_mock:
+            process = runtime.launch_command(command, {})
+
+        self.assertEqual(fake_process, process)
+        _, kwargs = popen_mock.call_args
+        self.assertFalse(kwargs["shell"])
+        self.assertTrue(kwargs["creationflags"])
 
     def test_game_event_policy_builds_openai_message(self):
         from plugins.StarCraft116.starcraft116_core.starcraft116_reaction_policy import (

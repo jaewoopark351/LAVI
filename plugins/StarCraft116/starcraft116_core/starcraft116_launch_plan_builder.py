@@ -48,6 +48,7 @@ class StarCraft116LaunchPlanBuilder:
                     cwd_key="bot_process_working_dir",
                     run_as_admin_key="bot_process_run_as_admin",
                     delay_key="bot_process_launch_delay_sec",
+                    show_window_key="bot_process_show_window",
                 )
             )
         if self.config_manager.get_profile_bool(profile, "start_observer_process", False):
@@ -73,6 +74,7 @@ class StarCraft116LaunchPlanBuilder:
         cwd_key,
         run_as_admin_key,
         delay_key=None,
+        show_window_key=None,
     ):
         executable = self.config_manager.resolve_profile_path(profile, path_key)
         if not executable:
@@ -96,6 +98,11 @@ class StarCraft116LaunchPlanBuilder:
                 self._coerce_delay(profile.get(delay_key, 0.0))
                 if delay_key
                 else 0.0
+            ),
+            show_window=(
+                self.config_manager.get_profile_bool(profile, show_window_key, False)
+                if show_window_key
+                else False
             ),
         )
 

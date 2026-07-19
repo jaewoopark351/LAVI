@@ -121,6 +121,20 @@ plugins/StarCraftRemastered/config/starcraft_remastered_config.json
 plugins/StarCraft116/config/starcraft116_config.json
 plugins/StarCraft2/config_starcraft2.json
 plugins/StarCraft2/config/starcraft2_config.json
+
+# Track shareable runtime config files.
+!config/audio_device_config.json
+!config/gpu_device_config.json
+!config/modules.json
+!config/starcraft2_config.json
+!config/gpt_sovits_config.json
+!plugins/GPTSoVITS/config/gpt_sovits_config.json
+!plugins/SongPlayer/config/song_player_songs.json
+!plugins/Chess/config/chess_config.json
+!plugins/StarCraftRemastered/config/starcraft_remastered_config.json
+!plugins/StarCraft116/config/starcraft116_config.json
+!plugins/StarCraft2/config_starcraft2.json
+!plugins/StarCraft2/config/starcraft2_config.json
 !config/modules.example.json
 !config/gpu_device_config.example.json
 !config/starcraft2_config.example.json
@@ -162,7 +176,7 @@ memory/
 test/test_Isolation/
 tests/tmp*/
 
-ai_character_system_prompt.txt
+!ai_character_system_prompt.txt
 
 plugins/StarCraft2/runtime/
 plugins/StarCraft2/runtime.Zip

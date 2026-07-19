@@ -15,3 +15,4 @@ class StarCraft116LaunchCommand:
     cwd: str = ""
     run_as_admin: bool = False
     launch_delay_sec: float = 0.0
+    show_window: bool = False
