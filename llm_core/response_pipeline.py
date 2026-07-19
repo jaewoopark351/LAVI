@@ -44,6 +44,8 @@ class LLMResponsePipeline:#20260621_kpopmodder
         self.response_generation = 0#20260623_kpopmodder: TTS가 이전 LLM 응답 조각을 새 응답보다 먼저 읽지 않도록 세대 번호를 붙인다.
         self.response_generation_lock = threading.Lock()#20260623_kpopmodder
         self.interaction_context = LLMInteractionContext()#20260621_kpopmodder
+        self._recent_model_history = []#20260720_kpopmodder: Fallback when Gradio sends an empty history for a live turn.
+        self._recent_model_history_limit = 12#20260720_kpopmodder
         self.post_processor = LLMResponsePostProcessor(#20260706_kpopmodder
             send_full_output_callback=self.send_full_output_callback,
             history_callback=self.history_callback,
@@ -85,18 +87,9 @@ class LLMResponsePipeline:#20260621_kpopmodder
             normalized_input,
             screen_question_decision=screen_question_decision,
         )
-        model_history = self.interaction_context.filter_history_for_model(history)#20260622_kpopmodder
-
-        if normalized_input.kind != LLMInteractionContext.SCREEN_KIND:#20260621_kpopmodder
-            self._record_raw_event(#20260621_kpopmodder
-                event_type="user_message",
-                value=normalized_input.display_text,
-                source="user",
-                metadata={
-                    "kind": normalized_input.kind,
-                    "remember_history": normalized_input.remember_history,
-                },
-            )
+        model_history = self._model_history_with_fallback(#20260720_kpopmodder
+            self.interaction_context.filter_history_for_model(history)
+        )
 
         log_print(f"history: {model_history}")#20260612_kpopmodder
         self.start_of_response = True
@@ -110,6 +103,7 @@ class LLMResponsePipeline:#20260621_kpopmodder
         )
 
         if memory_command_response:#20260621_kpopmodder
+            self._record_user_input_event(normalized_input)#20260720_kpopmodder
             yield from self.post_processor.handle_memory_command_response(#20260706_kpopmodder
                 memory_command_response,
                 normalized_input,
@@ -117,6 +111,7 @@ class LLMResponsePipeline:#20260621_kpopmodder
                 set_output_callback=self._set_llm_output,
                 send_stream_output_callback=self.send_stream_output,
             )
+            self._remember_model_history_turn(normalized_input, self.LLM_output)#20260720_kpopmodder
             return
 
         self.memory_bridge.set_memory_router_ai_callback(#20260626_kpopmodder
@@ -125,7 +120,10 @@ class LLMResponsePipeline:#20260621_kpopmodder
         augmented_system_prompt = self._build_augmented_system_prompt(#20260621_kpopmodder
             system_prompt,
             query=normalized_input.display_text,#20260622_kpopmodder: 사용자가 실제로 말한 문장으로 과거를 검색한다.
+            active_history=model_history,#20260720_kpopmodder: Keep short-term memory from duplicating model history.
         )
+
+        self._record_user_input_event(normalized_input)#20260720_kpopmodder
 
         #result = current_plugin.predict(model_message, model_history, system_prompt)#20260621_kpopmodder
         result = current_plugin.predict(#20260621_kpopmodder
@@ -145,11 +143,13 @@ class LLMResponsePipeline:#20260621_kpopmodder
         else:#20260614_kpopmodder
             yield from self._predict_non_generator(result, response_generation)
 
-        self.post_processor.finish_full_response(#20260706_kpopmodder
+        finished = self.post_processor.finish_full_response(#20260706_kpopmodder
             self.LLM_output,
             normalized_input,
             source=current_plugin.__class__.__name__,
         )
+        if finished:#20260720_kpopmodder
+            self._remember_model_history_turn(normalized_input, self.LLM_output)
 
     def _predict_generator(self, result, response_generation):
         processed_idx = 0
@@ -244,10 +244,63 @@ class LLMResponsePipeline:#20260621_kpopmodder
     def _set_llm_output(self, value):#20260706_kpopmodder
         self.LLM_output = value
 
-    def _build_augmented_system_prompt(self, system_prompt, query=None):#20260622_kpopmodder: 질문별 회상 컨텍스트를 LLM 프롬프트에 붙인다.
+    def _model_history_with_fallback(self, model_history):#20260720_kpopmodder
+        if model_history:
+            self._replace_recent_model_history(model_history)
+            return model_history
+
+        fallback_history = self._copy_recent_model_history()
+        if fallback_history:
+            log_print(
+                "[LLM] active history empty; using recent in-process "
+                "model history fallback."
+            )
+        return fallback_history
+
+    def _replace_recent_model_history(self, model_history):#20260720_kpopmodder
+        self._recent_model_history = [
+            [str(user or "").strip(), str(assistant or "").strip()]
+            for user, assistant in self._iter_history_pairs(model_history)
+            if str(user or "").strip() or str(assistant or "").strip()
+        ][-self._recent_model_history_limit:]
+
+    def _remember_model_history_turn(self, normalized_input, llm_output):#20260720_kpopmodder
+        if (
+            not getattr(normalized_input, "remember_history", True)
+            or getattr(normalized_input, "kind", "") == LLMInteractionContext.SCREEN_KIND
+        ):
+            return
+
+        user_text = str(getattr(normalized_input, "display_text", "") or "").strip()
+        assistant_text = str(llm_output or "").strip()
+        if not user_text or not assistant_text:
+            return
+
+        new_pair = [user_text, assistant_text]
+        if self._recent_model_history and self._recent_model_history[-1] == new_pair:
+            return
+
+        self._recent_model_history.append(new_pair)
+        self._recent_model_history = (
+            self._recent_model_history[-self._recent_model_history_limit:]
+        )
+
+    def _copy_recent_model_history(self):#20260720_kpopmodder
+        return [list(pair) for pair in self._recent_model_history]
+
+    def _iter_history_pairs(self, model_history):#20260720_kpopmodder
+        for entry in model_history or []:
+            try:
+                user, assistant = entry
+            except Exception:
+                continue
+            yield user, assistant
+
+    def _build_augmented_system_prompt(self, system_prompt, query=None, active_history=None):#20260622_kpopmodder: 질문별 회상 컨텍스트를 LLM 프롬프트에 붙인다.
         return self.memory_bridge.build_augmented_system_prompt(
             system_prompt,
             query=query,
+            active_history=active_history,#20260720_kpopmodder
         )
 
     def _try_handle_memory_command(self, message):#20260621_kpopmodder
@@ -255,6 +308,20 @@ class LLMResponsePipeline:#20260621_kpopmodder
 
     def _get_memory_store(self):#20260621_kpopmodder
         return self.memory_bridge.get_memory_store()
+
+    def _record_user_input_event(self, normalized_input):#20260720_kpopmodder
+        if normalized_input.kind == LLMInteractionContext.SCREEN_KIND:
+            return
+
+        self._record_raw_event(
+            event_type="user_message",
+            value=normalized_input.display_text,
+            source="user",
+            metadata={
+                "kind": normalized_input.kind,
+                "remember_history": normalized_input.remember_history,
+            },
+        )
 
     def _record_raw_event(
         self,

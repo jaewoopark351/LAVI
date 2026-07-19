@@ -419,6 +419,7 @@ class MemoryStore:
         observation,
         source="ScreenVision",
         ttl_seconds=600,#20260622_kpopmodder
+        confidence=0.95,#20260720_kpopmodder: ScreenVision UI-noise observations can opt into lower confidence.
     ):
         observation = str(observation or "").strip()
 
@@ -429,7 +430,7 @@ class MemoryStore:
             key="screen_observation",
             value=observation,
             source=source,
-            confidence=0.95,
+            confidence=confidence,
             ttl_seconds=ttl_seconds,
         )
 

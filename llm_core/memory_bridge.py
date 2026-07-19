@@ -12,7 +12,7 @@ class LLMMemoryBridge:
         self.memory_context_builder = memory_context_builder
         self.memory_command_handler = memory_command_handler
 
-    def build_augmented_system_prompt(self, system_prompt, query=None):#20260622_kpopmodder: 현재 질문을 기억 검색 질의로 전달한다.
+    def build_augmented_system_prompt(self, system_prompt, query=None, active_history=None):#20260622_kpopmodder: 현재 질문을 기억 검색 질의로 전달한다.
         base_prompt = str(system_prompt or "")
 
         if self.memory_context_builder is None:
@@ -22,10 +22,17 @@ class LLMMemoryBridge:
             try:
                 memory_context = self.memory_context_builder.build_context_text(
                     query=query,
+                    active_history=active_history,#20260720_kpopmodder: Avoid duplicating turns already visible to the LLM.
                 )
             except TypeError:
-                #20260622_kpopmodder: Keep compatibility with older/custom context builders.
-                memory_context = self.memory_context_builder.build_context_text()
+                try:
+                    #20260622_kpopmodder: Keep compatibility with query-aware custom context builders.
+                    memory_context = self.memory_context_builder.build_context_text(
+                        query=query,
+                    )
+                except TypeError:
+                    #20260622_kpopmodder: Keep compatibility with older/custom context builders.
+                    memory_context = self.memory_context_builder.build_context_text()
         except Exception as e:
             log_print(f"[Memory] context build failed: {e}")
             return base_prompt

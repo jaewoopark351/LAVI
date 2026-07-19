@@ -463,7 +463,7 @@ class DerivedMemoryBuilderTests(unittest.TestCase):
                         use_derived_fallback=True,
                     )
 
-                    results = retriever.retrieve("Neuro Shooting Stars")
+                    results = retriever.retrieve("YouTube video Neuro Shooting Stars")
 
                     self.assertTrue(results)
                     self.assertEqual("derived_memory", results[0]["recall_mode"])
@@ -490,7 +490,7 @@ class DerivedMemoryBuilderTests(unittest.TestCase):
             )
 
             with self.assertLogs("LAV", level="INFO") as captured:
-                results = retriever.retrieve("Neuro Shooting Stars")
+                results = retriever.retrieve("YouTube video Neuro Shooting Stars")
 
             self.assertTrue(results)
             self.assertEqual("derived_memory", results[0]["recall_mode"])
@@ -540,7 +540,7 @@ class DerivedMemoryBuilderTests(unittest.TestCase):
                 use_derived_fallback="prefer",
             )
 
-            results = retriever.retrieve("Ghost Hunter")
+            results = retriever.retrieve("screen Ghost Hunter")
 
             self.assertTrue(results)
             self.assertEqual("derived_memory", results[0]["recall_mode"])

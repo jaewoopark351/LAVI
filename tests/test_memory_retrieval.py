@@ -239,9 +239,11 @@ class MemoryRetrievalTests(unittest.TestCase):
                 ["내가 좋아하는 색이 뭐였지?"],
                 retriever.queries,
             )
-            self.assertIn("[관련된 과거 대화 회상", context)
+            self.assertIn("[Relevant recalled memory]", context)
             self.assertIn("파란색", context)
-            self.assertIn("현재 사실과 다를 수 있습니다", context)
+            self.assertIn("[LAVI memory context]", context)
+            self.assertIn("Use this memory only as supplemental context", context)
+            self.assertNotIn("[AI ", context)
 
     def test_generic_recall_returns_recent_meaningful_conversations(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -329,12 +331,12 @@ class MemoryRetrievalTests(unittest.TestCase):
             results = retriever.retrieve("옜날일 기억나?")
             recalled_text = "\n".join(item["text"] for item in results)
 
-            self.assertEqual(3, len(results))
-            self.assertIn("YouTube", recalled_text)
+            self.assertEqual(2, len(results))
+            self.assertNotIn("YouTube", recalled_text)
             self.assertIn("TTS 끊김", recalled_text)
             self.assertIn("고양이 나비", recalled_text)
             self.assertEqual(
-                1,
+                0,
                 sum(
                     item["kind"] == "screen_observation"
                     for item in results
@@ -399,9 +401,9 @@ class MemoryRetrievalTests(unittest.TestCase):
 
             context = builder.build_context_text(query="옛날일 기억나?")
 
-            self.assertIn("[최근 과거 사건 회상", context)
-            self.assertIn("과거형으로 대답", context)
-            self.assertIn("예전에 YouTube에서", context)
+            self.assertIn("[Recent recalled events]", context)
+            self.assertIn("Use only facts present in the bullets", context)
+            self.assertIn("do not infer unseen wins", context)
             self.assertIn("TTS 테스트", context)
 
     def test_deep_recall_context_promotes_concrete_song_titles(self):#20260627_kpopmodder
@@ -1102,7 +1104,7 @@ class MemoryRetrievalTests(unittest.TestCase):
         )
 
         results = retriever.retrieve(
-            "\ubd95\uad343rd \uae30\uc5b5\ub098\ub294 \uac70 \uc54c\ub824\uc918",
+            "\uc720\ud29c\ube0c\uc5d0\uc11c \ubd24\ub358 \ubd95\uad343rd \uc601\uc0c1 \uae30\uc5b5\ub098\ub294 \uac70 \uc54c\ub824\uc918",
             max_results_override=10,
         )
         recalled_text = "\n".join(item["text"] for item in results)
@@ -1186,6 +1188,127 @@ class MemoryRetrievalTests(unittest.TestCase):
         self.assertNotIn("Fake Song", recalled_text)
         self.assertNotIn("No specific memory", recalled_text)
 
+    def test_builder_excludes_screenvision_for_regular_topic_recall(self):#20260720_kpopmodder
+        class EmptyShortTermSelector:
+            def select(self, query=None, active_history=None):
+                return []
+
+        class RawStore:
+            def __init__(self, events):
+                self.events = list(events)
+
+            def get_raw_events(self, limit=2000):
+                if limit is None:
+                    return list(self.events)
+                return self.events[-int(limit):]
+
+            def get_working_memory(self):
+                return []
+
+            def get_session_memory(self):
+                return {}
+
+            def get_long_term_memory(self):
+                return {}
+
+        events = [
+            self._event(
+                "screen_observation",
+                (
+                    "ScreenVision StarCraft replay scoreboard shows "
+                    "Fake Screen Build."
+                ),
+                "2026-06-01 10:00:00",
+                1.0,
+                source="ScreenVision",
+            ),
+            self._event(
+                "user_message",
+                "StarCraft Monster bot connected through BWAPI client.",
+                "2026-06-01 10:00:01",
+                2.0,
+            ),
+            self._event(
+                "assistant_message",
+                "Monster is running with Client Connection.",
+                "2026-06-01 10:00:02",
+                3.0,
+            ),
+        ]
+        store = RawStore(events)
+        retriever = MemoryRetriever(
+            store,
+            max_raw_events=100,
+            max_results=3,
+            accuracy_first_raw_search=True,
+            minimum_score=0.1,
+        )
+        builder = MemoryContextBuilder(
+            store,
+            memory_retriever=retriever,
+            short_term_memory_selector=EmptyShortTermSelector(),
+        )
+
+        context = builder.build_context_text(query="StarCraft remember?")
+
+        self.assertIn("Monster bot connected", context)
+        self.assertNotIn("Fake Screen Build", context)
+
+    def test_builder_allows_screenvision_for_video_recall(self):#20260720_kpopmodder
+        class EmptyShortTermSelector:
+            def select(self, query=None, active_history=None):
+                return []
+
+        class RawStore:
+            def __init__(self, events):
+                self.events = list(events)
+
+            def get_raw_events(self, limit=2000):
+                if limit is None:
+                    return list(self.events)
+                return self.events[-int(limit):]
+
+            def get_working_memory(self):
+                return []
+
+            def get_session_memory(self):
+                return {}
+
+            def get_long_term_memory(self):
+                return {}
+
+        events = [
+            self._event(
+                "screen_observation",
+                (
+                    "ScreenVision YouTube page shows Cyber Angel ZERO "
+                    "Exception video playback."
+                ),
+                "2026-06-01 10:00:00",
+                1.0,
+                source="ScreenVision",
+            ),
+        ]
+        store = RawStore(events)
+        retriever = MemoryRetriever(
+            store,
+            max_raw_events=100,
+            max_results=3,
+            accuracy_first_raw_search=True,
+            minimum_score=0.1,
+        )
+        builder = MemoryContextBuilder(
+            store,
+            memory_retriever=retriever,
+            short_term_memory_selector=EmptyShortTermSelector(),
+        )
+
+        context = builder.build_context_text(
+            query="Youtube watched video remember?",
+        )
+
+        self.assertIn("Cyber Angel ZERO Exception", context)
+
     def test_retriever_does_not_call_derived_store_when_fallback_disabled(self):#20260626_kpopmodder
         class EmptyRawStore:
             def get_raw_events(self, limit=2000):
@@ -1259,13 +1382,58 @@ class MemoryRetrievalTests(unittest.TestCase):
         self.assertIn("[MemoryRetrieverDerivedMemoryFallbackFailed]", logs)
         self.assertIn("error_type=RuntimeError", logs)
 
+    def test_refresh_derived_memory_rebuilds_stale_index(self):#20260720_kpopmodder
+        from app_core.memory_bootstrap import refresh_derived_memory_if_stale
+        from memory_core.derived_memory_sqlite_store import (
+            DerivedMemorySQLiteStore,
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store = MemoryStore(memory_dir=temp_dir)
+            self._write_events(store.raw_events_path, [
+                self._event(
+                    "user_message",
+                    "LAVI project memory anchor",
+                    "2026-07-20 01:00:00",
+                    1.0,
+                ),
+                self._event(
+                    "assistant_message",
+                    "The project memory anchor was saved.",
+                    "2026-07-20 01:00:01",
+                    2.0,
+                ),
+                self._event(
+                    "screen_observation_decision",
+                    "Non-indexed decision event should not keep derived stale.",
+                    "2026-07-20 01:00:02",
+                    3.0,
+                ),
+            ])
+            store.initialize_raw_event_sqlite()
+            derived_store = DerivedMemorySQLiteStore(
+                os.path.join(temp_dir, "derived_memory.sqlite3")
+            )
+            derived_store.initialize()
+
+            refreshed = refresh_derived_memory_if_stale(
+                derived_store,
+                store,
+                {"stale": True, "row_count": 0},
+                auto_rebuild=True,
+            )
+
+            self.assertGreater(refreshed["row_count"], 0)
+            self.assertFalse(refreshed["stale"])
+
     def test_memory_bootstrap_wires_derived_fallback_disabled_by_default(self):#20260627_kpopmodder
         bootstrap_path = (
             Path(__file__).resolve().parents[1]
             / "app_core"
             / "memory_bootstrap.py"
         )
-        module = ast.parse(bootstrap_path.read_text(encoding="utf-8"))
+        bootstrap_text = bootstrap_path.read_text(encoding="utf-8")
+        module = ast.parse(bootstrap_text)
         config_text = (
             Path(__file__).resolve().parents[1] / "config.ini.example"
         ).read_text(encoding="utf-8")
@@ -1350,22 +1518,36 @@ class MemoryRetrievalTests(unittest.TestCase):
         self.assertIn("accuracy_first_raw_search = true", config_text)
 
         retriever_max_values = [
-            keyword.value.value
+            getattr(keyword.value, "id", "")
             for call in memory_retriever_calls
             for keyword in call.keywords
             if keyword.arg == "max_results"
-            and isinstance(keyword.value, ast.Constant)
         ]
-        self.assertIn(100, retriever_max_values)
+        self.assertIn("memory_retriever_max_results", retriever_max_values)
+        retriever_max_assignment = find_assignment("memory_retriever_max_results")
+        self.assertIn("max_results", constant_values(retriever_max_assignment))
+        self.assertIn("memory_retriever_max_results", constant_values(
+            retriever_max_assignment,
+        ))
+        self.assertIn(12, constant_values(retriever_max_assignment))
+        self.assertIn("max_results = 12", config_text)
 
         deep_recall_limits = [
-            keyword.value.value
+            getattr(keyword.value, "id", "")
             for call in memory_context_builder_calls
             for keyword in call.keywords
             if keyword.arg == "max_deep_recalled_items"
-            and isinstance(keyword.value, ast.Constant)
         ]
-        self.assertIn(100, deep_recall_limits)
+        self.assertIn("memory_max_deep_recalled_items", deep_recall_limits)
+        deep_recall_assignment = find_assignment("memory_max_deep_recalled_items")
+        self.assertIn("max_deep_recalled_items", constant_values(
+            deep_recall_assignment,
+        ))
+        self.assertIn("memory_context_max_deep_recalled_items", constant_values(
+            deep_recall_assignment,
+        ))
+        self.assertIn(12, constant_values(deep_recall_assignment))
+        self.assertIn("max_deep_recalled_items = 12", config_text)
 
         prefer_values = [
             getattr(keyword.value, "id", "")
@@ -1376,8 +1558,19 @@ class MemoryRetrievalTests(unittest.TestCase):
         self.assertIn("memory_prefer_derived_first", prefer_values)
         prefer_assignment = find_assignment("memory_prefer_derived_first")
         self.assertIn("prefer_derived_first", constant_values(prefer_assignment))
-        self.assertIn("false", constant_values(prefer_assignment))
-        self.assertIn("prefer_derived_first = false", config_text)
+        self.assertIn("true", constant_values(prefer_assignment))
+        self.assertIn("prefer_derived_first = true", config_text)
+        auto_rebuild_assignment = find_assignment(
+            "memory_auto_rebuild_derived_when_stale"
+        )
+        self.assertIn("auto_rebuild_derived_when_stale", constant_values(
+            auto_rebuild_assignment,
+        ))
+        self.assertIn("true", constant_values(auto_rebuild_assignment))
+        self.assertIn("auto_rebuild_derived_when_stale = true", config_text)
+        self.assertIn('derived_memory_stats.get("stale")', bootstrap_text)
+        self.assertIn("refresh_derived_memory_if_stale", bootstrap_text)
+        self.assertIn("prefer_derived_first is disabled", bootstrap_text)
 
     def test_memory_bootstrap_router_provider_defaults_to_rule_and_openai_is_opt_in(self):#20260627_kpopmodder
         project_root = Path(__file__).resolve().parents[1]

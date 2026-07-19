@@ -134,6 +134,7 @@ class DerivedMemoryBuilder:
         created_at = str(episode.get("created_at", "") or "")
         created_ts = self._float_or_zero(episode.get("created_ts"))
         now_ts = time.time()
+        episode_metadata = self._dict_value(episode.get("metadata"))#20260720_kpopmodder
 
         return {
             "kind": kind,
@@ -148,10 +149,11 @@ class DerivedMemoryBuilder:
             "last_created_at": created_at,
             "first_created_ts": created_ts,
             "last_created_ts": created_ts,
-            "confidence": self._confidence_for_kind(kind),
+            "confidence": self._confidence_for_episode(kind, episode_metadata),#20260720_kpopmodder
             "metadata": {
                 "derived_from": "raw_events",
                 "episode_kind": kind,
+                **episode_metadata,
                 "source_event_ids": self._list_value(
                     episode.get("raw_event_ids"),
                 ),
@@ -331,6 +333,15 @@ class DerivedMemoryBuilder:
             return 0.75
         return 0.65
 
+    def _confidence_for_episode(self, kind, metadata):#20260720_kpopmodder
+        confidence = self._confidence_for_kind(kind)
+        if (
+            kind == "screen_observation"
+            and self._dict_value(metadata).get("screen_memory_quality") == "ui_noise"
+        ):
+            return min(confidence, 0.35)
+        return confidence
+
     def _float_or_zero(self, value):
         try:
             return float(value)
@@ -343,6 +354,11 @@ class DerivedMemoryBuilder:
         if value is None:
             return []
         return [value]
+
+    def _dict_value(self, value):#20260720_kpopmodder
+        if isinstance(value, dict):
+            return dict(value)
+        return {}
 
     def _dedupe_list(self, values):
         result = []

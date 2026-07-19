@@ -2,6 +2,7 @@ import os
 
 from core.config_manager import config_manager#20260626_kpopmodder
 from core.logger import log_print
+from memory_core.derived_memory_builder import DerivedMemoryBuilder#20260720_kpopmodder
 from memory_core.derived_memory_sqlite_store import DerivedMemorySQLiteStore#20260626_kpopmodder
 from memory_core.memory_context_builder import MemoryContextBuilder#20260621_kpopmodder
 from memory_core.memory_retriever import MemoryRetriever#20260622_kpopmodder
@@ -25,19 +26,97 @@ def memory_router_config_bool(config, short_key, recommended_key, default):#2026
     return str(value).lower() not in {"0", "false", "no", "off"}
 
 
+def memory_router_config_int(config, short_key, recommended_key, default):#20260720_kpopmodder
+    value = memory_router_config_value(
+        config,
+        short_key,
+        recommended_key,
+        default,
+    )
+    try:
+        return max(1, int(value))
+    except Exception:
+        return max(1, int(default))
+
+
+DERIVED_MEMORY_INDEX_EVENT_TYPES = (#20260720_kpopmodder
+    "user_message",
+    "assistant_message",
+    "screen_observation",
+    "screen_observation_silent",
+)
+
+
 def memory_latest_raw_event_ts(memory_store):#20260627_kpopmodder: Cheap stale check for the optional derived recall index.
+    latest_ts = None#20260720_kpopmodder: Compare derived memory only against indexable raw events.
     try:
-        events = memory_store.get_raw_events(limit=1)
+        if hasattr(memory_store, "iter_raw_events"):
+            for event in memory_store.iter_raw_events(
+                limit=None,
+                event_types=DERIVED_MEMORY_INDEX_EVENT_TYPES,
+            ):
+                try:
+                    created_ts = float(event.get("created_ts", 0) or 0)
+                except Exception:
+                    continue
+                if latest_ts is None or created_ts > latest_ts:
+                    latest_ts = created_ts
+            return latest_ts
+    except Exception:
+        pass
+
+    try:
+        events = memory_store.get_raw_events(limit=2000)
     except Exception:
         return None
 
-    if not events:
-        return None
+    for event in reversed(events or []):
+        if str(event.get("event_type", "")) not in DERIVED_MEMORY_INDEX_EVENT_TYPES:
+            continue
+        try:
+            return float(event.get("created_ts", 0) or 0)
+        except Exception:
+            return None
+
+    return None
+
+
+def refresh_derived_memory_if_stale(
+    derived_store,
+    memory_store,
+    stats,
+    auto_rebuild=True,
+):#20260720_kpopmodder: Rebuild stale derived recall index once before disabling derived-first mode.
+    if not bool((stats or {}).get("stale")):
+        return stats or {}
+
+    if not auto_rebuild:
+        log_print(
+            "[Memory][Warning] derived_memory.sqlite3 is stale; "
+            "auto rebuild is disabled."
+        )
+        return stats or {}
 
     try:
-        return float(events[-1].get("created_ts", 0) or 0)
-    except Exception:
-        return None
+        raw_events = memory_store.get_raw_events(limit=None)
+        rebuild_stats = DerivedMemoryBuilder().rebuild(
+            raw_events,
+            derived_store=derived_store,
+            clear=True,
+        )
+        refreshed_stats = derived_store.get_stats(
+            raw_latest_created_ts=memory_latest_raw_event_ts(memory_store),
+        )
+        log_print(
+            "[Memory] derived_memory.sqlite3 auto-rebuilt "
+            f"(raw_events={rebuild_stats.get('raw_event_count', 0)}, "
+            f"rows={refreshed_stats.get('row_count', 0)}, "
+            f"stale={refreshed_stats.get('stale', False)})"
+        )
+        return refreshed_stats
+    except Exception as e:
+        log_print(f"[Memory][Warning] derived_memory.sqlite3 auto rebuild failed: {e}")
+        return stats or {}
 
 
 def log_derived_memory_startup_state(
@@ -50,7 +129,8 @@ def log_derived_memory_startup_state(
     )
     log_print(
         "[Memory] SQLite derived recall index ready "
-        "(fallback_enabled=False, source_of_truth=False, "
+        "(retriever_fallback_enabled=False, source_of_truth=False, "
+        f"prefer_derived_first={prefer_derived_first}, "
         f"rows={stats.get('row_count', 0)}, "
         f"stale={stats.get('stale', False)}): "
         f"{derived_store.db_path}"
@@ -60,6 +140,7 @@ def log_derived_memory_startup_state(
             "[Memory][Warning] prefer_derived_first=true but "
             "derived_memory.sqlite3 is empty; raw recall fallback will be used."
         )
+    return stats
 
 
 def bootstrap_memory(current_module_directory):#20260630_kpopmodder: Build memory services for main.py startup.
@@ -75,22 +156,41 @@ def bootstrap_memory(current_module_directory):#20260630_kpopmodder: Build memor
         memory_router_config,
         "prefer_derived_first",
         "memory_router_prefer_derived_first",
-        "false",
+        "true",
+    )
+    memory_auto_rebuild_derived_when_stale = memory_router_config_bool(#20260720_kpopmodder
+        memory_router_config,
+        "auto_rebuild_derived_when_stale",
+        "memory_router_auto_rebuild_derived_when_stale",
+        "true",
     )
     derived_memory_store = None#20260626_kpopmodder
+    derived_memory_stats = {}#20260720_kpopmodder
     try:#20260626_kpopmodder: Derived DB is a fallback recall index; raw_events remain source of truth.
         derived_memory_store = DerivedMemorySQLiteStore(
             os.path.join(memory_dir, "derived_memory.sqlite3")
         )
         derived_memory_store.initialize()
-        log_derived_memory_startup_state(
+        derived_memory_stats = log_derived_memory_startup_state(
             derived_memory_store,
             memory_store,
             memory_prefer_derived_first,
         )
+        derived_memory_stats = refresh_derived_memory_if_stale(
+            derived_memory_store,
+            memory_store,
+            derived_memory_stats,
+            auto_rebuild=memory_auto_rebuild_derived_when_stale,
+        )
     except Exception as e:
         derived_memory_store = None
         log_print(f"[Memory] SQLite derived memory store unavailable: {e}")
+    if memory_prefer_derived_first and bool(derived_memory_stats.get("stale")):
+        memory_prefer_derived_first = False#20260720_kpopmodder
+        log_print(
+            "[Memory][Warning] derived_memory.sqlite3 is stale; "
+            "prefer_derived_first is disabled for this run."
+        )
     memory_allow_single_screen_observation_fallback = memory_router_config_bool(#20260627_kpopmodder
         memory_router_config,
         "allow_single_screen_observation_fallback",
@@ -103,9 +203,21 @@ def bootstrap_memory(current_module_directory):#20260630_kpopmodder: Build memor
         "memory_router_accuracy_first_raw_search",
         "true",
     )
+    memory_retriever_max_results = memory_router_config_int(#20260720_kpopmodder
+        memory_router_config,
+        "max_results",
+        "memory_retriever_max_results",
+        12,
+    )
+    memory_max_deep_recalled_items = memory_router_config_int(#20260720_kpopmodder
+        memory_router_config,
+        "max_deep_recalled_items",
+        "memory_context_max_deep_recalled_items",
+        12,
+    )
     memory_retriever = MemoryRetriever(#20260622_kpopmodder
         memory_store,
-        max_results=100,#20260627_kpopmodder: Watched/all-memory recall favors broad raw evidence over terse summaries.
+        max_results=memory_retriever_max_results,#20260720_kpopmodder: Cap broad recall evidence before prompt injection.
         derived_store=derived_memory_store,#20260626_kpopmodder
         use_derived_fallback=False,#20260627_kpopmodder: Keep runtime recall raw-first; tests cover opt-in derived fallback.
         allow_single_screen_observation_fallback=memory_allow_single_screen_observation_fallback,#20260627_kpopmodder
@@ -161,6 +273,6 @@ def bootstrap_memory(current_module_directory):#20260630_kpopmodder: Build memor
         memory_retriever=memory_retriever,#20260622_kpopmodder
         memory_router=memory_router,#20260626_kpopmodder
         prefer_derived_first=memory_prefer_derived_first,#20260626_kpopmodder
-        max_deep_recalled_items=100,#20260627_kpopmodder: Preserve more raw-backed facts for watched/all-memory requests.
+        max_deep_recalled_items=memory_max_deep_recalled_items,#20260720_kpopmodder: Avoid 100-item deep recall prompt floods.
     )
     return memory_store, memory_context_builder

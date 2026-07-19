@@ -143,6 +143,7 @@ class ScreenObservationDispatchHelperTests(unittest.TestCase):
         self.assertEqual("A browser window is visible.", payload["observation"])
         self.assertEqual("[Manual] A browser window is visible.", payload["display_text"])
         self.assertFalse(payload["remember_history"])
+        self.assertEqual("normal", payload["metadata"]["screen_memory_quality"])
         self.assertIn("[Manual]", payload["text"])
         self.assertIn("What is on screen?", payload["text"])
 
@@ -171,13 +172,55 @@ class ScreenObservationDispatchHelperTests(unittest.TestCase):
         )
 
         self.assertEqual(
-            [{"observation": "A game lobby is visible.", "source": "Auto"}],
+            [{
+                "observation": "A game lobby is visible.",
+                "source": "Auto",
+                "confidence": 0.95,
+            }],
             memory_store.observations,
         )
         self.assertEqual("screen_observation_silent", memory_store.raw_events[0]["event_type"])
         self.assertEqual("A game lobby is visible.", memory_store.raw_events[0]["value"])
         self.assertTrue(memory_store.raw_events[0]["metadata"]["silent"])
         self.assertFalse(memory_store.raw_events[0]["metadata"]["remember_history"])
+        self.assertEqual(
+            "normal",
+            memory_store.raw_events[0]["metadata"]["screen_memory_quality"],
+        )
+
+    def test_marks_self_ui_observation_as_low_confidence(self):#20260720_kpopmodder
+        class MemoryStore:
+            def __init__(self):
+                self.observations = []
+                self.raw_events = []
+
+            def add_screen_observation(self, **kwargs):
+                self.observations.append(kwargs)
+
+            def add_raw_event(self, **kwargs):
+                self.raw_events.append(kwargs)
+
+        memory_store = MemoryStore()
+        helper = ScreenObservationDispatchHelper(memory_store)
+
+        helper.save_observation(
+            observation="OBS Studio shows a Codex chat window.",
+            question="latest",
+            source="Auto",
+            event_type="screen_observation_silent",
+            error_log_message="[Memory] silent screen observation save failed",
+            silent=True,
+        )
+
+        self.assertEqual([], memory_store.observations)
+        self.assertEqual(
+            "ui_noise",
+            memory_store.raw_events[0]["metadata"]["screen_memory_quality"],
+        )
+        self.assertIn(
+            "codex",
+            memory_store.raw_events[0]["metadata"]["screen_memory_noise_terms"],
+        )
 
 
 class ScreenObservationMemoryDispatchTests(unittest.TestCase):
@@ -217,7 +260,11 @@ class ScreenObservationMemoryDispatchTests(unittest.TestCase):
         self.assertEqual("Auto", owner.last_screen_observation_source)
         self.assertGreater(owner.last_screen_observation_time, 0.0)
         self.assertEqual(
-            [{"observation": "A game lobby is visible.", "source": "Auto"}],
+            [{
+                "observation": "A game lobby is visible.",
+                "source": "Auto",
+                "confidence": 0.95,
+            }],
             owner.memory_store.observations,
         )
         self.assertEqual(
@@ -260,7 +307,11 @@ class ScreenObservationMemoryDispatchTests(unittest.TestCase):
         )
 
         self.assertEqual(
-            [{"observation": "A browser is visible.", "source": "Manual"}],
+            [{
+                "observation": "A browser is visible.",
+                "source": "Manual",
+                "confidence": 0.95,
+            }],
             owner.memory_store.observations,
         )
         self.assertEqual("screen_observation", owner.memory_store.raw_events[0]["event_type"])

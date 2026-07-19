@@ -77,13 +77,13 @@ class MemoryConsolidator:#20260622_kpopmodder: 원본 이벤트를 회상 가능
             "raw_event_ids": self._event_ids(user_event, assistant_event),
             "raw_line_hashes": self._line_hashes(user_event, assistant_event),
             "created_at": (
-                user_event.get("created_at")
-                or assistant_event.get("created_at")
+                assistant_event.get("created_at")
+                or user_event.get("created_at")
                 or ""
             ),
             "created_ts": (
-                user_event.get("created_ts")
-                or assistant_event.get("created_ts")
+                assistant_event.get("created_ts")
+                or user_event.get("created_ts")
                 or 0.0
             ),
         }
@@ -113,6 +113,7 @@ class MemoryConsolidator:#20260622_kpopmodder: 원본 이벤트를 회상 가능
             #20260626_kpopmodder: Screen recall can be traced back to raw_events.sqlite3.
             "raw_event_ids": self._event_ids(event),
             "raw_line_hashes": self._line_hashes(event),
+            "metadata": self._metadata(event),#20260720_kpopmodder
             "silent": (
                 str(event.get("event_type", ""))
                 == self.SILENT_SCREEN_EVENT
@@ -146,3 +147,9 @@ class MemoryConsolidator:#20260622_kpopmodder: 원본 이벤트를 회상 가능
             if line_hash:
                 hashes.append(line_hash)
         return hashes
+
+    def _metadata(self, event):#20260720_kpopmodder
+        metadata = event.get("metadata", {})
+        if isinstance(metadata, dict):
+            return dict(metadata)
+        return {}

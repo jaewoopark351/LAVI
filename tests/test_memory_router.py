@@ -416,12 +416,12 @@ class MemoryContextBuilderRouterTests(unittest.TestCase):
             [("Youtube 에 대해서 기억나는 거 전부 기억해줘", False)],
             retriever.queries,
         )
-        self.assertIn("[관련된 과거 대화 회상", context)
+        self.assertIn("[Relevant recalled memory]", context)
         self.assertIn(
             "memory result for Youtube 에 대해서 기억나는 거 전부 기억해줘",
             context,
         )
-        self.assertNotIn("[기억 저장 요청 처리", context)
+        self.assertNotIn("[Memory save request]", context)
 
     def test_builder_uses_router_query_when_memory_needed(self):
         retriever = FakeRetriever()
@@ -481,7 +481,7 @@ class MemoryContextBuilderRouterTests(unittest.TestCase):
         self.assertIn("memory result for Neuro song all memories", context)
         self.assertIn("memory result for Neuro song", context)
 
-    def test_builder_uses_deep_limit_for_explicit_topic_recall(self):#20260627_kpopmodder
+    def test_builder_uses_deep_limit_for_deep_topic_recall(self):#20260720_kpopmodder
         class WideRecallRetriever:
             def __init__(self):
                 self.calls = []
@@ -523,20 +523,163 @@ class MemoryContextBuilderRouterTests(unittest.TestCase):
         )
 
         context = builder.build_context_text(
-            query="\ubd95\uad343rd \uae30\uc5b5\ub098\ub294 \uac70 \uc54c\ub824\uc918",
+            query="\ubd95\uad343rd all memories",
         )
 
         self.assertEqual(
             [
                 (
-                    "\ubd95\uad343rd \uae30\uc5b5\ub098\ub294 \uac70 \uc54c\ub824\uc918",
+                    "\ubd95\uad343rd all memories",
                     4,
                 )
             ],
             retriever.calls,
         )
-        self.assertIn("Broad recall request", context)
+        self.assertIn("Deep recall request", context)
         self.assertIn("topic memory 3", context)
+
+    def test_builder_keeps_simple_recall_recent_only(self):#20260720_kpopmodder
+        class PolicyRetriever:
+            def __init__(self):
+                self.calls = []
+
+            def retrieve(
+                self,
+                query,
+                exclude_texts=None,
+                use_derived_fallback_override=None,
+                max_results_override=None,
+                allow_deep_raw_search=None,
+                include_screen_observations=None,
+            ):
+                self.calls.append({
+                    "query": query,
+                    "max_results": max_results_override,
+                    "allow_deep": allow_deep_raw_search,
+                    "include_screen": include_screen_observations,
+                })
+                return [{
+                    "text": f"memory result for {query}",
+                    "created_at": "2026-07-20 00:00:00",
+                    "recall_mode": "raw_recent",
+                }]
+
+        retriever = PolicyRetriever()
+        router = MemoryRouter(
+            provider="auto",
+            ai_response_callback=lambda system, user, timeout: json.dumps({
+                "intent": "search",
+                "need_memory": True,
+                "queries": ["StarCraft topic"],
+                "max_items": 2,
+            }),
+        )
+        builder = MemoryContextBuilder(
+            FakeStore(),
+            memory_retriever=retriever,
+            memory_router=router,
+            max_recalled_items=2,
+            max_deep_recalled_items=6,
+        )
+
+        context = builder.build_context_text(query="StarCraft remember?")
+
+        self.assertEqual([
+            {
+                "query": "StarCraft topic",
+                "max_results": 2,
+                "allow_deep": False,
+                "include_screen": False,
+            }
+        ], retriever.calls)
+        self.assertIn("[Relevant recalled memory]", context)
+        self.assertNotIn("Deep recall request", context)
+
+    def test_builder_allows_screen_recall_only_for_screen_query(self):#20260720_kpopmodder
+        class PolicyRetriever:
+            def __init__(self):
+                self.calls = []
+
+            def retrieve(
+                self,
+                query,
+                exclude_texts=None,
+                use_derived_fallback_override=None,
+                max_results_override=None,
+                allow_deep_raw_search=None,
+                include_screen_observations=None,
+            ):
+                self.calls.append({
+                    "query": query,
+                    "allow_deep": allow_deep_raw_search,
+                    "include_screen": include_screen_observations,
+                })
+                return [{
+                    "text": f"screen memory result for {query}",
+                    "created_at": "2026-07-20 00:00:00",
+                    "recall_mode": "raw_recent",
+                }]
+
+        retriever = PolicyRetriever()
+        builder = MemoryContextBuilder(
+            FakeStore(),
+            memory_retriever=retriever,
+            memory_router=MemoryRouter(provider="rule"),
+        )
+
+        context = builder.build_context_text(
+            query="Youtube watched video remember?",
+        )
+
+        self.assertTrue(retriever.calls)
+        self.assertTrue(retriever.calls[0]["include_screen"])
+        self.assertIn("[Relevant recalled memory]", context)
+
+    def test_builder_skips_raw_recall_when_short_term_is_confident(self):#20260720_kpopmodder
+        class ConfidentShortTermSelector:
+            def select(self, query=None, active_history=None):
+                return [{
+                    "score": 0.55,
+                    "user_text": "GPU power limit was lowered.",
+                    "assistant_text": "Performance drops a little, heat drops more.",
+                    "context_text": (
+                        "User: GPU power limit was lowered.\n"
+                        "Assistant: Performance drops a little, heat drops more."
+                    ),
+                }]
+
+            def format_selected(self, items):
+                return (
+                    "[Related recent conversation]\n"
+                    "- User: GPU power limit was lowered.\n"
+                    "- Assistant: Performance drops a little, heat drops more."
+                )
+
+        class TrackingRetriever:
+            def __init__(self):
+                self.calls = []
+
+            def retrieve(self, *args, **kwargs):
+                self.calls.append((args, kwargs))
+                return [{
+                    "text": "stale raw memory that should not be injected",
+                    "created_at": "2026-06-01 00:00:00",
+                }]
+
+        retriever = TrackingRetriever()
+        builder = MemoryContextBuilder(
+            FakeStore(),
+            memory_retriever=retriever,
+            short_term_memory_selector=ConfidentShortTermSelector(),
+        )
+
+        context = builder.build_context_text(
+            query="Does that hurt GPU performance a lot?",
+        )
+
+        self.assertEqual([], retriever.calls)
+        self.assertIn("[Related recent conversation]", context)
+        self.assertNotIn("stale raw memory", context)
 
     def test_builder_falls_back_to_existing_retriever_on_router_exception(self):
         class FailingRouter:

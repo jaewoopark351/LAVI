@@ -18,13 +18,17 @@ provider = rule
 timeout_sec = 5
 max_items = 5
 fallback_to_keyword = true
+max_results = 12
+max_deep_recalled_items = 12
 
 ; Accuracy-first recall: scan the full raw_events store before accepting a fast recent hit.
 ; This is slower, but preserves older DB-backed memories better.
 accuracy_first_raw_search = true
 
-; Experimental: try derived_memory.sqlite3 before raw recall when the router asks for memory.
-prefer_derived_first = false
+; Prefer derived_memory.sqlite3 before raw recall when the router asks for memory.
+; If the derived index is stale, startup tries one local rebuild before disabling this for that run.
+prefer_derived_first = true
+auto_rebuild_derived_when_stale = true
 
 ; Experimental: allow source_event_count=1 and duplicate_count=0 screen_observation rows.
 allow_single_screen_observation_fallback = false
