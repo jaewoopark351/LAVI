@@ -136,6 +136,7 @@ class StarCraft2FacadeService:
         args,
         proxy_ports,
         ai_race=None,
+        bot_display_name=None,
     ):
         if self.local_match_service is None:
             return self._local_match_missing_status()
@@ -145,6 +146,7 @@ class StarCraft2FacadeService:
             args,
             proxy_ports,
             ai_race=ai_race,
+            bot_display_name=bot_display_name,
         )
         self._sync_local_match_runtime_context(
             result=result,
@@ -153,6 +155,7 @@ class StarCraft2FacadeService:
                 working_directory=working_directory,
                 args=args,
                 proxy_ports=proxy_ports,
+                bot_display_name=bot_display_name,
             ),
         )
         return result
@@ -302,6 +305,7 @@ class StarCraft2FacadeService:
         args,
         proxy_ports,
         ai_race=None,
+        bot_display_name=None,
     ):
         return self.local_match_status_json(
             result=self.start_local_match(
@@ -310,6 +314,7 @@ class StarCraft2FacadeService:
                 args=args,
                 proxy_ports=proxy_ports,
                 ai_race=ai_race,
+                bot_display_name=bot_display_name,
             )
         )
 

@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+import os
+import re
 from typing import Any, Callable, Dict, Optional, Union
 
 from app_core.extensions import (
@@ -39,6 +41,8 @@ LOCAL_MATCH_AI_BY_RACE = {
     "Protoss": "sharkbot",
     "Zerg": "changeling",
 }
+_SAFE_BOT_DISPLAY_NAME = re.compile(r"^[A-Za-z0-9_. -]{1,32}$")
+_CHANGELING_BOT_NAME_LINE = re.compile(r"(?m)^\s*MyBotName\s*:\s*.*$")
 
 
 class StarCraft2LocalMatchService:
@@ -108,6 +112,7 @@ class StarCraft2LocalMatchService:
         args,
         proxy_ports,
         ai_race=None,
+        bot_display_name=None,
     ) -> LocalMatchRuntimeStatusDTO:
         command = self._build_local_match_command(
             executable_path=executable_path,
@@ -115,6 +120,7 @@ class StarCraft2LocalMatchService:
             args=args,
             proxy_ports=proxy_ports,
             ai_race=ai_race,
+            bot_display_name=bot_display_name,
         )
         if isinstance(command, StarCraft2CommandResult):
             return self._make_local_match_status(result=command)
@@ -127,6 +133,7 @@ class StarCraft2LocalMatchService:
                 args=args,
                 proxy_ports=proxy_ports,
                 bot_name=command.bot_name,
+                bot_display_name=command.bot_display_name or None,
                 keep_local_match_identity_args=command.keep_local_match_identity_args,
             ),
         )
@@ -161,6 +168,7 @@ class StarCraft2LocalMatchService:
         args,
         proxy_ports,
         ai_race=None,
+        bot_display_name=None,
     ):
         status = self.start_local_match(
             executable_path=executable_path,
@@ -168,6 +176,7 @@ class StarCraft2LocalMatchService:
             args=args,
             proxy_ports=proxy_ports,
             ai_race=ai_race,
+            bot_display_name=bot_display_name,
         )
         return self._local_match_status_json(result=status)
 
@@ -178,6 +187,7 @@ class StarCraft2LocalMatchService:
         args,
         proxy_ports,
         ai_race=None,
+        bot_display_name=None,
     ) -> Union[StarCraft2LocalMatchCommand, StarCraft2CommandResult]:
         selected_ai_race = self.arg_utils.normalize_sc2_race(
             ai_race
@@ -214,6 +224,7 @@ class StarCraft2LocalMatchService:
             ).as_dict()["args"],
             proxy_ports=str(proxy_ports or ""),
             bot_name=bot_name,
+            bot_display_name=str(bot_display_name or "").strip(),
             ai_race=selected_ai_race,
             human_race=selected_human_race,
             capture_output=True,
@@ -238,6 +249,7 @@ class StarCraft2LocalMatchService:
             args=launch_template.as_dict()["args"],
             proxy_ports=command.proxy_ports,
             bot_name=command.bot_name,
+            bot_display_name=command.bot_display_name or None,
             keep_local_match_identity_args=command.keep_local_match_identity_args,
         )
         config["launch_template"] = launch_template.as_dict()
@@ -265,6 +277,7 @@ class StarCraft2LocalMatchService:
                 args=launch_template.as_dict()["args"],
                 proxy_ports=command.proxy_ports,
                 bot_name=command.bot_name,
+                bot_display_name=command.bot_display_name or None,
                 keep_local_match_identity_args=command.keep_local_match_identity_args,
             )
             config["runtime_download"] = runtime_download
@@ -289,6 +302,10 @@ class StarCraft2LocalMatchService:
                 f"[StarCraft2LocalMatchService] preflight failed: {result.to_dict()}"
             )
             return result
+
+        config["bot_display_name_prepare"] = self._prepare_local_bot_display_name(
+            config
+        )
 
         #20260715_kpopmodder: Pass the normalized DTO to the launcher boundary.
         start_result = self._launch_local_match_process(
@@ -467,5 +484,93 @@ class StarCraft2LocalMatchService:
             log_print(f"[StarCraft2LocalMatchService] runtime snapshot failed: {e}")
             return {}
         return dict(snapshot) if isinstance(snapshot, dict) else {}
+
+    def _prepare_local_bot_display_name(self, config: Dict[str, Any]) -> Dict[str, Any]:
+        #20260720_kpopmodder: Keep the executable profile name as "changeling",
+        # but let the bot's own config advertise the chosen in-game AI name.
+        profile = config.get("bot_profile", {}) if isinstance(config, dict) else {}
+        bot_name = str(profile.get("name") or config.get("bot_name") or "").strip()
+        display_name = str(config.get("bot_display_name") or "").strip().strip("\"'")
+        if not display_name:
+            return {"ok": True, "applied": False, "skipped": "empty_display_name"}
+        if not _SAFE_BOT_DISPLAY_NAME.match(display_name):
+            return {
+                "ok": False,
+                "applied": False,
+                "error": "invalid_bot_display_name",
+                "display_name": display_name,
+            }
+        if bot_name.lower() != "changeling":
+            return {
+                "ok": True,
+                "applied": False,
+                "skipped": "unsupported_bot_display_name_target",
+                "bot_name": bot_name,
+                "display_name": display_name,
+            }
+        config_path = os.path.join(
+            str(config.get("working_directory") or ""),
+            "Bots",
+            "changeling",
+            "config.yml",
+        )
+        try:
+            return self._write_changeling_display_name(config_path, display_name)
+        except Exception as e:
+            log_print(
+                "[StarCraft2LocalMatchService] bot display name update failed: "
+                f"{e}"
+            )
+            return {
+                "ok": False,
+                "applied": False,
+                "error": "bot_display_name_update_failed",
+                "message": str(e),
+                "path": config_path,
+                "display_name": display_name,
+            }
+
+    def _write_changeling_display_name(
+        self,
+        config_path: str,
+        display_name: str,
+    ) -> Dict[str, Any]:
+        path = os.path.normpath(str(config_path or ""))
+        if not path or not os.path.isfile(path):
+            return {
+                "ok": True,
+                "applied": False,
+                "skipped": "changeling_config_missing",
+                "path": path,
+                "display_name": display_name,
+            }
+        with open(path, "r", encoding="utf-8", errors="replace") as file_handle:
+            original = file_handle.read()
+        replacement = f"MyBotName: {display_name}"
+        if _CHANGELING_BOT_NAME_LINE.search(original):
+            updated = _CHANGELING_BOT_NAME_LINE.sub(replacement, original, count=1)
+        else:
+            separator = "" if original.endswith(("\n", "\r")) else "\n"
+            updated = f"{original}{separator}{replacement}\n"
+        if updated == original:
+            return {
+                "ok": True,
+                "applied": False,
+                "skipped": "display_name_already_set",
+                "path": path,
+                "display_name": display_name,
+            }
+        with open(path, "w", encoding="utf-8", newline="") as file_handle:
+            file_handle.write(updated)
+        log_print(
+            "[StarCraft2LocalMatchService] changeling display name prepared: "
+            f"{display_name}"
+        )
+        return {
+            "ok": True,
+            "applied": True,
+            "path": path,
+            "display_name": display_name,
+        }
 
 _StarCraft2LocalMatchService = StarCraft2LocalMatchService

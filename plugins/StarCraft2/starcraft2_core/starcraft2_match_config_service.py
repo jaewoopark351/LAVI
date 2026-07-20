@@ -62,6 +62,7 @@ class _StarCraft2MatchConfigService:
         args=None,
         proxy_ports=None,
         bot_name: Optional[str] = None,
+        bot_display_name: Optional[str] = None,
         keep_local_match_identity_args: bool = False,
     ) -> Dict[str, Any]:
         #20260711_kpopmodder: Local Match intentionally no longer reads the LAN
@@ -93,6 +94,8 @@ class _StarCraft2MatchConfigService:
             config["args"] = args if isinstance(args, list) else str(args or "")
         if proxy_ports is not None and str(proxy_ports or "").strip():
             config["ports"] = proxy_ports
+        if bot_display_name is not None:
+            config["bot_display_name"] = str(bot_display_name or "").strip()
         normalized_args = self.arg_utils.normalize_ladder_args(config.get("args", []))
         config["args"] = (
             normalized_args
@@ -113,6 +116,7 @@ class _StarCraft2MatchConfigService:
                 break
         if preferred_bot_name:
             resolved_bot_name = preferred_bot_name
+        config["bot_name"] = resolved_bot_name
         profile = get_bot_launch_profile(resolved_bot_name)
         config["bot_profile"] = {
             "name": profile.name,

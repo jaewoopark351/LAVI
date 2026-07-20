@@ -76,6 +76,7 @@ class StarCraft2FacadeServiceTests(unittest.TestCase):
             "--bot changeling --race Protoss",
             "5677,5678",
             ai_race="Zerg",
+            bot_display_name=None,
         )
 
     def test_event_bus_emits_stable_event_contract(self):
@@ -142,12 +143,14 @@ class StarCraft2FacadeServiceTests(unittest.TestCase):
                 "args": ["--race", "Protoss"],
                 "ports": "5677,5678",
                 "bot_name": "changeling",
+                "bot_display_name": "LAVI",
             }
         )
 
         self.assertEqual([5677, 5678], command.proxy_ports)
         self.assertEqual("--race Protoss", command.args)
         self.assertEqual("changeling", command.bot_name)
+        self.assertEqual("LAVI", command.bot_display_name)
 
     def test_facade_missing_local_match_returns_typed_status_contract(self):
         facade = StarCraft2FacadeService(

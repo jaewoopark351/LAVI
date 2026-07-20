@@ -296,6 +296,7 @@ class StarCraft2:
         args,
         proxy_ports,
         ai_race=None,
+        bot_display_name=None,
     ):
         return self._facade_service.on_local_human_vs_changeling_click(
             executable_path,
@@ -303,6 +304,7 @@ class StarCraft2:
             args,
             proxy_ports,
             ai_race=ai_race,
+            bot_display_name=bot_display_name,
         )
 
     def on_local_match_stop_click(self):

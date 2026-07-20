@@ -135,6 +135,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
             "HumanLadder.json",
         ],
         "ports": [5677, 5678],
+        "bot_display_name": "LAVI",
         "check_hosts": ["127.0.0.1"],
         "connect_timeout_sec": 0.5,
         "capture_output": True,

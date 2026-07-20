@@ -24,6 +24,7 @@ class StarCraft2LocalMatchCommand(LocalMatchLaunchConfigDTO):
             args=dto.args,
             proxy_ports=list(dto.proxy_ports),
             bot_name=dto.bot_name,
+            bot_display_name=dto.bot_display_name,
             ai_race=dto.ai_race,
             human_race=dto.human_race,
             capture_output=dto.capture_output,

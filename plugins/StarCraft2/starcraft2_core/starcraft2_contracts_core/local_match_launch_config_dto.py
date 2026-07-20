@@ -71,6 +71,7 @@ class LocalMatchLaunchConfigDTO:
     args: str = ""
     proxy_ports: list[int] = field(default_factory=lambda: [5677, 5678])
     bot_name: str = ""
+    bot_display_name: str = ""
     ai_race: str = "Zerg"
     human_race: str = "Terran"
     capture_output: bool = True
@@ -115,6 +116,7 @@ class LocalMatchLaunchConfigDTO:
                 payload.get("proxy_ports", payload.get("ports"))
             ),
             bot_name=_coerce_str(payload.get("bot_name")),
+            bot_display_name=_coerce_str(payload.get("bot_display_name")),
             ai_race=_coerce_str(payload.get("ai_race"), "Zerg"),
             human_race=_coerce_str(payload.get("human_race"), "Terran"),
             capture_output=(
@@ -151,6 +153,7 @@ class LocalMatchLaunchConfigDTO:
             args=_coerce_str(args),
             proxy_ports=list(self.proxy_ports),
             bot_name=self.bot_name,
+            bot_display_name=self.bot_display_name,
             ai_race=self.ai_race,
             human_race=self.human_race,
             capture_output=self.capture_output,
@@ -181,6 +184,7 @@ class LocalMatchLaunchConfigDTO:
             "runtime_download": dict(self.runtime_download),
             "bot_profile_validation": dict(self.bot_profile_validation),
             "bot_name": self.bot_name,
+            "bot_display_name": self.bot_display_name,
             "ai_race": self.ai_race,
             "human_race": self.human_race,
             "capture_output": bool(self.capture_output),

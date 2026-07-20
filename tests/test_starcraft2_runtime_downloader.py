@@ -239,6 +239,53 @@ class StarCraft2RuntimeDownloaderTests(unittest.TestCase):
         start.assert_not_called()
         self.assertIn("bot_runtime_missing", result_json)
 
+    def test_local_match_applies_changeling_display_name_before_launch(self):
+        temp_dir = self._make_temp_dir()
+        runtime_dir = temp_dir / "external_runtime"
+        exe_path = temp_dir / "LavHumanVsBot.exe"
+        exe_path.write_text("stub", encoding="utf-8")
+        self._write_minimum_runtime(runtime_dir)
+        changeling_config = runtime_dir / "Bots" / "changeling" / "config.yml"
+        changeling_config.write_text(
+            "# change the name if you really want\n"
+            "MyBotName: changeling\n"
+            "UseData: true\n",
+            encoding="utf-8",
+        )
+
+        facade = StarCraft2()
+        facade.config_manager.config["local_match"] = {
+            "enabled": False,
+            "executable_path": str(exe_path),
+            "working_directory": str(runtime_dir),
+            "args": ["--bot", "changeling", "--race", "Protoss"],
+            "ports": [5677, 5678],
+            "capture_output": True,
+            "bot_display_name": "LAVI",
+        }
+
+        with mock.patch.object(
+            facade.ladder_proxy,
+            "start",
+            return_value={"ok": True, "running": True},
+        ) as start:
+            facade.on_local_human_vs_changeling_click(
+                str(exe_path),
+                str(runtime_dir),
+                "--bot changeling --race Protoss",
+                "5677,5678",
+                "Zerg",
+            )
+
+        started_config = start.call_args.args[0]
+
+        self.assertIn(
+            "MyBotName: LAVI",
+            changeling_config.read_text(encoding="utf-8"),
+        )
+        self.assertEqual("changeling", started_config.bot_name)
+        self.assertEqual("LAVI", started_config.bot_display_name)
+
 
 if __name__ == "__main__":
     unittest.main()

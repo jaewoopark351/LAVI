@@ -63,6 +63,11 @@ class _StarCraft2LocalMatchSection:
                     else str(local_match_config.get("ports", "5677,5678")),
                     lines=1,
                 )
+            owner.local_match_bot_display_name_box = gr.Textbox(
+                label="Local AI Display Name",
+                value=str(local_match_config.get("bot_display_name", "LAVI")),
+                lines=1,
+            )
             owner.local_match_args_box = gr.Textbox(
                 label="Local Human vs AI Args",
                 value=local_match_args_text,
@@ -86,6 +91,7 @@ class _StarCraft2LocalMatchSection:
             ]
             self.start_inputs = self.inputs + [
                 owner.local_match_ai_race_dropdown,
+                owner.local_match_bot_display_name_box,
             ]
         return self.inputs, self.start_inputs
 
