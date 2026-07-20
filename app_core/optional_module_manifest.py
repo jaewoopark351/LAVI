@@ -32,7 +32,7 @@ OPTIONAL_MODULE_MANIFEST = {
         "capabilities": ("game_extension", "chess"),
         "config_schema": {
             "Chess": {
-                "config_path": "plugins/Chess/config/chess_config.json",
+                "config_path": "config/chess_config.json",
                 "lc0_path": "",
                 "weights_path": "",
                 "web_server_port": 8790,

@@ -310,17 +310,31 @@ class RepositoryContractTests(unittest.TestCase):
 
         self.assertIn("modules.json", tracked)
 
-    def test_actual_local_config_files_are_not_tracked(self):
+    def test_shareable_config_files_are_tracked_for_deployment_artifacts(self):
+        tracked = set(self._git_ls_files())
+        required_config_paths = {
+            "config/audio_device_config.example.json",
+            "config/audio_device_config.json",
+            "config/gpu_device_config.json",
+            "config/gpu_device_config.example.json",
+            "config/modules.json",
+            "config/modules.core.json",
+            "config/modules.example.json",
+            "config/chess_config.json",
+            "config/chess_config.example.json",
+            "config/starcraft2_config.json",
+            "config/starcraft2_config.example.json",
+            "config/voice_input_config.example.json",
+        }
+
+        self.assertEqual([], sorted(required_config_paths - tracked))
+
+    def test_legacy_plugin_local_config_files_are_not_tracked(self):
         tracked = set(self._git_ls_files())
         local_config_paths = {
-            "config/gpu_device_config.json",
-            "config/modules.json",
-            "config/starcraft2_config.json",
+            "plugins/Chess/config/chess_config.json",
             "plugins/StarCraft2/config_starcraft2.json",
             "plugins/StarCraft2/config/starcraft2_config.json",
-            "plugins/Chess/config/chess_config.json",
-            "plugins/StarCraft116/config/starcraft116_config.json",
-            "plugins/GPTSoVITS/config/gpt_sovits_config.json",
         }
 
         self.assertFalse(tracked.intersection(local_config_paths))

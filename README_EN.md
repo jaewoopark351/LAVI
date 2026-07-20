@@ -537,7 +537,7 @@ The Chess plugin runs inside the Gradio tab as a local iframe chessboard.
 The chess engine is not implemented in Python. LAV launches a separately installed LC0 / Leela Chess Zero `lc0.exe` process and talks to it through the UCI protocol.
 
 Do not put `lc0.exe` or the BT4-it332 weight file in this repository.
-Only reference their local paths from `plugins\Chess\config\chess_config.json`.
+Only reference their local paths from `config\chess_config.json`.
 
 ### 1. Check the Python package
 
@@ -603,12 +603,12 @@ dir C:\Vtuber_Souorce_Code\lc0-v0.32.1-windows-gpu-nvidia-cuda12\BT4-1024x15x32h
 
 ### 4. Create the local Chess config
 
-`chess_config.json` is a local-only config file. Do not commit it.
-Copy the example file and edit the real LC0 and weight paths.
+`config\chess_config.json` is the default Chess config file.
+If it is missing, copy the example file and edit the real LC0 and weight paths.
 
 ```bat
-copy plugins\Chess\config\chess_config.example.json plugins\Chess\config\chess_config.json
-notepad plugins\Chess\config\chess_config.json
+copy config\chess_config.example.json config\chess_config.json
+notepad config\chess_config.json
 ```
 
 Example:

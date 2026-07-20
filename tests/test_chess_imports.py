@@ -67,6 +67,26 @@ class ChessImportTests(unittest.TestCase):
     def test_chess_config_paths_resolve_from_project_root(self):
         repo_root = os.path.dirname(os.path.dirname(__file__))
         plugin = Chess()
+        self.assertEqual(
+            os.path.normcase(os.path.join(repo_root, "config", "chess_config.json")),
+            os.path.normcase(plugin.config_path),
+        )
+        self.assertEqual(
+            os.path.normcase(
+                os.path.join(
+                    repo_root,
+                    "plugins",
+                    "Chess",
+                    "config",
+                    "chess_config.json",
+                )
+            ),
+            os.path.normcase(plugin.legacy_config_path),
+        )
+        self.assertEqual(
+            os.path.normcase(plugin.config_path),
+            os.path.normcase(plugin._active_config_path()),
+        )
         plugin.config = {
             "lc0_path": "plugins/Chess/lc0-v0.32.1-windows-gpu-nvidia-cuda12/lc0.exe",
             "weights_path": "plugins/Chess/lc0-v0.32.1-windows-gpu-nvidia-cuda12/BT4-1024x15x32h-swa-6147500-policytune-332.pb.gz",

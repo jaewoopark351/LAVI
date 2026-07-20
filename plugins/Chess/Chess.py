@@ -26,12 +26,22 @@ class Chess:
     def __init__(self):
         self.paths = LaviPaths()
         self.plugin_root = os.path.dirname(__file__)
-        self.config_dir = os.path.join(self.plugin_root, "config")
-        self.config_path = os.path.join(self.config_dir, "chess_config.json")
-        self.example_config_path = os.path.join(
-            self.config_dir,
+        self.legacy_config_dir = os.path.join(self.plugin_root, "config")
+        self.config_dir = str(self.paths.config_dir)
+        self.config_path = str(self.paths.config_path("chess_config.json"))
+        self.example_config_path = str(
+            self.paths.config_path("chess_config.example.json")
+        )
+        #20260720_kpopmodder: Prefer root config/ while preserving legacy plugin config fallback.
+        self.legacy_config_path = os.path.join(
+            self.legacy_config_dir,
+            "chess_config.json",
+        )
+        self.legacy_example_config_path = os.path.join(
+            self.legacy_config_dir,
             "chess_config.example.json",
         )
+        self.loaded_config_path = self.config_path
         self.static_dir = os.path.join(self.plugin_root, "web", "static")
         self.config = self._load_config()
         self.config_message = self._config_message()
@@ -109,21 +119,25 @@ class Chess:
             log_print(f"[Chess] auto_start_engine: {state.get('message', '')}")
 
     def _load_config(self):
-        if not os.path.exists(self.config_path):
+        config_path = self._active_config_path()
+        self.loaded_config_path = config_path
+        if not os.path.exists(config_path):
             return {}
 
         try:
-            with open(self.config_path, "r", encoding="utf-8") as file:
+            with open(config_path, "r", encoding="utf-8") as file:
                 return json.load(file)
         except Exception as e:
             log_print(f"[Chess] config load failed: {e}")
             return {}
 
     def _config_message(self):
-        if not os.path.exists(self.config_path):
+        config_path = self._active_config_path()
+        if not os.path.exists(config_path):
+            example_path = self._active_example_config_path()
             return (
                 "Chess config missing. Copy "
-                f"{self.example_config_path} to {self.config_path} and set "
+                f"{example_path} to {self.config_path} and set "
                 "lc0_path plus weights_path for BT4-it332."
             )
 
@@ -137,6 +151,18 @@ class Chess:
             return "Chess config missing required keys: " + ", ".join(missing)
 
         return ""
+
+    def _active_config_path(self):
+        for path in (self.config_path, self.legacy_config_path):
+            if os.path.exists(path):
+                return path
+        return self.config_path
+
+    def _active_example_config_path(self):
+        for path in (self.example_config_path, self.legacy_example_config_path):
+            if os.path.exists(path):
+                return path
+        return self.example_config_path
 
     def _build_engine(self):
         if self.config_message:
