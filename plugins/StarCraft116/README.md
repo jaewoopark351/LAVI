@@ -149,15 +149,15 @@ BWAPI project to an installed Win32 C++ toolset.
 Install:
 
 ```bat
-copy bin\Release\LAVEventExporter.dll C:\Vtuber_Souorce_Code\StarCraft_1.16\StarCraft\bwapi-data\AI\LAVEventExporter.dll
+copy bin\Release\LAVIEventExporter.dll C:\Vtuber_Souorce_Code\StarCraft_1.16\StarCraft\bwapi-data\AI\LAVIEventExporter.dll
 copy LAVEventExporter.ini.example C:\Vtuber_Souorce_Code\StarCraft_1.16\StarCraft\bwapi-data\AI\LAVEventExporter.ini
 ```
 
 Set `bwapi-data\bwapi.ini`:
 
 ```ini
-ai     = bwapi-data/AI/LAVEventExporter.dll
-ai_dbg = bwapi-data/AI/LAVEventExporter.dll
+ai     = bwapi-data/AI/LAVIEventExporter.dll
+ai_dbg = bwapi-data/AI/LAVIEventExporter.dll
 ```
 
 Set the plugin config flag when this path is intentionally enabled:

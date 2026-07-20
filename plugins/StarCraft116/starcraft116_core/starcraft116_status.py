@@ -146,7 +146,7 @@ class StarCraft116StatusReader:
             "values": {},
             "expected_bot_binary": self._basename(profile.get("bot_binary_path", "")),
             "expected_exporter_binary": self._basename(
-                exporter.get("expected_ai_binary", "LAVEventExporter.dll")
+                exporter.get("expected_ai_binary", "LAVIEventExporter.dll")
             ),
             "configured_ai_binary": "",
             "configured_ai_is_profile_bot": False,
@@ -519,10 +519,10 @@ class StarCraft116StatusReader:
         ):
             severity = "warning" if severity == "ok" else severity
             messages.append(
-                "BWAPI event exporter is enabled in LAV, but bwapi.ini is not using LAVEventExporter.dll."
+                "BWAPI event exporter is enabled in LAV, but bwapi.ini is not using LAVIEventExporter.dll."
             )
             next_actions.append(
-                "Set ai and ai_dbg to bwapi-data/AI/LAVEventExporter.dll after installing the exporter."
+                "Set ai and ai_dbg to bwapi-data/AI/LAVIEventExporter.dll after installing the exporter."
             )
 
         if process_errors:

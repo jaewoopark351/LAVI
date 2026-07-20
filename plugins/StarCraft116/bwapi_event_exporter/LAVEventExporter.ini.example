@@ -1,4 +1,4 @@
-#20260703_kpopmodder: Copy next to LAVEventExporter.dll as LAVEventExporter.ini.
+#20260703_kpopmodder: Copy next to LAVIEventExporter.dll as LAVEventExporter.ini.
 # Paths may be absolute, or relative to this DLL folder.
 wrapped_ai=Stardust.dll
 events_path=C:\Vtuber_Souorce_Code\LAVI\logs\starcraft116_game_events.jsonl

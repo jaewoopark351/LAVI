@@ -679,7 +679,7 @@ C:\Vtuber_Souorce_Code\StarCraft_1.16
 |       +-- bwapi.ini
 |       +-- AI
 |           +-- Stardust.dll
-|           +-- LAVEventExporter.dll
+|           +-- LAVIEventExporter.dll
 |           +-- LAVEventExporter.ini
 +-- BWAPI_4_4_0
     +-- Release_Binary
@@ -744,11 +744,11 @@ ai_dbg = bwapi-data/AI/Stardust.dll
 race   = Protoss
 ```
 
-To enable LAV's in-game commentary, load `LAVEventExporter.dll` as the BWAPI AI and let the exporter wrap Stardust internally.
+To enable LAV's in-game commentary, load `LAVIEventExporter.dll` as the BWAPI AI and let the exporter wrap Stardust internally.
 
 ```ini
-ai     = bwapi-data/AI/LAVEventExporter.dll
-ai_dbg = bwapi-data/AI/LAVEventExporter.dll
+ai     = bwapi-data/AI/LAVIEventExporter.dll
+ai_dbg = bwapi-data/AI/LAVIEventExporter.dll
 race   = Protoss
 ```
 
@@ -762,7 +762,7 @@ combat_cooldown_frames=96
 supply_block_cooldown_frames=240
 ```
 
-With this setup, BWAPI loads `LAVEventExporter.dll`; the exporter loads `Stardust.dll` again, so Stardust still controls the units.
+With this setup, BWAPI loads `LAVIEventExporter.dll`; the exporter loads `Stardust.dll` again, so Stardust still controls the units.
 At the same time, LAV can read `starcraft116_game_events.jsonl` and generate OpenAI/TTS reactions.
 
 ### 3.1. Install Monster with BWAPI 4.2.0
@@ -941,8 +941,8 @@ When it works, logs should show this flow:
 
 ```text
 [StarCraft116GameEvents] watching: ...\logs\starcraft116_game_events.jsonl
-Loaded the AI Module "bwapi-data\AI\LAVEventExporter.dll"
-BWAPI 4.4.0 ... now live using "LAVEventExporter.dll"
+Loaded the AI Module "bwapi-data\AI\LAVIEventExporter.dll"
+BWAPI 4.4.0 ... now live using "LAVIEventExporter.dll"
 [StarCraft116Reaction] game_event: type=...
 [StarCraft116Reaction] TTS: ...
 ```

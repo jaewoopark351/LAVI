@@ -5,7 +5,8 @@ import shutil
 
 class StarCraft116ExporterManager:
     #20260703_kpopmodder: Keeps exporter installation checks separate from launch/status logic.
-    EXPORTER_DLL_NAME = "LAVEventExporter.dll"
+    EXPORTER_DLL_NAME = "LAVIEventExporter.dll"
+    LEGACY_EXPORTER_DLL_NAME = "LAVEventExporter.dll"
     EXPORTER_INI_NAME = "LAVEventExporter.ini"
     STARDUST_PROFILE_NAME = "stardust"
     DEFAULT_EXPORTER_PROFILE_NAMES = {
@@ -84,6 +85,15 @@ class StarCraft116ExporterManager:
                 build_config,
                 self.EXPORTER_DLL_NAME,
             )
+            legacy_source_dll = os.path.join(
+                source_dir,
+                "bin",
+                build_config,
+                self.LEGACY_EXPORTER_DLL_NAME,
+            )
+            #20260720_kpopmodder: Allow existing pre-rename builds to install under the new BWAPI-facing DLL name.
+            if not os.path.isfile(source_dll) and os.path.isfile(legacy_source_dll):
+                source_dll = legacy_source_dll
 
         ai_dir = self._ai_dir(profile, profile_name)
         target_dll = os.path.join(ai_dir, self.EXPORTER_DLL_NAME) if ai_dir else ""
@@ -137,9 +147,9 @@ class StarCraft116ExporterManager:
         if not target_ini:
             return False, "LAVEventExporter.ini target path is not configured."
         if not source_dll or not os.path.isfile(source_dll):
-            return False, f"LAVEventExporter.dll source does not exist: {source_dll}"
+            return False, f"LAVIEventExporter.dll source does not exist: {source_dll}"
         if not target_dll:
-            return False, "LAVEventExporter.dll target path is not configured."
+            return False, "LAVIEventExporter.dll target path is not configured."
 
         target_dir = os.path.dirname(target_ini)
         if target_dir:

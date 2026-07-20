@@ -563,7 +563,7 @@ class StarCraft116PluginTests(unittest.TestCase):
         ai_dir.mkdir(parents=True)
         chaos_dir.mkdir(parents=True)
         bot_path = ai_dir / "Stardust.dll"
-        exporter_path = ai_dir / "LAVEventExporter.dll"
+        exporter_path = ai_dir / "LAVIEventExporter.dll"
         bot_path.write_text("", encoding="utf-8")
         exporter_path.write_text("", encoding="utf-8")
         (ai_dir / "LAVEventExporter.ini").write_text(
@@ -575,8 +575,8 @@ class StarCraft116PluginTests(unittest.TestCase):
         )
         (bwapi_dir / "bwapi.ini").write_text(
             "\n".join([
-                "ai     = bwapi-data/AI/LAVEventExporter.dll",
-                "ai_dbg = bwapi-data/AI/LAVEventExporter.dll",
+                "ai     = bwapi-data/AI/LAVIEventExporter.dll",
+                "ai_dbg = bwapi-data/AI/LAVIEventExporter.dll",
                 "race = Protoss",
             ]),
             encoding="utf-8",
@@ -615,7 +615,7 @@ class StarCraft116PluginTests(unittest.TestCase):
             snapshot = reader.snapshot()
 
         self.assertEqual(
-            "LAVEventExporter.dll",
+            "LAVIEventExporter.dll",
             snapshot["bwapi_ini"]["configured_ai_binary"],
         )
         self.assertTrue(snapshot["bwapi_ini"]["configured_ai_is_exporter"])
@@ -642,7 +642,7 @@ class StarCraft116PluginTests(unittest.TestCase):
         chaos_dir.mkdir(parents=True)
         bot_path = ai_dir / "Stardust.dll"
         bot_path.write_text("", encoding="utf-8")
-        (ai_dir / "LAVEventExporter.dll").write_text("", encoding="utf-8")
+        (ai_dir / "LAVIEventExporter.dll").write_text("", encoding="utf-8")
         (ai_dir / "LAVEventExporter.ini").write_text(
             "\n".join([
                 "wrapped_ai=Stardust.dll",
@@ -652,8 +652,8 @@ class StarCraft116PluginTests(unittest.TestCase):
         )
         (bwapi_dir / "bwapi.ini").write_text(
             "\n".join([
-                "ai     = bwapi-data/AI/LAVEventExporter.dll",
-                "ai_dbg = bwapi-data/AI/LAVEventExporter.dll",
+                "ai     = bwapi-data/AI/LAVIEventExporter.dll",
+                "ai_dbg = bwapi-data/AI/LAVIEventExporter.dll",
             ]),
             encoding="utf-8",
         )
@@ -901,7 +901,7 @@ class StarCraft116PluginTests(unittest.TestCase):
         internal_bwapi_dir.mkdir(parents=True)
         bundle_ai_dir.mkdir(parents=True)
         source_dir.mkdir(parents=True)
-        (source_dir / "LAVEventExporter.dll").write_bytes(b"lav-exporter")
+        (source_dir / "LAVIEventExporter.dll").write_bytes(b"lav-exporter")
         (runtime_ai_dir / "Stardust.dll").write_text("", encoding="utf-8")
         bot_path = bundle_ai_dir / "Stardust.dll"
         bot_path.write_text("", encoding="utf-8")
@@ -1073,7 +1073,7 @@ class StarCraft116PluginTests(unittest.TestCase):
         external_dir.mkdir(parents=True)
         source_dir = plugin_root / "bwapi_event_exporter" / "bin" / "Release"
         source_dir.mkdir(parents=True)
-        (source_dir / "LAVEventExporter.dll").write_bytes(b"lav-exporter")
+        (source_dir / "LAVIEventExporter.dll").write_bytes(b"lav-exporter")
         bot_path = external_dir / "BananaBrain.dll"
         bot_path.write_text("", encoding="utf-8")
         self.write_config(
@@ -1101,8 +1101,48 @@ class StarCraft116PluginTests(unittest.TestCase):
         self.assertIn(f"events_path={plugin_root / 'events.jsonl'}", ini_text)
         self.assertEqual(
             b"lav-exporter",
-            (ai_dir / "LAVEventExporter.dll").read_bytes(),
+            (ai_dir / "LAVIEventExporter.dll").read_bytes(),
         )
+
+    def test_exporter_manager_installs_legacy_build_as_lavi_exporter(self):
+        from plugins.StarCraft116.starcraft116_core.starcraft116_config import StarCraft116Config
+        from plugins.StarCraft116.starcraft116_core.starcraft116_exporter import (
+            StarCraft116ExporterManager,
+        )
+
+        plugin_root = self.make_plugin_root()
+        bwapi_dir = plugin_root / "Star Craft 116" / "bwapi-data"
+        ai_dir = bwapi_dir / "AI"
+        source_dir = plugin_root / "bwapi_event_exporter" / "bin" / "Release"
+        ai_dir.mkdir(parents=True)
+        source_dir.mkdir(parents=True)
+        (source_dir / "LAVEventExporter.dll").write_bytes(b"legacy-lav-exporter")
+        bot_path = ai_dir / "Stardust.dll"
+        bot_path.write_text("", encoding="utf-8")
+        self.write_config(
+            plugin_root,
+            {
+                "enabled": True,
+                "active_profile": "stardust",
+                "profiles": {
+                    "stardust": {
+                        "bwapi_data_dir": str(bwapi_dir),
+                        "bot_binary_path": str(bot_path),
+                    },
+                },
+            },
+        )
+        manager = StarCraft116ExporterManager(StarCraft116Config(str(plugin_root)))
+
+        ok, message = manager.write_ini("stardust")
+
+        self.assertTrue(ok)
+        self.assertIn("LAVIEventExporter.dll", message)
+        self.assertEqual(
+            b"legacy-lav-exporter",
+            (ai_dir / "LAVIEventExporter.dll").read_bytes(),
+        )
+        self.assertFalse((ai_dir / "LAVEventExporter.dll").exists())
 
     def test_exporter_manager_writes_runtime_starcraft_bwapi_data_dir(self):
         from plugins.StarCraft116.starcraft116_core.starcraft116_config import StarCraft116Config
@@ -1119,7 +1159,7 @@ class StarCraft116PluginTests(unittest.TestCase):
         internal_bwapi_dir.mkdir(parents=True)
         source_dir = plugin_root / "bwapi_event_exporter" / "bin" / "Release"
         source_dir.mkdir(parents=True)
-        (source_dir / "LAVEventExporter.dll").write_bytes(b"lav-exporter")
+        (source_dir / "LAVIEventExporter.dll").write_bytes(b"lav-exporter")
         (runtime_bwapi_dir / "bwapi.ini").write_text(
             "ai = bwapi-data/AI/ExampleAIModule.dll\n",
             encoding="utf-8",
@@ -1154,14 +1194,14 @@ class StarCraft116PluginTests(unittest.TestCase):
         self.assertTrue(bwapi_ok)
         self.assertEqual(
             b"lav-exporter",
-            (runtime_ai_dir / "LAVEventExporter.dll").read_bytes(),
+            (runtime_ai_dir / "LAVIEventExporter.dll").read_bytes(),
         )
         ini_text = (runtime_ai_dir / "LAVEventExporter.ini").read_text(encoding="utf-8")
         self.assertIn(f"wrapped_ai={bot_path}", ini_text)
         bwapi_text = (runtime_bwapi_dir / "bwapi.ini").read_text(encoding="utf-8")
-        self.assertIn("ai     = bwapi-data/AI/LAVEventExporter.dll", bwapi_text)
+        self.assertIn("ai     = bwapi-data/AI/LAVIEventExporter.dll", bwapi_text)
         self.assertFalse(
-            (internal_bwapi_dir / "AI" / "LAVEventExporter.dll").exists()
+            (internal_bwapi_dir / "AI" / "LAVIEventExporter.dll").exists()
         )
 
     def test_exporter_manager_fails_when_exporter_dll_is_missing(self):
@@ -1194,8 +1234,8 @@ class StarCraft116PluginTests(unittest.TestCase):
         ok, message = manager.write_ini("stardust")
 
         self.assertFalse(ok)
-        self.assertIn("LAVEventExporter.dll source does not exist", message)
-        self.assertFalse((ai_dir / "LAVEventExporter.dll").exists())
+        self.assertIn("LAVIEventExporter.dll source does not exist", message)
+        self.assertFalse((ai_dir / "LAVIEventExporter.dll").exists())
 
     def test_launch_config_sync_skips_monster_profile(self):
         from plugins.StarCraft116.starcraft116_core.starcraft116_launch_config_sync import (

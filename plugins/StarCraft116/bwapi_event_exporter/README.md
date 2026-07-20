@@ -2,7 +2,7 @@
 
 <!--20260703_kpopmodder: Documents the StarCraft 1.16 BWAPI JSONL exporter proxy.-->
 
-`LAVEventExporter.dll` is a BWAPI AIModule proxy. BWAPI loads this DLL, this
+`LAVIEventExporter.dll` is a BWAPI AIModule proxy. BWAPI loads this DLL, this
 DLL loads the real bot DLL such as `Stardust.dll`, forwards every BWAPI
 callback to the bot, and appends structured game events to JSONL for LAV.
 
@@ -25,7 +25,7 @@ projects to an installed Win32 C++ toolset.
 The output DLL is:
 
 ```bat
-bin\Release\LAVEventExporter.dll
+bin\Release\LAVIEventExporter.dll
 ```
 
 ## Install
@@ -33,7 +33,7 @@ bin\Release\LAVEventExporter.dll
 Copy the DLL and config next to `Stardust.dll`:
 
 ```bat
-copy bin\Release\LAVEventExporter.dll C:\Vtuber_Souorce_Code\StarCraft_1.16\StarCraft\bwapi-data\AI\LAVEventExporter.dll
+copy bin\Release\LAVIEventExporter.dll C:\Vtuber_Souorce_Code\StarCraft_1.16\StarCraft\bwapi-data\AI\LAVIEventExporter.dll
 copy LAVEventExporter.ini.example C:\Vtuber_Souorce_Code\StarCraft_1.16\StarCraft\bwapi-data\AI\LAVEventExporter.ini
 ```
 
@@ -50,8 +50,8 @@ supply_block_cooldown_frames=240
 Then point `bwapi-data\bwapi.ini` at the proxy:
 
 ```ini
-ai     = bwapi-data/AI/LAVEventExporter.dll
-ai_dbg = bwapi-data/AI/LAVEventExporter.dll
+ai     = bwapi-data/AI/LAVIEventExporter.dll
+ai_dbg = bwapi-data/AI/LAVIEventExporter.dll
 ```
 
 The proxy loads `Stardust.dll` through `wrapped_ai`, so Stardust should still

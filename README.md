@@ -680,7 +680,7 @@ C:\Vtuber_Souorce_Code\StarCraft_1.16
 |       +-- bwapi.ini
 |       +-- AI
 |           +-- Stardust.dll
-|           +-- LAVEventExporter.dll
+|           +-- LAVIEventExporter.dll
 |           +-- LAVEventExporter.ini
 +-- BWAPI_4_4_0
     +-- Release_Binary
@@ -745,11 +745,11 @@ ai_dbg = bwapi-data/AI/Stardust.dll
 race   = Protoss
 ```
 
-LAV의 게임 진행 해설까지 사용하려면 `LAVEventExporter.dll`을 BWAPI AI로 로드하고, exporter가 내부에서 Stardust를 감싸도록 설정합니다.
+LAV의 게임 진행 해설까지 사용하려면 `LAVIEventExporter.dll`을 BWAPI AI로 로드하고, exporter가 내부에서 Stardust를 감싸도록 설정합니다.
 
 ```ini
-ai     = bwapi-data/AI/LAVEventExporter.dll
-ai_dbg = bwapi-data/AI/LAVEventExporter.dll
+ai     = bwapi-data/AI/LAVIEventExporter.dll
+ai_dbg = bwapi-data/AI/LAVIEventExporter.dll
 race   = Protoss
 ```
 
@@ -763,7 +763,7 @@ combat_cooldown_frames=96
 supply_block_cooldown_frames=240
 ```
 
-이 방식이면 BWAPI는 `LAVEventExporter.dll`을 로드하고, exporter가 `Stardust.dll`을 다시 로드해서 유닛 제어는 Stardust가 계속 담당합니다.
+이 방식이면 BWAPI는 `LAVIEventExporter.dll`을 로드하고, exporter가 `Stardust.dll`을 다시 로드해서 유닛 제어는 Stardust가 계속 담당합니다.
 동시에 LAV는 `starcraft116_game_events.jsonl`을 읽어서 OpenAI/TTS 반응을 만들 수 있습니다.
 
 ### 3.1. Monster / BWAPI 4.2.0 설치
@@ -940,8 +940,8 @@ python main.py
 
 ```text
 [StarCraft116GameEvents] watching: ...\logs\starcraft116_game_events.jsonl
-Loaded the AI Module "bwapi-data\AI\LAVEventExporter.dll"
-BWAPI 4.4.0 ... now live using "LAVEventExporter.dll"
+Loaded the AI Module "bwapi-data\AI\LAVIEventExporter.dll"
+BWAPI 4.4.0 ... now live using "LAVIEventExporter.dll"
 [StarCraft116Reaction] game_event: type=...
 [StarCraft116Reaction] TTS: ...
 ```
