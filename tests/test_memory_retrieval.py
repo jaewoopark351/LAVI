@@ -3,7 +3,9 @@ import json
 import os
 import tempfile
 import unittest
+from io import StringIO
 from pathlib import Path
+from unittest import mock
 
 from memory_core.memory_consolidator import MemoryConsolidator
 from memory_core.memory_context_builder import MemoryContextBuilder
@@ -1382,6 +1384,67 @@ class MemoryRetrievalTests(unittest.TestCase):
         self.assertIn("[MemoryRetrieverDerivedMemoryFallbackFailed]", logs)
         self.assertIn("error_type=RuntimeError", logs)
 
+    def test_retriever_schedules_background_rebuild_after_derived_error(self):#20260720_kpopmodder
+        from memory_core import memory_retriever
+
+        class EmptyRawStore:
+            def get_raw_events(self, limit=2000):
+                return []
+
+        class BrokenRebuildableDerivedStore:
+            def search(self, query, limit=4):
+                raise RuntimeError("derived sqlite unavailable")
+
+            def get_recent(self, limit=4):
+                raise RuntimeError("derived sqlite unavailable")
+
+            def clear(self):
+                pass
+
+            def upsert_memory(self, item):
+                return {"action": "inserted"}
+
+            def get_stats(self, raw_latest_created_ts=None):
+                return {"row_count": 0, "stale": True}
+
+        calls = []
+        original = (
+            memory_retriever
+            .DerivedMemoryRebuildService
+            .schedule_background_rebuild
+        )
+
+        try:
+            def fake_schedule(derived_store, memory_store, reason="stale", clear=True):
+                calls.append((derived_store, memory_store, reason, clear))
+                return object()
+
+            (
+                memory_retriever
+                .DerivedMemoryRebuildService
+                .schedule_background_rebuild
+            ) = fake_schedule
+            raw_store = EmptyRawStore()
+            derived_store = BrokenRebuildableDerivedStore()
+            retriever = MemoryRetriever(
+                raw_store,
+                derived_store=derived_store,
+                use_derived_fallback=True,
+                max_results=2,
+            )
+
+            retriever.retrieve("What was the missing clue?")
+        finally:
+            (
+                memory_retriever
+                .DerivedMemoryRebuildService
+                .schedule_background_rebuild
+            ) = original
+
+        self.assertEqual([
+            (derived_store, raw_store, "derived_fallback_error", True),
+        ], calls)
+
     def test_refresh_derived_memory_rebuilds_stale_index(self):#20260720_kpopmodder
         from app_core.memory_bootstrap import refresh_derived_memory_if_stale
         from memory_core.derived_memory_sqlite_store import (
@@ -1425,6 +1488,98 @@ class MemoryRetrievalTests(unittest.TestCase):
 
             self.assertGreater(refreshed["row_count"], 0)
             self.assertFalse(refreshed["stale"])
+
+    def test_manual_derived_rebuild_emits_terminal_progress_bar(self):#20260720_kpopmodder
+        from memory_core.derived_memory_rebuild_service import (
+            DerivedMemoryRebuildService,
+        )
+        from memory_core.derived_memory_sqlite_store import (
+            DerivedMemorySQLiteStore,
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store = MemoryStore(memory_dir=temp_dir)
+            self._write_events(store.raw_events_path, [
+                self._event(
+                    "user_message",
+                    "LAVI progress memory anchor",
+                    "2026-07-20 02:00:00",
+                    1.0,
+                ),
+                self._event(
+                    "assistant_message",
+                    "The progress memory anchor was saved.",
+                    "2026-07-20 02:00:01",
+                    2.0,
+                ),
+            ])
+            store.initialize_raw_event_sqlite()
+            derived_store = DerivedMemorySQLiteStore(
+                os.path.join(temp_dir, "derived_memory.sqlite3")
+            )
+
+            progress_output = StringIO()
+            with mock.patch("sys.stderr", progress_output):
+                result = DerivedMemoryRebuildService.rebuild_now_exclusive(
+                    derived_store,
+                    store,
+                    reason="test_manual",
+                    progress=True,
+                    progress_interval=1,
+                )
+
+        self.assertIsNotNone(result)
+        output = progress_output.getvalue()
+        self.assertIn("[Memory][RebuildProgress]", output)
+        self.assertIn("[############################]", output)
+        self.assertIn("100.00%", output)
+        self.assertIn("reason=test_manual", output)
+        self.assertIn("stage=collect_raw_events_done", output)
+        self.assertIn("stage=build_items_done", output)
+        self.assertIn("100.00% 1/1 stage=build_items_done", output)
+        self.assertIn("stage=upsert_items", output)
+        self.assertIn("stage=stats_refreshed", output)
+
+    def test_refresh_derived_memory_schedules_background_when_requested(self):#20260720_kpopmodder
+        from app_core import memory_bootstrap
+
+        calls = []
+        original = (
+            memory_bootstrap
+            .DerivedMemoryRebuildService
+            .schedule_background_rebuild
+        )
+
+        try:
+            def fake_schedule(derived_store, memory_store, reason="stale", clear=True):
+                calls.append((derived_store, memory_store, reason, clear))
+                return object()
+
+            (
+                memory_bootstrap
+                .DerivedMemoryRebuildService
+                .schedule_background_rebuild
+            ) = fake_schedule
+            stats = {"stale": True, "row_count": 3}
+
+            refreshed = memory_bootstrap.refresh_derived_memory_if_stale(
+                "derived-store",
+                "memory-store",
+                stats,
+                auto_rebuild=True,
+                background=True,
+            )
+        finally:
+            (
+                memory_bootstrap
+                .DerivedMemoryRebuildService
+                .schedule_background_rebuild
+            ) = original
+
+        self.assertIs(refreshed, stats)
+        self.assertEqual([
+            ("derived-store", "memory-store", "stale_startup", True),
+        ], calls)
 
     def test_memory_bootstrap_wires_derived_fallback_disabled_by_default(self):#20260627_kpopmodder
         bootstrap_path = (
@@ -1570,6 +1725,7 @@ class MemoryRetrievalTests(unittest.TestCase):
         self.assertIn("auto_rebuild_derived_when_stale = true", config_text)
         self.assertIn('derived_memory_stats.get("stale")', bootstrap_text)
         self.assertIn("refresh_derived_memory_if_stale", bootstrap_text)
+        self.assertIn("background=True", bootstrap_text)
         self.assertIn("prefer_derived_first is disabled", bootstrap_text)
 
     def test_memory_bootstrap_router_provider_defaults_to_rule_and_openai_is_opt_in(self):#20260627_kpopmodder

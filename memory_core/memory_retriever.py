@@ -5,6 +5,9 @@ import re
 import time
 from difflib import SequenceMatcher
 
+from memory_core.derived_memory_rebuild_service import (
+    DerivedMemoryRebuildService,
+)#20260720_kpopmodder
 from memory_core.memory_consolidator import MemoryConsolidator
 
 MEMORY_LOGGER_NAME = "LAV.memory_core"#20260627_kpopmodder
@@ -245,6 +248,9 @@ class MemoryRetriever:#20260622_kpopmodder: 현재 질문과 관련된 과거 �
                     exc,
                     query=query,
                 )
+                self._schedule_derived_rebuild_after_error(
+                    reason="derived_prefer_error",
+                )
 
         if self.accuracy_first_raw_search and allow_deep_raw_search:
             #20260627_kpopmodder: Recall questions should scan all raw_events before trusting a fast recent hit.
@@ -333,6 +339,9 @@ class MemoryRetriever:#20260622_kpopmodder: 현재 질문과 관련된 과거 �
                     exc,
                     query=query,
                 )
+                self._schedule_derived_rebuild_after_error(
+                    reason="derived_fallback_error",
+                )
 
         return []
 
@@ -344,6 +353,30 @@ class MemoryRetriever:#20260622_kpopmodder: 현재 질문과 관련된 과거 �
             return "prefer"
 
         return bool(override)
+
+    def _schedule_derived_rebuild_after_error(self, reason):
+        if self.derived_store is None or self.memory_store is None:
+            return
+
+        required_methods = ("clear", "upsert_memory", "get_stats")
+        if not all(
+            callable(getattr(self.derived_store, method_name, None))
+            for method_name in required_methods
+        ):
+            return
+
+        try:
+            DerivedMemoryRebuildService.schedule_background_rebuild(
+                self.derived_store,
+                self.memory_store,
+                reason=reason,
+            )
+        except Exception as exc:
+            self._log_retrieval_warning(
+                "DerivedMemoryBackgroundRebuildScheduleFailed",
+                exc,
+                query=reason,
+            )
 
     def _resolve_result_limit(self, override):#20260627_kpopmodder: Keep broad recall limits request-scoped.
         if override is None:

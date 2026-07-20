@@ -1,15 +1,20 @@
 import re
 
 from safety_filter import clean_text
+from tts_core.multilingual_list_normalizer import (
+    normalize_multilingual_list_ordinals,
+)
 
 
 class TTSTextProcessor:#20260616_kpopmodder
-    def normalize_text_item(self, text):
+    def normalize_text_item(self, text, language=None):
         if text is None:
             return ""
 
         text = str(text).strip()
         text = clean_text(text)
+        text = normalize_multilingual_list_ordinals(text, language=language)
+        text = self.normalize_tts_markdown(text)
         #20260628_kpopmodder: Normalize readable dot cases before sentence splitting.
         text = self.normalize_tts_punctuation(text)
         text = text.strip()
@@ -84,6 +89,12 @@ class TTSTextProcessor:#20260616_kpopmodder
             return replacement
 
         return pattern.sub(replace, text)
+
+    def normalize_tts_markdown(self, text):
+        text = re.sub(r"(?<!\*)\*\*([^*\r\n]+)\*\*(?!\*)", r"\1", text)
+        text = re.sub(r"(?<!_)__([^_\r\n]+)__(?!_)", r"\1", text)
+        text = re.sub(r"`([^`\r\n]+)`", r"\1", text)
+        return text
 
     def is_sentence_boundary(self, text, index):
         char = text[index]

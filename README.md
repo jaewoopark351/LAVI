@@ -1055,6 +1055,7 @@ ScreenVision 관찰은 오인식이나 화면 요약 환각이 섞일 수 있으
 provider = rule
 accuracy_first_raw_search = true
 prefer_derived_first = false
+auto_rebuild_derived_when_stale = true
 allow_single_screen_observation_fallback = false
 ```
 
@@ -1063,6 +1064,10 @@ allow_single_screen_observation_fallback = false
 - OpenAI router는 로컬 `config.ini`에서 `provider=openai`를 명시한 경우에만 사용됩니다.
 - `accuracy_first_raw_search=true`: 기억이 필요한 질문은 빠른 최근 기록에서 멈추지 않고 전체 `raw_events`를 먼저 검색합니다. 느릴 수 있지만 오래된 실제 기억을 놓칠 가능성을 줄입니다.
 - `prefer_derived_first=true`: 실험용 derived-first recall입니다. raw recall은 fallback으로 남지만, derived row가 먼저 주입될 수 있습니다.
+- `auto_rebuild_derived_when_stale=true`: `derived_memory.sqlite3`가 오래된 경우 시작을 막지 않고 백그라운드에서 재빌드합니다.
+- 수동 재빌드가 필요하면 `python scripts/rebuild_derived_memory.py`를 실행합니다.
+- UI 수동 재빌드 버튼은 `Setting` > `Memory` > `Rebuild Derived Memory`에 있습니다.
+- 재빌드 중에는 터미널에 `[Memory][RebuildProgress] [####----] 50.00%` 형태의 진행 바가 표시됩니다.
 - `allow_single_screen_observation_fallback=true`: `source_event_count=1`, `duplicate_count=0`인 단발 `screen_observation` row도 fallback으로 허용합니다. 기본값은 `false`입니다.
 - 기본 derived fallback 조건은 `source_event_count >= 2` 또는 `duplicate_count >= 1`입니다.
 - 단발 screen row가 명시 옵션으로 recall되면 `MemoryRecallTop` 로그에 `source_event_count`와 `duplicate_count`가 출력됩니다.

@@ -58,8 +58,28 @@ class DerivedMemoryBuilder:
         self.min_normalized_chars = max(1, int(min_normalized_chars))
 
     def build_items(self, raw_events):
+        return self.build_items_with_progress(raw_events)
+
+    def build_items_with_progress(
+        self,
+        raw_events,
+        progress_callback=None,
+        progress_interval=1000,
+    ):
         raw_events = list(raw_events or [])
+        self._emit_progress(
+            progress_callback,
+            "consolidate_start",
+            current=0,
+            total=len(raw_events),
+        )
         episodes = self.consolidator.consolidate(raw_events)
+        self._emit_progress(
+            progress_callback,
+            "consolidate_done",
+            current=len(episodes),
+            total=len(episodes),
+        )
         items = []
         stats = {
             "raw_event_count": len(raw_events),
@@ -70,22 +90,39 @@ class DerivedMemoryBuilder:
             "skipped_noise_count": 0,
         }
         seen_normalized_keys = {}
+        episode_count = len(episodes)
 
-        for episode in episodes:
+        for index, episode in enumerate(episodes, start=1):
             memory_item = self._episode_to_memory_item(episode)
             if memory_item is None:
                 stats["skipped_noise_count"] += 1
-                continue
-
-            self._preserve_duplicate_normalized_key(
-                memory_item,
-                seen_normalized_keys,
-                stats,
-            )
-            items.append(memory_item)
+            else:
+                self._preserve_duplicate_normalized_key(
+                    memory_item,
+                    seen_normalized_keys,
+                    stats,
+                )
+                items.append(memory_item)
+            if self._should_emit_progress(index, episode_count, progress_interval):
+                self._emit_progress(
+                    progress_callback,
+                    "build_items",
+                    current=index,
+                    total=episode_count,
+                    inserted=len(items),
+                    skipped=stats["skipped_noise_count"],
+                )
 
         self._apply_duplicate_group_metadata(items)
         stats["inserted_count"] = len(items)
+        self._emit_progress(
+            progress_callback,
+            "build_items_done",
+            current=episode_count,
+            total=episode_count,
+            inserted=len(items),
+            skipped=stats["skipped_noise_count"],
+        )
         return items, stats
 
     def rebuild(
@@ -94,23 +131,81 @@ class DerivedMemoryBuilder:
         derived_store=None,
         clear=True,
         dry_run=False,
+        progress_callback=None,
+        progress_interval=1000,
     ):
-        items, stats = self.build_items(raw_events)
+        items, stats = self.build_items_with_progress(
+            raw_events,
+            progress_callback=progress_callback,
+            progress_interval=progress_interval,
+        )
 
         if derived_store is None or dry_run:
+            self._emit_progress(
+                progress_callback,
+                "dry_run_done",
+                current=len(items),
+                total=len(items),
+                inserted=stats.get("inserted_count", 0),
+            )
             return stats
 
         if clear:
+            self._emit_progress(
+                progress_callback,
+                "clear_start",
+                current=0,
+                total=len(items),
+            )
             derived_store.clear()
+            self._emit_progress(
+                progress_callback,
+                "clear_done",
+                current=0,
+                total=len(items),
+            )
 
         inserted_count = 0
-        for item in items:
+        item_count = len(items)
+        for index, item in enumerate(items, start=1):
             result = derived_store.upsert_memory(item)
             if result.get("action") == "inserted":
                 inserted_count += 1
+            if self._should_emit_progress(index, item_count, progress_interval):
+                self._emit_progress(
+                    progress_callback,
+                    "upsert_items",
+                    current=index,
+                    total=item_count,
+                    inserted=inserted_count,
+                )
 
         stats["inserted_count"] = inserted_count
+        self._emit_progress(
+            progress_callback,
+            "rebuild_done",
+            current=item_count,
+            total=item_count,
+            inserted=inserted_count,
+        )
         return stats
+
+    def _should_emit_progress(self, current, total, progress_interval):
+        if total <= 0:
+            return False
+        try:
+            interval = max(1, int(progress_interval))
+        except Exception:
+            interval = 1000
+        return current == total or current % interval == 0
+
+    def _emit_progress(self, progress_callback, stage, **values):
+        if not callable(progress_callback):
+            return
+        try:
+            progress_callback(stage, **values)
+        except Exception:
+            pass
 
     def _episode_to_memory_item(self, episode):
         if self._is_excluded_episode(episode):

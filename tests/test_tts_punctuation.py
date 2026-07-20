@@ -25,6 +25,18 @@ class TTSDecimalAndInitialismTests(unittest.TestCase):
         self.assertIsNone(chunk)
         self.assertEqual(0, processed_idx)
 
+    def test_streaming_chunker_keeps_markdown_list_marker_with_item(self):
+        chunker = LLMStreamingChunker()
+        text = "1.\n**\uc815\uc758**: \ud569\uc131 CDO\uc57c. \ub2e4\uc74c"
+
+        chunk, processed_idx = chunker.get_streaming_tts_chunk(text, 0)
+
+        self.assertEqual(
+            "1.\n**\uc815\uc758**: \ud569\uc131 CDO\uc57c.",
+            chunk,
+        )
+        self.assertEqual(text.index(" \ub2e4\uc74c"), processed_idx)
+
     def test_streaming_chunker_does_not_split_initialism_dots(self):
         chunker = LLMStreamingChunker()
         text = "S.T.A.R.S가 화면에 표시됩니다. 다음"

@@ -201,7 +201,10 @@ class TTS(PluginSelectionBase):#20260615_kpopmodder
 
         for item in text_list:
             #item = self.normalize_text_item(item)#20260616_kpopmodder
-            item = self.text_processor.normalize_text_item(item)#20260616_kpopmodder
+            item = self.text_processor.normalize_text_item(
+                item,
+                language=self.get_current_text_language_hint(),
+            )#20260616_kpopmodder
 
             if item == "":
                 continue
@@ -222,7 +225,10 @@ class TTS(PluginSelectionBase):#20260615_kpopmodder
 
     def prepare_string_input_items(self, text):
         #text = self.normalize_text_item(text)#20260616_kpopmodder
-        text = self.text_processor.normalize_text_item(text)#20260616_kpopmodder
+        text = self.text_processor.normalize_text_item(
+            text,
+            language=self.get_current_text_language_hint(),
+        )#20260616_kpopmodder
 
         if text == "":
             log_print("TTS: ignoring empty input")
@@ -235,6 +241,20 @@ class TTS(PluginSelectionBase):#20260615_kpopmodder
         #return self.text_processor.split_tts_sentences(text)#20260616_kpopmodder
 
         return items#20260616_kpopmodder
+
+    def get_current_text_language_hint(self):
+        current_plugin = getattr(self, "current_plugin", None)
+        candidates = [
+            current_plugin,
+            getattr(current_plugin, "gpt_sovits", None),
+        ]
+
+        for candidate in candidates:
+            language = getattr(candidate, "text_language", None)
+            if language:
+                return language
+
+        return None
 
     # def normalize_text_item(self, text):
     #     if text is None:

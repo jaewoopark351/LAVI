@@ -300,6 +300,8 @@ class AppComposer:
             starcraft116_plugin=self.starcraft116_plugin,
             starcraft2_plugin=self.starcraft2_plugin,
             screen_vision=self.screen_vision,
+            memory_store=self.memory_store,
+            memory_context_builder=self.memory_context_builder,
         )
 
     def wire_event_listeners(self):

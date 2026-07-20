@@ -53,6 +53,9 @@ class LLMStreamingChunker:#20260617_kpopmodder
             #20260628_kpopmodder: Avoid cutting streamed TTS on decimal dots or dotted initialisms.
             return self.is_sentence_end_dot(text, index, allow_end=False)
 
+        if char == "\n" and self.is_numbered_list_marker_line_break(text, index):
+            return False
+
         return True
 
     def is_sentence_end_dot(self, text, index, allow_end=False):
@@ -60,6 +63,9 @@ class LLMStreamingChunker:#20260617_kpopmodder
             return False
 
         if self.is_initialism_dot(text, index):
+            return False
+
+        if self.is_line_start_numbered_list_dot(text, index):
             return False
 
         next_index = self.next_meaningful_index(text, index + 1)
@@ -73,6 +79,30 @@ class LLMStreamingChunker:#20260617_kpopmodder
             return True
 
         return text[next_index].isspace()
+
+    def is_line_start_numbered_list_dot(self, text, index):
+        previous_char = text[index - 1] if index > 0 else ""
+        if not previous_char.isdigit():
+            return False
+
+        line_start = max(
+            text.rfind("\n", 0, index) + 1,
+            text.rfind("\r", 0, index) + 1,
+        )
+        token = text[line_start:index]
+
+        #20260720_kpopmodder: Keep streamed markdown lists together so TTS can
+        # read "1. **정의**" as one item instead of a standalone "1.".
+        return bool(re.fullmatch(r"[ \t]*[0-9]{1,2}", token))
+
+    def is_numbered_list_marker_line_break(self, text, index):
+        line_start = max(
+            text.rfind("\n", 0, index) + 1,
+            text.rfind("\r", 0, index) + 1,
+        )
+        line = text[line_start:index]
+
+        return bool(re.fullmatch(r"[ \t]*[0-9]{1,2}\.[ \t]*", line))
 
     def is_decimal_dot(self, text, index):
         previous_char = text[index - 1] if index > 0 else ""

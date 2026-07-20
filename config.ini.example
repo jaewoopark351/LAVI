@@ -26,7 +26,7 @@ max_deep_recalled_items = 12
 accuracy_first_raw_search = true
 
 ; Prefer derived_memory.sqlite3 before raw recall when the router asks for memory.
-; If the derived index is stale, startup tries one local rebuild before disabling this for that run.
+; If the derived index is stale, startup schedules a background rebuild and disables this for that run.
 prefer_derived_first = true
 auto_rebuild_derived_when_stale = true
 

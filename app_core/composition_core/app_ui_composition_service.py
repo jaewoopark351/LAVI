@@ -17,9 +17,14 @@ class AppUiCompositionService:
         starcraft116_plugin=None,
         starcraft2_plugin=None,
         screen_vision=None,
+        memory_store=None,
+        memory_context_builder=None,
     ):
         import gradio as gr
         from audio_device_manager import audio_device_manager
+        from memory_core.derived_memory_settings_panel import (
+            DerivedMemorySettingsPanel,
+        )
 
         input_component.create_ui()
         llm.create_ui()
@@ -39,5 +44,9 @@ class AppUiCompositionService:
             with gr.Tabs():
                 vtuber.create_ui()
                 audio_device_manager.create_ui()
+                DerivedMemorySettingsPanel(
+                    memory_store=memory_store,
+                    memory_context_builder=memory_context_builder,
+                ).create_ui()
                 if screen_vision is not None:
                     screen_vision.create_ui()

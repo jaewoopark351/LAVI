@@ -2,7 +2,9 @@ import os
 
 from core.config_manager import config_manager#20260626_kpopmodder
 from core.logger import log_print
-from memory_core.derived_memory_builder import DerivedMemoryBuilder#20260720_kpopmodder
+from memory_core.derived_memory_rebuild_service import (
+    DerivedMemoryRebuildService,
+)#20260720_kpopmodder
 from memory_core.derived_memory_sqlite_store import DerivedMemorySQLiteStore#20260626_kpopmodder
 from memory_core.memory_context_builder import MemoryContextBuilder#20260621_kpopmodder
 from memory_core.memory_retriever import MemoryRetriever#20260622_kpopmodder
@@ -86,7 +88,8 @@ def refresh_derived_memory_if_stale(
     memory_store,
     stats,
     auto_rebuild=True,
-):#20260720_kpopmodder: Rebuild stale derived recall index once before disabling derived-first mode.
+    background=False,
+):#20260720_kpopmodder: Rebuild stale derived recall index without blocking startup when requested.
     if not bool((stats or {}).get("stale")):
         return stats or {}
 
@@ -97,25 +100,33 @@ def refresh_derived_memory_if_stale(
         )
         return stats or {}
 
-    try:
-        raw_events = memory_store.get_raw_events(limit=None)
-        rebuild_stats = DerivedMemoryBuilder().rebuild(
-            raw_events,
-            derived_store=derived_store,
-            clear=True,
+    if background:
+        DerivedMemoryRebuildService.schedule_background_rebuild(
+            derived_store,
+            memory_store,
+            reason="stale_startup",
         )
-        refreshed_stats = derived_store.get_stats(
-            raw_latest_created_ts=memory_latest_raw_event_ts(memory_store),
+        return stats or {}
+
+    try:
+        rebuild_stats, refreshed_stats = DerivedMemoryRebuildService.rebuild_now(
+            derived_store,
+            memory_store,
         )
         log_print(
-            "[Memory] derived_memory.sqlite3 auto-rebuilt "
+            "[Memory] derived_memory.sqlite3 rebuilt "
             f"(raw_events={rebuild_stats.get('raw_event_count', 0)}, "
             f"rows={refreshed_stats.get('row_count', 0)}, "
             f"stale={refreshed_stats.get('stale', False)})"
         )
         return refreshed_stats
     except Exception as e:
-        log_print(f"[Memory][Warning] derived_memory.sqlite3 auto rebuild failed: {e}")
+        log_print(f"[Memory][Warning] derived_memory.sqlite3 rebuild failed: {e}")
+        DerivedMemoryRebuildService.schedule_background_rebuild(
+            derived_store,
+            memory_store,
+            reason="sync_rebuild_error",
+        )
         return stats or {}
 
 
@@ -181,10 +192,19 @@ def bootstrap_memory(current_module_directory):#20260630_kpopmodder: Build memor
             memory_store,
             derived_memory_stats,
             auto_rebuild=memory_auto_rebuild_derived_when_stale,
+            background=True,
         )
     except Exception as e:
+        derived_memory_db_path = os.path.join(memory_dir, "derived_memory.sqlite3")
         derived_memory_store = None
         log_print(f"[Memory] SQLite derived memory store unavailable: {e}")
+        if memory_auto_rebuild_derived_when_stale:
+            repair_store = DerivedMemorySQLiteStore(derived_memory_db_path)
+            DerivedMemoryRebuildService.schedule_background_rebuild(
+                repair_store,
+                memory_store,
+                reason="startup_error",
+            )
     if memory_prefer_derived_first and bool(derived_memory_stats.get("stale")):
         memory_prefer_derived_first = False#20260720_kpopmodder
         log_print(

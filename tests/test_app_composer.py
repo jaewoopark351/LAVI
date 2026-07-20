@@ -276,6 +276,8 @@ class AppComposerTests(unittest.TestCase):
         composer.starcraft116_plugin = object()
         composer.starcraft2_plugin = object()
         composer.screen_vision = object()
+        composer.memory_store = object()
+        composer.memory_context_builder = object()
         composer.ui_composition_service = mock.Mock()
 
         composer.create_component_ui()
@@ -292,6 +294,8 @@ class AppComposerTests(unittest.TestCase):
             starcraft116_plugin=composer.starcraft116_plugin,
             starcraft2_plugin=composer.starcraft2_plugin,
             screen_vision=composer.screen_vision,
+            memory_store=composer.memory_store,
+            memory_context_builder=composer.memory_context_builder,
         )
 
     def test_launch_gradio_delegates_to_runtime_launcher(self):
