@@ -6,6 +6,8 @@ import json
 import os
 from dataclasses import dataclass, field
 
+from core.paths import LaviPaths
+
 from .starcraft116_ai_bundle_downloader import (
     DEFAULT_STARCRAFT116_AI_BUNDLE_DIR,
     DEFAULT_STARCRAFT116_AI_BUNDLE_REMOTE_SUBDIR,
@@ -152,32 +154,56 @@ from .starcraft116_path_check import StarCraft116PathCheck
 class StarCraft116Config:
     #20260702_kpopmodder: Supports BWAPI-era bot profiles without bundling game files.
     def __init__(self, plugin_root=None):
-        self.plugin_root = plugin_root or os.path.dirname(__file__)
+        self.plugin_root = plugin_root or os.path.dirname(os.path.dirname(__file__))
         self.project_root = os.path.dirname(os.path.dirname(self.plugin_root))
-        self.config_dir = os.path.join(self.plugin_root, "config")
-        self.config_path = os.path.join(
-            self.config_dir,
+        self.paths = LaviPaths(self.project_root)
+        self.legacy_config_dir = os.path.join(self.plugin_root, "config")
+        self.config_dir = str(self.paths.config_dir)
+        self.config_path = str(self.paths.config_path("starcraft116_config.json"))
+        self.example_config_path = str(
+            self.paths.config_path("starcraft116_config.example.json")
+        )
+        #20260720_kpopmodder: Prefer root config/ while preserving legacy plugin config fallback.
+        self.legacy_config_path = os.path.join(
+            self.legacy_config_dir,
             "starcraft116_config.json",
         )
-        self.example_config_path = os.path.join(
-            self.config_dir,
+        self.legacy_example_config_path = os.path.join(
+            self.legacy_config_dir,
             "starcraft116_config.example.json",
         )
+        self.loaded_config_path = self.config_path
         self.config = self._default_config()
         self.config_exists = False
         self.load_error = ""
         self.load()
 
+    def _active_config_path(self):
+        if os.path.exists(self.config_path):
+            return self.config_path
+        if os.path.exists(self.legacy_config_path):
+            return self.legacy_config_path
+        return self.config_path
+
+    def _active_example_config_path(self):
+        if os.path.exists(self.example_config_path):
+            return self.example_config_path
+        if os.path.exists(self.legacy_example_config_path):
+            return self.legacy_example_config_path
+        return self.example_config_path
+
     def load(self):
         self.config = self._default_config()
-        self.config_exists = os.path.exists(self.config_path)
+        config_path = self._active_config_path()
+        self.loaded_config_path = config_path
+        self.config_exists = os.path.exists(config_path)
         self.load_error = ""
 
         if not self.config_exists:
             return self.config
 
         try:
-            with open(self.config_path, "r", encoding="utf-8") as file:
+            with open(config_path, "r", encoding="utf-8") as file:
                 loaded = json.load(file)
         except Exception as e:
             self.load_error = str(e)
@@ -268,9 +294,10 @@ class StarCraft116Config:
 
     def config_message(self):
         if not self.config_exists:
+            example_path = self._active_example_config_path()
             return (
                 "StarCraft 1.16 config missing. Copy "
-                f"{self.example_config_path} to {self.config_path} and set "
+                f"{example_path} to {self.config_path} and set "
                 "your local Chaoslauncher, BWAPI, and bot paths."
             )
 
@@ -278,7 +305,7 @@ class StarCraft116Config:
             return f"StarCraft 1.16 config load failed: {self.load_error}"
 
         if not self.get_bool("enabled", False):
-            return "StarCraft 1.16 config loaded. enabled=false in plugin config."
+            return "StarCraft 1.16 config loaded. enabled=false in config."
 
         return (
             "StarCraft 1.16 config loaded. active_profile="

@@ -1,27 +1,43 @@
 #20260702_kpopmodder: Added tests for the StarCraft 1.16 BWAPI launcher plugin.
 import json
+import shutil
 import sys
-import tempfile
 import unittest
+import uuid
 from pathlib import Path
 from unittest import mock
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+TEST_TMP_ROOT = PROJECT_ROOT / "test" / "test_Isolation" / "tmp"
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 
 class StarCraft116PluginTests(unittest.TestCase):
+    def make_temp_project_root(self):
+        TEST_TMP_ROOT.mkdir(parents=True, exist_ok=True)
+        path = TEST_TMP_ROOT / f"starcraft116_plugin_{uuid.uuid4().hex}"
+        path.mkdir()
+        self.addCleanup(lambda: shutil.rmtree(path, ignore_errors=True))
+        return path
+
     def make_plugin_root(self):
-        temp_dir = tempfile.TemporaryDirectory()
-        root = Path(temp_dir.name) / "StarCraft116"
+        project_root = self.make_temp_project_root()
+        root = project_root / "plugins" / "StarCraft116"
         (root / "config").mkdir(parents=True)
-        self.addCleanup(temp_dir.cleanup)
+        (project_root / "config").mkdir(parents=True)
         return root
 
+    def project_root_for(self, plugin_root):
+        return plugin_root.parent.parent
+
+    def config_path_for(self, plugin_root):
+        return self.project_root_for(plugin_root) / "config" / "starcraft116_config.json"
+
     def write_config(self, plugin_root, config):
-        path = plugin_root / "config" / "starcraft116_config.json"
+        path = self.config_path_for(plugin_root)
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(
             json.dumps(config, ensure_ascii=False),
             encoding="utf-8",
@@ -47,6 +63,45 @@ class StarCraft116PluginTests(unittest.TestCase):
         validation = config.validate_paths()
         self.assertFalse(validation.ok)
         self.assertIn("Copy", validation.message())
+
+    def test_config_paths_resolve_from_project_root(self):
+        from plugins.StarCraft116.starcraft116_core.starcraft116_config import StarCraft116Config
+
+        plugin_root = self.make_plugin_root()
+        project_root = self.project_root_for(plugin_root)
+        config = StarCraft116Config(str(plugin_root))
+
+        self.assertEqual(
+            str(project_root / "config" / "starcraft116_config.json"),
+            config.config_path,
+        )
+        self.assertEqual(
+            str(plugin_root / "config" / "starcraft116_config.json"),
+            config.legacy_config_path,
+        )
+        self.assertEqual(config.config_path, config._active_config_path())
+
+    def test_legacy_plugin_config_remains_readable(self):
+        from plugins.StarCraft116.starcraft116_core.starcraft116_config import StarCraft116Config
+
+        plugin_root = self.make_plugin_root()
+        legacy_path = plugin_root / "config" / "starcraft116_config.json"
+        legacy_path.write_text(
+            json.dumps(
+                {
+                    "enabled": True,
+                    "active_profile": "monster",
+                    "profiles": {"monster": {"display_name": "Monster"}},
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+
+        config = StarCraft116Config(str(plugin_root))
+
+        self.assertEqual(str(legacy_path), config.loaded_config_path)
+        self.assertTrue(config.get_bool("enabled", False))
 
     def test_validate_paths_reports_missing_selected_launcher(self):
         from plugins.StarCraft116.starcraft116_core.starcraft116_config import StarCraft116Config
@@ -120,7 +175,7 @@ class StarCraft116PluginTests(unittest.TestCase):
         self.assertEqual(str(saida_path), saida_profile["bot_binary_path"])
         self.assertEqual(str(game_dir), saida_profile["chaoslauncher_working_dir"])
         self.assertTrue(saida_profile["chaoslauncher_run_as_admin"])
-        self.assertTrue((plugin_root / "config" / "starcraft116_config.json").exists())
+        self.assertTrue(Path(config.config_path).exists())
 
     def test_write_config_from_install_detects_supported_loose_bot_profiles(self):
         from plugins.StarCraft116.starcraft116_core.starcraft116_config import StarCraft116Config
@@ -2060,17 +2115,14 @@ class StarCraft116PluginTests(unittest.TestCase):
         )
 
     def test_config_resolves_project_local_bwapi_bundle_defaults(self):
-        from plugins.StarCraft116.starcraft116_core.starcraft116_config import StarCraft116Config
+        from plugins.StarCraft116.starcraft116_core.starcraft116_config import (
+            DEFAULT_BWAPI_BUNDLE_DIRS,
+            StarCraft116Config,
+        )
 
         plugin_root = self.make_plugin_root()
         project_root = plugin_root.parent.parent
-        bundle_dir = (
-            project_root
-            / "plugins"
-            / "StarCraft116"
-            / "BWAPI_APP"
-            / "BWAPI_420"
-        )
+        bundle_dir = project_root / Path(DEFAULT_BWAPI_BUNDLE_DIRS["monster"])
         bwapi_data_dir = bundle_dir / "Starcraft" / "bwapi-data"
         self.write_config(
             plugin_root,
@@ -2256,9 +2308,7 @@ class StarCraft116PluginTests(unittest.TestCase):
         )
         from plugins.StarCraft116.starcraft116_core.starcraft116_config import StarCraft116Config
 
-        temp_dir = tempfile.TemporaryDirectory()
-        self.addCleanup(temp_dir.cleanup)
-        project_root = Path(temp_dir.name)
+        project_root = self.make_temp_project_root()
         plugin_root = project_root / "plugins" / "StarCraft116"
         config_dir = plugin_root / "config"
         config_dir.mkdir(parents=True)
@@ -2306,9 +2356,7 @@ class StarCraft116PluginTests(unittest.TestCase):
         )
         from plugins.StarCraft116.starcraft116_core.starcraft116_config import StarCraft116Config
 
-        temp_dir = tempfile.TemporaryDirectory()
-        self.addCleanup(temp_dir.cleanup)
-        project_root = Path(temp_dir.name)
+        project_root = self.make_temp_project_root()
         plugin_root = project_root / "plugins" / "StarCraft116"
         source_dir = (
             plugin_root
@@ -2360,9 +2408,7 @@ class StarCraft116PluginTests(unittest.TestCase):
         )
         from plugins.StarCraft116.starcraft116_core.starcraft116_config import StarCraft116Config
 
-        temp_dir = tempfile.TemporaryDirectory()
-        self.addCleanup(temp_dir.cleanup)
-        project_root = Path(temp_dir.name)
+        project_root = self.make_temp_project_root()
         plugin_root = project_root / "plugins" / "StarCraft116"
         source_dir = (
             plugin_root

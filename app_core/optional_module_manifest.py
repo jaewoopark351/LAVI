@@ -77,7 +77,7 @@ OPTIONAL_MODULE_MANIFEST = {
         "capabilities": ("game_extension", "starcraft116"),
         "config_schema": {
             "StarCraft116": {
-                "config_path": "plugins/StarCraft116/config/starcraft116_config.json",
+                "config_path": "config/starcraft116_config.json",
                 "enabled": False,
                 "active_profile": "monster",
             },

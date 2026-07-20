@@ -324,6 +324,8 @@ class RepositoryContractTests(unittest.TestCase):
             "config/chess_config.example.json",
             "config/starcraft2_config.json",
             "config/starcraft2_config.example.json",
+            "config/starcraft116_config.json",
+            "config/starcraft116_config.example.json",
             "config/voice_input_config.example.json",
         }
 
@@ -333,6 +335,7 @@ class RepositoryContractTests(unittest.TestCase):
         tracked = set(self._git_ls_files())
         local_config_paths = {
             "plugins/Chess/config/chess_config.json",
+            "plugins/StarCraft116/config/starcraft116_config.json",
             "plugins/StarCraft2/config_starcraft2.json",
             "plugins/StarCraft2/config/starcraft2_config.json",
         }

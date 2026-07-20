@@ -868,8 +868,8 @@ In `modules.json`, enable the StarCraft 1.16 plugin and disable the Remastered p
 Copy the example file and edit it to match your real installation paths.
 
 ```bat
-copy plugins\StarCraft116\config\starcraft116_config.example.json plugins\StarCraft116\config\starcraft116_config.json
-notepad plugins\StarCraft116\config\starcraft116_config.json
+copy config\starcraft116_config.example.json config\starcraft116_config.json
+notepad config\starcraft116_config.json
 ```
 
 The core Stardust profile looks like this.

@@ -867,8 +867,8 @@ Mapped BWAPI shared memory read-only for pid=...
 예시 파일을 복사한 뒤 실제 설치 경로로 수정하세요.
 
 ```bat
-copy plugins\StarCraft116\config\starcraft116_config.example.json plugins\StarCraft116\config\starcraft116_config.json
-notepad plugins\StarCraft116\config\starcraft116_config.json
+copy config\starcraft116_config.example.json config\starcraft116_config.json
+notepad config\starcraft116_config.json
 ```
 
 현재 Stardust 기준 핵심 설정 예시는 다음과 같습니다.

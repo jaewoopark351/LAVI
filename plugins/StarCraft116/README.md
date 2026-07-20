@@ -19,7 +19,7 @@ Set the main module switch:
 Then copy the example config and edit local paths:
 
 ```bat
-copy plugins\StarCraft116\config\starcraft116_config.example.json plugins\StarCraft116\config\starcraft116_config.json
+copy config\starcraft116_config.example.json config\starcraft116_config.json
 ```
 
 Set `"enabled": true` inside `starcraft116_config.json` only after the paths

@@ -143,7 +143,7 @@ class StarCraft116AIBundleDownloaderTests(unittest.TestCase):
     def test_config_validation_repairs_internal_ai_bundle_paths(self):
         temp_dir = self._make_temp_dir()
         plugin_root = temp_dir / "plugins" / "StarCraft116"
-        config_dir = plugin_root / "config"
+        config_dir = temp_dir / "config"
         config_dir.mkdir(parents=True)
         bundle_dir = plugin_root / "StarCraft_1_16_Bots"
         config = {

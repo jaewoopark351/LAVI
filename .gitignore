@@ -120,6 +120,7 @@ plugins/Chess/**/*.pb.gz
 plugins/Chess/lc0-v0.32.1-windows-gpu-nvidia-cuda12/
 plugins/StarCraftRemastered/config/starcraft_remastered_config.json
 plugins/StarCraft116/config/starcraft116_config.json
+plugins/StarCraft116/config/starcraft116_config.example.json
 plugins/StarCraft2/config_starcraft2.json
 plugins/StarCraft2/config/starcraft2_config.json
 
@@ -129,17 +130,18 @@ plugins/StarCraft2/config/starcraft2_config.json
 !config/modules.json
 !config/chess_config.json
 !config/starcraft2_config.json
+!config/starcraft116_config.json
 !config/gpt_sovits_config.json
 !plugins/GPTSoVITS/config/gpt_sovits_config.json
 !plugins/SongPlayer/config/song_player_songs.json
 !plugins/StarCraftRemastered/config/starcraft_remastered_config.json
-!plugins/StarCraft116/config/starcraft116_config.json
 !plugins/StarCraft2/config_starcraft2.json
 !plugins/StarCraft2/config/starcraft2_config.json
 !config/modules.example.json
 !config/gpu_device_config.example.json
 !config/chess_config.example.json
 !config/starcraft2_config.example.json
+!config/starcraft116_config.example.json
 
 # ==============================
 # Transformers_LLM local model cache
