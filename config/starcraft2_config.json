@@ -1,7 +1,5 @@
 {
     "enabled":  true,
-    "sc2aiapp_path":  "C:\\Vtuber_Souorce_Code\\StarCraft2\\SC2AIApp_2025_S1\\SC2AIApp_2025_S1\\SC2AIApp.exe",
-    "probots_app_path":  "C:\\Vtuber_Souorce_Code\\StarCraft2\\SC2AIApp_2025_S1\\SC2AIApp_2025_S1\\SC2AIApp.exe",
     "starcraft2_exe_path":  "C:\\Program Files (x86)\\StarCraft II\\Versions\\Base97563\\SC2_x64.exe",
     "starcraft2_support64_path":  "C:\\Program Files (x86)\\StarCraft II\\Support64",
     "starcraft2_base_path":  "C:\\Program Files (x86)\\StarCraft II\\Versions\\Base97563",
