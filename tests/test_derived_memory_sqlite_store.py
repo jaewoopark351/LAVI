@@ -128,6 +128,25 @@ class DerivedMemorySQLiteStoreTests(unittest.TestCase):
             self.assertFalse(fresh_stats["stale"])
             self.assertTrue(stale_stats["stale"])
 
+    def test_stats_treats_post_raw_rebuild_as_fresh(self):  #20260720_kpopmodder
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store = DerivedMemorySQLiteStore(
+                os.path.join(temp_dir, "derived_memory.sqlite3")
+            )
+            item = self._memory_item(
+                search_text="ScreenVision saw useful project context",
+                normalized_key="screenvisionsawusefulprojectcontext",
+                topic_key="memory",
+            )
+            item["last_created_ts"] = 1.0
+            item["updated_ts"] = 20.0
+
+            store.upsert_memory(item)
+            stats = store.get_stats(raw_latest_created_ts=10.0)
+
+            self.assertEqual(1, stats["row_count"])
+            self.assertFalse(stats["stale"])
+
     def _memory_item(
         self,
         search_text,

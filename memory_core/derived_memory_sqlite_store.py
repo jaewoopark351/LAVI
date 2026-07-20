@@ -303,18 +303,25 @@ class DerivedMemorySQLiteStore:
 
         row_count = int(row["row_count"] or 0)
         latest_source_ts = self._float_or_zero(row["latest_source_ts"])
+        latest_updated_ts = self._float_or_zero(row["latest_updated_ts"])
         raw_latest_ts = self._float_or_none(raw_latest_created_ts)
         stale = False
         if raw_latest_ts is not None:
             if row_count == 0:
                 stale = raw_latest_ts > 0
             elif latest_source_ts > 0:
-                stale = raw_latest_ts > latest_source_ts
+                #20260720_kpopmodder: A full rebuild can skip trailing noisy raw
+                # events; if the index was updated after the latest raw event,
+                # it should not stay stale just because no row used that event.
+                stale = (
+                    raw_latest_ts > latest_source_ts
+                    and raw_latest_ts > latest_updated_ts
+                )
 
         return {
             "row_count": row_count,
             "latest_source_ts": latest_source_ts,
-            "latest_updated_ts": self._float_or_zero(row["latest_updated_ts"]),
+            "latest_updated_ts": latest_updated_ts,
             "raw_latest_ts": raw_latest_ts,
             "stale": stale,
         }
