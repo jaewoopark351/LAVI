@@ -64,6 +64,8 @@ class AppComposer:
         self.starcraft2_plugin = None
         self.starcraft2_game_extension = None
         self.starcraft2_changeling_observer_extension = None
+        self.minecraft_plugin = None
+        self.minecraft_game_extension = None
         self.screen_vision = None
         self.game_extension_context = None
         self.game_runtime_contexts = GameRuntimeContextRegistry()
@@ -272,12 +274,14 @@ class AppComposer:
             context=self.game_extension_context,
             starcraft116_plugin=self.starcraft116_plugin,
             starcraft2_plugin=self.starcraft2_plugin,
+            minecraft_plugin=self.minecraft_plugin,
             chess_plugin=self.chess_plugin,
             starcraft116_game_extension=self.starcraft116_game_extension,
             starcraft2_game_extension=self.starcraft2_game_extension,
             starcraft2_changeling_observer_extension=(
                 self.starcraft2_changeling_observer_extension
             ),
+            minecraft_game_extension=self.minecraft_game_extension,
             chess_game_extension=self.chess_game_extension,
         )
         self.starcraft116_game_extension = result.starcraft116_game_extension
@@ -285,6 +289,7 @@ class AppComposer:
         self.starcraft2_changeling_observer_extension = (
             result.starcraft2_changeling_observer_extension
         )
+        self.minecraft_game_extension = result.minecraft_game_extension
         self.chess_game_extension = result.chess_game_extension
 
     def create_component_ui(self):
@@ -299,6 +304,7 @@ class AppComposer:
             starcraft_plugin=self.starcraft_plugin,
             starcraft116_plugin=self.starcraft116_plugin,
             starcraft2_plugin=self.starcraft2_plugin,
+            minecraft_plugin=self.minecraft_plugin,
             screen_vision=self.screen_vision,
             memory_store=self.memory_store,
             memory_context_builder=self.memory_context_builder,

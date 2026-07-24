@@ -167,6 +167,7 @@ class AppComposerTests(unittest.TestCase):
         self.assertIsNone(composer.starcraft_plugin)
         self.assertIsNone(composer.starcraft116_plugin)
         self.assertIsNone(composer.starcraft2_plugin)
+        self.assertIsNone(composer.minecraft_plugin)
         self.assertIsNone(composer.screen_vision)
 
     def test_create_optional_plugins_consumes_composition_result(self):
@@ -176,6 +177,7 @@ class AppComposerTests(unittest.TestCase):
         starcraft_plugin = object()
         starcraft116_plugin = object()
         starcraft2_plugin = object()
+        minecraft_plugin = object()
         screen_vision = object()
         composer.optional_plugin_composition_service = mock.Mock()
         composer.optional_plugin_composition_service.compose.return_value = (
@@ -185,6 +187,7 @@ class AppComposerTests(unittest.TestCase):
                 starcraft_plugin=starcraft_plugin,
                 starcraft116_plugin=starcraft116_plugin,
                 starcraft2_plugin=starcraft2_plugin,
+                minecraft_plugin=minecraft_plugin,
                 screen_vision=screen_vision,
                 optional_components=(
                     song_player,
@@ -209,6 +212,7 @@ class AppComposerTests(unittest.TestCase):
         self.assertIs(starcraft_plugin, composer.starcraft_plugin)
         self.assertIs(starcraft116_plugin, composer.starcraft116_plugin)
         self.assertIs(starcraft2_plugin, composer.starcraft2_plugin)
+        self.assertIs(minecraft_plugin, composer.minecraft_plugin)
         self.assertIs(screen_vision, composer.screen_vision)
         self.assertEqual(
             [song_player, starcraft_plugin, screen_vision],
@@ -275,6 +279,7 @@ class AppComposerTests(unittest.TestCase):
         composer.starcraft_plugin = object()
         composer.starcraft116_plugin = object()
         composer.starcraft2_plugin = object()
+        composer.minecraft_plugin = object()
         composer.screen_vision = object()
         composer.memory_store = object()
         composer.memory_context_builder = object()
@@ -293,6 +298,7 @@ class AppComposerTests(unittest.TestCase):
             starcraft_plugin=composer.starcraft_plugin,
             starcraft116_plugin=composer.starcraft116_plugin,
             starcraft2_plugin=composer.starcraft2_plugin,
+            minecraft_plugin=composer.minecraft_plugin,
             screen_vision=composer.screen_vision,
             memory_store=composer.memory_store,
             memory_context_builder=composer.memory_context_builder,
@@ -476,15 +482,18 @@ class AppComposerTests(unittest.TestCase):
         composer.chess_plugin = object()
         composer.starcraft116_plugin = object()
         composer.starcraft2_plugin = object()
+        composer.minecraft_plugin = object()
         composer.chess_game_extension = object()
         composer.starcraft116_game_extension = object()
         composer.starcraft2_game_extension = object()
+        composer.minecraft_game_extension = object()
         #20260717_kpopmodder: Verify AppComposer tracks only the registry as lifecycle owner.
         composer.game_extension_registry = mock.Mock()
         composer.game_extension_registry.all.return_value = [
             composer.chess_game_extension,
             composer.starcraft116_game_extension,
             composer.starcraft2_game_extension,
+            composer.minecraft_game_extension,
         ]
 
         composer.build_managed_components()
@@ -492,12 +501,14 @@ class AppComposerTests(unittest.TestCase):
         self.assertNotIn(composer.chess_plugin, composer.managed_components)
         self.assertNotIn(composer.starcraft116_plugin, composer.managed_components)
         self.assertNotIn(composer.starcraft2_plugin, composer.managed_components)
+        self.assertNotIn(composer.minecraft_plugin, composer.managed_components)
         self.assertNotIn(composer.chess_game_extension, composer.managed_components)
         self.assertNotIn(
             composer.starcraft116_game_extension,
             composer.managed_components,
         )
         self.assertNotIn(composer.starcraft2_game_extension, composer.managed_components)
+        self.assertNotIn(composer.minecraft_game_extension, composer.managed_components)
         self.assertIn(composer.game_extension_registry, composer.managed_components)
         self.assertIn(composer.game_extension_registry, composer.optional_components)
 
@@ -551,10 +562,12 @@ class AppComposerTests(unittest.TestCase):
         composer.game_extension_context = object()
         composer.starcraft116_plugin = object()
         composer.starcraft2_plugin = object()
+        composer.minecraft_plugin = object()
         composer.chess_plugin = object()
         starcraft116_extension = object()
         starcraft2_extension = object()
         observer_extension = object()
+        minecraft_extension = object()
         chess_extension = object()
         composer.game_extension_composition_service = mock.Mock()
         composer.game_extension_composition_service.compose.return_value = (
@@ -562,6 +575,7 @@ class AppComposerTests(unittest.TestCase):
                 starcraft116_game_extension=starcraft116_extension,
                 starcraft2_game_extension=starcraft2_extension,
                 starcraft2_changeling_observer_extension=observer_extension,
+                minecraft_game_extension=minecraft_extension,
                 chess_game_extension=chess_extension,
             )
         )
@@ -572,10 +586,12 @@ class AppComposerTests(unittest.TestCase):
             context=composer.game_extension_context,
             starcraft116_plugin=composer.starcraft116_plugin,
             starcraft2_plugin=composer.starcraft2_plugin,
+            minecraft_plugin=composer.minecraft_plugin,
             chess_plugin=composer.chess_plugin,
             starcraft116_game_extension=None,
             starcraft2_game_extension=None,
             starcraft2_changeling_observer_extension=None,
+            minecraft_game_extension=None,
             chess_game_extension=None,
         )
         self.assertIs(starcraft116_extension, composer.starcraft116_game_extension)
@@ -584,6 +600,7 @@ class AppComposerTests(unittest.TestCase):
             observer_extension,
             composer.starcraft2_changeling_observer_extension,
         )
+        self.assertIs(minecraft_extension, composer.minecraft_game_extension)
         self.assertIs(chess_extension, composer.chess_game_extension)
 
     def test_game_debug_status_exposes_runtime_and_recent_events(self):

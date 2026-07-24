@@ -17,16 +17,19 @@ class GameExtensionCompositionService:
         context,
         starcraft116_plugin=None,
         starcraft2_plugin=None,
+        minecraft_plugin=None,
         chess_plugin=None,
         starcraft116_game_extension=None,
         starcraft2_game_extension=None,
         starcraft2_changeling_observer_extension=None,
+        minecraft_game_extension=None,
         chess_game_extension=None,
     ) -> GameExtensionCompositionResult:
         result = GameExtensionCompositionResult(
             starcraft116_game_extension=starcraft116_game_extension,
             starcraft2_game_extension=starcraft2_game_extension,
             starcraft2_changeling_observer_extension=starcraft2_changeling_observer_extension,
+            minecraft_game_extension=minecraft_game_extension,
             chess_game_extension=chess_game_extension,
         )
 
@@ -45,6 +48,11 @@ class GameExtensionCompositionService:
             result,
             enabled=starcraft2_plugin is not None
             or result.starcraft2_game_extension is not None,
+        )
+        result.minecraft_game_extension = self._register_minecraft(
+            minecraft_plugin,
+            result.minecraft_game_extension,
+            result,
         )
         result.chess_game_extension = self._register_chess(
             chess_plugin,
@@ -122,6 +130,27 @@ class GameExtensionCompositionService:
             )
             return None
 
+    def _register_minecraft(self, plugin, existing, result):
+        if plugin is None or existing is not None:
+            return existing
+        try:
+            from app_core.extensions.minecraft_game_extension import (
+                MinecraftGameExtension,
+            )
+
+            extension = MinecraftGameExtension(plugin=plugin)
+            self.registry.register(extension)
+            result.registered_extensions.append(extension)
+            self.logger("[AppComposer] minecraft game extension registered")
+            return extension
+        except Exception as e:
+            self._record_error(
+                result,
+                "register MinecraftGameExtension failed",
+                e,
+            )
+            return None
+
     def _register_chess(self, plugin, existing, result):
         if plugin is None or existing is not None:
             return existing
@@ -153,6 +182,7 @@ class GameExtensionCompositionService:
             result.starcraft2_changeling_observer_extension,
             "starcraft2_changeling_observer",
         )
+        self._log_lookup(result.minecraft_game_extension, "minecraft")
         self._log_lookup(result.chess_game_extension, "chess")
 
     def _log_lookup(self, extension, name: str) -> None:

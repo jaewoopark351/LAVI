@@ -16,6 +16,7 @@ class AppUiCompositionService:
         starcraft_plugin=None,
         starcraft116_plugin=None,
         starcraft2_plugin=None,
+        minecraft_plugin=None,
         screen_vision=None,
         memory_store=None,
         memory_context_builder=None,
@@ -40,6 +41,8 @@ class AppUiCompositionService:
             starcraft116_plugin.create_ui()
         if starcraft2_plugin is not None:
             starcraft2_plugin.create_ui()
+        if minecraft_plugin is not None:
+            minecraft_plugin.create_ui()
         with gr.Tab("Setting"):
             with gr.Tabs():
                 vtuber.create_ui()

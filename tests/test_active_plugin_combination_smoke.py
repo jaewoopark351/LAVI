@@ -29,6 +29,7 @@ class ActivePluginCombinationSmokeTests(unittest.TestCase):
         self.assertTrue(snapshot.is_enabled("Chess"))
         self.assertTrue(snapshot.is_enabled("StarCraft116"))
         self.assertTrue(snapshot.is_enabled("StarCraft2"))
+        self.assertFalse(snapshot.is_enabled("Minecraft"))
         for module_name in ("rvc", "vitsTTS", "silero", "voicevox"):
             self.assertFalse(snapshot.is_enabled(module_name), module_name)
 
@@ -108,6 +109,7 @@ class ActivePluginCombinationSmokeTests(unittest.TestCase):
         self.assertIsNotNone(registry.get("chess"))
         self.assertIsNotNone(registry.get("starcraft116"))
         self.assertIsNotNone(registry.get("starcraft2"))
+        self.assertIsNone(registry.get("minecraft"))
         self.assertEqual([], result.errors)
 
     def _production_snapshot(self):

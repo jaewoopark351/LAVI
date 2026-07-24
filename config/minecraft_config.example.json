@@ -1,0 +1,8 @@
+{
+  "enabled": true,
+  "allow_actions": true,
+  "bridge": {
+    "base_url": "http://127.0.0.1:4316",
+    "timeout_sec": 3.0
+  }
+}

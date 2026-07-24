@@ -18,6 +18,7 @@ from .game_extension_contracts import (
 )
 from .game_extension_interface import GameExtensionInterface
 from .game_runtime_context import GameRuntimeContext, GameRuntimeContextRegistry
+from .minecraft_game_extension import MinecraftGameExtension
 
 __all__ = [
     "ExtensionRegistry",
@@ -35,5 +36,6 @@ __all__ = [
     "GameStartResultDTO",
     "GameStatusDTO",
     "GameStopResultDTO",
+    "MinecraftGameExtension",
 ]
 

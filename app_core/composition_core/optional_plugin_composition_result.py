@@ -11,6 +11,7 @@ class OptionalPluginCompositionResult:
     starcraft_plugin: Any = None
     starcraft116_plugin: Any = None
     starcraft2_plugin: Any = None
+    minecraft_plugin: Any = None
     screen_vision: Any = None
     optional_components: Tuple[Any, ...] = ()
     startup_components: Tuple[Any, ...] = ()
@@ -22,5 +23,6 @@ class OptionalPluginCompositionResult:
             "starcraft_plugin": self.starcraft_plugin,
             "starcraft116_plugin": self.starcraft116_plugin,
             "starcraft2_plugin": self.starcraft2_plugin,
+            "minecraft_plugin": self.minecraft_plugin,
             "screen_vision": self.screen_vision,
         }

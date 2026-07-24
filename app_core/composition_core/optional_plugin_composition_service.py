@@ -29,6 +29,7 @@ class OptionalPluginCompositionService:
         ),
         OptionalPluginSpec("StarCraft116", "starcraft116_plugin"),
         OptionalPluginSpec("StarCraft2", "starcraft2_plugin"),
+        OptionalPluginSpec("Minecraft", "minecraft_plugin"),
         OptionalPluginSpec(
             "ScreenVision",
             "screen_vision",
@@ -81,6 +82,7 @@ class OptionalPluginCompositionService:
             starcraft_plugin=plugins.get("starcraft_plugin"),
             starcraft116_plugin=plugins.get("starcraft116_plugin"),
             starcraft2_plugin=plugins.get("starcraft2_plugin"),
+            minecraft_plugin=plugins.get("minecraft_plugin"),
             screen_vision=plugins.get("screen_vision"),
             optional_components=optional_components,
             startup_components=startup_components,

@@ -46,6 +46,7 @@ class OptionalPluginCompositionTests(unittest.TestCase):
                 "StarCraftRemastered",
                 "StarCraft116",
                 "StarCraft2",
+                "Minecraft",
                 "ScreenVision",
             ],
             [plugin.plugin_name for plugin in constructed],
