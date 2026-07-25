@@ -27,7 +27,13 @@ public class LaviEquipItemRunner {
         String itemName = String.valueOf(commandSpec.getRequest().getOrDefault("item", ""));
         Item item = itemResolver.resolve(itemName);
         if (!mod.getSlotHandler().forceEquipItem(item)) {
-            throw new IllegalStateException("Item is not available in inventory: " + itemName);
+            throw new IllegalStateException(
+                    "Item is not available in inventory: "
+                            + itemName
+                            + ". Use get-and-equip "
+                            + itemName
+                            + " 1 to collect it first."
+            );
         }
         return "Equipped " + itemName + ".";
     }

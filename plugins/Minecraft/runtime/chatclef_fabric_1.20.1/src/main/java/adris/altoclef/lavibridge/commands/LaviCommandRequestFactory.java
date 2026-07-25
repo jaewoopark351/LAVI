@@ -20,6 +20,10 @@ public class LaviCommandRequestFactory {
         return registry.build("get-item", request);
     }
 
+    public LaviCommandSpec getAndEquip(Map<String, Object> request) {
+        return registry.build("get-and-equip", request);
+    }
+
     public LaviCommandSpec gotoTarget(Map<String, Object> request) {
         return registry.build("goto", request);
     }

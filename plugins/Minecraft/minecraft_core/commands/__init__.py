@@ -5,6 +5,7 @@ from .minecraft_command_parser import MinecraftCommandParser
 from .minecraft_command_result_formatter import MinecraftCommandResultFormatter
 from .minecraft_command_router import MinecraftCommandRouter
 from .minecraft_equip_command_parser import MinecraftEquipCommandParser
+from .minecraft_get_and_equip_command_parser import MinecraftGetAndEquipCommandParser
 from .minecraft_get_item_candidate_normalizer import MinecraftGetItemCandidateNormalizer
 from .minecraft_get_item_command_parser import MinecraftGetItemCommandParser
 from .minecraft_goto_command_parser import MinecraftGotoCommandParser
@@ -18,6 +19,7 @@ __all__ = [
     "MinecraftCommandResultFormatter",
     "MinecraftCommandRouter",
     "MinecraftEquipCommandParser",
+    "MinecraftGetAndEquipCommandParser",
     "MinecraftGetItemCandidateNormalizer",
     "MinecraftGetItemCommandParser",
     "MinecraftGotoCommandParser",

@@ -68,6 +68,15 @@ class MinecraftConversationCommandParserTests(unittest.TestCase):
         self.assertEqual("equip iron_pickaxe", route.command)
         self.assertEqual("suffix", route.trigger)
 
+    def test_parses_suffixed_get_and_equip_command(self):
+        route = MinecraftConversationCommandParser().parse(
+            "get and equip diamond_pickaxe in Minecraft",
+        )
+
+        self.assertIsNotNone(route)
+        self.assertEqual("get and equip diamond_pickaxe", route.command)
+        self.assertEqual("suffix", route.trigger)
+
     def test_ignores_general_minecraft_chat(self):
         route = MinecraftConversationCommandParser().parse(
             "tell me about Minecraft",

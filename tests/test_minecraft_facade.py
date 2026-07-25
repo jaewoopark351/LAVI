@@ -18,6 +18,7 @@ class MinecraftFacadeTests(unittest.TestCase):
     def test_facade_routes_get_item_goto_stop_and_cancel(self):
         client = mock.Mock()
         client.get_item.return_value = {"ok": True, "accepted": True}
+        client.get_and_equip.return_value = {"ok": True, "accepted": True}
         client.equip.return_value = {"ok": True, "accepted": True}
         client.goto.return_value = {"ok": True, "accepted": True}
         client.stop.return_value = {"ok": True, "accepted": True}
@@ -39,15 +40,20 @@ class MinecraftFacadeTests(unittest.TestCase):
         equip_result = service.handle_command(
             {"action": "equip", "item": "iron_pickaxe"}
         )
+        get_and_equip_result = service.handle_command(
+            {"action": "get-and-equip", "item": "diamond_pickaxe", "count": "1"}
+        )
         stop_result = service.handle_command({"action": "stop"})
         cancel_result = service.handle_command({"action": "cancel"})
 
         self.assertTrue(get_result["ok"])
         self.assertTrue(goto_result["ok"])
         self.assertTrue(equip_result["ok"])
+        self.assertTrue(get_and_equip_result["ok"])
         self.assertTrue(stop_result["ok"])
         self.assertTrue(cancel_result["ok"])
         client.get_item.assert_called_once_with("oak_log", 3)
+        client.get_and_equip.assert_called_once_with("diamond_pickaxe", 1)
         client.equip.assert_called_once_with("iron_pickaxe")
         client.goto.assert_called_once_with(
             "0 64 0 overworld",

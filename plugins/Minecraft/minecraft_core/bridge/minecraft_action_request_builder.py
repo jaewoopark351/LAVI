@@ -8,6 +8,9 @@ class MinecraftActionRequestBuilder:
     def get_item(self, item: str, count: int = 1) -> Dict[str, Any]:
         return {"item": str(item or "").strip(), "count": int(count or 1)}
 
+    def get_and_equip(self, item: str, count: int = 1) -> Dict[str, Any]:
+        return {"item": str(item or "").strip(), "count": int(count or 1)}
+
     def equip(self, item: str) -> Dict[str, Any]:
         return {"item": str(item or "").strip()}
 

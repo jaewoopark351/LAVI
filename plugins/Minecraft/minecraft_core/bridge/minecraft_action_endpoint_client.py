@@ -23,6 +23,13 @@ class MinecraftActionEndpointClient:
             self.request_builder.get_item(item, count),
         )
 
+    def get_and_equip(self, item: str, count: int = 1) -> Dict[str, Any]:
+        return self.transport.request_json(
+            "POST",
+            "/v1/actions/get-and-equip",
+            self.request_builder.get_and_equip(item, count),
+        )
+
     def equip(self, item: str) -> Dict[str, Any]:
         return self.transport.request_json(
             "POST",

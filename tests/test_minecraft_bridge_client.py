@@ -48,6 +48,33 @@ class MinecraftBridgeClientTests(unittest.TestCase):
             json.loads(request.data.decode("utf-8")),
         )
 
+    def test_client_posts_get_and_equip_to_v1_endpoint(self):
+        calls = []
+
+        def opener(request, timeout):
+            calls.append((request, timeout))
+            return FakeHttpResponse({"ok": True, "accepted": True})
+
+        client = ChatClefBridgeClient(
+            base_url="http://127.0.0.1:4316",
+            timeout_sec=2,
+            opener=opener,
+        )
+
+        result = client.get_and_equip("iron_pickaxe", 1)
+
+        self.assertTrue(result["ok"])
+        request, _timeout = calls[0]
+        self.assertEqual("POST", request.get_method())
+        self.assertEqual(
+            "http://127.0.0.1:4316/v1/actions/get-and-equip",
+            request.full_url,
+        )
+        self.assertEqual(
+            {"item": "iron_pickaxe", "count": 1},
+            json.loads(request.data.decode("utf-8")),
+        )
+
     def test_client_posts_equip_goto_and_stop_to_v1_endpoints(self):
         calls = []
 

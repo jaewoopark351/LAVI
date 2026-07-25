@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Any, Dict
 
 from .minecraft_equip_command_parser import MinecraftEquipCommandParser
+from .minecraft_get_and_equip_command_parser import MinecraftGetAndEquipCommandParser
 from .minecraft_get_item_command_parser import MinecraftGetItemCommandParser
 from .minecraft_goto_command_parser import MinecraftGotoCommandParser
 from .minecraft_mapping_command_parser import MinecraftMappingCommandParser
@@ -17,6 +18,7 @@ class MinecraftCommandParser:
         self,
         simple_parser: MinecraftSimpleCommandParser | None = None,
         goto_parser: MinecraftGotoCommandParser | None = None,
+        get_and_equip_parser: MinecraftGetAndEquipCommandParser | None = None,
         equip_parser: MinecraftEquipCommandParser | None = None,
         get_item_parser: MinecraftGetItemCommandParser | None = None,
         parser_chain: MinecraftParserChain | None = None,
@@ -26,6 +28,7 @@ class MinecraftCommandParser:
             (
                 simple_parser or MinecraftSimpleCommandParser(),
                 goto_parser or MinecraftGotoCommandParser(),
+                get_and_equip_parser or MinecraftGetAndEquipCommandParser(),
                 equip_parser or MinecraftEquipCommandParser(),
                 get_item_parser or MinecraftGetItemCommandParser(),
             )

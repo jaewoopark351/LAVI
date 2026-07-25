@@ -43,6 +43,11 @@ class MinecraftUiController:
             self.facade_service.get_item(item, count)
         )
 
+    def on_get_and_equip_click(self, item: Any, count: Any) -> str:
+        return self.facade_service.status_json(
+            self.facade_service.get_and_equip(item, count)
+        )
+
     def on_equip_click(self, item: Any) -> str:
         return self.facade_service.status_json(self.facade_service.equip(item))
 
