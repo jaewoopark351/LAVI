@@ -2,73 +2,86 @@ package adris.altoclef.lavibridge;
 
 //20260725_kpopmodder: Added this class to track LAVI bridge action state separately from HTTP routing.
 
-import java.time.Instant;
+import adris.altoclef.lavibridge.actionstate.LaviActionClock;
+import adris.altoclef.lavibridge.actionstate.LaviActionIdGenerator;
+import adris.altoclef.lavibridge.actionstate.LaviActionRecord;
+import adris.altoclef.lavibridge.actionstate.LaviActionSnapshotFactory;
+import adris.altoclef.lavibridge.actionstate.LaviActionStatus;
+import adris.altoclef.lavibridge.actionstate.LaviActionStatusMutator;
+
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicLong;
 
 public class LaviActionRegistry {
 
-    public enum ActionStatus {
-        QUEUED,
-        RUNNING,
-        SUCCEEDED,
-        FAILED,
-        CANCELLED
+    private final LaviActionIdGenerator idGenerator;
+    private final LaviActionClock clock;
+    private final LaviActionSnapshotFactory snapshotFactory;
+    private final LaviActionStatusMutator statusMutator;
+    private LaviActionRecord currentAction;
+
+    public LaviActionRegistry() {
+        this(
+                new LaviActionIdGenerator(),
+                new LaviActionClock(),
+                new LaviActionSnapshotFactory(),
+                new LaviActionStatusMutator()
+        );
     }
 
-    private final AtomicLong sequence = new AtomicLong(1L);
-    private Action currentAction;
+    public LaviActionRegistry(
+            LaviActionIdGenerator idGenerator,
+            LaviActionClock clock,
+            LaviActionSnapshotFactory snapshotFactory,
+            LaviActionStatusMutator statusMutator
+    ) {
+        this.idGenerator = idGenerator;
+        this.clock = clock;
+        this.snapshotFactory = snapshotFactory;
+        this.statusMutator = statusMutator;
+    }
 
     public synchronized Map<String, Object> createAction(String type, String command, Map<String, Object> request) {
-        currentAction = new Action(nextActionId(), type, command, request);
-        return currentAction.toMap();
+        currentAction = new LaviActionRecord(idGenerator.nextActionId(), type, command, request, clock.now());
+        return snapshotFactory.toMap(currentAction);
     }
 
     public synchronized void markRunning(String actionId) {
         if (matchesCurrent(actionId)) {
-            currentAction.status = ActionStatus.RUNNING;
-            currentAction.updatedAt = Instant.now();
+            statusMutator.running(currentAction, clock.now());
         }
     }
 
     public synchronized void markSucceeded(String actionId, String message) {
         if (matchesCurrent(actionId)) {
-            currentAction.status = ActionStatus.SUCCEEDED;
-            currentAction.message = message;
-            currentAction.updatedAt = Instant.now();
+            statusMutator.succeeded(currentAction, message, clock.now());
         }
     }
 
     public synchronized void markFailed(String actionId, String error) {
         if (matchesCurrent(actionId)) {
-            currentAction.status = ActionStatus.FAILED;
-            currentAction.error = error;
-            currentAction.updatedAt = Instant.now();
+            statusMutator.failed(currentAction, error, clock.now());
         }
     }
 
     public synchronized void markCancelled(String actionId, String message) {
         if (matchesCurrent(actionId)) {
-            currentAction.status = ActionStatus.CANCELLED;
-            currentAction.message = message;
-            currentAction.updatedAt = Instant.now();
+            statusMutator.cancelled(currentAction, message, clock.now());
         }
     }
 
     public synchronized Map<String, Object> cancelCurrentIfRunning(String message) {
         if (hasRunningAction()) {
-            currentAction.status = ActionStatus.CANCELLED;
-            currentAction.message = message;
-            currentAction.updatedAt = Instant.now();
-            return currentAction.toMap();
+            statusMutator.cancelled(currentAction, message, clock.now());
+            return snapshotFactory.toMap(currentAction);
         }
         return null;
     }
 
     public synchronized boolean hasRunningAction() {
         return currentAction != null
-                && (currentAction.status == ActionStatus.QUEUED || currentAction.status == ActionStatus.RUNNING);
+                && (currentAction.getStatus() == LaviActionStatus.QUEUED
+                || currentAction.getStatus() == LaviActionStatus.RUNNING);
     }
 
     public synchronized Map<String, Object> currentAction() {
@@ -81,55 +94,15 @@ public class LaviActionRegistry {
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("ok", true);
-        result.put("action", currentAction.toMap());
+        result.put("action", snapshotFactory.toMap(currentAction));
         return result;
     }
 
     public synchronized Map<String, Object> currentActionSnapshotOnly() {
-        return currentAction == null ? null : currentAction.toMap();
+        return currentAction == null ? null : snapshotFactory.toMap(currentAction);
     }
 
     private boolean matchesCurrent(String actionId) {
-        return currentAction != null && currentAction.actionId.equals(actionId);
-    }
-
-    private String nextActionId() {
-        return "lavi-" + sequence.getAndIncrement();
-    }
-
-    private static class Action {
-        private final String actionId;
-        private final String type;
-        private final String command;
-        private final Map<String, Object> request;
-        private final Instant createdAt;
-        private Instant updatedAt;
-        private ActionStatus status;
-        private String message;
-        private String error;
-
-        private Action(String actionId, String type, String command, Map<String, Object> request) {
-            this.actionId = actionId;
-            this.type = type;
-            this.command = command;
-            this.request = request;
-            this.createdAt = Instant.now();
-            this.updatedAt = createdAt;
-            this.status = ActionStatus.QUEUED;
-        }
-
-        private Map<String, Object> toMap() {
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("action_id", actionId);
-            result.put("type", type);
-            result.put("status", status.name().toLowerCase());
-            result.put("command", command);
-            result.put("request", request);
-            result.put("message", message);
-            result.put("error", error);
-            result.put("created_at", createdAt.toString());
-            result.put("updated_at", updatedAt.toString());
-            return result;
-        }
+        return currentAction != null && currentAction.getActionId().equals(actionId);
     }
 }

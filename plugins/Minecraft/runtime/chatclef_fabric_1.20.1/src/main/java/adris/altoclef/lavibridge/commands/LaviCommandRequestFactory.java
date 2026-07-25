@@ -6,14 +6,21 @@ import java.util.Map;
 
 public class LaviCommandRequestFactory {
 
-    private final LaviGetItemCommandFactory getItemCommandFactory = new LaviGetItemCommandFactory();
-    private final LaviGotoCommandFactory gotoCommandFactory = new LaviGotoCommandFactory();
+    private final LaviCommandFactoryRegistry registry;
+
+    public LaviCommandRequestFactory() {
+        this(LaviCommandFactoryRegistry.defaults());
+    }
+
+    public LaviCommandRequestFactory(LaviCommandFactoryRegistry registry) {
+        this.registry = registry;
+    }
 
     public LaviCommandSpec getItem(Map<String, Object> request) {
-        return getItemCommandFactory.build(request);
+        return registry.build("get-item", request);
     }
 
     public LaviCommandSpec gotoTarget(Map<String, Object> request) {
-        return gotoCommandFactory.build(request);
+        return registry.build("goto", request);
     }
 }

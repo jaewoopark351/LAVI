@@ -3,25 +3,18 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from plugins.Minecraft.minecraft_core import (
-    MinecraftConfig,
-    MinecraftFacadeService,
-)
-from plugins.Minecraft.minecraft_core.ui.minecraft_ui_builder import MinecraftUiBuilder
-from plugins.Minecraft.minecraft_core.ui.minecraft_ui_controller import (
-    MinecraftUiController,
+from plugins.Minecraft.minecraft_core.minecraft_plugin_components import (
+    MinecraftPluginComponents,
 )
 
 
 class Minecraft:
     def __init__(self):
-        self.config_manager = MinecraftConfig()
-        self.facade_service = MinecraftFacadeService(self.config_manager)
-        self.ui_controller = MinecraftUiController(
-            self.config_manager,
-            self.facade_service,
-        )
-        self.ui_builder = MinecraftUiBuilder(self.ui_controller)
+        components = MinecraftPluginComponents()
+        self.config_manager = components.config_manager
+        self.facade_service = components.facade_service
+        self.ui_controller = components.ui_controller
+        self.ui_builder = components.ui_builder
 
     def create_ui(self):
         self.ui_builder.create_ui()

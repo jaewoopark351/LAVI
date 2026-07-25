@@ -8,26 +8,25 @@ import adris.altoclef.lavibridge.MinecraftThreadDispatcher;
 import adris.altoclef.lavibridge.commands.LaviCommandSpec;
 
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 public class LaviUserCommandExecutor {
 
-    private final AltoClef mod;
     private final MinecraftThreadDispatcher dispatcher;
-    private final LaviActionRegistry actionRegistry;
     private final LaviAcceptedResponseFactory responseFactory;
     private final LaviMinecraftActionGuard actionGuard;
+    private final LaviCommandActionLifecycle actionLifecycle;
+    private final LaviAltoClefCommandRunner commandRunner;
 
     public LaviUserCommandExecutor(
             AltoClef mod,
             MinecraftThreadDispatcher dispatcher,
             LaviActionRegistry actionRegistry
     ) {
-        this.mod = mod;
         this.dispatcher = dispatcher;
-        this.actionRegistry = actionRegistry;
         this.responseFactory = new LaviAcceptedResponseFactory();
         this.actionGuard = new LaviMinecraftActionGuard(mod, actionRegistry);
+        this.actionLifecycle = new LaviCommandActionLifecycle(actionRegistry);
+        this.commandRunner = new LaviAltoClefCommandRunner(mod);
     }
 
     public Map<String, Object> execute(LaviCommandSpec commandSpec) throws Exception {
@@ -36,27 +35,9 @@ public class LaviUserCommandExecutor {
             actionGuard.ensureNoRunningAction();
             actionGuard.ensureNoManualTask();
 
-            Map<String, Object> action = actionRegistry.createAction(
-                    commandSpec.getActionType(),
-                    commandSpec.getCommand(),
-                    commandSpec.getRequest()
-            );
-            String actionId = (String) action.get("action_id");
-            actionRegistry.markRunning(actionId);
-
-            AtomicBoolean failed = new AtomicBoolean(false);
-            String commandLine = mod.getCommandExecutor().getCommandPrefix() + commandSpec.getCommand();
-
-            mod.getCommandExecutor().execute(commandLine, () -> {
-                if (!failed.get()) {
-                    actionRegistry.markSucceeded(actionId, "AltoClef command finished.");
-                }
-            }, exception -> {
-                failed.set(true);
-                actionRegistry.markFailed(actionId, exception.getMessage());
-            });
-
-            return responseFactory.accepted(actionRegistry.currentActionSnapshotOnly());
+            String actionId = actionLifecycle.start(commandSpec);
+            commandRunner.run(commandSpec, actionId, actionLifecycle);
+            return responseFactory.accepted(actionLifecycle.currentSnapshot());
         });
     }
 }

@@ -3,11 +3,8 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from .actions.minecraft_action_service import MinecraftActionService
-from .bridge.chatclef_bridge_client import ChatClefBridgeClient
-from .commands.minecraft_command_router import MinecraftCommandRouter
 from .minecraft_config import MinecraftConfig
-from .status.minecraft_status_json_formatter import MinecraftStatusJsonFormatter
+from .minecraft_facade_components import MinecraftFacadeComponents
 
 
 class MinecraftFacadeService:
@@ -16,14 +13,15 @@ class MinecraftFacadeService:
         config_manager: MinecraftConfig | None = None,
         client_factory=None,
     ):
-        self.config_manager = config_manager or MinecraftConfig()
-        self.client_factory = client_factory or ChatClefBridgeClient
-        self.action_service = MinecraftActionService(
-            self.config_manager,
-            self.client_factory,
+        components = MinecraftFacadeComponents(
+            config_manager=config_manager,
+            client_factory=client_factory,
         )
-        self.command_router = MinecraftCommandRouter(self.action_service)
-        self.status_json_formatter = MinecraftStatusJsonFormatter()
+        self.config_manager = components.config_manager
+        self.client_factory = components.client_factory
+        self.action_service = components.action_service
+        self.command_router = components.command_router
+        self.status_json_formatter = components.status_json_formatter
 
     def reload(self) -> Dict[str, Any]:
         return self.action_service.reload()

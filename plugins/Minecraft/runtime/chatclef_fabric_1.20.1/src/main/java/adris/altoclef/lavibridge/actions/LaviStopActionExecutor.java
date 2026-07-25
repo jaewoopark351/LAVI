@@ -7,16 +7,17 @@ import adris.altoclef.lavibridge.LaviActionRegistry;
 import adris.altoclef.lavibridge.LaviStopController;
 import adris.altoclef.lavibridge.MinecraftThreadDispatcher;
 
-import java.util.LinkedHashMap;
 import java.util.Map;
 
 public class LaviStopActionExecutor {
 
     private final MinecraftThreadDispatcher dispatcher;
-    private final LaviActionRegistry actionRegistry;
-    private final LaviStopController stopController;
     private final LaviAcceptedResponseFactory responseFactory;
     private final LaviMinecraftActionGuard actionGuard;
+    private final LaviRunningActionCanceller runningActionCanceller;
+    private final LaviStopRequestFactory stopRequestFactory;
+    private final LaviStopActionLifecycle stopActionLifecycle;
+    private final LaviStopAutomationRunner stopAutomationRunner;
 
     public LaviStopActionExecutor(
             AltoClef mod,
@@ -25,26 +26,23 @@ public class LaviStopActionExecutor {
             LaviStopController stopController
     ) {
         this.dispatcher = dispatcher;
-        this.actionRegistry = actionRegistry;
-        this.stopController = stopController;
         this.responseFactory = new LaviAcceptedResponseFactory();
         this.actionGuard = new LaviMinecraftActionGuard(mod, actionRegistry);
+        this.runningActionCanceller = new LaviRunningActionCanceller(actionRegistry);
+        this.stopRequestFactory = new LaviStopRequestFactory();
+        this.stopActionLifecycle = new LaviStopActionLifecycle(actionRegistry);
+        this.stopAutomationRunner = new LaviStopAutomationRunner(stopController);
     }
 
     public Map<String, Object> stop() throws Exception {
         return dispatcher.call(() -> {
             actionGuard.ensureInGame();
-            Map<String, Object> request = new LinkedHashMap<>();
-            Map<String, Object> cancelledAction = actionRegistry.cancelCurrentIfRunning("Cancelled by stop request.");
-            if (cancelledAction != null) {
-                request.put("cancelled_action", cancelledAction);
-            }
-            Map<String, Object> action = actionRegistry.createAction("stop", "stop", request);
-            String actionId = (String) action.get("action_id");
-            actionRegistry.markRunning(actionId);
-            stopController.stopAutomation();
-            actionRegistry.markSucceeded(actionId, "Stop requested.");
-            return responseFactory.accepted(actionRegistry.currentActionSnapshotOnly());
+            Map<String, Object> cancelledAction = runningActionCanceller.cancelForStopRequest();
+            Map<String, Object> request = stopRequestFactory.build(cancelledAction);
+            String actionId = stopActionLifecycle.start(request);
+            stopAutomationRunner.stop();
+            stopActionLifecycle.succeeded(actionId);
+            return responseFactory.accepted(stopActionLifecycle.currentSnapshot());
         });
     }
 }

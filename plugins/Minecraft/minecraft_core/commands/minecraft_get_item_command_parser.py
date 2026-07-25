@@ -3,42 +3,28 @@ from __future__ import annotations
 
 from typing import Dict
 
-from .minecraft_command_aliases import DIMENSION_ALIASES, ITEM_PREFIXES, ITEM_WORDS
-from .minecraft_text_parse_helpers import (
-    build_payload,
-    first_item_token,
-    first_positive_number,
-)
+from .minecraft_get_item_candidate_selector import MinecraftGetItemCandidateSelector
+from .minecraft_get_item_payload_builder import MinecraftGetItemPayloadBuilder
+from .minecraft_get_item_request_extractor import MinecraftGetItemRequestExtractor
 
 
 class MinecraftGetItemCommandParser:
+    def __init__(
+        self,
+        candidate_selector: MinecraftGetItemCandidateSelector | None = None,
+        request_extractor: MinecraftGetItemRequestExtractor | None = None,
+        payload_builder: MinecraftGetItemPayloadBuilder | None = None,
+    ):
+        self.candidate_selector = candidate_selector or MinecraftGetItemCandidateSelector()
+        self.request_extractor = request_extractor or MinecraftGetItemRequestExtractor()
+        self.payload_builder = payload_builder or MinecraftGetItemPayloadBuilder()
+
     def parse(self, text: str, lowered: str) -> Dict[str, object] | None:
-        candidate = self._candidate_text(text, lowered)
+        candidate = self.candidate_selector.select(text, lowered)
         if not candidate:
             return None
 
-        item = first_item_token(
-            candidate,
-            dimension_aliases=DIMENSION_ALIASES,
-            item_prefixes=ITEM_PREFIXES,
-        )
-        if not item:
+        request = self.request_extractor.extract(candidate)
+        if request is None:
             return None
-        payload = build_payload("get_item", text)
-        payload.update(
-            {
-                "item": item,
-                "count": first_positive_number(candidate, default=1),
-            }
-        )
-        return payload
-
-    def _candidate_text(self, text: str, lowered: str) -> str:
-        for prefix in ITEM_PREFIXES:
-            if lowered == prefix:
-                return ""
-            if lowered.startswith(prefix + " "):
-                return text[len(prefix) :].strip()
-        if any(word in lowered for word in ITEM_WORDS):
-            return text
-        return ""
+        return self.payload_builder.build(text, request)

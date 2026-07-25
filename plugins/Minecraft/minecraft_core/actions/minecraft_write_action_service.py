@@ -5,9 +5,7 @@ from typing import Any, Dict
 
 from ..bridge.minecraft_bridge_client_provider import MinecraftBridgeClientProvider
 from ..minecraft_config import MinecraftConfig
-from .minecraft_get_item_action import MinecraftGetItemAction
-from .minecraft_goto_action import MinecraftGotoAction
-from .minecraft_stop_action import MinecraftStopAction
+from .minecraft_write_action_registry import MinecraftWriteActionRegistry
 
 
 class MinecraftWriteActionService:
@@ -15,19 +13,15 @@ class MinecraftWriteActionService:
         self,
         config_manager: MinecraftConfig,
         client_provider: MinecraftBridgeClientProvider,
+        action_registry: MinecraftWriteActionRegistry | None = None,
     ):
-        self.get_item_action = MinecraftGetItemAction(
+        self.action_registry = action_registry or MinecraftWriteActionRegistry.defaults(
             config_manager,
             client_provider,
         )
-        self.goto_action = MinecraftGotoAction(
-            config_manager,
-            client_provider,
-        )
-        self.stop_action = MinecraftStopAction(client_provider)
 
     def get_item(self, item: Any, count: Any = 1) -> Dict[str, object]:
-        return self.get_item_action.run(item, count)
+        return self.action_registry.get("get_item").run(item, count)
 
     def goto(
         self,
@@ -38,7 +32,7 @@ class MinecraftWriteActionService:
         z: Any = None,
         dimension: Any = None,
     ) -> Dict[str, object]:
-        return self.goto_action.run(
+        return self.action_registry.get("goto").run(
             target,
             x=x,
             y=y,
@@ -47,4 +41,4 @@ class MinecraftWriteActionService:
         )
 
     def stop(self) -> Dict[str, object]:
-        return self.stop_action.run()
+        return self.action_registry.get("stop").run()

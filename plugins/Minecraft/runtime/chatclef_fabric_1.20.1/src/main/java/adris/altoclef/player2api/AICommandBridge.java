@@ -22,7 +22,14 @@ import net.minecraft.network.message.MessageType;
 
 public class AICommandBridge {
     private ConversationHistory conversationHistory = null;
-    private Character character = null;
+    private static final Character DEFAULT_CHARACTER = new Character(
+            "AI agent",
+            "AI",
+            "Greetings",
+            "You are a helpful AI Agent",
+            new String[0]
+    );
+    private Character character = DEFAULT_CHARACTER;
     public static boolean avoidNextMessageFlag = false;
 
     public static String initialPrompt = """
@@ -66,7 +73,7 @@ public class AICommandBridge {
     private CommandExecutor cmdExecutor = null;
     private AltoClef mod = null;
 
-    private boolean _enabled = true;
+    private boolean _enabled = Player2ApiFeatureToggle.isEnabled();
     private boolean _playermode = false;
 
     private String _lastQueuedMessage = null;
@@ -87,7 +94,7 @@ public class AICommandBridge {
         this.mod = mod;
         this.cmdExecutor = cmdExecutor;
         EventBus.subscribe(ChatMessageEvent.class, evt -> {
-            if (!getPlayerMode())
+            if (!getEnabled() || !getPlayerMode())
                 return;
             String message = evt.messageContent();
             String sender = evt.senderName();
@@ -114,6 +121,11 @@ public class AICommandBridge {
      * selected character.
      */
     private void updateInfo() {
+        if (!Player2ApiFeatureToggle.isEnabled()) {
+            this.character = DEFAULT_CHARACTER;
+            this.conversationHistory = null;
+            return;
+        }
         System.out.println("Updating info");
         Character newCharacter = Player2APIService.getSelectedCharacter();
         // System.out.println(newCharacter);
@@ -170,6 +182,9 @@ public class AICommandBridge {
     }
 
     public void processChatWithAPI() {
+        if (!getEnabled()) {
+            return;
+        }
         llmThread.submit(() -> {
             try {
                 llmProcessing = true;
@@ -238,6 +253,9 @@ public class AICommandBridge {
      * Sends either the first-time greeting or a welcome-back message based on loaded history.
      */
     public void sendGreeting() {
+        if (!getEnabled()) {
+            return;
+        }
         System.out.println("Sending Greeting");
         llmThread.submit(() -> {
             updateInfo();
@@ -256,12 +274,18 @@ public class AICommandBridge {
     }
 
     public void sendHeartbeat() {
+        if (!getEnabled()) {
+            return;
+        }
         llmThread.submit(() -> {
             Player2APIService.sendHeartbeat();
         });
     }
 
     public void onTick() {
+        if (!getEnabled()) {
+            return;
+        }
         if (messageQueue.isEmpty()) {
             return;
         }
@@ -279,7 +303,7 @@ public class AICommandBridge {
     }
 
     public void setEnabled(boolean enabled) {
-        _enabled = enabled;
+        _enabled = enabled && Player2ApiFeatureToggle.isEnabled();
     }
 
     public boolean getEnabled() {
@@ -295,7 +319,7 @@ public class AICommandBridge {
     }
 
     public void setPlayerMode(boolean playermode) {
-        _playermode = playermode;
+        _playermode = playermode && getEnabled();
     }
 
     public boolean getPlayerMode() {
@@ -303,10 +327,16 @@ public class AICommandBridge {
     }
 
     public void startSTT() {
+        if (!getEnabled()) {
+            return;
+        }
         sttThread.execute(Player2APIService::startSTT);
     }
 
     public void stopSTT() {
+        if (!getEnabled()) {
+            return;
+        }
         sttThread.execute(() -> {
             String result = Player2APIService.stopSTT();
 

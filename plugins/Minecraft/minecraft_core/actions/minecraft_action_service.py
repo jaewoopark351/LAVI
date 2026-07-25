@@ -3,12 +3,8 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from ..bridge.chatclef_bridge_client import ChatClefBridgeClient
-from ..bridge.minecraft_bridge_client_provider import MinecraftBridgeClientProvider
 from ..minecraft_config import MinecraftConfig
-from ..status.minecraft_status_service import MinecraftStatusService
-from .minecraft_read_action_service import MinecraftReadActionService
-from .minecraft_write_action_service import MinecraftWriteActionService
+from .minecraft_action_service_components import MinecraftActionServiceComponents
 
 
 class MinecraftActionService:
@@ -17,33 +13,23 @@ class MinecraftActionService:
         config_manager: MinecraftConfig | None = None,
         client_factory=None,
     ):
-        self.config_manager = config_manager or MinecraftConfig()
-        self.client_provider = MinecraftBridgeClientProvider(
-            self.config_manager,
-            client_factory or ChatClefBridgeClient,
+        components = MinecraftActionServiceComponents(
+            config_manager=config_manager,
+            client_factory=client_factory,
         )
-        self.read_actions = MinecraftReadActionService(self.client_provider)
-        self.write_actions = MinecraftWriteActionService(
-            self.config_manager,
-            self.client_provider,
-        )
-        self.status_service = MinecraftStatusService(
-            self.config_manager,
-            self.read_actions,
-        )
+        self.config_manager = components.config_manager
+        self.client_provider = components.client_provider
+        self.read_actions = components.read_actions
+        self.write_actions = components.write_actions
+        self.status_service = components.status_service
+        self.reload_service = components.reload_service
 
     @property
     def client(self):
         return self.client_provider.client
 
     def reload(self) -> Dict[str, Any]:
-        self.config_manager.reload()
-        self.client_provider.reload()
-        return {
-            "ok": True,
-            "action": "reload",
-            "config": self.public_config(),
-        }
+        return self.reload_service.reload(self.public_config)
 
     def health(self) -> Dict[str, Any]:
         return self.read_actions.health()
