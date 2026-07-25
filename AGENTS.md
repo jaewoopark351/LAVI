@@ -1281,6 +1281,22 @@ __pycache__/
 
 Refactoring is allowed only when it improves maintainability without breaking behavior.
 
+Mandatory responsibility split trigger:
+
+* If a class, module, source file, service, manager, controller, adapter, or facade has two or more independent responsibilities, Codex must split those responsibilities into separate focused units before adding more behavior.
+* Do not postpone this split as a future cleanup when the current task touches that code.
+* Keep each extracted unit focused on one primary responsibility, with a name that states that responsibility clearly.
+* Preserve public APIs, config keys, runtime behavior, and compatibility paths unless the user explicitly approves a breaking change.
+* If the split cannot be done safely within the current task, stop expanding the mixed-responsibility code and report the blocker instead of adding more logic to it.
+
+Readability-first separation preference:
+
+* Prefer more small, explicit classes/files over fewer dense classes when that makes the code easier to read, test, and extend.
+* Do not avoid a split merely because it increases the class or file count.
+* Optimize for clear responsibility boundaries first; performance, allocation count, and class-count efficiency are secondary unless there is a measured runtime problem or a user explicitly asks for optimization.
+* Avoid clever consolidation that hides responsibilities behind generic utility classes, broad managers, or overloaded facades.
+* If in doubt, choose the structure that a future maintainer can understand fastest.
+
 Preferred refactoring style:
 
 * Extract small helper class.

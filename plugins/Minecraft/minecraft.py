@@ -3,48 +3,28 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-import gradio as gr
-
-from plugins.Minecraft.minecraft_core import MinecraftConfig, MinecraftFacadeService
+from plugins.Minecraft.minecraft_core import (
+    MinecraftConfig,
+    MinecraftFacadeService,
+)
+from plugins.Minecraft.minecraft_core.ui.minecraft_ui_builder import MinecraftUiBuilder
+from plugins.Minecraft.minecraft_core.ui.minecraft_ui_controller import (
+    MinecraftUiController,
+)
 
 
 class Minecraft:
     def __init__(self):
         self.config_manager = MinecraftConfig()
         self.facade_service = MinecraftFacadeService(self.config_manager)
+        self.ui_controller = MinecraftUiController(
+            self.config_manager,
+            self.facade_service,
+        )
+        self.ui_builder = MinecraftUiBuilder(self.ui_controller)
 
     def create_ui(self):
-        with gr.Tab("Minecraft"):
-            status_box = gr.Textbox(
-                label="Bridge Status",
-                value=self.initial_status_text(),
-                lines=16,
-                interactive=False,
-            )
-            with gr.Row():
-                health_button = gr.Button("Health")
-                status_button = gr.Button("Status")
-                inventory_button = gr.Button("Inventory")
-                current_action_button = gr.Button("Current Action")
-                stop_button = gr.Button("Stop")
-            with gr.Row():
-                item_box = gr.Textbox(label="Item", value="oak_log", lines=1)
-                count_box = gr.Textbox(label="Count", value="1", lines=1)
-                get_item_button = gr.Button("Get Item")
-
-            health_button.click(fn=self.on_health_click, outputs=status_box)
-            status_button.click(fn=self.on_status_click, outputs=status_box)
-            inventory_button.click(fn=self.on_inventory_click, outputs=status_box)
-            current_action_button.click(
-                fn=self.on_current_action_click,
-                outputs=status_box,
-            )
-            stop_button.click(fn=self.on_stop_click, outputs=status_box)
-            get_item_button.click(
-                fn=self.on_get_item_click,
-                inputs=[item_box, count_box],
-                outputs=status_box,
-            )
+        self.ui_builder.create_ui()
 
     def start(self) -> None:
         return None
@@ -67,6 +47,9 @@ class Minecraft:
     def get_item(self, item: Any, count: Any = 1) -> Dict[str, Any]:
         return self.facade_service.get_item(item, count)
 
+    def goto(self, target: Any) -> Dict[str, Any]:
+        return self.facade_service.goto(target)
+
     def stop(self) -> Dict[str, Any]:
         return self.facade_service.stop()
 
@@ -80,29 +63,25 @@ class Minecraft:
         return self.facade_service.reload()
 
     def initial_status_text(self) -> str:
-        return self.facade_service.status_json(
-            {
-                "ok": True,
-                "message": self.config_manager.config_message(),
-                "config": self.facade_service.public_config(),
-                "bridge_checked": False,
-            }
-        )
+        return self.ui_controller.initial_status_text()
 
     def on_health_click(self) -> str:
-        return self.facade_service.status_json(self.health())
+        return self.ui_controller.on_health_click()
 
     def on_status_click(self) -> str:
-        return self.facade_service.status_json(self.get_status())
+        return self.ui_controller.on_status_click()
 
     def on_inventory_click(self) -> str:
-        return self.facade_service.status_json(self.inventory())
+        return self.ui_controller.on_inventory_click()
 
     def on_current_action_click(self) -> str:
-        return self.facade_service.status_json(self.current_action())
+        return self.ui_controller.on_current_action_click()
 
     def on_get_item_click(self, item: Any, count: Any) -> str:
-        return self.facade_service.status_json(self.get_item(item, count))
+        return self.ui_controller.on_get_item_click(item, count)
+
+    def on_goto_click(self, target: Any) -> str:
+        return self.ui_controller.on_goto_click(target)
 
     def on_stop_click(self) -> str:
-        return self.facade_service.status_json(self.stop())
+        return self.ui_controller.on_stop_click()
