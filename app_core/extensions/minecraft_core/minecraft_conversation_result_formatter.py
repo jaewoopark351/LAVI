@@ -4,18 +4,25 @@ from __future__ import annotations
 from typing import Any, Mapping
 
 from .minecraft_conversation_command_route import MinecraftConversationCommandRoute
+from .minecraft_conversation_reply_builder import MinecraftConversationReplyBuilder
 
 
 class MinecraftConversationResultFormatter:
+    def __init__(
+        self,
+        reply_builder: MinecraftConversationReplyBuilder | None = None,
+    ):
+        self.reply_builder = reply_builder or MinecraftConversationReplyBuilder()
+
     def extension_missing(self, route: MinecraftConversationCommandRoute) -> str:
-        return "Minecraft extension is not available."
+        return self.reply_builder.extension_missing()
 
     def command_failed(
         self,
         route: MinecraftConversationCommandRoute,
         error: Exception,
     ) -> str:
-        return f"Minecraft command failed: {type(error).__name__}: {error}"
+        return self.reply_builder.failed(f"{type(error).__name__}: {error}")
 
     def format(
         self,
@@ -23,21 +30,20 @@ class MinecraftConversationResultFormatter:
         result: Any,
     ) -> str:
         if not isinstance(result, Mapping):
-            return f"Minecraft command handled: {route.command}"
+            return self.reply_builder.handled()
 
         ok = bool(result.get("ok"))
-        action = str(result.get("action") or route.command).strip()
         message = str(result.get("message") or "").strip()
         error = str(result.get("error") or "").strip()
 
         if not ok:
             detail = error or message or "unknown error"
-            return f"Minecraft command failed: {detail}"
+            return self.reply_builder.failed(detail)
 
         if result.get("accepted") is True:
-            return f"Minecraft command accepted: {action}"
+            return self.reply_builder.accepted(route, result)
 
         if message:
-            return f"Minecraft command handled: {message}"
+            return self.reply_builder.handled(message)
 
-        return f"Minecraft command handled: {action}"
+        return self.reply_builder.handled()

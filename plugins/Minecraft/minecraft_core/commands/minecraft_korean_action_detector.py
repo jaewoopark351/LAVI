@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import re
 
+from .minecraft_korean_equip_signal_detector import MinecraftKoreanEquipSignalDetector
+
 
 class MinecraftKoreanActionDetector:
     COORDINATE_PATTERN = re.compile(r"-?\d+")
@@ -33,14 +35,6 @@ class MinecraftKoreanActionDetector:
         "\uc218\uc9d1",
     )
     CRAFT_WORDS = ("\ub9cc\ub4e4", "\uc81c\uc791", "\uc870\ud569")
-    EQUIP_WORDS = (
-        "\uc7a5\ucc29",
-        "\ub4e4\uc5b4",
-        "\ub4e4\uace0",
-        "\ucc29\uc6a9",
-        "\uc950\uc5b4",
-        "\ub07c\uc6cc",
-    )
     GOTO_WORDS = (
         "\uc774\ub3d9",
         "\uac00\uc918",
@@ -48,6 +42,14 @@ class MinecraftKoreanActionDetector:
         "\uac00",
         "\uc88c\ud45c",
     )
+
+    def __init__(
+        self,
+        equip_signal_detector: MinecraftKoreanEquipSignalDetector | None = None,
+    ):
+        self.equip_signal_detector = (
+            equip_signal_detector or MinecraftKoreanEquipSignalDetector()
+        )
 
     def detect(self, text: object) -> str:
         lowered = str(text or "").strip().lower()
@@ -66,10 +68,11 @@ class MinecraftKoreanActionDetector:
             return "status"
 
         has_get = self._contains_any(lowered, self.GET_WORDS)
-        has_equip = self._contains_any(lowered, self.EQUIP_WORDS)
-        if has_get and has_equip:
+        has_craft = self._contains_any(lowered, self.CRAFT_WORDS)
+        has_equip = self._has_equip_signal(lowered)
+        if (has_get or has_craft) and has_equip:
             return "get_and_equip"
-        if self._contains_any(lowered, self.CRAFT_WORDS):
+        if has_craft:
             return "craft"
         if has_equip:
             return "equip"
@@ -81,6 +84,9 @@ class MinecraftKoreanActionDetector:
 
     def _contains_any(self, text: str, words: tuple[str, ...]) -> bool:
         return any(word in text for word in words)
+
+    def _has_equip_signal(self, text: str) -> bool:
+        return self.equip_signal_detector.has_signal(text)
 
     def _has_coordinates(self, text: str) -> bool:
         return len(self.COORDINATE_PATTERN.findall(text)) >= 3

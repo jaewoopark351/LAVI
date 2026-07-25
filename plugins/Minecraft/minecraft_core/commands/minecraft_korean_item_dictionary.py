@@ -1,6 +1,8 @@
 #20260725_kpopmodder: Added Korean item aliases for Minecraft natural command parsing.
 from __future__ import annotations
 
+from .minecraft_korean_alias_text_normalizer import MinecraftKoreanAliasTextNormalizer
+
 
 class MinecraftKoreanItemDictionary:
     ITEM_ALIASES = (
@@ -25,6 +27,7 @@ class MinecraftKoreanItemDictionary:
         ("\uc791\uc5c5\ub300", "crafting_table"),
         ("\uc81c\uc791\ub300", "crafting_table"),
         ("\ub2e4\uc774\uc544\ubaac\ub4dc", "diamond"),
+        ("\ub098\ubb34", "oak_log"),
         ("\ucc38\ub098\ubb34", "oak_log"),
         ("\uc624\ud06c", "oak_log"),
         ("\uc790\uc791\ub098\ubb34", "birch_log"),
@@ -33,18 +36,26 @@ class MinecraftKoreanItemDictionary:
         ("\uc2a4\ud2f1", "stick"),
         ("\uc870\uc57d\ub3cc", "cobblestone"),
         ("\ucf54\ube14\uc2a4\ud1a4", "cobblestone"),
+        ("\ub3cc", "cobblestone"),
         ("\ud654\ub85c", "furnace"),
         ("\uc11d\ud0c4", "coal"),
         ("\ucca0\uad11\uc11d", "iron_ore"),
         ("\ucca0 \uc6d0\uc11d", "raw_iron"),
     )
 
+    def __init__(
+        self,
+        text_normalizer: MinecraftKoreanAliasTextNormalizer | None = None,
+    ):
+        self.text_normalizer = text_normalizer or MinecraftKoreanAliasTextNormalizer()
+
     def find_item(self, text: object) -> str:
         lowered = str(text or "").strip().lower()
         if not lowered:
             return ""
 
+        normalized = self.text_normalizer.normalize(lowered)
         for phrase, item_id in self.ITEM_ALIASES:
-            if phrase in lowered:
+            if phrase in lowered or self.text_normalizer.normalize(phrase) in normalized:
                 return item_id
         return ""

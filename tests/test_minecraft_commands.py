@@ -115,6 +115,49 @@ class MinecraftCommandParserTests(unittest.TestCase):
             },
         )
         self.assertEqual(
+            {"action": "get_and_equip", "item": "iron_pickaxe", "count": 1},
+            {
+                key: value
+                for key, value in parser.parse(
+                    "\ucca0 \uace1\uad2d\uc774 \ub9cc\ub4e4\uc5b4\uc11c "
+                    "\uc7a5\ucc29\ud574\uc918"
+                ).items()
+                if key in {"action", "item", "count"}
+            },
+        )
+        self.assertEqual(
+            {"action": "get_and_equip", "item": "iron_pickaxe", "count": 1},
+            {
+                key: value
+                for key, value in parser.parse(
+                    "\ucca0\uace1\uad2d\uc774 \ub9cc\ub4e4\uc5b4\uc11c "
+                    "\uc7a5\ucc45\ud574\uc918"
+                ).items()
+                if key in {"action", "item", "count"}
+            },
+        )
+        self.assertEqual(
+            {"action": "get_and_equip", "item": "iron_pickaxe", "count": 1},
+            {
+                key: value
+                for key, value in parser.parse(
+                    "\ucca0 \uace1\uad2d\uc774 \ub9cc\ub4e4\uc5b4\uc11c "
+                    "\uc7a5\uc791\ud574\uc918"
+                ).items()
+                if key in {"action", "item", "count"}
+            },
+        )
+        self.assertEqual(
+            {"action": "equip", "item": "iron_pickaxe"},
+            {
+                key: value
+                for key, value in parser.parse(
+                    "\ucca0\uace1\uad2d\uc774 \uc7a5\ucc29\ud574\uc870"
+                ).items()
+                if key in {"action", "item"}
+            },
+        )
+        self.assertEqual(
             {"action": "craft", "item": "stick", "count": 4},
             {
                 key: value
@@ -131,6 +174,26 @@ class MinecraftCommandParserTests(unittest.TestCase):
                 for key, value in parser.parse(
                     "\ucc38\ub098\ubb34 \uc6d0\ubaa9 \ud558\ub098 "
                     "\uce90\uc640"
+                ).items()
+                if key in {"action", "item", "count"}
+            },
+        )
+        self.assertEqual(
+            {"action": "get_item", "item": "oak_log", "count": 10},
+            {
+                key: value
+                for key, value in parser.parse(
+                    "\ub098\ubb34 10\uac1c \uce90\uc918."
+                ).items()
+                if key in {"action", "item", "count"}
+            },
+        )
+        self.assertEqual(
+            {"action": "get_item", "item": "cobblestone", "count": 10},
+            {
+                key: value
+                for key, value in parser.parse(
+                    "\ub3cc 10\uac1c \uce90\uc918"
                 ).items()
                 if key in {"action", "item", "count"}
             },

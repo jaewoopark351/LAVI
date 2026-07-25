@@ -5,7 +5,7 @@ import re
 from typing import Any, Dict, Iterable, Mapping
 
 
-ITEM_TOKEN_PATTERN = re.compile(r"[a-z0-9_:.\\-]+", re.IGNORECASE)
+ITEM_TOKEN_PATTERN = re.compile(r"[a-z0-9_][a-z0-9_:.\\-]*", re.IGNORECASE)
 NUMBER_PATTERN = re.compile(r"-?\d+")
 
 

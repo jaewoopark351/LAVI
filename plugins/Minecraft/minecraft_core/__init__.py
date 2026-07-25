@@ -26,9 +26,15 @@ from .commands.minecraft_get_and_equip_command_parser import MinecraftGetAndEqui
 from .commands.minecraft_get_item_command_parser import MinecraftGetItemCommandParser
 from .commands.minecraft_goto_command_parser import MinecraftGotoCommandParser
 from .commands.minecraft_item_phrase_normalizer import MinecraftItemPhraseNormalizer
+from .commands.minecraft_korean_alias_text_normalizer import (
+    MinecraftKoreanAliasTextNormalizer,
+)
 from .commands.minecraft_korean_action_detector import MinecraftKoreanActionDetector
 from .commands.minecraft_korean_command_parser import MinecraftKoreanCommandParser
 from .commands.minecraft_korean_count_parser import MinecraftKoreanCountParser
+from .commands.minecraft_korean_equip_signal_detector import (
+    MinecraftKoreanEquipSignalDetector,
+)
 from .commands.minecraft_korean_goto_target_extractor import (
     MinecraftKoreanGotoTargetExtractor,
 )
@@ -67,9 +73,11 @@ __all__ = [
     "MinecraftInventoryDeltaVerifier",
     "MinecraftItemCountSnapshotReader",
     "MinecraftItemPhraseNormalizer",
+    "MinecraftKoreanAliasTextNormalizer",
     "MinecraftKoreanActionDetector",
     "MinecraftKoreanCommandParser",
     "MinecraftKoreanCountParser",
+    "MinecraftKoreanEquipSignalDetector",
     "MinecraftKoreanGotoTargetExtractor",
     "MinecraftKoreanItemDictionary",
     "MinecraftKoreanPayloadBuilder",
