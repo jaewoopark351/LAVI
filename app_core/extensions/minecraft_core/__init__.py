@@ -4,6 +4,10 @@ from .minecraft_command_dispatcher import MinecraftCommandDispatcher
 from .minecraft_command_payload_resolver import MinecraftCommandPayloadResolver
 from .minecraft_command_registry import MinecraftCommandRegistry
 from .minecraft_command_support_guard import MinecraftCommandSupportGuard
+from .minecraft_conversation_command_handler import MinecraftConversationCommandHandler
+from .minecraft_conversation_command_parser import MinecraftConversationCommandParser
+from .minecraft_conversation_command_route import MinecraftConversationCommandRoute
+from .minecraft_conversation_result_formatter import MinecraftConversationResultFormatter
 from .minecraft_extension_status_builder import MinecraftExtensionStatusBuilder
 from .minecraft_extension_status_snapshot import MinecraftExtensionStatusSnapshot
 from .minecraft_nested_payload_action_reader import MinecraftNestedPayloadActionReader
@@ -21,6 +25,10 @@ __all__ = [
     "MinecraftCommandPayloadResolver",
     "MinecraftCommandRegistry",
     "MinecraftCommandSupportGuard",
+    "MinecraftConversationCommandHandler",
+    "MinecraftConversationCommandParser",
+    "MinecraftConversationCommandRoute",
+    "MinecraftConversationResultFormatter",
     "MinecraftExtensionStatusBuilder",
     "MinecraftExtensionStatusSnapshot",
     "MinecraftNestedPayloadActionReader",

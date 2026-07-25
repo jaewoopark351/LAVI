@@ -78,11 +78,13 @@ class LLM(PluginSelectionBase):
         self,
         memory_context_builder=None,
         memory_command_handler=None,
+        game_command_handler=None,#20260725_kpopmodder
         screen_question_router=None,#20260628_kpopmodder
     ) -> None:#20260621_kpopmodder
         super().__init__(LLMPluginInterface)
         self.memory_context_builder = memory_context_builder#20260621_kpopmodder
         self.memory_command_handler = memory_command_handler#20260621_kpopmodder
+        self.game_command_handler = game_command_handler#20260725_kpopmodder
         self.screen_question_router = screen_question_router#20260628_kpopmodder
 
         self.history = []#20260617_kpopmodder
@@ -122,6 +124,7 @@ class LLM(PluginSelectionBase):
             streaming_chunker=self.streaming_chunker,
             memory_context_builder=self.memory_context_builder,#20260621_kpopmodder
             memory_command_handler=self.memory_command_handler,#20260621_kpopmodder
+            game_command_handler=self.game_command_handler,#20260725_kpopmodder
             screen_question_router=self.screen_question_router,#20260628_kpopmodder
         )
         self.text_only_generation_helper = self._get_text_only_generation_helper()#20260705_kpopmodder
@@ -518,6 +521,10 @@ class LLM(PluginSelectionBase):
             function,
             full_response=full_response,
         )
+
+    def set_game_command_handler(self, handler):#20260725_kpopmodder
+        self.game_command_handler = handler
+        self.response_pipeline.game_command_handler = handler
 
     def is_sentence_end(self, word):#20260617_kpopmodder
         return self.streaming_chunker.is_sentence_end(word)

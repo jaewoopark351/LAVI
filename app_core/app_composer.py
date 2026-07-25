@@ -11,6 +11,9 @@ from app_core.core_component_composition import CoreComponentCompositionService
 from app_core.gradio_launch import load_gradio_launch_options
 from app_core.gradio_runtime_launcher import GradioRuntimeLauncher
 from app_core.memory_bootstrap import bootstrap_memory
+from app_core.composition_core.game_command_handler_wiring_service import (
+    GameCommandHandlerWiringService,
+)
 from app_core.extensions import (
     ExtensionRegistry,
     GameEventBus,
@@ -77,6 +80,7 @@ class AppComposer:
         self.game_extension_composition_service = GameExtensionCompositionService(
             self.game_extension_registry,
         )
+        self.game_command_handler_wiring_service = GameCommandHandlerWiringService()
         self.component_wiring_service = AppComponentWiringService()
         self.ui_composition_service = AppUiCompositionService()
         self.gradio_runtime_launcher = GradioRuntimeLauncher()
@@ -219,6 +223,10 @@ class AppComposer:
             runtime_state={},
         )
         self._register_game_extensions()
+        self.game_command_handler_wiring_service.wire(
+            llm=self.llm,
+            game_extension_registry=self.game_extension_registry,
+        )
 
     def get_game_debug_status(self):
         #20260715_kpopmodder: Expose shared game runtime/event snapshots without adding UI-specific logic here.

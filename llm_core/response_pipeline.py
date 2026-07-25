@@ -20,6 +20,7 @@ class LLMResponsePipeline:#20260621_kpopmodder
         streaming_chunker,
         memory_context_builder=None,#20260621_kpopmodder
         memory_command_handler=None,#20260621_kpopmodder
+        game_command_handler=None,#20260725_kpopmodder
         screen_question_router=None,#20260628_kpopmodder
     ):
         self.current_plugin_callback = current_plugin_callback
@@ -31,6 +32,7 @@ class LLMResponsePipeline:#20260621_kpopmodder
         self.streaming_chunker = streaming_chunker
         self.memory_context_builder = memory_context_builder#20260621_kpopmodder
         self.memory_command_handler = memory_command_handler#20260621_kpopmodder
+        self.game_command_handler = game_command_handler#20260725_kpopmodder
         self.screen_question_router = screen_question_router#20260628_kpopmodder
         #20260622_kpopmodder: 메모리 명령/프롬프트/raw event 연동을 응답 흐름에서 분리한다.
         self.memory_bridge = LLMMemoryBridge(
@@ -112,6 +114,25 @@ class LLMResponsePipeline:#20260621_kpopmodder
                 send_stream_output_callback=self.send_stream_output,
             )
             self._remember_model_history_turn(normalized_input, self.LLM_output)#20260720_kpopmodder
+            return
+
+        game_command_response = self._try_handle_game_command(
+            normalized_input.display_text
+        )
+
+        if game_command_response:
+            self._record_user_input_event(normalized_input)
+            yield from self.post_processor.handle_short_circuit_response(
+                game_command_response,
+                normalized_input,
+                response_generation,
+                source="game_command",
+                kind="game_command_response",
+                set_output_callback=self._set_llm_output,
+                send_stream_output_callback=self.send_stream_output,
+                interrupt_log_message="[LLM] game command response dropped after interrupt",
+            )
+            self._remember_model_history_turn(normalized_input, self.LLM_output)
             return
 
         self.memory_bridge.set_memory_router_ai_callback(#20260626_kpopmodder
@@ -305,6 +326,19 @@ class LLMResponsePipeline:#20260621_kpopmodder
 
     def _try_handle_memory_command(self, message):#20260621_kpopmodder
         return self.memory_bridge.try_handle_command(message)
+
+    def _try_handle_game_command(self, message):#20260725_kpopmodder
+        handler = self.game_command_handler
+        if handler is None:
+            return None
+        try_handle = getattr(handler, "try_handle", None)
+        if not callable(try_handle):
+            return None
+        try:
+            return try_handle(message)
+        except Exception as e:
+            log_print(f"[GameCommand] handling failed: {e}")
+            return None
 
     def _get_memory_store(self):#20260621_kpopmodder
         return self.memory_bridge.get_memory_store()

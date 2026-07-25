@@ -29,14 +29,37 @@ class LLMResponsePostProcessor:
         set_output_callback,
         send_stream_output_callback,
     ):
+        yield from self.handle_short_circuit_response(
+            response_text,
+            normalized_input,
+            response_generation,
+            source="memory_command",
+            kind="memory_command_response",
+            set_output_callback=set_output_callback,
+            send_stream_output_callback=send_stream_output_callback,
+            interrupt_log_message="[LLM] memory command response dropped after interrupt",
+        )
+
+    def handle_short_circuit_response(
+        self,
+        response_text,
+        normalized_input,
+        response_generation,
+        *,
+        source,
+        kind,
+        set_output_callback,
+        send_stream_output_callback,
+        interrupt_log_message,
+    ):
         llm_output = str(response_text or "").strip()
         set_output_callback(llm_output)
         self.record_raw_event_callback(
             event_type="assistant_message",
             value=llm_output,
-            source="memory_command",
+            source=source,
             metadata={
-                "kind": "memory_command_response",
+                "kind": kind,
             },
         )
         self.live_textbox.print("AI: ")
@@ -48,7 +71,7 @@ class LLMResponsePostProcessor:
         yield llm_output
 
         if self.interrupt_event.is_set():
-            log_print("[LLM] memory command response dropped after interrupt")
+            log_print(interrupt_log_message)
             return
 
         self.send_full_output_callback(llm_output)
