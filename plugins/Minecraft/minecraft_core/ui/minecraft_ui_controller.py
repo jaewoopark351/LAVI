@@ -48,3 +48,8 @@ class MinecraftUiController:
 
     def on_stop_click(self) -> str:
         return self.facade_service.status_json(self.facade_service.stop())
+
+    def on_run_command_click(self, command: Any) -> str:
+        return self.facade_service.status_json(
+            self.facade_service.handle_command(command)
+        )

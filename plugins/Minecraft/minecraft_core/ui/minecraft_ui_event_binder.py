@@ -32,6 +32,11 @@ class MinecraftUiEventBinder:
             fn=self.controller.on_stop_click,
             outputs=status_box,
         )
+        components["run_command_button"].click(
+            fn=self.controller.on_run_command_click,
+            inputs=components["command_box"],
+            outputs=status_box,
+        )
         components["get_item_button"].click(
             fn=self.controller.on_get_item_click,
             inputs=[components["item_box"], components["count_box"]],

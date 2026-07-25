@@ -22,6 +22,13 @@ class MinecraftUiLayout:
                 current_action_button = gr.Button("Current Action")
                 stop_button = gr.Button("Stop")
             with gr.Row():
+                command_box = gr.Textbox(
+                    label="Command",
+                    value="get oak_log 1",
+                    lines=1,
+                )
+                run_command_button = gr.Button("Run Command")
+            with gr.Row():
                 item_box = gr.Textbox(label="Item", value="oak_log", lines=1)
                 count_box = gr.Textbox(label="Count", value="1", lines=1)
                 get_item_button = gr.Button("Get Item")
@@ -40,6 +47,8 @@ class MinecraftUiLayout:
             "inventory_button": inventory_button,
             "current_action_button": current_action_button,
             "stop_button": stop_button,
+            "command_box": command_box,
+            "run_command_button": run_command_button,
             "item_box": item_box,
             "count_box": count_box,
             "get_item_button": get_item_button,
