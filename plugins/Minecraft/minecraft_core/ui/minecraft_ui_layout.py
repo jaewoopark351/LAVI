@@ -33,6 +33,13 @@ class MinecraftUiLayout:
                 count_box = gr.Textbox(label="Count", value="1", lines=1)
                 get_item_button = gr.Button("Get Item")
             with gr.Row():
+                equip_item_box = gr.Textbox(
+                    label="Equip Item",
+                    value="iron_pickaxe",
+                    lines=1,
+                )
+                equip_button = gr.Button("Equip")
+            with gr.Row():
                 goto_target_box = gr.Textbox(
                     label="Go To Target",
                     value="0 64 0 overworld",
@@ -52,6 +59,8 @@ class MinecraftUiLayout:
             "item_box": item_box,
             "count_box": count_box,
             "get_item_button": get_item_button,
+            "equip_item_box": equip_item_box,
+            "equip_button": equip_button,
             "goto_target_box": goto_target_box,
             "goto_button": goto_button,
         }

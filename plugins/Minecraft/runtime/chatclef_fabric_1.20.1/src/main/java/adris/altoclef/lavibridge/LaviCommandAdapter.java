@@ -3,6 +3,7 @@ package adris.altoclef.lavibridge;
 //20260725_kpopmodder: Added this adapter to translate LAVI actions into existing AltoClef commands.
 
 import adris.altoclef.AltoClef;
+import adris.altoclef.lavibridge.actions.LaviEquipActionExecutor;
 import adris.altoclef.lavibridge.actions.LaviStopActionExecutor;
 import adris.altoclef.lavibridge.actions.LaviUserCommandExecutor;
 import adris.altoclef.lavibridge.commands.LaviCommandRequestFactory;
@@ -12,6 +13,7 @@ public class LaviCommandAdapter {
 
     private final LaviCommandRequestFactory commandFactory;
     private final LaviUserCommandExecutor commandExecutor;
+    private final LaviEquipActionExecutor equipExecutor;
     private final LaviStopActionExecutor stopExecutor;
 
     public LaviCommandAdapter(
@@ -22,6 +24,7 @@ public class LaviCommandAdapter {
     ) {
         this.commandFactory = new LaviCommandRequestFactory();
         this.commandExecutor = new LaviUserCommandExecutor(mod, dispatcher, actionRegistry);
+        this.equipExecutor = new LaviEquipActionExecutor(mod, dispatcher, actionRegistry);
         this.stopExecutor = new LaviStopActionExecutor(mod, dispatcher, actionRegistry, stopController);
     }
 
@@ -31,6 +34,10 @@ public class LaviCommandAdapter {
 
     public Map<String, Object> gotoTarget(Map<String, Object> request) throws Exception {
         return commandExecutor.execute(commandFactory.gotoTarget(request));
+    }
+
+    public Map<String, Object> equip(Map<String, Object> request) throws Exception {
+        return equipExecutor.execute(commandFactory.equip(request));
     }
 
     public Map<String, Object> stop() throws Exception {

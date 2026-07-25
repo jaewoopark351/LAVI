@@ -42,6 +42,11 @@ class MinecraftUiEventBinder:
             inputs=[components["item_box"], components["count_box"]],
             outputs=status_box,
         )
+        components["equip_button"].click(
+            fn=self.controller.on_equip_click,
+            inputs=components["equip_item_box"],
+            outputs=status_box,
+        )
         components["goto_button"].click(
             fn=self.controller.on_goto_click,
             inputs=components["goto_target_box"],

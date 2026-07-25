@@ -48,7 +48,7 @@ class MinecraftBridgeClientTests(unittest.TestCase):
             json.loads(request.data.decode("utf-8")),
         )
 
-    def test_client_posts_goto_and_stop_to_v1_endpoints(self):
+    def test_client_posts_equip_goto_and_stop_to_v1_endpoints(self):
         calls = []
 
         def opener(request, timeout):
@@ -61,23 +61,34 @@ class MinecraftBridgeClientTests(unittest.TestCase):
             opener=opener,
         )
 
+        equip_result = client.equip("iron_pickaxe")
         goto_result = client.goto("0 64 0 overworld")
         stop_result = client.stop()
 
+        self.assertTrue(equip_result["ok"])
         self.assertTrue(goto_result["ok"])
         self.assertTrue(stop_result["ok"])
         self.assertEqual("POST", calls[0][0].get_method())
         self.assertEqual(
-            "http://127.0.0.1:4316/v1/actions/goto",
+            "http://127.0.0.1:4316/v1/actions/equip",
             calls[0][0].full_url,
         )
         self.assertEqual(
-            {"target": "0 64 0 overworld"},
+            {"item": "iron_pickaxe"},
             json.loads(calls[0][0].data.decode("utf-8")),
+        )
+        self.assertEqual("POST", calls[1][0].get_method())
+        self.assertEqual(
+            "http://127.0.0.1:4316/v1/actions/goto",
+            calls[1][0].full_url,
+        )
+        self.assertEqual(
+            {"target": "0 64 0 overworld"},
+            json.loads(calls[1][0].data.decode("utf-8")),
         )
         self.assertEqual(
             "http://127.0.0.1:4316/v1/actions/stop",
-            calls[1][0].full_url,
+            calls[2][0].full_url,
         )
 
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from typing import Dict
 
+from .minecraft_equip_command_handler import MinecraftEquipCommandHandler
 from .minecraft_get_item_command_handler import MinecraftGetItemCommandHandler
 from .minecraft_goto_command_handler import MinecraftGotoCommandHandler
 from .minecraft_read_command_handler import MinecraftReadCommandHandler
@@ -28,6 +29,11 @@ class MinecraftCommandHandlerRegistry:
             MinecraftReadCommandHandler("current_action"),
         )
         cls._register_many(handlers, ("get_item", "getitem"), MinecraftGetItemCommandHandler())
+        cls._register_many(
+            handlers,
+            ("equip", "equip_item", "hold", "hold_item", "select", "select_item"),
+            MinecraftEquipCommandHandler(),
+        )
         cls._register_many(
             handlers,
             ("goto", "go_to", "move_to", "travel_to"),

@@ -52,6 +52,12 @@ KNOWN_ACTIONS = {
     "get_item",
     "get-item",
     "getitem",
+    "equip",
+    "equip_item",
+    "hold",
+    "hold_item",
+    "select",
+    "select_item",
     "goto",
     "go_to",
     "move_to",
@@ -77,6 +83,19 @@ GOTO_PREFIXES = (
     "go to",
     "move to",
     "travel to",
+)
+
+EQUIP_PREFIXES = (
+    "equip",
+    "equip item",
+    "equip-item",
+    "equip_item",
+    "hold",
+    "hold item",
+    "hold_item",
+    "select",
+    "select item",
+    "select_item",
 )
 
 ITEM_WORDS = (

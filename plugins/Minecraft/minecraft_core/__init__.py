@@ -1,5 +1,6 @@
 #20260725_kpopmodder: Groups Minecraft bridge client, config, and facade helpers.
 from .actions.minecraft_action_service import MinecraftActionService
+from .actions.minecraft_equip_action import MinecraftEquipAction
 from .actions.minecraft_get_item_action import MinecraftGetItemAction
 from .actions.minecraft_goto_action import MinecraftGotoAction
 from .actions.minecraft_read_action_service import MinecraftReadActionService
@@ -12,8 +13,10 @@ from .commands.minecraft_command_payload_builder import MinecraftCommandPayloadB
 from .commands.minecraft_command_parser import MinecraftCommandParser
 from .commands.minecraft_command_result_formatter import MinecraftCommandResultFormatter
 from .commands.minecraft_command_router import MinecraftCommandRouter
+from .commands.minecraft_equip_command_parser import MinecraftEquipCommandParser
 from .commands.minecraft_get_item_command_parser import MinecraftGetItemCommandParser
 from .commands.minecraft_goto_command_parser import MinecraftGotoCommandParser
+from .commands.minecraft_item_phrase_normalizer import MinecraftItemPhraseNormalizer
 from .commands.minecraft_simple_command_parser import MinecraftSimpleCommandParser
 from .minecraft_config import MinecraftConfig
 from .minecraft_facade_service import MinecraftFacadeService
@@ -31,11 +34,14 @@ __all__ = [
     "MinecraftCommandResultFormatter",
     "MinecraftCommandRouter",
     "MinecraftConfig",
+    "MinecraftEquipAction",
+    "MinecraftEquipCommandParser",
     "MinecraftFacadeService",
     "MinecraftGetItemAction",
     "MinecraftGetItemCommandParser",
     "MinecraftGotoAction",
     "MinecraftGotoCommandParser",
+    "MinecraftItemPhraseNormalizer",
     "MinecraftReadActionService",
     "MinecraftSimpleCommandParser",
     "MinecraftStatusJsonFormatter",

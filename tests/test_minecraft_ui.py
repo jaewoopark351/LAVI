@@ -20,6 +20,10 @@ class FakeMinecraftFacade:
         self.commands.append(command)
         return {"ok": True, "action": "get_item"}
 
+    def equip(self, item):
+        self.commands.append(("equip", item))
+        return {"ok": True, "action": "equip"}
+
     def status_json(self, payload):
         return json.dumps(payload, sort_keys=True)
 
@@ -37,6 +41,16 @@ class MinecraftUiControllerTests(unittest.TestCase):
         self.assertTrue(result["ok"])
         self.assertEqual("get_item", result["action"])
         self.assertEqual(["get oak_log 1"], facade.commands)
+
+    def test_equip_click_routes_to_facade_equip(self):
+        facade = FakeMinecraftFacade()
+        controller = MinecraftUiController(FakeMinecraftConfig(), facade)
+
+        result = json.loads(controller.on_equip_click("iron_pickaxe"))
+
+        self.assertTrue(result["ok"])
+        self.assertEqual("equip", result["action"])
+        self.assertEqual([("equip", "iron_pickaxe")], facade.commands)
 
 
 if __name__ == "__main__":

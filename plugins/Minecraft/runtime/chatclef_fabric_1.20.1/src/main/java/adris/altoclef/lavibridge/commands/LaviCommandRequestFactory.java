@@ -23,4 +23,8 @@ public class LaviCommandRequestFactory {
     public LaviCommandSpec gotoTarget(Map<String, Object> request) {
         return registry.build("goto", request);
     }
+
+    public LaviCommandSpec equip(Map<String, Object> request) {
+        return registry.build("equip", request);
+    }
 }

@@ -23,6 +23,9 @@ class MinecraftWriteActionService:
     def get_item(self, item: Any, count: Any = 1) -> Dict[str, object]:
         return self.action_registry.get("get_item").run(item, count)
 
+    def equip(self, item: Any) -> Dict[str, object]:
+        return self.action_registry.get("equip").run(item)
+
     def goto(
         self,
         target: Any = None,

@@ -40,6 +40,9 @@ class Minecraft:
     def get_item(self, item: Any, count: Any = 1) -> Dict[str, Any]:
         return self.facade_service.get_item(item, count)
 
+    def equip(self, item: Any) -> Dict[str, Any]:
+        return self.facade_service.equip(item)
+
     def goto(self, target: Any) -> Dict[str, Any]:
         return self.facade_service.goto(target)
 
@@ -72,6 +75,9 @@ class Minecraft:
 
     def on_get_item_click(self, item: Any, count: Any) -> str:
         return self.ui_controller.on_get_item_click(item, count)
+
+    def on_equip_click(self, item: Any) -> str:
+        return self.ui_controller.on_equip_click(item)
 
     def on_goto_click(self, target: Any) -> str:
         return self.ui_controller.on_goto_click(target)

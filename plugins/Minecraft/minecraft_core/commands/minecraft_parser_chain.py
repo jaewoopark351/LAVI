@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from typing import Dict, Iterable
 
+from .minecraft_equip_command_parser import MinecraftEquipCommandParser
 from .minecraft_get_item_command_parser import MinecraftGetItemCommandParser
 from .minecraft_goto_command_parser import MinecraftGotoCommandParser
 from .minecraft_simple_command_parser import MinecraftSimpleCommandParser
@@ -15,6 +16,7 @@ class MinecraftParserChain:
             or (
                 MinecraftSimpleCommandParser(),
                 MinecraftGotoCommandParser(),
+                MinecraftEquipCommandParser(),
                 MinecraftGetItemCommandParser(),
             )
         )

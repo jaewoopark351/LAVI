@@ -17,6 +17,7 @@ public class LaviCommandFactoryRegistry {
         Map<String, LaviTypedCommandFactory> factories = new LinkedHashMap<>();
         register(factories, new LaviGetItemCommandFactory());
         register(factories, new LaviGotoCommandFactory());
+        register(factories, new LaviEquipCommandFactory());
         return new LaviCommandFactoryRegistry(factories);
     }
 

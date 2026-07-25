@@ -41,6 +41,9 @@ class MinecraftFacadeService:
     def get_item(self, item: Any, count: Any = 1) -> Dict[str, Any]:
         return self.action_service.get_item(item, count)
 
+    def equip(self, item: Any) -> Dict[str, Any]:
+        return self.action_service.equip(item)
+
     def goto(
         self,
         target: Any = None,
