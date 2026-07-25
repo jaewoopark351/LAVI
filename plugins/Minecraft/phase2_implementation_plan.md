@@ -1,5 +1,72 @@
 <!-- 20260725_kpopmodder: Added the phase 2 implementation plan for the planned Minecraft ChatClef/LAVI integration. -->
 
+<!-- 20260725_kpopmodder: Updated this implementation plan with the completed bridge, refactor, and runtime verification status. -->
+
+# Minecraft ChatClef Bridge Implementation - Verified Status
+
+## Current Implementation Snapshot - 2026-07-25
+
+This file was originally a phase 2 implementation plan. The core plan is now implemented and verified on branch `minecraft-plugin`.
+
+Completed implementation:
+
+- ChatClef 1.20.1 Fabric target confirmed.
+- Java bridge implemented and refactored into focused route, response, state, command, action, and lifecycle classes.
+- Python Minecraft plugin implemented and refactored into focused bridge, action, command, status, UI, and composition classes.
+- `MinecraftGameExtension` is registered and dispatches Minecraft commands through the plugin.
+- `modules.json` can enable Minecraft with `Minecraft=true`.
+- Gradio Minecraft tab is available.
+- `get-item` completed end-to-end with `oak_log`.
+- `goto` completed end-to-end with `0 64 0 overworld`.
+- `stop` cancels a running action and records the stopped action.
+- Inventory verification works through `GET /v1/inventory`.
+- `Current Action` reports `running`, `succeeded`, and `cancelled` states.
+- Original ChatClef Player2API AI companion traffic to `127.0.0.1:4315` is disabled by default to prevent connection refused noise when that companion server is not running.
+
+Current API surface:
+
+```text
+GET  /v1/health
+GET  /v1/status
+GET  /v1/inventory
+GET  /v1/actions/current
+POST /v1/actions/get-item
+POST /v1/actions/goto
+POST /v1/actions/stop
+```
+
+Endpoint corrections:
+
+- Use `GET /v1/health`, not `/health`.
+- Use `POST /v1/actions/get-item`, not `/command`.
+- `POST /v1/actions/goto` is also implemented.
+
+Control mode status:
+
+- `MANUAL`: no active LAVI action and no non-idle AltoClef user task.
+- `AI`: LAVI has a running action or AltoClef has a non-idle user task.
+- `PAUSED`: AltoClef is paused or unavailable.
+- The decision is isolated in `LaviControlModeReader`; `LaviActionRegistry` only supplies action state such as whether an action is running.
+
+Verified build/runtime status:
+
+```text
+Gradle command: .\gradlew.bat :1.20.1:build --offline --no-daemon
+Result: BUILD SUCCESSFUL
+Runtime jar: versions/1.20.1/build/libs/chatclef-1.20.1-0.18.23.jar
+Copied test target: C:\Users\jaewo\curseforge\minecraft\Instances\LAVI_TEST_Fabric01\mods\chatclef-1.20.1-0.18.23.jar
+Bridge listen URL: http://127.0.0.1:4316
+```
+
+Current remaining work:
+
+1. Commit the completed bridge/refactor/documentation state.
+2. Add a free-form Minecraft command input to the Gradio tab if direct text-command UI testing is desired.
+3. Connect LAVI conversation/LLM natural-language intent to `MinecraftGameExtension` commands.
+4. Add the next action family after that baseline is stable: `equip`, `mine`, or `craft`.
+
+Historical phase 2 implementation plan notes remain below for context.
+
 # 2단계 구현 계획서
 
 ## 0. 목표

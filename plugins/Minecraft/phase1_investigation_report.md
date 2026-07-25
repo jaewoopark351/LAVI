@@ -1,5 +1,51 @@
 <!-- 20260725_kpopmodder: Added the phase 1 investigation report for the planned Minecraft ChatClef/LAVI integration. -->
 
+<!-- 20260725_kpopmodder: Updated this report with the implemented bridge status after the first Minecraft end-to-end tests. -->
+
+# Minecraft ChatClef Bridge Investigation - Implemented Status
+
+## Current Status Snapshot - 2026-07-25
+
+This document started as a phase 1 investigation report. The investigation has now been converted into a working Minecraft integration on branch `minecraft-plugin`.
+
+Completed state:
+
+- ChatClef/Fabric 1.20.1 build target is confirmed.
+- The usable build target is `:1.20.1:build`.
+- The tested runtime jar is `plugins/Minecraft/runtime/chatclef_fabric_1.20.1/versions/1.20.1/build/libs/chatclef-1.20.1-0.18.23.jar`.
+- LAVI Java bridge is implemented under `adris.altoclef.lavibridge`.
+- LAVI Python Minecraft plugin is implemented under `plugins/Minecraft`.
+- LAVI GameExtension integration is implemented for Minecraft.
+- Minecraft tab appears in the LAVI Gradio UI.
+- Health, status, inventory, current action, get-item, goto, and stop were tested through the bridge.
+- Player2API AI companion calls to `127.0.0.1:4315` are disabled by default because LAVI does not use the original ChatClef AI companion path.
+
+Current bridge API surface:
+
+```text
+GET  /v1/health
+GET  /v1/status
+GET  /v1/inventory
+GET  /v1/actions/current
+POST /v1/actions/get-item
+POST /v1/actions/goto
+POST /v1/actions/stop
+```
+
+Important correction from early notes:
+
+- Use `GET /v1/health`, not `/health`.
+- Use `POST /v1/actions/get-item`, not `/command`.
+- `MANUAL`, `AI`, and `PAUSED` control mode decisions are handled by `LaviControlModeReader`.
+- `LaviActionRegistry` remains focused on action identity, current action state, status transitions, timestamps, and snapshots.
+
+Remaining integration boundary:
+
+- The direct control path is connected: LAVI UI/Python plugin -> Java bridge -> ChatClef/AltoClef.
+- The next functional layer is LAVI conversation/LLM natural-language intent -> Minecraft action dispatch.
+
+Historical phase 1 investigation notes remain below for context.
+
 # 1단계 조사 보고서
 
 ## 0. 범위
