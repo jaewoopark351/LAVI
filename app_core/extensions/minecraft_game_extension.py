@@ -68,6 +68,14 @@ class MinecraftGameExtension(GameExtensionInterface):
             action=dispatch_result.action,
         )
 
+    def preview_command(self, command: Any) -> Dict[str, Any]:
+        self._ensure_plugin_ready()
+        preview_command = getattr(self.plugin, "preview_command", None)
+        if not callable(preview_command):
+            return {"ok": False, "error": "missing_plugin_preview"}
+        result = preview_command(command)
+        return dict(result) if isinstance(result, dict) else {"ok": False, "raw": result}
+
     def get_status(self) -> Dict[str, Any]:
         self._sync_runtime_context_resources()
         plugin_status = self.status_builder.build(

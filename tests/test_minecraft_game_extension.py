@@ -8,12 +8,17 @@ from app_core.extensions.minecraft_game_extension import MinecraftGameExtension
 class FakeMinecraftPlugin:
     def __init__(self):
         self.commands = []
+        self.previews = []
 
     def handle_command(self, command):
         self.commands.append(command)
         if isinstance(command, dict):
             return {"ok": True, "action": command.get("action")}
         return {"ok": True, "action": command}
+
+    def preview_command(self, command):
+        self.previews.append(command)
+        return {"ok": True, "accepted": True, "preview": True}
 
     def get_status(self):
         return {"ok": True, "bridge": {"ok": True}}
@@ -43,6 +48,19 @@ class MinecraftGameExtensionTests(unittest.TestCase):
 
         self.assertTrue(result["ok"])
         self.assertEqual("go to 0 64 0", plugin.commands[0])
+
+    def test_game_extension_previews_without_recording_command_execution(self):
+        plugin = FakeMinecraftPlugin()
+        extension = MinecraftGameExtension(plugin=plugin)
+        extension.initialize(GameExtensionContext())
+        extension.start()
+
+        result = extension.preview_command("get oak_log 1")
+
+        self.assertTrue(result["ok"])
+        self.assertTrue(result["preview"])
+        self.assertEqual(["get oak_log 1"], plugin.previews)
+        self.assertEqual([], plugin.commands)
 
 
 if __name__ == "__main__":

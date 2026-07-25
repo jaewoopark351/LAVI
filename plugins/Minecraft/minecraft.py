@@ -58,6 +58,9 @@ class Minecraft:
     def handle_command(self, command: Any) -> Dict[str, Any]:
         return self.facade_service.handle_command(command)
 
+    def preview_command(self, command: Any) -> Dict[str, Any]:
+        return self.facade_service.preview_command(command)
+
     def get_status(self) -> Dict[str, Any]:
         return self.facade_service.get_status()
 

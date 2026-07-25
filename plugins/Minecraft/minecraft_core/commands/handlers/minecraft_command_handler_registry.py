@@ -58,6 +58,9 @@ class MinecraftCommandHandlerRegistry:
     def handler_for(self, action: str):
         return self.handlers.get(action, self.unknown_handler)
 
+    def supports(self, action: str) -> bool:
+        return action in self.handlers
+
     @staticmethod
     def _register_many(handlers: Dict[str, object], aliases, handler: object) -> None:
         for alias in aliases:

@@ -17,4 +17,9 @@ class GameCommandHandlerWiringService:
             MinecraftConversationCommandHandler,
         )
 
-        setter(MinecraftConversationCommandHandler(game_extension_registry))
+        setter(
+            MinecraftConversationCommandHandler(
+                game_extension_registry,
+                completion_callback=getattr(llm, "emit_background_response", None),
+            )
+        )

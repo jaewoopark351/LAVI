@@ -93,7 +93,16 @@ class MinecraftVerifiedItemActionRunner:
         }
         if isinstance(completion.get("action"), dict):
             result["action"] = completion["action"]
-        if completion.get("completion_status") in {"cancelled", "failed"}:
+
+        completion_status = str(completion.get("completion_status") or "").strip().lower()
+        if completion_status == "succeeded":
+            return
+        if completion_status == "timeout":
+            result["ok"] = False
+            result.setdefault("error", "action_completion_pending")
+            result.setdefault("message", completion.get("message"))
+            return
+        if completion_status:
             result["ok"] = False
             result.setdefault("error", "action_completion_failed")
             result.setdefault("message", completion.get("message"))

@@ -1,9 +1,14 @@
 #20260725_kpopmodder: Covers explicit Minecraft commands routed from LAVI chat input.
+import threading
+import time
 import unittest
 
 from app_core.extensions.minecraft_core import (
+    MinecraftConversationAsyncCommandRunner,
     MinecraftConversationCommandHandler,
     MinecraftConversationCommandParser,
+    MinecraftConversationCommandRoute,
+    MinecraftConversationCompletionNotifier,
     MinecraftImplicitConversationCommandParser,
 )
 
@@ -34,6 +39,48 @@ class FakeMinecraftExtension:
 
     def get_status(self):
         return self.status
+
+
+class BlockingPreviewMinecraftExtension(FakeMinecraftExtension):
+    def __init__(self, preview, completion_response):
+        super().__init__(response=completion_response)
+        self.preview = preview
+        self.started = threading.Event()
+        self.release = threading.Event()
+
+    def preview_command(self, command):
+        return self.preview
+
+    def handle_command(self, command):
+        self.commands.append(command)
+        self.started.set()
+        self.release.wait(timeout=2.0)
+        return self.response
+
+
+class PendingMinecraftExtension(FakeMinecraftExtension):
+    def __init__(self, pending_response):
+        super().__init__(response=pending_response)
+
+
+class ImmediateThread:
+    def __init__(self, target, args=(), daemon=None):
+        self.target = target
+        self.args = args
+        self.daemon = daemon
+
+    def start(self):
+        self.target(*self.args)
+
+
+class FakePendingActionWatcher:
+    def __init__(self, final_result):
+        self.final_result = final_result
+        self.calls = []
+
+    def wait(self, extension, result):
+        self.calls.append((extension, result))
+        return self.final_result
 
 
 class FakeExtensionRegistry:
@@ -359,6 +406,128 @@ class MinecraftConversationCommandHandlerTests(unittest.TestCase):
 
         self.assertNotIn("action_completion_failed", response)
         self.assertIn("\ud655\uc778", response)
+
+    def test_long_item_command_replies_before_background_completion(self):
+        notifications = []
+        notified = threading.Event()
+
+        def notify(text):
+            notifications.append(text)
+            notified.set()
+
+        extension = BlockingPreviewMinecraftExtension(
+            preview={
+                "ok": True,
+                "accepted": True,
+                "action": {
+                    "type": "get-item",
+                    "request": {"item": "oak_log", "count": 10},
+                },
+            },
+            completion_response={
+                "ok": True,
+                "accepted": True,
+                "completion": {
+                    "action": {
+                        "type": "get-item",
+                        "request": {"item": "oak_log", "count": 10},
+                        "status": "succeeded",
+                    }
+                },
+            },
+        )
+        handler = MinecraftConversationCommandHandler(
+            FakeExtensionRegistry(extension),
+            completion_callback=notify,
+        )
+
+        started_at = time.monotonic()
+        response = handler.try_handle("\ub9c8\ud06c\uc5d0\uc11c get oak_log 10")
+        elapsed = time.monotonic() - started_at
+
+        try:
+            self.assertLess(elapsed, 0.5)
+            self.assertEqual(
+                "\uc751. \ucc38\ub098\ubb34 \uc6d0\ubaa9 10\uac1c \uad6c\ud574\ubcfc\uac8c.",
+                response,
+            )
+            self.assertFalse(extension.started.is_set())
+
+            handler.run_after_response_tasks()
+
+            self.assertTrue(extension.started.wait(timeout=1.0))
+            self.assertEqual([], notifications)
+
+            extension.release.set()
+
+            self.assertTrue(notified.wait(timeout=1.0))
+            self.assertEqual(
+                ["\ub2e4 \ud588\uc5b4. \ucc38\ub098\ubb34 \uc6d0\ubaa9 10\uac1c \uad6c\ud574\ub1a8\uc5b4."],
+                notifications,
+            )
+            self.assertEqual(["get oak_log 10"], extension.commands)
+        finally:
+            extension.release.set()
+
+    def test_timeout_notifies_pending_then_final_success(self):
+        notifications = []
+        action = {
+            "action_id": "lavi-long",
+            "type": "craft",
+            "status": "running",
+            "request": {"item": "diamond_pickaxe", "count": 1},
+        }
+        pending_result = {
+            "ok": False,
+            "accepted": True,
+            "error": "action_completion_pending",
+            "action": action,
+            "completion": {
+                "ok": False,
+                "completion_status": "timeout",
+                "action_status": "running",
+                "action": action,
+            },
+        }
+        final_action = dict(action)
+        final_action["status"] = "succeeded"
+        final_result = {
+            "ok": True,
+            "accepted": True,
+            "action": final_action,
+            "completion": {
+                "ok": True,
+                "completion_status": "succeeded",
+                "action_status": "succeeded",
+                "action": final_action,
+            },
+        }
+        watcher = FakePendingActionWatcher(final_result)
+        runner = MinecraftConversationAsyncCommandRunner(
+            completion_notifier=MinecraftConversationCompletionNotifier(
+                notifications.append
+            ),
+            pending_action_watcher=watcher,
+            thread_factory=ImmediateThread,
+        )
+        extension = PendingMinecraftExtension(pending_result)
+        route = MinecraftConversationCommandRoute(
+            game="minecraft",
+            command="\ub2e4\uc774\uc544\ubaac\ub4dc \uace1\uad2d\uc774 \ub9cc\ub4e4\uc5b4\uc918",
+            raw_text="\ub2e4\uc774\uc544\ubaac\ub4dc \uace1\uad2d\uc774 \ub9cc\ub4e4\uc5b4\uc918",
+            trigger="implicit_active",
+        )
+
+        runner.start(route, extension)
+
+        self.assertEqual(
+            [
+                "\uc544\uc9c1 \ub2e4\uc774\uc544\ubaac\ub4dc \uace1\uad2d\uc774 \ub9cc\ub4dc\ub294 \uc911\uc774\uc57c. \uc2dc\uac04\uc774 \uc870\uae08 \ub354 \uac78\ub9ac\uace0 \uc788\uc5b4.",
+                "\ub2e4 \ud588\uc5b4. \ub2e4\uc774\uc544\ubaac\ub4dc \uace1\uad2d\uc774 \ub9cc\ub4e4\uc5b4\ub1a8\uc5b4.",
+            ],
+            notifications,
+        )
+        self.assertEqual(1, len(watcher.calls))
 
 
 if __name__ == "__main__":

@@ -14,6 +14,9 @@ class FakeLLM:
     def set_game_command_handler(self, handler):
         self.handler = handler
 
+    def emit_background_response(self, text):
+        return text
+
 
 class FakeRegistry:
     pass
@@ -35,6 +38,7 @@ class GameCommandHandlerWiringServiceTests(unittest.TestCase):
 
         self.assertIsInstance(llm.handler, MinecraftConversationCommandHandler)
         self.assertIs(llm.handler.extension_registry, registry)
+        self.assertTrue(llm.handler.async_command_runner.can_notify)
 
     def test_clears_handler_when_registry_is_missing(self):
         llm = FakeLLM()

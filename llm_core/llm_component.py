@@ -14,6 +14,7 @@ from core.config_manager import config_manager#20260629_kpopmodder
 from core.logger import log_print, debug_print#20260612_kpopmodder
 
 from llm_core.context_manager import LLMContextManager#20260617_kpopmodder
+from llm_core.background_response_emitter import LLMBackgroundResponseEmitter#20260725_kpopmodder
 from llm_core.event_dispatcher import LLMEventDispatcher#20260620_kpopmodder
 from llm_core.input_queue_worker import LLMInputQueueWorker#20260620_kpopmodder
 from llm_core.response_pipeline import LLMResponsePipeline#20260620_kpopmodder
@@ -114,6 +115,7 @@ class LLM(PluginSelectionBase):
 
         self.streaming_chunker = LLMStreamingChunker()#20260617_kpopmodder
         self.event_dispatcher = LLMEventDispatcher()#20260620_kpopmodder
+        self.background_response_emitter = LLMBackgroundResponseEmitter()#20260725_kpopmodder
         self.response_pipeline = LLMResponsePipeline(
             current_plugin_callback=self.get_current_plugin,
             send_output_callback=self.send_output,
@@ -490,6 +492,16 @@ class LLM(PluginSelectionBase):
         #20260620_kpopmodder: Full-response dispatch moved to LLMEventDispatcher.
         # for subcriber in self.full_output_event_listeners:
         #     subcriber(output)
+
+    def emit_background_response(self, text):#20260725_kpopmodder
+        self.background_response_emitter.emit(
+            text,
+            response_generation_callback=self.response_pipeline.current_response_generation,
+            build_stream_payload_callback=self.response_pipeline.build_stream_payload,
+            send_output_callback=self.send_output,
+            send_full_output_callback=self.send_full_output,
+            live_textbox=self.liveTextbox,
+        )
 
     def receive_input(self, text):#20260617_kpopmodder
         self.input_queue_worker.receive_input(text)

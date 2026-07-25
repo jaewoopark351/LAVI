@@ -132,6 +132,7 @@ class LLMResponsePipeline:#20260621_kpopmodder
                 send_stream_output_callback=self.send_stream_output,
                 interrupt_log_message="[LLM] game command response dropped after interrupt",
             )
+            self._run_game_command_after_response_tasks()
             self._remember_model_history_turn(normalized_input, self.LLM_output)
             return
 
@@ -246,6 +247,10 @@ class LLMResponsePipeline:#20260621_kpopmodder
             self.response_generation += 1
             return self.response_generation
 
+    def current_response_generation(self):#20260725_kpopmodder
+        with self.response_generation_lock:
+            return self.response_generation
+
     def invalidate_response_generation(self):#20260623_kpopmodder
         with self.response_generation_lock:
             self.response_generation += 1
@@ -339,6 +344,18 @@ class LLMResponsePipeline:#20260621_kpopmodder
         except Exception as e:
             log_print(f"[GameCommand] handling failed: {e}")
             return None
+
+    def _run_game_command_after_response_tasks(self):#20260725_kpopmodder
+        handler = self.game_command_handler
+        if handler is None:
+            return
+        runner = getattr(handler, "run_after_response_tasks", None)
+        if not callable(runner):
+            return
+        try:
+            runner()
+        except Exception as e:
+            log_print(f"[GameCommand] deferred task failed: {e}")
 
     def _get_memory_store(self):#20260621_kpopmodder
         return self.memory_bridge.get_memory_store()

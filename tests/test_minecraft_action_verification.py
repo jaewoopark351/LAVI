@@ -149,7 +149,7 @@ class MinecraftActionVerificationTests(unittest.TestCase):
         self.assertEqual("action_not_accepted", result["verification"]["reason"])
         self.assertEqual([("stick", 4)], client.craft_calls)
 
-    def test_verification_timeout_does_not_mark_accepted_action_failed(self):
+    def test_verification_timeout_marks_action_pending(self):
         client = FakeVerifiedActionClient(before_count=20, after_count=24)
         runner = MinecraftVerifiedItemActionRunner(
             self._config(),
@@ -165,11 +165,11 @@ class MinecraftActionVerificationTests(unittest.TestCase):
             submit=lambda: client.craft("stick", 4),
         )
 
-        self.assertTrue(result["ok"])
+        self.assertFalse(result["ok"])
         self.assertFalse(result["verified"])
+        self.assertEqual("action_completion_pending", result["error"])
         self.assertEqual("timeout", result["verification"]["status"])
         self.assertEqual("running", result["completion"]["action_status"])
-        self.assertNotIn("error", result)
 
     def _config(self):
         config = MinecraftConfig(

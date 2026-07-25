@@ -17,6 +17,7 @@ from .bridge.chatclef_bridge_client import ChatClefBridgeClient
 from .bridge.minecraft_bridge_client_provider import MinecraftBridgeClientProvider
 from .commands.minecraft_command_aliases import KNOWN_ACTIONS
 from .commands.minecraft_command_payload_builder import MinecraftCommandPayloadBuilder
+from .commands.minecraft_command_preview_builder import MinecraftCommandPreviewBuilder
 from .commands.minecraft_command_parser import MinecraftCommandParser
 from .commands.minecraft_command_result_formatter import MinecraftCommandResultFormatter
 from .commands.minecraft_command_router import MinecraftCommandRouter
@@ -54,6 +55,7 @@ __all__ = [
     "MinecraftActionCompletionPoller",
     "MinecraftBridgeClientProvider",
     "MinecraftCommandPayloadBuilder",
+    "MinecraftCommandPreviewBuilder",
     "MinecraftCommandParser",
     "MinecraftCommandResultFormatter",
     "MinecraftCommandRouter",

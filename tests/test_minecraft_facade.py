@@ -117,6 +117,27 @@ class MinecraftFacadeTests(unittest.TestCase):
         client.equip.assert_called_once_with("iron_pickaxe")
         client.craft.assert_called_once_with("stick", 4)
 
+    def test_facade_previews_command_without_calling_bridge_client(self):
+        client = mock.Mock()
+        config = MinecraftConfig(
+            str(PROJECT_ROOT / "plugins" / "Minecraft"),
+            config_path=str(PROJECT_ROOT / "missing_minecraft_config.json"),
+        )
+        config.config["action_verification"]["enabled"] = False
+        service = MinecraftFacadeService(
+            config,
+            client_factory=lambda **_kwargs: client,
+        )
+
+        result = service.preview_command("\ub9c9\ub300\uae30 4\uac1c \ub9cc\ub4e4\uc5b4")
+
+        self.assertTrue(result["ok"])
+        self.assertTrue(result["accepted"])
+        self.assertTrue(result["preview"])
+        self.assertEqual("craft", result["action"]["type"])
+        self.assertEqual({"item": "stick", "count": 4}, result["action"]["request"])
+        client.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()
