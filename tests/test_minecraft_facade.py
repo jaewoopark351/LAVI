@@ -27,6 +27,7 @@ class MinecraftFacadeTests(unittest.TestCase):
             str(PROJECT_ROOT / "plugins" / "Minecraft"),
             config_path=str(PROJECT_ROOT / "missing_minecraft_config.json"),
         )
+        config.config["action_verification"]["enabled"] = False
         service = MinecraftFacadeService(
             config,
             client_factory=lambda **_kwargs: client,
@@ -77,6 +78,7 @@ class MinecraftFacadeTests(unittest.TestCase):
             str(PROJECT_ROOT / "plugins" / "Minecraft"),
             config_path=str(PROJECT_ROOT / "missing_minecraft_config.json"),
         )
+        config.config["action_verification"]["enabled"] = False
         service = MinecraftFacadeService(
             config,
             client_factory=lambda **_kwargs: client,

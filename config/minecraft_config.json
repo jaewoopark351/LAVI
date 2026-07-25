@@ -4,5 +4,10 @@
   "bridge": {
     "base_url": "http://127.0.0.1:4316",
     "timeout_sec": 3.0
+  },
+  "action_verification": {
+    "enabled": true,
+    "timeout_sec": 120.0,
+    "poll_interval_sec": 0.5
   }
 }

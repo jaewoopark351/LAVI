@@ -6,6 +6,7 @@ from typing import Any, Dict
 from ..bridge.minecraft_bridge_client_provider import MinecraftBridgeClientProvider
 from ..minecraft_config import MinecraftConfig
 from .minecraft_item_count_action_validator import MinecraftItemCountActionValidator
+from .minecraft_verified_item_action_runner import MinecraftVerifiedItemActionRunner
 from .minecraft_write_action_permission_guard import MinecraftWriteActionPermissionGuard
 
 
@@ -16,12 +17,17 @@ class MinecraftCraftAction:
         client_provider: MinecraftBridgeClientProvider,
         permission_guard: MinecraftWriteActionPermissionGuard | None = None,
         validator: MinecraftItemCountActionValidator | None = None,
+        verified_runner: MinecraftVerifiedItemActionRunner | None = None,
     ):
         self.client_provider = client_provider
         self.permission_guard = permission_guard or MinecraftWriteActionPermissionGuard(
             config_manager
         )
         self.validator = validator or MinecraftItemCountActionValidator()
+        self.verified_runner = verified_runner or MinecraftVerifiedItemActionRunner(
+            config_manager,
+            client_provider,
+        )
 
     def run(self, item: Any, count: Any = 1) -> Dict[str, object]:
         blocked = self.permission_guard.blocked_response("craft")
@@ -32,7 +38,12 @@ class MinecraftCraftAction:
         if not request.get("ok"):
             return request
 
-        return self.client_provider.client.craft(
-            request["item"],
-            request["count"],
+        return self.verified_runner.run(
+            action="craft",
+            item=request["item"],
+            count=request["count"],
+            submit=lambda: self.client_provider.client.craft(
+                request["item"],
+                request["count"],
+            ),
         )

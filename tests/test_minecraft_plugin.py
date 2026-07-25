@@ -28,6 +28,9 @@ class MinecraftPluginTests(unittest.TestCase):
         self.assertTrue(example["allow_actions"])
         self.assertEqual("http://127.0.0.1:4316", example["bridge"]["base_url"])
         self.assertGreater(example["bridge"]["timeout_sec"], 0)
+        self.assertTrue(example["action_verification"]["enabled"])
+        self.assertGreater(example["action_verification"]["timeout_sec"], 0)
+        self.assertGreater(example["action_verification"]["poll_interval_sec"], 0)
 
     """
     Moved test bodies kept only as migration notes.

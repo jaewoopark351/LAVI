@@ -17,6 +17,11 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "base_url": "http://127.0.0.1:4316",
         "timeout_sec": 3.0,
     },
+    "action_verification": {
+        "enabled": True,
+        "timeout_sec": 120.0,
+        "poll_interval_sec": 0.5,
+    },
 }
 
 
@@ -89,6 +94,27 @@ class MinecraftConfig:
         except (TypeError, ValueError):
             return 3.0
 
+    def action_verification_enabled(self) -> bool:
+        verification = self._action_verification_section()
+        value = verification.get("enabled", True)
+        if isinstance(value, bool):
+            return value
+        return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+    def action_verification_timeout_sec(self) -> float:
+        verification = self._action_verification_section()
+        try:
+            return max(0.1, float(verification.get("timeout_sec", 120.0)))
+        except (TypeError, ValueError):
+            return 120.0
+
+    def action_verification_poll_interval_sec(self) -> float:
+        verification = self._action_verification_section()
+        try:
+            return max(0.1, float(verification.get("poll_interval_sec", 0.5)))
+        except (TypeError, ValueError):
+            return 0.5
+
     def config_message(self) -> str:
         if self.load_error:
             return f"Minecraft config load failed: {self.load_error}"
@@ -104,6 +130,10 @@ class MinecraftConfig:
     def _bridge_section(self) -> Dict[str, Any]:
         bridge = self.config.get("bridge", {})
         return copy.deepcopy(bridge) if isinstance(bridge, dict) else {}
+
+    def _action_verification_section(self) -> Dict[str, Any]:
+        verification = self.config.get("action_verification", {})
+        return copy.deepcopy(verification) if isinstance(verification, dict) else {}
 
     def _default_config(self) -> Dict[str, Any]:
         return copy.deepcopy(DEFAULT_CONFIG)

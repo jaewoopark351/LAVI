@@ -1,12 +1,17 @@
 #20260725_kpopmodder: Groups Minecraft bridge client, config, and facade helpers.
 from .actions.minecraft_action_service import MinecraftActionService
+from .actions.minecraft_action_completion_poller import MinecraftActionCompletionPoller
 from .actions.minecraft_craft_action import MinecraftCraftAction
 from .actions.minecraft_equip_action import MinecraftEquipAction
 from .actions.minecraft_get_and_equip_action import MinecraftGetAndEquipAction
 from .actions.minecraft_get_item_action import MinecraftGetItemAction
 from .actions.minecraft_goto_action import MinecraftGotoAction
+from .actions.minecraft_inventory_count_reader import MinecraftInventoryCountReader
+from .actions.minecraft_inventory_delta_verifier import MinecraftInventoryDeltaVerifier
+from .actions.minecraft_item_count_snapshot_reader import MinecraftItemCountSnapshotReader
 from .actions.minecraft_read_action_service import MinecraftReadActionService
 from .actions.minecraft_stop_action import MinecraftStopAction
+from .actions.minecraft_verified_item_action_runner import MinecraftVerifiedItemActionRunner
 from .actions.minecraft_write_action_service import MinecraftWriteActionService
 from .bridge.chatclef_bridge_client import ChatClefBridgeClient
 from .bridge.minecraft_bridge_client_provider import MinecraftBridgeClientProvider
@@ -32,6 +37,7 @@ from .ui.minecraft_ui_controller import MinecraftUiController
 __all__ = [
     "ChatClefBridgeClient",
     "MinecraftActionService",
+    "MinecraftActionCompletionPoller",
     "MinecraftBridgeClientProvider",
     "MinecraftCommandPayloadBuilder",
     "MinecraftCommandParser",
@@ -49,6 +55,9 @@ __all__ = [
     "MinecraftGetItemCommandParser",
     "MinecraftGotoAction",
     "MinecraftGotoCommandParser",
+    "MinecraftInventoryCountReader",
+    "MinecraftInventoryDeltaVerifier",
+    "MinecraftItemCountSnapshotReader",
     "MinecraftItemPhraseNormalizer",
     "MinecraftReadActionService",
     "MinecraftSimpleCommandParser",
@@ -57,6 +66,7 @@ __all__ = [
     "MinecraftStopAction",
     "MinecraftUiBuilder",
     "MinecraftUiController",
+    "MinecraftVerifiedItemActionRunner",
     "MinecraftWriteActionService",
     "KNOWN_ACTIONS",
 ]
