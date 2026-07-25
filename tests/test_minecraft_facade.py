@@ -91,6 +91,32 @@ class MinecraftFacadeTests(unittest.TestCase):
         self.assertIsInstance(service.command_router, MinecraftCommandRouter)
         client.health.assert_called_once_with()
 
+    def test_facade_routes_korean_text_commands(self):
+        client = mock.Mock()
+        client.equip.return_value = {"ok": True, "accepted": True}
+        client.craft.return_value = {"ok": True, "accepted": True}
+        config = MinecraftConfig(
+            str(PROJECT_ROOT / "plugins" / "Minecraft"),
+            config_path=str(PROJECT_ROOT / "missing_minecraft_config.json"),
+        )
+        config.config["action_verification"]["enabled"] = False
+        service = MinecraftFacadeService(
+            config,
+            client_factory=lambda **_kwargs: client,
+        )
+
+        equip_result = service.handle_command(
+            "\ucca0 \uace1\uad2d\uc774 \uc7a5\ucc29\ud574"
+        )
+        craft_result = service.handle_command(
+            "\ub9c9\ub300\uae30 4\uac1c \ub9cc\ub4e4\uc5b4"
+        )
+
+        self.assertTrue(equip_result["ok"])
+        self.assertTrue(craft_result["ok"])
+        client.equip.assert_called_once_with("iron_pickaxe")
+        client.craft.assert_called_once_with("stick", 4)
+
 
 if __name__ == "__main__":
     unittest.main()

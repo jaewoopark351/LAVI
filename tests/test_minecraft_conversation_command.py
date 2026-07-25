@@ -86,9 +86,43 @@ class MinecraftConversationCommandParserTests(unittest.TestCase):
         self.assertEqual("craft stick 4", route.command)
         self.assertEqual("suffix", route.trigger)
 
+    def test_parses_korean_minecraft_prefix_command(self):
+        route = MinecraftConversationCommandParser().parse(
+            "\ub9c8\ud06c\uc5d0\uc11c \ucca0 \uace1\uad2d\uc774 "
+            "\uc7a5\ucc29\ud574",
+        )
+
+        self.assertIsNotNone(route)
+        self.assertEqual("minecraft", route.game)
+        self.assertEqual(
+            "\ucca0 \uace1\uad2d\uc774 \uc7a5\ucc29\ud574",
+            route.command,
+        )
+        self.assertEqual("korean_prefix", route.trigger)
+
+    def test_parses_korean_minecraft_suffix_command(self):
+        route = MinecraftConversationCommandParser().parse(
+            "\ub9c9\ub300\uae30 4\uac1c \ub9cc\ub4e4\uc5b4 "
+            "\ub9c8\ud06c\uc5d0\uc11c",
+        )
+
+        self.assertIsNotNone(route)
+        self.assertEqual(
+            "\ub9c9\ub300\uae30 4\uac1c \ub9cc\ub4e4\uc5b4",
+            route.command,
+        )
+        self.assertEqual("suffix", route.trigger)
+
     def test_ignores_general_minecraft_chat(self):
         route = MinecraftConversationCommandParser().parse(
             "tell me about Minecraft",
+        )
+
+        self.assertIsNone(route)
+
+    def test_ignores_general_korean_minecraft_chat(self):
+        route = MinecraftConversationCommandParser().parse(
+            "\ub9c8\ud06c\uc5d0\uc11c \ubb50 \ud560 \uc218 \uc788\uc5b4?",
         )
 
         self.assertIsNone(route)
@@ -105,6 +139,23 @@ class MinecraftConversationCommandHandlerTests(unittest.TestCase):
         self.assertEqual("Minecraft command accepted: get_item", response)
         self.assertEqual(["minecraft"], registry.names)
         self.assertEqual(["get oak_log 1"], extension.commands)
+
+    def test_dispatches_korean_minecraft_command_to_extension(self):
+        extension = FakeMinecraftExtension()
+        registry = FakeExtensionRegistry(extension)
+        handler = MinecraftConversationCommandHandler(registry)
+
+        response = handler.try_handle(
+            "\ub9c8\ud06c\uc5d0\uc11c \ucca0 \uace1\uad2d\uc774 "
+            "\uc7a5\ucc29\ud574"
+        )
+
+        self.assertEqual("Minecraft command accepted: get_item", response)
+        self.assertEqual(["minecraft"], registry.names)
+        self.assertEqual(
+            ["\ucca0 \uace1\uad2d\uc774 \uc7a5\ucc29\ud574"],
+            extension.commands,
+        )
 
     def test_returns_none_for_non_minecraft_command(self):
         extension = FakeMinecraftExtension()

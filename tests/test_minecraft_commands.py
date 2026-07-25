@@ -89,6 +89,66 @@ class MinecraftCommandParserTests(unittest.TestCase):
                 if key in {"action", "item", "count"}
             },
         )
+
+    def test_parser_maps_korean_natural_commands(self):
+        parser = MinecraftCommandParser()
+
+        self.assertEqual(
+            {"action": "equip", "item": "iron_pickaxe"},
+            {
+                key: value
+                for key, value in parser.parse(
+                    "\ucca0 \uace1\uad2d\uc774 \uc7a5\ucc29\ud574"
+                ).items()
+                if key in {"action", "item"}
+            },
+        )
+        self.assertEqual(
+            {"action": "get_and_equip", "item": "iron_pickaxe", "count": 1},
+            {
+                key: value
+                for key, value in parser.parse(
+                    "\ucca0 \uace1\uad2d\uc774 \uad6c\ud574\uc11c "
+                    "\uc7a5\ucc29\ud574"
+                ).items()
+                if key in {"action", "item", "count"}
+            },
+        )
+        self.assertEqual(
+            {"action": "craft", "item": "stick", "count": 4},
+            {
+                key: value
+                for key, value in parser.parse(
+                    "\ub9c9\ub300\uae30 4\uac1c \ub9cc\ub4e4\uc5b4"
+                ).items()
+                if key in {"action", "item", "count"}
+            },
+        )
+        self.assertEqual(
+            {"action": "get_item", "item": "oak_log", "count": 1},
+            {
+                key: value
+                for key, value in parser.parse(
+                    "\ucc38\ub098\ubb34 \uc6d0\ubaa9 \ud558\ub098 "
+                    "\uce90\uc640"
+                ).items()
+                if key in {"action", "item", "count"}
+            },
+        )
+        self.assertEqual(
+            {"action": "goto", "target": "0 64 0"},
+            {
+                key: value
+                for key, value in parser.parse(
+                    "0 64 0\uc73c\ub85c \uc774\ub3d9\ud574"
+                ).items()
+                if key in {"action", "target"}
+            },
+        )
+        self.assertEqual(
+            "stop",
+            parser.parse("\uc9c0\uae08 \ud589\ub3d9 \uba48\ucdb0")["action"],
+        )
         self.assertEqual(
             {"action": "craft", "item": "stick", "count": 4},
             {

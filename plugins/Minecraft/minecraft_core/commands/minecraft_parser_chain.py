@@ -8,6 +8,7 @@ from .minecraft_equip_command_parser import MinecraftEquipCommandParser
 from .minecraft_get_and_equip_command_parser import MinecraftGetAndEquipCommandParser
 from .minecraft_get_item_command_parser import MinecraftGetItemCommandParser
 from .minecraft_goto_command_parser import MinecraftGotoCommandParser
+from .minecraft_korean_command_parser import MinecraftKoreanCommandParser
 from .minecraft_simple_command_parser import MinecraftSimpleCommandParser
 
 
@@ -17,6 +18,7 @@ class MinecraftParserChain:
             parsers
             or (
                 MinecraftSimpleCommandParser(),
+                MinecraftKoreanCommandParser(),
                 MinecraftGotoCommandParser(),
                 MinecraftGetAndEquipCommandParser(),
                 MinecraftCraftCommandParser(),

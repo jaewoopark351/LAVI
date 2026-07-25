@@ -4,6 +4,7 @@ from __future__ import annotations
 import re
 
 from .minecraft_conversation_command_route import MinecraftConversationCommandRoute
+from .minecraft_korean_command_signal_detector import MinecraftKoreanCommandSignalDetector
 
 
 class MinecraftConversationCommandParser:
@@ -16,10 +17,22 @@ class MinecraftConversationCommandParser:
         + r")\s*(?::|,)?\s*(?P<command>.+?)\s*$",
         re.IGNORECASE,
     )
+    KOREAN_CONTEXT_PREFIX_PATTERN = re.compile(
+        r"^\s*"
+        + KOREAN_MINECRAFT_PREFIX_PATTERN
+        + r"(?:\uc5d0\uc11c|\uc5d0|\uc73c\ub85c|\ub85c)?\s*(?P<command>.+?)\s*$",
+        re.IGNORECASE,
+    )
     SUFFIX_PATTERNS = (
         re.compile(r"\s+(?:in|on|for)\s+(?:minecraft|mc)\s*[\.\!\?]*$", re.IGNORECASE),
         re.compile(r"\s+(?:minecraft|mc)\s+action\s*[\.\!\?]*$", re.IGNORECASE),
         re.compile(r"\s+(?:minecraft|mc)\s*[\.\!\?]*$", re.IGNORECASE),
+        re.compile(
+            r"\s+"
+            + KOREAN_MINECRAFT_PREFIX_PATTERN
+            + r"(?:\uc5d0\uc11c|\uc5d0|\uc73c\ub85c|\ub85c)?\s*[\.\!\?]*$",
+            re.IGNORECASE,
+        ),
     )
     COMMAND_PREFIXES = (
         "get ",
@@ -69,10 +82,22 @@ class MinecraftConversationCommandParser:
     DIRECT_ITEM_PATTERN = re.compile(r"\b[a-z0-9_:.\\-]*[_:][a-z0-9_:.\\-]*\b", re.IGNORECASE)
     NUMBER_PATTERN = re.compile(r"\b\d+\b")
 
+    def __init__(
+        self,
+        korean_signal_detector: MinecraftKoreanCommandSignalDetector | None = None,
+    ):
+        self.korean_signal_detector = (
+            korean_signal_detector or MinecraftKoreanCommandSignalDetector()
+        )
+
     def parse(self, text: object) -> MinecraftConversationCommandRoute | None:
         raw_text = str(text or "").strip()
         if not raw_text:
             return None
+
+        korean_targeted = self._parse_korean_targeted(raw_text)
+        if korean_targeted is not None:
+            return korean_targeted
 
         prefixed = self._parse_prefixed(raw_text)
         if prefixed is not None:
@@ -89,6 +114,16 @@ class MinecraftConversationCommandParser:
         if not self._looks_like_command(command):
             return None
         return self._route(command, raw_text, "prefix")
+
+    def _parse_korean_targeted(self, raw_text: str) -> MinecraftConversationCommandRoute | None:
+        match = self.KOREAN_CONTEXT_PREFIX_PATTERN.match(raw_text)
+        if not match:
+            return None
+
+        command = self._clean_command(match.group("command"))
+        if not self._looks_like_command(command):
+            return None
+        return self._route(command, raw_text, "korean_prefix")
 
     def _parse_suffixed(self, raw_text: str) -> MinecraftConversationCommandRoute | None:
         command = self._strip_suffix(raw_text)
@@ -121,7 +156,7 @@ class MinecraftConversationCommandParser:
         return bool(
             self.DIRECT_ITEM_PATTERN.search(lowered)
             and self.NUMBER_PATTERN.search(lowered)
-        )
+        ) or self.korean_signal_detector.looks_like_command(command)
 
     def _clean_command(self, value: str) -> str:
         return " ".join(str(value or "").strip().strip("`\"'").split())

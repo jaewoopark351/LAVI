@@ -11,6 +11,12 @@ from .minecraft_get_item_candidate_normalizer import MinecraftGetItemCandidateNo
 from .minecraft_get_item_command_parser import MinecraftGetItemCommandParser
 from .minecraft_goto_command_parser import MinecraftGotoCommandParser
 from .minecraft_item_phrase_normalizer import MinecraftItemPhraseNormalizer
+from .minecraft_korean_action_detector import MinecraftKoreanActionDetector
+from .minecraft_korean_command_parser import MinecraftKoreanCommandParser
+from .minecraft_korean_count_parser import MinecraftKoreanCountParser
+from .minecraft_korean_goto_target_extractor import MinecraftKoreanGotoTargetExtractor
+from .minecraft_korean_item_dictionary import MinecraftKoreanItemDictionary
+from .minecraft_korean_payload_builder import MinecraftKoreanPayloadBuilder
 from .minecraft_simple_command_parser import MinecraftSimpleCommandParser
 
 __all__ = [
@@ -26,5 +32,11 @@ __all__ = [
     "MinecraftGetItemCommandParser",
     "MinecraftGotoCommandParser",
     "MinecraftItemPhraseNormalizer",
+    "MinecraftKoreanActionDetector",
+    "MinecraftKoreanCommandParser",
+    "MinecraftKoreanCountParser",
+    "MinecraftKoreanGotoTargetExtractor",
+    "MinecraftKoreanItemDictionary",
+    "MinecraftKoreanPayloadBuilder",
     "MinecraftSimpleCommandParser",
 ]

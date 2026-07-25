@@ -10,6 +10,7 @@ from .minecraft_conversation_command_route import MinecraftConversationCommandRo
 from .minecraft_conversation_result_formatter import MinecraftConversationResultFormatter
 from .minecraft_extension_status_builder import MinecraftExtensionStatusBuilder
 from .minecraft_extension_status_snapshot import MinecraftExtensionStatusSnapshot
+from .minecraft_korean_command_signal_detector import MinecraftKoreanCommandSignalDetector
 from .minecraft_nested_payload_action_reader import MinecraftNestedPayloadActionReader
 from .minecraft_plugin_loader import MinecraftPluginLoader
 from .minecraft_plugin_command_invoker import MinecraftPluginCommandInvoker
@@ -31,6 +32,7 @@ __all__ = [
     "MinecraftConversationResultFormatter",
     "MinecraftExtensionStatusBuilder",
     "MinecraftExtensionStatusSnapshot",
+    "MinecraftKoreanCommandSignalDetector",
     "MinecraftNestedPayloadActionReader",
     "MinecraftPluginLoader",
     "MinecraftPluginCommandInvoker",

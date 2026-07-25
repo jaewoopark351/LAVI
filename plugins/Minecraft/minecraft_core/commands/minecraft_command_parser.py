@@ -8,6 +8,7 @@ from .minecraft_equip_command_parser import MinecraftEquipCommandParser
 from .minecraft_get_and_equip_command_parser import MinecraftGetAndEquipCommandParser
 from .minecraft_get_item_command_parser import MinecraftGetItemCommandParser
 from .minecraft_goto_command_parser import MinecraftGotoCommandParser
+from .minecraft_korean_command_parser import MinecraftKoreanCommandParser
 from .minecraft_mapping_command_parser import MinecraftMappingCommandParser
 from .minecraft_parser_chain import MinecraftParserChain
 from .minecraft_simple_command_parser import MinecraftSimpleCommandParser
@@ -23,12 +24,14 @@ class MinecraftCommandParser:
         craft_parser: MinecraftCraftCommandParser | None = None,
         equip_parser: MinecraftEquipCommandParser | None = None,
         get_item_parser: MinecraftGetItemCommandParser | None = None,
+        korean_parser: MinecraftKoreanCommandParser | None = None,
         parser_chain: MinecraftParserChain | None = None,
         mapping_parser: MinecraftMappingCommandParser | None = None,
     ):
         self.parser_chain = parser_chain or MinecraftParserChain(
             (
                 simple_parser or MinecraftSimpleCommandParser(),
+                korean_parser or MinecraftKoreanCommandParser(),
                 goto_parser or MinecraftGotoCommandParser(),
                 get_and_equip_parser or MinecraftGetAndEquipCommandParser(),
                 craft_parser or MinecraftCraftCommandParser(),
