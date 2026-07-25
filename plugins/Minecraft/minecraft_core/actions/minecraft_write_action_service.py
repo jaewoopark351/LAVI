@@ -26,6 +26,9 @@ class MinecraftWriteActionService:
     def get_and_equip(self, item: Any, count: Any = 1) -> Dict[str, object]:
         return self.action_registry.get("get_and_equip").run(item, count)
 
+    def craft(self, item: Any, count: Any = 1) -> Dict[str, object]:
+        return self.action_registry.get("craft").run(item, count)
+
     def equip(self, item: Any) -> Dict[str, object]:
         return self.action_registry.get("equip").run(item)
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from typing import Dict
 
+from .minecraft_craft_command_handler import MinecraftCraftCommandHandler
 from .minecraft_equip_command_handler import MinecraftEquipCommandHandler
 from .minecraft_get_and_equip_command_handler import MinecraftGetAndEquipCommandHandler
 from .minecraft_get_item_command_handler import MinecraftGetItemCommandHandler
@@ -34,6 +35,11 @@ class MinecraftCommandHandlerRegistry:
             handlers,
             ("get_and_equip", "getandequip"),
             MinecraftGetAndEquipCommandHandler(),
+        )
+        cls._register_many(
+            handlers,
+            ("craft", "craft_item", "craftitem", "make", "make_item"),
+            MinecraftCraftCommandHandler(),
         )
         cls._register_many(
             handlers,

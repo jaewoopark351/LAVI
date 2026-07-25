@@ -44,6 +44,9 @@ class MinecraftFacadeService:
     def get_and_equip(self, item: Any, count: Any = 1) -> Dict[str, Any]:
         return self.action_service.get_and_equip(item, count)
 
+    def craft(self, item: Any, count: Any = 1) -> Dict[str, Any]:
+        return self.action_service.craft(item, count)
+
     def equip(self, item: Any) -> Dict[str, Any]:
         return self.action_service.equip(item)
 

@@ -77,6 +77,26 @@ class MinecraftCommandParserTests(unittest.TestCase):
                 if key in {"action", "item", "count"}
             },
         )
+
+    def test_parser_maps_craft_commands(self):
+        parser = MinecraftCommandParser()
+
+        self.assertEqual(
+            {"action": "craft", "item": "crafting_table", "count": 1},
+            {
+                key: value
+                for key, value in parser.parse("craft one crafting table").items()
+                if key in {"action", "item", "count"}
+            },
+        )
+        self.assertEqual(
+            {"action": "craft", "item": "stick", "count": 4},
+            {
+                key: value
+                for key, value in parser.parse("make 4 sticks").items()
+                if key in {"action", "item", "count"}
+            },
+        )
         self.assertEqual(
             {"action": "get_and_equip", "item": "diamond_pickaxe", "count": 2},
             {

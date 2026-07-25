@@ -49,6 +49,9 @@ class MinecraftActionService:
     def get_and_equip(self, item: Any, count: Any = 1) -> Dict[str, Any]:
         return self.write_actions.get_and_equip(item, count)
 
+    def craft(self, item: Any, count: Any = 1) -> Dict[str, Any]:
+        return self.write_actions.craft(item, count)
+
     def equip(self, item: Any) -> Dict[str, Any]:
         return self.write_actions.equip(item)
 

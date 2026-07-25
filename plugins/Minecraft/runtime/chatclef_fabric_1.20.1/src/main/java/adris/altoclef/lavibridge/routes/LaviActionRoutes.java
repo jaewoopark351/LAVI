@@ -36,6 +36,10 @@ public class LaviActionRoutes {
                 exchange,
                 commandAdapter::getAndEquip
         ));
+        server.createContext("/v1/actions/craft", exchange -> exchangeHandler.handlePost(
+                exchange,
+                commandAdapter::craft
+        ));
         server.createContext("/v1/actions/stop", exchange -> exchangeHandler.handlePost(
                 exchange,
                 ignored -> commandAdapter.stop()

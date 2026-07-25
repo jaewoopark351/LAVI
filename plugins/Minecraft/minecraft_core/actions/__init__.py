@@ -1,5 +1,6 @@
 #20260725_kpopmodder: Groups Minecraft write/read action service classes.
 from .minecraft_action_service import MinecraftActionService
+from .minecraft_craft_action import MinecraftCraftAction
 from .minecraft_equip_action import MinecraftEquipAction
 from .minecraft_get_and_equip_action import MinecraftGetAndEquipAction
 from .minecraft_get_item_action import MinecraftGetItemAction
@@ -10,6 +11,7 @@ from .minecraft_write_action_service import MinecraftWriteActionService
 
 __all__ = [
     "MinecraftActionService",
+    "MinecraftCraftAction",
     "MinecraftEquipAction",
     "MinecraftGetAndEquipAction",
     "MinecraftGetItemAction",

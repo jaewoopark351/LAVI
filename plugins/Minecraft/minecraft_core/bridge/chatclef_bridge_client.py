@@ -43,6 +43,9 @@ class ChatClefBridgeClient:
     def get_and_equip(self, item: str, count: int = 1) -> Dict[str, Any]:
         return self.action_endpoints.get_and_equip(item, count)
 
+    def craft(self, item: str, count: int = 1) -> Dict[str, Any]:
+        return self.action_endpoints.craft(item, count)
+
     def equip(self, item: str) -> Dict[str, Any]:
         return self.action_endpoints.equip(item)
 

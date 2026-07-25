@@ -5,6 +5,7 @@ from typing import Dict
 
 from ..bridge.minecraft_bridge_client_provider import MinecraftBridgeClientProvider
 from ..minecraft_config import MinecraftConfig
+from .minecraft_craft_action import MinecraftCraftAction
 from .minecraft_equip_action import MinecraftEquipAction
 from .minecraft_get_and_equip_action import MinecraftGetAndEquipAction
 from .minecraft_get_item_action import MinecraftGetItemAction
@@ -26,6 +27,7 @@ class MinecraftWriteActionRegistry:
             {
                 "get_item": MinecraftGetItemAction(config_manager, client_provider),
                 "get_and_equip": MinecraftGetAndEquipAction(config_manager, client_provider),
+                "craft": MinecraftCraftAction(config_manager, client_provider),
                 "equip": MinecraftEquipAction(config_manager, client_provider),
                 "goto": MinecraftGotoAction(config_manager, client_provider),
                 "stop": MinecraftStopAction(client_provider),

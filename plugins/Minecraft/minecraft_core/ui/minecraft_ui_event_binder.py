@@ -55,6 +55,11 @@ class MinecraftUiEventBinder:
             ],
             outputs=status_box,
         )
+        components["craft_button"].click(
+            fn=self.controller.on_craft_click,
+            inputs=[components["craft_item_box"], components["craft_count_box"]],
+            outputs=status_box,
+        )
         components["goto_button"].click(
             fn=self.controller.on_goto_click,
             inputs=components["goto_target_box"],

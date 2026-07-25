@@ -55,6 +55,13 @@ KNOWN_ACTIONS = {
     "get_and_equip",
     "get-and-equip",
     "getandequip",
+    "craft",
+    "craft_item",
+    "craft-item",
+    "craftitem",
+    "make",
+    "make_item",
+    "make-item",
     "equip",
     "equip_item",
     "hold",
@@ -90,6 +97,18 @@ GET_AND_EQUIP_PREFIXES = (
     "collect and equip",
     "fetch and equip",
     "bring and equip",
+)
+
+CRAFT_PREFIXES = (
+    "craft-item",
+    "craft_item",
+    "craftitem",
+    "craft item",
+    "craft",
+    "make item",
+    "make-item",
+    "make_item",
+    "make",
 )
 
 GOTO_PREFIXES = (

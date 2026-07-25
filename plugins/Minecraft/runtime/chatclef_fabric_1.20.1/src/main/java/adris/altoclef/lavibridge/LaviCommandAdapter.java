@@ -47,6 +47,10 @@ public class LaviCommandAdapter {
         return getAndEquipExecutor.execute(commandFactory.getAndEquip(request));
     }
 
+    public Map<String, Object> craft(Map<String, Object> request) throws Exception {
+        return commandExecutor.execute(commandFactory.craft(request));
+    }
+
     public Map<String, Object> stop() throws Exception {
         return stopExecutor.stop();
     }

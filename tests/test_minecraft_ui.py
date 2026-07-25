@@ -28,6 +28,10 @@ class FakeMinecraftFacade:
         self.commands.append(("get_and_equip", item, count))
         return {"ok": True, "action": "get_and_equip"}
 
+    def craft(self, item, count):
+        self.commands.append(("craft", item, count))
+        return {"ok": True, "action": "craft"}
+
     def status_json(self, payload):
         return json.dumps(payload, sort_keys=True)
 
@@ -68,6 +72,16 @@ class MinecraftUiControllerTests(unittest.TestCase):
             [("get_and_equip", "iron_pickaxe", "1")],
             facade.commands,
         )
+
+    def test_craft_click_routes_to_facade_craft(self):
+        facade = FakeMinecraftFacade()
+        controller = MinecraftUiController(FakeMinecraftConfig(), facade)
+
+        result = json.loads(controller.on_craft_click("stick", "4"))
+
+        self.assertTrue(result["ok"])
+        self.assertEqual("craft", result["action"])
+        self.assertEqual([("craft", "stick", "4")], facade.commands)
 
 
 if __name__ == "__main__":

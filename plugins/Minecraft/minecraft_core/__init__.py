@@ -1,5 +1,6 @@
 #20260725_kpopmodder: Groups Minecraft bridge client, config, and facade helpers.
 from .actions.minecraft_action_service import MinecraftActionService
+from .actions.minecraft_craft_action import MinecraftCraftAction
 from .actions.minecraft_equip_action import MinecraftEquipAction
 from .actions.minecraft_get_and_equip_action import MinecraftGetAndEquipAction
 from .actions.minecraft_get_item_action import MinecraftGetItemAction
@@ -14,6 +15,7 @@ from .commands.minecraft_command_payload_builder import MinecraftCommandPayloadB
 from .commands.minecraft_command_parser import MinecraftCommandParser
 from .commands.minecraft_command_result_formatter import MinecraftCommandResultFormatter
 from .commands.minecraft_command_router import MinecraftCommandRouter
+from .commands.minecraft_craft_command_parser import MinecraftCraftCommandParser
 from .commands.minecraft_equip_command_parser import MinecraftEquipCommandParser
 from .commands.minecraft_get_and_equip_command_parser import MinecraftGetAndEquipCommandParser
 from .commands.minecraft_get_item_command_parser import MinecraftGetItemCommandParser
@@ -36,6 +38,8 @@ __all__ = [
     "MinecraftCommandResultFormatter",
     "MinecraftCommandRouter",
     "MinecraftConfig",
+    "MinecraftCraftAction",
+    "MinecraftCraftCommandParser",
     "MinecraftEquipAction",
     "MinecraftEquipCommandParser",
     "MinecraftFacadeService",

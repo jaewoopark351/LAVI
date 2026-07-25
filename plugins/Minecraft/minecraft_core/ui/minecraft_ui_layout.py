@@ -48,6 +48,14 @@ class MinecraftUiLayout:
                 get_and_equip_count_box = gr.Textbox(label="Count", value="1", lines=1)
                 get_and_equip_button = gr.Button("Get And Equip")
             with gr.Row():
+                craft_item_box = gr.Textbox(
+                    label="Craft Item",
+                    value="stick",
+                    lines=1,
+                )
+                craft_count_box = gr.Textbox(label="Count", value="4", lines=1)
+                craft_button = gr.Button("Craft")
+            with gr.Row():
                 goto_target_box = gr.Textbox(
                     label="Go To Target",
                     value="0 64 0 overworld",
@@ -72,6 +80,9 @@ class MinecraftUiLayout:
             "get_and_equip_item_box": get_and_equip_item_box,
             "get_and_equip_count_box": get_and_equip_count_box,
             "get_and_equip_button": get_and_equip_button,
+            "craft_item_box": craft_item_box,
+            "craft_count_box": craft_count_box,
+            "craft_button": craft_button,
             "goto_target_box": goto_target_box,
             "goto_button": goto_button,
         }
