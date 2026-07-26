@@ -11,6 +11,7 @@ import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.ItemTarget;
 import adris.altoclef.util.helpers.ItemHelper;
 import adris.altoclef.util.helpers.WorldHelper;
+import adris.altoclef.util.logging.StateChangeLogger;
 import adris.altoclef.util.progresscheck.MovementProgressChecker;
 import baritone.api.schematic.AbstractSchematic;
 import baritone.api.schematic.ISchematic;
@@ -42,6 +43,7 @@ public class PlaceBlockTask extends Task implements ITaskRequiresGrounded {
     private final TimeoutWanderTask wanderTask = new TimeoutWanderTask(5); // This can get stuck forever, so we increase the range.
     private Task materialTask;
     private int failCount = 0;
+    private final StateChangeLogger debugLogger = new StateChangeLogger("PlaceBlockTask");
 
     public PlaceBlockTask(BlockPos target, Block[] toPlace, boolean useThrowaways, boolean autoCollectStructureBlocks) {
         this.target = target;
@@ -71,6 +73,10 @@ public class PlaceBlockTask extends Task implements ITaskRequiresGrounded {
     @Override
     protected void onStart() {
         progressChecker.reset();
+        debugLogger.event("start: target=" + target.toShortString()
+                + ", blocks=" + describeBlocks()
+                + ", useThrowaways=" + useThrowaways
+                + ", autoCollectStructureBlocks=" + autoCollectStructureBlocks);
         // If we get interrupted by another task, this might cause problems...
         //_wanderTask.resetWander();
     }
@@ -100,6 +106,8 @@ public class PlaceBlockTask extends Task implements ITaskRequiresGrounded {
         // Perform timeout wander
         if (wanderTask.isActive() && !wanderTask.isFinished()) {
             setDebugState("Wandering.");
+            debugLogger.state("wandering before place retry: target=" + target.toShortString()
+                    + ", failCount=" + failCount);
             progressChecker.reset();
             return wanderTask;
         }
@@ -108,8 +116,13 @@ public class PlaceBlockTask extends Task implements ITaskRequiresGrounded {
             if (materialTask != null && materialTask.isActive() && !materialTask.isFinished()) {
                 setDebugState("No structure items, collecting cobblestone + dirt as default.");
                 if (getMaterialCount(mod) < PREFERRED_MATERIALS) {
+                    debugLogger.state("continue collecting place materials: count=" + getMaterialCount(mod)
+                            + ", preferred=" + PREFERRED_MATERIALS
+                            + ", target=" + target.toShortString());
                     return materialTask;
                 } else {
+                    debugLogger.state("place material target satisfied: count=" + getMaterialCount(mod)
+                            + ", preferred=" + PREFERRED_MATERIALS);
                     materialTask = null;
                 }
             }
@@ -118,6 +131,10 @@ public class PlaceBlockTask extends Task implements ITaskRequiresGrounded {
             if (getMaterialCount(mod) < MIN_MATERIALS) {
                 // TODO: Mine items, extract their resource key somehow.
                 materialTask = getMaterialTask(PREFERRED_MATERIALS);
+                debugLogger.state("collect place materials: count=" + getMaterialCount(mod)
+                        + ", minimum=" + MIN_MATERIALS
+                        + ", preferred=" + PREFERRED_MATERIALS
+                        + ", target=" + target.toShortString());
                 progressChecker.reset();
                 return materialTask;
             }
@@ -129,9 +146,13 @@ public class PlaceBlockTask extends Task implements ITaskRequiresGrounded {
             failCount++;
             if (!tryingAlternativeWay()) {
                 Debug.logMessage("Failed to place, wandering timeout.");
+                debugLogger.state("place progress failed; wandering: target=" + target.toShortString()
+                        + ", failCount=" + failCount);
                 return wanderTask;
             } else {
                 Debug.logMessage("Trying alternative way of placing block...");
+                debugLogger.state("place progress failed; trying alternative: target=" + target.toShortString()
+                        + ", failCount=" + failCount);
             }
         }
 
@@ -139,14 +160,19 @@ public class PlaceBlockTask extends Task implements ITaskRequiresGrounded {
         // Place block
         if (tryingAlternativeWay()) {
             setDebugState("Alternative way: Trying to go above block to place block.");
+            debugLogger.state("alternative place route: target=" + target.toShortString());
             return new GetToBlockTask(target.up(), false);
         } else {
             setDebugState("Letting baritone place a block.");
             // Perform baritone placement
             if (!mod.getClientBaritone().getBuilderProcess().isActive()) {
                 Debug.logInternal("Run Structure Build");
+                debugLogger.state("start baritone build: target=" + target.toShortString()
+                        + ", blocks=" + describeBlocks());
                 ISchematic schematic = new PlaceStructureSchematic(mod);
                 mod.getClientBaritone().getBuilderProcess().build("structure", schematic, target);
+            } else {
+                debugLogger.state("baritone build already active: target=" + target.toShortString());
             }
         }
         return null;
@@ -154,6 +180,8 @@ public class PlaceBlockTask extends Task implements ITaskRequiresGrounded {
 
     @Override
     protected void onStop(Task interruptTask) {
+        debugLogger.event("stop: target=" + target.toShortString()
+                + ", interruptedBy=" + (interruptTask == null ? "none" : interruptTask.getClass().getSimpleName()));
         AltoClef.getInstance().getClientBaritone().getBuilderProcess().onLostControl();
     }
 
@@ -211,11 +239,18 @@ public class PlaceBlockTask extends Task implements ITaskRequiresGrounded {
                     }
                 }
                 Debug.logInternal("Failed to find throwaway block");
+                debugLogger.state("schematic could not find matching available block: target=" + target.toShortString()
+                        + ", blocks=" + describeBlocks()
+                        + ", available=" + available.size());
                 // No throwaways available!!
                 return new BlockOptionalMeta(Blocks.COBBLESTONE).getAnyBlockState();
             }
             // Don't care.
             return blockState;
         }
+    }
+
+    private String describeBlocks() {
+        return ArrayUtils.toString(toPlace);
     }
 }

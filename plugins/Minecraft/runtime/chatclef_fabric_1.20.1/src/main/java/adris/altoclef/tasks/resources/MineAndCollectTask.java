@@ -13,6 +13,7 @@ import adris.altoclef.util.ItemTarget;
 import adris.altoclef.util.MiningRequirement;
 import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.helpers.WorldHelper;
+import adris.altoclef.util.logging.StateChangeLogger;
 import adris.altoclef.util.progresscheck.MovementProgressChecker;
 import adris.altoclef.util.slots.CursorSlot;
 import adris.altoclef.util.slots.PlayerSlot;
@@ -39,6 +40,7 @@ public class MineAndCollectTask extends ResourceTask {
     private final TimerGame _cursorStackTimer = new TimerGame(3);
 
     private final MineOrCollectTask _subtask;
+    private final StateChangeLogger debugLogger = new StateChangeLogger("MineAndCollectTask");
 
     public MineAndCollectTask(ItemTarget[] itemTargets, Block[] blocksToMine, MiningRequirement requirement) {
         super(itemTargets);
@@ -80,6 +82,9 @@ public class MineAndCollectTask extends ResourceTask {
         mod.getBehaviour().addProtectedItems(Items.WOODEN_PICKAXE, Items.STONE_PICKAXE, Items.IRON_PICKAXE, Items.DIAMOND_PICKAXE, Items.NETHERITE_PICKAXE);
 
         _subtask.resetSearch();
+        debugLogger.event("start: targets=" + Arrays.toString(itemTargets)
+                + ", blocks=" + Arrays.toString(_blocksToMine)
+                + ", requirement=" + _requirement);
     }
 
     @Override
@@ -91,23 +96,32 @@ public class MineAndCollectTask extends ResourceTask {
     @Override
     protected Task onResourceTick(AltoClef mod) {
         if (!StorageHelper.miningRequirementMet(_requirement)) {
+            debugLogger.state("satisfy mining requirement first: requirement=" + _requirement
+                    + ", targets=" + Arrays.toString(itemTargets));
             return new SatisfyMiningRequirementTask(_requirement);
         }
 
         if (_subtask.isMining()) {
+            debugLogger.state("mining active: pos=" + describePos(_subtask.miningPos())
+                    + ", targets=" + Arrays.toString(itemTargets));
             makeSureToolIsEquipped(mod);
         }
 
         // Wrong dimension check.
         if (_subtask.wasWandering() && isInWrongDimension(mod) && !mod.getBlockScanner().anyFound(_blocksToMine)) {
+            debugLogger.state("wrong dimension while mining; traveling: current=" + WorldHelper.getCurrentDimension()
+                    + ", targets=" + Arrays.toString(itemTargets));
             return getToCorrectDimensionTask(mod);
         }
 
+        debugLogger.state("delegate to mine/collect subtask: targets=" + Arrays.toString(itemTargets));
         return _subtask;
     }
 
     @Override
     protected void onResourceStop(AltoClef mod, Task interruptTask) {
+        debugLogger.event("stop: interruptedBy=" + (interruptTask == null ? "none" : interruptTask.getClass().getSimpleName())
+                + ", targets=" + Arrays.toString(itemTargets));
         mod.getBehaviour().pop();
     }
 
@@ -160,6 +174,7 @@ public class MineAndCollectTask extends ResourceTask {
         private final MovementProgressChecker progressChecker = new MovementProgressChecker();
         private final Task _pickupTask;
         private BlockPos miningPos;
+        private final StateChangeLogger debugLogger = new StateChangeLogger("MineOrCollectTask");
 
         public MineOrCollectTask(Block[] blocks, ItemTarget[] targets) {
             _blocks = blocks;
@@ -188,12 +203,20 @@ public class MineAndCollectTask extends ResourceTask {
 
             // We can't mine right now.
             if (mod.getExtraBaritoneSettings().isInteractionPaused()) {
+                debugLogger.state("interaction paused; prefer dropped item: drop=" + closestDrop.getRight().map(this::describeDrop).orElse("none")
+                        + ", block=" + closestBlock.getRight().map(BlockPos::toShortString).orElse("none"));
                 return closestDrop.getRight().map(Object.class::cast);
             }
 
             if (dropSq <= blockSq) {
+                debugLogger.state("closest target is dropped item: drop=" + closestDrop.getRight().map(this::describeDrop).orElse("none")
+                        + ", dropSq=" + formatDouble(dropSq)
+                        + ", blockSq=" + formatDouble(blockSq));
                 return closestDrop.getRight().map(Object.class::cast);
             } else {
+                debugLogger.state("closest target is block: block=" + closestBlock.getRight().map(BlockPos::toShortString).orElse("none")
+                        + ", blockSq=" + formatDouble(blockSq)
+                        + ", dropSq=" + formatDouble(dropSq));
                 return closestBlock.getRight().map(Object.class::cast);
             }
         }
@@ -239,6 +262,7 @@ public class MineAndCollectTask extends ResourceTask {
             if (miningPos != null && !progressChecker.check(mod)) {
                 mod.getClientBaritone().getPathingBehavior().forceCancel();
                 Debug.logMessage("Failed to mine block. Suggesting it may be unreachable.");
+                debugLogger.state("mining progress failed; marking unreachable: pos=" + miningPos.toShortString());
                 mod.getBlockScanner().requestBlockUnreachable(miningPos, 2);
                 blacklist.add(miningPos);
                 miningPos = null;
@@ -252,11 +276,13 @@ public class MineAndCollectTask extends ResourceTask {
             if (obj instanceof BlockPos newPos) {
                 if (miningPos == null || !miningPos.equals(newPos)) {
                     progressChecker.reset();
+                    debugLogger.state("new mining target: pos=" + newPos.toShortString());
                 }
                 miningPos = newPos;
                 return new DestroyBlockTask(miningPos);
             }
             if (obj instanceof ItemEntity) {
+                debugLogger.state("pickup target selected: " + describeDrop((ItemEntity) obj));
                 miningPos = null;
                 return _pickupTask;
             }
@@ -284,11 +310,14 @@ public class MineAndCollectTask extends ResourceTask {
         protected void onStart() {
             progressChecker.reset();
             miningPos = null;
+            debugLogger.event("start: blocks=" + Arrays.toString(_blocks)
+                    + ", targets=" + Arrays.toString(_targets));
         }
 
         @Override
         protected void onStop(Task interruptTask) {
-
+            debugLogger.event("stop: interruptedBy=" + (interruptTask == null ? "none" : interruptTask.getClass().getSimpleName())
+                    + ", miningPos=" + describePos(miningPos));
         }
 
         @Override
@@ -311,6 +340,27 @@ public class MineAndCollectTask extends ResourceTask {
         public BlockPos miningPos() {
             return miningPos;
         }
+
+        private String describeDrop(ItemEntity drop) {
+            return drop.getStack().getItem().getTranslationKey()
+                    + " x " + drop.getStack().getCount()
+                    + " at " + drop.getBlockPos().toShortString();
+        }
+
+        private String describePos(BlockPos pos) {
+            return pos == null ? "none" : pos.toShortString();
+        }
+
+        private String formatDouble(double value) {
+            if (Double.isInfinite(value)) {
+                return "infinity";
+            }
+            return String.format(Locale.ROOT, "%.1f", value);
+        }
+    }
+
+    private String describePos(BlockPos pos) {
+        return pos == null ? "none" : pos.toShortString();
     }
 
 }

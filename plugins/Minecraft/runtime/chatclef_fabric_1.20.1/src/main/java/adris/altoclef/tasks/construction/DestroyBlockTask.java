@@ -10,6 +10,7 @@ import adris.altoclef.util.helpers.ItemHelper;
 import adris.altoclef.util.helpers.LookHelper;
 import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.helpers.WorldHelper;
+import adris.altoclef.util.logging.StateChangeLogger;
 import adris.altoclef.util.progresscheck.MovementProgressChecker;
 import adris.altoclef.util.slots.Slot;
 import baritone.api.pathing.goals.GoalBlock;
@@ -51,6 +52,7 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
     };
     private Task unstuckTask = null;
     private boolean isMining;
+    private final StateChangeLogger debugLogger = new StateChangeLogger("DestroyBlockTask");
 
     public DestroyBlockTask(BlockPos pos) {
         this.pos = pos;
@@ -202,6 +204,9 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
         // Get the item stack in the cursor slot.
         ItemStack cursorStack = StorageHelper.getItemStackInCursorSlot();
         Debug.logInternal("Cursor stack: " + cursorStack);
+        debugLogger.event("start: target=" + pos.toShortString()
+                + ", block=" + describeTargetBlock(mod)
+                + ", cursor=" + describeStack(cursorStack));
 
         // If the cursor stack is not empty, try to move it to a suitable slot in the player inventory.
         if (!cursorStack.isEmpty()) {
@@ -256,6 +261,7 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
                 // Check if the entity is a PillagerEntity and is within a distance of 144 blocks from the position
                 if (entity instanceof PillagerEntity && pos.isWithinDistance(entity.getPos(), 144)) {
                     Debug.logMessage("Blacklisting pillager wool.");
+                    debugLogger.state("blacklist pillager wool: target=" + pos.toShortString());
                     // Request the block at the position to be marked as unreachable
                     mod.getBlockScanner().requestBlockUnreachable(pos, 0);
                 }
@@ -289,6 +295,8 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
         // Check if there is an active unstuck task and the player is stuck in a block
         if (unstuckTask != null && unstuckTask.isActive() && !unstuckTask.isFinished() && stuckInBlock(mod) != null) {
             setDebugState("Getting unstuck from block.");
+            debugLogger.state("continue unstuck while mining: target=" + pos.toShortString()
+                    + ", player=" + mod.getPlayer().getBlockPos().toShortString());
             stuckCheck.reset();
             // Release control of Baritone's custom goal process and explore process
             mod.getClientBaritone().getCustomGoalProcess().onLostControl();
@@ -301,6 +309,8 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
             BlockPos blockStuck = stuckInBlock(mod);
             if (blockStuck != null) {
                 unstuckTask = getFenceUnstuckTask();
+                debugLogger.state("start unstuck while mining: stuckBlock=" + blockStuck.toShortString()
+                        + ", target=" + pos.toShortString());
                 return unstuckTask;
             }
             stuckCheck.reset();
@@ -310,6 +320,8 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
         if (!_moveChecker.check(mod)) {
             _moveChecker.reset();
             // Request the block at the position to be marked as unreachable
+            debugLogger.state("movement failed; marking block unreachable: target=" + pos.toShortString()
+                    + ", block=" + describeTargetBlock(mod));
             mod.getBlockScanner().requestBlockUnreachable(pos);
         }
 
@@ -318,6 +330,8 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
         if (!WorldHelper.isSolidBlock(pos.up()) && mod.getPlayer().getPos().y > pos.getY() && pos.isWithinDistance(mod.getPlayer().isOnGround() ? mod.getPlayer().getPos() : mod.getPlayer().getPos().add(0, -1, 0), 0.89)) {
             if (WorldHelper.dangerousToBreakIfRightAbove(pos)) {
                 setDebugState("It's dangerous to break as we're right above it, moving away and trying again.");
+                debugLogger.state("dangerous to break directly below/near player: target=" + pos.toShortString()
+                        + ", block=" + describeTargetBlock(mod));
                 return new RunAwayFromPositionTask(3, pos.getY(), pos);
             }
         }
@@ -325,6 +339,10 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
         Optional<Rotation> reach = LookHelper.getReach(pos);
         if (reach.isPresent() && (mod.getPlayer().isTouchingWater() || mod.getPlayer().isOnGround()) && !mod.getFoodChain().needsToEat() && !WorldHelper.isInNetherPortal() && mod.getClientBaritone().getPathingBehavior().isSafeToCancel()) {
             setDebugState("Block in range, mining...");
+            debugLogger.state("mining block in reach: target=" + pos.toShortString()
+                    + ", block=" + describeTargetBlock(mod)
+                    + ", onGround=" + mod.getPlayer().isOnGround()
+                    + ", touchingWater=" + mod.getPlayer().isTouchingWater());
             stuckCheck.reset();
             isMining = true;
             mod.getInputControls().release(Input.SNEAK);
@@ -342,6 +360,8 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
             if (isMining && mod.getPlayer().isTouchingWater()) {
                 setDebugState("We are in water... holding break button");
                 isMining = false;
+                debugLogger.state("mining in water failed; marking unreachable: target=" + pos.toShortString()
+                        + ", block=" + describeTargetBlock(mod));
                 mod.getBlockScanner().requestBlockUnreachable(pos);
                 mod.getInputControls().hold(Input.CLICK_LEFT);
             } else {
@@ -360,6 +380,10 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
             }
             if (!mod.getClientBaritone().getCustomGoalProcess().isActive()) {
                 mod.getClientBaritone().getBuilderProcess().onLostControl();
+                debugLogger.state("pathing to block: target=" + pos.toShortString()
+                        + ", block=" + describeTargetBlock(mod)
+                        + ", closeToMoveBack=" + isCloseToMoveBack
+                        + ", needsToEat=" + mod.getFoodChain().needsToEat());
                 mod.getClientBaritone().getCustomGoalProcess().setGoalAndPath(mod.getWorld().getBlockState(pos.up()).getBlock() ==
                         Blocks.SNOW ? new GoalBlock(pos) : new GoalNear(pos, 1));
             }
@@ -393,6 +417,8 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
 
         // Logging statements for debugging
         Debug.logInternal("onStop method called");
+        debugLogger.event("stop: target=" + pos.toShortString()
+                + ", interruptedBy=" + (interruptTask == null ? "none" : interruptTask.getClass().getSimpleName()));
         Debug.logInternal("Baritone pathing cancelled");
         if (!AltoClef.inGame()) {
             Debug.logInternal("Not in game");
@@ -450,5 +476,16 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
     @Override
     protected String toDebugString() {
         return "Destroy block at " + pos.toShortString();
+    }
+
+    private String describeTargetBlock(AltoClef mod) {
+        return mod.getWorld().getBlockState(pos).getBlock().getTranslationKey();
+    }
+
+    private String describeStack(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return "empty";
+        }
+        return stack.getItem().getTranslationKey() + " x " + stack.getCount();
     }
 }

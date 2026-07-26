@@ -5,6 +5,7 @@ import adris.altoclef.Debug;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.tasksystem.TaskChain;
 import adris.altoclef.tasksystem.TaskRunner;
+import adris.altoclef.util.logging.StateChangeLogger;
 
 public abstract class SingleTaskChain extends TaskChain {
 
@@ -12,6 +13,7 @@ public abstract class SingleTaskChain extends TaskChain {
     private boolean interrupted = false;
 
     private final AltoClef mod;
+    private final StateChangeLogger debugLogger = new StateChangeLogger("Chain." + getClass().getSimpleName());
 
     public SingleTaskChain(TaskRunner runner) {
         super(runner);
@@ -25,14 +27,21 @@ public abstract class SingleTaskChain extends TaskChain {
         if (interrupted) {
             interrupted = false;
             if (mainTask != null) {
+                debugLogger.event("reset main task after interrupt: " + describeTask(mainTask));
                 mainTask.reset();
             }
         }
 
         if (mainTask != null) {
-            if ((mainTask.isFinished()) || mainTask.stopped()) {
+            boolean finished = mainTask.isFinished();
+            boolean stopped = mainTask.stopped();
+            if (finished || stopped) {
+                debugLogger.event("main task finished/stopped: finished=" + finished
+                        + ", stopped=" + stopped
+                        + ", task=" + describeTask(mainTask));
                 onTaskFinish(mod);
             } else {
+                debugLogger.state("tick main task: " + describeTask(mainTask));
                 mainTask.tick(this);
             }
         }
@@ -40,6 +49,7 @@ public abstract class SingleTaskChain extends TaskChain {
 
     protected void onStop() {
         if (isActive() && mainTask != null) {
+            debugLogger.event("stop chain task: " + describeTask(mainTask));
             mainTask.stop();
             mainTask = null;
         }
@@ -47,6 +57,7 @@ public abstract class SingleTaskChain extends TaskChain {
 
     public void setTask(Task task) {
         if (mainTask == null || !mainTask.equals(task)) {
+            debugLogger.event("set main task: " + describeTask(mainTask) + " -> " + describeTask(task));
             if (mainTask != null) {
                 mainTask.stop(task);
             }
@@ -67,6 +78,7 @@ public abstract class SingleTaskChain extends TaskChain {
     public void onInterrupt(TaskChain other) {
         if (other != null) {
             Debug.logInternal("Chain Interrupted: " + this + " by " + other);
+            debugLogger.event("interrupted by chain: " + other.getName());
         }
         // Stop our task. When we're started up again, let our task know we need to run.
         interrupted = true;
@@ -81,5 +93,9 @@ public abstract class SingleTaskChain extends TaskChain {
 
     public Task getCurrentTask() {
         return mainTask;
+    }
+
+    private String describeTask(Task task) {
+        return task == null ? "none" : task.getClass().getSimpleName() + "{" + task + "}";
     }
 }

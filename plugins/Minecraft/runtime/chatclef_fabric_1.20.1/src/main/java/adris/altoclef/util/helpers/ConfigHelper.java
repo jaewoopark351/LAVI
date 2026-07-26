@@ -67,6 +67,8 @@ public class ConfigHelper {
         T result = getDefault.get();
         File loadFrom = getConfigFile(path);
         if (!loadFrom.exists()) {
+            Debug.logWarning("[ConfigHelper] missing config; writing defaults: path=" + path
+                    + ", type=" + classToLoad.getSimpleName());
             saveConfig(path, result);
             return result;
         }
@@ -80,13 +82,21 @@ public class ConfigHelper {
 
         try {
             result = mapper.readValue(loadFrom, classToLoad);
+            Debug.logWarning("[ConfigHelper] loaded config: path=" + path
+                    + ", type=" + classToLoad.getSimpleName());
         } catch (JsonMappingException ex) {
+            Debug.logWarning("[ConfigHelper] using defaults after parse failure: path=" + path
+                    + ", type=" + classToLoad.getSimpleName()
+                    + ", error=" + ex.getMessage());
             Debug.logError("Failed to parse Config file of type " + classToLoad.getSimpleName() + "at " + path + ". JSON Error Message: " + ex.getMessage() + ".\n JSON Error STACK TRACE:\n\n");
             ex.printStackTrace();
             if (result instanceof IFailableConfigFile failable)
                 failable.failedToLoad();
             return result;
         } catch (IOException e) {
+            Debug.logWarning("[ConfigHelper] using defaults after read failure: path=" + path
+                    + ", type=" + classToLoad.getSimpleName()
+                    + ", error=" + e.getMessage());
             Debug.logError("Failed to read Config at " + path + ".");
             e.printStackTrace();
             if (result instanceof IFailableConfigFile failable)
@@ -149,6 +159,8 @@ public class ConfigHelper {
 
             // Write the serialized configuration object to the file
             writeConfigToFile(mapper, configFile, config);
+            Debug.logWarning("[ConfigHelper] saved config: path=" + path
+                    + ", type=" + (config == null ? "null" : config.getClass().getSimpleName()));
         } catch (IOException e) {
             // Handle any IO exceptions that occur during the write process
             handleIOException(e);

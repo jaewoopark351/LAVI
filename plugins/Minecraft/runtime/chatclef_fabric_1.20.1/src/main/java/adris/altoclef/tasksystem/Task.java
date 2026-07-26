@@ -2,6 +2,7 @@ package adris.altoclef.tasksystem;
 
 import adris.altoclef.Debug;
 import adris.altoclef.tasks.movement.TimeoutWanderTask;
+import adris.altoclef.util.logging.StateChangeLogger;
 
 import java.util.function.Predicate;
 
@@ -17,11 +18,13 @@ public abstract class Task {
     private boolean stopped = false;
 
     private boolean active = false;
+    private final StateChangeLogger debugLogger = new StateChangeLogger("Task." + getClass().getSimpleName());
 
     public void tick(TaskChain parentChain) {
         parentChain.addTaskToChain(this);
         if (first) {
             Debug.logInternal("Task START: " + this);
+            debugLogger.event("start: " + safeDebugString());
             active = true;
             onStart();
             first = false;
@@ -33,6 +36,7 @@ public abstract class Task {
         // Debug state print
         if (!oldDebugState.equals(debugState)) {
             Debug.logInternal(toString());
+            debugLogger.state("state: " + safeDebugString());
             oldDebugState = debugState;
         }
         // We have a sub task
@@ -40,6 +44,7 @@ public abstract class Task {
             if (!newSub.isEqual(sub)) {
                 if (canBeInterrupted(sub, newSub)) {
                     // Our sub task is new
+                    debugLogger.event("subtask change: " + describeTask(sub) + " -> " + describeTask(newSub));
                     if (sub != null) {
                         // Our previous sub must be interrupted.
                         sub.stop(newSub);
@@ -55,6 +60,7 @@ public abstract class Task {
             // We are null
             if (sub != null && canBeInterrupted(sub, null)) {
                 // Our previous sub must be interrupted.
+                debugLogger.event("subtask cleared: " + describeTask(sub));
                 sub.stop();
                 sub = null;
             }
@@ -77,6 +83,7 @@ public abstract class Task {
     public void stop(Task interruptTask) {
         if (!active) return;
         Debug.logInternal("Task STOP: " + this + ", interrupted by " + interruptTask);
+        debugLogger.event("stop: interruptedBy=" + describeTask(interruptTask) + ", task=" + safeDebugString());
         if (!first) {
             onStop(interruptTask);
         }
@@ -92,6 +99,7 @@ public abstract class Task {
 
     public void fail(String reason) {
         stop();
+        debugLogger.event("failed: " + reason);
         Debug.logMessage("Task FAILED: " + reason);
     }
 
@@ -104,6 +112,7 @@ public abstract class Task {
      */
     public void interrupt(Task interruptTask) {
         if (!active) return;
+        debugLogger.event("interrupt: interruptedBy=" + describeTask(interruptTask) + ", task=" + safeDebugString());
         if (!first) {
             onStop(interruptTask);
         }
@@ -185,5 +194,17 @@ public abstract class Task {
             }
             return true;
         }));
+    }
+
+    private String describeTask(Task task) {
+        return task == null ? "none" : task.getClass().getSimpleName() + "{" + task.safeDebugString() + "}";
+    }
+
+    private String safeDebugString() {
+        try {
+            return toString();
+        } catch (RuntimeException ex) {
+            return getClass().getSimpleName() + " debugString failed: " + ex.getClass().getSimpleName() + ": " + ex.getMessage();
+        }
     }
 }

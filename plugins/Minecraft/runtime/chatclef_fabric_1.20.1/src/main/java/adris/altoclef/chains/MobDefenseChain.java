@@ -15,6 +15,7 @@ import adris.altoclef.tasks.speedrun.DragonBreathTracker;
 import adris.altoclef.tasksystem.TaskRunner;
 import adris.altoclef.util.baritone.CachedProjectile;
 import adris.altoclef.util.helpers.*;
+import adris.altoclef.util.logging.StateChangeLogger;
 import adris.altoclef.util.slots.PlayerSlot;
 import adris.altoclef.util.slots.Slot;
 import baritone.Baritone;
@@ -67,6 +68,7 @@ public class MobDefenseChain extends SingleTaskChain {
     private Entity lockedOnEntity = null;
 
     private float cachedLastPriority;
+    private final StateChangeLogger defenseLogger = new StateChangeLogger("MobDefenseChain");
 
     public MobDefenseChain(TaskRunner runner) {
         super(runner);
@@ -122,6 +124,7 @@ public class MobDefenseChain extends SingleTaskChain {
         cachedLastPriority = getPriorityInner();
         if (getCurrentTask() == null) {
             // We're doing nothing! Don't run.
+            defenseLogger.state("idle: no defense task selected, computedPriority=" + formatDouble(cachedLastPriority));
             cachedLastPriority = 0;
         }
         prevHealth = AltoClef.getInstance().getPlayer().getHealth();
@@ -178,6 +181,8 @@ public class MobDefenseChain extends SingleTaskChain {
         // Put out fire if we're standing on one like an idiot
         BlockPos fireBlock = isInsideFireAndOnFire(mod);
         if (fireBlock != null) {
+            defenseLogger.state("put out fire: block=" + fireBlock.toShortString()
+                    + ", health=" + formatDouble(mod.getPlayer().getHealth()));
             putOutFire(mod, fireBlock);
             wasPuttingOutFire = true;
         } else {
@@ -190,6 +195,8 @@ public class MobDefenseChain extends SingleTaskChain {
         Optional<Entity> universallyDangerous = getUniversallyDangerousMob(mod);
         if (universallyDangerous.isPresent() && mod.getPlayer().getHealth() <= 10) {
             runAwayTask = new RunAwayFromHostilesTask(DANGER_KEEP_DISTANCE, true);
+            defenseLogger.state("run from universally dangerous mob: entity=" + describeEntity(universallyDangerous.get())
+                    + ", health=" + formatDouble(mod.getPlayer().getHealth()));
             setTask(runAwayTask);
             return 70;
         }
@@ -209,13 +216,20 @@ public class MobDefenseChain extends SingleTaskChain {
                 LookHelper.lookAt(mod, blowingUp.getEyePos());
                 ItemStack shieldSlot = StorageHelper.getItemStackInSlot(PlayerSlot.OFFHAND_SLOT);
                 if (shieldSlot.getItem() != Items.SHIELD) {
+                    defenseLogger.state("equip shield against fusing creeper: creeper=" + describeEntity(blowingUp)
+                            + ", fuse=" + formatDouble(blowingUp.getClientFuseTime(1)));
                     mod.getSlotHandler().forceEquipItemToOffhand(Items.SHIELD);
                 } else {
+                    defenseLogger.state("shield against fusing creeper: creeper=" + describeEntity(blowingUp)
+                            + ", fuse=" + formatDouble(blowingUp.getClientFuseTime(1)));
                     startShielding(mod);
                 }
             } else {
                 doingFunkyStuff = true;
                 runAwayTask = new RunAwayFromCreepersTask(CREEPER_KEEP_DISTANCE);
+                defenseLogger.state("run from fusing creeper: creeper=" + describeEntity(blowingUp)
+                        + ", fuse=" + formatDouble(blowingUp.getClientFuseTime(1))
+                        + ", health=" + formatDouble(mod.getPlayer().getHealth()));
                 setTask(runAwayTask);
                 return 50 + blowingUp.getClientFuseTime(1) * 50;
             }
@@ -229,8 +243,10 @@ public class MobDefenseChain extends SingleTaskChain {
                     && !mod.getEntityTracker().entityFound(PotionEntity.class) && isProjectileClose(mod)) {
                 ItemStack shieldSlot = StorageHelper.getItemStackInSlot(PlayerSlot.OFFHAND_SLOT);
                 if (shieldSlot.getItem() != Items.SHIELD) {
+                    defenseLogger.state("equip shield against projectile");
                     mod.getSlotHandler().forceEquipItemToOffhand(Items.SHIELD);
                 } else {
+                    defenseLogger.state("shield against projectile");
                     startShielding(mod);
                 }
                 return 60;
@@ -244,6 +260,10 @@ public class MobDefenseChain extends SingleTaskChain {
                 || !mod.getMLGBucketChain().doneMLG() || mod.getMLGBucketChain().isChorusFruiting()) {
             killAura.stopShielding(mod);
             stopShielding(mod);
+            defenseLogger.state("defense paused by critical action: needsToEat=" + mod.getFoodChain().needsToEat()
+                    + ", falling=" + mod.getMLGBucketChain().isFalling(mod)
+                    + ", doneMLG=" + mod.getMLGBucketChain().doneMLG()
+                    + ", chorus=" + mod.getMLGBucketChain().isChorusFruiting());
             return Float.NEGATIVE_INFINITY;
         }
 
@@ -256,12 +276,16 @@ public class MobDefenseChain extends SingleTaskChain {
             if (StorageHelper.getNumberOfThrowawayBlocks(mod) > 0 && !mod.getFoodChain().needsToEat()
                     && mod.getModSettings().isDodgeProjectiles() && isProjectileClose(mod)) {
                 doingFunkyStuff = true;
+                defenseLogger.state("build projectile protection wall: health=" + formatDouble(mod.getPlayer().getHealth())
+                        + ", throwawayBlocks=" + StorageHelper.getNumberOfThrowawayBlocks(mod));
                 setTask(new ProjectileProtectionWallTask(mod));
                 return 65;
             }
 
             if (isProjectileClose(mod)) {
                 runAwayTask = new DodgeProjectilesTask(ARROW_KEEP_DISTANCE_HORIZONTAL, ARROW_KEEP_DISTANCE_VERTICAL);
+                defenseLogger.state("dodge projectile: health=" + formatDouble(mod.getPlayer().getHealth())
+                        + ", hasShield=false");
                 setTask(runAwayTask);
                 return 65;    
             }
@@ -270,6 +294,9 @@ public class MobDefenseChain extends SingleTaskChain {
         if (isInDanger(mod) && !escapeDragonBreath(mod) && !mod.getFoodChain().isShouldStop()) {
             if (targetEntity == null || WorldHelper.isSurroundedByHostiles()) {
                 runAwayTask = new RunAwayFromHostilesTask(DANGER_KEEP_DISTANCE, true);
+                defenseLogger.state("run from danger: health=" + formatDouble(mod.getPlayer().getHealth())
+                        + ", surrounded=" + WorldHelper.isSurroundedByHostiles()
+                        + ", targetEntity=" + describeEntity(targetEntity));
                 setTask(runAwayTask);
                 return 70;
             }
@@ -345,11 +372,18 @@ public class MobDefenseChain extends SingleTaskChain {
                     Entity toKill = toDealWithList.get(0);
                     lockedOnEntity = toKill;
 
+                    defenseLogger.state("attack hostile: target=" + describeEntity(toKill)
+                            + ", hostileCount=" + toDealWithList.size()
+                            + ", canDealWith=" + canDealWith
+                            + ", dangerScore=" + getDangerousnessScore(toDealWithList));
                     setTask(new KillEntitiesTask(toKill.getClass()));
                     return 65;
                 } else {
                     // We can't deal with it
                     runAwayTask = new RunAwayFromHostilesTask(DANGER_KEEP_DISTANCE, true);
+                    defenseLogger.state("run from hostiles: hostileCount=" + toDealWithList.size()
+                            + ", canDealWith=" + canDealWith
+                            + ", dangerScore=" + getDangerousnessScore(toDealWithList));
                     setTask(runAwayTask);
                     return 80;
                 }
@@ -358,6 +392,7 @@ public class MobDefenseChain extends SingleTaskChain {
         // By default, if we aren't "immediately" in danger but were running away, keep
         // running away until we're good.
         if (runAwayTask != null && !runAwayTask.isFinished()) {
+            defenseLogger.state("continue run away task: priority=" + formatDouble(cachedLastPriority));
             setTask(runAwayTask);
             return cachedLastPriority;
         } else {
@@ -365,6 +400,7 @@ public class MobDefenseChain extends SingleTaskChain {
         }
 
         if (needsChangeOnAttack && lockedOnEntity != null && lockedOnEntity.isAlive()) {
+            defenseLogger.state("continue locked attack: target=" + describeEntity(lockedOnEntity));
             setTask(new KillEntitiesTask(lockedOnEntity.getClass()));
             return 65;
         } else {
@@ -651,5 +687,21 @@ public class MobDefenseChain extends SingleTaskChain {
     @Override
     public String getName() {
         return "Mob Defense";
+    }
+
+    private String describeEntity(Entity entity) {
+        if (entity == null) {
+            return "none";
+        }
+        return entity.getType().getTranslationKey()
+                + " at " + entity.getBlockPos().toShortString()
+                + ", distance=" + formatDouble(entity.distanceTo(AltoClef.getInstance().getPlayer()));
+    }
+
+    private String formatDouble(double value) {
+        if (Double.isInfinite(value)) {
+            return "infinity";
+        }
+        return String.format(Locale.ROOT, "%.1f", value);
     }
 }
