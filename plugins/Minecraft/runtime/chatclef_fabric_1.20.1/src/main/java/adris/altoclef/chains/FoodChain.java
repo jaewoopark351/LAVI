@@ -15,6 +15,7 @@ import adris.altoclef.tasks.speedrun.DragonBreathTracker;
 import adris.altoclef.tasksystem.TaskRunner;
 import adris.altoclef.util.helpers.ConfigHelper;
 import adris.altoclef.util.helpers.LookHelper;
+import adris.altoclef.util.logging.StateChangeLogger;
 import net.minecraft.item.Item;
 
 import java.util.Optional;
@@ -34,6 +35,8 @@ public class FoodChain extends SingleTaskChain {
     private final FoodEatingPolicy eatingPolicy = new FoodEatingPolicy();
     private final FoodEatingController eatingController = new FoodEatingController();
     private final FoodCollectionPolicy collectionPolicy = new FoodCollectionPolicy();
+    private final StateChangeLogger decisionLogger = new StateChangeLogger("FoodChain.Decision");
+    private final StateChangeLogger eatingLogger = new StateChangeLogger("FoodChain.Eating");
     private boolean needsFood = false;
     private Optional<Item> cachedPerfectFood = Optional.empty();
     private boolean shouldStop = false;
@@ -56,6 +59,7 @@ public class FoodChain extends SingleTaskChain {
         AltoClef mod = AltoClef.getInstance();
 
         if (safetyPolicy.shouldPauseEating(mod, dragonBreathTracker, shouldStop)) {
+            decisionLogger.state("paused by safety policy; shouldStop=" + shouldStop + ", " + describeVitals(mod));
             eatingController.stopEating();
             return Float.NEGATIVE_INFINITY;
         }
@@ -80,8 +84,10 @@ public class FoodChain extends SingleTaskChain {
                 && !mod.getMLGBucketChain().isChorusFruiting()
                 && !mod.getPlayer().isBlocking()/* && !safetyPolicy.areEnemiesNearby(mod, isTryingToEat())*/) {
             if (!LookHelper.tryAvoidingInteractable(mod)) {
+                eatingLogger.state("eating deferred: could not avoid interactable; food=" + cachedPerfectFood.get().getTranslationKey() + ", " + describeVitals(mod));
                 return false;
             }
+            eatingLogger.state("eating: food=" + cachedPerfectFood.get().getTranslationKey() + ", " + describeVitals(mod));
             eatingController.startEating(mod, cachedPerfectFood.get());
         } else {
             eatingController.stopEating();
@@ -90,14 +96,34 @@ public class FoodChain extends SingleTaskChain {
     }
 
     private float updateFoodCollection(Settings settings, int cachedFoodScore) {
+        boolean wasNeedingFood = needsFood;
         FoodCollectionDecision decision = collectionPolicy.decide(cachedFoodScore, needsFood, settings);
         needsFood = decision.needsFood();
 
         if (decision.shouldCollect()) {
+            decisionLogger.state("collecting food: score=" + cachedFoodScore
+                    + ", min=" + settings.getMinimumFoodAllowed()
+                    + ", target=" + decision.getTargetFoodUnits()
+                    + ", wasNeedingFood=" + wasNeedingFood
+                    + ", needsFood=" + needsFood);
             setTask(new CollectFoodTask(decision.getTargetFoodUnits()));
             return 55f;
         }
+        decisionLogger.state("idle: score=" + cachedFoodScore
+                + ", min=" + settings.getMinimumFoodAllowed()
+                + ", target=" + decision.getTargetFoodUnits()
+                + ", hasFood=" + hasFood
+                + ", needsFood=" + needsFood);
         return Float.NEGATIVE_INFINITY;
+    }
+
+    private String describeVitals(AltoClef mod) {
+        if (mod == null || mod.getPlayer() == null) {
+            return "player=missing";
+        }
+        return "health=" + mod.getPlayer().getHealth()
+                + ", hunger=" + mod.getPlayer().getHungerManager().getFoodLevel()
+                + ", saturation=" + mod.getPlayer().getHungerManager().getSaturationLevel();
     }
 
     @Override
@@ -131,6 +157,9 @@ public class FoodChain extends SingleTaskChain {
     }
 
     public void shouldStop(boolean shouldStopInput) {
+        if (shouldStop != shouldStopInput) {
+            decisionLogger.event("shouldStop changed: " + shouldStop + " -> " + shouldStopInput);
+        }
         shouldStop = shouldStopInput;
     }
 

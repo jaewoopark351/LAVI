@@ -14,6 +14,7 @@ import adris.altoclef.util.MiningRequirement;
 import adris.altoclef.util.SmeltTarget;
 import adris.altoclef.util.helpers.ItemHelper;
 import adris.altoclef.util.helpers.StorageHelper;
+import adris.altoclef.util.logging.StateChangeLogger;
 import adris.altoclef.util.slots.FurnaceSlot;
 import adris.altoclef.util.slots.Slot;
 import net.minecraft.block.Blocks;
@@ -41,6 +42,7 @@ public class SmeltInFurnaceTask extends ResourceTask {
     private final SmeltTarget[] _targets;
 
     private final DoSmeltInFurnaceTask _doTask;
+    private final StateChangeLogger debugLogger = new StateChangeLogger("SmeltInFurnaceTask");
 
     public SmeltInFurnaceTask(SmeltTarget[] targets) {
         super(extractItemTargets(targets));
@@ -73,6 +75,7 @@ public class SmeltInFurnaceTask extends ResourceTask {
     @Override
     protected void onResourceStart(AltoClef mod) {
         mod.getBehaviour().push();
+        debugLogger.event("start: targets=" + Arrays.toString(_targets));
         if (_targets.length != 1) {
             Debug.logWarning("Tried smelting multiple targets, only one target is supported at a time!");
         }
@@ -82,6 +85,7 @@ public class SmeltInFurnaceTask extends ResourceTask {
     protected Task onResourceTick(AltoClef mod) {
         Optional<BlockPos> furnacePos = mod.getBlockScanner().getNearestBlock(Blocks.FURNACE);
         furnacePos.ifPresent(blockPos -> mod.getBehaviour().avoidBlockBreaking(blockPos));
+        debugLogger.state("resource tick: nearestFurnace=" + furnacePos.map(BlockPos::toShortString).orElse("none"));
         return _doTask;
     }
 
@@ -134,6 +138,7 @@ public class SmeltInFurnaceTask extends ResourceTask {
         private final FurnaceCache furnaceCache = new FurnaceCache();
         private final ItemTarget allMaterials;
         private boolean ignoreMaterials;
+        private final StateChangeLogger debugLogger = new StateChangeLogger("DoSmeltInFurnaceTask");
 
         public DoSmeltInFurnaceTask(SmeltTarget target) {
             super(Blocks.FURNACE, new ItemTarget(Items.FURNACE));
@@ -143,6 +148,7 @@ public class SmeltInFurnaceTask extends ResourceTask {
 
         public void ignoreMaterials() {
             ignoreMaterials = true;
+            debugLogger.event("ignore materials enabled: target=" + target.getItem() + ", material=" + target.getMaterial());
         }
 
         @Override
@@ -167,6 +173,7 @@ public class SmeltInFurnaceTask extends ResourceTask {
             botBehaviour.addProtectedItems(Items.COAL);
             botBehaviour.addProtectedItems(allMaterials.getMatches());
             botBehaviour.addProtectedItems(target.getMaterial().getMatches());
+            debugLogger.event("start: output=" + target.getItem() + ", materials=" + allMaterials);
         }
 
         @Override
@@ -197,21 +204,32 @@ public class SmeltInFurnaceTask extends ResourceTask {
             // We don't have enough materials...
             if (mod.getItemStorage().getItemCount(materialTarget.getMatches()) < materialsNeeded) {
                 setDebugState("Getting Materials");
+                debugLogger.state("get materials: needed=" + materialsNeeded
+                        + ", inventory=" + mod.getItemStorage().getItemCount(materialTarget.getMatches())
+                        + ", materialTarget=" + materialTarget
+                        + ", " + describeCache());
                 return getMaterialTask(target.getMaterial());
             }
 
             // We don't have enough fuel...
             if (furnaceCache.burningFuelCount <= 0 && StorageHelper.calculateInventoryFuelCount(mod) < fuelNeeded) {
                 setDebugState("Getting Fuel");
+                debugLogger.state("get fuel: needed=" + formatDouble(fuelNeeded)
+                        + ", inventoryFuel=" + formatDouble(StorageHelper.calculateInventoryFuelCount(mod))
+                        + ", " + describeCache());
                 return new CollectFuelTask(fuelNeeded + 1);
             }
 
             // Make sure our materials are accessible in our inventory
             if (StorageHelper.isItemInaccessibleToContainer(mod, allMaterials)) {
+                debugLogger.state("move inaccessible materials: " + allMaterials + ", " + describeCache());
                 return new MoveInaccessibleItemToInventoryTask(allMaterials);
             }
 
             // We have fuel and materials. Get to our container and smelt!
+            debugLogger.state("ready for furnace interaction: materialsNeeded=" + materialsNeeded
+                    + ", fuelNeeded=" + formatDouble(fuelNeeded)
+                    + ", " + describeCache());
             return super.onTick();
         }
 
@@ -239,6 +257,9 @@ public class SmeltInFurnaceTask extends ResourceTask {
             double needsWhileCooking = material.getCount() - currentlyCachedWhileCooking;
             if (needsWhileCooking <= 0) {
                 if (!fuel.isEmpty()) {
+                    debugLogger.state("remove extra fuel: fuel=" + describeStack(fuel)
+                            + ", material=" + describeStack(material)
+                            + ", output=" + describeStack(output));
                     ItemStack cursor = StorageHelper.getItemStackInCursorSlot();
                     if (!ItemHelper.canStackTogether(fuel, cursor)) {
                         Optional<Slot> toFit = mod.getItemStorage().getSlotThatCanFitInPlayerInventory(cursor, false);
@@ -259,6 +280,9 @@ public class SmeltInFurnaceTask extends ResourceTask {
             }
             if (!output.isEmpty()) {
                 setDebugState("Receiving Output");
+                debugLogger.state("receive output: output=" + describeStack(output)
+                        + ", material=" + describeStack(material)
+                        + ", fuel=" + describeStack(fuel));
                 // Ensure our cursor is empty/can receive our item
                 ItemStack cursor = StorageHelper.getItemStackInCursorSlot();
                 if (!ItemHelper.canStackTogether(output, cursor)) {
@@ -291,6 +315,10 @@ public class SmeltInFurnaceTask extends ResourceTask {
             if (!allMaterials.matches(material.getItem()) || neededMaterialsInSlot > material.getCount()) {
                 int materialsAlreadyIn = (materialTarget.matches(material.getItem()) ? material.getCount() : 0);
                 setDebugState("Moving Materials");
+                debugLogger.state("move materials into furnace: needInSlot=" + neededMaterialsInSlot
+                        + ", alreadyIn=" + materialsAlreadyIn
+                        + ", materialSlot=" + describeStack(material)
+                        + ", output=" + describeStack(output));
                 return new MoveItemToSlotFromInventoryTask(new ItemTarget(materialTarget, neededMaterialsInSlot - materialsAlreadyIn), FurnaceSlot.INPUT_SLOT_MATERIALS);
             }
 
@@ -329,12 +357,18 @@ public class SmeltInFurnaceTask extends ResourceTask {
                     }
                     if (bestStack != null) {
                         setDebugState("Filling fuel");
+                        debugLogger.state("fill fuel: bestStack=" + describeStack(bestStack)
+                                + ", needs=" + formatDouble(needs)
+                                + ", fuelSlot=" + describeStack(fuel));
                         return new MoveItemToSlotFromInventoryTask(new ItemTarget(bestStack.getItem(), bestStack.getCount()), FurnaceSlot.INPUT_SLOT_FUEL);
                     }
                 }
             }
 
             setDebugState("Waiting...");
+            debugLogger.state("wait for smelting: material=" + describeStack(material)
+                    + ", fuel=" + describeStack(fuel)
+                    + ", output=" + describeStack(output));
             return null;
         }
 
@@ -367,6 +401,29 @@ public class SmeltInFurnaceTask extends ResourceTask {
                 furnaceCache.materialSlot = StorageHelper.getItemStackInSlot(FurnaceSlot.INPUT_SLOT_MATERIALS);
                 furnaceCache.outputSlot = StorageHelper.getItemStackInSlot(FurnaceSlot.OUTPUT_SLOT);
             }
+        }
+
+        private String describeCache() {
+            return "cache[input=" + describeStack(furnaceCache.materialSlot)
+                    + ", fuel=" + describeStack(furnaceCache.fuelSlot)
+                    + ", output=" + describeStack(furnaceCache.outputSlot)
+                    + ", burningFuel=" + formatDouble(furnaceCache.burningFuelCount)
+                    + ", cook=" + formatDouble(furnaceCache.burnPercentage)
+                    + "]";
+        }
+
+        private String describeStack(ItemStack stack) {
+            if (stack == null || stack.isEmpty()) {
+                return "empty";
+            }
+            return stack.getItem().getTranslationKey() + " x " + stack.getCount();
+        }
+
+        private String formatDouble(double value) {
+            if (Double.isInfinite(value)) {
+                return "infinity";
+            }
+            return String.format(java.util.Locale.ROOT, "%.1f", value);
         }
     }
 

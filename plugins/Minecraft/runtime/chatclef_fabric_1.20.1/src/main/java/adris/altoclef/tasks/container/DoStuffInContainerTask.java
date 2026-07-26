@@ -12,8 +12,10 @@ import adris.altoclef.util.helpers.BaritoneHelper;
 import adris.altoclef.util.helpers.ItemHelper;
 import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.helpers.WorldHelper;
+import adris.altoclef.util.logging.StateChangeLogger;
 import adris.altoclef.util.slots.Slot;
 import adris.altoclef.util.time.TimerGame;
+import net.minecraft.item.ItemStack;
 import net.minecraft.block.Block;
 import net.minecraft.screen.slot.SlotActionType;
 import net.minecraft.util.math.BlockPos;
@@ -40,6 +42,7 @@ public abstract class DoStuffInContainerTask extends Task {
     private final TimerGame justPlacedTimer = new TimerGame(3);
     private BlockPos cachedContainerPosition = null;
     private Task openTableTask;
+    private final StateChangeLogger debugLogger = new StateChangeLogger("DoStuffInContainerTask");
 
     public DoStuffInContainerTask(Block[] containerBlocks, ItemTarget containerTarget) {
         this.containerBlocks = containerBlocks;
@@ -62,6 +65,7 @@ public abstract class DoStuffInContainerTask extends Task {
 
         // Protect container since we might place it.
         mod.getBehaviour().addProtectedItems(ItemHelper.blocksToItems(containerBlocks));
+        debugLogger.event("start: containerTarget=" + containerTarget);
     }
 
     @Override
@@ -70,10 +74,12 @@ public abstract class DoStuffInContainerTask extends Task {
         // If we're placing, keep on placing.
         if (mod.getItemStorage().hasItem(ItemHelper.blocksToItems(containerBlocks)) && placeTask.isActive() && !placeTask.isFinished()) {
             setDebugState("Placing container");
+            debugLogger.state("continue placing container: placed=" + describePos(placeTask.getPlaced()));
             return placeTask;
         }
 
         if (isContainerOpen(mod)) {
+            debugLogger.state("container open: targetPosition=" + describePos(cachedContainerPosition));
             return containerSubTask(mod);
         }
 
@@ -117,10 +123,19 @@ public abstract class DoStuffInContainerTask extends Task {
             // Get if we don't have...
             if (!mod.getItemStorage().hasItem(containerTarget)) {
                 setDebugState("Getting container item");
+                debugLogger.state("get container item: target=" + containerTarget
+                        + ", nearest=" + describeOptionalPos(nearest)
+                        + ", walkCost=" + formatDouble(costToWalk)
+                        + ", makeCost=" + formatDouble(getCostToMakeNew(mod)));
                 return TaskCatalogue.getItemTask(containerTarget);
             }
 
             setDebugState("Placing container...");
+            debugLogger.state("place new container: target=" + containerTarget
+                    + ", nearest=" + describeOptionalPos(nearest)
+                    + ", walkCost=" + formatDouble(costToWalk)
+                    + ", makeCost=" + formatDouble(getCostToMakeNew(mod))
+                    + ", previousPlaced=" + describePos(placeTask.getPlaced()));
 
             justPlacedTimer.reset();
             // Now place!
@@ -136,11 +151,16 @@ public abstract class DoStuffInContainerTask extends Task {
         // Wait for food
         if (mod.getFoodChain().needsToEat()) {
             setDebugState("Waiting for eating...");
+            debugLogger.state("wait for eating before opening container: targetPosition=" + describePos(cachedContainerPosition));
             return null;
         }
         setDebugState("Walking to container... " + nearest.get().toShortString());
+        debugLogger.state("walk/open container: targetPosition=" + nearest.get().toShortString()
+                + ", walkCost=" + formatDouble(costToWalk)
+                + ", makeCost=" + formatDouble(getCostToMakeNew(mod)));
 
         if (!StorageHelper.getItemStackInCursorSlot().isEmpty()) {
+            debugLogger.state("clear cursor before opening container: cursor=" + describeStack(StorageHelper.getItemStackInCursorSlot()));
             Optional<Slot> toMoveTo = mod.getItemStorage().getSlotThatCanFitInPlayerInventory(StorageHelper.getItemStackInCursorSlot(), false);
             if (toMoveTo.isEmpty()) {
                 return new EnsureFreeInventorySlotTask();
@@ -196,4 +216,26 @@ public abstract class DoStuffInContainerTask extends Task {
     protected abstract Task containerSubTask(AltoClef mod);
 
     protected abstract double getCostToMakeNew(AltoClef mod);
+
+    private String describeOptionalPos(Optional<BlockPos> pos) {
+        return pos.map(BlockPos::toShortString).orElse("none");
+    }
+
+    private String describePos(BlockPos pos) {
+        return pos == null ? "none" : pos.toShortString();
+    }
+
+    private String describeStack(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return "empty";
+        }
+        return stack.getItem().getTranslationKey() + " x " + stack.getCount();
+    }
+
+    private String formatDouble(double value) {
+        if (Double.isInfinite(value)) {
+            return "infinity";
+        }
+        return String.format(java.util.Locale.ROOT, "%.1f", value);
+    }
 }

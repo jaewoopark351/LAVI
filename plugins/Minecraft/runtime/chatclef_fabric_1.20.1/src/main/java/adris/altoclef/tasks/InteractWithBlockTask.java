@@ -13,6 +13,7 @@ import adris.altoclef.util.helpers.ItemHelper;
 import adris.altoclef.util.helpers.LookHelper;
 import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.helpers.WorldHelper;
+import adris.altoclef.util.logging.StateChangeLogger;
 import adris.altoclef.util.progresscheck.MovementProgressChecker;
 import adris.altoclef.util.slots.Slot;
 import adris.altoclef.util.time.TimerGame;
@@ -68,6 +69,7 @@ public class InteractWithBlockTask extends Task {
     private Task unstuckTask = null;
     private ClickResponse cachedClickStatus = ClickResponse.CANT_REACH;
     private int waitingForClickTicks = 0;
+    private final StateChangeLogger debugLogger = new StateChangeLogger("InteractWithBlockTask");
 
     public InteractWithBlockTask(ItemTarget toUse, Direction direction, BlockPos target, Input interactInput, boolean walkInto, Vec3i interactOffset, boolean shiftClick) {
         this.toUse = toUse;
@@ -229,6 +231,10 @@ public class InteractWithBlockTask extends Task {
         stuckCheck.reset();
         wanderTask.resetWander();
         clickTimer.reset();
+        debugLogger.event("start: target=" + target.toShortString()
+                + ", toUse=" + toUse
+                + ", direction=" + direction
+                + ", shiftClick=" + shiftClick);
     }
 
     @Override
@@ -279,6 +285,7 @@ public class InteractWithBlockTask extends Task {
         if (!ItemTarget.nullOrEmpty(toUse) && !StorageHelper.itemTargetsMet(mod, toUse)) {
             moveChecker.reset();
             clickTimer.reset();
+            debugLogger.state("get interact item: target=" + target.toShortString() + ", item=" + toUse);
             return TaskCatalogue.getItemTask(toUse);
         }
 
@@ -286,10 +293,12 @@ public class InteractWithBlockTask extends Task {
         if (wanderTask.isActive() && !wanderTask.isFinished()) {
             moveChecker.reset();
             clickTimer.reset();
+            debugLogger.state("wander before interact retry: target=" + target.toShortString());
             return wanderTask;
         }
         if (!moveChecker.check(mod)) {
             Debug.logMessage("Failed, blacklisting and wandering.");
+            debugLogger.state("interact movement failed; blacklisting target=" + target.toShortString());
             mod.getBlockScanner().requestBlockUnreachable(target);
             return wanderTask;
         }
@@ -385,13 +394,18 @@ public class InteractWithBlockTask extends Task {
 
         // Don't interact if baritone can't interact.
         if (mod.getExtraBaritoneSettings().isInteractionPaused() || mod.getFoodChain().needsToEat() ||
-                mod.getPlayer().isBlocking())
+                mod.getPlayer().isBlocking()) {
+            debugLogger.state("right click paused: interactionPaused=" + mod.getExtraBaritoneSettings().isInteractionPaused()
+                    + ", needsToEat=" + mod.getFoodChain().needsToEat()
+                    + ", blocking=" + mod.getPlayer().isBlocking());
             return ClickResponse.WAIT_FOR_CLICK;
+        }
 
         // We can't interact while a screen is open.
         if (!StorageHelper.isPlayerInventoryOpen()) {
             ItemStack cursorStack = StorageHelper.getItemStackInCursorSlot();
             if (!cursorStack.isEmpty()) {
+                debugLogger.state("right click delayed: clearing cursor=" + describeStack(cursorStack));
                 Optional<Slot> moveTo = mod.getItemStorage().getSlotThatCanFitInPlayerInventory(cursorStack, false);
                 if (moveTo.isPresent()) {
                     mod.getSlotHandler().clickSlot(moveTo.get(), 0, SlotActionType.PICKUP);
@@ -410,6 +424,7 @@ public class InteractWithBlockTask extends Task {
                 mod.getSlotHandler().clickSlot(Slot.UNDEFINED, 0, SlotActionType.PICKUP);
                 return ClickResponse.WAIT_FOR_CLICK;
             } else {
+                debugLogger.state("right click delayed: closing open screen before interacting");
                 StorageHelper.closeScreen();
             }
         }
@@ -422,6 +437,9 @@ public class InteractWithBlockTask extends Task {
                 } else {
                     mod.getSlotHandler().forceDeequipRightClickableItem();
                 }
+                debugLogger.state("right click pressing input: target=" + target.toShortString()
+                        + ", input=" + interactInput
+                        + ", shiftClick=" + shiftClick);
                 mod.getInputControls().tryPress(interactInput);
                 if (mod.getInputControls().isHeldDown(interactInput)) {
                     if (shiftClick) {
@@ -431,6 +449,7 @@ public class InteractWithBlockTask extends Task {
                 }
                 //mod.getClientBaritone().getInputOverrideHandler().setInputForceState(_interactInput, true);
             } else {
+                debugLogger.state("right click delayed: looking at reachable rotation for target=" + target.toShortString());
                 LookHelper.lookAt(reachable.get());
             }
             return ClickResponse.WAIT_FOR_CLICK;
@@ -438,6 +457,7 @@ public class InteractWithBlockTask extends Task {
         if (shiftClick) {
             mod.getInputControls().release(Input.SNEAK);
         }
+        debugLogger.state("right click cannot reach target=" + target.toShortString() + ", direction=" + direction);
         return ClickResponse.CANT_REACH;
     }
 
@@ -449,5 +469,12 @@ public class InteractWithBlockTask extends Task {
         CANT_REACH,
         WAIT_FOR_CLICK,
         CLICK_ATTEMPTED
+    }
+
+    private String describeStack(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return "empty";
+        }
+        return stack.getItem().getTranslationKey() + " x " + stack.getCount();
     }
 }

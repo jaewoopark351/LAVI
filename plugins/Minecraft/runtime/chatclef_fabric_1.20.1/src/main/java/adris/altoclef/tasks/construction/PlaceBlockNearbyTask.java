@@ -12,6 +12,7 @@ import adris.altoclef.util.helpers.ItemHelper;
 import adris.altoclef.util.helpers.LookHelper;
 import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.helpers.WorldHelper;
+import adris.altoclef.util.logging.StateChangeLogger;
 import adris.altoclef.util.progresscheck.MovementProgressChecker;
 import adris.altoclef.util.time.TimerGame;
 import baritone.api.utils.IPlayerContext;
@@ -48,6 +49,7 @@ public class PlaceBlockNearbyTask extends Task {
     private BlockPos tryPlace;   // Where we should TRY placing a block.
     // Oof, necesarry for the onBlockPlaced action.
     private Subscription<BlockPlaceEvent> _onBlockPlaced;
+    private final StateChangeLogger debugLogger = new StateChangeLogger("PlaceBlockNearbyTask");
 
     public PlaceBlockNearbyTask(Predicate<BlockPos> canPlaceHere, Block... toPlace) {
         this.toPlace = toPlace;
@@ -62,10 +64,12 @@ public class PlaceBlockNearbyTask extends Task {
     protected void onStart() {
         progressChecker.reset();
         AltoClef.getInstance().getClientBaritone().getInputOverrideHandler().setInputForceState(Input.CLICK_RIGHT, false);
+        debugLogger.event("start: blocks=" + Arrays.toString(toPlace));
 
         // Check for blocks being placed
         _onBlockPlaced = EventBus.subscribe(BlockPlaceEvent.class, evt -> {
             if (ArrayUtils.contains(toPlace, evt.blockState.getBlock())) {
+                debugLogger.event("block placed event: block=" + evt.blockState.getBlock().getTranslationKey());
                 stopPlacing();
             }
         });
@@ -88,6 +92,7 @@ public class PlaceBlockNearbyTask extends Task {
         // Close screen first
         ItemStack cursorStack = StorageHelper.getItemStackInCursorSlot();
         if (!cursorStack.isEmpty()) {
+            debugLogger.state("cursor occupied while placing: cursor=" + describeStack(cursorStack));
            /* Optional<Slot> moveTo = mod.getItemStorage().getSlotThatCanFitInPlayerInventory(cursorStack, false);
             if (moveTo.isPresent()) {
                 mod.getSlotHandler().clickSlot(moveTo.get(), 0, SlotActionType.PICKUP);
@@ -116,18 +121,24 @@ public class PlaceBlockNearbyTask extends Task {
                 if (place(mod, current)) {
                     return null;
                 }
+            } else {
+                debugLogger.state("place blocked: could not equip block; target=" + current.toShortString());
             }
         }
 
         // Wander while we can.
         if (wander.isActive() && !wander.isFinished()) {
             setDebugState("Wandering, will try to place again later.");
+            debugLogger.state("wander before retrying place: tryPlace=" + describePos(tryPlace)
+                    + ", justPlaced=" + describePos(justPlaced));
             progressChecker.reset();
             return wander;
         }
         // Fail check
         if (!progressChecker.check(mod)) {
             Debug.logMessage("Failed placing, wandering and trying again.");
+            debugLogger.state("placing progress failed: tryPlace=" + describePos(tryPlace)
+                    + ", justPlaced=" + describePos(justPlaced));
             LookHelper.randomOrientation();
             if (tryPlace != null) {
                 mod.getBlockScanner().requestBlockUnreachable(tryPlace);
@@ -142,6 +153,7 @@ public class PlaceBlockNearbyTask extends Task {
         }
         if (tryPlace != null) {
             setDebugState("Trying to place at " + tryPlace);
+            debugLogger.state("try planned place: target=" + tryPlace.toShortString());
             justPlaced = tryPlace;
             return new PlaceBlockTask(tryPlace, toPlace);
         }
@@ -153,6 +165,7 @@ public class PlaceBlockNearbyTask extends Task {
         }
 
         setDebugState("Wandering until we randomly place or find a good place spot.");
+        debugLogger.state("no valid place position found; random looking");
         return new TimeoutWanderTask();
     }
 
@@ -219,15 +232,20 @@ public class PlaceBlockNearbyTask extends Task {
             // TODO: Helper lol
             HitResult mouseOver = MinecraftClient.getInstance().crosshairTarget;
             if (mouseOver == null || mouseOver.getType() != HitResult.Type.BLOCK) {
+                debugLogger.state("place aborted: crosshair target is not a block; mouseOver=" + mouseOver);
                 return false;
             }
             Hand hand = Hand.MAIN_HAND;
             assert MinecraftClient.getInstance().interactionManager != null;
-            if (MinecraftClient.getInstance().interactionManager.interactBlock(mod.getPlayer(),hand, (BlockHitResult) mouseOver) == ActionResult.SUCCESS &&
-                    mod.getPlayer().isSneaking()) {
+            ActionResult result = MinecraftClient.getInstance().interactionManager.interactBlock(mod.getPlayer(),hand, (BlockHitResult) mouseOver);
+            debugLogger.state("place click attempted: target=" + targetPlace.toShortString()
+                    + ", result=" + result
+                    + ", sneaking=" + mod.getPlayer().isSneaking());
+            if (result == ActionResult.SUCCESS && mod.getPlayer().isSneaking()) {
                 mod.getPlayer().swingHand(hand);
                 justPlaced = targetPlace;
                 Debug.logMessage("PRESSED");
+                debugLogger.event("place click succeeded: target=" + targetPlace.toShortString());
                 return true;
             }
 
@@ -235,6 +253,8 @@ public class PlaceBlockNearbyTask extends Task {
             //mod.getClientBaritone().getInputOverrideHandler().setInputForceState(Input.CLICK_RIGHT, true);
             return true;
         }
+        debugLogger.state("place blocked: interactionPaused=" + mod.getExtraBaritoneSettings().isInteractionPaused()
+                + ", equipped=" + blockEquipped());
         return false;
     }
 
@@ -243,6 +263,17 @@ public class PlaceBlockNearbyTask extends Task {
         //mod.getControllerExtras().mouseClickOverride(1, false);
         // Oof, these sometimes cause issues so this is a bit of a duct tape fix.
         AltoClef.getInstance().getClientBaritone().getBuilderProcess().onLostControl();
+    }
+
+    private String describePos(BlockPos pos) {
+        return pos == null ? "none" : pos.toShortString();
+    }
+
+    private String describeStack(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return "empty";
+        }
+        return stack.getItem().getTranslationKey() + " x " + stack.getCount();
     }
 
     private BlockPos locateClosePlacePos(AltoClef mod) {

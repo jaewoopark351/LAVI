@@ -18,6 +18,7 @@ import adris.altoclef.util.RecipeTarget;
 import adris.altoclef.util.SmeltTarget;
 import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.helpers.WorldHelper;
+import adris.altoclef.util.logging.StateChangeLogger;
 import adris.altoclef.util.slots.Slot;
 import adris.altoclef.util.slots.SmokerSlot;
 import adris.altoclef.util.time.TimerGame;
@@ -36,6 +37,7 @@ import net.minecraft.screen.SmokerScreenHandler;
 import net.minecraft.util.math.BlockPos;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Predicate;
@@ -70,6 +72,7 @@ public class CollectFoodTask extends Task {
     private SmeltInSmokerTask smeltTask = null;
     private Item smeltRawMaterial = null;
     private Task currentResourceTask = null;
+    private final StateChangeLogger debugLogger = new StateChangeLogger("CollectFoodTask");
 
     public CollectFoodTask(double unitsNeeded) {
         this.unitsNeeded = unitsNeeded;
@@ -138,6 +141,7 @@ public class CollectFoodTask extends Task {
         }
          */
         mod.getBehaviour().addProtectedItems(Items.HAY_BLOCK, Items.SWEET_BERRIES);
+        debugLogger.event("start: targetUnits=" + formatDouble(unitsNeeded) + ", " + describeFoodResources(mod));
     }
 
     @Override
@@ -158,9 +162,11 @@ public class CollectFoodTask extends Task {
         if (smeltTask != null && smeltTask.isActive() && !smeltTask.isFinished()) {
             // If we don't have cooking materials, cancel.
             if (!mod.getItemStorage().hasItemScreen(smeltRawMaterial)) {
+                debugLogger.state("cancel smelting: missing raw material=" + describeItem(smeltRawMaterial));
                 smeltTask = null;
             } else {
                 setDebugState("Cooking...");
+                debugLogger.state("continue smelting: raw=" + describeItem(smeltRawMaterial) + ", " + describeFoodResources(mod));
                 return smeltTask;    
             }
         }
@@ -172,6 +178,7 @@ public class CollectFoodTask extends Task {
         }
 
         if (currentResourceTask != null && currentResourceTask.isActive() && !currentResourceTask.isFinished() && !currentResourceTask.thisOrChildAreTimedOut()) {
+            debugLogger.state("continue subtask: " + describeTask(currentResourceTask) + ", " + describeFoodResources(mod));
             return currentResourceTask;
         }
 
@@ -186,6 +193,7 @@ public class CollectFoodTask extends Task {
             // Convert Hay+Wheat -> Bread
             if (mod.getItemStorage().getItemCount(Items.WHEAT) >= 3) {
                 setDebugState("Crafting Bread");
+                debugLogger.state("craft bread: " + describeFoodResources(mod));
                 Item[] w = new Item[]{Items.WHEAT};
                 Item[] o = null;
                 // jank
@@ -194,6 +202,7 @@ public class CollectFoodTask extends Task {
             }
             if (mod.getItemStorage().getItemCount(Items.HAY_BLOCK) >= 1) {
                 setDebugState("Crafting Wheat");
+                debugLogger.state("craft wheat from hay: " + describeFoodResources(mod));
                 Item[] o = null;
                 currentResourceTask = new CraftInInventoryTask(new RecipeTarget(Items.WHEAT, 99999999, CraftingRecipe.newShapedRecipe("wheat", new Item[][]{new Item[]{Items.HAY_BLOCK}, o, o, o}, 9)), false, false);
                 return currentResourceTask;
@@ -211,6 +220,9 @@ public class CollectFoodTask extends Task {
             //         return smeltTask;
             //     }
             // }
+            if (getTotalRawFoodCount(mod) > 0) {
+                debugLogger.state("raw food present but cooking branch is disabled here: " + describeFoodResources(mod));
+            }
         }
         
         {
@@ -219,6 +231,7 @@ public class CollectFoodTask extends Task {
                 Task t = this.pickupTaskOrNull(mod, item);
                 if (t != null) {
                     setDebugState("Picking up Food: " + item.getTranslationKey());
+                    debugLogger.state("pickup ready food: item=" + item.getTranslationKey() + ", " + describeFoodResources(mod));
                     currentResourceTask = t;
                     return currentResourceTask;
                 }
@@ -229,6 +242,9 @@ public class CollectFoodTask extends Task {
                 if (t == null) t = this.pickupTaskOrNull(mod, cookable.getCooked(), 40);
                 if (t != null) {
                     setDebugState("Picking up Cookable food");
+                    debugLogger.state("pickup cookable food: raw=" + cookable.getRaw().getTranslationKey()
+                            + ", cooked=" + cookable.getCooked().getTranslationKey()
+                            + ", " + describeFoodResources(mod));
                     currentResourceTask = t;
                     return currentResourceTask;
                 }
@@ -237,6 +253,7 @@ public class CollectFoodTask extends Task {
             Task hayTaskBlock = this.pickupBlockTaskOrNull(mod, Blocks.HAY_BLOCK, Items.HAY_BLOCK, 300);
             if (hayTaskBlock != null) {
                 setDebugState("Collecting Hay");
+                debugLogger.state("collect hay: " + describeFoodResources(mod));
                 currentResourceTask = hayTaskBlock;
                 return currentResourceTask;
             }
@@ -264,6 +281,7 @@ public class CollectFoodTask extends Task {
                 }), 96);
                 if (t != null) {
                     setDebugState("Harvesting " + target.cropItem.getTranslationKey());
+                    debugLogger.state("harvest crop: item=" + target.cropItem.getTranslationKey() + ", " + describeFoodResources(mod));
                     currentResourceTask = t;
                     return currentResourceTask;
                 }
@@ -293,6 +311,10 @@ public class CollectFoodTask extends Task {
             }
             if (bestEntity != null) {
                 setDebugState("Killing " + bestEntity.getType().getTranslationKey() + " ??? " + bestEntity.isAlive());
+                debugLogger.state("hunt mob: entity=" + bestEntity.getType().getTranslationKey()
+                        + ", raw=" + bestRawFood.getTranslationKey()
+                        + ", score=" + formatDouble(bestScore)
+                        + ", " + describeFoodResources(mod));
                 currentResourceTask = killTaskOrNull(bestEntity, notBaby, bestRawFood);
                 return currentResourceTask;
             }
@@ -301,6 +323,7 @@ public class CollectFoodTask extends Task {
             Task berryPickup = pickupBlockTaskOrNull(mod, Blocks.SWEET_BERRY_BUSH, Items.SWEET_BERRIES, 96);
             if (berryPickup != null) {
                 setDebugState("Getting sweet berries (no better foods are present)");
+                debugLogger.state("collect sweet berries: " + describeFoodResources(mod));
                 currentResourceTask = berryPickup;
                 return currentResourceTask;
             }
@@ -308,6 +331,9 @@ public class CollectFoodTask extends Task {
 
         // Look for food.
         setDebugState("Searching...");
+        debugLogger.state("searching for food: potential=" + formatDouble(potentialFood)
+                + ", target=" + formatDouble(unitsNeeded)
+                + ", " + describeFoodResources(mod));
         return new TimeoutWanderTask();
     }
 
@@ -423,7 +449,13 @@ public class CollectFoodTask extends Task {
                             }
                             int groundCost = (int) (hunger * nearestDrop.get().getStack().getCount());
 
-                            if (inventoryCost > groundCost) return null;
+                            if (inventoryCost > groundCost) {
+                                debugLogger.state("skip pickup: inventory food is more valuable than ground item; item="
+                                        + itemToGrab.getTranslationKey()
+                                        + ", inventoryCost=" + inventoryCost
+                                        + ", groundCost=" + groundCost);
+                                return null;
+                            }
                         }
                     }
                 }
@@ -435,6 +467,51 @@ public class CollectFoodTask extends Task {
 
     private Task pickupTaskOrNull(AltoClef mod, Item itemToGrab) {
         return pickupTaskOrNull(mod, itemToGrab, Double.POSITIVE_INFINITY);
+    }
+
+    private String describeTask(Task task) {
+        return task == null ? "none" : task.getClass().getSimpleName() + "{" + task + "}";
+    }
+
+    private String describeItem(Item item) {
+        return item == null ? "null" : item.getTranslationKey();
+    }
+
+    private String describeFoodResources(AltoClef mod) {
+        return "readyScore=" + StorageHelper.calculateInventoryFoodScore()
+                + ", potential=" + formatDouble(calculateFoodPotential(mod))
+                + ", raw=" + describeCookableCounts(mod, true)
+                + ", cooked=" + describeCookableCounts(mod, false)
+                + ", wheat=" + mod.getItemStorage().getItemCount(Items.WHEAT)
+                + ", hay=" + mod.getItemStorage().getItemCount(Items.HAY_BLOCK);
+    }
+
+    private int getTotalRawFoodCount(AltoClef mod) {
+        int total = 0;
+        for (CookableFoodTarget cookable : COOKABLE_FOODS) {
+            total += mod.getItemStorage().getItemCount(cookable.getRaw());
+        }
+        return total;
+    }
+
+    private String describeCookableCounts(AltoClef mod, boolean raw) {
+        StringBuilder result = new StringBuilder();
+        for (CookableFoodTarget cookable : COOKABLE_FOODS) {
+            Item item = raw ? cookable.getRaw() : cookable.getCooked();
+            int count = mod.getItemStorage().getItemCount(item);
+            if (count <= 0) {
+                continue;
+            }
+            if (result.length() > 0) {
+                result.append(", ");
+            }
+            result.append(item.getTranslationKey()).append("=").append(count);
+        }
+        return result.length() == 0 ? "none" : result.toString();
+    }
+
+    private String formatDouble(double value) {
+        return String.format(Locale.ROOT, "%.1f", value);
     }
 
     @SuppressWarnings("rawtypes")
