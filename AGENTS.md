@@ -1948,7 +1948,413 @@ Do not combine file separation with unrelated feature work or large architectura
 ---
 
 
-## 29.3 Game Extension Migration Rule
+## 29.3 Inheritance and Common Base Class Rule
+
+Inheritance must be actively considered when multiple project classes share the same stable responsibility, lifecycle, validation flow, execution sequence, or error-handling template.
+
+Do not repeatedly copy the same control flow into sibling classes when the differences can be expressed as small subclass-specific steps.
+
+### Mandatory Inheritance Evaluation Trigger
+
+Before adding or modifying a second class with behavior similar to an existing class, Codex must compare the classes and determine whether they share:
+
+* the same public operation or lifecycle
+* the same ordered execution steps
+* the same validation, permission, retry, logging, cleanup, or error-handling flow
+* the same constructor dependencies
+* the same result conversion or response-building flow
+* differences limited to an action name, endpoint, command prefix, strategy hook, payload type, or one small execution step
+
+If two or more concrete classes share a stable algorithm or control-flow skeleton, Codex must evaluate a common abstract base class before adding more duplicated logic.
+
+If three or more classes already repeat the same skeleton, Codex must not add another copied implementation. It must first extract or extend a common base class unless doing so would violate substitutability, create an unsafe dependency, or break compatibility.
+
+This evaluation is required even when the current duplicated methods are individually short.
+
+### Preferred Inheritance Pattern: Template Method
+
+Use the Template Method pattern when the overall algorithm must remain consistent but one or more steps vary by implementation.
+
+The base class should:
+
+* own the stable public execution method
+* enforce shared ordering and invariants
+* perform common validation, permission checks, logging, retry, cleanup, and response conversion
+* expose only the smallest necessary protected or abstract hooks
+* keep subclass-specific logic out of the shared algorithm
+
+The subclass should:
+
+* declare its domain-specific identity clearly
+* override only the variable step or steps
+* avoid reimplementing the complete public algorithm
+* remain substitutable anywhere the base type is accepted
+
+Python example:
+
+```python
+from abc import ABC, abstractmethod
+from typing import ClassVar
+
+
+class MinecraftVerifiedItemActionBase(ABC):
+    action_name: ClassVar[str]
+
+    def run(self, item: str, count: int):
+        blocked = self._permission_guard.blocked_response(self.action_name)
+        if blocked is not None:
+            return blocked
+
+        validation = self._validator.validate(self.action_name, item, count)
+        if validation is not None:
+            return validation
+
+        return self._verified_runner.run(
+            action=self.action_name,
+            item=item,
+            count=count,
+            submit=lambda: self._submit(item, count),
+        )
+
+    @abstractmethod
+    def _submit(self, item: str, count: int):
+        raise NotImplementedError
+```
+
+```python
+class MinecraftCraftAction(MinecraftVerifiedItemActionBase):
+    action_name = "craft"
+
+    def _submit(self, item: str, count: int):
+        return self._client.craft(item, count)
+```
+
+In this structure, permission checks, validation, verified execution, and result handling belong to the base class. Only the bridge operation belongs to the subclass.
+
+### ABC, Interface, and Protocol Selection
+
+Choose the contract type deliberately.
+
+Use an abstract base class when:
+
+* subclasses have a real `is-a` relationship
+* shared implementation or state is required
+* a stable execution template must be enforced
+* subclasses must override one or more well-defined hooks
+* duplicated behavior would otherwise exist in every implementation
+
+Use a `Protocol`, interface, or pure abstract contract when:
+
+* only a callable or behavioral contract is required
+* implementations may be structurally unrelated
+* shared implementation is not appropriate
+* dependency inversion across plugins, adapters, extensions, or infrastructure boundaries is the primary goal
+
+A Python `Protocol` provides a structural contract but does not remove duplicated implementation by itself.
+If sibling classes implement the same `Protocol` and also duplicate the same algorithm, keep the `Protocol` for the external contract and add an abstract base class for the shared implementation when appropriate.
+
+Example relationship:
+
+```text
+MinecraftCommandHandler Protocol
+    <- external handler contract
+
+MinecraftItemCommandHandlerBase ABC
+    <- shared parsing, validation, and response flow
+
+MinecraftCraftCommandHandler
+MinecraftEquipCommandHandler
+    <- domain-specific implementations
+```
+
+### Inheritance Versus Composition Decision Rule
+
+Inheritance and composition are both valid, but they solve different problems.
+
+Prefer inheritance when:
+
+* the subtype is a specialized form of the base type
+* the shared algorithm must not be reordered by each implementation
+* subclass identity is meaningful in logs, registration, testing, or public APIs
+* most behavior is invariant and only a small hook varies
+* preserving named domain classes improves readability and traceability
+
+Prefer composition, delegation, or strategy objects when:
+
+* behavior must be selected or replaced at runtime
+* collaborators have independent lifecycles
+* there is no true `is-a` relationship
+* only a utility function or isolated operation is shared
+* multiple independent capabilities must be combined
+* inheritance would expose unrelated protected state or methods
+
+Do not use composition merely to avoid inheritance when it causes every sibling class to duplicate the same orchestration flow.
+
+Do not use inheritance merely to share a few unrelated helper functions. Extract a focused function or collaborator instead.
+
+### Preserve Domain-Specific Classes
+
+Do not collapse several meaningful domain classes into one overly generic configurable class solely to reduce the class count.
+
+Prefer thin subclasses when separate class identities are useful for:
+
+* dependency injection wiring
+* command or action registration
+* plugin discovery
+* logging and diagnostics
+* tests and mocks
+* public imports
+* future subclass-specific behavior
+* human-readable architecture
+
+For example, these named classes may remain separate:
+
+```text
+MinecraftCraftAction
+MinecraftGetItemAction
+MinecraftGetAndEquipAction
+```
+
+while inheriting their common execution flow from:
+
+```text
+MinecraftVerifiedItemActionBase
+```
+
+A generic class such as `ConfiguredAction(action_name, callback)` is acceptable only when the objects have no meaningful independent domain identity and the generic form is clearly easier to understand.
+
+### Base Class Design Rules
+
+A shared base class must have one clear responsibility.
+
+Required rules:
+
+* Give the base class a name that describes the shared domain role, not a vague name such as `Base`, `Common`, `HelperBase`, or `ManagerBase`.
+* Prefer names such as `MinecraftVerifiedItemActionBase`, `MinecraftPrefixCandidateSelectorBase`, or `GameExtensionBase`.
+* Keep public behavior in the base class and variable behavior behind protected or abstract methods.
+* Keep abstract hooks small and purpose-specific.
+* Do not make subclasses override a method only to copy most of the base implementation.
+* Do not require subclasses to know the internal ordering of the template algorithm.
+* Do not expose mutable base-class state unless subclasses genuinely require it.
+* Prefer constructor injection for shared dependencies.
+* Document invariants that subclasses must preserve.
+* Use `final` or language-equivalent restrictions when a template method must not be overridden and the language/project supports it safely.
+* Do not add unrelated responsibilities to a base class because multiple subclasses happen to need them.
+
+### Substitutability Rule
+
+Every subclass must obey the behavioral contract of its base class.
+
+A subclass must not:
+
+* weaken required validation or permission checks
+* change the meaning of an inherited public method
+* return an incompatible result shape
+* require callers to perform subtype-specific preconditions not required by the base type
+* silently skip shared logging, cleanup, retry, or error handling
+* raise new unexpected exceptions for normal inputs accepted by the base contract
+
+If a proposed subclass cannot follow the base contract, it is not a valid subtype. Use composition or a separate hierarchy instead.
+
+### Language-Specific Inheritance Rules
+
+Apply the same design rule using the language's native mechanism.
+
+* Python: use `ABC` and `@abstractmethod` when shared implementation and enforced hooks are required. Keep `Protocol` for structural contracts.
+* TypeScript: use an `abstract class` for shared implementation and `protected abstract` hooks. Use an `interface` when only the external contract is required.
+* Java: use an `abstract class` for the template implementation and abstract methods for variable steps. Mark the template method `final` when subclasses must not replace the algorithm.
+* C++: use an abstract base class with pure virtual hooks and a virtual destructor. Keep ownership explicit and avoid deep virtual hierarchies.
+* C: C has no class inheritance. Use a focused interface struct with function pointers, an explicit context pointer, and shared non-virtual functions for the stable execution template.
+
+TypeScript example:
+
+```typescript
+//YYYYMMDD_kpopmodder: Added this abstract action to centralize verified item-action execution.
+abstract class MinecraftVerifiedItemActionBase {
+  protected abstract readonly actionName: string
+
+  public async run(item: string, count: number): Promise<ActionResult> {
+    const blocked = this.permissionGuard.blockedResponse(this.actionName)
+    if (blocked !== null) {
+      return blocked
+    }
+
+    const validation = this.validator.validate(this.actionName, item, count)
+    if (validation !== null) {
+      return validation
+    }
+
+    return this.verifiedRunner.run({
+      action: this.actionName,
+      item,
+      count,
+      submit: () => this.submit(item, count),
+    })
+  }
+
+  protected abstract submit(item: string, count: number): Promise<ActionResult>
+}
+```
+
+Do not simulate inheritance with repeated wrapper classes that each copy the same public method.
+Do not replace a useful abstract base class with an interface plus duplicated implementations merely to claim that the code uses composition.
+
+### Inheritance Depth and Multiple Inheritance
+
+Keep inheritance shallow.
+
+Preferred structure:
+
+```text
+interface or Protocol
+    -> abstract base class
+        -> concrete implementation
+```
+
+Prefer one abstract implementation level and one concrete subclass level.
+Do not add deeper inheritance chains without a clear written justification.
+
+Avoid multiple inheritance for production behavior.
+Multiple inheritance is allowed only for small, stateless, clearly named mixins whose responsibilities do not overlap and whose method-resolution order is obvious.
+
+Do not use mixins to bypass the one-primary-responsibility rule or to assemble a hidden large class from many unrelated behaviors.
+
+### File and Folder Placement
+
+A reusable abstract base class is an independent project type and must follow the one-class-per-file rule.
+
+Python examples:
+
+```text
+plugins/Minecraft/minecraft_core/actions/base/
+    minecraft_verified_item_action_base.py
+
+plugins/Minecraft/minecraft_core/actions/
+    minecraft_craft_action.py
+    minecraft_get_item_action.py
+    minecraft_get_and_equip_action.py
+```
+
+Folder placement must follow the existing component structure.
+Do not create a `base/` folder automatically when the component has only one base class and an existing responsibility-oriented folder is already clear.
+
+Acceptable alternatives include:
+
+```text
+plugins/Minecraft/minecraft_core/actions/minecraft_verified_item_action_base.py
+```
+
+or a focused contract folder when multiple related contracts exist:
+
+```text
+plugins/Minecraft/minecraft_core/actions/contracts/
+    minecraft_item_action.py
+    minecraft_verified_item_action_base.py
+```
+
+Do not create repository-wide dumping grounds such as:
+
+```text
+base_classes/
+abstracts/
+inheritance/
+common_bases/
+```
+
+### Refactoring Existing Duplicate Implementations
+
+When converting existing sibling classes to inheritance, Codex must:
+
+1. List the duplicate public flow shared by the classes.
+2. Separate invariant steps from subclass-specific steps.
+3. Explain why the subclasses satisfy an `is-a` relationship.
+4. Propose the exact base class and subclass file paths.
+5. Preserve existing public class names, methods, constructor compatibility, imports, registration keys, configuration keys, and response shapes.
+6. Move only the shared behavior into the base class.
+7. Keep specialized behavior in the concrete subclass.
+8. Avoid unrelated cleanup or renaming in the same change.
+9. Add or update tests for both the shared base behavior and every subclass hook.
+10. Search for direct construction, mocks, patch targets, registries, and dynamic imports that reference the original classes.
+
+If constructor compatibility cannot be preserved directly, use a small compatibility adapter or staged migration rather than breaking all call sites at once.
+
+### Required Tests for Inheritance Refactoring
+
+At minimum, test:
+
+* shared validation runs for every subclass
+* shared permission checks cannot be bypassed
+* the correct subclass hook is called
+* action names, command names, endpoints, or payload types remain correct
+* shared exceptions and cleanup behavior remain unchanged
+* each subclass remains usable through the base contract or interface
+* existing registration and dynamic loading still resolve the concrete class
+* no old duplicated public flow remains in concrete subclasses
+
+Recommended Python checks:
+
+```bat
+python -m compileall <changed_package>
+python -m pytest <smallest_relevant_test_path>
+git diff --check
+```
+
+### Forbidden Inheritance Patterns
+
+Do not:
+
+* create an empty base class with no contract or shared behavior
+* create a base class only because two class names share a suffix
+* move unrelated helpers into a base class
+* use inheritance to access another class's internal state
+* override a template method and replace the entire shared algorithm
+* duplicate the base algorithm inside each subclass
+* create subclass flags that produce many hidden execution branches in the base class
+* use `isinstance` chains in the base class to detect concrete subclasses
+* create a deep hierarchy that makes runtime behavior difficult to trace
+* replace clear domain classes with one large inheritance tree for speculative future reuse
+* introduce inheritance into stable third-party, vendored, or generated code
+
+### Required Planning Report
+
+Before introducing or changing a production inheritance hierarchy, Codex must report:
+
+```text
+Shared contract:
+- <public operation and expected behavior>
+
+Invariant flow:
+- <steps owned by the base class>
+
+Variable hooks:
+- <steps implemented by subclasses>
+
+Proposed base class:
+- <exact path>: <responsibility>
+
+Concrete subclasses:
+- <exact path>: <specialized behavior>
+
+Why inheritance is valid:
+- <is-a relationship and substitutability explanation>
+
+Compatibility to preserve:
+- constructors
+- public imports
+- registration keys
+- config keys
+- response types
+- dynamic loading paths
+
+Validation:
+- <tests and commands>
+```
+
+If inheritance is rejected after evaluation, Codex must briefly state why composition, delegation, a strategy, a shared function, or a protocol-only contract is safer.
+
+---
+
+## 29.4 Game Extension Migration Rule
 
 New games must be added as `GameExtension` implementations and integrated through `ExtensionRegistry`.
 
@@ -1980,6 +2386,578 @@ When adding exception handling:
 For audio playback and TTS, cleanup should happen even after exceptions.
 
 Use `finally` blocks where appropriate.
+
+---
+
+## 30.1 Null, Nil, Undefined, and Invalid Reference Safety Rule
+
+Null-reference failures are not limited to Java.
+
+Different languages use different names, but the underlying defect is usually the same: code assumes that a value, object, pointer, callback, collection element, dependency, configuration value, or external response exists when it may actually be absent, invalid, uninitialized, or already disposed.
+
+Common manifestations include:
+
+```text
+Java                  NullPointerException
+Kotlin                NullPointerException or failed `!!`
+C#                    NullReferenceException
+Python                AttributeError on None, TypeError from None, or UnboundLocalError
+JavaScript/TypeScript TypeError when reading or calling a property of null/undefined
+C/C++                 null pointer dereference, access violation, segmentation fault, or undefined behavior
+Go                    panic caused by nil pointer dereference or nil interface misuse
+Rust                  panic from unwrap/expect on None, or unsafe raw-pointer misuse
+Swift                 fatal error from unexpectedly unwrapping nil
+Objective-C           silent nil behavior or invalid pointer access
+```
+
+Codex must treat all of these as one broad defect category:
+
+```text
+Null / nil / None / undefined / invalid-reference safety
+```
+
+### Core Rule
+
+Do not assume that a value exists merely because:
+
+* a type annotation says it should exist
+* a constructor parameter is normally supplied
+* a dictionary or map key usually exists
+* a configuration key has a documented default
+* an external API normally returns an object
+* a callback normally returns a value
+* a dependency injection container normally supplies an implementation
+* a parser normally succeeds
+* a UI component normally exists
+* a collection is normally non-empty
+* a background operation normally reaches an assignment
+* validation occurred in another layer
+* a test mock normally behaves like the real implementation
+
+At every trust boundary, determine:
+
+1. Can the value be absent?
+2. Can it be present with the wrong type?
+3. Can creation fail before assignment?
+4. Can reload, shutdown, disposal, callback, async work, or another thread invalidate it?
+5. Does absence mean optional, not found, disabled, pending, failure, or invalid input?
+6. Should the correct behavior be fallback, typed failure, validation error, or fail-fast exception?
+
+Do not add a null check without deciding the correct semantic behavior.
+
+### Mandatory Review Trigger
+
+Perform an explicit null-safety review whenever code involves:
+
+* optional configuration values
+* JSON, YAML, TOML, environment variables, or external settings
+* HTTP, WebSocket, database, subprocess, file, plugin, game bridge, or model responses
+* callbacks and event handlers
+* dependency injection, registries, factories, and plugin loading
+* parser or extractor results
+* dictionary, map, object, or payload lookups
+* collection indexing or first/last element access
+* UI component maps
+* lazy initialization
+* reload, reconnect, shutdown, disposal, or lifecycle transitions
+* background threads, async tasks, futures, queues, or timers
+* variables assigned inside `try`, conditional, loop, callback, or asynchronous branches
+* C/C++ pointers, function pointers, handles, COM pointers, or API output pointers
+* force unwraps, non-null assertions, casts, and untrusted numeric or enum conversions
+
+Review both explicit null-like values and wrong-type values that cause the same failure at the use site.
+
+### Validate at Boundaries
+
+Validate nullable and untrusted values where they enter the owning component.
+
+Preferred boundaries include:
+
+```text
+configuration loader
+HTTP or bridge transport
+database or repository adapter
+parser-result boundary
+composition root
+plugin or action registry
+UI component builder
+callback adapter
+thread or task entry point
+C/C++ API wrapper
+```
+
+Preferred flow:
+
+```text
+untrusted value
+    -> validate and normalize once
+    -> typed domain value or explicit failure
+    -> internal code
+```
+
+Avoid passing raw nullable values through several services and scattering `.get()`, casts, default values, and defensive checks across unrelated modules.
+
+### Absence Must Have One Meaning
+
+Do not use one null-like value to represent several unrelated states.
+
+Avoid using `None`, `null`, `nil`, or `undefined` interchangeably to mean:
+
+```text
+not configured
+not found
+not initialized
+operation failed
+operation pending
+feature disabled
+empty result
+permission denied
+transport disconnected
+invalid input
+```
+
+Use a result type, status enum, error object, or explicit state when callers must distinguish these cases.
+
+Do not return null for an error when the caller requires an error reason.
+
+### Configuration Null Semantics
+
+Configuration handling must distinguish between:
+
+```text
+key absent
+key present with null
+key present with an invalid value
+key present with a valid false, zero, or empty value
+```
+
+Do not automatically convert explicit null to false, zero, an empty string, or an empty collection unless the configuration contract defines that behavior.
+
+Do not use truthiness fallback when false, zero, or an empty value is meaningful.
+
+Avoid:
+
+```python
+count = int(value or 1)
+```
+
+Prefer deliberate handling:
+
+```python
+if value is None:
+    count = 1
+else:
+    count = parse_count(value)
+```
+
+Use a default only when explicit null is documented to mean “use the default.” Otherwise return a validation error.
+
+### Python Rules
+
+Python equivalents commonly appear as:
+
+```text
+AttributeError: 'NoneType' object has no attribute ...
+TypeError caused by None in int(), len(), iteration, arithmetic, or context-manager use
+UnboundLocalError when assignment occurred only in a failed branch
+KeyError or IndexError caused by unsafe assumptions
+```
+
+Required practices:
+
+* Use `Optional[T]` or `T | None` when absence is part of the contract.
+* Narrow optional values before dereferencing them.
+* Do not use `typing.cast()` to hide a real nullability problem.
+* Do not use `assert value is not None` for public or external runtime validation.
+* Initialize variables before conditional or `try` branches when used afterward, or return immediately from failure branches.
+* Validate values returned from callbacks, mocks, transports, plugins, registries, and dynamic imports.
+* Validate dictionary values, not only key presence.
+* Catch `TypeError` and `ValueError` narrowly around untrusted conversions when a typed failure is appropriate.
+* Do not catch `Exception` merely to hide a `None` defect.
+
+Unsafe:
+
+```python
+try:
+    result = extension.handle_command(command)
+except Exception as error:
+    message = format_error(error)
+
+notify(message)
+
+if result.get("pending"):
+    watch(result)
+```
+
+Safe:
+
+```python
+try:
+    result = extension.handle_command(command)
+except Exception as error:
+    notify(format_error(error))
+    return
+
+notify(format_result(result))
+
+if is_pending(result):
+    watch(result)
+```
+
+### Java and Kotlin Rules
+
+Java:
+
+* Do not catch `NullPointerException` as normal control flow.
+* Validate required arguments with `Objects.requireNonNull()` when immediate failure is appropriate.
+* Use `Optional<T>` only when absence is a meaningful return result.
+* Do not return null for collections when an empty immutable collection is the defined result.
+* Validate nullable intermediate values in chained calls.
+* Preserve useful context in null-related errors.
+
+Kotlin:
+
+* Prefer nullable types and explicit handling.
+* Avoid `!!` unless the invariant is locally proven and documented.
+* Validate Java platform types.
+* Use `requireNotNull`, `checkNotNull`, safe calls, Elvis handling, or typed results according to the contract.
+* Do not use `?: default` when null should be invalid.
+
+### C# Rules
+
+* Enable and respect nullable reference types when supported.
+* Do not use the null-forgiving operator `!` merely to silence diagnostics.
+* Validate required constructor arguments and dependency injection results.
+* Use `ArgumentNullException.ThrowIfNull()` or the project equivalent for required public inputs.
+* Use `?.` and `??` only when the fallback is semantically correct.
+* Distinguish absence from operation failure.
+
+### JavaScript and TypeScript Rules
+
+Typical failures include:
+
+```text
+TypeError: Cannot read properties of null
+TypeError: Cannot read properties of undefined
+TypeError: value is not a function
+```
+
+Required practices:
+
+* Enable and respect `strictNullChecks` when supported.
+* Do not use non-null assertion `!` merely to silence the compiler.
+* Do not use optional chaining to hide a missing required dependency.
+* Validate JSON, DOM, IPC, HTTP, plugin, environment-variable, and callback boundaries.
+* Use discriminated unions for success, failure, pending, disabled, and not-found states.
+* Validate both property existence and property type.
+* Check `Map.get()` results before dereferencing.
+* Do not use `value || default` when `0`, `false`, or `""` is valid.
+* Use `value ?? default` only when nullish fallback is the documented behavior.
+
+### C and C++ Rules
+
+A null pointer dereference may cause an access violation, segmentation fault, memory corruption, or undefined behavior.
+
+Required practices:
+
+* Validate nullable raw pointers before dereferencing them.
+* Initialize pointers and handles to a defined invalid state.
+* Check API return codes before using output pointers or handles.
+* Validate function pointers before calling them.
+* Use RAII and explicit ownership in C++.
+* Prefer references or an established non-null contract for required dependencies.
+* Use `std::optional<T>` for absent values that do not require pointer identity.
+* Preserve the distinction between null pointers, invalid OS handles, empty buffers, and failed operations.
+* Do not return pointers to expired objects.
+* Inspect lifetime and ownership, not only nullness.
+
+A null check does not fix:
+
+```text
+dangling pointer
+use-after-free
+uninitialized pointer
+invalid handle
+data race
+buffer lifetime error
+```
+
+### Go Rules
+
+* Check errors before using returned values.
+* Do not use a value when `err != nil`.
+* Account for interfaces that are non-nil while containing a typed nil pointer.
+* Validate nil maps, slices, channels, functions, and pointers according to their language behavior.
+* Do not call a nil function.
+* Do not recover from a nil panic merely to continue with invalid state.
+
+### Rust Rules
+
+* Use `Option<T>` for meaningful absence.
+* Do not use `unwrap()` or `expect()` on runtime input, configuration, external responses, plugins, or lifecycle state unless failure is deliberately fatal and documented.
+* Handle `Option` and `Result` with pattern matching, `?`, or explicit error mapping.
+* In `unsafe` or FFI code, validate raw pointers and document ownership and lifetime.
+
+### Swift and Objective-C Rules
+
+Swift:
+
+* Avoid force unwrap `!` for runtime or external values.
+* Use optional binding, `guard let`, or typed errors.
+* Do not use implicitly unwrapped optionals for values that may remain absent after initialization.
+
+Objective-C:
+
+* Sending a message to `nil` can silently return zero-like values and hide defects.
+* Explicitly validate required objects when silent nil behavior would corrupt state.
+* Distinguish deliberate optional receivers from missing required dependencies.
+
+### Dependency Injection and Registry Rules
+
+Composition roots, registries, factories, plugin loaders, and tests must reject invalid dependencies before runtime use.
+
+Do not permit:
+
+```text
+action name -> null
+parser list item -> null
+service dependency -> null
+callback -> null
+UI component key -> null
+plugin object without its required method
+```
+
+Validate that:
+
+```text
+the object exists
+required methods exist
+required methods are callable
+result types match the contract
+missing registration returns a named error
+duplicate registration is handled deliberately
+```
+
+Prefer a precise composition-time error over a later unrelated attribute or method failure.
+
+### External Response Normalization
+
+External systems may return:
+
+```text
+null
+an empty body
+a scalar instead of an object
+an object missing required fields
+a field present with null
+a field with the wrong type
+a stale or partially initialized object
+```
+
+Transport and adapter boundaries must normalize malformed responses into the project’s standard failure result.
+
+Do not let raw malformed data pass through multiple service layers.
+
+A method that promises a dictionary, object, or DTO must not return null without declaring that possibility.
+
+### Collection and Mapping Rules
+
+Before using a collection or mapping:
+
+* distinguish missing from empty
+* validate the collection type
+* validate required keys
+* validate values associated with those keys
+* check length before indexing
+* check map lookup results before dereferencing
+* account for concurrent invalidation when relevant
+
+This is not sufficient for untrusted data:
+
+```python
+count = int(payload.get("count", 0))
+```
+
+The key may exist with `None` or an invalid string.
+
+### Lifecycle, Reload, and Concurrency Rules
+
+Null and invalid-reference defects often occur during:
+
+```text
+startup
+partial initialization
+reload
+reconnect
+shutdown
+plugin replacement
+thread cancellation
+async failure
+UI teardown
+resource disposal
+```
+
+Required practices:
+
+* Do not publish partially initialized dependencies.
+* Build and validate replacement state before swapping it into live state.
+* On failed reload, retain the previous valid state.
+* Do not clear a shared dependency while active users may still access it without a defined synchronized lifecycle.
+* Ensure callbacks cannot observe half-updated state.
+* Return from failure branches before using values that require success.
+* After disposal, return an explicit unavailable result rather than dereferencing cleared state.
+* Add synchronization only when an actual shared-state race is identified.
+
+### Null Object Pattern
+
+A Null Object is allowed only when “do nothing successfully” is valid domain behavior.
+
+Potentially valid examples:
+
+```text
+no-op logger
+disabled metrics sink
+optional notification sink
+```
+
+Do not use a Null Object to hide:
+
+```text
+missing required bridge client
+missing model
+failed plugin initialization
+invalid configuration
+missing action handler
+permission denial
+transport failure
+```
+
+A Null Object must obey the full contract and must not report misleading success.
+
+### Exception and Fallback Rules
+
+Do not catch a null-reference failure and continue without repairing or rejecting the invalid state.
+
+Avoid:
+
+```text
+catch NullPointerException and ignore
+catch NullReferenceException and return success
+catch AttributeError and assume every case means None
+catch TypeError around unrelated code
+recover from panic without identifying the invalid state
+```
+
+When a value is required, reject it early with a precise error.
+
+When it is optional, handle absence explicitly.
+
+When an external system is malformed, return a typed failure and preserve the last valid internal state.
+
+When continuing would corrupt state, fail the current operation safely rather than inventing a default.
+
+### Required Tests
+
+When nullable values, optional results, dependency composition, boundary validation, or lifecycle state are changed, consider tests for:
+
+* required dependency missing
+* optional dependency absent
+* dictionary key absent
+* dictionary key present with null
+* wrong value type
+* callback returns null
+* callback raises before later assignment
+* transport returns null
+* transport returns empty or malformed data
+* parser returns no match
+* invalid registry entry
+* empty collection
+* configuration key absent
+* configuration key explicitly null
+* false, zero, or empty string used as valid values
+* reload preparation fails before swap
+* callback fails during reload
+* shutdown occurs before a late callback
+* background operation fails before result assignment
+* previous valid state remains usable after failure
+
+Do not weaken tests to accept a silent default unless that default is part of the documented contract.
+
+### Static Analysis and Compiler Support
+
+Use existing project tools when available:
+
+```text
+Python       mypy, pyright, Ruff, pylint, pytest
+TypeScript   strictNullChecks, tsc, ESLint
+Java         compiler warnings, SpotBugs, Error Prone, NullAway
+Kotlin       compiler null-safety
+C#           nullable reference types and analyzers
+C/C++        compiler warnings, clang-tidy, sanitizers, static analyzers
+Go           go vet, staticcheck, tests
+Rust         compiler, clippy, tests, Miri where appropriate
+Swift        compiler warnings and tests
+```
+
+Do not add or upgrade analysis dependencies without following the dependency rules.
+
+Static-analysis success does not replace runtime boundary tests.
+
+### Required Review Report
+
+For null-safety investigation or remediation, report:
+
+```text
+Nullable or invalid-reference sources:
+- <path and value>
+
+Possible failure:
+- <language-specific exception, panic, access violation, or undefined behavior>
+
+Current contract:
+- <required, optional, pending, disabled, not found, or failure>
+
+Chosen behavior:
+- <fallback, validation error, typed result, or fail-fast exception>
+
+Files changed:
+- <exact paths>
+
+Tests added:
+- missing value
+- explicit null
+- wrong type
+- failure before assignment
+- lifecycle or reload failure when relevant
+
+Validation:
+- <commands and results>
+
+Remaining runtime risk:
+- <manual or integration validation>
+```
+
+### Forbidden Patterns
+
+Do not:
+
+* add broad exception handling only to hide a null defect
+* use force unwraps or non-null assertions without a locally proven invariant
+* replace every null with zero, false, an empty string, or an empty object
+* use truthiness when false, zero, or an empty value is valid
+* return success after a required dependency is missing
+* publish partially initialized objects
+* dereference external responses before type and field validation
+* assume a mapping value is valid because its key exists
+* assume a variable was assigned inside a branch that may fail
+* use null checks as a substitute for C/C++ ownership and lifetime analysis
+* silently convert malformed responses into normal empty results
+* spread unrelated defensive checks throughout internal code instead of validating the owning boundary
+* weaken types to `Any`, `object`, raw pointers, or broad nullable unions merely to silence diagnostics
+
+The goal is not to eliminate every optional value.
+
+The goal is to make absence explicit, validate it at the correct boundary, preserve valid state after failures, and prevent language-specific null-reference crashes or silent state corruption.
 
 ---
 
