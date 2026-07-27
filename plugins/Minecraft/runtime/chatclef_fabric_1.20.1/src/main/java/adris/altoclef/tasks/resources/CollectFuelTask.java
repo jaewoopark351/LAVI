@@ -5,6 +5,8 @@ import adris.altoclef.TaskCatalogue;
 import adris.altoclef.tasks.movement.DefaultGoToDimensionTask;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.Dimension;
+import adris.altoclef.util.helpers.ItemHelper;
+import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.helpers.WorldHelper;
 import net.minecraft.item.Items;
 
@@ -12,6 +14,7 @@ import net.minecraft.item.Items;
 public class CollectFuelTask extends Task {
 
     private final double targetFuel;
+    private static final double COAL_FUEL_AMOUNT = ItemHelper.getFuelAmount(Items.COAL);
 
     public CollectFuelTask(double targetFuel) {
         this.targetFuel = targetFuel;
@@ -28,8 +31,12 @@ public class CollectFuelTask extends Task {
         switch (WorldHelper.getCurrentDimension()) {
             case OVERWORLD -> {
                 // Just collect coal for now.
+                AltoClef mod = AltoClef.getInstance();
+                double fuelRemaining = Math.max(0, targetFuel - StorageHelper.calculateInventoryFuelCount(mod));
+                int coalToCollect = COAL_FUEL_AMOUNT <= 0 ? 0 : (int) Math.ceil(fuelRemaining / COAL_FUEL_AMOUNT);
+                int coalTarget = mod.getItemStorage().getItemCountInventoryOnly(Items.COAL) + coalToCollect;
                 setDebugState("Collecting coal.");
-                return TaskCatalogue.getItemTask(Items.COAL, (int) Math.ceil(targetFuel / 8));
+                return TaskCatalogue.getItemTask(Items.COAL, coalTarget);
             }
             case END -> {
                 setDebugState("Going to overworld, since, well, no more fuel can be found here.");
@@ -59,7 +66,7 @@ public class CollectFuelTask extends Task {
 
     @Override
     public boolean isFinished() {
-        return AltoClef.getInstance().getItemStorage().getItemCountInventoryOnly(Items.COAL) >= targetFuel;
+        return StorageHelper.calculateInventoryFuelCount(AltoClef.getInstance()) >= targetFuel;
     }
 
     @Override
