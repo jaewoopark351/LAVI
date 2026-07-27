@@ -2,7 +2,6 @@ package adris.altoclef.tasks.container;
 
 import adris.altoclef.AltoClef;
 import adris.altoclef.TaskCatalogue;
-import adris.altoclef.tasks.DoToClosestBlockTask;
 import adris.altoclef.tasks.InteractWithBlockTask;
 import adris.altoclef.tasks.construction.PlaceBlockNearbyTask;
 import adris.altoclef.tasks.slot.EnsureFreeInventorySlotTask;
@@ -41,7 +40,6 @@ public abstract class DoStuffInContainerTask extends Task {
     // If we just placed something, stop placing and try going to the nearest container.
     private final TimerGame justPlacedTimer = new TimerGame(3);
     private BlockPos cachedContainerPosition = null;
-    private Task openTableTask;
     private final StateChangeLogger debugLogger = new StateChangeLogger("DoStuffInContainerTask");
 
     public DoStuffInContainerTask(Block[] containerBlocks, ItemTarget containerTarget) {
@@ -59,9 +57,6 @@ public abstract class DoStuffInContainerTask extends Task {
     protected void onStart() {
         AltoClef mod = AltoClef.getInstance();
         mod.getBehaviour().push();
-        if (openTableTask == null) {
-            openTableTask = new DoToClosestBlockTask(InteractWithBlockTask::new, containerBlocks);
-        }
 
         // Protect container since we might place it.
         mod.getBehaviour().addProtectedItems(ItemHelper.blocksToItems(containerBlocks));
@@ -87,11 +82,18 @@ public abstract class DoStuffInContainerTask extends Task {
         double costToWalk = Double.POSITIVE_INFINITY;
 
         Optional<BlockPos> nearest;
+        boolean usingPlacedContainer = false;
 
         Vec3d currentPos = mod.getPlayer().getPos();
         BlockPos override = overrideContainerPosition(mod);
+        Optional<BlockPos> placedContainer = getPlacedContainerIfValid(mod);
 
-        if (override != null && mod.getBlockScanner().isBlockAtPosition(override, containerBlocks)) {
+        if (placedContainer.isPresent()) {
+            nearest = placedContainer;
+            usingPlacedContainer = true;
+            debugLogger.state("prefer placed container:" + nearest.get().toShortString(),
+                    "prefer placed container: targetPosition=" + nearest.get().toShortString());
+        } else if (override != null && mod.getBlockScanner().isBlockAtPosition(override, containerBlocks)) {
             // We have an override so go there instead.
             nearest = Optional.of(override);
         } else {
@@ -100,10 +102,7 @@ public abstract class DoStuffInContainerTask extends Task {
         }
         if (nearest.isEmpty()) {
             // If all else fails, try using our placed task
-            nearest = Optional.ofNullable(placeTask.getPlaced());
-            if (nearest.isPresent() && !mod.getBlockScanner().isBlockAtPosition(nearest.get(), containerBlocks)) {
-                nearest = Optional.empty();
-            }
+            nearest = getPlacedContainerIfValid(mod);
         }
         if (nearest.isPresent()) {
             costToWalk = BaritoneHelper.calculateGenericHeuristic(currentPos, WorldHelper.toVec3d(nearest.get()));
@@ -111,10 +110,10 @@ public abstract class DoStuffInContainerTask extends Task {
 
         // Make a new container if going to the container is a pretty bad cost.
         // Also keep on making the container if we're stuck in some
-        if (costToWalk > getCostToMakeNew(mod)) {
+        if (!usingPlacedContainer && costToWalk > getCostToMakeNew(mod)) {
             placeForceTimer.reset();
         }
-        if (nearest.isEmpty() || (!placeForceTimer.elapsed() && justPlacedTimer.elapsed())) {
+        if (nearest.isEmpty() || (!usingPlacedContainer && !placeForceTimer.elapsed() && justPlacedTimer.elapsed())) {
             // It's cheaper to make a new one, or our only option.
 
             // We're no longer going to our previous container.
@@ -173,7 +172,7 @@ public abstract class DoStuffInContainerTask extends Task {
             mod.getSlotHandler().clickSlot(toMoveTo.get(), 0, SlotActionType.PICKUP);
             return null;
         }
-        return openTableTask;
+        return new InteractWithBlockTask(cachedContainerPosition);
         //return new GetToBlockTask(nearest, true);
     }
 
@@ -188,6 +187,33 @@ public abstract class DoStuffInContainerTask extends Task {
 
     protected BlockPos getTargetContainerPosition() {
         return cachedContainerPosition;
+    }
+
+    private Optional<BlockPos> getPlacedContainerIfValid(AltoClef mod) {
+        BlockPos placed = placeTask.getPlaced();
+        if (placed == null) {
+            return Optional.empty();
+        }
+        if (!isPlacedContainerBlock(mod, placed)) {
+            return Optional.empty();
+        }
+        if (!WorldHelper.canReach(placed)) {
+            return Optional.empty();
+        }
+        return Optional.of(placed);
+    }
+
+    private boolean isPlacedContainerBlock(AltoClef mod, BlockPos placed) {
+        if (!mod.getChunkTracker().isChunkLoaded(placed)) {
+            return false;
+        }
+        Block block = mod.getWorld().getBlockState(placed).getBlock();
+        for (Block containerBlock : containerBlocks) {
+            if (block == containerBlock) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override

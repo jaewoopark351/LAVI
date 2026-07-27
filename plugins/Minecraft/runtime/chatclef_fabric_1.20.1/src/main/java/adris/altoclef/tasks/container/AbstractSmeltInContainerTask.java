@@ -140,10 +140,13 @@ abstract class AbstractDoSmeltInContainerTask extends DoStuffInContainerTask {
     private final String containerDebugName;
     private final StateChangeLogger debugLogger;
     private boolean ignoreMaterials;
-    private static final int FUEL_INSERTION_CACHE_GRACE_TICKS = 10;
-    // #20260727_kpopmodder: Furnace handlers can report a stale fuel slot for a few ticks after a slot move.
+    private static final int FUEL_INSERTION_CACHE_GRACE_TICKS = 20 * 3;
+    private static final int FUEL_MOVE_TASK_GRACE_TICKS = 20 * 3;
+    // #20260727_kpopmodder: Furnace handlers can report a stale fuel slot after a throttled slot move.
     private double pendingInsertedFuelAmount;
     private int pendingInsertedFuelTicks;
+    private Task pendingFuelMoveTask;
+    private int pendingFuelMoveTicks;
 
     protected AbstractDoSmeltInContainerTask(
             SmeltTarget target,
@@ -202,7 +205,7 @@ abstract class AbstractDoSmeltInContainerTask extends DoStuffInContainerTask {
         AltoClef mod = AltoClef.getInstance();
 
         tryUpdateOpenContainer(mod);
-        updatePendingInsertedFuel();
+        updatePendingInsertedFuel(mod);
         ItemTarget materialTarget = allMaterials;
         ItemTarget outputTarget = target.getItem();
         int materialsNeeded = materialTarget.getTargetCount()
@@ -210,7 +213,7 @@ abstract class AbstractDoSmeltInContainerTask extends DoStuffInContainerTask {
                 - mod.getItemStorage().getItemCountInventoryOnly(outputTarget.getMatches())
                 - (materialTarget.matches(containerCache.materialSlot.getItem()) ? containerCache.materialSlot.getCount() : 0)
                 - (outputTarget.matches(containerCache.outputSlot.getItem()) ? containerCache.outputSlot.getCount() : 0);
-        double totalFuelInContainer = getTotalPlannedFuelInContainer();
+        double totalFuelInContainer = getTotalPlannedFuelInContainer(mod);
         double fuelNeeded = ignoreMaterials
                 ? Math.min(materialTarget.matches(containerCache.materialSlot.getItem()) ? containerCache.materialSlot.getCount() : 0, materialTarget.getTargetCount())
                 : materialTarget.getTargetCount()
@@ -228,7 +231,23 @@ abstract class AbstractDoSmeltInContainerTask extends DoStuffInContainerTask {
             return getMaterialTask(target.getMaterial());
         }
 
+        Task pendingFuelMove = getPendingFuelMoveTaskIfActive(mod);
+        if (pendingFuelMove != null) {
+            setDebugState("Filling fuel");
+            debugLogger.state("continue fuel move",
+                    "continue fuel move: " + describeCache());
+            return pendingFuelMove;
+        }
+
         if (containerCache.burningFuelCount <= 0 && StorageHelper.calculateInventoryFuelCount(mod) < fuelNeeded) {
+            if (isPendingFuelInsertActive()) {
+                setDebugState("Waiting for fuel slot");
+                debugLogger.state("wait for pending fuel insert",
+                        "wait for pending fuel insert: needed=" + formatDouble(fuelNeeded)
+                                + ", inventoryFuel=" + formatDouble(StorageHelper.calculateInventoryFuelCount(mod))
+                                + ", " + describeCache());
+                return null;
+            }
             setDebugState("Getting Fuel");
             debugLogger.state("get fuel: needed=" + formatDouble(fuelNeeded)
                     + ", inventoryFuel=" + formatDouble(StorageHelper.calculateInventoryFuelCount(mod))
@@ -306,11 +325,12 @@ abstract class AbstractDoSmeltInContainerTask extends DoStuffInContainerTask {
                 ItemStack bestStack = getBestFuelStack(mod, needs);
                 if (bestStack != null) {
                     setDebugState("Filling fuel");
-                    notePendingInsertedFuel(bestStack);
                     debugLogger.state("fill fuel: bestStack=" + describeStack(bestStack)
                             + ", needs=" + formatDouble(needs)
                             + ", fuelSlot=" + describeStack(fuel));
-                    return new MoveItemToSlotFromInventoryTask(new ItemTarget(bestStack.getItem(), bestStack.getCount()), fuelSlot);
+                    Task fuelMoveTask = new MoveItemToSlotFromInventoryTask(new ItemTarget(bestStack.getItem(), bestStack.getCount()), fuelSlot);
+                    rememberPendingFuelMove(fuelMoveTask, bestStack);
+                    return fuelMoveTask;
                 }
             }
         }
@@ -348,11 +368,12 @@ abstract class AbstractDoSmeltInContainerTask extends DoStuffInContainerTask {
         }
     }
 
-    private double getTotalPlannedFuelInContainer() {
+    private double getTotalPlannedFuelInContainer(AltoClef mod) {
         return ItemHelper.getFuelAmount(containerCache.fuelSlot)
                 + containerCache.burningFuelCount
                 + containerCache.burnPercentage
-                + pendingInsertedFuelAmount;
+                + pendingInsertedFuelAmount
+                + getCursorFuelAmount(mod);
     }
 
     private void notePendingInsertedFuel(ItemStack fuelStack) {
@@ -360,12 +381,41 @@ abstract class AbstractDoSmeltInContainerTask extends DoStuffInContainerTask {
         pendingInsertedFuelTicks = FUEL_INSERTION_CACHE_GRACE_TICKS;
     }
 
-    private void updatePendingInsertedFuel() {
+    private void rememberPendingFuelMove(Task fuelMoveTask, ItemStack fuelStack) {
+        pendingFuelMoveTask = fuelMoveTask;
+        pendingFuelMoveTicks = FUEL_MOVE_TASK_GRACE_TICKS;
+        notePendingInsertedFuel(fuelStack);
+    }
+
+    private Task getPendingFuelMoveTaskIfActive(AltoClef mod) {
+        if (pendingFuelMoveTask == null) {
+            return null;
+        }
+        if (!isContainerOpen(mod) || pendingFuelMoveTask.stopped() || pendingFuelMoveTask.isFinished() || pendingFuelMoveTicks <= 0) {
+            clearPendingFuelMoveTask();
+            return null;
+        }
+        pendingFuelMoveTicks--;
+        return pendingFuelMoveTask;
+    }
+
+    private void clearPendingFuelMoveTask() {
+        pendingFuelMoveTask = null;
+        pendingFuelMoveTicks = 0;
+    }
+
+    private boolean isPendingFuelInsertActive() {
+        return pendingInsertedFuelAmount > 0 && pendingInsertedFuelTicks > 0;
+    }
+
+    private void updatePendingInsertedFuel(AltoClef mod) {
         if (pendingInsertedFuelAmount <= 0) {
             return;
         }
-        if (isNotEmpty(containerCache.fuelSlot) || containerCache.burningFuelCount > 0 || containerCache.burnPercentage > 0) {
-            clearPendingInsertedFuel();
+        double cursorFuel = getCursorFuelAmount(mod);
+        if (cursorFuel > 0) {
+            pendingInsertedFuelAmount = Math.max(pendingInsertedFuelAmount, cursorFuel);
+            pendingInsertedFuelTicks = FUEL_INSERTION_CACHE_GRACE_TICKS;
             return;
         }
         pendingInsertedFuelTicks--;
@@ -384,6 +434,14 @@ abstract class AbstractDoSmeltInContainerTask extends DoStuffInContainerTask {
             return StorageHelper.getFurnaceFuel(handler) + StorageHelper.getFurnaceCookPercent(handler);
         }
         return 0;
+    }
+
+    private double getCursorFuelAmount(AltoClef mod) {
+        ItemStack cursor = StorageHelper.getItemStackInCursorSlot();
+        if (cursor.isEmpty() || !mod.getModSettings().isSupportedFuel(cursor.getItem())) {
+            return 0;
+        }
+        return ItemHelper.getFuelAmount(cursor);
     }
 
     private boolean ensureCursorCanStackWith(AltoClef mod, ItemStack targetStack) {
@@ -430,6 +488,8 @@ abstract class AbstractDoSmeltInContainerTask extends DoStuffInContainerTask {
                 + ", burningFuel=" + formatDouble(containerCache.burningFuelCount)
                 + ", cook=" + formatDouble(containerCache.burnPercentage)
                 + ", pendingFuel=" + formatDouble(pendingInsertedFuelAmount)
+                + ", pendingFuelTicks=" + pendingInsertedFuelTicks
+                + ", pendingFuelMoveTicks=" + pendingFuelMoveTicks
                 + "]";
     }
 

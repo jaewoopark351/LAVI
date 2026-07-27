@@ -69,7 +69,9 @@ public class PlaceBlockNearbyTask extends Task {
         // Check for blocks being placed
         _onBlockPlaced = EventBus.subscribe(BlockPlaceEvent.class, evt -> {
             if (ArrayUtils.contains(toPlace, evt.blockState.getBlock())) {
-                debugLogger.event("block placed event: block=" + evt.blockState.getBlock().getTranslationKey());
+                justPlaced = evt.blockPos;
+                debugLogger.event("block placed event: block=" + evt.blockState.getBlock().getTranslationKey()
+                        + ", pos=" + evt.blockPos.toShortString());
                 stopPlacing();
             }
         });

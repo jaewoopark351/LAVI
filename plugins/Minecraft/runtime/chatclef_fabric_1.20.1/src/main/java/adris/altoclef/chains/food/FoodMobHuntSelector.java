@@ -11,6 +11,8 @@ import java.util.function.Predicate;
 //20260727_kpopmodder: Isolates mob food target scoring from CollectFoodTask control flow.
 public final class FoodMobHuntSelector {
     private static final Predicate<Entity> NOT_BABY = entity -> entity instanceof LivingEntity livingEntity && !livingEntity.isBaby();
+    private static final Predicate<Entity> HUNTABLE_FOOD_MOB = entity -> NOT_BABY.test(entity)
+            && !FoodCollectionBlacklist.shouldSkipHuntTarget(entity);
 
     private FoodMobHuntSelector() {
     }
@@ -23,7 +25,7 @@ public final class FoodMobHuntSelector {
 
         for (FoodCollectionTargets.CookableFoodTarget cookable : cookableFoods) {
             if (!mod.getEntityTracker().entityFound(cookable.mobToKill)) continue;
-            Optional<Entity> nearest = mod.getEntityTracker().getClosestEntity(mod.getPlayer().getPos(), NOT_BABY, cookable.mobToKill);
+            Optional<Entity> nearest = mod.getEntityTracker().getClosestEntity(mod.getPlayer().getPos(), HUNTABLE_FOOD_MOB, cookable.mobToKill);
             if (nearest.isEmpty()) continue;
             if (!nearest.get().isAlive()) continue;
             int hungerPerformance = cookable.getCookedUnits();
@@ -42,7 +44,7 @@ public final class FoodMobHuntSelector {
         if (bestEntity == null) {
             return Optional.empty();
         }
-        return Optional.of(new HuntTarget(bestEntity, bestRawFood, bestScore, NOT_BABY));
+        return Optional.of(new HuntTarget(bestEntity, bestRawFood, bestScore, HUNTABLE_FOOD_MOB));
     }
 
     public static final class HuntTarget {
