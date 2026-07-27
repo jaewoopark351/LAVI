@@ -30,6 +30,7 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 
 import java.util.*;
+import java.util.function.Predicate;
 
 public class MineAndCollectTask extends ResourceTask {
 
@@ -168,12 +169,16 @@ public class MineAndCollectTask extends ResourceTask {
 
     public static class MineOrCollectTask extends AbstractDoToClosestObjectTask<Object> {
 
+        private static final int MINING_TARGET_TIMEOUT_TICKS = 20 * 30;
+        private static final int TEMPORARY_BLOCK_SKIP_TICKS = 20 * 45;
+
         private final Block[] _blocks;
         private final ItemTarget[] _targets;
-        private final Set<BlockPos> blacklist = new HashSet<>();
+        private final TemporaryBlockBlacklist temporaryBlockBlacklist = new TemporaryBlockBlacklist();
         private final MovementProgressChecker progressChecker = new MovementProgressChecker();
         private final Task _pickupTask;
         private BlockPos miningPos;
+        private int miningTargetStartTick;
         private final StateChangeLogger debugLogger = new StateChangeLogger("MineOrCollectTask");
 
         public MineOrCollectTask(Block[] blocks, ItemTarget[] targets) {
@@ -195,7 +200,9 @@ public class MineAndCollectTask extends ResourceTask {
 
         @Override
         protected Optional<Object> getClosestTo(AltoClef mod, Vec3d pos) {
-            Pair<Double, Optional<BlockPos>> closestBlock = getClosestBlock(mod,pos,  _blocks);
+            temporaryBlockBlacklist.pruneExpired();
+
+            Pair<Double, Optional<BlockPos>> closestBlock = getClosestBlock(mod,pos, this::isAllowedMiningCandidate, _blocks);
             Pair<Double, Optional<ItemEntity>> closestDrop = getClosestItemDrop(mod,pos,  _targets);
 
             double blockSq = closestBlock.getLeft();
@@ -204,19 +211,22 @@ public class MineAndCollectTask extends ResourceTask {
             // We can't mine right now.
             if (mod.getExtraBaritoneSettings().isInteractionPaused()) {
                 debugLogger.state("interaction paused; prefer dropped item: drop=" + closestDrop.getRight().map(this::describeDrop).orElse("none")
-                        + ", block=" + closestBlock.getRight().map(BlockPos::toShortString).orElse("none"));
+                        + ", block=" + closestBlock.getRight().map(BlockPos::toShortString).orElse("none")
+                        + ", skippedBlocks=" + temporaryBlockBlacklist.size());
                 return closestDrop.getRight().map(Object.class::cast);
             }
 
             if (dropSq <= blockSq) {
                 debugLogger.state("closest target is dropped item: drop=" + closestDrop.getRight().map(this::describeDrop).orElse("none")
                         + ", dropSq=" + formatDouble(dropSq)
-                        + ", blockSq=" + formatDouble(blockSq));
+                        + ", blockSq=" + formatDouble(blockSq)
+                        + ", skippedBlocks=" + temporaryBlockBlacklist.size());
                 return closestDrop.getRight().map(Object.class::cast);
             } else {
                 debugLogger.state("closest target is block: block=" + closestBlock.getRight().map(BlockPos::toShortString).orElse("none")
                         + ", blockSq=" + formatDouble(blockSq)
-                        + ", dropSq=" + formatDouble(dropSq));
+                        + ", dropSq=" + formatDouble(dropSq)
+                        + ", skippedBlocks=" + temporaryBlockBlacklist.size());
                 return closestBlock.getRight().map(Object.class::cast);
             }
         }
@@ -235,9 +245,14 @@ public class MineAndCollectTask extends ResourceTask {
         }
 
         public static Pair<Double,Optional<BlockPos> > getClosestBlock(AltoClef mod,Vec3d pos ,Block... blocks) {
+            return getClosestBlock(mod, pos, check -> true, blocks);
+        }
+
+        public static Pair<Double,Optional<BlockPos> > getClosestBlock(AltoClef mod, Vec3d pos, Predicate<BlockPos> isValidTest, Block... blocks) {
             Optional<BlockPos> closestBlock = mod.getBlockScanner().getNearestBlock(pos, check -> {
 
                 if (mod.getBlockScanner().isUnreachable(check)) return false;
+                if (!isValidTest.test(check)) return false;
                 return WorldHelper.canBreak(check);
             }, blocks);
 
@@ -259,14 +274,11 @@ public class MineAndCollectTask extends ResourceTask {
             if (mod.getClientBaritone().getPathingBehavior().isPathing()) {
                 progressChecker.reset();
             }
+            if (miningPos != null && WorldHelper.getTicks() - miningTargetStartTick > MINING_TARGET_TIMEOUT_TICKS) {
+                temporarilySkipMiningTarget(mod, "target timeout");
+            }
             if (miningPos != null && !progressChecker.check(mod)) {
-                mod.getClientBaritone().getPathingBehavior().forceCancel();
-                Debug.logMessage("Failed to mine block. Suggesting it may be unreachable.");
-                debugLogger.state("mining progress failed; marking unreachable: pos=" + miningPos.toShortString());
-                mod.getBlockScanner().requestBlockUnreachable(miningPos, 2);
-                blacklist.add(miningPos);
-                miningPos = null;
-                progressChecker.reset();
+                temporarilySkipMiningTarget(mod, "mining progress failed");
             }
             return super.onTick();
         }
@@ -276,7 +288,9 @@ public class MineAndCollectTask extends ResourceTask {
             if (obj instanceof BlockPos newPos) {
                 if (miningPos == null || !miningPos.equals(newPos)) {
                     progressChecker.reset();
-                    debugLogger.state("new mining target: pos=" + newPos.toShortString());
+                    miningTargetStartTick = WorldHelper.getTicks();
+                    debugLogger.state("new mining target: pos=" + newPos.toShortString()
+                            + ", timeoutTicks=" + MINING_TARGET_TIMEOUT_TICKS);
                 }
                 miningPos = newPos;
                 return new DestroyBlockTask(miningPos);
@@ -292,7 +306,9 @@ public class MineAndCollectTask extends ResourceTask {
         @Override
         protected boolean isValid(AltoClef mod, Object obj) {
             if (obj instanceof BlockPos b) {
-                return mod.getBlockScanner().isBlockAtPosition(b, _blocks) && WorldHelper.canBreak(b);
+                return mod.getBlockScanner().isBlockAtPosition(b, _blocks)
+                        && !temporaryBlockBlacklist.contains(b)
+                        && WorldHelper.canBreak(b);
             }
             if (obj instanceof ItemEntity drop) {
                 Item item = drop.getStack().getItem();
@@ -310,6 +326,8 @@ public class MineAndCollectTask extends ResourceTask {
         protected void onStart() {
             progressChecker.reset();
             miningPos = null;
+            miningTargetStartTick = 0;
+            temporaryBlockBlacklist.pruneExpired();
             debugLogger.event("start: blocks=" + Arrays.toString(_blocks)
                     + ", targets=" + Arrays.toString(_targets));
         }
@@ -341,6 +359,30 @@ public class MineAndCollectTask extends ResourceTask {
             return miningPos;
         }
 
+        private void temporarilySkipMiningTarget(AltoClef mod, String reason) {
+            if (miningPos == null) {
+                return;
+            }
+
+            BlockPos skipped = miningPos;
+            temporaryBlockBlacklist.add(skipped, TEMPORARY_BLOCK_SKIP_TICKS);
+            mod.getClientBaritone().getPathingBehavior().forceCancel();
+            Debug.logMessage("Temporarily skipping mining target " + skipped.toShortString() + " (" + reason + ").");
+            debugLogger.state("temporarily skip mining target: pos=" + skipped.toShortString()
+                    + ", reason=" + reason
+                    + ", skipTicks=" + TEMPORARY_BLOCK_SKIP_TICKS
+                    + ", skippedBlocks=" + temporaryBlockBlacklist.size());
+            mod.getBlockScanner().requestBlockUnreachable(skipped, 2);
+            miningPos = null;
+            miningTargetStartTick = 0;
+            progressChecker.reset();
+            resetSearch();
+        }
+
+        private boolean isAllowedMiningCandidate(BlockPos pos) {
+            return !temporaryBlockBlacklist.contains(pos);
+        }
+
         private String describeDrop(ItemEntity drop) {
             return drop.getStack().getItem().getTranslationKey()
                     + " x " + drop.getStack().getCount()
@@ -356,6 +398,31 @@ public class MineAndCollectTask extends ResourceTask {
                 return "infinity";
             }
             return String.format(Locale.ROOT, "%.1f", value);
+        }
+
+        //20260727_kpopmodder: Keep per-task block cooldown bookkeeping separate from mining candidate selection.
+        private static class TemporaryBlockBlacklist {
+            private final Map<BlockPos, Integer> skipUntilTick = new HashMap<>();
+
+            public void add(BlockPos pos, int ticks) {
+                skipUntilTick.put(pos, WorldHelper.getTicks() + ticks);
+            }
+
+            public boolean contains(BlockPos pos) {
+                pruneExpired();
+                Integer untilTick = skipUntilTick.get(pos);
+                return untilTick != null && untilTick > WorldHelper.getTicks();
+            }
+
+            public int size() {
+                pruneExpired();
+                return skipUntilTick.size();
+            }
+
+            public void pruneExpired() {
+                int currentTick = WorldHelper.getTicks();
+                skipUntilTick.entrySet().removeIf(entry -> entry.getValue() <= currentTick);
+            }
         }
     }
 

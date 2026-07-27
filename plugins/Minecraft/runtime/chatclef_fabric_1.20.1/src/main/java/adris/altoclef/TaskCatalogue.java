@@ -523,7 +523,7 @@ public class TaskCatalogue {
             shapedRecipe3x3("soul_torch", Items.SOUL_TORCH, 4, o, "coal", o, o, s, o, o, "soul_soil", o);
             {
                 String l = "log";
-                shapedRecipe3x3("smoker", Items.SMOKER, 1, o, l, o, l, "furnace", l, o, l, o);
+                shapedRecipe3x3("smoker", Items.SMOKER, 1, o, l, o, l, "furnace", l, o, l, o).dontMineIfPresent();
             }
             {
                 String i = "iron_nugget";

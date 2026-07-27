@@ -140,6 +140,10 @@ abstract class AbstractDoSmeltInContainerTask extends DoStuffInContainerTask {
     private final String containerDebugName;
     private final StateChangeLogger debugLogger;
     private boolean ignoreMaterials;
+    private static final int FUEL_INSERTION_CACHE_GRACE_TICKS = 10;
+    // #20260727_kpopmodder: Furnace handlers can report a stale fuel slot for a few ticks after a slot move.
+    private double pendingInsertedFuelAmount;
+    private int pendingInsertedFuelTicks;
 
     protected AbstractDoSmeltInContainerTask(
             SmeltTarget target,
@@ -198,6 +202,7 @@ abstract class AbstractDoSmeltInContainerTask extends DoStuffInContainerTask {
         AltoClef mod = AltoClef.getInstance();
 
         tryUpdateOpenContainer(mod);
+        updatePendingInsertedFuel();
         ItemTarget materialTarget = allMaterials;
         ItemTarget outputTarget = target.getItem();
         int materialsNeeded = materialTarget.getTargetCount()
@@ -205,7 +210,7 @@ abstract class AbstractDoSmeltInContainerTask extends DoStuffInContainerTask {
                 - mod.getItemStorage().getItemCountInventoryOnly(outputTarget.getMatches())
                 - (materialTarget.matches(containerCache.materialSlot.getItem()) ? containerCache.materialSlot.getCount() : 0)
                 - (outputTarget.matches(containerCache.outputSlot.getItem()) ? containerCache.outputSlot.getCount() : 0);
-        double totalFuelInContainer = ItemHelper.getFuelAmount(containerCache.fuelSlot) + containerCache.burningFuelCount + containerCache.burnPercentage;
+        double totalFuelInContainer = getTotalPlannedFuelInContainer();
         double fuelNeeded = ignoreMaterials
                 ? Math.min(materialTarget.matches(containerCache.materialSlot.getItem()) ? containerCache.materialSlot.getCount() : 0, materialTarget.getTargetCount())
                 : materialTarget.getTargetCount()
@@ -301,6 +306,7 @@ abstract class AbstractDoSmeltInContainerTask extends DoStuffInContainerTask {
                 ItemStack bestStack = getBestFuelStack(mod, needs);
                 if (bestStack != null) {
                     setDebugState("Filling fuel");
+                    notePendingInsertedFuel(bestStack);
                     debugLogger.state("fill fuel: bestStack=" + describeStack(bestStack)
                             + ", needs=" + formatDouble(needs)
                             + ", fuelSlot=" + describeStack(fuel));
@@ -340,6 +346,37 @@ abstract class AbstractDoSmeltInContainerTask extends DoStuffInContainerTask {
             containerCache.materialSlot = StorageHelper.getItemStackInSlot(materialSlot);
             containerCache.outputSlot = StorageHelper.getItemStackInSlot(outputSlot);
         }
+    }
+
+    private double getTotalPlannedFuelInContainer() {
+        return ItemHelper.getFuelAmount(containerCache.fuelSlot)
+                + containerCache.burningFuelCount
+                + containerCache.burnPercentage
+                + pendingInsertedFuelAmount;
+    }
+
+    private void notePendingInsertedFuel(ItemStack fuelStack) {
+        pendingInsertedFuelAmount = Math.max(pendingInsertedFuelAmount, ItemHelper.getFuelAmount(fuelStack));
+        pendingInsertedFuelTicks = FUEL_INSERTION_CACHE_GRACE_TICKS;
+    }
+
+    private void updatePendingInsertedFuel() {
+        if (pendingInsertedFuelAmount <= 0) {
+            return;
+        }
+        if (isNotEmpty(containerCache.fuelSlot) || containerCache.burningFuelCount > 0 || containerCache.burnPercentage > 0) {
+            clearPendingInsertedFuel();
+            return;
+        }
+        pendingInsertedFuelTicks--;
+        if (pendingInsertedFuelTicks <= 0) {
+            clearPendingInsertedFuel();
+        }
+    }
+
+    private void clearPendingInsertedFuel() {
+        pendingInsertedFuelAmount = 0;
+        pendingInsertedFuelTicks = 0;
     }
 
     private double getCurrentFuelAndCookProgress(AltoClef mod) {
@@ -392,6 +429,7 @@ abstract class AbstractDoSmeltInContainerTask extends DoStuffInContainerTask {
                 + ", output=" + describeStack(containerCache.outputSlot)
                 + ", burningFuel=" + formatDouble(containerCache.burningFuelCount)
                 + ", cook=" + formatDouble(containerCache.burnPercentage)
+                + ", pendingFuel=" + formatDouble(pendingInsertedFuelAmount)
                 + "]";
     }
 
