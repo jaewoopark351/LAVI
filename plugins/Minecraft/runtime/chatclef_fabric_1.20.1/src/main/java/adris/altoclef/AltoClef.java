@@ -104,6 +104,7 @@ public class AltoClef implements ModInitializer {
     private AltoClefTickChart altoClefTickChart;
     // Settings
     private adris.altoclef.Settings settings;
+    private BaritoneOverlayRenderSettingsSnapshot baritoneOverlayRenderSettingsSnapshot;
     // Misc managers/input
     private MessageSender messageSender;
     private InputControls inputControls;
@@ -235,6 +236,7 @@ public class AltoClef implements ModInitializer {
         // Load settings
         adris.altoclef.Settings.load(newSettings -> {
             settings = newSettings;
+            applyInGameOverlayVisibilityFromSettings();
             if (laviBridgeServer == null) {
                 laviBridgeServer = new LaviBridgeServer(this);
                 laviBridgeServer.start();
@@ -341,11 +343,13 @@ public class AltoClef implements ModInitializer {
         }
 
         // Chatclef UI
-        if (ChatclefToggleButton.tick()) {
-            setChatClefEnabled(!getAiBridge().getEnabled());
-        }
-        if (PlayerModeToggleButton.tick()) {
-            setPlayerMode(!getAiBridge().getPlayerMode());
+        if (isInGameOverlayVisible()) {
+            if (ChatclefToggleButton.tick()) {
+                setChatClefEnabled(!getAiBridge().getEnabled());
+            }
+            if (PlayerModeToggleButton.tick()) {
+                setPlayerMode(!getAiBridge().getPlayerMode());
+            }
         }
     }
 
@@ -369,7 +373,26 @@ public class AltoClef implements ModInitializer {
         getAiBridge().setPlayerMode(enabled);
     }
 
+    public boolean isInGameOverlayVisible() {
+        return settings == null || settings.shouldShowInGameOverlay();
+    }
+
+    public void setInGameOverlayVisible(boolean visible) {
+        boolean previous = isInGameOverlayVisible();
+        if (settings != null) {
+            settings.setShowInGameOverlay(visible);
+        }
+        applyBaritoneOverlayVisibility(visible);
+        Debug.logWarning("[OverlayVisibility] requested=" + formatOverlayVisibility(visible)
+                + ", previous=" + formatOverlayVisibility(previous)
+                + ", applied=" + formatOverlayVisibility(isInGameOverlayVisible())
+                + ", settingsLoaded=" + (settings != null));
+    }
+
     private void onClientRenderOverlay(DrawContextWrapper context) {
+        if (settings == null || !settings.shouldShowInGameOverlay()) {
+            return;
+        }
         context.setRenderLayer(RenderLayerVer.getGuiOverlay());
         if (settings.shouldShowTaskChain()) {
             commandStatusOverlay.render(this, context);
@@ -439,6 +462,81 @@ public class AltoClef implements ModInitializer {
         getClientBaritoneSettings().planAheadFailureTimeoutMS.reset();
         // Was 100
         getClientBaritoneSettings().movementTimeoutTicks.reset();
+    }
+
+    private void applyInGameOverlayVisibilityFromSettings() {
+        if (settings != null) {
+            boolean visible = settings.shouldShowInGameOverlay();
+            applyBaritoneOverlayVisibility(visible);
+            Debug.logWarning("[OverlayVisibility] loaded from settings: showInGameOverlay="
+                    + formatOverlayVisibility(visible));
+        }
+    }
+
+    private static String formatOverlayVisibility(boolean visible) {
+        return visible ? "ON" : "OFF";
+    }
+
+    private void applyBaritoneOverlayVisibility(boolean visible) {
+        Settings baritoneSettings = getClientBaritoneSettings();
+        if (visible) {
+            if (baritoneOverlayRenderSettingsSnapshot != null) {
+                baritoneOverlayRenderSettingsSnapshot.restore(baritoneSettings);
+                baritoneOverlayRenderSettingsSnapshot = null;
+            }
+            return;
+        }
+
+        if (baritoneOverlayRenderSettingsSnapshot == null) {
+            baritoneOverlayRenderSettingsSnapshot = new BaritoneOverlayRenderSettingsSnapshot(baritoneSettings);
+        }
+
+        //20260728_kpopmodder: Hide Baritone debug/path visuals when the ChatClef HUD is disabled.
+        baritoneSettings.renderPath.value = false;
+        baritoneSettings.renderPathAsLine.value = false;
+        baritoneSettings.renderGoal.value = false;
+        baritoneSettings.renderGoalAnimated.value = false;
+        baritoneSettings.renderSelectionBoxes.value = false;
+        baritoneSettings.renderGoalXZBeacon.value = false;
+        baritoneSettings.renderCachedChunks.value = false;
+        baritoneSettings.renderSelection.value = false;
+        baritoneSettings.fadePath.value = false;
+    }
+
+    private static final class BaritoneOverlayRenderSettingsSnapshot {
+        private final boolean renderPath;
+        private final boolean renderPathAsLine;
+        private final boolean renderGoal;
+        private final boolean renderGoalAnimated;
+        private final boolean renderSelectionBoxes;
+        private final boolean renderGoalXZBeacon;
+        private final boolean renderCachedChunks;
+        private final boolean renderSelection;
+        private final boolean fadePath;
+
+        private BaritoneOverlayRenderSettingsSnapshot(Settings settings) {
+            renderPath = settings.renderPath.value;
+            renderPathAsLine = settings.renderPathAsLine.value;
+            renderGoal = settings.renderGoal.value;
+            renderGoalAnimated = settings.renderGoalAnimated.value;
+            renderSelectionBoxes = settings.renderSelectionBoxes.value;
+            renderGoalXZBeacon = settings.renderGoalXZBeacon.value;
+            renderCachedChunks = settings.renderCachedChunks.value;
+            renderSelection = settings.renderSelection.value;
+            fadePath = settings.fadePath.value;
+        }
+
+        private void restore(Settings settings) {
+            settings.renderPath.value = renderPath;
+            settings.renderPathAsLine.value = renderPathAsLine;
+            settings.renderGoal.value = renderGoal;
+            settings.renderGoalAnimated.value = renderGoalAnimated;
+            settings.renderSelectionBoxes.value = renderSelectionBoxes;
+            settings.renderGoalXZBeacon.value = renderGoalXZBeacon;
+            settings.renderCachedChunks.value = renderCachedChunks;
+            settings.renderSelection.value = renderSelection;
+            settings.fadePath.value = fadePath;
+        }
     }
 
     // List all command sources here.

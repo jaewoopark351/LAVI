@@ -13,6 +13,7 @@ import adris.altoclef.commands.HeroCommand;
 import adris.altoclef.commands.IdleCommand;
 import adris.altoclef.commands.LocateStructureCommand;
 import adris.altoclef.commands.MeatCommand;
+import adris.altoclef.commands.OverlayCommand;
 import adris.altoclef.commands.ReloadSettingsCommand;
 import adris.altoclef.commands.SetAIBridgeEnabledCommand;
 import adris.altoclef.commands.SetGammaCommand;
@@ -45,6 +46,7 @@ public class AltoClefCommands {
                 new MeatCommand(),
                 new ReloadSettingsCommand(),
                 new ResetMemoryCommand(),
+                new OverlayCommand(),
                 new GamerCommand(),
                 new FollowCommand(),
                 new GiveCommand(),

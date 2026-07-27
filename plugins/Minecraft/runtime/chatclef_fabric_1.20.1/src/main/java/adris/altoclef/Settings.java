@@ -46,6 +46,12 @@ public class Settings implements IFailableConfigFile {
     //////////////////////////////////////////////////////////////////////////////////////////
 
     /**
+     * If true, render ChatClef's in-game HUD: task chain text, ChatClef/Player Mode state,
+     * STT feedback, debug tick chart, and Baritone path/goal overlays.
+     */
+    private boolean showInGameOverlay = true;
+
+    /**
      * If true, shows a debug bar displaying how much milliseconds is spend on altoclefs tick function
      */
     private boolean showDebugTickMs = false;
@@ -459,6 +465,14 @@ public class Settings implements IFailableConfigFile {
 
     public static void load(Consumer<Settings> onReload) {
         ConfigHelper.loadConfig(SETTINGS_PATH, Settings::new, Settings.class, onReload);
+    }
+
+    public boolean shouldShowInGameOverlay() {
+        return showInGameOverlay;
+    }
+
+    public void setShowInGameOverlay(boolean showInGameOverlay) {
+        this.showInGameOverlay = showInGameOverlay;
     }
 
     public boolean shouldShowTaskChain() {
