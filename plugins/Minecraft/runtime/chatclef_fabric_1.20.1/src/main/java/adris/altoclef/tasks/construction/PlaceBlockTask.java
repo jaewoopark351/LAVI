@@ -301,10 +301,24 @@ public class PlaceBlockTask extends Task implements ITaskRequiresGrounded {
                 + ", materialCount=" + getMaterialCount(mod)
                 + ", cursor=" + describeStack(StorageHelper.getItemStackInCursorSlot())
                 + ", equipped=" + StorageHelper.isEquipped(ItemHelper.blocksToItems(toPlace))
+                + ", screen=" + describeCurrentScreen()
+                + ", screenHandler=" + describeScreenHandler(mod)
                 + ", builderActive=" + mod.getClientBaritone().getBuilderProcess().isActive()
                 + ", pathing=" + mod.getClientBaritone().getPathingBehavior().isPathing()
                 + ", failCount=" + failCount
                 + ", blocks=" + describeBlocks();
+    }
+
+    private String describeCurrentScreen() {
+        Object screen = MinecraftClient.getInstance().currentScreen;
+        return screen == null ? "none" : screen.getClass().getSimpleName();
+    }
+
+    private String describeScreenHandler(AltoClef mod) {
+        if (mod == null || mod.getPlayer() == null || mod.getPlayer().currentScreenHandler == null) {
+            return "none";
+        }
+        return mod.getPlayer().currentScreenHandler.getClass().getSimpleName();
     }
 
     private String describeAvailableBlocks(List<BlockState> available) {

@@ -20,11 +20,15 @@ import baritone.api.utils.IPlayerContext;
 import baritone.api.utils.input.Input;
 import baritone.pathing.movement.MovementHelper;
 import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.Blocks;
+import net.minecraft.block.ShapeContext;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.ChatScreen;
 import net.minecraft.client.gui.screen.GameMenuScreen;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.screen.option.GameOptionsScreen;
+import net.minecraft.entity.Entity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
@@ -44,6 +48,8 @@ import java.util.function.Predicate;
 public class PlaceBlockNearbyTask extends Task {
 
     private static final int MAX_DIRECT_PLACE_ATTEMPTS_PER_TARGET = 20;
+    private static final int PLANNED_PLACE_GRACE_TICKS = 20 * 8;
+    private static final int MAX_CLEAR_ATTEMPTS_PER_TARGET = 2;
     private static final double DIRECT_PLACE_TARGET_SKIP_SECONDS = 6.0;
 
     private final Block[] toPlace;
@@ -62,6 +68,14 @@ public class PlaceBlockNearbyTask extends Task {
     private int directPlaceAttempts;
     private BlockPos skippedDirectPlaceTarget;
     private final TimerGame skippedDirectPlaceTimer = new TimerGame(DIRECT_PLACE_TARGET_SKIP_SECONDS);
+    private PlaceBlockTask plannedPlaceTask;
+    private BlockPos plannedPlaceTarget;
+    private int plannedPlaceTicks;
+    private DestroyBlockTask clearNearbyTask;
+    private BlockPos clearNearbyTarget;
+    private BlockPos clearNearbyForPlaceTarget;
+    private BlockPos lastClearAttemptPlaceTarget;
+    private int clearAttemptsForTarget;
 
     public PlaceBlockNearbyTask(Predicate<BlockPos> canPlaceHere, Block... toPlace) {
         this.toPlace = toPlace;
@@ -76,7 +90,11 @@ public class PlaceBlockNearbyTask extends Task {
     protected void onStart() {
         progressChecker.reset();
         resetDirectPlaceAttempts();
+        resetPlannedPlaceTask();
+        resetClearNearbyTask(false);
         skippedDirectPlaceTarget = null;
+        lastClearAttemptPlaceTarget = null;
+        clearAttemptsForTarget = 0;
         AltoClef.getInstance().getClientBaritone().getInputOverrideHandler().setInputForceState(Input.CLICK_RIGHT, false);
         if (shouldAvoidSneakRightClick()) {
             AltoClef.getInstance().getInputControls().release(Input.SNEAK);
@@ -89,6 +107,8 @@ public class PlaceBlockNearbyTask extends Task {
             if (ArrayUtils.contains(toPlace, evt.blockState.getBlock())) {
                 justPlaced = evt.blockPos;
                 resetDirectPlaceAttempts();
+                resetPlannedPlaceTask();
+                resetClearNearbyTask(false);
                 debugLogger.event("block placed event: block=" + evt.blockState.getBlock().getTranslationKey()
                         + ", pos=" + evt.blockPos.toShortString());
                 stopPlacing();
@@ -139,12 +159,23 @@ public class PlaceBlockNearbyTask extends Task {
             return null;
         }
 
+        Task clearTask = continueClearNearbyTask(mod);
+        if (clearTask != null) {
+            return clearTask;
+        }
+
         // Try placing where we're looking right now.
         BlockPos current = getCurrentlyLookingBlockPlace(mod);
         if (current != null && isTemporarilySkippingDirectPlace(current)) {
             debugLogger.state("skip repeated direct place target: " + current.toShortString(),
                     "skip repeated direct place target: target=" + current.toShortString()
                             + ", blockAtTarget=" + describeBlockAt(current));
+        } else if (current != null && isPlacementCollisionBlocked(mod, current)) {
+            debugLogger.state("skip direct place target blocked by collision: " + current.toShortString(),
+                    "skip direct place target blocked by collision: target=" + current.toShortString()
+                            + ", entity=" + describeNearbyBlockingEntity(mod, current)
+                            + ", " + describePlacementContext(mod, current));
+            markDirectPlaceTargetSkipped(current);
         } else if (current != null && _canPlaceHere.test(current)) {
             setDebugState("Placing since we can...");
             if (mod.getSlotHandler().forceEquipItem(ItemHelper.blocksToItems(toPlace))) {
@@ -182,10 +213,26 @@ public class PlaceBlockNearbyTask extends Task {
             tryPlace = locateClosePlacePos(mod);
         }
         if (tryPlace != null) {
-            setDebugState("Trying to place at " + tryPlace);
-            debugLogger.state("try planned place: target=" + tryPlace.toShortString());
-            justPlaced = tryPlace;
-            return new PlaceBlockTask(tryPlace, toPlace);
+            BlockPos plannedTarget = tryPlace;
+            Task clearBeforePlacing = getClearTaskBeforePlacing(mod, plannedTarget);
+            if (clearBeforePlacing != null) {
+                return clearBeforePlacing;
+            }
+            if (tryPlace == null || !plannedTarget.equals(tryPlace)) {
+                // The pre-place check skipped this target.
+            } else if (isPlacementCollisionBlocked(mod, plannedTarget)) {
+                debugLogger.event("planned place target blocked by collision: target=" + plannedTarget.toShortString()
+                        + ", entity=" + describeNearbyBlockingEntity(mod, plannedTarget)
+                        + ", " + describePlacementContext(mod, plannedTarget));
+                markDirectPlaceTargetSkipped(plannedTarget);
+            } else {
+                setDebugState("Trying to place at " + plannedTarget);
+                justPlaced = plannedTarget;
+                Task plannedTask = getPlannedPlaceTaskOrRecover(mod, plannedTarget);
+                if (plannedTask != null) {
+                    return plannedTask;
+                }
+            }
         }
 
         // Look in random places to maybe get a random hit
@@ -202,6 +249,8 @@ public class PlaceBlockNearbyTask extends Task {
     @Override
     protected void onStop(Task interruptTask) {
         stopPlacing();
+        resetPlannedPlaceTask();
+        resetClearNearbyTask(false);
         EventBus.unsubscribe(_onBlockPlaced);
     }
 
@@ -358,7 +407,7 @@ public class PlaceBlockNearbyTask extends Task {
             justPlaced = null;
         }
         resetDirectPlaceAttempts();
-        debugLogger.event("temporarily skipping repeated direct place target: target=" + targetPlace.toShortString()
+        debugLogger.event("temporarily skipping place target: target=" + targetPlace.toShortString()
                 + ", seconds=" + DIRECT_PLACE_TARGET_SKIP_SECONDS
                 + ", blockAtTarget=" + describeBlockAt(targetPlace));
         LookHelper.randomOrientation();
@@ -378,6 +427,252 @@ public class PlaceBlockNearbyTask extends Task {
     private boolean isPlacedAt(BlockPos targetPlace) {
         return targetPlace != null
                 && ArrayUtils.contains(toPlace, AltoClef.getInstance().getWorld().getBlockState(targetPlace).getBlock());
+    }
+
+    private Task getPlannedPlaceTaskOrRecover(AltoClef mod, BlockPos targetPlace) {
+        if (isPlacedAt(targetPlace)) {
+            justPlaced = targetPlace;
+            resetPlannedPlaceTask();
+            return null;
+        }
+
+        if (plannedPlaceTask != null && targetPlace.equals(plannedPlaceTarget)) {
+            if (plannedPlaceTask.isFinished()) {
+                justPlaced = targetPlace;
+                resetPlannedPlaceTask();
+                return null;
+            }
+
+            plannedPlaceTicks++;
+            if (plannedPlaceTicks > PLANNED_PLACE_GRACE_TICKS) {
+                return recoverFromBlockedPlannedPlace(mod, targetPlace);
+            }
+
+            debugLogger.state("continue planned place: " + targetPlace.toShortString(),
+                    "continue planned place: target=" + targetPlace.toShortString()
+                            + ", ticks=" + plannedPlaceTicks
+                            + ", graceTicks=" + PLANNED_PLACE_GRACE_TICKS
+                            + ", " + describePlacementContext(mod, targetPlace));
+            return plannedPlaceTask;
+        }
+
+        plannedPlaceTarget = copyPos(targetPlace);
+        plannedPlaceTicks = 0;
+        plannedPlaceTask = new PlaceBlockTask(targetPlace, toPlace);
+        debugLogger.state("try planned place: target=" + targetPlace.toShortString(),
+                "try planned place: target=" + targetPlace.toShortString()
+                        + ", graceTicks=" + PLANNED_PLACE_GRACE_TICKS
+                        + ", " + describePlacementContext(mod, targetPlace));
+        return plannedPlaceTask;
+    }
+
+    private Task recoverFromBlockedPlannedPlace(AltoClef mod, BlockPos targetPlace) {
+        debugLogger.event("planned place grace expired: target=" + targetPlace.toShortString()
+                + ", ticks=" + plannedPlaceTicks
+                + ", " + describePlacementContext(mod, targetPlace));
+        resetPlannedPlaceTask();
+
+        BlockPos clearTarget = findClearableBlockNearPlacement(mod, targetPlace);
+        Task clearTask = startClearNearbyTask(mod, targetPlace, clearTarget, "planned place stuck");
+        if (clearTask != null) {
+            return clearTask;
+        }
+
+        debugLogger.event("planned place skipped after failed recovery: target=" + targetPlace.toShortString()
+                + ", " + describePlacementContext(mod, targetPlace));
+        markDirectPlaceTargetSkipped(targetPlace);
+        return null;
+    }
+
+    private Task getClearTaskBeforePlacing(AltoClef mod, BlockPos targetPlace) {
+        BlockState state = mod.getWorld().getBlockState(targetPlace);
+        if (state.isAir() || state.isReplaceable()) {
+            return null;
+        }
+
+        if (!isSafeToClearForPlacement(mod, targetPlace)) {
+            debugLogger.event("planned place target occupied but unsafe to clear: target=" + targetPlace.toShortString()
+                    + ", block=" + describeBlockAt(targetPlace)
+                    + ", " + describePlacementContext(mod, targetPlace));
+            markDirectPlaceTargetSkipped(targetPlace);
+            return null;
+        }
+
+        return startClearNearbyTask(mod, targetPlace, targetPlace, "placement target occupied");
+    }
+
+    private Task continueClearNearbyTask(AltoClef mod) {
+        if (clearNearbyTask == null) {
+            return null;
+        }
+
+        if (clearNearbyTask.isFinished()) {
+            debugLogger.event("clear nearby block complete: target=" + describePos(clearNearbyForPlaceTarget)
+                    + ", cleared=" + describePos(clearNearbyTarget)
+                    + ", blockNow=" + describeBlockAt(clearNearbyTarget));
+            resetClearNearbyTask(false);
+            resetPlannedPlaceTask();
+            progressChecker.reset();
+            return null;
+        }
+
+        if (clearNearbyTask.stopped()) {
+            debugLogger.event("clear nearby block stopped before completion: target=" + describePos(clearNearbyForPlaceTarget)
+                    + ", clear=" + describePos(clearNearbyTarget)
+                    + ", block=" + describeBlockAt(clearNearbyTarget));
+            BlockPos skippedTarget = clearNearbyForPlaceTarget;
+            resetClearNearbyTask(false);
+            if (skippedTarget != null) {
+                markDirectPlaceTargetSkipped(skippedTarget);
+            }
+            return null;
+        }
+
+        setDebugState("Clearing nearby block before placing.");
+        debugLogger.state("continue clearing nearby block: " + describePos(clearNearbyTarget),
+                "continue clearing nearby block: target=" + describePos(clearNearbyForPlaceTarget)
+                        + ", clear=" + describePos(clearNearbyTarget)
+                        + ", block=" + describeBlockAt(clearNearbyTarget));
+        return clearNearbyTask;
+    }
+
+    private Task startClearNearbyTask(AltoClef mod, BlockPos placeTarget, BlockPos blockToClear, String reason) {
+        if (blockToClear == null) {
+            return null;
+        }
+        if (!recordClearAttempt(placeTarget)) {
+            debugLogger.event("clear nearby block limit reached: target=" + placeTarget.toShortString()
+                    + ", maxAttempts=" + MAX_CLEAR_ATTEMPTS_PER_TARGET
+                    + ", reason=" + reason);
+            return null;
+        }
+
+        resetPlannedPlaceTask();
+        clearNearbyTask = new DestroyBlockTask(blockToClear);
+        clearNearbyTarget = copyPos(blockToClear);
+        clearNearbyForPlaceTarget = copyPos(placeTarget);
+        progressChecker.reset();
+        debugLogger.event("clear nearby block before place retry: reason=" + reason
+                + ", target=" + placeTarget.toShortString()
+                + ", clear=" + blockToClear.toShortString()
+                + ", block=" + describeBlockAt(blockToClear)
+                + ", attempt=" + clearAttemptsForTarget + "/" + MAX_CLEAR_ATTEMPTS_PER_TARGET);
+        return clearNearbyTask;
+    }
+
+    private boolean recordClearAttempt(BlockPos placeTarget) {
+        if (lastClearAttemptPlaceTarget == null || !lastClearAttemptPlaceTarget.equals(placeTarget)) {
+            lastClearAttemptPlaceTarget = copyPos(placeTarget);
+            clearAttemptsForTarget = 0;
+        }
+        if (clearAttemptsForTarget >= MAX_CLEAR_ATTEMPTS_PER_TARGET) {
+            return false;
+        }
+        clearAttemptsForTarget++;
+        return true;
+    }
+
+    private void resetPlannedPlaceTask() {
+        plannedPlaceTask = null;
+        plannedPlaceTarget = null;
+        plannedPlaceTicks = 0;
+    }
+
+    private void resetClearNearbyTask(boolean resetAttemptCounter) {
+        clearNearbyTask = null;
+        clearNearbyTarget = null;
+        clearNearbyForPlaceTarget = null;
+        if (resetAttemptCounter) {
+            lastClearAttemptPlaceTarget = null;
+            clearAttemptsForTarget = 0;
+        }
+    }
+
+    private BlockPos findClearableBlockNearPlacement(AltoClef mod, BlockPos targetPlace) {
+        BlockPos best = null;
+        double bestScore = Double.POSITIVE_INFINITY;
+        BlockPos start = targetPlace.add(-1, 0, -1);
+        BlockPos end = targetPlace.add(1, 1, 1);
+        for (BlockPos blockPos : WorldHelper.scanRegion(start, end)) {
+            if (blockPos.equals(targetPlace) || blockPos.equals(targetPlace.down())) {
+                continue;
+            }
+            if (!isSafeToClearForPlacement(mod, blockPos)) {
+                continue;
+            }
+            double score = BlockPosVer.getSquaredDistance(blockPos, mod.getPlayer().getPos())
+                    + (blockPos.getY() > targetPlace.getY() ? 1.0 : 0.0)
+                    + (WorldHelper.isInsidePlayer(blockPos) ? 5.0 : 0.0);
+            if (score < bestScore) {
+                best = copyPos(blockPos);
+                bestScore = score;
+            }
+        }
+        return best;
+    }
+
+    private boolean isSafeToClearForPlacement(AltoClef mod, BlockPos blockPos) {
+        if (blockPos == null || mod == null || mod.getWorld() == null) {
+            return false;
+        }
+        BlockState state = mod.getWorld().getBlockState(blockPos);
+        if (state.isAir() || state.isReplaceable()) {
+            return false;
+        }
+        if (!WorldHelper.canBreak(blockPos)) {
+            return false;
+        }
+        if (WorldHelper.isInsidePlayer(blockPos)) {
+            return false;
+        }
+        if (mod.getWorld().getBlockEntity(blockPos) != null || state.hasBlockEntity()) {
+            return false;
+        }
+
+        Block block = state.getBlock();
+        if (ArrayUtils.contains(toPlace, block) || isProtectedPlacementClearBlock(block)) {
+            return false;
+        }
+        String translationKey = block.getTranslationKey();
+        return !translationKey.contains("_ore")
+                && !translationKey.contains("ancient_debris")
+                && !translationKey.contains("spawner");
+    }
+
+    private boolean isProtectedPlacementClearBlock(Block block) {
+        return block == Blocks.BEDROCK
+                || block == Blocks.OBSIDIAN
+                || block == Blocks.CHEST
+                || block == Blocks.TRAPPED_CHEST
+                || block == Blocks.BARREL
+                || block == Blocks.HOPPER
+                || block == Blocks.FURNACE
+                || block == Blocks.BLAST_FURNACE
+                || block == Blocks.SMOKER
+                || block == Blocks.CRAFTING_TABLE
+                || block == Blocks.ANVIL
+                || block == Blocks.CHIPPED_ANVIL
+                || block == Blocks.DAMAGED_ANVIL;
+    }
+
+    private boolean isPlacementCollisionBlocked(AltoClef mod, BlockPos targetPlace) {
+        if (mod == null || mod.getWorld() == null || targetPlace == null) {
+            return false;
+        }
+        BlockState currentState = mod.getWorld().getBlockState(targetPlace);
+        if (!currentState.isAir() && !currentState.isReplaceable()) {
+            return false;
+        }
+        return !mod.getWorld().canPlace(getFallbackPlaceState(), targetPlace, ShapeContext.absent());
+    }
+
+    private BlockState getFallbackPlaceState() {
+        for (Block block : toPlace) {
+            if (block != null) {
+                return block.getDefaultState();
+            }
+        }
+        return Blocks.COBBLESTONE.getDefaultState();
     }
 
     private boolean shouldAvoidSneakRightClick() {
@@ -414,6 +709,60 @@ public class PlaceBlockNearbyTask extends Task {
         return block.getTranslationKey();
     }
 
+    private String describePlacementContext(AltoClef mod, BlockPos targetPlace) {
+        if (mod == null || mod.getPlayer() == null || mod.getWorld() == null) {
+            return "context=missing-client";
+        }
+        return "player=" + mod.getPlayer().getBlockPos().toShortString()
+                + ", blockAtTarget=" + describeBlockAt(targetPlace)
+                + ", collisionBlocked=" + isPlacementCollisionBlocked(mod, targetPlace)
+                + ", nearbyEntity=" + describeNearbyBlockingEntity(mod, targetPlace)
+                + ", screen=" + describeScreen(MinecraftClient.getInstance().currentScreen)
+                + ", screenHandler=" + describeScreenHandler(mod)
+                + ", cursor=" + describeStack(StorageHelper.getItemStackInCursorSlot())
+                + ", pathing=" + mod.getClientBaritone().getPathingBehavior().isPathing()
+                + ", builderActive=" + mod.getClientBaritone().getBuilderProcess().isActive()
+                + ", tryPlace=" + describePos(tryPlace)
+                + ", justPlaced=" + describePos(justPlaced);
+    }
+
+    private String describeScreenHandler(AltoClef mod) {
+        if (mod == null || mod.getPlayer() == null || mod.getPlayer().currentScreenHandler == null) {
+            return "none";
+        }
+        return mod.getPlayer().currentScreenHandler.getClass().getSimpleName();
+    }
+
+    private String describeNearbyBlockingEntity(AltoClef mod, BlockPos targetPlace) {
+        if (mod == null || mod.getWorld() == null || mod.getPlayer() == null || targetPlace == null) {
+            return "none";
+        }
+
+        Entity closest = null;
+        double closestDistance = 2.25;
+        for (Entity entity : mod.getWorld().getEntities()) {
+            if (entity == mod.getPlayer() || !entity.isAlive()) {
+                continue;
+            }
+            double distance = BlockPosVer.getSquaredDistance(targetPlace, entity.getPos());
+            if (distance < closestDistance) {
+                closest = entity;
+                closestDistance = distance;
+            }
+        }
+        if (closest == null) {
+            return "none";
+        }
+        return closest.getType().getTranslationKey() + "@" + closest.getBlockPos().toShortString();
+    }
+
+    private BlockPos copyPos(BlockPos pos) {
+        if (pos == null) {
+            return null;
+        }
+        return new BlockPos(pos.getX(), pos.getY(), pos.getZ());
+    }
+
     private BlockPos locateClosePlacePos(AltoClef mod) {
         int range = 7;
         BlockPos best = null;
@@ -421,10 +770,12 @@ public class PlaceBlockNearbyTask extends Task {
         BlockPos start = mod.getPlayer().getBlockPos().add(-range,-range,-range);
         BlockPos end = mod.getPlayer().getBlockPos().add(range,range,range);
         for (BlockPos blockPos : WorldHelper.scanRegion(start, end)) {
+            BlockState state = mod.getWorld().getBlockState(blockPos);
+            boolean occupied = !state.isAir() && !state.isReplaceable();
             boolean solid = WorldHelper.isSolidBlock(blockPos);
             boolean inside = WorldHelper.isInsidePlayer(blockPos);
             // We can't break this block.
-            if (solid && !WorldHelper.canBreak(blockPos)) {
+            if (occupied && !isSafeToClearForPlacement(mod, blockPos)) {
                 continue;
             }
             if (isTemporarilySkippingDirectPlace(blockPos)) {
@@ -436,6 +787,9 @@ public class PlaceBlockNearbyTask extends Task {
             }
             // We can't place here.
             if (!WorldHelper.canReach(blockPos) || !WorldHelper.canPlace(blockPos)) {
+                continue;
+            }
+            if (isPlacementCollisionBlocked(mod, blockPos)) {
                 continue;
             }
             boolean hasBelow = WorldHelper.isSolidBlock(blockPos.down());

@@ -25,6 +25,7 @@ import baritone.api.utils.Rotation;
 import baritone.api.utils.input.Input;
 import net.minecraft.block.*;
 import adris.altoclef.multiversion.versionedfields.Blocks;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.screen.slot.SlotActionType;
@@ -234,7 +235,8 @@ public class InteractWithBlockTask extends Task {
         debugLogger.event("start: target=" + target.toShortString()
                 + ", toUse=" + toUse
                 + ", direction=" + direction
-                + ", shiftClick=" + shiftClick);
+                + ", shiftClick=" + shiftClick
+                + ", " + describeInteractionContext(AltoClef.getInstance()));
     }
 
     @Override
@@ -397,7 +399,8 @@ public class InteractWithBlockTask extends Task {
                 mod.getPlayer().isBlocking()) {
             debugLogger.state("right click paused: interactionPaused=" + mod.getExtraBaritoneSettings().isInteractionPaused()
                     + ", needsToEat=" + mod.getFoodChain().needsToEat()
-                    + ", blocking=" + mod.getPlayer().isBlocking());
+                    + ", blocking=" + mod.getPlayer().isBlocking()
+                    + ", " + describeInteractionContext(mod));
             return ClickResponse.WAIT_FOR_CLICK;
         }
 
@@ -405,7 +408,9 @@ public class InteractWithBlockTask extends Task {
         if (!StorageHelper.isPlayerInventoryOpen()) {
             ItemStack cursorStack = StorageHelper.getItemStackInCursorSlot();
             if (!cursorStack.isEmpty()) {
-                debugLogger.state("right click delayed: clearing cursor=" + describeStack(cursorStack));
+                debugLogger.state("right click delayed: clearing cursor=" + describeStack(cursorStack),
+                        "right click delayed: clearing cursor=" + describeStack(cursorStack)
+                                + ", " + describeInteractionContext(mod));
                 Optional<Slot> moveTo = mod.getItemStorage().getSlotThatCanFitInPlayerInventory(cursorStack, false);
                 if (moveTo.isPresent()) {
                     mod.getSlotHandler().clickSlot(moveTo.get(), 0, SlotActionType.PICKUP);
@@ -424,7 +429,8 @@ public class InteractWithBlockTask extends Task {
                 mod.getSlotHandler().clickSlot(Slot.UNDEFINED, 0, SlotActionType.PICKUP);
                 return ClickResponse.WAIT_FOR_CLICK;
             } else {
-                debugLogger.state("right click delayed: closing open screen before interacting");
+                debugLogger.state("right click delayed: closing open screen before interacting",
+                        "right click delayed: closing open screen before interacting: " + describeInteractionContext(mod));
                 StorageHelper.closeScreen();
             }
         }
@@ -476,5 +482,29 @@ public class InteractWithBlockTask extends Task {
             return "empty";
         }
         return stack.getItem().getTranslationKey() + " x " + stack.getCount();
+    }
+
+    private String describeInteractionContext(AltoClef mod) {
+        if (mod == null || mod.getPlayer() == null) {
+            return "context=missing-client";
+        }
+        return "player=" + mod.getPlayer().getBlockPos().toShortString()
+                + ", screen=" + describeCurrentScreen()
+                + ", screenHandler=" + describeScreenHandler(mod)
+                + ", cursor=" + describeStack(StorageHelper.getItemStackInCursorSlot())
+                + ", pathing=" + mod.getClientBaritone().getPathingBehavior().isPathing()
+                + ", shiftClick=" + shiftClick;
+    }
+
+    private String describeCurrentScreen() {
+        Object screen = MinecraftClient.getInstance().currentScreen;
+        return screen == null ? "none" : screen.getClass().getSimpleName();
+    }
+
+    private String describeScreenHandler(AltoClef mod) {
+        if (mod == null || mod.getPlayer() == null || mod.getPlayer().currentScreenHandler == null) {
+            return "none";
+        }
+        return mod.getPlayer().currentScreenHandler.getClass().getSimpleName();
     }
 }

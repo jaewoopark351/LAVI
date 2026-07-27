@@ -7,6 +7,7 @@ import adris.altoclef.tasksystem.TaskRunner;
 import adris.altoclef.util.helpers.ItemHelper;
 import adris.altoclef.util.helpers.LookHelper;
 import adris.altoclef.util.helpers.StorageHelper;
+import adris.altoclef.util.logging.StateChangeLogger;
 import adris.altoclef.util.slots.PlayerSlot;
 import adris.altoclef.util.slots.Slot;
 import adris.altoclef.util.time.TimerGame;
@@ -34,6 +35,7 @@ public class PlayerInteractionFixChain extends TaskChain {
 
     private Screen lastScreen;
     private Rotation lastLookRotation;
+    private final StateChangeLogger debugLogger = new StateChangeLogger("PlayerInteractionFixChain");
 
     public PlayerInteractionFixChain(TaskRunner runner) {
         super(runner);
@@ -143,6 +145,9 @@ public class PlayerInteractionFixChain extends TaskChain {
             //Debug.logMessage("Closed screen since we changed our look.");
             ItemStack cursorStack = StorageHelper.getItemStackInCursorSlot();
             if (!cursorStack.isEmpty()) {
+                debugLogger.state("screen close delayed by cursor=" + describeStack(cursorStack),
+                        "screen close delayed by cursor=" + describeStack(cursorStack)
+                                + ", " + describeInteractionContext(mod));
                 Optional<Slot> moveTo = mod.getItemStorage().getSlotThatCanFitInPlayerInventory(cursorStack, false);
                 if (moveTo.isPresent()) {
                     mod.getSlotHandler().clickSlot(moveTo.get(), 0, SlotActionType.PICKUP);
@@ -160,6 +165,7 @@ public class PlayerInteractionFixChain extends TaskChain {
                 }
                 mod.getSlotHandler().clickSlot(Slot.UNDEFINED, 0, SlotActionType.PICKUP);
             } else {
+                debugLogger.event("closing open screen after look change: " + describeInteractionContext(mod));
                 StorageHelper.closeScreen();
             }
             return Float.NEGATIVE_INFINITY;
@@ -176,6 +182,9 @@ public class PlayerInteractionFixChain extends TaskChain {
         Screen openScreen = MinecraftClient.getInstance().currentScreen;
         if (openScreen != lastScreen) {
             mouseMovingButScreenOpenTimeout.reset();
+            debugLogger.state("open screen changed: " + describeScreen(openScreen),
+                    "open screen changed: screen=" + describeScreen(openScreen)
+                            + ", handler=" + describeScreenHandler(AltoClef.getInstance()));
         }
         // We're in the player screen/a screen we DON'T want to cancel out of
         if (openScreen == null || openScreen instanceof ChatScreen || openScreen instanceof GameMenuScreen || openScreen instanceof DeathScreen) {
@@ -188,6 +197,10 @@ public class PlayerInteractionFixChain extends TaskChain {
             Rotation delta = look.subtract(lastLookRotation);
             if (Math.abs(delta.getYaw()) > 0.1f || Math.abs(delta.getPitch()) > 0.1f) {
                 lastLookRotation = look;
+                debugLogger.event("screen close requested after look change: screen=" + describeScreen(openScreen)
+                        + ", deltaYaw=" + delta.getYaw()
+                        + ", deltaPitch=" + delta.getPitch()
+                        + ", handler=" + describeScreenHandler(AltoClef.getInstance()));
                 return true;
             }
             // do NOT update our last look rotation, just because we want to measure long term rotation.
@@ -206,5 +219,34 @@ public class PlayerInteractionFixChain extends TaskChain {
     @Override
     public String getName() {
         return "Hand Stack Fix Chain";
+    }
+
+    private String describeInteractionContext(AltoClef mod) {
+        if (mod == null || mod.getPlayer() == null) {
+            return "context=missing-client";
+        }
+        return "screen=" + describeScreen(MinecraftClient.getInstance().currentScreen)
+                + ", handler=" + describeScreenHandler(mod)
+                + ", cursor=" + describeStack(StorageHelper.getItemStackInCursorSlot())
+                + ", pathing=" + mod.getClientBaritone().getPathingBehavior().isPathing()
+                + ", breaking=" + mod.getControllerExtras().isBreakingBlock();
+    }
+
+    private String describeScreen(Screen screen) {
+        return screen == null ? "none" : screen.getClass().getSimpleName();
+    }
+
+    private String describeScreenHandler(AltoClef mod) {
+        if (mod == null || mod.getPlayer() == null || mod.getPlayer().currentScreenHandler == null) {
+            return "none";
+        }
+        return mod.getPlayer().currentScreenHandler.getClass().getSimpleName();
+    }
+
+    private String describeStack(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return "empty";
+        }
+        return stack.getItem().getTranslationKey() + " x " + stack.getCount();
     }
 }

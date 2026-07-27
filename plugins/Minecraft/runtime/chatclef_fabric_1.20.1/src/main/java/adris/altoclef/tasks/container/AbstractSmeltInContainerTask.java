@@ -140,6 +140,7 @@ abstract class AbstractDoSmeltInContainerTask extends DoStuffInContainerTask {
     private final String containerDebugName;
     private final StateChangeLogger debugLogger;
     private boolean ignoreMaterials;
+    private boolean ignoreMaterialsLogged;
     private static final int FUEL_INSERTION_CACHE_GRACE_TICKS = 20 * 3;
     private static final int FUEL_MOVE_TASK_GRACE_TICKS = 20 * 3;
     // #20260727_kpopmodder: Furnace handlers can report a stale fuel slot after a throttled slot move.
@@ -172,7 +173,6 @@ abstract class AbstractDoSmeltInContainerTask extends DoStuffInContainerTask {
 
     public void ignoreMaterials() {
         ignoreMaterials = true;
-        debugLogger.event("ignore materials enabled: target=" + target.getItem() + ", material=" + target.getMaterial());
     }
 
     @Override
@@ -198,6 +198,15 @@ abstract class AbstractDoSmeltInContainerTask extends DoStuffInContainerTask {
         botBehaviour.addProtectedItems(allMaterials.getMatches());
         botBehaviour.addProtectedItems(target.getMaterial().getMatches());
         debugLogger.event("start: output=" + target.getItem() + ", materials=" + allMaterials);
+        logIgnoreMaterialsIfNeeded();
+    }
+
+    private void logIgnoreMaterialsIfNeeded() {
+        // #20260728_kpopmodder: Log ignore-material mode only when this smelt task actually starts, not during food-plan probing.
+        if (ignoreMaterials && !ignoreMaterialsLogged) {
+            ignoreMaterialsLogged = true;
+            debugLogger.event("ignore materials enabled: target=" + target.getItem() + ", material=" + target.getMaterial());
+        }
     }
 
     @Override

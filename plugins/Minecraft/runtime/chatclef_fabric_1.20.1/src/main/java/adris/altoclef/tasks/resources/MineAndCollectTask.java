@@ -172,13 +172,15 @@ public class MineAndCollectTask extends ResourceTask {
         private static final int MINING_TARGET_TIMEOUT_TICKS = 20 * 30;
         private static final int TEMPORARY_BLOCK_SKIP_TICKS = 20 * 45;
         private static final int DROPPED_ITEM_PICKUP_GRACE_TICKS = 20 * 5;
+        private static final int ACTIVE_PICKUP_CONTINUATION_TICKS = 20 * 2;
         private static final double DROPPED_ITEM_PICKUP_GRACE_RANGE = 16;
 
         private final Block[] _blocks;
         private final ItemTarget[] _targets;
         private final TemporaryBlockBlacklist temporaryBlockBlacklist = new TemporaryBlockBlacklist();
-        private final DroppedItemPickupGrace droppedItemPickupGrace = new DroppedItemPickupGrace(
+        private final PickupContinuationPolicy pickupContinuationPolicy = new PickupContinuationPolicy(
                 DROPPED_ITEM_PICKUP_GRACE_TICKS,
+                ACTIVE_PICKUP_CONTINUATION_TICKS,
                 DROPPED_ITEM_PICKUP_GRACE_RANGE
         );
         private final MovementProgressChecker progressChecker = new MovementProgressChecker();
@@ -190,6 +192,7 @@ public class MineAndCollectTask extends ResourceTask {
         private int blockPreferredCount = 0;
         private int dropPreferredCount = 0;
         private int pickupGracePreferredCount = 0;
+        private int pickupContinuationPreferredCount = 0;
         private int interactionPausedDropPreferredCount = 0;
         private int miningTargetSwitchCount = 0;
         private int pickupTargetSwitchCount = 0;
@@ -216,7 +219,7 @@ public class MineAndCollectTask extends ResourceTask {
         @Override
         protected Optional<Object> getClosestTo(AltoClef mod, Vec3d pos) {
             temporaryBlockBlacklist.pruneExpired();
-            droppedItemPickupGrace.pruneExpired();
+            pickupContinuationPolicy.pruneExpired();
 
             Pair<Double, Optional<BlockPos>> closestBlock = getClosestBlock(mod,pos, this::isAllowedMiningCandidate, _blocks);
             Pair<Double, Optional<ItemEntity>> closestDrop = getClosestItemDrop(mod,pos,  _targets);
@@ -233,14 +236,28 @@ public class MineAndCollectTask extends ResourceTask {
                 return closestDrop.getRight().map(Object.class::cast);
             }
 
-            Optional<ItemEntity> graceDrop = droppedItemPickupGrace.getPreferredDrop(closestDrop.getRight());
+            Optional<ItemEntity> graceDrop = pickupContinuationPolicy.getPreferredMinedDrop(closestDrop.getRight());
             if (graceDrop.isPresent()) {
                 pickupGracePreferredCount++;
                 debugLogger.state("pickup grace prefers dropped item",
                         "pickup grace prefers dropped item: drop=" + describeDrop(graceDrop.get())
                                 + ", block=" + closestBlock.getRight().map(BlockPos::toShortString).orElse("none")
-                                + ", ticksRemaining=" + droppedItemPickupGrace.ticksRemaining());
+                                + ", ticksRemaining=" + pickupContinuationPolicy.miningGraceTicksRemaining());
                 return graceDrop.map(Object.class::cast);
+            }
+
+            Optional<ItemEntity> continuationDrop = pickupContinuationPolicy.getPreferredActivePickupDrop(
+                    closestDrop.getRight(),
+                    isPickupTaskContinuing(),
+                    pos
+            );
+            if (continuationDrop.isPresent()) {
+                pickupContinuationPreferredCount++;
+                debugLogger.state("active pickup prefers dropped item",
+                        "active pickup prefers dropped item: drop=" + describeDrop(continuationDrop.get())
+                                + ", block=" + closestBlock.getRight().map(BlockPos::toShortString).orElse("none")
+                                + ", ticksRemaining=" + pickupContinuationPolicy.activePickupTicksRemaining());
+                return continuationDrop.map(Object.class::cast);
             }
 
             if (dropSq <= blockSq) {
@@ -323,13 +340,14 @@ public class MineAndCollectTask extends ResourceTask {
                             + ", timeoutTicks=" + MINING_TARGET_TIMEOUT_TICKS);
                 }
                 miningPos = newPos;
-                droppedItemPickupGrace.arm(newPos);
+                pickupContinuationPolicy.armAfterMining(newPos);
                 return new DestroyBlockTask(miningPos);
             }
             if (obj instanceof ItemEntity drop) {
                 recordGoalSelection("drop:" + drop.getUuid(), false);
                 debugLogger.state("pickup target selected: " + describeDrop(drop));
                 miningPos = null;
+                pickupContinuationPolicy.armActivePickup(drop);
                 return _pickupTask;
             }
             throw new UnsupportedOperationException("Shouldn't try to get the goal from object " + obj + " of type " + (obj != null ? obj.getClass().toString() : "(null object)"));
@@ -360,7 +378,7 @@ public class MineAndCollectTask extends ResourceTask {
             miningPos = null;
             miningTargetStartTick = 0;
             temporaryBlockBlacklist.pruneExpired();
-            droppedItemPickupGrace.reset();
+            pickupContinuationPolicy.reset();
             resetDiagnostics();
             debugLogger.event("start: blocks=" + Arrays.toString(_blocks)
                     + ", targets=" + Arrays.toString(_targets));
@@ -375,13 +393,14 @@ public class MineAndCollectTask extends ResourceTask {
                         + ", blockPreferredTicks=" + blockPreferredCount
                         + ", dropPreferredTicks=" + dropPreferredCount
                         + ", pickupGracePreferredTicks=" + pickupGracePreferredCount
+                        + ", pickupContinuationPreferredTicks=" + pickupContinuationPreferredCount
                         + ", interactionPausedDropPreferredTicks=" + interactionPausedDropPreferredCount
                         + ", miningTargetSwitches=" + miningTargetSwitchCount
                         + ", pickupTargetSwitches=" + pickupTargetSwitchCount
                         + ", temporaryMiningSkips=" + temporaryMiningSkipCount
                         + ", lastGoal=" + lastSelectedGoalKey);
             }
-            droppedItemPickupGrace.reset();
+            pickupContinuationPolicy.reset();
         }
 
         @Override
@@ -403,6 +422,12 @@ public class MineAndCollectTask extends ResourceTask {
 
         public BlockPos miningPos() {
             return miningPos;
+        }
+
+        private boolean isPickupTaskContinuing() {
+            return _pickupTask.isActive()
+                    && !_pickupTask.isFinished()
+                    && !_pickupTask.thisOrChildAreTimedOut();
         }
 
         private void temporarilySkipMiningTarget(AltoClef mod, String reason) {
@@ -463,6 +488,7 @@ public class MineAndCollectTask extends ResourceTask {
             return blockPreferredCount
                     + dropPreferredCount
                     + pickupGracePreferredCount
+                    + pickupContinuationPreferredCount
                     + interactionPausedDropPreferredCount
                     + miningTargetSwitchCount
                     + pickupTargetSwitchCount
@@ -473,6 +499,7 @@ public class MineAndCollectTask extends ResourceTask {
             blockPreferredCount = 0;
             dropPreferredCount = 0;
             pickupGracePreferredCount = 0;
+            pickupContinuationPreferredCount = 0;
             interactionPausedDropPreferredCount = 0;
             miningTargetSwitchCount = 0;
             pickupTargetSwitchCount = 0;
@@ -505,31 +532,41 @@ public class MineAndCollectTask extends ResourceTask {
             }
         }
 
-        //20260727_kpopmodder: Keeps freshly mined drops preferred over nearby new blocks for a short recovery window.
-        private static class DroppedItemPickupGrace {
-            private final int graceTicks;
+        //20260728_kpopmodder: Keeps mine/drop switching policy separate from target scoring.
+        private static class PickupContinuationPolicy {
+            private final int miningGraceTicks;
+            private final int activePickupTicks;
             private final double maxDistanceSq;
-            private int graceUntilTick;
+            private int miningGraceUntilTick;
+            private int activePickupUntilTick;
             private BlockPos miningOrigin;
 
-            private DroppedItemPickupGrace(int graceTicks, double maxDistance) {
-                this.graceTicks = graceTicks;
+            private PickupContinuationPolicy(int miningGraceTicks, int activePickupTicks, double maxDistance) {
+                this.miningGraceTicks = miningGraceTicks;
+                this.activePickupTicks = activePickupTicks;
                 maxDistanceSq = maxDistance * maxDistance;
             }
 
-            private void arm(BlockPos origin) {
+            private void armAfterMining(BlockPos origin) {
                 miningOrigin = origin;
-                graceUntilTick = WorldHelper.getTicks() + graceTicks;
+                miningGraceUntilTick = WorldHelper.getTicks() + miningGraceTicks;
+                activePickupUntilTick = 0;
             }
 
-            private Optional<ItemEntity> getPreferredDrop(Optional<ItemEntity> closestDrop) {
+            private void armActivePickup(ItemEntity drop) {
+                if (isUsableDrop(drop)) {
+                    activePickupUntilTick = WorldHelper.getTicks() + activePickupTicks;
+                }
+            }
+
+            private Optional<ItemEntity> getPreferredMinedDrop(Optional<ItemEntity> closestDrop) {
                 pruneExpired();
                 if (miningOrigin == null || closestDrop.isEmpty()) {
                     return Optional.empty();
                 }
 
                 ItemEntity drop = closestDrop.get();
-                if (!drop.isAlive() || drop.getStack().isEmpty()) {
+                if (!isUsableDrop(drop)) {
                     return Optional.empty();
                 }
 
@@ -540,19 +577,46 @@ public class MineAndCollectTask extends ResourceTask {
                 return Optional.of(drop);
             }
 
-            private int ticksRemaining() {
-                return Math.max(0, graceUntilTick - WorldHelper.getTicks());
+            private Optional<ItemEntity> getPreferredActivePickupDrop(Optional<ItemEntity> closestDrop, boolean pickupTaskContinuing, Vec3d playerPos) {
+                pruneExpired();
+                if (!pickupTaskContinuing || activePickupUntilTick <= WorldHelper.getTicks() || closestDrop.isEmpty()) {
+                    return Optional.empty();
+                }
+
+                ItemEntity drop = closestDrop.get();
+                if (!isUsableDrop(drop) || drop.getPos().squaredDistanceTo(playerPos) > maxDistanceSq) {
+                    return Optional.empty();
+                }
+                return Optional.of(drop);
+            }
+
+            private int miningGraceTicksRemaining() {
+                return Math.max(0, miningGraceUntilTick - WorldHelper.getTicks());
+            }
+
+            private int activePickupTicksRemaining() {
+                return Math.max(0, activePickupUntilTick - WorldHelper.getTicks());
             }
 
             private void pruneExpired() {
-                if (miningOrigin != null && WorldHelper.getTicks() > graceUntilTick) {
-                    reset();
+                int currentTick = WorldHelper.getTicks();
+                if (miningOrigin != null && currentTick > miningGraceUntilTick) {
+                    miningOrigin = null;
+                    miningGraceUntilTick = 0;
+                }
+                if (activePickupUntilTick > 0 && currentTick > activePickupUntilTick) {
+                    activePickupUntilTick = 0;
                 }
             }
 
             private void reset() {
                 miningOrigin = null;
-                graceUntilTick = 0;
+                miningGraceUntilTick = 0;
+                activePickupUntilTick = 0;
+            }
+
+            private boolean isUsableDrop(ItemEntity drop) {
+                return drop != null && drop.isAlive() && !drop.getStack().isEmpty();
             }
         }
     }
