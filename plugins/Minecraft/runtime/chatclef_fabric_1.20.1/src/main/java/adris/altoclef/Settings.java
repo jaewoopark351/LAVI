@@ -65,6 +65,14 @@ public class Settings implements IFailableConfigFile {
     private boolean hideAllWarningLogs = false;
 
     /**
+     * If true, prints detailed task state-change logs such as food scoring,
+     * entity positions, movement recovery, and container slot decisions.
+     * <p>
+     * Keep this false during normal play; enable it when diagnosing ChatClef behavior.
+     */
+    private boolean chatClefDebugLogging = false;
+
+    /**
      * The prefix for commands (ex. @gamer )
      */
     private String commandPrefix = "@";
@@ -463,6 +471,10 @@ public class Settings implements IFailableConfigFile {
 
     public boolean shouldHideAllWarningLogs() {
         return hideAllWarningLogs;
+    }
+
+    public boolean shouldLogChatClefDebug() {
+        return chatClefDebugLogging;
     }
 
     public String getLogLevel() {

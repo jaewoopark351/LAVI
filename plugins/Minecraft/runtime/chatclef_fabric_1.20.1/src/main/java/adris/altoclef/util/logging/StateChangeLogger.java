@@ -1,6 +1,8 @@
 package adris.altoclef.util.logging;
 
+import adris.altoclef.AltoClef;
 import adris.altoclef.Debug;
+import adris.altoclef.Settings;
 
 import java.util.Objects;
 
@@ -18,6 +20,37 @@ public class StateChangeLogger {
     }
 
     public void state(String stateKey, String detail) {
+        if (!isDebugLoggingEnabled()) {
+            return;
+        }
+        logState(stateKey, detail);
+    }
+
+    public void debugState(String state) {
+        state(state, state);
+    }
+
+    public void debugState(String stateKey, String detail) {
+        state(stateKey, detail);
+    }
+
+    public void event(String message) {
+        lastStateKey = "";
+        Debug.logWarning("[" + label + "] " + message);
+    }
+
+    public void debugEvent(String message) {
+        if (!isDebugLoggingEnabled()) {
+            return;
+        }
+        event(message);
+    }
+
+    public void reset() {
+        lastStateKey = "";
+    }
+
+    private void logState(String stateKey, String detail) {
         if (Objects.equals(lastStateKey, stateKey)) {
             return;
         }
@@ -26,12 +59,12 @@ public class StateChangeLogger {
         Debug.logWarning("[" + label + "] " + detail);
     }
 
-    public void event(String message) {
-        lastStateKey = "";
-        Debug.logWarning("[" + label + "] " + message);
-    }
-
-    public void reset() {
-        lastStateKey = "";
+    private boolean isDebugLoggingEnabled() {
+        AltoClef mod = AltoClef.getInstance();
+        if (mod == null) {
+            return false;
+        }
+        Settings settings = mod.getModSettings();
+        return settings != null && settings.shouldLogChatClefDebug();
     }
 }

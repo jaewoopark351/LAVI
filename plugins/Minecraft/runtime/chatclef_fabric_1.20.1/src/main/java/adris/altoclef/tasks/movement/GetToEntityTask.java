@@ -5,6 +5,7 @@ import adris.altoclef.tasksystem.ITaskRequiresGrounded;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.baritone.GoalFollowEntity;
 import adris.altoclef.util.helpers.WorldHelper;
+import adris.altoclef.util.logging.StateChangeLogger;
 import adris.altoclef.util.progresscheck.MovementProgressChecker;
 import baritone.api.utils.input.Input;
 import net.minecraft.block.*;
@@ -12,12 +13,15 @@ import adris.altoclef.multiversion.versionedfields.Blocks;
 import net.minecraft.entity.Entity;
 import net.minecraft.util.math.BlockPos;
 
+import java.util.Locale;
+
 public class GetToEntityTask extends Task implements ITaskRequiresGrounded {
     private final MovementProgressChecker stuckCheck = new MovementProgressChecker();
     private final MovementProgressChecker _progress = new MovementProgressChecker();
     private final TimeoutWanderTask _wanderTask = new TimeoutWanderTask(5);
     private final Entity _entity;
     private final double _closeEnoughDistance;
+    private final StateChangeLogger movementLogger = new StateChangeLogger("GetToEntityTask");
     Block[] annoyingBlocks = new Block[]{
             Blocks.VINE,
             Blocks.NETHER_SPROUTS,
@@ -59,13 +63,18 @@ public class GetToEntityTask extends Task implements ITaskRequiresGrounded {
     }
 
     private boolean isAnnoying(AltoClef mod, BlockPos pos) {
+        Block block = mod.getWorld().getBlockState(pos).getBlock();
+        if (block instanceof DoorBlock ||
+                block instanceof FenceBlock ||
+                block instanceof FenceGateBlock ||
+                block instanceof FlowerBlock) {
+            return true;
+        }
         if (annoyingBlocks != null) {
-            for (Block AnnoyingBlocks : annoyingBlocks) {
-                return mod.getWorld().getBlockState(pos).getBlock() == AnnoyingBlocks ||
-                        mod.getWorld().getBlockState(pos).getBlock() instanceof DoorBlock ||
-                        mod.getWorld().getBlockState(pos).getBlock() instanceof FenceBlock ||
-                        mod.getWorld().getBlockState(pos).getBlock() instanceof FenceGateBlock ||
-                        mod.getWorld().getBlockState(pos).getBlock() instanceof FlowerBlock;
+            for (Block annoyingBlock : annoyingBlocks) {
+                if (block == annoyingBlock) {
+                    return true;
+                }
             }
         }
         return false;
@@ -101,6 +110,7 @@ public class GetToEntityTask extends Task implements ITaskRequiresGrounded {
         _progress.reset();
         stuckCheck.reset();
         _wanderTask.resetWander();
+        movementLogger.debugEvent("start: " + describeTarget(AltoClef.getInstance()));
     }
 
     @Override
@@ -109,10 +119,12 @@ public class GetToEntityTask extends Task implements ITaskRequiresGrounded {
 
         if (mod.getClientBaritone().getPathingBehavior().isPathing()) {
             _progress.reset();
+            movementLogger.state("baritone pathing", "baritone pathing: " + describeTarget(mod));
         }
         if (WorldHelper.isInNetherPortal()) {
             if (!mod.getClientBaritone().getPathingBehavior().isPathing()) {
                 setDebugState("Getting out from nether portal");
+                movementLogger.state("nether portal escape", "nether portal escape: " + describeTarget(mod));
                 mod.getInputControls().hold(Input.SNEAK);
                 mod.getInputControls().hold(Input.MOVE_FORWARD);
                 return null;
@@ -128,8 +140,13 @@ public class GetToEntityTask extends Task implements ITaskRequiresGrounded {
                 mod.getInputControls().release(Input.MOVE_FORWARD);
             }
         }
-        if (_unstuckTask != null && _unstuckTask.isActive() && !_unstuckTask.isFinished() && stuckInBlock(mod) != null) {
+        BlockPos currentStuckBlock = stuckInBlock(mod);
+        if (_unstuckTask != null && _unstuckTask.isActive() && !_unstuckTask.isFinished() && currentStuckBlock != null) {
             setDebugState("Getting unstuck from block.");
+            movementLogger.state("continue unstuck " + currentStuckBlock.toShortString(), "continue unstuck: "
+                    + describeBlock(mod, currentStuckBlock)
+                    + ", task=" + _unstuckTask
+                    + ", " + describeTarget(mod));
             stuckCheck.reset();
             // Stop other tasks, we are JUST shimmying
             mod.getClientBaritone().getCustomGoalProcess().onLostControl();
@@ -137,37 +154,56 @@ public class GetToEntityTask extends Task implements ITaskRequiresGrounded {
             return _unstuckTask;
         }
         if (!_progress.check(mod) || !stuckCheck.check(mod)) {
-            BlockPos blockStuck = stuckInBlock(mod);
+            BlockPos blockStuck = currentStuckBlock != null ? currentStuckBlock : stuckInBlock(mod);
             if (blockStuck != null) {
+                movementLogger.state("annoying block " + blockStuck.toShortString(), "annoying block while approaching: "
+                        + describeBlock(mod, blockStuck)
+                        + ", " + describeTarget(mod));
                 _unstuckTask = getFenceUnstuckTask();
                 return _unstuckTask;
             }
+            movementLogger.state("progress stalled", "progress stalled without annoying block: "
+                    + "baritonePathing=" + mod.getClientBaritone().getPathingBehavior().isPathing()
+                    + ", goalActive=" + mod.getClientBaritone().getCustomGoalProcess().isActive()
+                    + ", " + describeTarget(mod));
             stuckCheck.reset();
         }
         if (_wanderTask.isActive() && !_wanderTask.isFinished()) {
             _progress.reset();
             setDebugState("Failed to get to target, wandering for a bit.");
+            movementLogger.state("wander after approach fail", "wander after approach fail: "
+                    + "wanderTask=" + _wanderTask
+                    + ", " + describeTarget(mod));
             return _wanderTask;
         }
 
         if (!mod.getClientBaritone().getCustomGoalProcess().isActive()) {
+            movementLogger.state("set follow goal", "set follow goal: closeEnough="
+                    + formatDouble(_closeEnoughDistance)
+                    + ", " + describeTarget(mod));
             mod.getClientBaritone().getCustomGoalProcess().setGoalAndPath(new GoalFollowEntity(_entity, _closeEnoughDistance));
         }
 
         if (mod.getPlayer().isInRange(_entity, _closeEnoughDistance)) {
+            movementLogger.state("close enough", "close enough to entity: " + describeTarget(mod));
             _progress.reset();
         }
 
         if (!_progress.check(mod)) {
+            movementLogger.state("progress failed switch wander", "progress failed, switching to wander: " + describeTarget(mod));
             return _wanderTask;
         }
 
         setDebugState("Going to entity");
+        movementLogger.state("going to entity", "going to entity: " + describeTarget(mod));
         return null;
     }
 
     @Override
     protected void onStop(Task interruptTask) {
+        movementLogger.debugEvent("stop: interruptedBy="
+                + (interruptTask == null ? "none" : interruptTask.getClass().getSimpleName() + "{" + interruptTask + "}")
+                + ", " + describeTarget(AltoClef.getInstance()));
         AltoClef.getInstance().getClientBaritone().getPathingBehavior().forceCancel();
     }
 
@@ -182,5 +218,27 @@ public class GetToEntityTask extends Task implements ITaskRequiresGrounded {
     @Override
     protected String toDebugString() {
         return "Approach entity " + _entity.getType().getTranslationKey();
+    }
+
+    private String describeTarget(AltoClef mod) {
+        if (mod == null || mod.getPlayer() == null || _entity == null) {
+            return "target=missing";
+        }
+        return "target=" + _entity.getType().getTranslationKey()
+                + ", targetPos=" + _entity.getBlockPos().toShortString()
+                + ", playerPos=" + mod.getPlayer().getBlockPos().toShortString()
+                + ", distance=" + formatDouble(_entity.distanceTo(mod.getPlayer()))
+                + ", targetAlive=" + _entity.isAlive()
+                + ", closeEnough=" + formatDouble(_closeEnoughDistance);
+    }
+
+    private String describeBlock(AltoClef mod, BlockPos pos) {
+        Block block = mod.getWorld().getBlockState(pos).getBlock();
+        return "block=" + block.getTranslationKey()
+                + ", blockPos=" + pos.toShortString();
+    }
+
+    private String formatDouble(double value) {
+        return String.format(Locale.ROOT, "%.2f", value);
     }
 }
