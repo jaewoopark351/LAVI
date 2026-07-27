@@ -2,7 +2,9 @@ package adris.altoclef.tasks.resources;
 
 import adris.altoclef.AltoClef;
 import adris.altoclef.Debug;
-import adris.altoclef.TaskCatalogue;
+import adris.altoclef.chains.food.FoodCollectionTargets;
+import adris.altoclef.chains.food.FoodPotentialCalculator;
+import adris.altoclef.chains.food.FoodResourceSnapshot;
 import adris.altoclef.multiversion.item.ItemVer;
 import adris.altoclef.tasks.CraftInInventoryTask;
 import adris.altoclef.tasks.DoToClosestBlockTask;
@@ -15,12 +17,10 @@ import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.CraftingRecipe;
 import adris.altoclef.util.ItemTarget;
 import adris.altoclef.util.RecipeTarget;
-import adris.altoclef.util.SmeltTarget;
 import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.helpers.WorldHelper;
 import adris.altoclef.util.logging.StateChangeLogger;
 import adris.altoclef.util.slots.Slot;
-import adris.altoclef.util.slots.SmokerSlot;
 import adris.altoclef.util.time.TimerGame;
 import net.minecraft.block.*;
 import net.minecraft.entity.Entity;
@@ -32,13 +32,10 @@ import net.minecraft.entity.passive.*;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
-import net.minecraft.screen.ScreenHandler;
-import net.minecraft.screen.SmokerScreenHandler;
 import net.minecraft.util.math.BlockPos;
 
 import java.util.List;
 import java.util.Locale;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Predicate;
 
@@ -79,50 +76,13 @@ public class CollectFoodTask extends Task {
     }
 
     private static double getFoodPotential(ItemStack food) {
-        if (food == null) return 0;
-        int count = food.getCount();
-        if (count <= 0) return 0;
-        for (CookableFoodTarget cookable : COOKABLE_FOODS) {
-            if (food.getItem() == cookable.getRaw()) {
-                assert ItemVer.getFoodComponent(cookable.getCooked()) != null;
-                return count * ItemVer.getFoodComponent(cookable.getCooked()).getHunger();
-            }
-        }
-
-        //bread logic
-        assert ItemVer.getFoodComponent( Items.BREAD) != null;
-
-        if (food.getItem().equals(Items.HAY_BLOCK)) {
-            return 3* ItemVer.getFoodComponent(Items.BREAD).getHunger()*count;
-        }
-        if (food.getItem().equals(Items.WHEAT)) {
-            return (double) (ItemVer.getFoodComponent(Items.BREAD).getHunger() * count) /3;
-        }
-
-        // We're just an ordinary item.
-        if (ItemVer.isFood(food.getItem())) {
-            assert ItemVer.getFoodComponent(food.getItem()) != null;
-            return count * ItemVer.getFoodComponent(food.getItem()).getHunger();
-        }
-        return 0;
+        return FoodPotentialCalculator.getFoodPotential(food, COOKABLE_FOODS);
     }
 
     // Gets the units of food if we were to convert all of our raw resources to food.
     @SuppressWarnings("RedundantCast")
     public static double calculateFoodPotential(AltoClef mod) {
-        double potentialFood = 0;
-        for (ItemStack food : mod.getItemStorage().getItemStacksPlayerInventory(true)) {
-            potentialFood += getFoodPotential(food);
-        }
-        int potentialBread = (int) (mod.getItemStorage().getItemCount(Items.WHEAT) / 3) + mod.getItemStorage().getItemCount(Items.HAY_BLOCK) * 3;
-        potentialFood += Objects.requireNonNull(ItemVer.getFoodComponent( Items.BREAD)).getHunger() * potentialBread;
-        // Check smelting
-        ScreenHandler screen = mod.getPlayer().currentScreenHandler;
-        if (screen instanceof SmokerScreenHandler) {
-            potentialFood += getFoodPotential(StorageHelper.getItemStackInSlot(SmokerSlot.INPUT_SLOT_MATERIALS));
-            potentialFood += getFoodPotential(StorageHelper.getItemStackInSlot(SmokerSlot.OUTPUT_SLOT));
-        }
-        return potentialFood;
+        return FoodPotentialCalculator.calculateFoodPotential(mod, COOKABLE_FOODS);
     }
 
     @Override
@@ -220,7 +180,7 @@ public class CollectFoodTask extends Task {
             //         return smeltTask;
             //     }
             // }
-            if (getTotalRawFoodCount(mod) > 0) {
+            if (FoodResourceSnapshot.getTotalRawFoodCount(mod, COOKABLE_FOODS) > 0) {
                 debugLogger.state("raw food present but cooking branch is disabled here: " + describeFoodResources(mod));
             }
         }
@@ -478,36 +438,7 @@ public class CollectFoodTask extends Task {
     }
 
     private String describeFoodResources(AltoClef mod) {
-        return "readyScore=" + StorageHelper.calculateInventoryFoodScore()
-                + ", potential=" + formatDouble(calculateFoodPotential(mod))
-                + ", raw=" + describeCookableCounts(mod, true)
-                + ", cooked=" + describeCookableCounts(mod, false)
-                + ", wheat=" + mod.getItemStorage().getItemCount(Items.WHEAT)
-                + ", hay=" + mod.getItemStorage().getItemCount(Items.HAY_BLOCK);
-    }
-
-    private int getTotalRawFoodCount(AltoClef mod) {
-        int total = 0;
-        for (CookableFoodTarget cookable : COOKABLE_FOODS) {
-            total += mod.getItemStorage().getItemCount(cookable.getRaw());
-        }
-        return total;
-    }
-
-    private String describeCookableCounts(AltoClef mod, boolean raw) {
-        StringBuilder result = new StringBuilder();
-        for (CookableFoodTarget cookable : COOKABLE_FOODS) {
-            Item item = raw ? cookable.getRaw() : cookable.getCooked();
-            int count = mod.getItemStorage().getItemCount(item);
-            if (count <= 0) {
-                continue;
-            }
-            if (result.length() > 0) {
-                result.append(", ");
-            }
-            result.append(item.getTranslationKey()).append("=").append(count);
-        }
-        return result.length() == 0 ? "none" : result.toString();
+        return FoodResourceSnapshot.capture(mod, COOKABLE_FOODS).describe();
     }
 
     private String formatDouble(double value) {
@@ -515,36 +446,13 @@ public class CollectFoodTask extends Task {
     }
 
     @SuppressWarnings("rawtypes")
-    public static class CookableFoodTarget {
-        public String rawFood;
-        public String cookedFood;
-        public Class mobToKill;
-
+    public static class CookableFoodTarget extends FoodCollectionTargets.CookableFoodTarget {
         public CookableFoodTarget(String rawFood, String cookedFood, Class mobToKill) {
-            this.rawFood = rawFood;
-            this.cookedFood = cookedFood;
-            this.mobToKill = mobToKill;
+            super(rawFood, cookedFood, mobToKill);
         }
 
         public CookableFoodTarget(String rawFood, Class mobToKill) {
-            this(rawFood, "cooked_" + rawFood, mobToKill);
-        }
-
-        public Item getRaw() {
-            return Objects.requireNonNull(TaskCatalogue.getItemMatches(rawFood))[0];
-        }
-
-        public Item getCooked() {
-            return Objects.requireNonNull(TaskCatalogue.getItemMatches(cookedFood))[0];
-        }
-
-        public int getCookedUnits() {
-            assert ItemVer.getFoodComponent(getCooked()) != null;
-            return ItemVer.getFoodComponent(getCooked()).getHunger();
-        }
-
-        public boolean isFish() {
-            return false;
+            super(rawFood, mobToKill);
         }
     }
 
@@ -561,13 +469,9 @@ public class CollectFoodTask extends Task {
         }
     }
 
-    public static class CropTarget {
-        public Item cropItem;
-        public Block cropBlock;
-
+    public static class CropTarget extends FoodCollectionTargets.CropTarget {
         public CropTarget(Item cropItem, Block cropBlock) {
-            this.cropItem = cropItem;
-            this.cropBlock = cropBlock;
+            super(cropItem, cropBlock);
         }
     }
 }
