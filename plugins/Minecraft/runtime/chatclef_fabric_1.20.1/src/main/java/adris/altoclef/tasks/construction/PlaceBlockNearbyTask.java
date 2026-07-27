@@ -21,6 +21,10 @@ import baritone.api.utils.input.Input;
 import baritone.pathing.movement.MovementHelper;
 import net.minecraft.block.Block;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.screen.ChatScreen;
+import net.minecraft.client.gui.screen.GameMenuScreen;
+import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.gui.screen.option.GameOptionsScreen;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
@@ -39,6 +43,9 @@ import java.util.function.Predicate;
  */
 public class PlaceBlockNearbyTask extends Task {
 
+    private static final int MAX_DIRECT_PLACE_ATTEMPTS_PER_TARGET = 20;
+    private static final double DIRECT_PLACE_TARGET_SKIP_SECONDS = 6.0;
+
     private final Block[] toPlace;
 
     private final MovementProgressChecker progressChecker = new MovementProgressChecker();
@@ -51,6 +58,10 @@ public class PlaceBlockNearbyTask extends Task {
     // Oof, necesarry for the onBlockPlaced action.
     private Subscription<BlockPlaceEvent> _onBlockPlaced;
     private final StateChangeLogger debugLogger = new StateChangeLogger("PlaceBlockNearbyTask");
+    private BlockPos directPlaceAttemptTarget;
+    private int directPlaceAttempts;
+    private BlockPos skippedDirectPlaceTarget;
+    private final TimerGame skippedDirectPlaceTimer = new TimerGame(DIRECT_PLACE_TARGET_SKIP_SECONDS);
 
     public PlaceBlockNearbyTask(Predicate<BlockPos> canPlaceHere, Block... toPlace) {
         this.toPlace = toPlace;
@@ -64,6 +75,8 @@ public class PlaceBlockNearbyTask extends Task {
     @Override
     protected void onStart() {
         progressChecker.reset();
+        resetDirectPlaceAttempts();
+        skippedDirectPlaceTarget = null;
         AltoClef.getInstance().getClientBaritone().getInputOverrideHandler().setInputForceState(Input.CLICK_RIGHT, false);
         if (shouldAvoidSneakRightClick()) {
             AltoClef.getInstance().getInputControls().release(Input.SNEAK);
@@ -75,6 +88,7 @@ public class PlaceBlockNearbyTask extends Task {
         _onBlockPlaced = EventBus.subscribe(BlockPlaceEvent.class, evt -> {
             if (ArrayUtils.contains(toPlace, evt.blockState.getBlock())) {
                 justPlaced = evt.blockPos;
+                resetDirectPlaceAttempts();
                 debugLogger.event("block placed event: block=" + evt.blockState.getBlock().getTranslationKey()
                         + ", pos=" + evt.blockPos.toShortString());
                 stopPlacing();
@@ -96,10 +110,13 @@ public class PlaceBlockNearbyTask extends Task {
         // - Prefer flat areas (open space, block below) closest to player
         // -
 
-        // Close screen first
+        //20260727_kpopmodder: Do not send world placement clicks while an inventory/container screen is still open.
         ItemStack cursorStack = StorageHelper.getItemStackInCursorSlot();
         if (!cursorStack.isEmpty()) {
-            debugLogger.state("cursor occupied while placing: cursor=" + describeStack(cursorStack));
+            setDebugState("Waiting for cursor slot to clear before placing.");
+            debugLogger.state("cursor occupied before placing",
+                    "cursor occupied while placing: cursor=" + describeStack(cursorStack));
+            return null;
            /* Optional<Slot> moveTo = mod.getItemStorage().getSlotThatCanFitInPlayerInventory(cursorStack, false);
             if (moveTo.isPresent()) {
                 mod.getSlotHandler().clickSlot(moveTo.get(), 0, SlotActionType.PICKUP);
@@ -116,13 +133,19 @@ public class PlaceBlockNearbyTask extends Task {
                 return null;
             }
             mod.getSlotHandler().clickSlot(Slot.UNDEFINED, 0, SlotActionType.PICKUP);*/
-        } else {
-            StorageHelper.closeScreen();
+        }
+        if (waitForScreenToClose()) {
+            setDebugState("Closing screen before placing.");
+            return null;
         }
 
         // Try placing where we're looking right now.
         BlockPos current = getCurrentlyLookingBlockPlace(mod);
-        if (current != null && _canPlaceHere.test(current)) {
+        if (current != null && isTemporarilySkippingDirectPlace(current)) {
+            debugLogger.state("skip repeated direct place target: " + current.toShortString(),
+                    "skip repeated direct place target: target=" + current.toShortString()
+                            + ", blockAtTarget=" + describeBlockAt(current));
+        } else if (current != null && _canPlaceHere.test(current)) {
             setDebugState("Placing since we can...");
             if (mod.getSlotHandler().forceEquipItem(ItemHelper.blocksToItems(toPlace))) {
                 if (place(mod, current)) {
@@ -230,7 +253,16 @@ public class PlaceBlockNearbyTask extends Task {
     }
 
     private boolean place(AltoClef mod, BlockPos targetPlace) {
+        if (waitForScreenToClose()) {
+            return false;
+        }
         if (!mod.getExtraBaritoneSettings().isInteractionPaused() && blockEquipped()) {
+            recordDirectPlaceAttempt(targetPlace);
+            if (directPlaceAttempts > MAX_DIRECT_PLACE_ATTEMPTS_PER_TARGET) {
+                markDirectPlaceTargetSkipped(targetPlace);
+                return false;
+            }
+
             boolean avoidSneakRightClick = shouldAvoidSneakRightClick();
             //20260727_kpopmodder: Carry On uses sneak-right-click for carrying blocks, so avoid it for container placement.
             if (avoidSneakRightClick) {
@@ -251,15 +283,23 @@ public class PlaceBlockNearbyTask extends Task {
             Hand hand = Hand.MAIN_HAND;
             assert MinecraftClient.getInstance().interactionManager != null;
             ActionResult result = MinecraftClient.getInstance().interactionManager.interactBlock(mod.getPlayer(),hand, (BlockHitResult) mouseOver);
-            debugLogger.state("place click attempted: target=" + targetPlace.toShortString()
-                    + ", result=" + result
-                    + ", sneaking=" + mod.getPlayer().isSneaking()
-                    + ", carryOnSafeSneak=" + avoidSneakRightClick);
+            debugLogger.state("place click attempted: " + targetPlace.toShortString(),
+                    "place click attempted: target=" + targetPlace.toShortString()
+                            + ", attempt=" + directPlaceAttempts
+                            + ", result=" + result
+                            + ", sneaking=" + mod.getPlayer().isSneaking()
+                            + ", carryOnSafeSneak=" + avoidSneakRightClick);
             if (result == ActionResult.SUCCESS && (avoidSneakRightClick || mod.getPlayer().isSneaking())) {
                 mod.getPlayer().swingHand(hand);
                 justPlaced = targetPlace;
-                Debug.logMessage("PRESSED");
-                debugLogger.event("place click succeeded: target=" + targetPlace.toShortString());
+                if (isPlacedAt(targetPlace)) {
+                    resetDirectPlaceAttempts();
+                    debugLogger.event("place confirmed immediately: target=" + targetPlace.toShortString());
+                } else {
+                    debugLogger.state("place click accepted waiting for block update: " + targetPlace.toShortString(),
+                            "place click accepted, waiting for block update: target=" + targetPlace.toShortString()
+                                    + ", blockAtTarget=" + describeBlockAt(targetPlace));
+                }
                 return true;
             }
 
@@ -270,6 +310,74 @@ public class PlaceBlockNearbyTask extends Task {
         debugLogger.state("place blocked: interactionPaused=" + mod.getExtraBaritoneSettings().isInteractionPaused()
                 + ", equipped=" + blockEquipped());
         return false;
+    }
+
+    private boolean waitForScreenToClose() {
+        Screen screen = MinecraftClient.getInstance().currentScreen;
+        if (screen == null) {
+            return false;
+        }
+
+        if (isClosableScreen(screen)) {
+            debugLogger.state("screen open before placing: " + describeScreen(screen),
+                    "screen open before placing; closing screen=" + describeScreen(screen));
+            StorageHelper.closeScreen();
+        } else {
+            debugLogger.state("protected screen open before placing: " + describeScreen(screen),
+                    "protected screen open before placing; waiting screen=" + describeScreen(screen));
+        }
+        return true;
+    }
+
+    private boolean isClosableScreen(Screen screen) {
+        return !(screen instanceof GameMenuScreen)
+                && !(screen instanceof GameOptionsScreen)
+                && !(screen instanceof ChatScreen);
+    }
+
+    private void recordDirectPlaceAttempt(BlockPos targetPlace) {
+        if (!targetPlace.equals(directPlaceAttemptTarget)) {
+            directPlaceAttemptTarget = targetPlace;
+            directPlaceAttempts = 0;
+        }
+        directPlaceAttempts++;
+    }
+
+    private void resetDirectPlaceAttempts() {
+        directPlaceAttemptTarget = null;
+        directPlaceAttempts = 0;
+    }
+
+    private void markDirectPlaceTargetSkipped(BlockPos targetPlace) {
+        skippedDirectPlaceTarget = new BlockPos(targetPlace.getX(), targetPlace.getY(), targetPlace.getZ());
+        skippedDirectPlaceTimer.reset();
+        if (targetPlace.equals(tryPlace)) {
+            tryPlace = null;
+        }
+        if (targetPlace.equals(justPlaced) && !isPlacedAt(justPlaced)) {
+            justPlaced = null;
+        }
+        resetDirectPlaceAttempts();
+        debugLogger.event("temporarily skipping repeated direct place target: target=" + targetPlace.toShortString()
+                + ", seconds=" + DIRECT_PLACE_TARGET_SKIP_SECONDS
+                + ", blockAtTarget=" + describeBlockAt(targetPlace));
+        LookHelper.randomOrientation();
+    }
+
+    private boolean isTemporarilySkippingDirectPlace(BlockPos targetPlace) {
+        if (skippedDirectPlaceTarget == null) {
+            return false;
+        }
+        if (skippedDirectPlaceTimer.elapsed()) {
+            skippedDirectPlaceTarget = null;
+            return false;
+        }
+        return skippedDirectPlaceTarget.equals(targetPlace);
+    }
+
+    private boolean isPlacedAt(BlockPos targetPlace) {
+        return targetPlace != null
+                && ArrayUtils.contains(toPlace, AltoClef.getInstance().getWorld().getBlockState(targetPlace).getBlock());
     }
 
     private boolean shouldAvoidSneakRightClick() {
@@ -294,6 +402,18 @@ public class PlaceBlockNearbyTask extends Task {
         return stack.getItem().getTranslationKey() + " x " + stack.getCount();
     }
 
+    private String describeScreen(Screen screen) {
+        return screen == null ? "none" : screen.getClass().getSimpleName();
+    }
+
+    private String describeBlockAt(BlockPos pos) {
+        if (pos == null) {
+            return "none";
+        }
+        Block block = AltoClef.getInstance().getWorld().getBlockState(pos).getBlock();
+        return block.getTranslationKey();
+    }
+
     private BlockPos locateClosePlacePos(AltoClef mod) {
         int range = 7;
         BlockPos best = null;
@@ -305,6 +425,9 @@ public class PlaceBlockNearbyTask extends Task {
             boolean inside = WorldHelper.isInsidePlayer(blockPos);
             // We can't break this block.
             if (solid && !WorldHelper.canBreak(blockPos)) {
+                continue;
+            }
+            if (isTemporarilySkippingDirectPlace(blockPos)) {
                 continue;
             }
             // We can't place here as defined by user.

@@ -268,10 +268,12 @@ public class PlaceBlockTask extends Task implements ITaskRequiresGrounded {
                         + ", available=" + describeAvailableBlocks(available));
                 // No throwaways available!!
                 BlockState fallback = getFallbackDesiredState();
-                debugLogger.event("schematic fallback desired state: fallback=" + describeBlockState(fallback)
-                        + ", target=" + target.toShortString()
-                        + ", blocks=" + describeBlocks()
-                        + ", available=" + describeAvailableBlocks(available));
+                debugLogger.state("schematic fallback desired state: fallback=" + describeBlockState(fallback)
+                                + ", target=" + target.toShortString(),
+                        "schematic fallback desired state: fallback=" + describeBlockState(fallback)
+                                + ", target=" + target.toShortString()
+                                + ", blocks=" + describeBlocks()
+                                + ", available=" + describeAvailableBlocks(available));
                 return fallback;
             }
             // Don't care.

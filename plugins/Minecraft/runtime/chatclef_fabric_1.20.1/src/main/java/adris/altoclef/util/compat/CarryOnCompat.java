@@ -1,14 +1,23 @@
 package adris.altoclef.util.compat;
 
 import adris.altoclef.multiversion.versionedfields.Blocks;
+import adris.altoclef.util.compat.carryon.CarriedBlockStateProvider;
+import adris.altoclef.util.compat.carryon.NoOpCarriedBlockStateProvider;
+import adris.altoclef.util.compat.carryon.ReflectiveCarryOnCarriedBlockStateProvider;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
 import net.minecraft.block.ShulkerBoxBlock;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.util.Identifier;
+
+import java.util.Optional;
 
 //20260727_kpopmodder: Keep Carry On checks isolated so vanilla ChatClef behavior stays unchanged when the mod is absent.
 public final class CarryOnCompat {
 
     private static final String MOD_ID = "carryon";
+    private static final CarriedBlockStateProvider CARRIED_BLOCK_STATE_PROVIDER = createCarriedBlockStateProvider();
 
     private CarryOnCompat() {
     }
@@ -23,6 +32,26 @@ public final class CarryOnCompat {
 
     public static boolean shouldAvoidSneakRightClick(Block... targetBlocks) {
         return isLoaded() && containsCarryOnSensitiveBlock(targetBlocks);
+    }
+
+    public static CarriedBlockStateProvider carriedBlockStateProvider() {
+        return CARRIED_BLOCK_STATE_PROVIDER;
+    }
+
+    public static boolean isCarryingBlock(PlayerEntity player) {
+        return CARRIED_BLOCK_STATE_PROVIDER.isCarryingBlock(player);
+    }
+
+    public static Optional<BlockState> getCarriedBlockState(PlayerEntity player) {
+        return CARRIED_BLOCK_STATE_PROVIDER.getCarriedBlockState(player);
+    }
+
+    public static Optional<Identifier> getCarriedBlockId(PlayerEntity player) {
+        return CARRIED_BLOCK_STATE_PROVIDER.getCarriedBlockId(player);
+    }
+
+    public static boolean isCarryingBlock(PlayerEntity player, Block expectedBlock) {
+        return CARRIED_BLOCK_STATE_PROVIDER.isCarryingBlock(player, expectedBlock);
     }
 
     public static boolean containsCarryOnSensitiveBlock(Block... targetBlocks) {
@@ -52,5 +81,13 @@ public final class CarryOnCompat {
                 || block == Blocks.CHIPPED_ANVIL
                 || block == Blocks.DAMAGED_ANVIL
                 || block instanceof ShulkerBoxBlock;
+    }
+
+    private static CarriedBlockStateProvider createCarriedBlockStateProvider() {
+        if (!isLoaded()) {
+            return new NoOpCarriedBlockStateProvider();
+        }
+        return ReflectiveCarryOnCarriedBlockStateProvider.create()
+                .orElseGet(NoOpCarriedBlockStateProvider::new);
     }
 }
