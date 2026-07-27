@@ -57,6 +57,11 @@ public abstract class ResourceTask extends Task implements ITaskCanForce {
     private Dimension targetDimension;
     private BlockPos mineLastClosest = null;
     private final StateChangeLogger resourceLogger = new StateChangeLogger("ResourceTask." + getClass().getSimpleName());
+    //20260728_kpopmodder: Summarize pickup continuation behavior so task-transition changes are visible in latest.log.
+    private int pickupVisibleReturnCount = 0;
+    private int pickupStartReturnCount = 0;
+    private int pickupContinuationReturnCount = 0;
+    private int pickupPickaxeFirstReturnCount = 0;
 
     public ResourceTask(ItemTarget[] itemTargets) {
         this.itemTargets = itemTargets;
@@ -93,6 +98,7 @@ public abstract class ResourceTask extends Task implements ITaskCanForce {
         botBehaviour.addProtectedItems(ItemTarget.getMatches(itemTargets));
 
         pickupContinuation.reset();
+        resetPickupDiagnostics();
         onResourceStart(AltoClef.getInstance());
         resourceLogger.event("start: targets=" + describeTargets());
     }
@@ -148,6 +154,7 @@ public abstract class ResourceTask extends Task implements ITaskCanForce {
                 if (PickupDroppedItemTask.isIsGettingPickaxeFirst(mod)) {
                     if (pickupTask.isCollectingPickaxeForThis()) {
                         setDebugState("Picking up (pickaxe first!)");
+                        pickupPickaxeFirstReturnCount++;
                         resourceLogger.state("pickup delayed by pickaxe-first flow; continuing pickaxe pickup: targets=" + describeTargets());
                         // Our pickup task is the one collecting the pickaxe, keep it going.
                         return pickupTask;
@@ -164,6 +171,10 @@ public abstract class ResourceTask extends Task implements ITaskCanForce {
             double range = getPickupRange(mod);
             if (droppedItemVisible && (range < 0 || (closest.isPresent() && closest.get().isInRange(mod.getPlayer(), range)) || pickupActive)) {
                 setDebugState("Picking up");
+                pickupVisibleReturnCount++;
+                if (!pickupActive) {
+                    pickupStartReturnCount++;
+                }
                 pickupContinuation.arm();
                 resourceLogger.state("pickup dropped item: closest=" + closest.map(this::describeDrop).orElse("unknown")
                         + ", range=" + range
@@ -172,6 +183,7 @@ public abstract class ResourceTask extends Task implements ITaskCanForce {
             }
             if (pickupContinuation.shouldContinue(pickupActive)) {
                 setDebugState("Picking up");
+                pickupContinuationReturnCount++;
                 resourceLogger.state("pickup continuation grace",
                         "pickup continuation grace: visible=" + droppedItemVisible
                                 + ", closest=" + closest.map(this::describeDrop).orElse("none")
@@ -255,6 +267,14 @@ public abstract class ResourceTask extends Task implements ITaskCanForce {
     @Override
     protected void onStop(Task interruptTask) {
         AltoClef.getInstance().getBehaviour().pop();
+        if (hasPickupDiagnostics()) {
+            resourceLogger.event("pickup summary: interruptedBy=" + describeTask(interruptTask)
+                    + ", visibleReturns=" + pickupVisibleReturnCount
+                    + ", pickupStarts=" + pickupStartReturnCount
+                    + ", continuationReturns=" + pickupContinuationReturnCount
+                    + ", pickaxeFirstReturns=" + pickupPickaxeFirstReturnCount
+                    + ", targets=" + describeTargets());
+        }
         pickupContinuation.reset();
         onResourceStop(AltoClef.getInstance(), interruptTask);
     }
@@ -324,6 +344,24 @@ public abstract class ResourceTask extends Task implements ITaskCanForce {
         return drop.getStack().getItem().getTranslationKey()
                 + " x " + drop.getStack().getCount()
                 + " at " + drop.getBlockPos().toShortString();
+    }
+
+    private boolean hasPickupDiagnostics() {
+        return pickupVisibleReturnCount
+                + pickupStartReturnCount
+                + pickupContinuationReturnCount
+                + pickupPickaxeFirstReturnCount > 0;
+    }
+
+    private void resetPickupDiagnostics() {
+        pickupVisibleReturnCount = 0;
+        pickupStartReturnCount = 0;
+        pickupContinuationReturnCount = 0;
+        pickupPickaxeFirstReturnCount = 0;
+    }
+
+    private String describeTask(Task task) {
+        return task == null ? "none" : task.getClass().getSimpleName();
     }
 
     protected abstract boolean shouldAvoidPickingUp(AltoClef mod);

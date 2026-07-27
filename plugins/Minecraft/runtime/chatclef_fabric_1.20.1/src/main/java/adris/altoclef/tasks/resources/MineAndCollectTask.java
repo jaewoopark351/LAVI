@@ -186,6 +186,15 @@ public class MineAndCollectTask extends ResourceTask {
         private BlockPos miningPos;
         private int miningTargetStartTick;
         private final StateChangeLogger debugLogger = new StateChangeLogger("MineOrCollectTask");
+        //20260728_kpopmodder: Count block/drop choice stability so latest.log can show whether pickup switching calmed down.
+        private int blockPreferredCount = 0;
+        private int dropPreferredCount = 0;
+        private int pickupGracePreferredCount = 0;
+        private int interactionPausedDropPreferredCount = 0;
+        private int miningTargetSwitchCount = 0;
+        private int pickupTargetSwitchCount = 0;
+        private int temporaryMiningSkipCount = 0;
+        private String lastSelectedGoalKey = "";
 
         public MineOrCollectTask(Block[] blocks, ItemTarget[] targets) {
             _blocks = blocks;
@@ -217,6 +226,7 @@ public class MineAndCollectTask extends ResourceTask {
 
             // We can't mine right now.
             if (mod.getExtraBaritoneSettings().isInteractionPaused()) {
+                interactionPausedDropPreferredCount++;
                 debugLogger.state("interaction paused; prefer dropped item: drop=" + closestDrop.getRight().map(this::describeDrop).orElse("none")
                         + ", block=" + closestBlock.getRight().map(BlockPos::toShortString).orElse("none")
                         + ", skippedBlocks=" + temporaryBlockBlacklist.size());
@@ -225,6 +235,7 @@ public class MineAndCollectTask extends ResourceTask {
 
             Optional<ItemEntity> graceDrop = droppedItemPickupGrace.getPreferredDrop(closestDrop.getRight());
             if (graceDrop.isPresent()) {
+                pickupGracePreferredCount++;
                 debugLogger.state("pickup grace prefers dropped item",
                         "pickup grace prefers dropped item: drop=" + describeDrop(graceDrop.get())
                                 + ", block=" + closestBlock.getRight().map(BlockPos::toShortString).orElse("none")
@@ -233,12 +244,14 @@ public class MineAndCollectTask extends ResourceTask {
             }
 
             if (dropSq <= blockSq) {
+                dropPreferredCount++;
                 debugLogger.state("closest target is dropped item: drop=" + closestDrop.getRight().map(this::describeDrop).orElse("none")
                         + ", dropSq=" + formatDouble(dropSq)
                         + ", blockSq=" + formatDouble(blockSq)
                         + ", skippedBlocks=" + temporaryBlockBlacklist.size());
                 return closestDrop.getRight().map(Object.class::cast);
             } else {
+                blockPreferredCount++;
                 debugLogger.state("closest target is block: block=" + closestBlock.getRight().map(BlockPos::toShortString).orElse("none")
                         + ", blockSq=" + formatDouble(blockSq)
                         + ", dropSq=" + formatDouble(dropSq)
@@ -303,6 +316,7 @@ public class MineAndCollectTask extends ResourceTask {
         protected Task getGoalTask(Object obj) {
             if (obj instanceof BlockPos newPos) {
                 if (miningPos == null || !miningPos.equals(newPos)) {
+                    recordGoalSelection("block:" + newPos.toShortString(), true);
                     progressChecker.reset();
                     miningTargetStartTick = WorldHelper.getTicks();
                     debugLogger.state("new mining target: pos=" + newPos.toShortString()
@@ -312,8 +326,9 @@ public class MineAndCollectTask extends ResourceTask {
                 droppedItemPickupGrace.arm(newPos);
                 return new DestroyBlockTask(miningPos);
             }
-            if (obj instanceof ItemEntity) {
-                debugLogger.state("pickup target selected: " + describeDrop((ItemEntity) obj));
+            if (obj instanceof ItemEntity drop) {
+                recordGoalSelection("drop:" + drop.getUuid(), false);
+                debugLogger.state("pickup target selected: " + describeDrop(drop));
                 miningPos = null;
                 return _pickupTask;
             }
@@ -346,6 +361,7 @@ public class MineAndCollectTask extends ResourceTask {
             miningTargetStartTick = 0;
             temporaryBlockBlacklist.pruneExpired();
             droppedItemPickupGrace.reset();
+            resetDiagnostics();
             debugLogger.event("start: blocks=" + Arrays.toString(_blocks)
                     + ", targets=" + Arrays.toString(_targets));
         }
@@ -354,6 +370,17 @@ public class MineAndCollectTask extends ResourceTask {
         protected void onStop(Task interruptTask) {
             debugLogger.event("stop: interruptedBy=" + (interruptTask == null ? "none" : interruptTask.getClass().getSimpleName())
                     + ", miningPos=" + describePos(miningPos));
+            if (hasDiagnostics()) {
+                debugLogger.event("choice summary: interruptedBy=" + (interruptTask == null ? "none" : interruptTask.getClass().getSimpleName())
+                        + ", blockPreferredTicks=" + blockPreferredCount
+                        + ", dropPreferredTicks=" + dropPreferredCount
+                        + ", pickupGracePreferredTicks=" + pickupGracePreferredCount
+                        + ", interactionPausedDropPreferredTicks=" + interactionPausedDropPreferredCount
+                        + ", miningTargetSwitches=" + miningTargetSwitchCount
+                        + ", pickupTargetSwitches=" + pickupTargetSwitchCount
+                        + ", temporaryMiningSkips=" + temporaryMiningSkipCount
+                        + ", lastGoal=" + lastSelectedGoalKey);
+            }
             droppedItemPickupGrace.reset();
         }
 
@@ -384,6 +411,7 @@ public class MineAndCollectTask extends ResourceTask {
             }
 
             BlockPos skipped = miningPos;
+            temporaryMiningSkipCount++;
             temporaryBlockBlacklist.add(skipped, TEMPORARY_BLOCK_SKIP_TICKS);
             mod.getClientBaritone().getPathingBehavior().forceCancel();
             Debug.logMessage("Temporarily skipping mining target " + skipped.toShortString() + " (" + reason + ").");
@@ -417,6 +445,39 @@ public class MineAndCollectTask extends ResourceTask {
                 return "infinity";
             }
             return String.format(Locale.ROOT, "%.1f", value);
+        }
+
+        private void recordGoalSelection(String goalKey, boolean miningGoal) {
+            if (goalKey.equals(lastSelectedGoalKey)) {
+                return;
+            }
+            lastSelectedGoalKey = goalKey;
+            if (miningGoal) {
+                miningTargetSwitchCount++;
+            } else {
+                pickupTargetSwitchCount++;
+            }
+        }
+
+        private boolean hasDiagnostics() {
+            return blockPreferredCount
+                    + dropPreferredCount
+                    + pickupGracePreferredCount
+                    + interactionPausedDropPreferredCount
+                    + miningTargetSwitchCount
+                    + pickupTargetSwitchCount
+                    + temporaryMiningSkipCount > 0;
+        }
+
+        private void resetDiagnostics() {
+            blockPreferredCount = 0;
+            dropPreferredCount = 0;
+            pickupGracePreferredCount = 0;
+            interactionPausedDropPreferredCount = 0;
+            miningTargetSwitchCount = 0;
+            pickupTargetSwitchCount = 0;
+            temporaryMiningSkipCount = 0;
+            lastSelectedGoalKey = "";
         }
 
         //20260727_kpopmodder: Keep per-task block cooldown bookkeeping separate from mining candidate selection.
