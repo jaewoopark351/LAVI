@@ -4,11 +4,11 @@ import adris.altoclef.AltoClef;
 import adris.altoclef.chains.food.FoodCollectionBlacklist;
 import adris.altoclef.chains.food.FoodCollectionTaskSelector;
 import adris.altoclef.chains.food.FoodCollectionTargets;
+import adris.altoclef.chains.food.FoodCookingTaskTracker;
 import adris.altoclef.chains.food.FoodConversionPlanner;
 import adris.altoclef.chains.food.FoodHuntTracker;
 import adris.altoclef.chains.food.FoodPotentialCalculator;
 import adris.altoclef.chains.food.FoodResourceSnapshot;
-import adris.altoclef.tasks.container.SmeltInSmokerTask;
 import adris.altoclef.tasks.movement.PickupDroppedItemTask;
 import adris.altoclef.tasks.movement.TimeoutWanderTask;
 import adris.altoclef.tasksystem.Task;
@@ -53,13 +53,9 @@ public class CollectFoodTask extends Task {
     private final double unitsNeeded;
     private final TimerGame checkNewOptionsTimer = new TimerGame(10);
     private final FoodHuntTracker huntTracker = new FoodHuntTracker();
+    private final FoodCookingTaskTracker cookingTracker = new FoodCookingTaskTracker();
     private final StateChangeLogger debugLogger = new StateChangeLogger("CollectFoodTask");
-    private SmeltInSmokerTask smeltTask = null;
-    private Item smeltRawMaterial = null;
     private Task currentResourceTask = null;
-    private Task cookingFuelTask = null;
-    private int cookingFuelTaskRawTotal = 0;
-    private int cookingFuelPreparedForRawTotal = 0;
 
     public CollectFoodTask(double unitsNeeded) {
         this.unitsNeeded = unitsNeeded;
@@ -97,36 +93,33 @@ public class CollectFoodTask extends Task {
         FoodCollectionBlacklist.applyKnownFoodBlacklists(mod);
 
         // If we were previously smelting, keep on smelting.
-        if (smeltTask != null) {
-            if (smeltTask.isFinished()) {
-                debugLogger.state("smelting target complete: raw=" + describeItem(smeltRawMaterial));
-                smeltTask = null;
-                smeltRawMaterial = null;
+        if (cookingTracker.hasSmeltingTask()) {
+            if (cookingTracker.getSmeltTask().isFinished()) {
+                debugLogger.state("smelting target complete: raw=" + describeItem(cookingTracker.getSmeltRawMaterial()));
+                cookingTracker.clearSmelting();
                 resetCookingFuelPreparationIfNoRawFood(mod);
-            } else if (smeltTask.thisOrChildAreTimedOut()) {
+            } else if (cookingTracker.getSmeltTask().thisOrChildAreTimedOut()) {
                 huntTracker.clear();
-                debugLogger.state("cancel smelting: timed out; raw=" + describeItem(smeltRawMaterial)
+                debugLogger.state("cancel smelting: timed out; raw=" + describeItem(cookingTracker.getSmeltRawMaterial())
                         + ", " + describeFoodResources(mod));
-                smeltTask = null;
-                smeltRawMaterial = null;
+                cookingTracker.clearSmelting();
             } else {
                 huntTracker.clear();
                 setDebugState("Cooking...");
-                debugLogger.state("continue smelting: raw=" + describeItem(smeltRawMaterial) + ", " + describeFoodResources(mod));
-                return smeltTask;
+                debugLogger.state("continue smelting: raw=" + describeItem(cookingTracker.getSmeltRawMaterial()) + ", " + describeFoodResources(mod));
+                return cookingTracker.getSmeltTask();
             }
         }
 
         if (currentResourceTask != null && currentResourceTask.isFinished()) {
-            if (currentResourceTask == cookingFuelTask) {
-                cookingFuelPreparedForRawTotal = Math.max(cookingFuelPreparedForRawTotal, cookingFuelTaskRawTotal);
+            if (cookingTracker.isCookingFuelTask(currentResourceTask)) {
+                int rawTotal = cookingTracker.getCookingFuelTaskRawTotal();
+                cookingTracker.finishFuelPreparation();
                 debugLogger.state("cooking fuel prepared",
-                        "cooking fuel prepared: rawTotal=" + cookingFuelTaskRawTotal
-                                + ", preparedRawTotal=" + cookingFuelPreparedForRawTotal
+                        "cooking fuel prepared: rawTotal=" + rawTotal
+                                + ", preparedRawTotal=" + cookingTracker.getCookingFuelPreparedForRawTotal()
                                 + ", inventoryFuel=" + formatDouble(StorageHelper.calculateInventoryFuelCount(mod))
                                 + ", " + describeFoodResources(mod));
-                cookingFuelTask = null;
-                cookingFuelTaskRawTotal = 0;
                 currentResourceTask = null;
             }
             huntTracker.clear();
@@ -138,19 +131,18 @@ public class CollectFoodTask extends Task {
             if (huntTracker.hasTarget()) {
                 huntTracker.temporarilySkip(mod, debugLogger, "hunt task timed out");
             }
-            if (currentResourceTask == cookingFuelTask) {
-                cookingFuelTask = null;
-                cookingFuelTaskRawTotal = 0;
+            if (cookingTracker.isCookingFuelTask(currentResourceTask)) {
+                cookingTracker.clearFuelPreparationTask();
             }
             currentResourceTask = null;
         }
-        if (isActiveCookingFuelTask(currentResourceTask)) {
+        if (cookingTracker.isActiveCookingFuelTask(currentResourceTask)) {
             huntTracker.clear();
             setDebugState("Preparing cooking fuel");
             debugLogger.state("continue cooking fuel prep",
                     "continue cooking fuel prep: task=" + describeTask(currentResourceTask)
-                            + ", rawTotal=" + cookingFuelTaskRawTotal
-                            + ", preparedRawTotal=" + cookingFuelPreparedForRawTotal
+                            + ", rawTotal=" + cookingTracker.getCookingFuelTaskRawTotal()
+                            + ", preparedRawTotal=" + cookingTracker.getCookingFuelPreparedForRawTotal()
                             + ", inventoryFuel=" + formatDouble(StorageHelper.calculateInventoryFuelCount(mod))
                             + ", " + describeFoodResources(mod));
             return currentResourceTask;
@@ -216,16 +208,15 @@ public class CollectFoodTask extends Task {
                 setDebugState(plan.getDebugState());
                 debugLogger.state(plan.getStateKey(), plan.describeWithResources(describeFoodResources(mod)));
                 if (plan.isSmelting()) {
-                    if (plan.needsFuelPreparation(mod) && !hasPreparedCookingFuelFor(plan)) {
+                    if (plan.needsFuelPreparation(mod) && !cookingTracker.hasPreparedFuelFor(plan)) {
                         setDebugState("Preparing cooking fuel");
                         debugLogger.state("prepare cooking fuel", plan.describeFuelPreparation(mod, describeFoodResources(mod)));
                         return setCookingFuelTask(plan.createFuelPreparationTask(), plan.getTotalRawFoodCount());
                     }
-                    markCookingFuelPrepared(plan);
-                    smeltTask = plan.getSmeltTask();
-                    smeltRawMaterial = plan.getRawMaterial();
+                    cookingTracker.markFuelPreparedFor(plan);
+                    cookingTracker.startSmelting(plan);
                     huntTracker.clear();
-                    return smeltTask;
+                    return cookingTracker.getSmeltTask();
                 }
                 return setCurrentResourceTask(plan.getTask());
             }
@@ -237,7 +228,7 @@ public class CollectFoodTask extends Task {
             }
         }
         
-        cookingFuelPreparedForRawTotal = 0;
+        cookingTracker.resetFuelPreparation();
         Optional<FoodCollectionTaskSelector.Selection> selection = FoodCollectionTaskSelector.select(
                 mod,
                 COOKABLE_FOODS,
@@ -281,7 +272,9 @@ public class CollectFoodTask extends Task {
 
     @Override
     public boolean isFinished() {
-        if (smeltTask != null && !smeltTask.isFinished() && !smeltTask.thisOrChildAreTimedOut()) {
+        if (cookingTracker.hasSmeltingTask()
+                && !cookingTracker.getSmeltTask().isFinished()
+                && !cookingTracker.getSmeltTask().thisOrChildAreTimedOut()) {
             return false;
         }
         return StorageHelper.calculateInventoryFoodScore() >= unitsNeeded;
@@ -312,9 +305,7 @@ public class CollectFoodTask extends Task {
     }
 
     private Task setCookingFuelTask(Task task, int rawFoodTotal) {
-        cookingFuelTask = task;
-        cookingFuelTaskRawTotal = rawFoodTotal;
-        currentResourceTask = task;
+        currentResourceTask = cookingTracker.startFuelPreparation(task, rawFoodTotal);
         huntTracker.clear();
         return currentResourceTask;
     }
@@ -333,27 +324,9 @@ public class CollectFoodTask extends Task {
                 && task.thisOrChildSatisfies(child -> child instanceof PickupDroppedItemTask);
     }
 
-    private boolean isActiveCookingFuelTask(Task task) {
-        return task != null
-                && task == cookingFuelTask
-                && task.isActive()
-                && !task.isFinished()
-                && !task.thisOrChildAreTimedOut();
-    }
-
-    private boolean hasPreparedCookingFuelFor(FoodConversionPlanner.Plan plan) {
-        return cookingFuelPreparedForRawTotal >= plan.getTotalRawFoodCount();
-    }
-
-    private void markCookingFuelPrepared(FoodConversionPlanner.Plan plan) {
-        cookingFuelPreparedForRawTotal = Math.max(cookingFuelPreparedForRawTotal, plan.getTotalRawFoodCount());
-    }
-
     private void resetCookingFuelPreparationIfNoRawFood(AltoClef mod) {
         if (FoodResourceSnapshot.getTotalRawFoodCount(mod, COOKABLE_FOODS) <= 0) {
-            cookingFuelTask = null;
-            cookingFuelTaskRawTotal = 0;
-            cookingFuelPreparedForRawTotal = 0;
+            cookingTracker.resetFuelPreparation();
         }
     }
 
