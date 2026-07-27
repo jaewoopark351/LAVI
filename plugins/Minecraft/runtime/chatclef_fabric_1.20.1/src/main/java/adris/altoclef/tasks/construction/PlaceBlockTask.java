@@ -10,18 +10,19 @@ import adris.altoclef.tasksystem.ITaskRequiresGrounded;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.ItemTarget;
 import adris.altoclef.util.helpers.ItemHelper;
+import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.helpers.WorldHelper;
 import adris.altoclef.util.logging.StateChangeLogger;
 import adris.altoclef.util.progresscheck.MovementProgressChecker;
 import baritone.api.schematic.AbstractSchematic;
 import baritone.api.schematic.ISchematic;
-import baritone.api.utils.BlockOptionalMeta;
 import baritone.api.utils.input.Input;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
 import net.minecraft.util.math.BlockPos;
 import org.apache.commons.lang3.ArrayUtils;
 
@@ -76,7 +77,8 @@ public class PlaceBlockTask extends Task implements ITaskRequiresGrounded {
         debugLogger.event("start: target=" + target.toShortString()
                 + ", blocks=" + describeBlocks()
                 + ", useThrowaways=" + useThrowaways
-                + ", autoCollectStructureBlocks=" + autoCollectStructureBlocks);
+                + ", autoCollectStructureBlocks=" + autoCollectStructureBlocks
+                + ", " + describePlacementContext(AltoClef.getInstance()));
         // If we get interrupted by another task, this might cause problems...
         //_wanderTask.resetWander();
     }
@@ -147,12 +149,14 @@ public class PlaceBlockTask extends Task implements ITaskRequiresGrounded {
             if (!tryingAlternativeWay()) {
                 Debug.logMessage("Failed to place, wandering timeout.");
                 debugLogger.state("place progress failed; wandering: target=" + target.toShortString()
-                        + ", failCount=" + failCount);
+                        + ", failCount=" + failCount
+                        + ", " + describePlacementContext(mod));
                 return wanderTask;
             } else {
                 Debug.logMessage("Trying alternative way of placing block...");
                 debugLogger.state("place progress failed; trying alternative: target=" + target.toShortString()
-                        + ", failCount=" + failCount);
+                        + ", failCount=" + failCount
+                        + ", " + describePlacementContext(mod));
             }
         }
 
@@ -160,7 +164,8 @@ public class PlaceBlockTask extends Task implements ITaskRequiresGrounded {
         // Place block
         if (tryingAlternativeWay()) {
             setDebugState("Alternative way: Trying to go above block to place block.");
-            debugLogger.state("alternative place route: target=" + target.toShortString());
+            debugLogger.state("alternative place route: target=" + target.toShortString()
+                    + ", " + describePlacementContext(mod));
             return new GetToBlockTask(target.up(), false);
         } else {
             setDebugState("Letting baritone place a block.");
@@ -168,11 +173,22 @@ public class PlaceBlockTask extends Task implements ITaskRequiresGrounded {
             if (!mod.getClientBaritone().getBuilderProcess().isActive()) {
                 Debug.logInternal("Run Structure Build");
                 debugLogger.state("start baritone build: target=" + target.toShortString()
-                        + ", blocks=" + describeBlocks());
+                        + ", " + describePlacementContext(mod));
                 ISchematic schematic = new PlaceStructureSchematic(mod);
-                mod.getClientBaritone().getBuilderProcess().build("structure", schematic, target);
+                try {
+                    mod.getClientBaritone().getBuilderProcess().build("structure", schematic, target);
+                } catch (RuntimeException exception) {
+                    debugLogger.event("baritone build exception: " + describeException(exception)
+                            + ", " + describePlacementContext(mod));
+                    exception.printStackTrace();
+                    mod.getClientBaritone().getBuilderProcess().onLostControl();
+                    progressChecker.reset();
+                    failCount++;
+                    return wanderTask;
+                }
             } else {
-                debugLogger.state("baritone build already active: target=" + target.toShortString());
+                debugLogger.state("baritone build already active: target=" + target.toShortString()
+                        + ", " + describePlacementContext(mod));
             }
         }
         return null;
@@ -227,13 +243,21 @@ public class PlaceBlockTask extends Task implements ITaskRequiresGrounded {
         public BlockState desiredState(int x, int y, int z, BlockState blockState, List<BlockState> available) {
             if (x == 0 && y == 0 && z == 0) {
                 // Place!!
-                if (!available.isEmpty()) {
+                if (available != null && !available.isEmpty()) {
                     for (BlockState possible : available) {
                         if (possible == null) continue;
                         if (useThrowaways && _mod.getClientBaritoneSettings().acceptableThrowawayItems.value.contains(possible.getBlock().asItem())) {
+                            debugLogger.state("schematic selected throwaway block: target=" + target.toShortString(),
+                                    "schematic selected throwaway block: selected=" + describeBlockState(possible)
+                                            + ", target=" + target.toShortString()
+                                            + ", available=" + describeAvailableBlocks(available));
                             return possible;
                         }
                         if (Arrays.asList(toPlace).contains(possible.getBlock())) {
+                            debugLogger.state("schematic selected requested block: target=" + target.toShortString(),
+                                    "schematic selected requested block: selected=" + describeBlockState(possible)
+                                            + ", target=" + target.toShortString()
+                                            + ", available=" + describeAvailableBlocks(available));
                             return possible;
                         }
                     }
@@ -241,13 +265,83 @@ public class PlaceBlockTask extends Task implements ITaskRequiresGrounded {
                 Debug.logInternal("Failed to find throwaway block");
                 debugLogger.state("schematic could not find matching available block: target=" + target.toShortString()
                         + ", blocks=" + describeBlocks()
-                        + ", available=" + available.size());
+                        + ", available=" + describeAvailableBlocks(available));
                 // No throwaways available!!
-                return new BlockOptionalMeta(Blocks.COBBLESTONE).getAnyBlockState();
+                BlockState fallback = getFallbackDesiredState();
+                debugLogger.event("schematic fallback desired state: fallback=" + describeBlockState(fallback)
+                        + ", target=" + target.toShortString()
+                        + ", blocks=" + describeBlocks()
+                        + ", available=" + describeAvailableBlocks(available));
+                return fallback;
             }
             // Don't care.
             return blockState;
         }
+    }
+
+    private BlockState getFallbackDesiredState() {
+        //20260727_kpopmodder: Avoid BlockOptionalMeta here; it can throw through Baritone during resource reloads.
+        for (Block block : toPlace) {
+            if (block != null) {
+                return block.getDefaultState();
+            }
+        }
+        return Blocks.COBBLESTONE.getDefaultState();
+    }
+
+    private String describePlacementContext(AltoClef mod) {
+        if (mod == null || mod.getPlayer() == null || mod.getWorld() == null) {
+            return "context=missing-client";
+        }
+
+        return "player=" + mod.getPlayer().getBlockPos().toShortString()
+                + ", targetState=" + describeBlockState(mod.getWorld().getBlockState(target))
+                + ", materialCount=" + getMaterialCount(mod)
+                + ", cursor=" + describeStack(StorageHelper.getItemStackInCursorSlot())
+                + ", equipped=" + StorageHelper.isEquipped(ItemHelper.blocksToItems(toPlace))
+                + ", builderActive=" + mod.getClientBaritone().getBuilderProcess().isActive()
+                + ", pathing=" + mod.getClientBaritone().getPathingBehavior().isPathing()
+                + ", failCount=" + failCount
+                + ", blocks=" + describeBlocks();
+    }
+
+    private String describeAvailableBlocks(List<BlockState> available) {
+        if (available == null) {
+            return "null";
+        }
+
+        StringBuilder result = new StringBuilder();
+        result.append(available.size()).append(" [");
+        int limit = Math.min(available.size(), 8);
+        for (int i = 0; i < limit; i++) {
+            if (i > 0) {
+                result.append(", ");
+            }
+            result.append(describeBlockState(available.get(i)));
+        }
+        if (available.size() > limit) {
+            result.append(", ...");
+        }
+        result.append("]");
+        return result.toString();
+    }
+
+    private String describeBlockState(BlockState state) {
+        if (state == null) {
+            return "null";
+        }
+        return state.getBlock().getTranslationKey();
+    }
+
+    private String describeStack(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return "empty";
+        }
+        return stack.getItem().getTranslationKey() + " x " + stack.getCount();
+    }
+
+    private String describeException(RuntimeException exception) {
+        return exception.getClass().getSimpleName() + ": " + exception.getMessage();
     }
 
     private String describeBlocks() {

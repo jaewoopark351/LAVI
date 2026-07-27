@@ -54,6 +54,9 @@ public class FoodInventoryEvaluator {
                 if (stack.getItem() == Items.ROTTEN_FLESH) {
                     score -= config.foodPickRottenFleshPenalty;
                 }
+                if (ItemHelper.cookableFoodMap.containsValue(stack.getItem())) {
+                    score += config.foodPickCookedFoodBonus;
+                }
                 if (score > bestFoodScore) {
                     bestFoodScore = score;
                     bestFood = stack.getItem();

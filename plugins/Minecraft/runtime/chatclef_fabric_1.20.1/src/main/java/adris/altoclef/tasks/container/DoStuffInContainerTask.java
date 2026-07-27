@@ -155,7 +155,8 @@ public abstract class DoStuffInContainerTask extends Task {
             return null;
         }
         setDebugState("Walking to container... " + nearest.get().toShortString());
-        debugLogger.state("walk/open container: targetPosition=" + nearest.get().toShortString()
+        debugLogger.state("walk/open container:" + nearest.get().toShortString(),
+                "walk/open container: targetPosition=" + nearest.get().toShortString()
                 + ", walkCost=" + formatDouble(costToWalk)
                 + ", makeCost=" + formatDouble(getCostToMakeNew(mod)));
 
