@@ -8,6 +8,7 @@ import adris.altoclef.eventbus.events.BlockPlaceEvent;
 import adris.altoclef.multiversion.blockpos.BlockPosVer;
 import adris.altoclef.tasks.movement.TimeoutWanderTask;
 import adris.altoclef.tasksystem.Task;
+import adris.altoclef.util.compat.CarryOnCompat;
 import adris.altoclef.util.helpers.ItemHelper;
 import adris.altoclef.util.helpers.LookHelper;
 import adris.altoclef.util.helpers.StorageHelper;
@@ -64,7 +65,11 @@ public class PlaceBlockNearbyTask extends Task {
     protected void onStart() {
         progressChecker.reset();
         AltoClef.getInstance().getClientBaritone().getInputOverrideHandler().setInputForceState(Input.CLICK_RIGHT, false);
-        debugLogger.event("start: blocks=" + Arrays.toString(toPlace));
+        if (shouldAvoidSneakRightClick()) {
+            AltoClef.getInstance().getInputControls().release(Input.SNEAK);
+        }
+        debugLogger.event("start: blocks=" + Arrays.toString(toPlace)
+                + ", carryOnSafeSneak=" + shouldAvoidSneakRightClick());
 
         // Check for blocks being placed
         _onBlockPlaced = EventBus.subscribe(BlockPlaceEvent.class, evt -> {
@@ -226,8 +231,14 @@ public class PlaceBlockNearbyTask extends Task {
 
     private boolean place(AltoClef mod, BlockPos targetPlace) {
         if (!mod.getExtraBaritoneSettings().isInteractionPaused() && blockEquipped()) {
-            // Shift click just for 100% container security.
-            mod.getInputControls().hold(Input.SNEAK);
+            boolean avoidSneakRightClick = shouldAvoidSneakRightClick();
+            //20260727_kpopmodder: Carry On uses sneak-right-click for carrying blocks, so avoid it for container placement.
+            if (avoidSneakRightClick) {
+                mod.getInputControls().release(Input.SNEAK);
+            } else {
+                // Shift click just for 100% container security.
+                mod.getInputControls().hold(Input.SNEAK);
+            }
 
             //mod.getInputControls().tryPress(Input.CLICK_RIGHT);
             // This appears to work on servers...
@@ -242,8 +253,9 @@ public class PlaceBlockNearbyTask extends Task {
             ActionResult result = MinecraftClient.getInstance().interactionManager.interactBlock(mod.getPlayer(),hand, (BlockHitResult) mouseOver);
             debugLogger.state("place click attempted: target=" + targetPlace.toShortString()
                     + ", result=" + result
-                    + ", sneaking=" + mod.getPlayer().isSneaking());
-            if (result == ActionResult.SUCCESS && mod.getPlayer().isSneaking()) {
+                    + ", sneaking=" + mod.getPlayer().isSneaking()
+                    + ", carryOnSafeSneak=" + avoidSneakRightClick);
+            if (result == ActionResult.SUCCESS && (avoidSneakRightClick || mod.getPlayer().isSneaking())) {
                 mod.getPlayer().swingHand(hand);
                 justPlaced = targetPlace;
                 Debug.logMessage("PRESSED");
@@ -258,6 +270,10 @@ public class PlaceBlockNearbyTask extends Task {
         debugLogger.state("place blocked: interactionPaused=" + mod.getExtraBaritoneSettings().isInteractionPaused()
                 + ", equipped=" + blockEquipped());
         return false;
+    }
+
+    private boolean shouldAvoidSneakRightClick() {
+        return CarryOnCompat.shouldAvoidSneakRightClick(toPlace);
     }
 
     private void stopPlacing() {

@@ -7,6 +7,7 @@ import adris.altoclef.tasks.construction.PlaceBlockNearbyTask;
 import adris.altoclef.tasks.slot.EnsureFreeInventorySlotTask;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.ItemTarget;
+import adris.altoclef.util.compat.CarryOnCompat;
 import adris.altoclef.util.helpers.BaritoneHelper;
 import adris.altoclef.util.helpers.ItemHelper;
 import adris.altoclef.util.helpers.StorageHelper;
@@ -14,6 +15,7 @@ import adris.altoclef.util.helpers.WorldHelper;
 import adris.altoclef.util.logging.StateChangeLogger;
 import adris.altoclef.util.slots.Slot;
 import adris.altoclef.util.time.TimerGame;
+import baritone.api.utils.input.Input;
 import net.minecraft.item.ItemStack;
 import net.minecraft.block.Block;
 import net.minecraft.screen.slot.SlotActionType;
@@ -60,17 +62,26 @@ public abstract class DoStuffInContainerTask extends Task {
 
         // Protect container since we might place it.
         mod.getBehaviour().addProtectedItems(ItemHelper.blocksToItems(containerBlocks));
-        debugLogger.event("start: containerTarget=" + containerTarget);
+        debugLogger.event("start: containerTarget=" + containerTarget
+                + ", carryOnSafeSneak=" + shouldUseCarryOnSafeInteraction());
     }
 
     @Override
     protected Task onTick() {
         AltoClef mod = AltoClef.getInstance();
         // If we're placing, keep on placing.
-        if (mod.getItemStorage().hasItem(ItemHelper.blocksToItems(containerBlocks)) && placeTask.isActive() && !placeTask.isFinished()) {
-            setDebugState("Placing container");
-            debugLogger.state("continue placing container: placed=" + describePos(placeTask.getPlaced()));
-            return placeTask;
+        if (placeTask.isActive() && !placeTask.isFinished()) {
+            if (mod.getItemStorage().hasItem(ItemHelper.blocksToItems(containerBlocks))) {
+                setDebugState("Placing container");
+                debugLogger.state("continue placing container: placed=" + describePos(placeTask.getPlaced()));
+                return placeTask;
+            }
+            if (shouldUseCarryOnSafeInteraction() && !justPlacedTimer.elapsed()) {
+                mod.getInputControls().release(Input.SNEAK);
+                setDebugState("Waiting for placed container verification");
+                debugLogger.state("wait for carry-on-safe placed container verification: placed=" + describePos(placeTask.getPlaced()));
+                return null;
+            }
         }
 
         if (isContainerOpen(mod)) {
@@ -137,6 +148,9 @@ public abstract class DoStuffInContainerTask extends Task {
                     + ", previousPlaced=" + describePos(placeTask.getPlaced()));
 
             justPlacedTimer.reset();
+            if (shouldUseCarryOnSafeInteraction()) {
+                mod.getInputControls().release(Input.SNEAK);
+            }
             // Now place!
             return placeTask;
         }
@@ -172,7 +186,12 @@ public abstract class DoStuffInContainerTask extends Task {
             mod.getSlotHandler().clickSlot(toMoveTo.get(), 0, SlotActionType.PICKUP);
             return null;
         }
-        return new InteractWithBlockTask(cachedContainerPosition);
+        if (shouldUseCarryOnSafeInteraction()) {
+            mod.getInputControls().release(Input.SNEAK);
+            debugLogger.state("carry-on-safe open container:" + cachedContainerPosition.toShortString(),
+                    "carry-on-safe open container: release sneak before targetPosition=" + cachedContainerPosition.toShortString());
+        }
+        return new InteractWithBlockTask(cachedContainerPosition, false);
         //return new GetToBlockTask(nearest, true);
     }
 
@@ -243,6 +262,10 @@ public abstract class DoStuffInContainerTask extends Task {
     protected abstract Task containerSubTask(AltoClef mod);
 
     protected abstract double getCostToMakeNew(AltoClef mod);
+
+    private boolean shouldUseCarryOnSafeInteraction() {
+        return CarryOnCompat.shouldAvoidSneakRightClick(containerBlocks);
+    }
 
     private String describeOptionalPos(Optional<BlockPos> pos) {
         return pos.map(BlockPos::toShortString).orElse("none");
