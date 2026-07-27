@@ -1070,6 +1070,305 @@ Do not remove useful debug logs during active troubleshooting unless the user as
 
 ---
 
+## 21.1 Diagnostic Logging First Rule
+
+When a feature fails, behaves inconsistently, hangs, returns an unexpected result, or cannot be reproduced reliably, Codex must first determine whether the existing logs are sufficient to identify the exact failing step.
+
+### Core Rule
+
+If the root cause is not directly proven by an existing stack trace, compiler error, failing test, validated reproduction, or clearly observable code defect, strengthen diagnostic logging before applying a behavioral fix.
+
+Use this order:
+
+```text
+reproduce the symptom
+    -> inspect existing logs and error output
+    -> identify the unobservable execution boundary
+    -> add focused diagnostic logs
+    -> reproduce again
+    -> verify the actual failing step and state
+    -> apply the smallest root-cause fix
+    -> validate the fix using tests and logs
+```
+
+A suspected cause is not a verified cause.
+
+Do not skip diagnostic logging merely because one module appears likely to be responsible. Logging-first may be skipped only when existing evidence already identifies the exact failing operation and the required correction.
+
+### Mandatory Diagnostic Review Trigger
+
+Codex must review and, when insufficient, strengthen logging when:
+
+* an operation silently fails or returns no result
+* the application reports only a generic error
+* the user reports that something does not work and the current logs do not show where execution stopped
+* a callback, event, command, request, response, queue item, or state transition disappears
+* a plugin, bridge, model, game integration, external process, HTTP endpoint, or WebSocket operation does not respond as expected
+* a background thread, async task, future, timer, subprocess, or queue worker terminates unexpectedly
+* an exception is caught without sufficient operation context or stack information
+* the result is incorrect but intermediate decisions cannot be observed
+* several modules or boundaries could plausibly be responsible
+* the problem is intermittent, timing-dependent, or difficult to reproduce
+* retry or fallback behavior may be hiding the original failure
+
+### Required Diagnostic Coverage
+
+Add the smallest set of logs needed to trace the affected operation from entry to completion.
+
+When applicable, diagnostic logs must identify:
+
+```text
+operation, action, command, or request name
+component, class, module, plugin, or worker name
+request or task entry
+important validated input metadata
+selected branch or state transition
+dependency, handler, parser, action, or plugin resolution
+external call start and completion
+response status and normalized result
+queue insertion, dequeue, cancellation, and completion
+thread, async task, future, subprocess, or timer start and completion
+retry attempt and exact reason
+fallback activation and exact reason
+exception type, message, and stack trace
+cleanup start, completion, and cleanup failure
+final success, rejection, cancellation, timeout, or failure result
+elapsed time when delay or timeout is relevant
+```
+
+The resulting logs must make it possible to answer:
+
+```text
+Where did the operation start?
+Which steps completed?
+Which branch was selected?
+What was the last successful boundary?
+What value, state, or response caused rejection or failure?
+Where did control flow stop?
+Was a fallback, retry, timeout, or cancellation path used?
+Did cleanup and final state publication complete?
+```
+
+### Boundary-First Logging
+
+Prefer logs at ownership and trust boundaries rather than adding random messages throughout unrelated code.
+
+Important boundaries include:
+
+```text
+UI -> application service
+application service -> domain or action logic
+parser -> typed command
+registry or factory -> resolved implementation
+plugin loader -> initialized plugin instance
+Python -> Java, TypeScript, C, or C++ bridge
+HTTP or WebSocket request -> normalized response
+queue producer -> queue consumer
+thread or async task entry -> terminal result
+configuration loader -> validated configuration
+model request -> normalized model result
+game action request -> observed game state
+reload preparation -> validated state swap
+```
+
+Log both sides of a boundary when the failure could occur during transfer, conversion, dispatch, or response handling.
+
+### Exception and Background-Task Logging
+
+When an exception is caught, the log must normally include:
+
+* the operation being performed
+* the component and relevant non-sensitive identifier
+* the exception type
+* the exception message
+* the stack trace
+* whether the operation will stop, retry, return a typed failure, or activate a fallback
+
+Do not use messages such as:
+
+```text
+Something went wrong.
+Operation failed.
+Exception occurred.
+```
+
+without identifying the failing operation and location.
+
+Do not allow exceptions from callbacks, threads, async tasks, futures, queue workers, subprocess readers, or timers to disappear silently. Their terminal failure must be observable by the owning component.
+
+Do not catch an exception only to log it and then return misleading success.
+
+### State and Result Logging
+
+Log expected versus actual state when that distinction is necessary to diagnose the failure.
+
+Prefer safe summaries such as:
+
+```text
+value type
+value length
+item count
+field names
+status code
+state name
+request or action identifier
+sanitized path or abbreviated identifier
+normalized success or failure category
+```
+
+Do not log complete sensitive or excessively large values.
+
+Never log:
+
+```text
+API keys
+access tokens
+passwords
+authentication headers
+private credentials
+VTube Studio tokens
+complete private conversations
+raw microphone audio
+large model prompts or responses unless explicitly sanitized and required
+personal information
+```
+
+### Logging Level and Volume Rules
+
+Use logging levels deliberately:
+
+```text
+DEBUG    detailed execution flow and investigation data
+INFO     meaningful lifecycle and successful operation milestones
+WARNING  recoverable abnormal state, retry, timeout, or fallback activation
+ERROR    operation failure requiring investigation
+CRITICAL unrecoverable process-wide or system-wide failure
+```
+
+Do not use `ERROR` for a normal optional absence.
+
+Do not use `INFO` for high-frequency loop details.
+
+Real-time audio, video, model-token, game-tick, polling, event, and queue loops must not emit unbounded logs. Use state-change logging, sampling, rate limiting, aggregation, or configurable debug logging when necessary.
+
+### Correlation and Traceability
+
+When one operation crosses multiple modules, reuse an existing request, command, action, job, trace, or correlation identifier when available.
+
+The identifier should make one operation traceable through:
+
+```text
+request received
+command parsed
+handler selected
+action submitted
+external operation executed
+result observed
+response returned
+```
+
+Use the project's existing logging context mechanism when one exists. Do not add a new logging framework or dependency solely for correlation without user approval.
+
+### Speculative Fix Prohibition
+
+Before the failure boundary is verified, do not attempt to solve an unknown problem by:
+
+* rewriting the affected component
+* changing dependency or runtime versions
+* adding broad `try/catch` or `try/except` blocks
+* adding arbitrary delays, sleeps, retries, or timeouts
+* changing thread, async, queue, or lifecycle behavior
+* adding a silent fallback
+* suppressing, downgrading, or ignoring the error
+* changing several plausible modules at once
+
+These changes may alter the symptom and hide the original defect.
+
+If a temporary guard is required to prevent data loss or a process-wide crash, keep the failure visible, label the guard as temporary, and continue the root-cause investigation.
+
+### Fix Verification Rule
+
+A fix is not verified merely because the visible error disappeared.
+
+After applying the fix, Codex must use the improved logs and the smallest relevant test to confirm:
+
+1. The operation enters the expected execution path.
+2. The previously failing boundary now completes successfully.
+3. The expected state or result is produced.
+4. No retry or fallback is silently hiding the original failure.
+5. Cleanup and final state transitions complete.
+6. The caller receives a result consistent with the observed runtime outcome.
+
+Keep permanent logs that provide continuing operational value, especially for:
+
+* startup and shutdown
+* dependency and plugin initialization
+* bridge connection, disconnection, and reconnection
+* action rejection reasons
+* retry, timeout, and fallback activation
+* malformed external responses
+* queue or worker termination
+* reload failure and retained previous state
+* cleanup failure
+
+Temporary high-volume investigation logs may be removed or downgraded only after the root cause is verified and sufficient permanent observability remains for the same failure class.
+
+### Required Investigation Report
+
+For a failure that requires diagnostic logging, Codex must report:
+
+```text
+Observed symptom:
+- <what failed or behaved unexpectedly>
+
+Existing logging gap:
+- <which execution step or state could not be observed>
+
+Logs added:
+- <exact file and diagnostic event>
+
+Reproduction result:
+- <last successful step and verified failing step>
+
+Root-cause status:
+- <verified or still suspected>
+
+Verified root cause:
+- <cause supported by logs, tests, stack trace, or direct evidence>
+
+Fix applied:
+- <smallest change addressing the verified cause>
+
+Validation:
+- <commands, tests, and relevant log result>
+
+Remaining uncertainty:
+- <anything not yet proven>
+```
+
+If the root cause remains unknown after logging is added, state that it remains unknown. Do not present a suspected cause as verified.
+
+### Forbidden Patterns
+
+Do not:
+
+* make several speculative fixes before improving observability
+* log only at the final outermost exception boundary
+* swallow callback, thread, async-task, queue-worker, timer, or subprocess exceptions
+* replace a reproducible error with a silent fallback before identifying its cause
+* return success after logging a required operation failure
+* print secrets or complete sensitive payloads
+* rely on console `print` when an existing logger is available
+* add so much logging that the relevant failure becomes harder to find
+* remove useful diagnostic logs immediately after the first successful run
+* claim that the problem is fixed without reproducing and observing the affected path
+
+The purpose of logging is not to produce more output.
+
+The purpose is to make the exact failing boundary observable before code behavior is changed.
+
+---
+
 ## 22. Testing Rules
 
 After code changes, suggest the smallest relevant test first.
@@ -3041,11 +3340,13 @@ Any change in these areas should be small and carefully explained.
 Before editing:
 
 1. Inspect the relevant files.
-2. Summarize the planned change.
-3. Make the smallest safe patch.
-4. Show what changed.
-5. Suggest a test command.
-6. Before any cleanup, deletion, move, rename, reset, or mass file operation, print the exact target list and stop for user confirmation.
+2. For a failure or unexpected behavior, inspect the existing logs, stack traces, tests, and reproduction evidence.
+3. If the root cause is not proven, add focused diagnostic logs and reproduce the problem before changing behavior.
+4. Summarize the planned change.
+5. Make the smallest safe patch.
+6. Show what changed.
+7. Suggest a test command.
+8. Before any cleanup, deletion, move, rename, reset, or mass file operation, print the exact target list and stop for user confirmation.
 
 After editing:
 
