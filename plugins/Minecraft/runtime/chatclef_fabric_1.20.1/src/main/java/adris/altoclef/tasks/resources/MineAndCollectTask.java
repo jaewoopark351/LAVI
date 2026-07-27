@@ -171,10 +171,16 @@ public class MineAndCollectTask extends ResourceTask {
 
         private static final int MINING_TARGET_TIMEOUT_TICKS = 20 * 30;
         private static final int TEMPORARY_BLOCK_SKIP_TICKS = 20 * 45;
+        private static final int DROPPED_ITEM_PICKUP_GRACE_TICKS = 20 * 5;
+        private static final double DROPPED_ITEM_PICKUP_GRACE_RANGE = 16;
 
         private final Block[] _blocks;
         private final ItemTarget[] _targets;
         private final TemporaryBlockBlacklist temporaryBlockBlacklist = new TemporaryBlockBlacklist();
+        private final DroppedItemPickupGrace droppedItemPickupGrace = new DroppedItemPickupGrace(
+                DROPPED_ITEM_PICKUP_GRACE_TICKS,
+                DROPPED_ITEM_PICKUP_GRACE_RANGE
+        );
         private final MovementProgressChecker progressChecker = new MovementProgressChecker();
         private final Task _pickupTask;
         private BlockPos miningPos;
@@ -201,6 +207,7 @@ public class MineAndCollectTask extends ResourceTask {
         @Override
         protected Optional<Object> getClosestTo(AltoClef mod, Vec3d pos) {
             temporaryBlockBlacklist.pruneExpired();
+            droppedItemPickupGrace.pruneExpired();
 
             Pair<Double, Optional<BlockPos>> closestBlock = getClosestBlock(mod,pos, this::isAllowedMiningCandidate, _blocks);
             Pair<Double, Optional<ItemEntity>> closestDrop = getClosestItemDrop(mod,pos,  _targets);
@@ -214,6 +221,15 @@ public class MineAndCollectTask extends ResourceTask {
                         + ", block=" + closestBlock.getRight().map(BlockPos::toShortString).orElse("none")
                         + ", skippedBlocks=" + temporaryBlockBlacklist.size());
                 return closestDrop.getRight().map(Object.class::cast);
+            }
+
+            Optional<ItemEntity> graceDrop = droppedItemPickupGrace.getPreferredDrop(closestDrop.getRight());
+            if (graceDrop.isPresent()) {
+                debugLogger.state("pickup grace prefers dropped item",
+                        "pickup grace prefers dropped item: drop=" + describeDrop(graceDrop.get())
+                                + ", block=" + closestBlock.getRight().map(BlockPos::toShortString).orElse("none")
+                                + ", ticksRemaining=" + droppedItemPickupGrace.ticksRemaining());
+                return graceDrop.map(Object.class::cast);
             }
 
             if (dropSq <= blockSq) {
@@ -293,6 +309,7 @@ public class MineAndCollectTask extends ResourceTask {
                             + ", timeoutTicks=" + MINING_TARGET_TIMEOUT_TICKS);
                 }
                 miningPos = newPos;
+                droppedItemPickupGrace.arm(newPos);
                 return new DestroyBlockTask(miningPos);
             }
             if (obj instanceof ItemEntity) {
@@ -328,6 +345,7 @@ public class MineAndCollectTask extends ResourceTask {
             miningPos = null;
             miningTargetStartTick = 0;
             temporaryBlockBlacklist.pruneExpired();
+            droppedItemPickupGrace.reset();
             debugLogger.event("start: blocks=" + Arrays.toString(_blocks)
                     + ", targets=" + Arrays.toString(_targets));
         }
@@ -336,6 +354,7 @@ public class MineAndCollectTask extends ResourceTask {
         protected void onStop(Task interruptTask) {
             debugLogger.event("stop: interruptedBy=" + (interruptTask == null ? "none" : interruptTask.getClass().getSimpleName())
                     + ", miningPos=" + describePos(miningPos));
+            droppedItemPickupGrace.reset();
         }
 
         @Override
@@ -422,6 +441,57 @@ public class MineAndCollectTask extends ResourceTask {
             public void pruneExpired() {
                 int currentTick = WorldHelper.getTicks();
                 skipUntilTick.entrySet().removeIf(entry -> entry.getValue() <= currentTick);
+            }
+        }
+
+        //20260727_kpopmodder: Keeps freshly mined drops preferred over nearby new blocks for a short recovery window.
+        private static class DroppedItemPickupGrace {
+            private final int graceTicks;
+            private final double maxDistanceSq;
+            private int graceUntilTick;
+            private BlockPos miningOrigin;
+
+            private DroppedItemPickupGrace(int graceTicks, double maxDistance) {
+                this.graceTicks = graceTicks;
+                maxDistanceSq = maxDistance * maxDistance;
+            }
+
+            private void arm(BlockPos origin) {
+                miningOrigin = origin;
+                graceUntilTick = WorldHelper.getTicks() + graceTicks;
+            }
+
+            private Optional<ItemEntity> getPreferredDrop(Optional<ItemEntity> closestDrop) {
+                pruneExpired();
+                if (miningOrigin == null || closestDrop.isEmpty()) {
+                    return Optional.empty();
+                }
+
+                ItemEntity drop = closestDrop.get();
+                if (!drop.isAlive() || drop.getStack().isEmpty()) {
+                    return Optional.empty();
+                }
+
+                double distanceSq = drop.getPos().squaredDistanceTo(WorldHelper.toVec3d(miningOrigin));
+                if (distanceSq > maxDistanceSq) {
+                    return Optional.empty();
+                }
+                return Optional.of(drop);
+            }
+
+            private int ticksRemaining() {
+                return Math.max(0, graceUntilTick - WorldHelper.getTicks());
+            }
+
+            private void pruneExpired() {
+                if (miningOrigin != null && WorldHelper.getTicks() > graceUntilTick) {
+                    reset();
+                }
+            }
+
+            private void reset() {
+                miningOrigin = null;
+                graceUntilTick = 0;
             }
         }
     }

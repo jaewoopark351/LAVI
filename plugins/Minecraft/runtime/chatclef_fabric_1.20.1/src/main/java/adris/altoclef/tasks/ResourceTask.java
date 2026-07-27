@@ -42,9 +42,12 @@ import java.util.Optional;
  */
 public abstract class ResourceTask extends Task implements ITaskCanForce {
 
+    private static final int DROPPED_ITEM_PICKUP_CONTINUATION_TICKS = 20 * 4;
+
     protected final ItemTarget[] itemTargets;
 
     private final PickupDroppedItemTask pickupTask;
+    private final DroppedItemPickupContinuation pickupContinuation = new DroppedItemPickupContinuation(DROPPED_ITEM_PICKUP_CONTINUATION_TICKS);
     private final EnsureFreePlayerCraftingGridTask ensureFreeCraftingGridTask = new EnsureFreePlayerCraftingGridTask();
     private ContainerCache currentContainer;
     // Extra resource parameters
@@ -89,6 +92,7 @@ public abstract class ResourceTask extends Task implements ITaskCanForce {
         //removeThrowawayItems(_itemTargets);
         botBehaviour.addProtectedItems(ItemTarget.getMatches(itemTargets));
 
+        pickupContinuation.reset();
         onResourceStart(AltoClef.getInstance());
         resourceLogger.event("start: targets=" + describeTargets());
     }
@@ -133,7 +137,12 @@ public abstract class ResourceTask extends Task implements ITaskCanForce {
 
         if (!shouldAvoidPickingUp(mod)) {
             // Check if items are on the floor. If so, pick em up.
-            if (mod.getEntityTracker().itemDropped(itemTargets)) {
+            boolean pickupActive = pickupTask.isActive() && !pickupTask.isFinished();
+            boolean droppedItemVisible = mod.getEntityTracker().itemDropped(itemTargets);
+            Optional<ItemEntity> closest = droppedItemVisible || pickupActive
+                    ? mod.getEntityTracker().getClosestItemDrop(mod.getPlayer().getPos(), itemTargets)
+                    : Optional.empty();
+            if (droppedItemVisible) {
 
                 // If we're picking up a pickaxe (we can't go far underground or mine much)
                 if (PickupDroppedItemTask.isIsGettingPickaxeFirst(mod)) {
@@ -144,24 +153,32 @@ public abstract class ResourceTask extends Task implements ITaskCanForce {
                         return pickupTask;
                     }
                     // Only get items that are CLOSE to us.
-                    Optional<ItemEntity> closest = mod.getEntityTracker().getClosestItemDrop(mod.getPlayer().getPos(), itemTargets);
                     if (closest.isPresent() && !closest.get().isInRange(mod.getPlayer(), 10)) {
                         resourceLogger.state("pickup skipped during pickaxe-first flow: closest=" + describeDrop(closest.get())
                                 + ", targets=" + describeTargets());
                         return onResourceTick(mod);
                     }
                 }
-
-                double range = getPickupRange(mod);
-                Optional<ItemEntity> closest = mod.getEntityTracker().getClosestItemDrop(mod.getPlayer().getPos(), itemTargets);
-                if (range < 0 || (closest.isPresent() && closest.get().isInRange(mod.getPlayer(), range)) || (pickupTask.isActive() && !pickupTask.isFinished())) {
-                    setDebugState("Picking up");
-                    resourceLogger.state("pickup dropped item: closest=" + closest.map(this::describeDrop).orElse("unknown")
-                            + ", range=" + range
-                            + ", targets=" + describeTargets());
-                    return pickupTask;
-                }
             }
+
+            double range = getPickupRange(mod);
+            if (droppedItemVisible && (range < 0 || (closest.isPresent() && closest.get().isInRange(mod.getPlayer(), range)) || pickupActive)) {
+                setDebugState("Picking up");
+                pickupContinuation.arm();
+                resourceLogger.state("pickup dropped item: closest=" + closest.map(this::describeDrop).orElse("unknown")
+                        + ", range=" + range
+                        + ", targets=" + describeTargets());
+                return pickupTask;
+            }
+            if (pickupContinuation.shouldContinue(pickupActive)) {
+                setDebugState("Picking up");
+                resourceLogger.state("pickup continuation grace",
+                        "pickup continuation grace: visible=" + droppedItemVisible
+                                + ", closest=" + closest.map(this::describeDrop).orElse("none")
+                                + ", ticksRemaining=" + pickupContinuation.ticksRemaining());
+                return pickupTask;
+            }
+            pickupContinuation.clearIfIdle(pickupActive);
         }
 
         // Check for chests and grab resources from them.
@@ -238,6 +255,7 @@ public abstract class ResourceTask extends Task implements ITaskCanForce {
     @Override
     protected void onStop(Task interruptTask) {
         AltoClef.getInstance().getBehaviour().pop();
+        pickupContinuation.reset();
         onResourceStop(AltoClef.getInstance(), interruptTask);
     }
 
@@ -322,5 +340,37 @@ public abstract class ResourceTask extends Task implements ITaskCanForce {
 
     public ItemTarget[] getItemTargets() {
         return itemTargets;
+    }
+
+    //20260727_kpopmodder: Keeps dropped-item pickup decisions from flickering back to mining while entity tracking settles.
+    private static class DroppedItemPickupContinuation {
+        private final int continuationTicks;
+        private int continueUntilTick;
+
+        private DroppedItemPickupContinuation(int continuationTicks) {
+            this.continuationTicks = continuationTicks;
+        }
+
+        private void arm() {
+            continueUntilTick = WorldHelper.getTicks() + continuationTicks;
+        }
+
+        private boolean shouldContinue(boolean pickupActive) {
+            return pickupActive && WorldHelper.getTicks() <= continueUntilTick;
+        }
+
+        private int ticksRemaining() {
+            return Math.max(0, continueUntilTick - WorldHelper.getTicks());
+        }
+
+        private void clearIfIdle(boolean pickupActive) {
+            if (!pickupActive) {
+                reset();
+            }
+        }
+
+        private void reset() {
+            continueUntilTick = 0;
+        }
     }
 }
