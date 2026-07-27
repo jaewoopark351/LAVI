@@ -119,7 +119,13 @@ public class CollectFoodPriorityCalculator extends ItemPriorityCalculator {
         // Cooked foods
         double bestScore = 0;
         Entity bestEntity = null;
-        Predicate<Entity> notBaby = entity -> entity instanceof LivingEntity livingEntity && !livingEntity.isBaby();
+        Predicate<Entity> notBaby = entity -> {
+            if (!(entity instanceof LivingEntity)) {
+                return false;
+            }
+            LivingEntity livingEntity = (LivingEntity) entity;
+            return !livingEntity.isBaby();
+        };
 
         for (CookableFoodTarget cookable : COOKABLE_FOODS) {
             if (!mod.getEntityTracker().entityFound(cookable.mobToKill)) continue;

@@ -29,6 +29,13 @@ targetCompatibility = sourceCompatibility
 
 tasks.withType(JavaCompile).configureEach {
     options.release = mcVersion >= 12006 ?  21 : 17
+    //20260727_kpopmodder: Use the javac executable directly to avoid Gradle compiler API crashes on JDK 21 LetExpr nodes.
+    options.fork = true
+    def javacName = System.getProperty("os.name").toLowerCase().contains("windows") ? "javac.exe" : "javac"
+    def javacExecutable = file("${System.getProperty("java.home")}/bin/${javacName}")
+    if (javacExecutable.exists()) {
+        options.forkOptions.executable = javacExecutable.absolutePath
+    }
 }
 
 archivesBaseName = project.archives_base_name

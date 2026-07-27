@@ -44,7 +44,11 @@ public class FoodSafetyPolicy {
 
     public boolean areEnemiesNearby(AltoClef mod, boolean isTryingToEat) {
         for (Entity entity : mod.getEntityTracker().getCloseEntities()) {
-            if (entity instanceof HostileEntity hostile && hostile.distanceTo(mod.getPlayer()) < (isTryingToEat ? 14 : 7)) {
+            if (!(entity instanceof HostileEntity)) {
+                continue;
+            }
+            HostileEntity hostile = (HostileEntity) entity;
+            if (hostile.distanceTo(mod.getPlayer()) < (isTryingToEat ? 14 : 7)) {
                 return true;
             }
         }

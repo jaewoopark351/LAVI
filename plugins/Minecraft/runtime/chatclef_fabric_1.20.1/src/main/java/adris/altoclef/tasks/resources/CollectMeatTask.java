@@ -142,7 +142,13 @@ public class CollectMeatTask extends Task {
             }
             if (bestEntity != null) {
                 setDebugState("Killing " + bestEntity.getType().getTranslationKey());
-                Predicate<Entity> notBaby = entity -> entity instanceof LivingEntity livingEntity && !livingEntity.isBaby();
+                Predicate<Entity> notBaby = entity -> {
+                    if (!(entity instanceof LivingEntity)) {
+                        return false;
+                    }
+                    LivingEntity livingEntity = (LivingEntity) entity;
+                    return !livingEntity.isBaby();
+                };
                 currentResourceTask = killTaskOrNull(bestEntity, notBaby, bestRawFood);
                 return currentResourceTask;
             }
@@ -196,7 +202,8 @@ public class CollectMeatTask extends Task {
 
     @Override
     protected boolean isEqual(Task other) {
-        if (other instanceof CollectMeatTask task) {
+        if (other instanceof CollectMeatTask) {
+            CollectMeatTask task = (CollectMeatTask) other;
             return task.unitsNeeded == unitsNeeded;
         }
         return false;
