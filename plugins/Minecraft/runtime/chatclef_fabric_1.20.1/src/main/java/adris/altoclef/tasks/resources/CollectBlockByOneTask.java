@@ -17,6 +17,8 @@ public class CollectBlockByOneTask extends ResourceTask {
     private final Block[] blocks;
     private final MiningRequirement requirement;
     private final int count;
+    //20260728_kpopmodder: Keep one mining child alive for the full request so stone/cobble does not reset after every block.
+    private final MineAndCollectTask mineTask;
 
     public CollectBlockByOneTask(Item item, Block[] blocks, MiningRequirement requirement, int targetCount) {
         super(item, targetCount);
@@ -24,11 +26,12 @@ public class CollectBlockByOneTask extends ResourceTask {
         this.blocks = blocks;
         this.requirement = requirement;
         count = targetCount;
+        mineTask = new MineAndCollectTask(item, targetCount, blocks, requirement);
     }
 
     @Override
     protected boolean shouldAvoidPickingUp(AltoClef mod) {
-        return false;
+        return true;
     }
 
     @Override
@@ -38,7 +41,7 @@ public class CollectBlockByOneTask extends ResourceTask {
 
     @Override
     protected Task onResourceTick(AltoClef mod) {
-        return new MineAndCollectTask(item, 1, blocks, requirement);
+        return mineTask;
     }
 
     @Override

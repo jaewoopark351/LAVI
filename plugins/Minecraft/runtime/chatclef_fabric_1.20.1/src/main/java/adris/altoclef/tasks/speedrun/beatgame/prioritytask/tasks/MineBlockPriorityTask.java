@@ -2,6 +2,7 @@ package adris.altoclef.tasks.speedrun.beatgame.prioritytask.tasks;
 
 import adris.altoclef.AltoClef;
 import adris.altoclef.tasks.resources.MineAndCollectTask;
+import adris.altoclef.tasks.resources.MineOrCollectTask;
 import adris.altoclef.tasks.speedrun.beatgame.prioritytask.prioritycalculators.DistancePriorityCalculator;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.ItemTarget;
@@ -75,8 +76,8 @@ public class MineBlockPriorityTask extends PriorityTask{
     private double getClosestDist(AltoClef mod) {
         Vec3d pos = mod.getPlayer().getPos();
 
-        Pair<Double, Optional<BlockPos>> closestBlock = MineAndCollectTask.MineOrCollectTask.getClosestBlock(mod,pos,  toMine);
-        Pair<Double, Optional<ItemEntity>> closestDrop = MineAndCollectTask.MineOrCollectTask.getClosestItemDrop(mod,pos, droppedItemTargets);
+        Pair<Double, Optional<BlockPos>> closestBlock = MineOrCollectTask.getClosestBlock(mod,pos,  toMine);
+        Pair<Double, Optional<ItemEntity>> closestDrop = MineOrCollectTask.getClosestItemDrop(mod,pos, droppedItemTargets);
 
         return Math.min(closestBlock.getLeft(), closestDrop.getLeft());
     }

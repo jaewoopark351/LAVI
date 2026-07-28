@@ -14,8 +14,6 @@ import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.helpers.WorldHelper;
 import adris.altoclef.util.logging.StateChangeLogger;
 import adris.altoclef.util.progresscheck.MovementProgressChecker;
-import net.minecraft.block.*;
-import adris.altoclef.multiversion.versionedfields.Blocks;
 import net.minecraft.entity.ItemEntity;
 import net.minecraft.item.Item;
 import net.minecraft.util.math.BlockPos;
@@ -40,25 +38,11 @@ public class PickupDroppedItemTask extends AbstractDoToClosestObjectTask<ItemEnt
     private final MovementProgressChecker progressChecker = new MovementProgressChecker();
     private final ItemTarget[] itemTargets;
     private final StateChangeLogger pickupLogger = new StateChangeLogger("PickupDroppedItemTask");
+    private final PickupUnstuckHelper unstuckHelper = new PickupUnstuckHelper();
 
     // This happens all the time in mineshafts and swamps/jungles
     private final Set<ItemEntity> _blacklist = new HashSet<>();
     private final boolean _freeInventoryIfFull;
-    Block[] annoyingBlocks = new Block[]{
-            Blocks.VINE,
-            Blocks.NETHER_SPROUTS,
-            Blocks.CAVE_VINES,
-            Blocks.CAVE_VINES_PLANT,
-            Blocks.TWISTING_VINES,
-            Blocks.TWISTING_VINES_PLANT,
-            Blocks.WEEPING_VINES_PLANT,
-            Blocks.LADDER,
-            Blocks.BIG_DRIPLEAF,
-            Blocks.BIG_DRIPLEAF_STEM,
-            Blocks.SMALL_DRIPLEAF,
-            Blocks.TALL_GRASS,
-            Blocks.SHORT_GRASS
-    };
     private Task unstuckTask = null;
     // Am starting to regret not making this a singleton
     private AltoClef _mod;
@@ -66,23 +50,12 @@ public class PickupDroppedItemTask extends AbstractDoToClosestObjectTask<ItemEnt
     private ItemEntity _currentDrop = null;
     private DropSnapshot currentDropSnapshot = null;
     //20260727_kpopmodder: Keep a short retry window so food drops are not abandoned after one pathing hiccup.
-    private int currentDropLockStartTick = -1;
-    private int currentDropFailureStartTick = -1;
-    private int currentDropFailureLastTick = -1;
-    private int currentDropFailureCount = 0;
+    private final CurrentDropRetentionPolicy currentDropRetention = new CurrentDropRetentionPolicy(
+            CURRENT_DROP_RETRY_GRACE_TICKS,
+            CURRENT_DROP_MIN_LOCK_TICKS
+    );
     //20260728_kpopmodder: Summarize pickup stability decisions so latest.log can confirm reduced task switching.
-    private int currentDropCandidateCount = 0;
-    private int currentDropLockCount = 0;
-    private int currentDropSwitchCount = 0;
-    private int currentDropRetainCount = 0;
-    private int currentDropMinLockRetainCount = 0;
-    private int currentDropMovementStallCount = 0;
-    private int currentDropRetryStartCount = 0;
-    private int currentDropRetryContinueCount = 0;
-    private int currentDropRetryRecoveredCount = 0;
-    private int currentDropRetryExpiredCount = 0;
-    private int currentDropAbandonCount = 0;
-    private int currentDropBlacklistCount = 0;
+    private final PickupDropDiagnostics pickupDiagnostics = new PickupDropDiagnostics();
 
     public PickupDroppedItemTask(ItemTarget[] itemTargets, boolean freeInventoryIfFull) {
         this.itemTargets = itemTargets;
@@ -101,57 +74,8 @@ public class PickupDroppedItemTask extends AbstractDoToClosestObjectTask<ItemEnt
         this(item, targetCount, true);
     }
 
-    private static BlockPos[] generateSides(BlockPos pos) {
-        return new BlockPos[]{
-                pos.add(1,0,0),
-                pos.add(-1,0,0),
-                pos.add(0,0,1),
-                pos.add(0,0,-1),
-                pos.add(1,0,-1),
-                pos.add(1,0,1),
-                pos.add(-1,0,-1),
-                pos.add(-1,0,1)
-        };
-    }
-
     public static boolean isIsGettingPickaxeFirst(AltoClef mod) {
         return isGettingPickaxeFirstFlag && mod.getModSettings().shouldCollectPickaxeFirst();
-    }
-
-    private boolean isAnnoying(AltoClef mod, BlockPos pos) {
-        if (annoyingBlocks != null) {
-            for (Block AnnoyingBlocks : annoyingBlocks) {
-                return mod.getWorld().getBlockState(pos).getBlock() == AnnoyingBlocks ||
-                        mod.getWorld().getBlockState(pos).getBlock() instanceof DoorBlock ||
-                        mod.getWorld().getBlockState(pos).getBlock() instanceof FenceBlock ||
-                        mod.getWorld().getBlockState(pos).getBlock() instanceof FenceGateBlock ||
-                        mod.getWorld().getBlockState(pos).getBlock() instanceof FlowerBlock;
-            }
-        }
-        return false;
-    }
-
-    private BlockPos stuckInBlock(AltoClef mod) {
-        BlockPos p = mod.getPlayer().getBlockPos();
-        if (isAnnoying(mod, p)) return p;
-        if (isAnnoying(mod, p.up())) return p.up();
-        BlockPos[] toCheck = generateSides(p);
-        for (BlockPos check : toCheck) {
-            if (isAnnoying(mod, check)) {
-                return check;
-            }
-        }
-        BlockPos[] toCheckHigh = generateSides(p.up());
-        for (BlockPos check : toCheckHigh) {
-            if (isAnnoying(mod, check)) {
-                return check;
-            }
-        }
-        return null;
-    }
-
-    private Task getFenceUnstuckTask() {
-        return new SafeRandomShimmyTask();
     }
 
     public boolean isCollectingPickaxeForThis() {
@@ -163,34 +87,24 @@ public class PickupDroppedItemTask extends AbstractDoToClosestObjectTask<ItemEnt
         wanderTask.reset();
         progressChecker.reset();
         stuckCheck.reset();
-        resetCurrentDropFailure();
+        currentDropRetention.resetFailure();
         pickupLogger.reset();
         resetPickupDiagnostics();
         if (_currentDrop == null || (currentDropSnapshot != null && !currentDropSnapshot.matches(_currentDrop))) {
             currentDropSnapshot = null;
-            resetCurrentDropLock();
+            currentDropRetention.resetLock();
         }
     }
 
     @Override
     protected void onStop(Task interruptTask) {
-        if (hasPickupDiagnostics()) {
-            pickupLogger.event("stop summary: interruptedBy=" + describeTask(interruptTask)
-                    + ", candidates=" + currentDropCandidateCount
-                    + ", locks=" + currentDropLockCount
-                    + ", switches=" + currentDropSwitchCount
-                    + ", retained=" + currentDropRetainCount
-                    + ", minLockRetained=" + currentDropMinLockRetainCount
-                    + ", movementStalls=" + currentDropMovementStallCount
-                    + ", retryStarts=" + currentDropRetryStartCount
-                    + ", retryTicks=" + currentDropRetryContinueCount
-                    + ", retryRecoveries=" + currentDropRetryRecoveredCount
-                    + ", retryExpired=" + currentDropRetryExpiredCount
-                    + ", abandons=" + currentDropAbandonCount
-                    + ", blacklisted=" + currentDropBlacklistCount
-                    + ", currentDrop=" + describeCurrentDrop(AltoClef.getInstance()));
+        if (pickupDiagnostics.hasEvents()) {
+            pickupLogger.event(pickupDiagnostics.describeStopSummary(
+                    describeTask(interruptTask),
+                    describeCurrentDrop(AltoClef.getInstance())
+            ));
         }
-        resetCurrentDropFailure();
+        currentDropRetention.resetFailure();
     }
 
     @Override
@@ -204,7 +118,7 @@ public class PickupDroppedItemTask extends AbstractDoToClosestObjectTask<ItemEnt
         if (mod.getClientBaritone().getPathingBehavior().isPathing()) {
             progressChecker.reset();
         }
-        if (unstuckTask != null && unstuckTask.isActive() && !unstuckTask.isFinished() && stuckInBlock(mod) != null) {
+        if (unstuckTask != null && unstuckTask.isActive() && !unstuckTask.isFinished() && unstuckHelper.stuckInBlock(mod) != null) {
             setDebugState("Getting unstuck from block.");
             stuckCheck.reset();
             // Stop other tasks, we are JUST shimmying
@@ -215,14 +129,14 @@ public class PickupDroppedItemTask extends AbstractDoToClosestObjectTask<ItemEnt
         boolean movementProgressing = progressChecker.check(mod);
         boolean stuckProgressing = stuckCheck.check(mod);
         if (!movementProgressing || !stuckProgressing) {
-            BlockPos blockStuck = stuckInBlock(mod);
+            BlockPos blockStuck = unstuckHelper.stuckInBlock(mod);
             if (blockStuck != null) {
                 pickupLogger.state("unstuck block " + blockStuck.toShortString(),
                         "pickup approach stuck in block: block="
                                 + mod.getWorld().getBlockState(blockStuck).getBlock().getTranslationKey()
                                 + ", blockPos=" + blockStuck.toShortString()
                                 + ", currentDrop=" + describeCurrentDrop(mod));
-                unstuckTask = getFenceUnstuckTask();
+                unstuckTask = unstuckHelper.createUnstuckTask();
                 return unstuckTask;
             }
             stuckCheck.reset();
@@ -245,7 +159,7 @@ public class PickupDroppedItemTask extends AbstractDoToClosestObjectTask<ItemEnt
         if (!movementProgressing) {
             mod.getClientBaritone().getPathingBehavior().forceCancel();
             if (_currentDrop != null && !_currentDrop.getStack().isEmpty()) {
-                currentDropMovementStallCount++;
+                pickupDiagnostics.movementStallCount++;
                 // We might want to get a pickaxe first.
                 if (!isGettingPickaxeFirstFlag && mod.getModSettings().shouldCollectPickaxeFirst() && !StorageHelper.miningRequirementMetInventory(MiningRequirement.STONE)) {
                     Debug.logMessage("Failed to pick up drop, will try to collect a stone pickaxe first and try again!");
@@ -253,14 +167,14 @@ public class PickupDroppedItemTask extends AbstractDoToClosestObjectTask<ItemEnt
                     isGettingPickaxeFirstFlag = true;
                     return getPickaxeFirstTask;
                 }
-                if (isWithinCurrentDropMinLock()) {
-                    currentDropMinLockRetainCount++;
+                if (currentDropRetention.isWithinMinLock()) {
+                    pickupDiagnostics.minLockRetainCount++;
                     setDebugState("Holding current drop.");
                     progressChecker.reset();
                     stuckCheck.reset();
                     pickupLogger.state("min lock retains stalled drop " + _currentDrop.getUuid(),
                             "minimum pickup lock retained stalled drop: ticksRemaining="
-                                    + currentDropMinLockTicksRemaining()
+                                    + currentDropRetention.minLockTicksRemaining()
                                     + ", " + describeDrop(mod, _currentDrop));
                     return super.onTick();
                 }
@@ -269,8 +183,8 @@ public class PickupDroppedItemTask extends AbstractDoToClosestObjectTask<ItemEnt
                     progressChecker.reset();
                     stuckCheck.reset();
                     pickupLogger.state("retry current drop " + _currentDrop.getUuid(),
-                            "retrying same drop during grace: failureCount=" + currentDropFailureCount
-                                    + ", ticksRemaining=" + currentDropRetryTicksRemaining()
+                            "retrying same drop during grace: failureCount=" + currentDropRetention.failureCount()
+                                    + ", ticksRemaining=" + currentDropRetention.retryTicksRemaining()
                                     + ", " + describeDrop(mod, _currentDrop));
                     return super.onTick();
                 }
@@ -326,7 +240,7 @@ public class PickupDroppedItemTask extends AbstractDoToClosestObjectTask<ItemEnt
             String releaseReason = getCurrentDropReleaseReason(mod);
             if (releaseReason == null) {
                 resetCurrentDropFailureIfRecovered(mod, "current drop reachable again");
-                currentDropRetainCount++;
+                pickupDiagnostics.retainCount++;
                 pickupLogger.state("retain current drop " + _currentDrop.getUuid(),
                         "retained drop: reason=current target still valid, " + describeDrop(mod, _currentDrop));
                 return Optional.of(_currentDrop);
@@ -337,7 +251,7 @@ public class PickupDroppedItemTask extends AbstractDoToClosestObjectTask<ItemEnt
                 pos,
                 itemTargets);
         closest.ifPresent(drop -> {
-            currentDropCandidateCount++;
+            pickupDiagnostics.candidateCount++;
             updateCurrentDropSnapshotIfUseful(drop);
             pickupLogger.state("candidate drop " + drop.getUuid(),
                     "candidate drop selected by tracker: " + describeDrop(mod, drop));
@@ -357,16 +271,16 @@ public class PickupDroppedItemTask extends AbstractDoToClosestObjectTask<ItemEnt
             DropSnapshot previousDropSnapshot = currentDropSnapshot;
             _currentDrop = itemEntity;
             updateCurrentDropSnapshotForLockedDrop(itemEntity);
-            armCurrentDropLock();
-            resetCurrentDropFailure();
+            currentDropRetention.armLock();
+            currentDropRetention.resetFailure();
             progressChecker.reset();
             stuckCheck.reset();
             if (previousDrop == null) {
-                currentDropLockCount++;
+                pickupDiagnostics.lockCount++;
                 pickupLogger.state("lock drop " + itemEntity.getUuid(),
                         "locked drop: " + describeDrop(_mod, itemEntity, currentDropSnapshot));
             } else {
-                currentDropSwitchCount++;
+                pickupDiagnostics.switchCount++;
                 pickupLogger.state("switch drop " + previousDrop.getUuid() + " " + itemEntity.getUuid(),
                         "switched drop: old=" + describeDrop(_mod, previousDrop, previousDropSnapshot)
                                 + ", new=" + describeDrop(_mod, itemEntity, currentDropSnapshot));
@@ -412,52 +326,32 @@ public class PickupDroppedItemTask extends AbstractDoToClosestObjectTask<ItemEnt
                             + ", " + describeDrop(mod, _currentDrop));
             return false;
         }
-        int now = WorldHelper.getTicks();
-        if (currentDropFailureStartTick < 0) {
-            currentDropFailureStartTick = now;
-            currentDropFailureLastTick = now;
-            currentDropFailureCount = 1;
-            currentDropRetryStartCount++;
+        boolean firstFailure = !currentDropRetention.hasFailure();
+        boolean stillInGrace = currentDropRetention.recordFailureAndIsWithinGrace();
+        if (firstFailure) {
+            pickupDiagnostics.retryStartCount++;
             pickupLogger.event("pickup retry grace started: reason=" + reason
-                    + ", graceTicks=" + CURRENT_DROP_RETRY_GRACE_TICKS
+                    + ", graceTicks=" + currentDropRetention.retryGraceTicks()
                     + ", " + describeDrop(mod, _currentDrop));
             pickupLogger.state("start retry grace " + _currentDrop.getUuid(),
                     "pickup retry grace started: reason=" + reason
                             + ", " + describeDrop(mod, _currentDrop));
             return true;
         }
-        if (currentDropFailureLastTick != now) {
-            currentDropFailureLastTick = now;
-            currentDropFailureCount++;
-        }
-        boolean stillInGrace = now - currentDropFailureStartTick < CURRENT_DROP_RETRY_GRACE_TICKS;
         if (stillInGrace) {
-            currentDropRetryContinueCount++;
+            pickupDiagnostics.retryContinueCount++;
         }
         if (!stillInGrace) {
-            currentDropRetryExpiredCount++;
+            pickupDiagnostics.retryExpiredCount++;
             pickupLogger.event("pickup retry grace expired: reason=" + reason
-                    + ", failures=" + currentDropFailureCount
+                    + ", failures=" + currentDropRetention.failureCount()
                     + ", " + describeDrop(mod, _currentDrop));
             pickupLogger.state("retry grace expired " + _currentDrop.getUuid(),
                     "pickup retry grace expired: reason=" + reason
-                            + ", failures=" + currentDropFailureCount
+                            + ", failures=" + currentDropRetention.failureCount()
                             + ", " + describeDrop(mod, _currentDrop));
         }
         return stillInGrace;
-    }
-
-    private int currentDropRetryTicksRemaining() {
-        if (currentDropFailureStartTick < 0) {
-            return CURRENT_DROP_RETRY_GRACE_TICKS;
-        }
-        return Math.max(0, CURRENT_DROP_RETRY_GRACE_TICKS - (WorldHelper.getTicks() - currentDropFailureStartTick));
-    }
-
-    private void resetCurrentDropFailure() {
-        currentDropFailureStartTick = -1;
-        currentDropFailureLastTick = -1;
-        currentDropFailureCount = 0;
     }
 
     private String getCurrentDropReleaseReason(AltoClef mod) {
@@ -466,11 +360,11 @@ public class PickupDroppedItemTask extends AbstractDoToClosestObjectTask<ItemEnt
             return nonRetryReleaseReason;
         }
         if (!mod.getEntityTracker().isEntityReachable(_currentDrop)) {
-            if (isWithinCurrentDropMinLock()) {
-                currentDropMinLockRetainCount++;
+            if (currentDropRetention.isWithinMinLock()) {
+                pickupDiagnostics.minLockRetainCount++;
                 pickupLogger.state("min lock retains unreachable drop " + _currentDrop.getUuid(),
                         "minimum pickup lock retained temporarily unreachable drop: ticksRemaining="
-                                + currentDropMinLockTicksRemaining()
+                                + currentDropRetention.minLockTicksRemaining()
                                 + ", " + describeDrop(mod, _currentDrop));
                 return null;
             }
@@ -504,43 +398,23 @@ public class PickupDroppedItemTask extends AbstractDoToClosestObjectTask<ItemEnt
     }
 
     private void resetCurrentDropFailureIfRecovered(AltoClef mod, String reason) {
-        if (_currentDrop == null || currentDropFailureStartTick < 0 || !mod.getEntityTracker().isEntityReachable(_currentDrop)) {
+        if (_currentDrop == null || !currentDropRetention.hasFailure() || !mod.getEntityTracker().isEntityReachable(_currentDrop)) {
             return;
         }
-        currentDropRetryRecoveredCount++;
+        pickupDiagnostics.retryRecoveredCount++;
         pickupLogger.event("pickup retry grace recovered: reason=" + reason
-                + ", failures=" + currentDropFailureCount
+                + ", failures=" + currentDropRetention.failureCount()
                 + ", " + describeDrop(mod, _currentDrop));
         pickupLogger.state("retry grace recovered " + _currentDrop.getUuid(),
                 "pickup retry grace recovered: reason=" + reason
-                        + ", failures=" + currentDropFailureCount
+                        + ", failures=" + currentDropRetention.failureCount()
                         + ", " + describeDrop(mod, _currentDrop));
-        resetCurrentDropFailure();
-    }
-
-    private void armCurrentDropLock() {
-        currentDropLockStartTick = WorldHelper.getTicks();
-    }
-
-    private boolean isWithinCurrentDropMinLock() {
-        return currentDropLockStartTick >= 0
-                && WorldHelper.getTicks() - currentDropLockStartTick < CURRENT_DROP_MIN_LOCK_TICKS;
-    }
-
-    private int currentDropMinLockTicksRemaining() {
-        if (currentDropLockStartTick < 0) {
-            return 0;
-        }
-        return Math.max(0, CURRENT_DROP_MIN_LOCK_TICKS - (WorldHelper.getTicks() - currentDropLockStartTick));
-    }
-
-    private void resetCurrentDropLock() {
-        currentDropLockStartTick = -1;
+        currentDropRetention.resetFailure();
     }
 
     private void abandonCurrentDrop(AltoClef mod, String reason, boolean blacklistEntity) {
         if (_currentDrop == null) {
-            resetCurrentDropFailure();
+            currentDropRetention.resetFailure();
             return;
         }
         ItemEntity abandonedDrop = _currentDrop;
@@ -548,7 +422,7 @@ public class PickupDroppedItemTask extends AbstractDoToClosestObjectTask<ItemEnt
         if (abandonedDropSnapshot == null) {
             abandonedDropSnapshot = DropSnapshot.from(abandonedDrop);
         }
-        if (blacklistEntity && currentDropFailureStartTick < 0) {
+        if (blacklistEntity && !currentDropRetention.hasFailure()) {
             pickupLogger.event("blacklist skipped because no retry grace was observed: reason=" + reason
                     + ", " + describeDrop(mod, abandonedDrop, abandonedDropSnapshot));
             blacklistEntity = false;
@@ -556,54 +430,28 @@ public class PickupDroppedItemTask extends AbstractDoToClosestObjectTask<ItemEnt
         if (blacklistEntity) {
             _blacklist.add(abandonedDrop);
             mod.getEntityTracker().requestEntityUnreachable(abandonedDrop);
-            currentDropBlacklistCount++;
+            pickupDiagnostics.blacklistCount++;
         }
-        currentDropAbandonCount++;
+        pickupDiagnostics.abandonCount++;
         pickupLogger.event("abandoned drop: reason=" + reason
                 + ", blacklisted=" + blacklistEntity
-                + ", failures=" + currentDropFailureCount
+                + ", failures=" + currentDropRetention.failureCount()
                 + ", " + describeDrop(mod, abandonedDrop, abandonedDropSnapshot));
         pickupLogger.state("abandon current drop " + abandonedDrop.getUuid() + " " + reason,
                 "abandoned drop: reason=" + reason
                         + ", blacklisted=" + blacklistEntity
-                        + ", failures=" + currentDropFailureCount
+                        + ", failures=" + currentDropRetention.failureCount()
                         + ", blacklist=" + StlHelper.toString(_blacklist, element -> element == null ? "(null)" : element.getStack().getItem().getTranslationKey())
                         + ", " + describeDrop(mod, abandonedDrop, abandonedDropSnapshot));
         _currentDrop = null;
         currentDropSnapshot = abandonedDropSnapshot;
-        resetCurrentDropFailure();
-        resetCurrentDropLock();
+        currentDropRetention.resetFailure();
+        currentDropRetention.resetLock();
         resetSearch();
     }
 
-    private boolean hasPickupDiagnostics() {
-        return currentDropCandidateCount
-                + currentDropLockCount
-                + currentDropSwitchCount
-                + currentDropRetainCount
-                + currentDropMinLockRetainCount
-                + currentDropMovementStallCount
-                + currentDropRetryStartCount
-                + currentDropRetryContinueCount
-                + currentDropRetryRecoveredCount
-                + currentDropRetryExpiredCount
-                + currentDropAbandonCount
-                + currentDropBlacklistCount > 0;
-    }
-
     private void resetPickupDiagnostics() {
-        currentDropCandidateCount = 0;
-        currentDropLockCount = 0;
-        currentDropSwitchCount = 0;
-        currentDropRetainCount = 0;
-        currentDropMinLockRetainCount = 0;
-        currentDropMovementStallCount = 0;
-        currentDropRetryStartCount = 0;
-        currentDropRetryContinueCount = 0;
-        currentDropRetryRecoveredCount = 0;
-        currentDropRetryExpiredCount = 0;
-        currentDropAbandonCount = 0;
-        currentDropBlacklistCount = 0;
+        pickupDiagnostics.reset();
     }
 
     private String describeTask(Task task) {
@@ -678,51 +526,6 @@ public class PickupDroppedItemTask extends AbstractDoToClosestObjectTask<ItemEnt
             return "unknown";
         }
         return String.format(Locale.ROOT, "%.2f", value);
-    }
-
-    //20260728_kpopmodder: Preserve the originally observed dropped item for logs after Minecraft clears the entity stack.
-    private static class DropSnapshot {
-        private final String uuid;
-        private final String itemKey;
-        private final int count;
-        private final String blockPos;
-
-        private DropSnapshot(String uuid, String itemKey, int count, String blockPos) {
-            this.uuid = uuid;
-            this.itemKey = itemKey;
-            this.count = count;
-            this.blockPos = blockPos;
-        }
-
-        private static DropSnapshot from(ItemEntity drop) {
-            if (drop == null || drop.getStack().isEmpty()) {
-                return null;
-            }
-            return new DropSnapshot(
-                    drop.getUuid().toString(),
-                    drop.getStack().getItem().getTranslationKey(),
-                    drop.getStack().getCount(),
-                    drop.getBlockPos().toShortString()
-            );
-        }
-
-        private boolean matches(ItemEntity drop) {
-            return drop != null && uuid.equals(drop.getUuid().toString());
-        }
-
-        private boolean shouldAnnotate(ItemEntity drop) {
-            return drop == null
-                    || !drop.isAlive()
-                    || drop.getStack().isEmpty()
-                    || !itemKey.equals(drop.getStack().getItem().getTranslationKey())
-                    || count != drop.getStack().getCount()
-                    || !blockPos.equals(drop.getBlockPos().toShortString());
-        }
-
-        private String describeAsLastKnown() {
-            return "lastKnownItem=" + itemKey + " x " + count
-                    + ", lastKnownDropPos=" + blockPos;
-        }
     }
 
 }
