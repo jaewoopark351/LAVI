@@ -12,6 +12,8 @@ final class PickupDropDiagnostics {
     int retryContinueCount = 0;
     int retryRecoveredCount = 0;
     int retryExpiredCount = 0;
+    //20260728_kpopmodder: Separate already-collected drops from real abandon failures in latest.log.
+    int consumedOrRemovedCount = 0;
     int abandonCount = 0;
     int blacklistCount = 0;
 
@@ -26,6 +28,7 @@ final class PickupDropDiagnostics {
                 + retryContinueCount
                 + retryRecoveredCount
                 + retryExpiredCount
+                + consumedOrRemovedCount
                 + abandonCount
                 + blacklistCount > 0;
     }
@@ -41,6 +44,7 @@ final class PickupDropDiagnostics {
         retryContinueCount = 0;
         retryRecoveredCount = 0;
         retryExpiredCount = 0;
+        consumedOrRemovedCount = 0;
         abandonCount = 0;
         blacklistCount = 0;
     }
@@ -57,6 +61,7 @@ final class PickupDropDiagnostics {
                 + ", retryTicks=" + retryContinueCount
                 + ", retryRecoveries=" + retryRecoveredCount
                 + ", retryExpired=" + retryExpiredCount
+                + ", consumedOrRemoved=" + consumedOrRemovedCount
                 + ", abandons=" + abandonCount
                 + ", blacklisted=" + blacklistCount
                 + ", currentDrop=" + currentDropDescription;
