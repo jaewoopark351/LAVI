@@ -30,6 +30,8 @@ import java.util.Set;
 public class PickupDroppedItemTask extends AbstractDoToClosestObjectTask<ItemEntity> implements ITaskRequiresGrounded {
     private static final Task getPickaxeFirstTask = new SatisfyMiningRequirementTask(MiningRequirement.STONE);
     private static final int CURRENT_DROP_RETRY_GRACE_TICKS = 20 * 4;
+    //20260728_kpopmodder: Hold a newly selected drop briefly so mining/pickup decisions do not thrash.
+    private static final int CURRENT_DROP_MIN_LOCK_TICKS = 20 * 3;
     private static final double CURRENT_DROP_MAX_RETAIN_DISTANCE = 64.0;
     // Not clean practice, but it helps keep things self contained I think.
     private static boolean isGettingPickaxeFirstFlag = false;
@@ -64,6 +66,7 @@ public class PickupDroppedItemTask extends AbstractDoToClosestObjectTask<ItemEnt
     private ItemEntity _currentDrop = null;
     private DropSnapshot currentDropSnapshot = null;
     //20260727_kpopmodder: Keep a short retry window so food drops are not abandoned after one pathing hiccup.
+    private int currentDropLockStartTick = -1;
     private int currentDropFailureStartTick = -1;
     private int currentDropFailureLastTick = -1;
     private int currentDropFailureCount = 0;
@@ -72,6 +75,7 @@ public class PickupDroppedItemTask extends AbstractDoToClosestObjectTask<ItemEnt
     private int currentDropLockCount = 0;
     private int currentDropSwitchCount = 0;
     private int currentDropRetainCount = 0;
+    private int currentDropMinLockRetainCount = 0;
     private int currentDropMovementStallCount = 0;
     private int currentDropRetryStartCount = 0;
     private int currentDropRetryContinueCount = 0;
@@ -164,6 +168,7 @@ public class PickupDroppedItemTask extends AbstractDoToClosestObjectTask<ItemEnt
         resetPickupDiagnostics();
         if (_currentDrop == null || (currentDropSnapshot != null && !currentDropSnapshot.matches(_currentDrop))) {
             currentDropSnapshot = null;
+            resetCurrentDropLock();
         }
     }
 
@@ -175,6 +180,7 @@ public class PickupDroppedItemTask extends AbstractDoToClosestObjectTask<ItemEnt
                     + ", locks=" + currentDropLockCount
                     + ", switches=" + currentDropSwitchCount
                     + ", retained=" + currentDropRetainCount
+                    + ", minLockRetained=" + currentDropMinLockRetainCount
                     + ", movementStalls=" + currentDropMovementStallCount
                     + ", retryStarts=" + currentDropRetryStartCount
                     + ", retryTicks=" + currentDropRetryContinueCount
@@ -246,6 +252,17 @@ public class PickupDroppedItemTask extends AbstractDoToClosestObjectTask<ItemEnt
                     _collectingPickaxeForThisResource = true;
                     isGettingPickaxeFirstFlag = true;
                     return getPickaxeFirstTask;
+                }
+                if (isWithinCurrentDropMinLock()) {
+                    currentDropMinLockRetainCount++;
+                    setDebugState("Holding current drop.");
+                    progressChecker.reset();
+                    stuckCheck.reset();
+                    pickupLogger.state("min lock retains stalled drop " + _currentDrop.getUuid(),
+                            "minimum pickup lock retained stalled drop: ticksRemaining="
+                                    + currentDropMinLockTicksRemaining()
+                                    + ", " + describeDrop(mod, _currentDrop));
+                    return super.onTick();
                 }
                 if (shouldRetryCurrentDrop(mod, "movement stalled")) {
                     setDebugState("Retrying current drop.");
@@ -340,6 +357,7 @@ public class PickupDroppedItemTask extends AbstractDoToClosestObjectTask<ItemEnt
             DropSnapshot previousDropSnapshot = currentDropSnapshot;
             _currentDrop = itemEntity;
             updateCurrentDropSnapshotForLockedDrop(itemEntity);
+            armCurrentDropLock();
             resetCurrentDropFailure();
             progressChecker.reset();
             stuckCheck.reset();
@@ -448,6 +466,14 @@ public class PickupDroppedItemTask extends AbstractDoToClosestObjectTask<ItemEnt
             return nonRetryReleaseReason;
         }
         if (!mod.getEntityTracker().isEntityReachable(_currentDrop)) {
+            if (isWithinCurrentDropMinLock()) {
+                currentDropMinLockRetainCount++;
+                pickupLogger.state("min lock retains unreachable drop " + _currentDrop.getUuid(),
+                        "minimum pickup lock retained temporarily unreachable drop: ticksRemaining="
+                                + currentDropMinLockTicksRemaining()
+                                + ", " + describeDrop(mod, _currentDrop));
+                return null;
+            }
             return shouldRetryCurrentDrop(mod, "entity tracker marked unreachable")
                     ? null
                     : "target unreachable after retry grace";
@@ -492,6 +518,26 @@ public class PickupDroppedItemTask extends AbstractDoToClosestObjectTask<ItemEnt
         resetCurrentDropFailure();
     }
 
+    private void armCurrentDropLock() {
+        currentDropLockStartTick = WorldHelper.getTicks();
+    }
+
+    private boolean isWithinCurrentDropMinLock() {
+        return currentDropLockStartTick >= 0
+                && WorldHelper.getTicks() - currentDropLockStartTick < CURRENT_DROP_MIN_LOCK_TICKS;
+    }
+
+    private int currentDropMinLockTicksRemaining() {
+        if (currentDropLockStartTick < 0) {
+            return 0;
+        }
+        return Math.max(0, CURRENT_DROP_MIN_LOCK_TICKS - (WorldHelper.getTicks() - currentDropLockStartTick));
+    }
+
+    private void resetCurrentDropLock() {
+        currentDropLockStartTick = -1;
+    }
+
     private void abandonCurrentDrop(AltoClef mod, String reason, boolean blacklistEntity) {
         if (_currentDrop == null) {
             resetCurrentDropFailure();
@@ -526,6 +572,7 @@ public class PickupDroppedItemTask extends AbstractDoToClosestObjectTask<ItemEnt
         _currentDrop = null;
         currentDropSnapshot = abandonedDropSnapshot;
         resetCurrentDropFailure();
+        resetCurrentDropLock();
         resetSearch();
     }
 
@@ -534,6 +581,7 @@ public class PickupDroppedItemTask extends AbstractDoToClosestObjectTask<ItemEnt
                 + currentDropLockCount
                 + currentDropSwitchCount
                 + currentDropRetainCount
+                + currentDropMinLockRetainCount
                 + currentDropMovementStallCount
                 + currentDropRetryStartCount
                 + currentDropRetryContinueCount
@@ -548,6 +596,7 @@ public class PickupDroppedItemTask extends AbstractDoToClosestObjectTask<ItemEnt
         currentDropLockCount = 0;
         currentDropSwitchCount = 0;
         currentDropRetainCount = 0;
+        currentDropMinLockRetainCount = 0;
         currentDropMovementStallCount = 0;
         currentDropRetryStartCount = 0;
         currentDropRetryContinueCount = 0;

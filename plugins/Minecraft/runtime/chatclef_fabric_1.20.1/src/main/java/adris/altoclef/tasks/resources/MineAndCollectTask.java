@@ -76,6 +76,18 @@ public class MineAndCollectTask extends ResourceTask {
     }
 
     @Override
+    public boolean isFinished() {
+        if (!super.isFinished()) {
+            return false;
+        }
+        if (!AltoClef.inGame()) {
+            return true;
+        }
+        AltoClef mod = AltoClef.getInstance();
+        return mod == null || !_subtask.shouldDelayResourceFinish(mod);
+    }
+
+    @Override
     protected void onResourceStart(AltoClef mod) {
         mod.getBehaviour().push();
 
@@ -171,11 +183,17 @@ public class MineAndCollectTask extends ResourceTask {
 
         private static final int MINING_TARGET_TIMEOUT_TICKS = 20 * 30;
         private static final int TEMPORARY_BLOCK_SKIP_TICKS = 20 * 45;
-        private static final int DROPPED_ITEM_PICKUP_GRACE_TICKS = 20 * 5;
-        private static final int ACTIVE_PICKUP_CONTINUATION_TICKS = 20 * 2;
+        //20260728_kpopmodder: Give drops a clearer ownership window before mining can take over again.
+        private static final int DROPPED_ITEM_PICKUP_GRACE_TICKS = 20 * 6;
+        private static final int ACTIVE_PICKUP_CONTINUATION_TICKS = 20 * 4;
         private static final double DROPPED_ITEM_PICKUP_GRACE_RANGE = 16;
+        //20260728_kpopmodder: Sweep nearby drops briefly after a mined block disappears before chasing more blocks.
+        private static final int POST_MINING_SWEEP_TICKS = 20 * 5;
+        private static final int POST_MINING_SETTLE_TICKS = 15;
+        private static final double POST_MINING_SWEEP_RANGE = 12;
 
         private static final PickupContinuationGoal PICKUP_CONTINUATION_GOAL = new PickupContinuationGoal();
+        private static final PostMiningSweepGoal POST_MINING_SWEEP_GOAL = new PostMiningSweepGoal();
 
         private final Block[] _blocks;
         private final ItemTarget[] _targets;
@@ -185,8 +203,14 @@ public class MineAndCollectTask extends ResourceTask {
                 ACTIVE_PICKUP_CONTINUATION_TICKS,
                 DROPPED_ITEM_PICKUP_GRACE_RANGE
         );
+        private final PostMiningSweepPolicy postMiningSweepPolicy = new PostMiningSweepPolicy(
+                POST_MINING_SWEEP_TICKS,
+                POST_MINING_SETTLE_TICKS,
+                POST_MINING_SWEEP_RANGE
+        );
         private final MovementProgressChecker progressChecker = new MovementProgressChecker();
         private final Task _pickupTask;
+        private final Task postMiningSweepWaitTask = new PostMiningSweepWaitTask(postMiningSweepPolicy);
         private BlockPos miningPos;
         private int miningTargetStartTick;
         private final StateChangeLogger debugLogger = new StateChangeLogger("MineOrCollectTask");
@@ -201,6 +225,9 @@ public class MineAndCollectTask extends ResourceTask {
         private int miningTargetReleaseCount = 0;
         private int pickupTargetSwitchCount = 0;
         private int temporaryMiningSkipCount = 0;
+        private int postMiningSweepPreferredCount = 0;
+        private int postMiningSweepWaitCount = 0;
+        private int postMiningSweepFinishDelayCount = 0;
         private String lastSelectedGoalKey = "";
 
         public MineOrCollectTask(Block[] blocks, ItemTarget[] targets) {
@@ -220,6 +247,9 @@ public class MineAndCollectTask extends ResourceTask {
             if (obj instanceof PickupContinuationGoal) {
                 return pickupContinuationPolicy.activePickupPos(mod.getPlayer().getPos());
             }
+            if (obj instanceof PostMiningSweepGoal) {
+                return postMiningSweepPolicy.activePos(mod.getPlayer().getPos());
+            }
             throw new UnsupportedOperationException("Shouldn't try to get the position of object " + obj + " of type " + (obj != null ? obj.getClass().toString() : "(null object)"));
         }
 
@@ -227,6 +257,8 @@ public class MineAndCollectTask extends ResourceTask {
         protected Optional<Object> getClosestTo(AltoClef mod, Vec3d pos) {
             temporaryBlockBlacklist.pruneExpired();
             pickupContinuationPolicy.pruneExpired();
+            postMiningSweepPolicy.pruneExpired();
+            releaseCompletedMiningTarget(mod);
 
             Pair<Double, Optional<BlockPos>> closestBlock = getClosestBlock(mod,pos, this::isAllowedMiningCandidate, _blocks);
             Pair<Double, Optional<ItemEntity>> closestDrop = getClosestItemDrop(mod,pos,  _targets);
@@ -241,6 +273,26 @@ public class MineAndCollectTask extends ResourceTask {
                         + ", block=" + closestBlock.getRight().map(BlockPos::toShortString).orElse("none")
                         + ", skippedBlocks=" + temporaryBlockBlacklist.size());
                 return closestDrop.getRight().map(Object.class::cast);
+            }
+
+            Optional<ItemEntity> sweepDrop = postMiningSweepPolicy.getPreferredSweepDrop(closestDrop.getRight());
+            if (sweepDrop.isPresent()) {
+                postMiningSweepPreferredCount++;
+                debugLogger.state("post mining sweep prefers dropped item",
+                        "post mining sweep prefers dropped item: drop=" + describeDrop(sweepDrop.get())
+                                + ", block=" + closestBlock.getRight().map(BlockPos::toShortString).orElse("none")
+                                + ", sweepTicksRemaining=" + postMiningSweepPolicy.sweepTicksRemaining());
+                return sweepDrop.map(Object.class::cast);
+            }
+
+            if (postMiningSweepPolicy.shouldWaitForPotentialDrops(closestDrop.getRight())) {
+                postMiningSweepWaitCount++;
+                debugLogger.state("post mining sweep settling",
+                        "post mining sweep settling: waiting for nearby drops"
+                                + ", block=" + closestBlock.getRight().map(BlockPos::toShortString).orElse("none")
+                                + ", settleTicksRemaining=" + postMiningSweepPolicy.settleTicksRemaining()
+                                + ", sweepTicksRemaining=" + postMiningSweepPolicy.sweepTicksRemaining());
+                return Optional.of((Object) POST_MINING_SWEEP_GOAL);
             }
 
             Optional<ItemEntity> graceDrop = pickupContinuationPolicy.getPreferredMinedDrop(closestDrop.getRight());
@@ -392,6 +444,7 @@ public class MineAndCollectTask extends ResourceTask {
                 debugLogger.state("pickup target selected: " + describeDrop(drop));
                 miningPos = null;
                 pickupContinuationPolicy.armActivePickup(drop);
+                postMiningSweepPolicy.armAfterPickup(drop);
                 return _pickupTask;
             }
             if (obj instanceof PickupContinuationGoal) {
@@ -401,6 +454,15 @@ public class MineAndCollectTask extends ResourceTask {
                                 + pickupContinuationPolicy.activePickupTicksRemaining());
                 miningPos = null;
                 return _pickupTask;
+            }
+            if (obj instanceof PostMiningSweepGoal) {
+                recordGoalSelection("drop:post-mining-sweep", false);
+                debugLogger.state("wait for post mining sweep",
+                        "wait for post mining sweep: settleTicksRemaining="
+                                + postMiningSweepPolicy.settleTicksRemaining()
+                                + ", sweepTicksRemaining=" + postMiningSweepPolicy.sweepTicksRemaining());
+                miningPos = null;
+                return postMiningSweepWaitTask;
             }
             throw new UnsupportedOperationException("Shouldn't try to get the goal from object " + obj + " of type " + (obj != null ? obj.getClass().toString() : "(null object)"));
         }
@@ -425,6 +487,9 @@ public class MineAndCollectTask extends ResourceTask {
             if (obj instanceof PickupContinuationGoal) {
                 return pickupContinuationPolicy.shouldContinueActivePickup(isPickupTaskContinuing());
             }
+            if (obj instanceof PostMiningSweepGoal) {
+                return postMiningSweepPolicy.isWaitingForPotentialDrops();
+            }
             return false;
         }
 
@@ -435,6 +500,8 @@ public class MineAndCollectTask extends ResourceTask {
             miningTargetStartTick = 0;
             temporaryBlockBlacklist.pruneExpired();
             pickupContinuationPolicy.reset();
+            postMiningSweepPolicy.reset();
+            postMiningSweepWaitTask.reset();
             resetDiagnostics();
             debugLogger.event("start: blocks=" + Arrays.toString(_blocks)
                     + ", targets=" + Arrays.toString(_targets));
@@ -456,9 +523,13 @@ public class MineAndCollectTask extends ResourceTask {
                         + ", miningTargetReleases=" + miningTargetReleaseCount
                         + ", pickupTargetSwitches=" + pickupTargetSwitchCount
                         + ", temporaryMiningSkips=" + temporaryMiningSkipCount
+                        + ", postMiningSweepPreferredTicks=" + postMiningSweepPreferredCount
+                        + ", postMiningSweepWaitTicks=" + postMiningSweepWaitCount
+                        + ", postMiningSweepFinishDelays=" + postMiningSweepFinishDelayCount
                         + ", lastGoal=" + lastSelectedGoalKey);
             }
             pickupContinuationPolicy.reset();
+            postMiningSweepPolicy.reset();
         }
 
         @Override
@@ -480,6 +551,23 @@ public class MineAndCollectTask extends ResourceTask {
 
         public BlockPos miningPos() {
             return miningPos;
+        }
+
+        public boolean shouldDelayResourceFinish(AltoClef mod) {
+            if (mod == null || mod.getPlayer() == null) {
+                return false;
+            }
+            Pair<Double, Optional<ItemEntity>> closestDrop = getClosestItemDrop(mod, mod.getPlayer().getPos(), _targets);
+            boolean shouldDelay = postMiningSweepPolicy.shouldDelayFinish(closestDrop.getRight(), isPickupTaskContinuing());
+            if (shouldDelay) {
+                postMiningSweepFinishDelayCount++;
+                debugLogger.state("post mining sweep delays finish",
+                        "post mining sweep delays finish: closest="
+                                + closestDrop.getRight().map(this::describeDrop).orElse("none")
+                                + ", pickupTaskContinuing=" + isPickupTaskContinuing()
+                                + ", sweepTicksRemaining=" + postMiningSweepPolicy.sweepTicksRemaining());
+            }
+            return shouldDelay;
         }
 
         private boolean isPickupTaskContinuing() {
@@ -507,6 +595,13 @@ public class MineAndCollectTask extends ResourceTask {
             miningTargetStartTick = 0;
             progressChecker.reset();
             resetSearch();
+        }
+
+        private void releaseCompletedMiningTarget(AltoClef mod) {
+            if (miningPos == null || mod.getBlockScanner().isBlockAtPosition(miningPos, _blocks)) {
+                return;
+            }
+            releaseMiningTarget("target block changed");
         }
 
         private Optional<BlockPos> getRetainedMiningTarget(AltoClef mod) {
@@ -565,6 +660,9 @@ public class MineAndCollectTask extends ResourceTask {
             }
             BlockPos released = miningPos;
             miningTargetReleaseCount++;
+            if ("target block changed".equals(reason)) {
+                postMiningSweepPolicy.armAfterBlockBreak(released);
+            }
             debugLogger.state("release mining target " + released.toShortString() + " " + reason,
                     "released mining target: pos=" + released.toShortString()
                             + ", reason=" + reason);
@@ -620,7 +718,10 @@ public class MineAndCollectTask extends ResourceTask {
                     + miningTargetRetainCount
                     + miningTargetReleaseCount
                     + pickupTargetSwitchCount
-                    + temporaryMiningSkipCount > 0;
+                    + temporaryMiningSkipCount
+                    + postMiningSweepPreferredCount
+                    + postMiningSweepWaitCount
+                    + postMiningSweepFinishDelayCount > 0;
         }
 
         private void resetDiagnostics() {
@@ -634,138 +735,12 @@ public class MineAndCollectTask extends ResourceTask {
             miningTargetReleaseCount = 0;
             pickupTargetSwitchCount = 0;
             temporaryMiningSkipCount = 0;
+            postMiningSweepPreferredCount = 0;
+            postMiningSweepWaitCount = 0;
+            postMiningSweepFinishDelayCount = 0;
             lastSelectedGoalKey = "";
         }
 
-        //20260728_kpopmodder: Sentinel goal keeps active pickup alive briefly while item entities settle.
-        private static class PickupContinuationGoal {
-        }
-
-        //20260727_kpopmodder: Keep per-task block cooldown bookkeeping separate from mining candidate selection.
-        private static class TemporaryBlockBlacklist {
-            private final Map<BlockPos, Integer> skipUntilTick = new HashMap<>();
-
-            public void add(BlockPos pos, int ticks) {
-                skipUntilTick.put(pos, WorldHelper.getTicks() + ticks);
-            }
-
-            public boolean contains(BlockPos pos) {
-                pruneExpired();
-                Integer untilTick = skipUntilTick.get(pos);
-                return untilTick != null && untilTick > WorldHelper.getTicks();
-            }
-
-            public int size() {
-                pruneExpired();
-                return skipUntilTick.size();
-            }
-
-            public void pruneExpired() {
-                int currentTick = WorldHelper.getTicks();
-                skipUntilTick.entrySet().removeIf(entry -> entry.getValue() <= currentTick);
-            }
-        }
-
-        //20260728_kpopmodder: Keeps mine/drop switching policy separate from target scoring.
-        private static class PickupContinuationPolicy {
-            private final int miningGraceTicks;
-            private final int activePickupTicks;
-            private final double maxDistanceSq;
-            private int miningGraceUntilTick;
-            private int activePickupUntilTick;
-            private BlockPos miningOrigin;
-            private Vec3d activePickupPos;
-
-            private PickupContinuationPolicy(int miningGraceTicks, int activePickupTicks, double maxDistance) {
-                this.miningGraceTicks = miningGraceTicks;
-                this.activePickupTicks = activePickupTicks;
-                maxDistanceSq = maxDistance * maxDistance;
-            }
-
-            private void armAfterMining(BlockPos origin) {
-                miningOrigin = origin;
-                miningGraceUntilTick = WorldHelper.getTicks() + miningGraceTicks;
-                activePickupUntilTick = 0;
-            }
-
-            private void armActivePickup(ItemEntity drop) {
-                if (isUsableDrop(drop)) {
-                    activePickupUntilTick = WorldHelper.getTicks() + activePickupTicks;
-                    activePickupPos = drop.getPos();
-                }
-            }
-
-            private Optional<ItemEntity> getPreferredMinedDrop(Optional<ItemEntity> closestDrop) {
-                pruneExpired();
-                if (miningOrigin == null || closestDrop.isEmpty()) {
-                    return Optional.empty();
-                }
-
-                ItemEntity drop = closestDrop.get();
-                if (!isUsableDrop(drop)) {
-                    return Optional.empty();
-                }
-
-                double distanceSq = drop.getPos().squaredDistanceTo(WorldHelper.toVec3d(miningOrigin));
-                if (distanceSq > maxDistanceSq) {
-                    return Optional.empty();
-                }
-                return Optional.of(drop);
-            }
-
-            private Optional<ItemEntity> getPreferredActivePickupDrop(Optional<ItemEntity> closestDrop, boolean pickupTaskContinuing, Vec3d playerPos) {
-                pruneExpired();
-                if (!pickupTaskContinuing || activePickupUntilTick <= WorldHelper.getTicks() || closestDrop.isEmpty()) {
-                    return Optional.empty();
-                }
-
-                ItemEntity drop = closestDrop.get();
-                if (!isUsableDrop(drop) || drop.getPos().squaredDistanceTo(playerPos) > maxDistanceSq) {
-                    return Optional.empty();
-                }
-                return Optional.of(drop);
-            }
-
-            private boolean shouldContinueActivePickup(boolean pickupTaskContinuing) {
-                pruneExpired();
-                return pickupTaskContinuing && activePickupUntilTick > WorldHelper.getTicks();
-            }
-
-            private Vec3d activePickupPos(Vec3d fallback) {
-                return activePickupPos == null ? fallback : activePickupPos;
-            }
-
-            private int miningGraceTicksRemaining() {
-                return Math.max(0, miningGraceUntilTick - WorldHelper.getTicks());
-            }
-
-            private int activePickupTicksRemaining() {
-                return Math.max(0, activePickupUntilTick - WorldHelper.getTicks());
-            }
-
-            private void pruneExpired() {
-                int currentTick = WorldHelper.getTicks();
-                if (miningOrigin != null && currentTick > miningGraceUntilTick) {
-                    miningOrigin = null;
-                    miningGraceUntilTick = 0;
-                }
-                if (activePickupUntilTick > 0 && currentTick > activePickupUntilTick) {
-                    activePickupUntilTick = 0;
-                    activePickupPos = null;
-                }
-            }
-
-            private void reset() {
-                miningOrigin = null;
-                miningGraceUntilTick = 0;
-                activePickupUntilTick = 0;
-                activePickupPos = null;
-            }
-
-            private boolean isUsableDrop(ItemEntity drop) {
-                return drop != null && drop.isAlive() && !drop.getStack().isEmpty();
-            }
-        }
     }
 
     private String describePos(BlockPos pos) {
