@@ -1,7 +1,7 @@
 package adris.altoclef.tasksystem;
 
 import adris.altoclef.Debug;
-import adris.altoclef.tasks.movement.TimeoutWanderTask;
+import adris.altoclef.tasks.movement.escape.TimeoutWanderTask;
 import adris.altoclef.util.logging.StateChangeLogger;
 
 import java.util.function.Predicate;

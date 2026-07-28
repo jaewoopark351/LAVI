@@ -4,7 +4,7 @@ import adris.altoclef.AltoClef;
 import adris.altoclef.Debug;
 import adris.altoclef.tasks.AbstractDoToClosestObjectTask;
 import adris.altoclef.tasks.movement.GetToEntityTask;
-import adris.altoclef.tasks.movement.TimeoutWanderTask;
+import adris.altoclef.tasks.movement.escape.TimeoutWanderTask;
 import adris.altoclef.tasks.resources.SatisfyMiningRequirementTask;
 import adris.altoclef.tasks.slot.EnsureFreeInventorySlotTask;
 import adris.altoclef.tasksystem.ITaskRequiresGrounded;

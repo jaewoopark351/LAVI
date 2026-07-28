@@ -1,7 +1,7 @@
 package adris.altoclef.util;
 
 import adris.altoclef.Debug;
-import adris.altoclef.TaskCatalogue;
+import adris.altoclef.catalogue.TaskCatalogue;
 import adris.altoclef.util.helpers.ItemHelper;
 import net.minecraft.item.Item;
 

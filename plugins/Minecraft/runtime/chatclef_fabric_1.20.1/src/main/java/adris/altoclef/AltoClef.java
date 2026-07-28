@@ -20,6 +20,7 @@ import adris.altoclef.chains.PreEquipItemChain;
 import adris.altoclef.chains.UnstuckChain;
 import adris.altoclef.chains.UserTaskChain;
 import adris.altoclef.chains.WorldSurvivalChain;
+import adris.altoclef.chains.carryon.CarryOnFixChain;
 import adris.altoclef.commands.BlockScanner;
 import adris.altoclef.commandsystem.CommandExecutor;
 import adris.altoclef.control.InputControls;
@@ -196,6 +197,7 @@ public class AltoClef implements ModInitializer {
         mobDefenseChain = new MobDefenseChain(taskRunner);
         new DeathMenuChain(taskRunner);
         new PlayerInteractionFixChain(taskRunner);
+        new CarryOnFixChain(taskRunner);
         mlgBucketChain = new MLGBucketFallChain(taskRunner);
         new UnstuckChain(taskRunner);
         new PreEquipItemChain(taskRunner);

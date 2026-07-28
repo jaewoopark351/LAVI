@@ -2,14 +2,14 @@ package adris.altoclef.tasks.construction.compound;
 
 import adris.altoclef.AltoClef;
 import adris.altoclef.Debug;
-import adris.altoclef.TaskCatalogue;
-import adris.altoclef.tasks.InteractWithBlockTask;
+import adris.altoclef.catalogue.TaskCatalogue;
+import adris.altoclef.tasks.interaction.InteractWithBlockTask;
 import adris.altoclef.tasks.construction.ClearLiquidTask;
 import adris.altoclef.tasks.construction.DestroyBlockTask;
 import adris.altoclef.tasks.construction.PlaceObsidianBucketTask;
 import adris.altoclef.tasks.movement.GetWithinRangeOfBlockTask;
 import adris.altoclef.tasks.movement.pickup.PickupDroppedItemTask;
-import adris.altoclef.tasks.movement.TimeoutWanderTask;
+import adris.altoclef.tasks.movement.escape.TimeoutWanderTask;
 import adris.altoclef.tasks.speedrun.beatgame.BeatMinecraftTask;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.ItemTarget;

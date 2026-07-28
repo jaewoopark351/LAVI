@@ -10,7 +10,7 @@ import adris.altoclef.chains.food.FoodEatingPolicy;
 import adris.altoclef.chains.food.FoodInventoryEvaluator;
 import adris.altoclef.chains.food.FoodInventoryResult;
 import adris.altoclef.chains.food.FoodSafetyPolicy;
-import adris.altoclef.tasks.resources.CollectFoodTask;
+import adris.altoclef.tasks.resources.food.CollectFoodTask;
 import adris.altoclef.tasks.speedrun.DragonBreathTracker;
 import adris.altoclef.tasksystem.TaskRunner;
 import adris.altoclef.util.helpers.ConfigHelper;

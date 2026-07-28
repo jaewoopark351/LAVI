@@ -3,7 +3,7 @@ package adris.altoclef.tasks.entity;
 import adris.altoclef.AltoClef;
 import adris.altoclef.BotBehaviour;
 import adris.altoclef.Debug;
-import adris.altoclef.TaskCatalogue;
+import adris.altoclef.catalogue.TaskCatalogue;
 import adris.altoclef.tasks.movement.FollowPlayerTask;
 import adris.altoclef.tasks.movement.RunAwayFromPositionTask;
 import adris.altoclef.tasks.squashed.CataloguedResourceTask;

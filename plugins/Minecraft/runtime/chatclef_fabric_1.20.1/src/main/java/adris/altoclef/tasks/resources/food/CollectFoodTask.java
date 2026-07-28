@@ -1,4 +1,4 @@
-package adris.altoclef.tasks.resources;
+package adris.altoclef.tasks.resources.food;
 
 import adris.altoclef.AltoClef;
 import adris.altoclef.chains.food.FoodCollectionBlacklist;
@@ -11,7 +11,7 @@ import adris.altoclef.chains.food.FoodHuntTracker;
 import adris.altoclef.chains.food.FoodPotentialCalculator;
 import adris.altoclef.chains.food.FoodResourceSnapshot;
 import adris.altoclef.tasks.movement.pickup.PickupDroppedItemTask;
-import adris.altoclef.tasks.movement.TimeoutWanderTask;
+import adris.altoclef.tasks.movement.escape.TimeoutWanderTask;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.logging.StateChangeLogger;
@@ -334,7 +334,7 @@ public class CollectFoodTask extends Task {
         return new TimeoutWanderTask();
     }
 
-    static void blackListChickenJockeys(AltoClef mod) {
+    public static void blackListChickenJockeys(AltoClef mod) {
         FoodCollectionBlacklist.blackListChickenJockeys(mod);
     }
 

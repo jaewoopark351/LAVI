@@ -1,5 +1,6 @@
-package adris.altoclef;
+package adris.altoclef.catalogue;
 
+import adris.altoclef.Debug;
 import adris.altoclef.multiversion.versionedfields.Blocks;
 import adris.altoclef.multiversion.versionedfields.Entities;
 import adris.altoclef.multiversion.versionedfields.Items;
@@ -9,6 +10,7 @@ import adris.altoclef.tasks.container.CraftInTableTask;
 import adris.altoclef.tasks.container.SmeltInFurnaceTask;
 import adris.altoclef.tasks.container.UpgradeInSmithingTableTask;
 import adris.altoclef.tasks.resources.*;
+import adris.altoclef.tasks.resources.food.CollectFoodTask;
 import adris.altoclef.tasks.resources.wood.*;
 import adris.altoclef.tasks.squashed.CataloguedResourceTask;
 import adris.altoclef.util.*;

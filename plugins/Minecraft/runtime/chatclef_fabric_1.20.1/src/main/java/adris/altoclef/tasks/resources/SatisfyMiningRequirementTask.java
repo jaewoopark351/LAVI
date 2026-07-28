@@ -1,6 +1,6 @@
 package adris.altoclef.tasks.resources;
 
-import adris.altoclef.TaskCatalogue;
+import adris.altoclef.catalogue.TaskCatalogue;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.MiningRequirement;
 import adris.altoclef.util.helpers.StorageHelper;

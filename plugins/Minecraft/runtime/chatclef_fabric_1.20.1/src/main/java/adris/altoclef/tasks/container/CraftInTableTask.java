@@ -6,7 +6,7 @@ import adris.altoclef.tasks.CraftGenericManuallyTask;
 import adris.altoclef.tasks.CraftGenericWithRecipeBooksTask;
 import adris.altoclef.tasks.CraftInInventoryTask;
 import adris.altoclef.tasks.ResourceTask;
-import adris.altoclef.tasks.movement.TimeoutWanderTask;
+import adris.altoclef.tasks.movement.escape.TimeoutWanderTask;
 import adris.altoclef.tasks.resources.CollectRecipeCataloguedResourcesTask;
 import adris.altoclef.tasks.slot.MoveInaccessibleItemToInventoryTask;
 import adris.altoclef.tasks.slot.ReceiveCraftingOutputSlotTask;

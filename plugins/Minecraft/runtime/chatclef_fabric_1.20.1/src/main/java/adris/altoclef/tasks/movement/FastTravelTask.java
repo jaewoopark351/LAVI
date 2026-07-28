@@ -1,7 +1,7 @@
 package adris.altoclef.tasks.movement;
 
 import adris.altoclef.AltoClef;
-import adris.altoclef.TaskCatalogue;
+import adris.altoclef.catalogue.TaskCatalogue;
 import adris.altoclef.tasks.construction.compound.ConstructNetherPortalObsidianTask;
 import adris.altoclef.tasks.movement.pickup.PickupDroppedItemTask;
 import adris.altoclef.tasksystem.Task;

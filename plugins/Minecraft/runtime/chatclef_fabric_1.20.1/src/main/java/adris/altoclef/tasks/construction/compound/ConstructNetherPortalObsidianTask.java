@@ -2,12 +2,12 @@ package adris.altoclef.tasks.construction.compound;
 
 import adris.altoclef.AltoClef;
 import adris.altoclef.Debug;
-import adris.altoclef.TaskCatalogue;
-import adris.altoclef.tasks.InteractWithBlockTask;
+import adris.altoclef.catalogue.TaskCatalogue;
+import adris.altoclef.tasks.interaction.InteractWithBlockTask;
 import adris.altoclef.tasks.construction.DestroyBlockTask;
 import adris.altoclef.tasks.construction.PlaceBlockTask;
 import adris.altoclef.tasks.construction.PlaceStructureBlockTask;
-import adris.altoclef.tasks.movement.TimeoutWanderTask;
+import adris.altoclef.tasks.movement.escape.TimeoutWanderTask;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.ItemTarget;
 import adris.altoclef.util.helpers.WorldHelper;

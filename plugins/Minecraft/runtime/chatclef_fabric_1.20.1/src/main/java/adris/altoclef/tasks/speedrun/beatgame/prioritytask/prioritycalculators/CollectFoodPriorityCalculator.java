@@ -2,7 +2,7 @@ package adris.altoclef.tasks.speedrun.beatgame.prioritytask.prioritycalculators;
 
 import adris.altoclef.AltoClef;
 import adris.altoclef.multiversion.item.ItemVer;
-import adris.altoclef.tasks.resources.CollectFoodTask;
+import adris.altoclef.tasks.resources.food.CollectFoodTask;
 import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.helpers.WorldHelper;
 import adris.altoclef.util.slots.Slot;
@@ -19,7 +19,7 @@ import net.minecraft.util.math.BlockPos;
 import java.util.Optional;
 import java.util.function.Predicate;
 
-import static adris.altoclef.tasks.resources.CollectFoodTask.*;
+import static adris.altoclef.tasks.resources.food.CollectFoodTask.*;
 
 /**
  * partial copy of CollectFoodTask.java, might be a good idea to somehow use the methods there instead of copying them

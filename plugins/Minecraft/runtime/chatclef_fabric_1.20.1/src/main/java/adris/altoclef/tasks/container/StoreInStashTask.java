@@ -1,7 +1,7 @@
 package adris.altoclef.tasks.container;
 
 import adris.altoclef.AltoClef;
-import adris.altoclef.TaskCatalogue;
+import adris.altoclef.catalogue.TaskCatalogue;
 import adris.altoclef.tasks.DoToClosestBlockTask;
 import adris.altoclef.tasks.movement.GetToXZTask;
 import adris.altoclef.tasksystem.Task;

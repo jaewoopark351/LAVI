@@ -1,9 +1,10 @@
 package adris.altoclef.tasks.container;
 
 import adris.altoclef.AltoClef;
-import adris.altoclef.TaskCatalogue;
-import adris.altoclef.tasks.InteractWithBlockTask;
+import adris.altoclef.catalogue.TaskCatalogue;
+import adris.altoclef.tasks.interaction.InteractWithBlockTask;
 import adris.altoclef.tasks.construction.PlaceBlockNearbyTask;
+import adris.altoclef.tasks.construction.carryon.PlaceCarriedBlockTask;
 import adris.altoclef.tasks.slot.EnsureFreeInventorySlotTask;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.ItemTarget;
@@ -16,8 +17,9 @@ import adris.altoclef.util.logging.StateChangeLogger;
 import adris.altoclef.util.slots.Slot;
 import adris.altoclef.util.time.TimerGame;
 import baritone.api.utils.input.Input;
-import net.minecraft.item.ItemStack;
 import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.item.ItemStack;
 import net.minecraft.screen.slot.SlotActionType;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
@@ -35,6 +37,7 @@ public abstract class DoStuffInContainerTask extends Task {
     private final Block[] containerBlocks;
 
     private final PlaceBlockNearbyTask placeTask;
+    private PlaceCarriedBlockTask placeCarriedTask;
     // If we decided on placing, force place for at least 1 second
     // (originally 10)
     private final TimerGame placeForceTimer = new TimerGame(1);
@@ -62,6 +65,7 @@ public abstract class DoStuffInContainerTask extends Task {
 
         // Protect container since we might place it.
         mod.getBehaviour().addProtectedItems(ItemHelper.blocksToItems(containerBlocks));
+        placeCarriedTask = null;
         debugLogger.event("start: containerTarget=" + containerTarget
                 + ", carryOnSafeSneak=" + shouldUseCarryOnSafeInteraction());
     }
@@ -69,6 +73,12 @@ public abstract class DoStuffInContainerTask extends Task {
     @Override
     protected Task onTick() {
         AltoClef mod = AltoClef.getInstance();
+
+        Task carriedPlacement = getCarryOnCarriedContainerPlacementTask(mod);
+        if (carriedPlacement != null) {
+            return carriedPlacement;
+        }
+
         // If we're placing, keep on placing.
         if (placeTask.isActive() && !placeTask.isFinished()) {
             if (mod.getItemStorage().hasItem(ItemHelper.blocksToItems(containerBlocks))) {
@@ -209,7 +219,15 @@ public abstract class DoStuffInContainerTask extends Task {
     }
 
     private Optional<BlockPos> getPlacedContainerIfValid(AltoClef mod) {
-        BlockPos placed = placeTask.getPlaced();
+        Optional<BlockPos> carriedPlaced = getPlacedContainerIfValid(mod,
+                placeCarriedTask == null ? null : placeCarriedTask.getPlaced());
+        if (carriedPlaced.isPresent()) {
+            return carriedPlaced;
+        }
+        return getPlacedContainerIfValid(mod, placeTask.getPlaced());
+    }
+
+    private Optional<BlockPos> getPlacedContainerIfValid(AltoClef mod, BlockPos placed) {
         if (placed == null) {
             return Optional.empty();
         }
@@ -222,11 +240,57 @@ public abstract class DoStuffInContainerTask extends Task {
         return Optional.of(placed);
     }
 
+    private Task getCarryOnCarriedContainerPlacementTask(AltoClef mod) {
+        if (!shouldUseCarryOnSafeInteraction()) {
+            return null;
+        }
+
+        if (placeCarriedTask != null) {
+            Optional<BlockPos> placed = getPlacedContainerIfValid(mod, placeCarriedTask.getPlaced());
+            if (placed.isPresent()) {
+                cachedContainerPosition = placed.get();
+                justPlacedTimer.reset();
+                debugLogger.state("carried container placed: targetPosition=" + cachedContainerPosition.toShortString());
+                return null;
+            }
+            if (placeCarriedTask.hasFailed()) {
+                debugLogger.state("carried container placement failed, falling back to normal container flow");
+                placeCarriedTask = null;
+                return null;
+            }
+            if (placeCarriedTask.isActive() && !placeCarriedTask.isFinished()) {
+                setDebugState("Placing carried container");
+                return placeCarriedTask;
+            }
+        }
+
+        Optional<BlockState> carriedContainer = getCarriedContainerState(mod);
+        if (carriedContainer.isEmpty()) {
+            return null;
+        }
+
+        cachedContainerPosition = null;
+        justPlacedTimer.reset();
+        placeCarriedTask = new PlaceCarriedBlockTask(containerBlocks);
+        mod.getInputControls().release(Input.SNEAK);
+        setDebugState("Placing carried container");
+        debugLogger.state("detected carried container block: " + carriedContainer.get().getBlock().getTranslationKey());
+        return placeCarriedTask;
+    }
+
     private boolean isPlacedContainerBlock(AltoClef mod, BlockPos placed) {
         if (!mod.getChunkTracker().isChunkLoaded(placed)) {
             return false;
         }
-        Block block = mod.getWorld().getBlockState(placed).getBlock();
+        return isContainerBlock(mod.getWorld().getBlockState(placed).getBlock());
+    }
+
+    private Optional<BlockState> getCarriedContainerState(AltoClef mod) {
+        return CarryOnCompat.getCarriedBlockState(mod.getPlayer())
+                .filter(state -> isContainerBlock(state.getBlock()));
+    }
+
+    private boolean isContainerBlock(Block block) {
         for (Block containerBlock : containerBlocks) {
             if (block == containerBlock) {
                 return true;

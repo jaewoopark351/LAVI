@@ -1,5 +1,6 @@
 package adris.altoclef;
 
+import adris.altoclef.catalogue.TaskCatalogue;
 import adris.altoclef.tasks.CraftGenericManuallyTask;
 import adris.altoclef.tasks.construction.PlaceBlockNearbyTask;
 import adris.altoclef.tasks.construction.PlaceStructureBlockTask;
@@ -18,7 +19,7 @@ import adris.altoclef.tasks.movement.*;
 import adris.altoclef.tasks.movement.pickup.PickupDroppedItemTask;
 import adris.altoclef.tasks.resources.CollectBlazeRodsTask;
 import adris.altoclef.tasks.resources.CollectFlintTask;
-import adris.altoclef.tasks.resources.CollectFoodTask;
+import adris.altoclef.tasks.resources.food.CollectFoodTask;
 import adris.altoclef.tasks.resources.TradeWithPiglinsTask;
 import adris.altoclef.tasks.speedrun.KillEnderDragonTask;
 import adris.altoclef.tasks.speedrun.KillEnderDragonWithBedsTask;

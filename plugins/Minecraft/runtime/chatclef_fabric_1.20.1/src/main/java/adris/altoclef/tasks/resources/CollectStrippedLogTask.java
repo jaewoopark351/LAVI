@@ -1,10 +1,10 @@
 package adris.altoclef.tasks.resources;
 
 import adris.altoclef.AltoClef;
-import adris.altoclef.TaskCatalogue;
-import adris.altoclef.tasks.InteractWithBlockTask;
+import adris.altoclef.catalogue.TaskCatalogue;
+import adris.altoclef.tasks.interaction.InteractWithBlockTask;
 import adris.altoclef.tasks.ResourceTask;
-import adris.altoclef.tasks.movement.TimeoutWanderTask;
+import adris.altoclef.tasks.movement.escape.TimeoutWanderTask;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.ItemTarget;
 import adris.altoclef.util.MiningRequirement;

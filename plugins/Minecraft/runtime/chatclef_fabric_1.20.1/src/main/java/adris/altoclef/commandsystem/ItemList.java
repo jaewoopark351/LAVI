@@ -1,6 +1,6 @@
 package adris.altoclef.commandsystem;
 
-import adris.altoclef.TaskCatalogue;
+import adris.altoclef.catalogue.TaskCatalogue;
 import adris.altoclef.util.ItemTarget;
 import adris.altoclef.util.helpers.FuzzySearchHelper;
 

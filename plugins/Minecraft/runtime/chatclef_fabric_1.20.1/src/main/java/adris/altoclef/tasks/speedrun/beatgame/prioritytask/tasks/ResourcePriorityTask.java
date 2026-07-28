@@ -1,7 +1,7 @@
 package adris.altoclef.tasks.speedrun.beatgame.prioritytask.tasks;
 
 import adris.altoclef.AltoClef;
-import adris.altoclef.TaskCatalogue;
+import adris.altoclef.catalogue.TaskCatalogue;
 import adris.altoclef.tasks.speedrun.beatgame.prioritytask.prioritycalculators.ItemPriorityCalculator;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.ItemTarget;

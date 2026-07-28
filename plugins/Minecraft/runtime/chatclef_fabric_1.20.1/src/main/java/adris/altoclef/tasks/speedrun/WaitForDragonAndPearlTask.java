@@ -2,7 +2,7 @@ package adris.altoclef.tasks.speedrun;
 
 import adris.altoclef.AltoClef;
 import adris.altoclef.Debug;
-import adris.altoclef.TaskCatalogue;
+import adris.altoclef.catalogue.TaskCatalogue;
 import adris.altoclef.tasks.entity.DoToClosestEntityTask;
 import adris.altoclef.tasks.entity.KillEntitiesTask;
 import adris.altoclef.tasks.movement.GetToBlockTask;

@@ -2,7 +2,7 @@ package adris.altoclef.commands;
 
 
 import adris.altoclef.AltoClef;
-import adris.altoclef.TaskCatalogue;
+import adris.altoclef.catalogue.TaskCatalogue;
 import adris.altoclef.commandsystem.Arg;
 import adris.altoclef.commandsystem.ArgParser;
 import adris.altoclef.commandsystem.Command;

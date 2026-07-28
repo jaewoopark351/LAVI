@@ -1,9 +1,9 @@
 package adris.altoclef.tasks.container;
 
 import adris.altoclef.AltoClef;
-import adris.altoclef.tasks.InteractWithBlockTask;
+import adris.altoclef.tasks.interaction.InteractWithBlockTask;
 import adris.altoclef.tasks.construction.DestroyBlockTask;
-import adris.altoclef.tasks.movement.TimeoutWanderTask;
+import adris.altoclef.tasks.movement.escape.TimeoutWanderTask;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.trackers.storage.ContainerCache;
 import adris.altoclef.trackers.storage.ContainerType;

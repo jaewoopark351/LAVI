@@ -2,7 +2,7 @@ package adris.altoclef.util.helpers;
 
 import adris.altoclef.AltoClef;
 import adris.altoclef.Debug;
-import adris.altoclef.TaskCatalogue;
+import adris.altoclef.catalogue.TaskCatalogue;
 import adris.altoclef.mixins.AbstractFurnaceScreenHandlerAccessor;
 import adris.altoclef.multiversion.item.ItemVer;
 import adris.altoclef.multiversion.ToolMaterialVer;

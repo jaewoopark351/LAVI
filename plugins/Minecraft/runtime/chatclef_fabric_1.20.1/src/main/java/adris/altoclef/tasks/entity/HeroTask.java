@@ -3,7 +3,7 @@ package adris.altoclef.tasks.entity;
 import adris.altoclef.AltoClef;
 import adris.altoclef.tasks.movement.GetToEntityTask;
 import adris.altoclef.tasks.movement.pickup.PickupDroppedItemTask;
-import adris.altoclef.tasks.movement.TimeoutWanderTask;
+import adris.altoclef.tasks.movement.escape.TimeoutWanderTask;
 import adris.altoclef.tasks.resources.KillAndLootTask;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.ItemTarget;

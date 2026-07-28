@@ -5,7 +5,7 @@ import adris.altoclef.tasks.ResourceTask;
 import adris.altoclef.tasks.entity.KillEntitiesTask;
 import adris.altoclef.tasks.entity.KillEntityTask;
 import adris.altoclef.tasks.movement.GetWithinRangeOfBlockTask;
-import adris.altoclef.tasks.movement.TimeoutWanderTask;
+import adris.altoclef.tasks.movement.escape.TimeoutWanderTask;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.Dimension;
 import adris.altoclef.util.ItemTarget;

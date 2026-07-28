@@ -5,6 +5,8 @@ import adris.altoclef.Debug;
 import adris.altoclef.control.InputControls;
 import adris.altoclef.multiversion.versionedfields.Blocks;
 import adris.altoclef.tasks.entity.KillEntityTask;
+import adris.altoclef.tasks.movement.escape.LocalTerrainEscapeTask;
+import adris.altoclef.tasks.movement.escape.TimeoutWanderTask;
 import adris.altoclef.tasksystem.ITaskRequiresGrounded;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.helpers.WorldHelper;

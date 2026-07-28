@@ -1,7 +1,7 @@
 package adris.altoclef.tasks;
 
 import adris.altoclef.AltoClef;
-import adris.altoclef.tasks.movement.TimeoutWanderTask;
+import adris.altoclef.tasks.movement.escape.TimeoutWanderTask;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.helpers.WorldHelper;
 import net.minecraft.util.math.Vec3d;

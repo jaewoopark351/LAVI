@@ -1,6 +1,6 @@
 package adris.altoclef.tasks.resources.wood;
 
-import adris.altoclef.TaskCatalogue;
+import adris.altoclef.catalogue.TaskCatalogue;
 import adris.altoclef.tasks.resources.CraftWithMatchingStrippedLogsTask;
 import adris.altoclef.util.CraftingRecipe;
 import adris.altoclef.util.ItemTarget;

@@ -2,10 +2,10 @@ package adris.altoclef.chains;
 
 import adris.altoclef.AltoClef;
 import adris.altoclef.tasks.DoToClosestBlockTask;
-import adris.altoclef.tasks.InteractWithBlockTask;
+import adris.altoclef.tasks.interaction.InteractWithBlockTask;
 import adris.altoclef.tasks.construction.PutOutFireTask;
 import adris.altoclef.tasks.movement.EnterNetherPortalTask;
-import adris.altoclef.tasks.movement.EscapeFromLavaTask;
+import adris.altoclef.tasks.movement.escape.EscapeFromLavaTask;
 import adris.altoclef.tasks.movement.GetToBlockTask;
 import adris.altoclef.tasks.movement.SafeRandomShimmyTask;
 import adris.altoclef.tasksystem.TaskRunner;

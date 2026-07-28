@@ -1,9 +1,10 @@
-package adris.altoclef.tasks.movement;
+package adris.altoclef.tasks.movement.escape;
 
 import adris.altoclef.AltoClef;
 import adris.altoclef.Debug;
 import adris.altoclef.multiversion.versionedfields.Blocks;
 import adris.altoclef.tasks.entity.KillEntityTask;
+import adris.altoclef.tasks.movement.SafeRandomShimmyTask;
 import adris.altoclef.tasksystem.ITaskRequiresGrounded;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.helpers.ItemHelper;

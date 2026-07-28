@@ -1,6 +1,6 @@
 package adris.altoclef.chains.food;
 
-import adris.altoclef.TaskCatalogue;
+import adris.altoclef.catalogue.TaskCatalogue;
 import adris.altoclef.multiversion.item.ItemVer;
 import net.minecraft.block.Block;
 import net.minecraft.item.Item;

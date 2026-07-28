@@ -2,7 +2,7 @@ package adris.altoclef.lavibridge.actions;
 
 //20260725_kpopmodder: Added this resolver so equip actions can target registry or catalogued item names.
 
-import adris.altoclef.TaskCatalogue;
+import adris.altoclef.catalogue.TaskCatalogue;
 import net.minecraft.item.Item;
 import net.minecraft.registry.Registries;
 import net.minecraft.util.Identifier;

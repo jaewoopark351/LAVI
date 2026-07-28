@@ -1,8 +1,9 @@
-package adris.altoclef.tasks.movement;
+package adris.altoclef.tasks.movement.escape;
 
 import adris.altoclef.AltoClef;
 import adris.altoclef.multiversion.FoodComponentWrapper;
 import adris.altoclef.multiversion.item.ItemVer;
+import adris.altoclef.tasks.movement.CustomBaritoneGoalTask;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.helpers.LookHelper;
 import adris.altoclef.util.progresscheck.MovementProgressChecker;

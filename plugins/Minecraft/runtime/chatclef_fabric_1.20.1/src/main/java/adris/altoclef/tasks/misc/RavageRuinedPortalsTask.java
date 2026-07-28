@@ -2,7 +2,7 @@ package adris.altoclef.tasks.misc;
 
 import adris.altoclef.AltoClef;
 import adris.altoclef.tasks.container.LootContainerTask;
-import adris.altoclef.tasks.movement.TimeoutWanderTask;
+import adris.altoclef.tasks.movement.escape.TimeoutWanderTask;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.Dimension;
 import adris.altoclef.util.helpers.WorldHelper;

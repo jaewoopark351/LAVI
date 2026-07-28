@@ -1,4 +1,4 @@
-package adris.altoclef.tasks.movement;
+package adris.altoclef.tasks.movement.escape;
 
 import adris.altoclef.AltoClef;
 import adris.altoclef.tasks.construction.DestroyBlockTask;
@@ -32,7 +32,7 @@ import java.util.Optional;
 import java.util.Set;
 
 //20260728_kpopmodder: Local terrain escape stays bounded so blocked goal recovery cannot become broad mining.
-class LocalTerrainEscapeTask extends Task implements ITaskRequiresGrounded {
+public class LocalTerrainEscapeTask extends Task implements ITaskRequiresGrounded {
     private static final double TIMEOUT_SECONDS = 8.0;
     private static final double MAX_DISTANCE_FROM_ORIGIN = 4.5;
     private static final int STAIR_STEPS = 2;
@@ -46,12 +46,12 @@ class LocalTerrainEscapeTask extends Task implements ITaskRequiresGrounded {
     private boolean finished;
     private boolean timedOut;
 
-    LocalTerrainEscapeTask(Plan plan, String parentTaskDebug) {
+    public LocalTerrainEscapeTask(Plan plan, String parentTaskDebug) {
         this.plan = plan;
         this.parentTaskDebug = parentTaskDebug;
     }
 
-    static Optional<Plan> findPlan(AltoClef mod, Set<BlockPos> cooldownOrigins) {
+    public static Optional<Plan> findPlan(AltoClef mod, Set<BlockPos> cooldownOrigins) {
         if (mod.getPlayer() == null) {
             return Optional.empty();
         }
@@ -140,15 +140,15 @@ class LocalTerrainEscapeTask extends Task implements ITaskRequiresGrounded {
         return finished;
     }
 
-    boolean didTimeOut() {
+    public boolean didTimeOut() {
         return timedOut;
     }
 
-    BlockPos getOrigin() {
+    public BlockPos getOrigin() {
         return plan.origin;
     }
 
-    String describePlan() {
+    public String describePlan() {
         return plan.describe();
     }
 
@@ -298,7 +298,7 @@ class LocalTerrainEscapeTask extends Task implements ITaskRequiresGrounded {
         return String.format(Locale.ROOT, "%.2f, %.2f, %.2f", vec.x, vec.y, vec.z);
     }
 
-    static class Plan {
+    public static class Plan {
         private final BlockPos origin;
         private final Direction direction;
         private final String kind;
@@ -311,7 +311,7 @@ class LocalTerrainEscapeTask extends Task implements ITaskRequiresGrounded {
             this.blocksToClear = List.copyOf(blocksToClear);
         }
 
-        String describe() {
+        public String describe() {
             return "kind=" + kind
                     + ", origin=" + origin.toShortString()
                     + ", direction=" + direction.getName()
