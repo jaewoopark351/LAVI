@@ -17,9 +17,7 @@ import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.logging.StateChangeLogger;
 import adris.altoclef.util.time.TimerGame;
 import net.minecraft.block.Block;
-import net.minecraft.block.Blocks;
 import net.minecraft.entity.Entity;
-import net.minecraft.entity.passive.*;
 import net.minecraft.item.Item;
 import net.minecraft.item.Items;
 
@@ -28,28 +26,9 @@ import java.util.Optional;
 
 public class CollectFoodTask extends Task {
 
-
-    // Represents order of preferred mobs to least preferred
-    public static final CookableFoodTarget[] COOKABLE_FOODS = new CookableFoodTarget[]{
-            new CookableFoodTarget("beef", CowEntity.class),
-            new CookableFoodTarget("porkchop", PigEntity.class),
-            new CookableFoodTarget("chicken", ChickenEntity.class),
-            new CookableFoodTarget("mutton", SheepEntity.class),
-            new CookableFoodTarget("rabbit", RabbitEntity.class)
-    };
-
-    public static final Item[] ITEMS_TO_PICK_UP = new Item[]{
-            Items.ENCHANTED_GOLDEN_APPLE,
-            Items.GOLDEN_APPLE,
-            Items.GOLDEN_CARROT,
-            Items.BREAD,
-            Items.BAKED_POTATO
-    };
-
-    public static final CropTarget[] CROPS = new CropTarget[]{
-            new CropTarget(Items.WHEAT, Blocks.WHEAT),
-            new CropTarget(Items.CARROT, Blocks.CARROTS)
-    };
+    public static final CookableFoodTarget[] COOKABLE_FOODS = FoodTaskTargets.COOKABLE_FOODS;
+    public static final Item[] ITEMS_TO_PICK_UP = FoodTaskTargets.ITEMS_TO_PICK_UP;
+    public static final CropTarget[] CROPS = FoodTaskTargets.CROPS;
 
     private final double unitsNeeded;
     private final TimerGame checkNewOptionsTimer = new TimerGame(10);

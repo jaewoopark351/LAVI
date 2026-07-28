@@ -4,18 +4,16 @@ import adris.altoclef.AltoClef;
 import adris.altoclef.Debug;
 import adris.altoclef.catalogue.TaskCatalogue;
 import adris.altoclef.tasks.movement.SafeRandomShimmyTask;
+import adris.altoclef.tasks.movement.escape.AnnoyingBlockDetector;
 import adris.altoclef.tasks.movement.escape.TimeoutWanderTask;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.ItemTarget;
 import adris.altoclef.util.baritone.GoalAnd;
 import adris.altoclef.util.baritone.GoalBlockSide;
-import adris.altoclef.util.helpers.ItemHelper;
-import adris.altoclef.util.helpers.LookHelper;
 import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.helpers.WorldHelper;
 import adris.altoclef.util.logging.StateChangeLogger;
 import adris.altoclef.util.progresscheck.MovementProgressChecker;
-import adris.altoclef.util.slots.Slot;
 import adris.altoclef.util.time.TimerGame;
 import baritone.api.pathing.goals.Goal;
 import baritone.api.pathing.goals.GoalNear;
@@ -23,12 +21,7 @@ import baritone.api.pathing.goals.GoalTwoBlocks;
 import baritone.api.process.ICustomGoalProcess;
 import baritone.api.utils.Rotation;
 import baritone.api.utils.input.Input;
-import net.minecraft.block.*;
-import adris.altoclef.multiversion.versionedfields.Blocks;
-import net.minecraft.client.MinecraftClient;
 import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.screen.slot.SlotActionType;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.Vec3i;
@@ -51,26 +44,12 @@ public class InteractWithBlockTask extends Task {
     private final boolean shiftClick;
     private final TimerGame clickTimer = new TimerGame(5);
     private final TimeoutWanderTask wanderTask = new TimeoutWanderTask(5, true);
-    Block[] annoyingBlocks = new Block[]{
-            Blocks.VINE,
-            Blocks.NETHER_SPROUTS,
-            Blocks.CAVE_VINES,
-            Blocks.CAVE_VINES_PLANT,
-            Blocks.TWISTING_VINES,
-            Blocks.TWISTING_VINES_PLANT,
-            Blocks.WEEPING_VINES_PLANT,
-            Blocks.LADDER,
-            Blocks.BIG_DRIPLEAF,
-            Blocks.BIG_DRIPLEAF_STEM,
-            Blocks.SMALL_DRIPLEAF,
-            Blocks.TALL_GRASS,
-            Blocks.SHORT_GRASS,
-            Blocks.SWEET_BERRY_BUSH
-    };
+    private final AnnoyingBlockDetector annoyingBlockDetector = new AnnoyingBlockDetector();
     private Task unstuckTask = null;
     private ClickResponse cachedClickStatus = ClickResponse.CANT_REACH;
     private int waitingForClickTicks = 0;
     private final StateChangeLogger debugLogger = new StateChangeLogger("InteractWithBlockTask");
+    private final BlockInteractionClickController clickController;
 
     public InteractWithBlockTask(ItemTarget toUse, Direction direction, BlockPos target, Input interactInput, boolean walkInto, Vec3i interactOffset, boolean shiftClick) {
         this.toUse = toUse;
@@ -80,6 +59,7 @@ public class InteractWithBlockTask extends Task {
         this.walkInto = walkInto;
         this.interactOffset = interactOffset;
         this.shiftClick = shiftClick;
+        this.clickController = new BlockInteractionClickController(toUse, direction, target, interactInput, shiftClick, debugLogger);
     }
 
     public InteractWithBlockTask(ItemTarget toUse, Direction direction, BlockPos target, Input interactInput, boolean walkInto, boolean shiftClick) {
@@ -147,19 +127,6 @@ public class InteractWithBlockTask extends Task {
         this(ItemTarget.EMPTY, null, target, Input.CLICK_RIGHT, false, false);
     }
 
-    private static BlockPos[] generateSides(BlockPos pos) {
-        return new BlockPos[]{
-                pos.add(1,0,0),
-                pos.add(-1,0,0),
-                pos.add(0,0,1),
-                pos.add(0,0,-1),
-                pos.add(1,0,-1),
-                pos.add(1,0,1),
-                pos.add(-1,0,-1),
-                pos.add(-1,0,1)
-        };
-    }
-
     private static Goal createGoalForInteract(BlockPos target, int reachDistance, Direction interactSide, Vec3i interactOffset, boolean walkInto) {
 
         boolean sideMatters = interactSide != null;
@@ -187,39 +154,6 @@ public class InteractWithBlockTask extends Task {
         }
     }
 
-    private boolean isAnnoying(AltoClef mod, BlockPos pos) {
-        if (annoyingBlocks != null) {
-            for (Block AnnoyingBlocks : annoyingBlocks) {
-                return mod.getWorld().getBlockState(pos).getBlock() == AnnoyingBlocks ||
-                        mod.getWorld().getBlockState(pos).getBlock() instanceof DoorBlock ||
-                        mod.getWorld().getBlockState(pos).getBlock() instanceof FenceBlock ||
-                        mod.getWorld().getBlockState(pos).getBlock() instanceof FenceGateBlock ||
-                        mod.getWorld().getBlockState(pos).getBlock() instanceof FlowerBlock;
-            }
-        }
-        return false;
-    }
-
-    // This happens all the time in mineshafts and swamps/jungles
-    private BlockPos stuckInBlock(AltoClef mod) {
-        BlockPos p = mod.getPlayer().getBlockPos();
-        if (isAnnoying(mod, p)) return p;
-        if (isAnnoying(mod, p.up())) return p.up();
-        BlockPos[] toCheck = generateSides(p);
-        for (BlockPos check : toCheck) {
-            if (isAnnoying(mod, check)) {
-                return check;
-            }
-        }
-        BlockPos[] toCheckHigh = generateSides(p.up());
-        for (BlockPos check : toCheckHigh) {
-            if (isAnnoying(mod, check)) {
-                return check;
-            }
-        }
-        return null;
-    }
-
     private Task getFenceUnstuckTask() {
         return new SafeRandomShimmyTask();
     }
@@ -236,7 +170,7 @@ public class InteractWithBlockTask extends Task {
                 + ", toUse=" + toUse
                 + ", direction=" + direction
                 + ", shiftClick=" + shiftClick
-                + ", " + describeInteractionContext(AltoClef.getInstance()));
+                + ", " + clickController.describeInteractionContext(AltoClef.getInstance()));
     }
 
     @Override
@@ -264,7 +198,10 @@ public class InteractWithBlockTask extends Task {
                 mod.getInputControls().release(Input.MOVE_FORWARD);
             }
         }
-        if (unstuckTask != null && unstuckTask.isActive() && !unstuckTask.isFinished() && stuckInBlock(mod) != null) {
+        if (unstuckTask != null
+                && unstuckTask.isActive()
+                && !unstuckTask.isFinished()
+                && annoyingBlockDetector.findNearbyAnnoyingBlock(mod) != null) {
             setDebugState("Getting unstuck from block.");
             stuckCheck.reset();
             // Stop other tasks, we are JUST shimmying
@@ -273,7 +210,7 @@ public class InteractWithBlockTask extends Task {
             return unstuckTask;
         }
         if (!moveChecker.check(mod) || !stuckCheck.check(mod)) {
-            BlockPos blockStuck = stuckInBlock(mod);
+            BlockPos blockStuck = annoyingBlockDetector.findNearbyAnnoyingBlock(mod);
             if (blockStuck != null) {
                 unstuckTask = getFenceUnstuckTask();
                 return unstuckTask;
@@ -309,7 +246,7 @@ public class InteractWithBlockTask extends Task {
         Goal moveGoal = createGoalForInteract(target, reachDistance, direction, interactOffset, walkInto);
         ICustomGoalProcess proc = mod.getClientBaritone().getCustomGoalProcess();
 
-        cachedClickStatus = rightClick(mod);
+        cachedClickStatus = clickController.click(mod);
         switch (Objects.requireNonNull(cachedClickStatus)) {
             case CANT_REACH -> {
                 setDebugState("Getting to our goal");
@@ -392,83 +329,8 @@ public class InteractWithBlockTask extends Task {
         return cachedClickStatus;
     }
 
-    private ClickResponse rightClick(AltoClef mod) {
-
-        // Don't interact if baritone can't interact.
-        if (mod.getExtraBaritoneSettings().isInteractionPaused() || mod.getFoodChain().needsToEat() ||
-                mod.getPlayer().isBlocking()) {
-            debugLogger.state("right click paused: interactionPaused=" + mod.getExtraBaritoneSettings().isInteractionPaused()
-                    + ", needsToEat=" + mod.getFoodChain().needsToEat()
-                    + ", blocking=" + mod.getPlayer().isBlocking()
-                    + ", " + describeInteractionContext(mod));
-            return ClickResponse.WAIT_FOR_CLICK;
-        }
-
-        // We can't interact while a screen is open.
-        if (!StorageHelper.isPlayerInventoryOpen()) {
-            ItemStack cursorStack = StorageHelper.getItemStackInCursorSlot();
-            if (!cursorStack.isEmpty()) {
-                debugLogger.state("right click delayed: clearing cursor=" + describeStack(cursorStack),
-                        "right click delayed: clearing cursor=" + describeStack(cursorStack)
-                                + ", " + describeInteractionContext(mod));
-                Optional<Slot> moveTo = mod.getItemStorage().getSlotThatCanFitInPlayerInventory(cursorStack, false);
-                if (moveTo.isPresent()) {
-                    mod.getSlotHandler().clickSlot(moveTo.get(), 0, SlotActionType.PICKUP);
-                    return ClickResponse.WAIT_FOR_CLICK;
-                }
-                if (ItemHelper.canThrowAwayStack(mod, cursorStack)) {
-                    mod.getSlotHandler().clickSlot(Slot.UNDEFINED, 0, SlotActionType.PICKUP);
-                    return ClickResponse.WAIT_FOR_CLICK;
-                }
-                Optional<Slot> garbage = StorageHelper.getGarbageSlot(mod);
-                // Try throwing away cursor slot if it's garbage
-                if (garbage.isPresent()) {
-                    mod.getSlotHandler().clickSlot(garbage.get(), 0, SlotActionType.PICKUP);
-                    return ClickResponse.WAIT_FOR_CLICK;
-                }
-                mod.getSlotHandler().clickSlot(Slot.UNDEFINED, 0, SlotActionType.PICKUP);
-                return ClickResponse.WAIT_FOR_CLICK;
-            } else {
-                debugLogger.state("right click delayed: closing open screen before interacting",
-                        "right click delayed: closing open screen before interacting: " + describeInteractionContext(mod));
-                StorageHelper.closeScreen();
-            }
-        }
-
-        Optional<Rotation> reachable = getCurrentReach();
-        if (reachable.isPresent()) {
-            if (LookHelper.isLookingAt(mod, target)) {
-                if (toUse != null) {
-                    mod.getSlotHandler().forceEquipItem(toUse, false);
-                } else {
-                    mod.getSlotHandler().forceDeequipRightClickableItem();
-                }
-                debugLogger.state("right click pressing input: target=" + target.toShortString()
-                        + ", input=" + interactInput
-                        + ", shiftClick=" + shiftClick);
-                mod.getInputControls().tryPress(interactInput);
-                if (mod.getInputControls().isHeldDown(interactInput)) {
-                    if (shiftClick) {
-                        mod.getInputControls().hold(Input.SNEAK);
-                    }
-                    return ClickResponse.CLICK_ATTEMPTED;
-                }
-                //mod.getClientBaritone().getInputOverrideHandler().setInputForceState(_interactInput, true);
-            } else {
-                debugLogger.state("right click delayed: looking at reachable rotation for target=" + target.toShortString());
-                LookHelper.lookAt(reachable.get());
-            }
-            return ClickResponse.WAIT_FOR_CLICK;
-        }
-        if (shiftClick) {
-            mod.getInputControls().release(Input.SNEAK);
-        }
-        debugLogger.state("right click cannot reach target=" + target.toShortString() + ", direction=" + direction);
-        return ClickResponse.CANT_REACH;
-    }
-
     public Optional<Rotation> getCurrentReach() {
-        return LookHelper.getReach(target, direction);
+        return clickController.getCurrentReach();
     }
 
     public enum ClickResponse {
@@ -477,34 +339,4 @@ public class InteractWithBlockTask extends Task {
         CLICK_ATTEMPTED
     }
 
-    private String describeStack(ItemStack stack) {
-        if (stack == null || stack.isEmpty()) {
-            return "empty";
-        }
-        return stack.getItem().getTranslationKey() + " x " + stack.getCount();
-    }
-
-    private String describeInteractionContext(AltoClef mod) {
-        if (mod == null || mod.getPlayer() == null) {
-            return "context=missing-client";
-        }
-        return "player=" + mod.getPlayer().getBlockPos().toShortString()
-                + ", screen=" + describeCurrentScreen()
-                + ", screenHandler=" + describeScreenHandler(mod)
-                + ", cursor=" + describeStack(StorageHelper.getItemStackInCursorSlot())
-                + ", pathing=" + mod.getClientBaritone().getPathingBehavior().isPathing()
-                + ", shiftClick=" + shiftClick;
-    }
-
-    private String describeCurrentScreen() {
-        Object screen = MinecraftClient.getInstance().currentScreen;
-        return screen == null ? "none" : screen.getClass().getSimpleName();
-    }
-
-    private String describeScreenHandler(AltoClef mod) {
-        if (mod == null || mod.getPlayer() == null || mod.getPlayer().currentScreenHandler == null) {
-            return "none";
-        }
-        return mod.getPlayer().currentScreenHandler.getClass().getSimpleName();
-    }
 }

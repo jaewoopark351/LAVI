@@ -2,8 +2,6 @@ package adris.altoclef.tasks.movement.escape;
 
 import adris.altoclef.AltoClef;
 import adris.altoclef.Debug;
-import adris.altoclef.multiversion.versionedfields.Blocks;
-import adris.altoclef.tasks.entity.KillEntityTask;
 import adris.altoclef.tasks.movement.SafeRandomShimmyTask;
 import adris.altoclef.tasksystem.ITaskRequiresGrounded;
 import adris.altoclef.tasksystem.Task;
@@ -15,7 +13,6 @@ import adris.altoclef.util.progresscheck.MovementProgressChecker;
 import adris.altoclef.util.slots.Slot;
 import adris.altoclef.util.time.TimerGame;
 import baritone.api.utils.input.Input;
-import net.minecraft.block.*;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.mob.MobEntity;
@@ -47,22 +44,7 @@ public class TimeoutWanderTask extends Task implements ITaskRequiresGrounded {
     private final TimerGame timer = new TimerGame(60);
     private final StateChangeLogger debugLogger = new StateChangeLogger("TimeoutWanderTask");
     private final Map<UUID, Integer> blockingEntityRetryCooldowns = new HashMap<>();
-    Block[] annoyingBlocks = new Block[]{
-            Blocks.VINE,
-            Blocks.NETHER_SPROUTS,
-            Blocks.CAVE_VINES,
-            Blocks.CAVE_VINES_PLANT,
-            Blocks.TWISTING_VINES,
-            Blocks.TWISTING_VINES_PLANT,
-            Blocks.WEEPING_VINES_PLANT,
-            Blocks.LADDER,
-            Blocks.BIG_DRIPLEAF,
-            Blocks.BIG_DRIPLEAF_STEM,
-            Blocks.SMALL_DRIPLEAF,
-            Blocks.TALL_GRASS,
-            Blocks.SHORT_GRASS,
-            Blocks.SWEET_BERRY_BUSH
-    };
+    private final AnnoyingBlockDetector annoyingBlockDetector = new AnnoyingBlockDetector();
     private Vec3d origin;
     //private DistanceProgressChecker _distanceProgressChecker = new DistanceProgressChecker(10, 0.1f);
     private boolean _forceExplore;
@@ -90,52 +72,8 @@ public class TimeoutWanderTask extends Task implements ITaskRequiresGrounded {
         _forceExplore = forceExplore;
     }
 
-    private static BlockPos[] generateSides(BlockPos pos) {
-        return new BlockPos[]{
-                pos.add(1,0,0),
-                pos.add(-1,0,0),
-                pos.add(0,0,1),
-                pos.add(0,0,-1),
-                pos.add(1,0,-1),
-                pos.add(1,0,1),
-                pos.add(-1,0,-1),
-                pos.add(-1,0,1)
-        };
-    }
-
-    private boolean isAnnoying(AltoClef mod, BlockPos pos) {
-        for (Block AnnoyingBlocks : annoyingBlocks) {
-            return mod.getWorld().getBlockState(pos).getBlock() == AnnoyingBlocks ||
-                    mod.getWorld().getBlockState(pos).getBlock() instanceof DoorBlock ||
-                    mod.getWorld().getBlockState(pos).getBlock() instanceof FenceBlock ||
-                    mod.getWorld().getBlockState(pos).getBlock() instanceof FenceGateBlock ||
-                    mod.getWorld().getBlockState(pos).getBlock() instanceof FlowerBlock;
-        }
-        return false;
-    }
-
     public void resetWander() {
         _wanderDistanceExtension = 0;
-    }
-
-    // This happens all the time in mineshafts and swamps/jungles
-    private BlockPos stuckInBlock(AltoClef mod) {
-        BlockPos p = mod.getPlayer().getBlockPos();
-        if (isAnnoying(mod, p)) return p;
-        if (isAnnoying(mod, p.up())) return p.up();
-        BlockPos[] toCheck = generateSides(p);
-        for (BlockPos check : toCheck) {
-            if (isAnnoying(mod, check)) {
-                return check;
-            }
-        }
-        BlockPos[] toCheckHigh = generateSides(p.up());
-        for (BlockPos check : toCheckHigh) {
-            if (isAnnoying(mod, check)) {
-                return check;
-            }
-        }
-        return null;
     }
 
     private Task getFenceUnstuckTask() {
@@ -218,7 +156,10 @@ public class TimeoutWanderTask extends Task implements ITaskRequiresGrounded {
             progressChecker.reset();
             stuckCheck.reset();
         }
-        if (_unstuckTask != null && _unstuckTask.isActive() && !_unstuckTask.isFinished() && stuckInBlock(mod) != null) {
+        if (_unstuckTask != null
+                && _unstuckTask.isActive()
+                && !_unstuckTask.isFinished()
+                && annoyingBlockDetector.findNearbyAnnoyingBlock(mod) != null) {
             setDebugState("Getting unstuck from block.");
             stuckCheck.reset();
             // Stop other tasks, we are JUST shimmying
@@ -230,7 +171,12 @@ public class TimeoutWanderTask extends Task implements ITaskRequiresGrounded {
             Optional<Entity> blockingEntity = getBlockingEntityToClear(mod);
             if (blockingEntity.isPresent()) {
                 Entity entity = blockingEntity.get();
-                clearBlockingEntityTask = new ClearBlockingEntityTask(entity, mod.getPlayer().getPos());
+                clearBlockingEntityTask = new ClearBlockingEntityTask(
+                        entity,
+                        mod.getPlayer().getPos(),
+                        BLOCKING_ENTITY_MAX_CHASE_RANGE,
+                        BLOCKING_ENTITY_CLEAR_TIMEOUT_SECONDS
+                );
                 setDebugState("Clearing blocking entity.");
                 debugLogger.event("clearing blocking entity: target=" + describeEntity(mod, entity)
                         + ", clearRange=" + BLOCKING_ENTITY_CLEAR_RANGE
@@ -238,7 +184,7 @@ public class TimeoutWanderTask extends Task implements ITaskRequiresGrounded {
                         + ", timeoutSeconds=" + BLOCKING_ENTITY_CLEAR_TIMEOUT_SECONDS);
                 return clearBlockingEntityTask;
             }
-            BlockPos blockStuck = stuckInBlock(mod);
+            BlockPos blockStuck = annoyingBlockDetector.findNearbyAnnoyingBlock(mod);
             if (blockStuck != null) {
                 failCounter++;
                 _unstuckTask = getFenceUnstuckTask();
@@ -380,107 +326,4 @@ public class TimeoutWanderTask extends Task implements ITaskRequiresGrounded {
         return String.format(java.util.Locale.ROOT, "%.2f, %.2f, %.2f", vec.x, vec.y, vec.z);
     }
 
-    //20260728_kpopmodder: Keep local obstacle removal bounded so recovery does not turn into animal hunting.
-    private static class ClearBlockingEntityTask extends Task {
-        private final Entity target;
-        private final Vec3d origin;
-        private final TimerGame timeout = new TimerGame(BLOCKING_ENTITY_CLEAR_TIMEOUT_SECONDS);
-        private final StateChangeLogger debugLogger = new StateChangeLogger("ClearBlockingEntityTask");
-        private boolean finished;
-        private boolean timedOut;
-
-        private ClearBlockingEntityTask(Entity target, Vec3d origin) {
-            this.target = target;
-            this.origin = origin;
-        }
-
-        @Override
-        protected void onStart() {
-            timeout.reset();
-            finished = false;
-            timedOut = false;
-            debugLogger.event("start: target=" + describeTarget(AltoClef.getInstance())
-                    + ", origin=" + formatVec(origin));
-        }
-
-        @Override
-        protected Task onTick() {
-            AltoClef mod = AltoClef.getInstance();
-            if (target == null || !target.isAlive()) {
-                finished = true;
-                debugLogger.event("finished: target gone");
-                return null;
-            }
-            if (!target.getPos().isInRange(mod.getPlayer().getPos(), BLOCKING_ENTITY_MAX_CHASE_RANGE)) {
-                finished = true;
-                debugLogger.event("finished: target no longer blocking: " + describeTarget(mod));
-                return null;
-            }
-            if (!target.getPos().isInRange(origin, BLOCKING_ENTITY_MAX_CHASE_RANGE + 1.0)) {
-                finished = true;
-                debugLogger.event("finished: target left local recovery area: " + describeTarget(mod));
-                return null;
-            }
-            if (timeout.elapsed()) {
-                timedOut = true;
-                finished = true;
-                debugLogger.event("timed out: " + describeTarget(mod));
-                return null;
-            }
-
-            setDebugState("Clearing " + target.getType().getTranslationKey());
-            return new KillEntityTask(target, 0, BLOCKING_ENTITY_MAX_CHASE_RANGE, 0);
-        }
-
-        @Override
-        protected void onStop(Task interruptTask) {
-        }
-
-        @Override
-        public boolean isFinished() {
-            return finished;
-        }
-
-        private boolean didTimeOut() {
-            return timedOut;
-        }
-
-        private UUID getTargetUuid() {
-            return target == null ? null : target.getUuid();
-        }
-
-        private String describeTarget(AltoClef mod) {
-            if (target == null) {
-                return "none";
-            }
-            String playerPos = mod == null || mod.getPlayer() == null
-                    ? "unknown"
-                    : mod.getPlayer().getBlockPos().toShortString();
-            return target.getType().getTranslationKey()
-                    + " uuid=" + target.getUuid()
-                    + ", entityPos=" + target.getBlockPos().toShortString()
-                    + ", playerPos=" + playerPos
-                    + ", alive=" + target.isAlive();
-        }
-
-        @Override
-        protected boolean isEqual(Task other) {
-            if (other instanceof ClearBlockingEntityTask task) {
-                return target != null && target.equals(task.target);
-            }
-            return false;
-        }
-
-        @Override
-        protected String toDebugString() {
-            return "Clear blocking entity " + (target == null ? "none" : target.getType().getTranslationKey());
-        }
-
-        private String formatVec(Vec3d vec) {
-            if (vec == null) {
-                return "none";
-            }
-            return String.format(java.util.Locale.ROOT, "%.2f, %.2f, %.2f", vec.x, vec.y, vec.z);
-        }
-    }
 }
