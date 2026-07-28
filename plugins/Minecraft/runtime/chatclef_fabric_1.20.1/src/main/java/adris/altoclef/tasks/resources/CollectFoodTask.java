@@ -2,6 +2,7 @@ package adris.altoclef.tasks.resources;
 
 import adris.altoclef.AltoClef;
 import adris.altoclef.chains.food.FoodCollectionBlacklist;
+import adris.altoclef.chains.food.FoodCollectionPlan;
 import adris.altoclef.chains.food.FoodCollectionTaskSelector;
 import adris.altoclef.chains.food.FoodCollectionTargets;
 import adris.altoclef.chains.food.FoodCookingTaskTracker;
@@ -299,7 +300,7 @@ public class CollectFoodTask extends Task {
     }
 
     private Task selectNextFoodTaskOrNull(AltoClef mod) {
-        Optional<FoodCollectionTaskSelector.Selection> selection = FoodCollectionTaskSelector.select(
+        Optional<FoodCollectionPlan> selection = FoodCollectionTaskSelector.select(
                 mod,
                 COOKABLE_FOODS,
                 ITEMS_TO_PICK_UP,
@@ -310,7 +311,7 @@ public class CollectFoodTask extends Task {
         if (!selection.isPresent()) {
             return null;
         }
-        FoodCollectionTaskSelector.Selection nextFoodTask = selection.get();
+        FoodCollectionPlan nextFoodTask = selection.get();
         setDebugState(nextFoodTask.getDebugState());
         debugLogger.state(nextFoodTask.getStateKey(), nextFoodTask.getDetail());
         if (nextFoodTask.isHunt()) {

@@ -24,7 +24,7 @@ public final class FoodCollectionTaskSelector {
     private FoodCollectionTaskSelector() {
     }
 
-    public static Optional<Selection> select(
+    public static Optional<FoodCollectionPlan> select(
             AltoClef mod,
             FoodCollectionTargets.CookableFoodTarget[] cookableFoods,
             Item[] itemsToPickUp,
@@ -35,7 +35,7 @@ public final class FoodCollectionTaskSelector {
         for (Item item : itemsToPickUp) {
             Task task = FoodCollectionTasks.pickupTaskOrNull(mod, item, debugLogger);
             if (task != null) {
-                return Optional.of(Selection.resource(
+                return Optional.of(FoodCollectionPlan.resource(
                         task,
                         "Picking up Food: " + item.getTranslationKey(),
                         "pickup ready food: item=" + item.getTranslationKey(),
@@ -50,7 +50,7 @@ public final class FoodCollectionTaskSelector {
                 task = FoodCollectionTasks.pickupTaskOrNull(mod, cookable.getCooked(), 40, debugLogger);
             }
             if (task != null) {
-                return Optional.of(Selection.resource(
+                return Optional.of(FoodCollectionPlan.resource(
                         task,
                         "Picking up Cookable food",
                         "pickup cookable food: raw=" + cookable.getRaw().getTranslationKey(),
@@ -63,7 +63,7 @@ public final class FoodCollectionTaskSelector {
 
         Task hayTask = FoodCollectionTasks.pickupBlockTaskOrNull(mod, Blocks.HAY_BLOCK, Items.HAY_BLOCK, 300, debugLogger);
         if (hayTask != null) {
-            return Optional.of(Selection.resource(
+            return Optional.of(FoodCollectionPlan.resource(
                     hayTask,
                     "Collecting Hay",
                     "collect hay",
@@ -75,7 +75,7 @@ public final class FoodCollectionTaskSelector {
             Task task = FoodCollectionTasks.pickupBlockTaskOrNull(mod, crop.cropBlock, crop.cropItem,
                     blockPos -> canHarvestCrop(mod, blockPos), 96, debugLogger);
             if (task != null) {
-                return Optional.of(Selection.resource(
+                return Optional.of(FoodCollectionPlan.resource(
                         task,
                         "Harvesting " + crop.cropItem.getTranslationKey(),
                         "harvest crop: item=" + crop.cropItem.getTranslationKey(),
@@ -88,7 +88,7 @@ public final class FoodCollectionTaskSelector {
         if (huntTarget.isPresent()) {
             Entity entity = huntTarget.get().getEntity();
             Item rawFood = huntTarget.get().getRawFood();
-            return Optional.of(Selection.hunt(
+            return Optional.of(FoodCollectionPlan.hunt(
                     FoodCollectionTasks.killAndLootTask(entity, huntTarget.get().getEntityPredicate(), rawFood),
                     entity,
                     rawFood,
@@ -107,7 +107,7 @@ public final class FoodCollectionTaskSelector {
 
         Task berryTask = FoodCollectionTasks.pickupBlockTaskOrNull(mod, Blocks.SWEET_BERRY_BUSH, Items.SWEET_BERRIES, 96, debugLogger);
         if (berryTask != null) {
-            return Optional.of(Selection.resource(
+            return Optional.of(FoodCollectionPlan.resource(
                     berryTask,
                     "Getting sweet berries (no better foods are present)",
                     "collect sweet berries",
@@ -143,59 +143,5 @@ public final class FoodCollectionTaskSelector {
 
     private static String formatDouble(double value) {
         return String.format(Locale.ROOT, "%.1f", value);
-    }
-
-    public static final class Selection {
-        private final Task task;
-        private final Entity huntEntity;
-        private final Item huntRawFood;
-        private final String debugState;
-        private final String stateKey;
-        private final String detail;
-
-        private Selection(Task task, Entity huntEntity, Item huntRawFood, String debugState, String stateKey, String detail) {
-            this.task = task;
-            this.huntEntity = huntEntity;
-            this.huntRawFood = huntRawFood;
-            this.debugState = debugState;
-            this.stateKey = stateKey;
-            this.detail = detail;
-        }
-
-        private static Selection resource(Task task, String debugState, String stateKey, String detail) {
-            return new Selection(task, null, null, debugState, stateKey, detail);
-        }
-
-        private static Selection hunt(Task task, Entity entity, Item rawFood, String debugState, String stateKey, String detail) {
-            return new Selection(task, entity, rawFood, debugState, stateKey, detail);
-        }
-
-        public Task getTask() {
-            return task;
-        }
-
-        public boolean isHunt() {
-            return huntEntity != null;
-        }
-
-        public Entity getHuntEntity() {
-            return huntEntity;
-        }
-
-        public Item getHuntRawFood() {
-            return huntRawFood;
-        }
-
-        public String getDebugState() {
-            return debugState;
-        }
-
-        public String getStateKey() {
-            return stateKey;
-        }
-
-        public String getDetail() {
-            return detail;
-        }
     }
 }

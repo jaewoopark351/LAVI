@@ -3,12 +3,13 @@ package adris.altoclef.tasks.movement;
 import adris.altoclef.AltoClef;
 import adris.altoclef.Debug;
 import adris.altoclef.multiversion.versionedfields.Blocks;
-import adris.altoclef.tasks.entity.KillEntitiesTask;
+import adris.altoclef.tasks.entity.KillEntityTask;
 import adris.altoclef.tasksystem.ITaskRequiresGrounded;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.helpers.ItemHelper;
 import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.helpers.WorldHelper;
+import adris.altoclef.util.logging.StateChangeLogger;
 import adris.altoclef.util.progresscheck.MovementProgressChecker;
 import adris.altoclef.util.slots.Slot;
 import adris.altoclef.util.time.TimerGame;
@@ -23,18 +24,28 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 
 import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 // TODO improve wandering
 /**
  * Call this when the place you're currently at is bad for some reason and you just wanna get away.
  */
 public class TimeoutWanderTask extends Task implements ITaskRequiresGrounded {
+    private static final double BLOCKING_ENTITY_CLEAR_RANGE = 1.25;
+    private static final double BLOCKING_ENTITY_MAX_CHASE_RANGE = 2.75;
+    private static final double BLOCKING_ENTITY_CLEAR_TIMEOUT_SECONDS = 2.0;
+    private static final int BLOCKING_ENTITY_RETRY_COOLDOWN_TICKS = 20 * 6;
+
     private final MovementProgressChecker stuckCheck = new MovementProgressChecker();
     private final float distanceToWander;
     private final MovementProgressChecker progressChecker = new MovementProgressChecker();
     private final boolean increaseRange;
     private final TimerGame timer = new TimerGame(60);
+    private final StateChangeLogger debugLogger = new StateChangeLogger("TimeoutWanderTask");
+    private final Map<UUID, Integer> blockingEntityRetryCooldowns = new HashMap<>();
     Block[] annoyingBlocks = new Block[]{
             Blocks.VINE,
             Blocks.NETHER_SPROUTS,
@@ -55,6 +66,7 @@ public class TimeoutWanderTask extends Task implements ITaskRequiresGrounded {
     //private DistanceProgressChecker _distanceProgressChecker = new DistanceProgressChecker(10, 0.1f);
     private boolean _forceExplore;
     private Task _unstuckTask = null;
+    private ClearBlockingEntityTask clearBlockingEntityTask = null;
     private int failCounter;
     private double _wanderDistanceExtension;
 
@@ -139,6 +151,12 @@ public class TimeoutWanderTask extends Task implements ITaskRequiresGrounded {
         progressChecker.reset();
         stuckCheck.reset();
         failCounter = 0;
+        clearBlockingEntityTask = null;
+        pruneBlockingEntityRetryCooldowns();
+        debugLogger.event("start: distance=" + distanceToWander
+                + ", increaseRange=" + increaseRange
+                + ", forceExplore=" + _forceExplore
+                + ", origin=" + formatVec(origin));
         ItemStack cursorStack = StorageHelper.getItemStackInCursorSlot();
         if (!cursorStack.isEmpty()) {
             Optional<Slot> moveTo = mod.getItemStorage().getSlotThatCanFitInPlayerInventory(cursorStack, false);
@@ -181,6 +199,24 @@ public class TimeoutWanderTask extends Task implements ITaskRequiresGrounded {
                 mod.getInputControls().release(Input.MOVE_FORWARD);
             }
         }
+        if (clearBlockingEntityTask != null) {
+            if (!clearBlockingEntityTask.isFinished()) {
+                setDebugState("Clearing blocking entity.");
+                return clearBlockingEntityTask;
+            }
+            if (clearBlockingEntityTask.didTimeOut()) {
+                cooldownBlockingEntity(clearBlockingEntityTask.getTargetUuid());
+                debugLogger.event("blocking entity clear timed out: target="
+                        + clearBlockingEntityTask.describeTarget(mod)
+                        + ", cooldownTicks=" + BLOCKING_ENTITY_RETRY_COOLDOWN_TICKS);
+            } else {
+                debugLogger.event("blocking entity clear finished: target="
+                        + clearBlockingEntityTask.describeTarget(mod));
+            }
+            clearBlockingEntityTask = null;
+            progressChecker.reset();
+            stuckCheck.reset();
+        }
         if (_unstuckTask != null && _unstuckTask.isActive() && !_unstuckTask.isFinished() && stuckInBlock(mod) != null) {
             setDebugState("Getting unstuck from block.");
             stuckCheck.reset();
@@ -190,18 +226,23 @@ public class TimeoutWanderTask extends Task implements ITaskRequiresGrounded {
             return _unstuckTask;
         }
         if (!progressChecker.check(mod) || !stuckCheck.check(mod)) {
-            List<Entity> closeEntities = mod.getEntityTracker().getCloseEntities();
-            for (Entity CloseEntities : closeEntities) {
-                if (CloseEntities instanceof MobEntity &&
-                        CloseEntities.getPos().isInRange(mod.getPlayer().getPos(), 1)) {
-                    setDebugState("Killing annoying entity.");
-                    return new KillEntitiesTask(CloseEntities.getClass());
-                }
+            Optional<Entity> blockingEntity = getBlockingEntityToClear(mod);
+            if (blockingEntity.isPresent()) {
+                Entity entity = blockingEntity.get();
+                clearBlockingEntityTask = new ClearBlockingEntityTask(entity, mod.getPlayer().getPos());
+                setDebugState("Clearing blocking entity.");
+                debugLogger.event("clearing blocking entity: target=" + describeEntity(mod, entity)
+                        + ", clearRange=" + BLOCKING_ENTITY_CLEAR_RANGE
+                        + ", maxChaseRange=" + BLOCKING_ENTITY_MAX_CHASE_RANGE
+                        + ", timeoutSeconds=" + BLOCKING_ENTITY_CLEAR_TIMEOUT_SECONDS);
+                return clearBlockingEntityTask;
             }
             BlockPos blockStuck = stuckInBlock(mod);
             if (blockStuck != null) {
                 failCounter++;
                 _unstuckTask = getFenceUnstuckTask();
+                debugLogger.event("stuck in annoying block; shimmy: block=" + blockStuck.toShortString()
+                        + ", failCounter=" + failCounter);
                 return _unstuckTask;
             }
             stuckCheck.reset();
@@ -229,6 +270,9 @@ public class TimeoutWanderTask extends Task implements ITaskRequiresGrounded {
             if (!_forceExplore) {
                 failCounter++;
                 Debug.logMessage("Failed exploring.");
+                debugLogger.event("explore progress failed: failCounter=" + failCounter
+                        + ", origin=" + formatVec(origin)
+                        + ", player=" + formatVec(mod.getPlayer().getPos()));
             }
         }
         return null;
@@ -237,10 +281,13 @@ public class TimeoutWanderTask extends Task implements ITaskRequiresGrounded {
     @Override
     protected void onStop(Task interruptTask) {
         AltoClef.getInstance().getClientBaritone().getPathingBehavior().forceCancel();
+        clearBlockingEntityTask = null;
         if (isFinished()) {
             if (increaseRange) {
                 _wanderDistanceExtension += distanceToWander;
                 Debug.logMessage("Increased wander range");
+                debugLogger.event("increased wander range: extension=" + _wanderDistanceExtension
+                        + ", distance=" + distanceToWander);
             }
         }
     }
@@ -283,5 +330,156 @@ public class TimeoutWanderTask extends Task implements ITaskRequiresGrounded {
     @Override
     protected String toDebugString() {
         return "Wander for " + (distanceToWander + _wanderDistanceExtension) + " blocks";
+    }
+
+    private Optional<Entity> getBlockingEntityToClear(AltoClef mod) {
+        pruneBlockingEntityRetryCooldowns();
+        List<Entity> closeEntities = mod.getEntityTracker().getCloseEntities();
+        for (Entity entity : closeEntities) {
+            if (entity instanceof MobEntity
+                    && entity.isAlive()
+                    && !isBlockingEntityOnCooldown(entity)
+                    && entity.getPos().isInRange(mod.getPlayer().getPos(), BLOCKING_ENTITY_CLEAR_RANGE)) {
+                return Optional.of(entity);
+            }
+        }
+        return Optional.empty();
+    }
+
+    private boolean isBlockingEntityOnCooldown(Entity entity) {
+        return blockingEntityRetryCooldowns.containsKey(entity.getUuid());
+    }
+
+    private void cooldownBlockingEntity(UUID uuid) {
+        if (uuid != null) {
+            blockingEntityRetryCooldowns.put(uuid, WorldHelper.getTicks() + BLOCKING_ENTITY_RETRY_COOLDOWN_TICKS);
+        }
+    }
+
+    private void pruneBlockingEntityRetryCooldowns() {
+        int now = WorldHelper.getTicks();
+        blockingEntityRetryCooldowns.entrySet().removeIf(entry -> entry.getValue() <= now);
+    }
+
+    private String describeEntity(AltoClef mod, Entity entity) {
+        if (entity == null) {
+            return "none";
+        }
+        return entity.getType().getTranslationKey()
+                + " uuid=" + entity.getUuid()
+                + ", entityPos=" + entity.getBlockPos().toShortString()
+                + ", playerPos=" + mod.getPlayer().getBlockPos().toShortString()
+                + ", distance=" + String.format(java.util.Locale.ROOT, "%.2f", entity.distanceTo(mod.getPlayer()));
+    }
+
+    private String formatVec(Vec3d vec) {
+        if (vec == null) {
+            return "none";
+        }
+        return String.format(java.util.Locale.ROOT, "%.2f, %.2f, %.2f", vec.x, vec.y, vec.z);
+    }
+
+    //20260728_kpopmodder: Keep local obstacle removal bounded so recovery does not turn into animal hunting.
+    private static class ClearBlockingEntityTask extends Task {
+        private final Entity target;
+        private final Vec3d origin;
+        private final TimerGame timeout = new TimerGame(BLOCKING_ENTITY_CLEAR_TIMEOUT_SECONDS);
+        private final StateChangeLogger debugLogger = new StateChangeLogger("ClearBlockingEntityTask");
+        private boolean finished;
+        private boolean timedOut;
+
+        private ClearBlockingEntityTask(Entity target, Vec3d origin) {
+            this.target = target;
+            this.origin = origin;
+        }
+
+        @Override
+        protected void onStart() {
+            timeout.reset();
+            finished = false;
+            timedOut = false;
+            debugLogger.event("start: target=" + describeTarget(AltoClef.getInstance())
+                    + ", origin=" + formatVec(origin));
+        }
+
+        @Override
+        protected Task onTick() {
+            AltoClef mod = AltoClef.getInstance();
+            if (target == null || !target.isAlive()) {
+                finished = true;
+                debugLogger.event("finished: target gone");
+                return null;
+            }
+            if (!target.getPos().isInRange(mod.getPlayer().getPos(), BLOCKING_ENTITY_MAX_CHASE_RANGE)) {
+                finished = true;
+                debugLogger.event("finished: target no longer blocking: " + describeTarget(mod));
+                return null;
+            }
+            if (!target.getPos().isInRange(origin, BLOCKING_ENTITY_MAX_CHASE_RANGE + 1.0)) {
+                finished = true;
+                debugLogger.event("finished: target left local recovery area: " + describeTarget(mod));
+                return null;
+            }
+            if (timeout.elapsed()) {
+                timedOut = true;
+                finished = true;
+                debugLogger.event("timed out: " + describeTarget(mod));
+                return null;
+            }
+
+            setDebugState("Clearing " + target.getType().getTranslationKey());
+            return new KillEntityTask(target, 0, BLOCKING_ENTITY_MAX_CHASE_RANGE, 0);
+        }
+
+        @Override
+        protected void onStop(Task interruptTask) {
+        }
+
+        @Override
+        public boolean isFinished() {
+            return finished;
+        }
+
+        private boolean didTimeOut() {
+            return timedOut;
+        }
+
+        private UUID getTargetUuid() {
+            return target == null ? null : target.getUuid();
+        }
+
+        private String describeTarget(AltoClef mod) {
+            if (target == null) {
+                return "none";
+            }
+            String playerPos = mod == null || mod.getPlayer() == null
+                    ? "unknown"
+                    : mod.getPlayer().getBlockPos().toShortString();
+            return target.getType().getTranslationKey()
+                    + " uuid=" + target.getUuid()
+                    + ", entityPos=" + target.getBlockPos().toShortString()
+                    + ", playerPos=" + playerPos
+                    + ", alive=" + target.isAlive();
+        }
+
+        @Override
+        protected boolean isEqual(Task other) {
+            if (other instanceof ClearBlockingEntityTask task) {
+                return target != null && target.equals(task.target);
+            }
+            return false;
+        }
+
+        @Override
+        protected String toDebugString() {
+            return "Clear blocking entity " + (target == null ? "none" : target.getType().getTranslationKey());
+        }
+
+        private String formatVec(Vec3d vec) {
+            if (vec == null) {
+                return "none";
+            }
+            return String.format(java.util.Locale.ROOT, "%.2f, %.2f, %.2f", vec.x, vec.y, vec.z);
+        }
     }
 }

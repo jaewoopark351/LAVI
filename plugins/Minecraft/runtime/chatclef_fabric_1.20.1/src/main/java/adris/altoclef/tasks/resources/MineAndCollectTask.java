@@ -175,6 +175,8 @@ public class MineAndCollectTask extends ResourceTask {
         private static final int ACTIVE_PICKUP_CONTINUATION_TICKS = 20 * 2;
         private static final double DROPPED_ITEM_PICKUP_GRACE_RANGE = 16;
 
+        private static final PickupContinuationGoal PICKUP_CONTINUATION_GOAL = new PickupContinuationGoal();
+
         private final Block[] _blocks;
         private final ItemTarget[] _targets;
         private final TemporaryBlockBlacklist temporaryBlockBlacklist = new TemporaryBlockBlacklist();
@@ -195,6 +197,8 @@ public class MineAndCollectTask extends ResourceTask {
         private int pickupContinuationPreferredCount = 0;
         private int interactionPausedDropPreferredCount = 0;
         private int miningTargetSwitchCount = 0;
+        private int miningTargetRetainCount = 0;
+        private int miningTargetReleaseCount = 0;
         private int pickupTargetSwitchCount = 0;
         private int temporaryMiningSkipCount = 0;
         private String lastSelectedGoalKey = "";
@@ -212,6 +216,9 @@ public class MineAndCollectTask extends ResourceTask {
             }
             if (obj instanceof ItemEntity item) {
                 return item.getPos();
+            }
+            if (obj instanceof PickupContinuationGoal) {
+                return pickupContinuationPolicy.activePickupPos(mod.getPlayer().getPos());
             }
             throw new UnsupportedOperationException("Shouldn't try to get the position of object " + obj + " of type " + (obj != null ? obj.getClass().toString() : "(null object)"));
         }
@@ -258,6 +265,43 @@ public class MineAndCollectTask extends ResourceTask {
                                 + ", block=" + closestBlock.getRight().map(BlockPos::toShortString).orElse("none")
                                 + ", ticksRemaining=" + pickupContinuationPolicy.activePickupTicksRemaining());
                 return continuationDrop.map(Object.class::cast);
+            }
+
+            if (pickupContinuationPolicy.shouldContinueActivePickup(isPickupTaskContinuing())) {
+                pickupContinuationPreferredCount++;
+                debugLogger.state("active pickup settling",
+                        "active pickup settling: keeping pickup task alive"
+                                + ", block=" + closestBlock.getRight().map(BlockPos::toShortString).orElse("none")
+                                + ", drop=" + closestDrop.getRight().map(this::describeDrop).orElse("none")
+                                + ", ticksRemaining=" + pickupContinuationPolicy.activePickupTicksRemaining());
+                return Optional.of((Object) PICKUP_CONTINUATION_GOAL);
+            }
+
+            Optional<ItemEntity> currentMiningInterruptDrop = getDropCloserThanCurrentMiningTarget(mod, pos, closestDrop.getRight(), dropSq);
+            if (currentMiningInterruptDrop.isPresent()) {
+                dropPreferredCount++;
+                debugLogger.state("closest drop interrupts mining target " + currentMiningInterruptDrop.get().getUuid(),
+                        "closest dropped item interrupts retained mining target: drop="
+                                + describeDrop(currentMiningInterruptDrop.get())
+                                + ", miningTarget=" + describePos(miningPos)
+                                + ", miningSq=" + formatDouble(currentMiningTargetDistanceSq(pos))
+                                + ", dropSq=" + formatDouble(dropSq));
+                return currentMiningInterruptDrop.map(Object.class::cast);
+            }
+
+            Optional<BlockPos> retainedMiningTarget = getRetainedMiningTarget(mod);
+            if (retainedMiningTarget.isPresent()) {
+                blockPreferredCount++;
+                miningTargetRetainCount++;
+                BlockPos retained = retainedMiningTarget.get();
+                debugLogger.state("retain mining target " + retained.toShortString(),
+                        "retained mining target: current=" + retained.toShortString()
+                                + ", currentSq=" + formatDouble(BlockPosVer.getSquaredDistance(retained, pos))
+                                + ", nearestBlock=" + closestBlock.getRight().map(BlockPos::toShortString).orElse("none")
+                                + ", nearestBlockSq=" + formatDouble(blockSq)
+                                + ", drop=" + closestDrop.getRight().map(this::describeDrop).orElse("none")
+                                + ", dropSq=" + formatDouble(dropSq));
+                return retainedMiningTarget.map(Object.class::cast);
             }
 
             if (dropSq <= blockSq) {
@@ -350,6 +394,14 @@ public class MineAndCollectTask extends ResourceTask {
                 pickupContinuationPolicy.armActivePickup(drop);
                 return _pickupTask;
             }
+            if (obj instanceof PickupContinuationGoal) {
+                recordGoalSelection("drop:active-pickup-continuation", false);
+                debugLogger.state("continue active pickup while drop settles",
+                        "continue active pickup while drop settles: ticksRemaining="
+                                + pickupContinuationPolicy.activePickupTicksRemaining());
+                miningPos = null;
+                return _pickupTask;
+            }
             throw new UnsupportedOperationException("Shouldn't try to get the goal from object " + obj + " of type " + (obj != null ? obj.getClass().toString() : "(null object)"));
         }
 
@@ -358,6 +410,7 @@ public class MineAndCollectTask extends ResourceTask {
             if (obj instanceof BlockPos b) {
                 return mod.getBlockScanner().isBlockAtPosition(b, _blocks)
                         && !temporaryBlockBlacklist.contains(b)
+                        && !mod.getBlockScanner().isUnreachable(b)
                         && WorldHelper.canBreak(b);
             }
             if (obj instanceof ItemEntity drop) {
@@ -368,6 +421,9 @@ public class MineAndCollectTask extends ResourceTask {
                     }
                 }
                 return false;
+            }
+            if (obj instanceof PickupContinuationGoal) {
+                return pickupContinuationPolicy.shouldContinueActivePickup(isPickupTaskContinuing());
             }
             return false;
         }
@@ -396,6 +452,8 @@ public class MineAndCollectTask extends ResourceTask {
                         + ", pickupContinuationPreferredTicks=" + pickupContinuationPreferredCount
                         + ", interactionPausedDropPreferredTicks=" + interactionPausedDropPreferredCount
                         + ", miningTargetSwitches=" + miningTargetSwitchCount
+                        + ", miningTargetRetainedTicks=" + miningTargetRetainCount
+                        + ", miningTargetReleases=" + miningTargetReleaseCount
                         + ", pickupTargetSwitches=" + pickupTargetSwitchCount
                         + ", temporaryMiningSkips=" + temporaryMiningSkipCount
                         + ", lastGoal=" + lastSelectedGoalKey);
@@ -451,8 +509,76 @@ public class MineAndCollectTask extends ResourceTask {
             resetSearch();
         }
 
+        private Optional<BlockPos> getRetainedMiningTarget(AltoClef mod) {
+            if (miningPos == null) {
+                return Optional.empty();
+            }
+
+            String releaseReason = getMiningTargetReleaseReason(mod, miningPos);
+            if (releaseReason != null) {
+                releaseMiningTarget(releaseReason);
+                return Optional.empty();
+            }
+            return Optional.of(miningPos);
+        }
+
+        private Optional<ItemEntity> getDropCloserThanCurrentMiningTarget(AltoClef mod, Vec3d pos, Optional<ItemEntity> closestDrop, double dropSq) {
+            if (miningPos == null || closestDrop.isEmpty() || getMiningTargetReleaseReason(mod, miningPos) != null) {
+                return Optional.empty();
+            }
+            ItemEntity drop = closestDrop.get();
+            if (!isUsableDrop(drop)) {
+                return Optional.empty();
+            }
+            if (dropSq <= currentMiningTargetDistanceSq(pos)) {
+                return Optional.of(drop);
+            }
+            return Optional.empty();
+        }
+
+        private double currentMiningTargetDistanceSq(Vec3d pos) {
+            if (miningPos == null) {
+                return Double.POSITIVE_INFINITY;
+            }
+            return BlockPosVer.getSquaredDistance(miningPos, pos);
+        }
+
+        private String getMiningTargetReleaseReason(AltoClef mod, BlockPos pos) {
+            if (!mod.getBlockScanner().isBlockAtPosition(pos, _blocks)) {
+                return "target block changed";
+            }
+            if (temporaryBlockBlacklist.contains(pos)) {
+                return "target temporarily skipped";
+            }
+            if (mod.getBlockScanner().isUnreachable(pos)) {
+                return "target marked unreachable";
+            }
+            if (!WorldHelper.canBreak(pos)) {
+                return "target cannot be broken";
+            }
+            return null;
+        }
+
+        private void releaseMiningTarget(String reason) {
+            if (miningPos == null) {
+                return;
+            }
+            BlockPos released = miningPos;
+            miningTargetReleaseCount++;
+            debugLogger.state("release mining target " + released.toShortString() + " " + reason,
+                    "released mining target: pos=" + released.toShortString()
+                            + ", reason=" + reason);
+            miningPos = null;
+            miningTargetStartTick = 0;
+            progressChecker.reset();
+        }
+
         private boolean isAllowedMiningCandidate(BlockPos pos) {
             return !temporaryBlockBlacklist.contains(pos);
+        }
+
+        private boolean isUsableDrop(ItemEntity drop) {
+            return drop != null && drop.isAlive() && !drop.getStack().isEmpty();
         }
 
         private String describeDrop(ItemEntity drop) {
@@ -491,6 +617,8 @@ public class MineAndCollectTask extends ResourceTask {
                     + pickupContinuationPreferredCount
                     + interactionPausedDropPreferredCount
                     + miningTargetSwitchCount
+                    + miningTargetRetainCount
+                    + miningTargetReleaseCount
                     + pickupTargetSwitchCount
                     + temporaryMiningSkipCount > 0;
         }
@@ -502,9 +630,15 @@ public class MineAndCollectTask extends ResourceTask {
             pickupContinuationPreferredCount = 0;
             interactionPausedDropPreferredCount = 0;
             miningTargetSwitchCount = 0;
+            miningTargetRetainCount = 0;
+            miningTargetReleaseCount = 0;
             pickupTargetSwitchCount = 0;
             temporaryMiningSkipCount = 0;
             lastSelectedGoalKey = "";
+        }
+
+        //20260728_kpopmodder: Sentinel goal keeps active pickup alive briefly while item entities settle.
+        private static class PickupContinuationGoal {
         }
 
         //20260727_kpopmodder: Keep per-task block cooldown bookkeeping separate from mining candidate selection.
@@ -540,6 +674,7 @@ public class MineAndCollectTask extends ResourceTask {
             private int miningGraceUntilTick;
             private int activePickupUntilTick;
             private BlockPos miningOrigin;
+            private Vec3d activePickupPos;
 
             private PickupContinuationPolicy(int miningGraceTicks, int activePickupTicks, double maxDistance) {
                 this.miningGraceTicks = miningGraceTicks;
@@ -556,6 +691,7 @@ public class MineAndCollectTask extends ResourceTask {
             private void armActivePickup(ItemEntity drop) {
                 if (isUsableDrop(drop)) {
                     activePickupUntilTick = WorldHelper.getTicks() + activePickupTicks;
+                    activePickupPos = drop.getPos();
                 }
             }
 
@@ -590,6 +726,15 @@ public class MineAndCollectTask extends ResourceTask {
                 return Optional.of(drop);
             }
 
+            private boolean shouldContinueActivePickup(boolean pickupTaskContinuing) {
+                pruneExpired();
+                return pickupTaskContinuing && activePickupUntilTick > WorldHelper.getTicks();
+            }
+
+            private Vec3d activePickupPos(Vec3d fallback) {
+                return activePickupPos == null ? fallback : activePickupPos;
+            }
+
             private int miningGraceTicksRemaining() {
                 return Math.max(0, miningGraceUntilTick - WorldHelper.getTicks());
             }
@@ -606,6 +751,7 @@ public class MineAndCollectTask extends ResourceTask {
                 }
                 if (activePickupUntilTick > 0 && currentTick > activePickupUntilTick) {
                     activePickupUntilTick = 0;
+                    activePickupPos = null;
                 }
             }
 
@@ -613,6 +759,7 @@ public class MineAndCollectTask extends ResourceTask {
                 miningOrigin = null;
                 miningGraceUntilTick = 0;
                 activePickupUntilTick = 0;
+                activePickupPos = null;
             }
 
             private boolean isUsableDrop(ItemEntity drop) {
