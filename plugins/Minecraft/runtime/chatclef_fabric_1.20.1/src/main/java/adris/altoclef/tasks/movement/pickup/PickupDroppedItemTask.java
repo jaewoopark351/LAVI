@@ -434,7 +434,13 @@ public class PickupDroppedItemTask extends AbstractDoToClosestObjectTask<ItemEnt
             mod.getEntityTracker().requestEntityUnreachable(abandonedDrop);
             pickupDiagnostics.blacklistCount++;
         }
-        if (isConsumedOrRemovedDrop(reason, blacklistEntity, abandonedDropSnapshot)) {
+        PickupDropReleaseClassification releaseClassification = PickupDropReleaseClassification.classify(
+                reason,
+                blacklistEntity,
+                currentDropRetention.hasFailure(),
+                abandonedDropSnapshot
+        );
+        if (releaseClassification.isConsumedOrRemoved()) {
             pickupDiagnostics.consumedOrRemovedCount++;
             pickupLogger.debugState("drop consumed or removed " + abandonedDrop.getUuid() + " " + reason,
                     "pickup drop consumed/removed: reason=" + reason
@@ -458,13 +464,6 @@ public class PickupDroppedItemTask extends AbstractDoToClosestObjectTask<ItemEnt
         currentDropRetention.resetFailure();
         currentDropRetention.resetLock();
         resetSearch();
-    }
-
-    private boolean isConsumedOrRemovedDrop(String reason, boolean blacklistEntity, DropSnapshot snapshot) {
-        return !blacklistEntity
-                && !currentDropRetention.hasFailure()
-                && snapshot != null
-                && ("target removed".equals(reason) || "stack empty".equals(reason));
     }
 
     private void resetPickupDiagnostics() {
