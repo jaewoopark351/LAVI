@@ -44,6 +44,7 @@ public class PickupDroppedItemTask extends AbstractDoToClosestObjectTask<ItemEnt
 
     // This happens all the time in mineshafts and swamps/jungles
     private final Set<ItemEntity> _blacklist = new HashSet<>();
+    private final PickupDropSelector dropSelector;
     private final boolean _freeInventoryIfFull;
     private Task unstuckTask = null;
     // Am starting to regret not making this a singleton
@@ -61,6 +62,7 @@ public class PickupDroppedItemTask extends AbstractDoToClosestObjectTask<ItemEnt
 
     public PickupDroppedItemTask(ItemTarget[] itemTargets, boolean freeInventoryIfFull) {
         this.itemTargets = itemTargets;
+        dropSelector = new PickupDropSelector(itemTargets, _blacklist);
         _freeInventoryIfFull = freeInventoryIfFull;
     }
 
@@ -249,16 +251,14 @@ public class PickupDroppedItemTask extends AbstractDoToClosestObjectTask<ItemEnt
             }
             abandonCurrentDrop(mod, releaseReason, "target unreachable after retry grace".equals(releaseReason));
         }
-        Optional<ItemEntity> closest = mod.getEntityTracker().getClosestItemDrop(
-                pos,
-                itemTargets);
-        closest.ifPresent(drop -> {
+        PickupDropSelection selection = dropSelector.selectClosest(mod, pos);
+        selection.drop().ifPresent(drop -> {
             pickupDiagnostics.candidateCount++;
             updateCurrentDropSnapshotIfUseful(drop);
             pickupLogger.state("candidate drop " + drop.getUuid(),
                     "candidate drop selected by tracker: " + describeDrop(mod, drop));
         });
-        return closest;
+        return selection.drop();
     }
 
     @Override
@@ -310,11 +310,7 @@ public class PickupDroppedItemTask extends AbstractDoToClosestObjectTask<ItemEnt
         if (obj != null && obj.equals(_currentDrop)) {
             return getCurrentDropNonRetryReleaseReason(mod) == null;
         }
-        return obj.isAlive()
-                && !obj.getStack().isEmpty()
-                && matchesTargets(obj)
-                && !_blacklist.contains(obj)
-                && mod.getEntityTracker().isEntityReachable(obj);
+        return dropSelector.isSelectable(mod, obj);
     }
 
     private boolean shouldRetryCurrentDrop(AltoClef mod, String reason) {
@@ -387,7 +383,7 @@ public class PickupDroppedItemTask extends AbstractDoToClosestObjectTask<ItemEnt
         if (_currentDrop.getStack().isEmpty()) {
             return "stack empty";
         }
-        if (!matchesTargets(_currentDrop)) {
+        if (!dropSelector.matchesTargets(_currentDrop)) {
             return "current item no longer matches target";
         }
         if (_blacklist.contains(_currentDrop)) {
@@ -492,19 +488,6 @@ public class PickupDroppedItemTask extends AbstractDoToClosestObjectTask<ItemEnt
         if (nextSnapshot != null) {
             currentDropSnapshot = nextSnapshot;
         }
-    }
-
-    private boolean matchesTargets(ItemEntity drop) {
-        if (drop == null || drop.getStack().isEmpty()) {
-            return false;
-        }
-        Item item = drop.getStack().getItem();
-        for (ItemTarget target : itemTargets) {
-            if (target != null && target.matches(item)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private String describeDrop(AltoClef mod, ItemEntity drop) {
