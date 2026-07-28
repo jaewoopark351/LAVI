@@ -40,11 +40,13 @@ public abstract class CustomBaritoneGoalTask extends Task implements ITaskRequir
     private static final double BLOCKING_ENTITY_MIN_PROGRESS_SQ = 0.08 * 0.08;
     private static final int BLOCKING_ENTITY_STUCK_TICKS = 20 * 2;
     private static final int BLOCKING_ENTITY_RETRY_COOLDOWN_TICKS = 20 * 6;
+    private static final int TERRAIN_ESCAPE_RETRY_COOLDOWN_TICKS = 20 * 8;
 
     private final Task wanderTask = new TimeoutWanderTask(5, true);
     private final MovementProgressChecker stuckCheck = new MovementProgressChecker();
     private final StateChangeLogger debugLogger = new StateChangeLogger("CustomBaritoneGoalTask");
     private final Map<UUID, Integer> blockingEntityRetryCooldowns = new HashMap<>();
+    private final Map<BlockPos, Integer> terrainEscapeRetryCooldowns = new HashMap<>();
     private final boolean wander;
     protected MovementProgressChecker checker = new MovementProgressChecker();
     protected Goal cachedGoal = null;
@@ -66,6 +68,7 @@ public abstract class CustomBaritoneGoalTask extends Task implements ITaskRequir
     };
     private Task unstuckTask = null;
     private ClearBlockingEntityTask clearBlockingEntityTask = null;
+    private LocalTerrainEscapeTask localTerrainEscapeTask = null;
     private Vec3d lastBlockingProgressPos = null;
     private int lastBlockingProgressTick = 0;
 
@@ -132,12 +135,14 @@ public abstract class CustomBaritoneGoalTask extends Task implements ITaskRequir
         checker.reset();
         stuckCheck.reset();
         clearBlockingEntityTask = null;
+        localTerrainEscapeTask = null;
         AltoClef mod = AltoClef.getInstance();
         if (mod.getPlayer() != null) {
             lastBlockingProgressPos = mod.getPlayer().getPos();
             lastBlockingProgressTick = WorldHelper.getTicks();
         }
         pruneBlockingEntityRetryCooldowns();
+        pruneTerrainEscapeRetryCooldowns();
     }
 
     @Override
@@ -203,6 +208,41 @@ public abstract class CustomBaritoneGoalTask extends Task implements ITaskRequir
                     + ", maxChaseRange=" + BLOCKING_ENTITY_MAX_CHASE_RANGE
                     + ", timeoutSeconds=" + BLOCKING_ENTITY_CLEAR_TIMEOUT_SECONDS);
             return clearBlockingEntityTask;
+        }
+        if (localTerrainEscapeTask != null) {
+            if (!localTerrainEscapeTask.isFinished()) {
+                setDebugState("Clearing local terrain escape route.");
+                mod.getClientBaritone().getCustomGoalProcess().onLostControl();
+                mod.getClientBaritone().getExploreProcess().onLostControl();
+                return localTerrainEscapeTask;
+            }
+            if (localTerrainEscapeTask.didTimeOut()) {
+                cooldownTerrainEscape(localTerrainEscapeTask.getOrigin());
+                debugLogger.event("local terrain escape timed out: "
+                        + localTerrainEscapeTask.describePlan()
+                        + ", task=" + toDebugString()
+                        + ", cooldownTicks=" + TERRAIN_ESCAPE_RETRY_COOLDOWN_TICKS);
+            } else {
+                debugLogger.event("local terrain escape finished: "
+                        + localTerrainEscapeTask.describePlan()
+                        + ", task=" + toDebugString());
+            }
+            localTerrainEscapeTask = null;
+            resetBlockingEntityProgress(mod);
+            checker.reset();
+            stuckCheck.reset();
+        }
+        Optional<LocalTerrainEscapeTask.Plan> terrainEscapePlan = getTerrainEscapePlan(mod);
+        if (terrainEscapePlan.isPresent()) {
+            localTerrainEscapeTask = new LocalTerrainEscapeTask(terrainEscapePlan.get(), toDebugString());
+            setDebugState("Clearing local terrain escape route.");
+            mod.getClientBaritone().getPathingBehavior().forceCancel();
+            mod.getClientBaritone().getCustomGoalProcess().onLostControl();
+            mod.getClientBaritone().getExploreProcess().onLostControl();
+            debugLogger.event("starting local terrain escape during goal: "
+                    + terrainEscapePlan.get().describe()
+                    + ", task=" + toDebugString());
+            return localTerrainEscapeTask;
         }
         if (unstuckTask != null && unstuckTask.isActive() && !unstuckTask.isFinished() && stuckInBlock(mod) != null) {
             setDebugState("Getting unstuck from block.");
@@ -280,6 +320,14 @@ public abstract class CustomBaritoneGoalTask extends Task implements ITaskRequir
             }
         }
         return Optional.empty();
+    }
+
+    private Optional<LocalTerrainEscapeTask.Plan> getTerrainEscapePlan(AltoClef mod) {
+        pruneTerrainEscapeRetryCooldowns();
+        if (!isLocallyStalled(mod)) {
+            return Optional.empty();
+        }
+        return LocalTerrainEscapeTask.findPlan(mod, terrainEscapeRetryCooldowns.keySet());
     }
 
     private boolean isLocallyStalled(AltoClef mod) {
@@ -361,6 +409,17 @@ public abstract class CustomBaritoneGoalTask extends Task implements ITaskRequir
     private void pruneBlockingEntityRetryCooldowns() {
         int now = WorldHelper.getTicks();
         blockingEntityRetryCooldowns.entrySet().removeIf(entry -> entry.getValue() <= now);
+    }
+
+    private void cooldownTerrainEscape(BlockPos origin) {
+        if (origin != null) {
+            terrainEscapeRetryCooldowns.put(origin, WorldHelper.getTicks() + TERRAIN_ESCAPE_RETRY_COOLDOWN_TICKS);
+        }
+    }
+
+    private void pruneTerrainEscapeRetryCooldowns() {
+        int now = WorldHelper.getTicks();
+        terrainEscapeRetryCooldowns.entrySet().removeIf(entry -> entry.getValue() <= now);
     }
 
     private String describeEntity(AltoClef mod, Entity entity) {
