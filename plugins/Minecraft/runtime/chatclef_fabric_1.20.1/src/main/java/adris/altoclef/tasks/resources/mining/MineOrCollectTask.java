@@ -2,7 +2,6 @@ package adris.altoclef.tasks.resources.mining;
 
 import adris.altoclef.AltoClef;
 import adris.altoclef.Debug;
-import adris.altoclef.multiversion.blockpos.BlockPosVer;
 import adris.altoclef.tasks.AbstractDoToClosestObjectTask;
 import adris.altoclef.tasks.construction.DestroyBlockTask;
 import adris.altoclef.tasksystem.Task;
@@ -17,7 +16,6 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 
 import java.util.Arrays;
-import java.util.Locale;
 import java.util.Optional;
 import java.util.function.Predicate;
 
@@ -30,6 +28,7 @@ public class MineOrCollectTask extends AbstractDoToClosestObjectTask<Object> {
     private final MiningTargetTracker miningTargetTracker;
     private final MineOrCollectDiagnostics diagnostics = new MineOrCollectDiagnostics();
     private final StateChangeLogger debugLogger = new StateChangeLogger("MineOrCollectTask");
+    private final MiningChoiceLogger choiceLogger = new MiningChoiceLogger(diagnostics, debugLogger, this::describeDrop);
     private final MiningPickupCoordinator pickupCoordinator;
 
     public MineOrCollectTask(Block[] blocks, ItemTarget[] targets) {
@@ -64,16 +63,24 @@ public class MineOrCollectTask extends AbstractDoToClosestObjectTask<Object> {
         Pair<Double, Optional<BlockPos>> closestBlock = getClosestBlock(mod, pos, miningTargetTracker::isAllowedCandidate, _blocks);
         Pair<Double, Optional<ItemEntity>> closestDrop = getClosestItemDrop(mod, pos, _targets);
 
+        MiningTargetChoice choice = chooseTarget(mod, pos, closestBlock, closestDrop);
+        return choice.target();
+    }
+
+    private MiningTargetChoice chooseTarget(AltoClef mod,
+                                            Vec3d pos,
+                                            Pair<Double, Optional<BlockPos>> closestBlock,
+                                            Pair<Double, Optional<ItemEntity>> closestDrop) {
         double blockSq = closestBlock.getLeft();
         double dropSq = closestDrop.getLeft();
 
         // We can't mine right now.
         if (mod.getExtraBaritoneSettings().isInteractionPaused()) {
-            diagnostics.recordInteractionPausedDropPreferred();
-            debugLogger.state("interaction paused; prefer dropped item: drop=" + closestDrop.getRight().map(this::describeDrop).orElse("none")
-                    + ", block=" + closestBlock.getRight().map(BlockPos::toShortString).orElse("none")
-                    + ", skippedBlocks=" + miningTargetTracker.skippedBlockCount());
-            return closestDrop.getRight().map(Object.class::cast);
+            return choiceLogger.interactionPausedDropPreferred(
+                    closestDrop.getRight(),
+                    closestBlock.getRight(),
+                    miningTargetTracker.skippedBlockCount()
+            );
         }
 
         Optional<Object> pickupTarget = pickupCoordinator.getPreferredTarget(
@@ -83,65 +90,55 @@ public class MineOrCollectTask extends AbstractDoToClosestObjectTask<Object> {
                 pos
         );
         if (pickupTarget.isPresent()) {
-            return pickupTarget;
+            return choiceLogger.pickupCoordinatorPreferred(pickupTarget.get());
         }
 
         Optional<ItemEntity> currentMiningInterruptDrop = miningTargetTracker.getDropCloserThanCurrentTarget(mod, pos, closestDrop.getRight(), dropSq);
         if (currentMiningInterruptDrop.isPresent()) {
-            diagnostics.recordDropPreferred();
-            debugLogger.state("closest drop interrupts mining target " + currentMiningInterruptDrop.get().getUuid(),
-                    "closest dropped item interrupts retained mining target: drop="
-                            + describeDrop(currentMiningInterruptDrop.get())
-                            + ", miningTarget=" + describePos(miningTargetTracker.miningPos())
-                            + ", miningSq=" + formatDouble(miningTargetTracker.currentTargetDistanceSq(pos))
-                            + ", dropSq=" + formatDouble(dropSq));
-            return currentMiningInterruptDrop.map(Object.class::cast);
+            return choiceLogger.dropInterruptsMiningTarget(
+                    currentMiningInterruptDrop.get(),
+                    miningTargetTracker,
+                    pos,
+                    dropSq
+            );
         }
 
         Optional<BlockPos> retainedMiningTarget = miningTargetTracker.retainOrRelease(mod, this::handleMiningTargetRelease);
         if (retainedMiningTarget.isPresent()) {
-            diagnostics.recordBlockPreferred();
-            diagnostics.recordMiningTargetRetained();
-            BlockPos retained = retainedMiningTarget.get();
-            debugLogger.state("retain mining target " + retained.toShortString(),
-                    "retained mining target: current=" + retained.toShortString()
-                            + ", currentSq=" + formatDouble(BlockPosVer.getSquaredDistance(retained, pos))
-                            + ", nearestBlock=" + closestBlock.getRight().map(BlockPos::toShortString).orElse("none")
-                            + ", nearestBlockSq=" + formatDouble(blockSq)
-                            + ", drop=" + closestDrop.getRight().map(this::describeDrop).orElse("none")
-                            + ", dropSq=" + formatDouble(dropSq));
-            return retainedMiningTarget.map(Object.class::cast);
+            return choiceLogger.retainMiningTarget(
+                    retainedMiningTarget.get(),
+                    closestBlock.getRight(),
+                    blockSq,
+                    closestDrop.getRight(),
+                    dropSq,
+                    pos
+            );
         }
 
         Optional<BlockPos> localMiningTarget = localMiningSessionPolicy.getPreferredLocalBlock(mod, pos, miningTargetTracker::isAllowedCandidate, _blocks);
         if (localMiningTarget.isPresent()) {
-            BlockPos local = localMiningTarget.get();
-            diagnostics.recordBlockPreferred();
-            diagnostics.recordLocalMiningPreferred();
-            debugLogger.state("local mining session prefers block " + local.toShortString(),
-                    "local mining session prefers block: block=" + local.toShortString()
-                            + ", anchor=" + localMiningSessionPolicy.describeAnchor()
-                            + ", ticksRemaining=" + localMiningSessionPolicy.ticksRemaining()
-                            + ", drop=" + closestDrop.getRight().map(this::describeDrop).orElse("none")
-                            + ", dropSq=" + formatDouble(dropSq));
-            return localMiningTarget.map(Object.class::cast);
+            return choiceLogger.localMiningTarget(
+                    localMiningTarget.get(),
+                    localMiningSessionPolicy,
+                    closestDrop.getRight(),
+                    dropSq
+            );
         }
 
         if (dropSq <= blockSq) {
-            diagnostics.recordDropPreferred();
-            debugLogger.state("closest target is dropped item: drop=" + closestDrop.getRight().map(this::describeDrop).orElse("none")
-                    + ", dropSq=" + formatDouble(dropSq)
-                    + ", blockSq=" + formatDouble(blockSq)
-                    + ", skippedBlocks=" + miningTargetTracker.skippedBlockCount());
-            return closestDrop.getRight().map(Object.class::cast);
-        } else {
-            diagnostics.recordBlockPreferred();
-            debugLogger.state("closest target is block: block=" + closestBlock.getRight().map(BlockPos::toShortString).orElse("none")
-                    + ", blockSq=" + formatDouble(blockSq)
-                    + ", dropSq=" + formatDouble(dropSq)
-                    + ", skippedBlocks=" + miningTargetTracker.skippedBlockCount());
-            return closestBlock.getRight().map(Object.class::cast);
+            return choiceLogger.closestDrop(
+                    closestDrop.getRight(),
+                    dropSq,
+                    blockSq,
+                    miningTargetTracker.skippedBlockCount()
+            );
         }
+        return choiceLogger.closestBlock(
+                closestBlock.getRight(),
+                blockSq,
+                dropSq,
+                miningTargetTracker.skippedBlockCount()
+        );
     }
 
     public static Pair<Double, Optional<ItemEntity>> getClosestItemDrop(AltoClef mod, Vec3d pos, ItemTarget... items) {
@@ -178,8 +175,7 @@ public class MineOrCollectTask extends AbstractDoToClosestObjectTask<Object> {
         if (obj instanceof BlockPos newPos) {
             if (miningTargetTracker.selectMiningTarget(newPos)) {
                 diagnostics.recordGoalSelection("block:" + newPos.toShortString(), true);
-                debugLogger.state("new mining target: pos=" + newPos.toShortString()
-                        + ", timeoutTicks=" + miningTargetTracker.targetTimeoutTicks());
+                choiceLogger.newMiningTarget(newPos, miningTargetTracker.targetTimeoutTicks());
             }
             localMiningSessionPolicy.armAfterMiningTarget(newPos, AltoClef.getInstance());
             pickupCoordinator.armAfterMining(newPos);
@@ -312,12 +308,5 @@ public class MineOrCollectTask extends AbstractDoToClosestObjectTask<Object> {
 
     private String describePos(BlockPos pos) {
         return pos == null ? "none" : pos.toShortString();
-    }
-
-    private String formatDouble(double value) {
-        if (Double.isInfinite(value)) {
-            return "infinity";
-        }
-        return String.format(Locale.ROOT, "%.1f", value);
     }
 }
