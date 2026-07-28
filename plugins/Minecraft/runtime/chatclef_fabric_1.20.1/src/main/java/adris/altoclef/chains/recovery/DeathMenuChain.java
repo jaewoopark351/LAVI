@@ -1,4 +1,4 @@
-package adris.altoclef.chains;
+package adris.altoclef.chains.recovery;
 
 import adris.altoclef.AltoClef;
 import adris.altoclef.Debug;

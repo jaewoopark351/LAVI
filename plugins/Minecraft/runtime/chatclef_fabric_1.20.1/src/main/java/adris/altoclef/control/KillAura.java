@@ -1,7 +1,7 @@
 package adris.altoclef.control;
 
 import adris.altoclef.AltoClef;
-import adris.altoclef.chains.MobDefenseChain;
+import adris.altoclef.chains.defense.MobDefenseChain;
 import adris.altoclef.multiversion.versionedfields.Entities;
 import adris.altoclef.multiversion.item.ItemVer;
 import adris.altoclef.util.helpers.LookHelper;

@@ -8,7 +8,6 @@ import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.compat.CarryOnCompat;
 import adris.altoclef.util.helpers.LookHelper;
 import adris.altoclef.util.helpers.StorageHelper;
-import adris.altoclef.util.helpers.WorldHelper;
 import adris.altoclef.util.logging.StateChangeLogger;
 import baritone.api.utils.Rotation;
 import net.minecraft.block.Block;
@@ -22,16 +21,20 @@ import net.minecraft.util.math.BlockPos;
 import org.apache.commons.lang3.ArrayUtils;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 
 //20260728_kpopmodder: Added this task to place blocks carried by the Carry On mod before normal item-crafting fallback starts.
 public class PlaceCarriedBlockTask extends Task {
 
     private static final int MAX_TICKS = 20 * 10;
-    private static final int CLICK_INTERVAL_TICKS = 6;
+    private static final int CLICK_INTERVAL_TICKS = 2;
+    private static final int MAX_EMPTY_SPACE_CANDIDATES = 8;
 
     private final Block[] expectedBlocks;
     private final CarriedBlockPlacementPlanner planner = new CarriedBlockPlacementPlanner();
+    private final CarryOnEmptySpacePlacementPlanner emptySpacePlanner = new CarryOnEmptySpacePlacementPlanner();
+    private final CarryOnPlacementCandidateCycle targetCycle = new CarryOnPlacementCandidateCycle();
     private final CarryOnPlacementInputController inputController = new CarryOnPlacementInputController();
     private final StateChangeLogger debugLogger = new StateChangeLogger("PlaceCarriedBlockTask");
 
@@ -40,6 +43,7 @@ public class PlaceCarriedBlockTask extends Task {
     private BlockPos placed;
     private boolean completed;
     private boolean failed;
+    private boolean targetFromEmptySpaceFallback;
     private boolean wasCarryingTarget;
     private int noCarryTicks;
     private int ticks;
@@ -69,6 +73,8 @@ public class PlaceCarriedBlockTask extends Task {
         placed = null;
         completed = false;
         failed = false;
+        targetFromEmptySpaceFallback = false;
+        targetCycle.reset();
         wasCarryingTarget = isCarryingTarget(mod);
         noCarryTicks = 0;
         ticks = 0;
@@ -135,30 +141,20 @@ public class PlaceCarriedBlockTask extends Task {
 
         mod.getClientBaritone().getPathingBehavior().forceCancel();
 
-        if (target == null || !planner.isValid(mod, target, carriedState.get())) {
-            target = planner.findNearest(mod, carriedState.get()).orElse(null);
+        if (target == null || !isTargetValid(mod, target, carriedState.get())) {
+            selectPlacementTarget(mod, carriedState.get());
             if (target == null) {
-                setDebugState("Searching placement spot for carried block");
-                debugLogger.state("waiting: no valid nearby placement support for " + describeBlock(carriedState.get().getBlock()));
+                setDebugState("Searching empty placement spot for carried block");
+                debugLogger.state("waiting: no block-empty nearby Carry On placement support for "
+                        + describeBlock(carriedState.get().getBlock()));
                 return null;
             }
-            debugLogger.state("selected carried placement target place=" + target.placePos().toShortString()
-                    + " support=" + target.supportPos().toShortString()
-                    + " face=" + target.supportFace());
         }
 
         setDebugState("Placing carried " + describeBlock(carriedState.get().getBlock())
                 + " at " + target.placePos().toShortString());
 
-        Optional<Rotation> reach = LookHelper.getReach(target.supportPos(), target.supportFace());
-        if (reach.isEmpty()) {
-            debugLogger.state("retry: support no longer reachable at " + target.supportPos().toShortString());
-            target = null;
-            return null;
-        }
-
-        LookHelper.lookAt(reach.get());
-        if (!LookHelper.isLookingAt(mod, reach.get())) {
+        if (!prepareTargetForClick(mod)) {
             return null;
         }
 
@@ -170,6 +166,10 @@ public class PlaceCarriedBlockTask extends Task {
         int nextAttempt = attempts + 1;
         if (inputController.tryShiftRightClickSupport(mod, target, nextAttempt)) {
             attempts = nextAttempt;
+            if (targetCycle.isBlockEmptyFallback()) {
+                targetCycle.advance();
+                target = targetCycle.current();
+            }
         }
         return null;
     }
@@ -221,6 +221,67 @@ public class PlaceCarriedBlockTask extends Task {
         return pos != null && ArrayUtils.contains(expectedBlocks, mod.getWorld().getBlockState(pos).getBlock());
     }
 
+    private void selectPlacementTarget(AltoClef mod, BlockState carriedState) {
+        List<CarriedBlockPlacementPlanner.PlacementTarget> emptySpaceTargets =
+                emptySpacePlanner.findNearestCandidates(mod, carriedState, MAX_EMPTY_SPACE_CANDIDATES);
+        if (!emptySpaceTargets.isEmpty()) {
+            targetCycle.setBlockEmptyFallback(emptySpaceTargets);
+            target = targetCycle.current();
+            targetFromEmptySpaceFallback = true;
+            logSelectedTarget(targetCycle.mode(), targetCycle.size());
+            return;
+        }
+
+        Optional<CarriedBlockPlacementPlanner.PlacementTarget> strictTarget = planner.findNearest(mod, carriedState);
+        if (strictTarget.isPresent()) {
+            targetCycle.setStrict(strictTarget.get());
+            target = targetCycle.current();
+            targetFromEmptySpaceFallback = false;
+            logSelectedTarget(targetCycle.mode(), targetCycle.size());
+            return;
+        }
+
+        targetCycle.reset();
+        target = null;
+        targetFromEmptySpaceFallback = false;
+    }
+
+    private boolean prepareTargetForClick(AltoClef mod) {
+        if (targetFromEmptySpaceFallback) {
+            LookHelper.lookAt(mod, target.supportPos(), target.supportFace());
+            return true;
+        }
+
+        Optional<Rotation> reach = LookHelper.getReach(target.supportPos(), target.supportFace());
+        if (reach.isEmpty()) {
+            debugLogger.state("retry: support no longer reachable at " + target.supportPos().toShortString());
+            target = null;
+            targetCycle.reset();
+            return false;
+        }
+
+        LookHelper.lookAt(reach.get());
+        if (!LookHelper.isLookingAt(mod, reach.get())) {
+            return false;
+        }
+        return true;
+    }
+
+    private boolean isTargetValid(AltoClef mod, CarriedBlockPlacementPlanner.PlacementTarget target, BlockState carriedState) {
+        if (targetFromEmptySpaceFallback) {
+            return emptySpacePlanner.isValid(mod, target, carriedState);
+        }
+        return planner.isValid(mod, target, carriedState);
+    }
+
+    private void logSelectedTarget(String mode, int candidateCount) {
+        debugLogger.state("selected carried placement target mode=" + mode
+                + ", candidates=" + candidateCount
+                + " place=" + target.placePos().toShortString()
+                + " support=" + target.supportPos().toShortString()
+                + " face=" + target.supportFace());
+    }
+
     private String describeExpectedBlocks() {
         return Arrays.stream(expectedBlocks)
                 .map(this::describeBlock)
@@ -238,6 +299,8 @@ public class PlaceCarriedBlockTask extends Task {
         }
         return "place=" + target.placePos().toShortString()
                 + ", support=" + target.supportPos().toShortString()
-                + ", face=" + target.supportFace();
+                + ", face=" + target.supportFace()
+                + ", mode=" + (targetFromEmptySpaceFallback ? targetCycle.mode() : "strict")
+                + ", candidates=" + targetCycle.size();
     }
 }

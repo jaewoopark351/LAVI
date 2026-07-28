@@ -1,4 +1,4 @@
-package adris.altoclef.chains;
+package adris.altoclef.chains.interaction;
 
 import adris.altoclef.AltoClef;
 import adris.altoclef.Debug;

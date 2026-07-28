@@ -1,6 +1,7 @@
-package adris.altoclef.chains;
+package adris.altoclef.chains.survival;
 
 import adris.altoclef.AltoClef;
+import adris.altoclef.chains.SingleTaskChain;
 import adris.altoclef.tasks.DoToClosestBlockTask;
 import adris.altoclef.tasks.interaction.InteractWithBlockTask;
 import adris.altoclef.tasks.construction.PutOutFireTask;

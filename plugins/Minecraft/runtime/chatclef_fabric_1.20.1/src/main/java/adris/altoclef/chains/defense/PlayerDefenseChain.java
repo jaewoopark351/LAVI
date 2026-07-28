@@ -1,4 +1,4 @@
-package adris.altoclef.chains;
+package adris.altoclef.chains.defense;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -6,6 +6,7 @@ import java.util.Set;
 import java.util.Optional;
 
 import adris.altoclef.AltoClef;
+import adris.altoclef.chains.SingleTaskChain;
 import adris.altoclef.eventbus.EventBus;
 import adris.altoclef.eventbus.events.PlayerDamageEvent;
 import adris.altoclef.eventbus.events.EntitySwungEvent;

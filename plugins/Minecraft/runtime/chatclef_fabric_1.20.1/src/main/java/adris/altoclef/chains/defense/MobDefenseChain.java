@@ -1,7 +1,8 @@
-package adris.altoclef.chains;
+package adris.altoclef.chains.defense;
 
 import adris.altoclef.AltoClef;
 import adris.altoclef.Debug;
+import adris.altoclef.chains.SingleTaskChain;
 import adris.altoclef.control.KillAura;
 import adris.altoclef.multiversion.versionedfields.Entities;
 import adris.altoclef.multiversion.item.ItemVer;

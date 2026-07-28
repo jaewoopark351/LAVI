@@ -8,6 +8,7 @@ import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.hit.HitResult;
+import net.minecraft.util.math.Vec3d;
 
 //20260728_kpopmodder: Added this controller to isolate Carry On's sneak-right-click placement input sequence.
 public final class CarryOnPlacementInputController {
@@ -52,13 +53,17 @@ public final class CarryOnPlacementInputController {
         }
 
         HitResult hitResult = client.crosshairTarget;
-        if (!(hitResult instanceof BlockHitResult blockHitResult)
-                || !blockHitResult.getBlockPos().equals(target.supportPos())
-                || blockHitResult.getSide() != target.supportFace()) {
+        boolean usingCrosshairTarget = hitResult instanceof BlockHitResult crosshairBlockHit
+                && crosshairBlockHit.getBlockPos().equals(target.supportPos())
+                && crosshairBlockHit.getSide() == target.supportFace();
+        BlockHitResult blockHitResult = usingCrosshairTarget
+                ? (BlockHitResult) hitResult
+                : createDirectSupportHit(target);
+
+        if (!usingCrosshairTarget) {
             debugLogger.state("waiting-crosshair",
-                    "waiting: crosshair has not reached Carry On support target=" + target.supportPos().toShortString()
+                    "using direct Carry On support hit because crosshair is not exact: support=" + target.supportPos().toShortString()
                             + " face=" + target.supportFace());
-            return false;
         }
 
         ActionResult result = client.interactionManager.interactBlock(mod.getPlayer(), Hand.MAIN_HAND, blockHitResult);
@@ -66,6 +71,7 @@ public final class CarryOnPlacementInputController {
         if (shouldLogAttempt(attempt)) {
             debugLogger.event("shift-right-click carried block attempt=" + attempt
                     + ", result=" + result
+                    + ", hitSource=" + (usingCrosshairTarget ? "crosshair" : "direct")
                     + ", playerSneaking=" + mod.getPlayer().isSneaking()
                     + ", inputSneaking=" + mod.getPlayer().input.sneaking
                     + ", support=" + target.supportPos().toShortString()
@@ -73,6 +79,14 @@ public final class CarryOnPlacementInputController {
                     + ", place=" + target.placePos().toShortString());
         }
         return true;
+    }
+
+    private BlockHitResult createDirectSupportHit(CarriedBlockPlacementPlanner.PlacementTarget target) {
+        Vec3d hitPos = Vec3d.ofCenter(target.supportPos()).add(
+                target.supportFace().getOffsetX() * 0.5,
+                target.supportFace().getOffsetY() * 0.5,
+                target.supportFace().getOffsetZ() * 0.5);
+        return new BlockHitResult(hitPos, target.supportFace(), target.supportPos(), false);
     }
 
     private void holdSneak(AltoClef mod) {

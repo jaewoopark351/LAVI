@@ -1,6 +1,7 @@
-package adris.altoclef.chains;
+package adris.altoclef.chains.equipment;
 
 import adris.altoclef.AltoClef;
+import adris.altoclef.chains.SingleTaskChain;
 import adris.altoclef.tasks.entity.AbstractKillEntityTask;
 import adris.altoclef.tasksystem.TaskChain;
 import adris.altoclef.tasksystem.TaskRunner;

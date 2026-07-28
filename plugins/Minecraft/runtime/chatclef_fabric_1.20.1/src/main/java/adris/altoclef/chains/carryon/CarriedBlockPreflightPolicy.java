@@ -8,7 +8,9 @@ import net.minecraft.block.BlockState;
 public final class CarriedBlockPreflightPolicy {
 
     public boolean shouldPlaceBeforeUserTask(BlockState carriedState) {
-        return carriedState != null && !carriedState.isAir();
+        return carriedState != null
+                && !carriedState.isAir()
+                && CarryOnCompat.shouldAutoPlaceCarriedBlock(carriedState.getBlock());
     }
 
     public String describeReason(BlockState carriedState) {
@@ -16,10 +18,13 @@ public final class CarriedBlockPreflightPolicy {
             return "missing-state";
         }
         Block block = carriedState.getBlock();
-        if (CarryOnCompat.containsCarryOnSensitiveBlock(block)) {
-            return "sensitive-carried-block";
+        if (CarryOnCompat.shouldAutoPlaceCarriedBlock(block)) {
+            return "auto-place-carried-furnace-or-smoker";
         }
-        return "carried-block-blocking-actions";
+        if (CarryOnCompat.containsCarryOnSensitiveBlock(block)) {
+            return "sensitive-carried-block-allowed";
+        }
+        return "carried-block-allowed";
     }
 
     public String describeBlock(BlockState carriedState) {

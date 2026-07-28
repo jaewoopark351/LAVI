@@ -34,6 +34,10 @@ public final class CarryOnCompat {
         return isLoaded() && containsCarryOnSensitiveBlock(targetBlocks);
     }
 
+    public static boolean shouldAutoPlaceCarriedBlock(Block block) {
+        return isLoaded() && isCarryOnAutoPlaceBlock(block);
+    }
+
     public static CarriedBlockStateProvider carriedBlockStateProvider() {
         return CARRIED_BLOCK_STATE_PROVIDER;
     }
@@ -81,6 +85,14 @@ public final class CarryOnCompat {
                 || block == Blocks.CHIPPED_ANVIL
                 || block == Blocks.DAMAGED_ANVIL
                 || block instanceof ShulkerBoxBlock;
+    }
+
+    private static boolean isCarryOnAutoPlaceBlock(Block block) {
+        if (block == null) {
+            return false;
+        }
+        return block == Blocks.SMOKER
+                || block == Blocks.FURNACE;
     }
 
     private static CarriedBlockStateProvider createCarriedBlockStateProvider() {

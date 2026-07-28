@@ -1,6 +1,7 @@
-package adris.altoclef.chains;
+package adris.altoclef.chains.survival;
 
 import adris.altoclef.AltoClef;
+import adris.altoclef.chains.SingleTaskChain;
 import adris.altoclef.catalogue.TaskCatalogue;
 import adris.altoclef.tasks.movement.MLGBucketTask;
 import adris.altoclef.tasksystem.ITaskOverridesGrounded;
