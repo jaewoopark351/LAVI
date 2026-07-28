@@ -16,6 +16,7 @@ import adris.altoclef.tasks.misc.EquipArmorTask;
 import adris.altoclef.tasks.misc.PlaceBedAndSetSpawnTask;
 import adris.altoclef.tasks.misc.SleepThroughNightTask;
 import adris.altoclef.tasks.movement.*;
+import adris.altoclef.tasks.movement.pickup.PickupDroppedItemTask;
 import adris.altoclef.tasks.resources.*;
 import adris.altoclef.tasks.speedrun.*;
 import adris.altoclef.tasks.speedrun.beatgame.prioritytask.prioritycalculators.CollectFoodPriorityCalculator;

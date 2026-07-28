@@ -8,7 +8,7 @@ import adris.altoclef.tasks.construction.ClearLiquidTask;
 import adris.altoclef.tasks.construction.DestroyBlockTask;
 import adris.altoclef.tasks.construction.PlaceObsidianBucketTask;
 import adris.altoclef.tasks.movement.GetWithinRangeOfBlockTask;
-import adris.altoclef.tasks.movement.PickupDroppedItemTask;
+import adris.altoclef.tasks.movement.pickup.PickupDroppedItemTask;
 import adris.altoclef.tasks.movement.TimeoutWanderTask;
 import adris.altoclef.tasks.speedrun.beatgame.BeatMinecraftTask;
 import adris.altoclef.tasksystem.Task;

@@ -1,6 +1,7 @@
 package adris.altoclef.tasks.movement;
 
 import adris.altoclef.AltoClef;
+import adris.altoclef.tasks.movement.pickup.PickupDroppedItemTask;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.helpers.WorldHelper;

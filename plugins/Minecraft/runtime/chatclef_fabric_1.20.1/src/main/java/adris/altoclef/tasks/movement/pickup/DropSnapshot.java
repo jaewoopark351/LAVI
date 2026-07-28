@@ -1,4 +1,4 @@
-package adris.altoclef.tasks.movement;
+package adris.altoclef.tasks.movement.pickup;
 
 import net.minecraft.entity.ItemEntity;
 

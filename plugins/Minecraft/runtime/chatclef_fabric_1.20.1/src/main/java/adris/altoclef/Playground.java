@@ -15,6 +15,7 @@ import adris.altoclef.tasks.misc.PlaceBedAndSetSpawnTask;
 import adris.altoclef.tasks.misc.RavageDesertTemplesTask;
 import adris.altoclef.tasks.misc.RavageRuinedPortalsTask;
 import adris.altoclef.tasks.movement.*;
+import adris.altoclef.tasks.movement.pickup.PickupDroppedItemTask;
 import adris.altoclef.tasks.resources.CollectBlazeRodsTask;
 import adris.altoclef.tasks.resources.CollectFlintTask;
 import adris.altoclef.tasks.resources.CollectFoodTask;

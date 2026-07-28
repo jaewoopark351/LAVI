@@ -9,7 +9,7 @@ import adris.altoclef.tasks.entity.AbstractKillEntityTask;
 import adris.altoclef.tasks.entity.DoToClosestEntityTask;
 import adris.altoclef.tasks.misc.EquipArmorTask;
 import adris.altoclef.tasks.movement.GetToBlockTask;
-import adris.altoclef.tasks.movement.PickupDroppedItemTask;
+import adris.altoclef.tasks.movement.pickup.PickupDroppedItemTask;
 import adris.altoclef.tasks.resources.CollectBlockByOneTask;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.ItemTarget;

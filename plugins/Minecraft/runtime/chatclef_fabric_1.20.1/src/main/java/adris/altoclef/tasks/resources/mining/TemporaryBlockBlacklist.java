@@ -1,4 +1,4 @@
-package adris.altoclef.tasks.resources;
+package adris.altoclef.tasks.resources.mining;
 
 import adris.altoclef.util.helpers.WorldHelper;
 import net.minecraft.util.math.BlockPos;

@@ -3,6 +3,7 @@ package adris.altoclef.tasks.resources;
 import adris.altoclef.AltoClef;
 import adris.altoclef.multiversion.ToolMaterialVer;
 import adris.altoclef.tasks.ResourceTask;
+import adris.altoclef.tasks.resources.mining.MineOrCollectTask;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.ItemTarget;
 import adris.altoclef.util.MiningRequirement;

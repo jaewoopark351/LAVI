@@ -1,4 +1,4 @@
-package adris.altoclef.tasks.movement;
+package adris.altoclef.tasks.movement.pickup;
 
 import adris.altoclef.util.helpers.WorldHelper;
 

@@ -1,7 +1,8 @@
-package adris.altoclef.tasks.movement;
+package adris.altoclef.tasks.movement.pickup;
 
 import adris.altoclef.AltoClef;
 import adris.altoclef.multiversion.versionedfields.Blocks;
+import adris.altoclef.tasks.movement.SafeRandomShimmyTask;
 import adris.altoclef.tasksystem.Task;
 import net.minecraft.block.Block;
 import net.minecraft.block.DoorBlock;

@@ -5,7 +5,7 @@ import adris.altoclef.BotBehaviour;
 import adris.altoclef.multiversion.blockpos.BlockPosVer;
 import adris.altoclef.tasks.container.PickupFromContainerTask;
 import adris.altoclef.tasks.movement.DefaultGoToDimensionTask;
-import adris.altoclef.tasks.movement.PickupDroppedItemTask;
+import adris.altoclef.tasks.movement.pickup.PickupDroppedItemTask;
 import adris.altoclef.tasks.resources.MineAndCollectTask;
 import adris.altoclef.tasks.slot.EnsureFreePlayerCraftingGridTask;
 import adris.altoclef.tasks.slot.MoveInaccessibleItemToInventoryTask;

@@ -1,4 +1,4 @@
-package adris.altoclef.tasks.movement;
+package adris.altoclef.tasks.movement.pickup;
 
 //20260728_kpopmodder: Added this type file to keep pickup stability counters out of PickupDroppedItemTask control flow.
 final class PickupDropDiagnostics {

@@ -10,7 +10,7 @@ import adris.altoclef.chains.food.FoodConversionPlanner;
 import adris.altoclef.chains.food.FoodHuntTracker;
 import adris.altoclef.chains.food.FoodPotentialCalculator;
 import adris.altoclef.chains.food.FoodResourceSnapshot;
-import adris.altoclef.tasks.movement.PickupDroppedItemTask;
+import adris.altoclef.tasks.movement.pickup.PickupDroppedItemTask;
 import adris.altoclef.tasks.movement.TimeoutWanderTask;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.helpers.StorageHelper;
