@@ -3,13 +3,11 @@ package adris.altoclef.tasks.resources.food;
 import adris.altoclef.AltoClef;
 import adris.altoclef.chains.food.FoodCollectionBlacklist;
 import adris.altoclef.chains.food.FoodCollectionPlan;
-import adris.altoclef.chains.food.FoodCollectionTaskSelector;
 import adris.altoclef.chains.food.FoodCollectionTargets;
 import adris.altoclef.chains.food.FoodCookingTaskTracker;
 import adris.altoclef.chains.food.FoodConversionPlanner;
 import adris.altoclef.chains.food.FoodHuntTracker;
 import adris.altoclef.chains.food.FoodPotentialCalculator;
-import adris.altoclef.chains.food.FoodResourceSnapshot;
 import adris.altoclef.tasks.movement.pickup.PickupDroppedItemTask;
 import adris.altoclef.tasks.movement.escape.TimeoutWanderTask;
 import adris.altoclef.tasksystem.Task;
@@ -34,6 +32,7 @@ public class CollectFoodTask extends Task {
     private final TimerGame checkNewOptionsTimer = new TimerGame(10);
     private final FoodHuntTracker huntTracker = new FoodHuntTracker();
     private final FoodCookingTaskTracker cookingTracker = new FoodCookingTaskTracker();
+    private final FoodTargetSelector targetSelector = new FoodTargetSelector(COOKABLE_FOODS, ITEMS_TO_PICK_UP, CROPS);
     private final StateChangeLogger debugLogger = new StateChangeLogger("CollectFoodTask");
     private Task currentResourceTask = null;
 
@@ -83,8 +82,9 @@ public class CollectFoodTask extends Task {
         if (cookingTracker.isActiveCookingFuelTask(currentResourceTask)) {
             return continueCookingFuelTask(mod);
         }
-        if (isActiveHuntTask()) {
-            return continueHuntTaskOrNull(mod);
+        FoodHuntingDecision huntingDecision = FoodHuntingDecision.evaluate(mod, huntTracker, currentResourceTask, debugLogger);
+        if (huntingDecision.isActive()) {
+            return continueHuntTaskOrNull(mod, huntingDecision);
         }
         if (isActiveFoodPickupTask(currentResourceTask)) {
             return continueFoodPickupTask(mod);
@@ -98,19 +98,19 @@ public class CollectFoodTask extends Task {
         }
         clearTimedOutResourceTask(mod);
 
-        double potentialFood = calculateFoodPotential(mod);
-        Task conversionTask = createConversionTaskOrNull(mod, potentialFood);
+        FoodCollectionState state = FoodCollectionState.capture(mod, unitsNeeded, COOKABLE_FOODS);
+        Task conversionTask = createConversionTaskOrNull(mod, state);
         if (conversionTask != null) {
             return conversionTask;
         }
 
         cookingTracker.resetFuelPreparation();
-        Task selectedFoodTask = selectNextFoodTaskOrNull(mod);
+        Task selectedFoodTask = selectNextFoodTaskOrNull(mod, state);
         if (selectedFoodTask != null) {
             return selectedFoodTask;
         }
 
-        return createFoodSearchTask(mod, potentialFood);
+        return createFoodSearchTask(state);
     }
 
     private Task continueSmeltingOrNull(AltoClef mod) {
@@ -184,17 +184,9 @@ public class CollectFoodTask extends Task {
         return currentResourceTask;
     }
 
-    private boolean isActiveHuntTask() {
-        return huntTracker.hasTarget()
-                && currentResourceTask != null
-                && currentResourceTask.isActive()
-                && !currentResourceTask.isFinished();
-    }
-
-    private Task continueHuntTaskOrNull(AltoClef mod) {
-        String skipReason = huntTracker.getSkipReason(mod, debugLogger);
-        if (skipReason != null) {
-            huntTracker.temporarilySkip(mod, debugLogger, skipReason);
+    private Task continueHuntTaskOrNull(AltoClef mod, FoodHuntingDecision huntingDecision) {
+        if (huntingDecision.shouldSkip()) {
+            huntTracker.temporarilySkip(mod, debugLogger, huntingDecision.getSkipReason());
             currentResourceTask = null;
             return null;
         }
@@ -239,24 +231,20 @@ public class CollectFoodTask extends Task {
         return currentResourceTask;
     }
 
-    private Task createConversionTaskOrNull(AltoClef mod, double potentialFood) {
-        if (potentialFood < unitsNeeded) {
+    private Task createConversionTaskOrNull(AltoClef mod, FoodCollectionState state) {
+        FoodCookingDecision cookingDecision = FoodCookingDecision.decide(mod, state, COOKABLE_FOODS);
+        if (!cookingDecision.hasEnoughPotential()) {
             return null;
         }
-        debugLogger.state("potential enough", "potential enough: potential="
-                + formatDouble(potentialFood)
-                + ", target=" + formatDouble(unitsNeeded)
-                + ", readyScore=" + StorageHelper.calculateInventoryFoodScore()
-                + ", " + describeFoodResources(mod));
-        Optional<FoodConversionPlanner.Plan> conversionPlan = FoodConversionPlanner.plan(mod, COOKABLE_FOODS);
+        debugLogger.state("potential enough", cookingDecision.describePotentialEnough());
+        Optional<FoodConversionPlanner.Plan> conversionPlan = cookingDecision.getConversionPlan();
         if (conversionPlan.isPresent()) {
             return startConversionPlan(mod, conversionPlan.get());
         }
-        if (FoodResourceSnapshot.getTotalRawFoodCount(mod, COOKABLE_FOODS) > 0) {
-            debugLogger.state("raw food not selected for cooking", "raw food not selected for cooking: " + describeFoodResources(mod));
+        if (cookingDecision.hasRawFood()) {
+            debugLogger.state("raw food not selected for cooking", cookingDecision.describeRawFoodNotSelected());
         } else {
-            debugLogger.state("potential met but no conversion target", "potential met but no conversion target: "
-                    + describeFoodResources(mod));
+            debugLogger.state("potential met but no conversion target", cookingDecision.describePotentialMetButNoTarget());
         }
         return null;
     }
@@ -278,15 +266,8 @@ public class CollectFoodTask extends Task {
         return cookingTracker.getSmeltTask();
     }
 
-    private Task selectNextFoodTaskOrNull(AltoClef mod) {
-        Optional<FoodCollectionPlan> selection = FoodCollectionTaskSelector.select(
-                mod,
-                COOKABLE_FOODS,
-                ITEMS_TO_PICK_UP,
-                CROPS,
-                debugLogger,
-                describeFoodResources(mod)
-        );
+    private Task selectNextFoodTaskOrNull(AltoClef mod, FoodCollectionState state) {
+        Optional<FoodCollectionPlan> selection = targetSelector.select(mod, debugLogger, state);
         if (!selection.isPresent()) {
             return null;
         }
@@ -304,12 +285,10 @@ public class CollectFoodTask extends Task {
         return setCurrentResourceTask(nextFoodTask.getTask());
     }
 
-    private Task createFoodSearchTask(AltoClef mod, double potentialFood) {
+    private Task createFoodSearchTask(FoodCollectionState state) {
         huntTracker.clear();
         setDebugState("Searching...");
-        debugLogger.state("searching for food: potential=" + formatDouble(potentialFood)
-                + ", target=" + formatDouble(unitsNeeded)
-                + ", " + describeFoodResources(mod));
+        debugLogger.state(state.describeSearch());
         return new TimeoutWanderTask();
     }
 
@@ -377,7 +356,7 @@ public class CollectFoodTask extends Task {
     }
 
     private void resetCookingFuelPreparationIfNoRawFood(AltoClef mod) {
-        if (FoodResourceSnapshot.getTotalRawFoodCount(mod, COOKABLE_FOODS) <= 0) {
+        if (!FoodCollectionState.capture(mod, unitsNeeded, COOKABLE_FOODS).hasRawFood()) {
             cookingTracker.resetFuelPreparation();
         }
     }
@@ -387,7 +366,7 @@ public class CollectFoodTask extends Task {
     }
 
     private String describeFoodResources(AltoClef mod) {
-        return FoodResourceSnapshot.capture(mod, COOKABLE_FOODS).describe();
+        return FoodCollectionState.capture(mod, unitsNeeded, COOKABLE_FOODS).describeResources();
     }
 
     private String formatDouble(double value) {
