@@ -5,7 +5,6 @@ import adris.altoclef.Debug;
 import adris.altoclef.multiversion.blockpos.BlockPosVer;
 import adris.altoclef.tasks.AbstractDoToClosestObjectTask;
 import adris.altoclef.tasks.construction.DestroyBlockTask;
-import adris.altoclef.tasks.movement.pickup.PickupDroppedItemTask;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.ItemTarget;
 import adris.altoclef.util.helpers.WorldHelper;
@@ -25,41 +24,18 @@ import java.util.function.Predicate;
 //20260728_kpopmodder: Added this type file to keep the mine/drop task separate from MineAndCollectTask orchestration.
 public class MineOrCollectTask extends AbstractDoToClosestObjectTask<Object> {
 
-    //20260728_kpopmodder: Give drops a clearer ownership window before mining can take over again.
-    private static final int DROPPED_ITEM_PICKUP_GRACE_TICKS = 20 * 6;
-    private static final int ACTIVE_PICKUP_CONTINUATION_TICKS = 20 * 4;
-    private static final double DROPPED_ITEM_PICKUP_GRACE_RANGE = 16;
-    //20260728_kpopmodder: Let a freshly mined block settle briefly, while visible drops get a longer sweep window.
-    private static final int POST_MINING_SWEEP_TICKS = 20 * 5;
-    private static final int POST_MINING_SETTLE_TICKS = 6;
-    private static final double POST_MINING_SWEEP_RANGE = 12;
-
-    private static final PickupContinuationGoal PICKUP_CONTINUATION_GOAL = new PickupContinuationGoal();
-    private static final PostMiningSweepGoal POST_MINING_SWEEP_GOAL = new PostMiningSweepGoal();
-
     private final Block[] _blocks;
     private final ItemTarget[] _targets;
-    private final PickupContinuationPolicy pickupContinuationPolicy = new PickupContinuationPolicy(
-            DROPPED_ITEM_PICKUP_GRACE_TICKS,
-            ACTIVE_PICKUP_CONTINUATION_TICKS,
-            DROPPED_ITEM_PICKUP_GRACE_RANGE
-    );
-    private final PostMiningSweepPolicy postMiningSweepPolicy = new PostMiningSweepPolicy(
-            POST_MINING_SWEEP_TICKS,
-            POST_MINING_SETTLE_TICKS,
-            POST_MINING_SWEEP_RANGE
-    );
     private final LocalMiningSessionPolicy localMiningSessionPolicy;
     private final MiningTargetTracker miningTargetTracker;
     private final MineOrCollectDiagnostics diagnostics = new MineOrCollectDiagnostics();
-    private final Task _pickupTask;
-    private final Task postMiningSweepWaitTask = new PostMiningSweepWaitTask(postMiningSweepPolicy);
     private final StateChangeLogger debugLogger = new StateChangeLogger("MineOrCollectTask");
+    private final MiningPickupCoordinator pickupCoordinator;
 
     public MineOrCollectTask(Block[] blocks, ItemTarget[] targets) {
         _blocks = blocks;
         _targets = targets;
-        _pickupTask = new PickupDroppedItemTask(_targets, true);
+        pickupCoordinator = new MiningPickupCoordinator(_targets, diagnostics, debugLogger, this::describeDrop);
         miningTargetTracker = new MiningTargetTracker(blocks);
         localMiningSessionPolicy = new LocalMiningSessionPolicy(blocks);
     }
@@ -72,11 +48,8 @@ public class MineOrCollectTask extends AbstractDoToClosestObjectTask<Object> {
         if (obj instanceof ItemEntity item) {
             return item.getPos();
         }
-        if (obj instanceof PickupContinuationGoal) {
-            return pickupContinuationPolicy.activePickupPos(mod.getPlayer().getPos());
-        }
-        if (obj instanceof PostMiningSweepGoal) {
-            return postMiningSweepPolicy.activePos(mod.getPlayer().getPos());
+        if (pickupCoordinator.isManagedGoal(obj)) {
+            return pickupCoordinator.getGoalPos(mod, obj);
         }
         throw new UnsupportedOperationException("Shouldn't try to get the position of object " + obj + " of type " + (obj != null ? obj.getClass().toString() : "(null object)"));
     }
@@ -84,8 +57,7 @@ public class MineOrCollectTask extends AbstractDoToClosestObjectTask<Object> {
     @Override
     protected Optional<Object> getClosestTo(AltoClef mod, Vec3d pos) {
         miningTargetTracker.pruneExpired();
-        pickupContinuationPolicy.pruneExpired();
-        postMiningSweepPolicy.pruneExpired();
+        pickupCoordinator.pruneExpired();
         localMiningSessionPolicy.pruneExpired(mod);
         miningTargetTracker.releaseCompleted(mod, this::handleMiningTargetRelease);
 
@@ -104,58 +76,14 @@ public class MineOrCollectTask extends AbstractDoToClosestObjectTask<Object> {
             return closestDrop.getRight().map(Object.class::cast);
         }
 
-        Optional<ItemEntity> sweepDrop = postMiningSweepPolicy.getPreferredSweepDrop(closestDrop.getRight());
-        if (sweepDrop.isPresent()) {
-            diagnostics.recordPostMiningSweepPreferred();
-            debugLogger.state("post mining sweep prefers dropped item",
-                    "post mining sweep prefers dropped item: drop=" + describeDrop(sweepDrop.get())
-                            + ", block=" + closestBlock.getRight().map(BlockPos::toShortString).orElse("none")
-                            + ", sweepTicksRemaining=" + postMiningSweepPolicy.sweepTicksRemaining());
-            return sweepDrop.map(Object.class::cast);
-        }
-
-        if (postMiningSweepPolicy.shouldWaitForPotentialDrops(closestDrop.getRight())) {
-            diagnostics.recordPostMiningSweepWait();
-            debugLogger.state("post mining settle wait",
-                    "post mining settle wait: waiting briefly for newly mined drops"
-                            + ", block=" + closestBlock.getRight().map(BlockPos::toShortString).orElse("none")
-                            + ", settleTicksRemaining=" + postMiningSweepPolicy.settleTicksRemaining()
-                            + ", sweepTicksRemaining=" + postMiningSweepPolicy.sweepTicksRemaining());
-            return Optional.of((Object) POST_MINING_SWEEP_GOAL);
-        }
-
-        Optional<ItemEntity> graceDrop = pickupContinuationPolicy.getPreferredMinedDrop(closestDrop.getRight());
-        if (graceDrop.isPresent()) {
-            diagnostics.recordPickupGracePreferred();
-            debugLogger.state("pickup grace prefers dropped item",
-                    "pickup grace prefers dropped item: drop=" + describeDrop(graceDrop.get())
-                            + ", block=" + closestBlock.getRight().map(BlockPos::toShortString).orElse("none")
-                            + ", ticksRemaining=" + pickupContinuationPolicy.miningGraceTicksRemaining());
-            return graceDrop.map(Object.class::cast);
-        }
-
-        Optional<ItemEntity> continuationDrop = pickupContinuationPolicy.getPreferredActivePickupDrop(
+        Optional<Object> pickupTarget = pickupCoordinator.getPreferredTarget(
                 closestDrop.getRight(),
+                closestBlock.getRight(),
                 isPickupTaskContinuing(),
                 pos
         );
-        if (continuationDrop.isPresent()) {
-            diagnostics.recordPickupContinuationPreferred();
-            debugLogger.state("active pickup prefers dropped item",
-                    "active pickup prefers dropped item: drop=" + describeDrop(continuationDrop.get())
-                            + ", block=" + closestBlock.getRight().map(BlockPos::toShortString).orElse("none")
-                            + ", ticksRemaining=" + pickupContinuationPolicy.activePickupTicksRemaining());
-            return continuationDrop.map(Object.class::cast);
-        }
-
-        if (pickupContinuationPolicy.shouldContinueActivePickup(isPickupTaskContinuing())) {
-            diagnostics.recordPickupContinuationPreferred();
-            debugLogger.state("active pickup settling",
-                    "active pickup settling: keeping pickup task alive"
-                            + ", block=" + closestBlock.getRight().map(BlockPos::toShortString).orElse("none")
-                            + ", drop=" + closestDrop.getRight().map(this::describeDrop).orElse("none")
-                            + ", ticksRemaining=" + pickupContinuationPolicy.activePickupTicksRemaining());
-            return Optional.of((Object) PICKUP_CONTINUATION_GOAL);
+        if (pickupTarget.isPresent()) {
+            return pickupTarget;
         }
 
         Optional<ItemEntity> currentMiningInterruptDrop = miningTargetTracker.getDropCloserThanCurrentTarget(mod, pos, closestDrop.getRight(), dropSq);
@@ -254,33 +182,13 @@ public class MineOrCollectTask extends AbstractDoToClosestObjectTask<Object> {
                         + ", timeoutTicks=" + miningTargetTracker.targetTimeoutTicks());
             }
             localMiningSessionPolicy.armAfterMiningTarget(newPos, AltoClef.getInstance());
-            pickupContinuationPolicy.armAfterMining(newPos);
+            pickupCoordinator.armAfterMining(newPos);
             return new DestroyBlockTask(miningTargetTracker.miningPos());
         }
-        if (obj instanceof ItemEntity drop) {
-            diagnostics.recordGoalSelection("drop:" + drop.getUuid(), false);
-            debugLogger.state("pickup target selected: " + describeDrop(drop));
+        Optional<Task> pickupTask = pickupCoordinator.getGoalTask(obj);
+        if (pickupTask.isPresent()) {
             miningTargetTracker.clear();
-            pickupContinuationPolicy.armActivePickup(drop);
-            postMiningSweepPolicy.armAfterPickup(drop);
-            return _pickupTask;
-        }
-        if (obj instanceof PickupContinuationGoal) {
-            diagnostics.recordGoalSelection("drop:active-pickup-continuation", false);
-            debugLogger.state("continue active pickup while drop settles",
-                    "continue active pickup while drop settles: ticksRemaining="
-                            + pickupContinuationPolicy.activePickupTicksRemaining());
-            miningTargetTracker.clear();
-            return _pickupTask;
-        }
-        if (obj instanceof PostMiningSweepGoal) {
-            diagnostics.recordGoalSelection("drop:post-mining-settle", false);
-            debugLogger.state("wait for post mining settle",
-                    "wait for post mining settle: settleTicksRemaining="
-                            + postMiningSweepPolicy.settleTicksRemaining()
-                            + ", sweepTicksRemaining=" + postMiningSweepPolicy.sweepTicksRemaining());
-            miningTargetTracker.clear();
-            return postMiningSweepWaitTask;
+            return pickupTask.get();
         }
         throw new UnsupportedOperationException("Shouldn't try to get the goal from object " + obj + " of type " + (obj != null ? obj.getClass().toString() : "(null object)"));
     }
@@ -303,10 +211,10 @@ public class MineOrCollectTask extends AbstractDoToClosestObjectTask<Object> {
             return false;
         }
         if (obj instanceof PickupContinuationGoal) {
-            return pickupContinuationPolicy.shouldContinueActivePickup(isPickupTaskContinuing());
+            return pickupCoordinator.shouldContinueActivePickup(isPickupTaskContinuing());
         }
         if (obj instanceof PostMiningSweepGoal) {
-            return postMiningSweepPolicy.isWaitingForPotentialDrops();
+            return pickupCoordinator.isWaitingForPotentialDrops();
         }
         return false;
     }
@@ -314,10 +222,8 @@ public class MineOrCollectTask extends AbstractDoToClosestObjectTask<Object> {
     @Override
     protected void onStart() {
         miningTargetTracker.reset();
-        pickupContinuationPolicy.reset();
-        postMiningSweepPolicy.reset();
+        pickupCoordinator.reset();
         localMiningSessionPolicy.reset();
-        postMiningSweepWaitTask.reset();
         diagnostics.reset();
         debugLogger.event("start: blocks=" + Arrays.toString(_blocks)
                 + ", targets=" + Arrays.toString(_targets)
@@ -331,8 +237,7 @@ public class MineOrCollectTask extends AbstractDoToClosestObjectTask<Object> {
         if (diagnostics.hasEvents()) {
             debugLogger.event(diagnostics.summary(interruptTask));
         }
-        pickupContinuationPolicy.reset();
-        postMiningSweepPolicy.reset();
+        pickupCoordinator.reset();
         localMiningSessionPolicy.reset();
     }
 
@@ -362,22 +267,20 @@ public class MineOrCollectTask extends AbstractDoToClosestObjectTask<Object> {
             return false;
         }
         Pair<Double, Optional<ItemEntity>> closestDrop = getClosestItemDrop(mod, mod.getPlayer().getPos(), _targets);
-        boolean shouldDelay = postMiningSweepPolicy.shouldDelayFinish(closestDrop.getRight(), isPickupTaskContinuing());
+        boolean shouldDelay = pickupCoordinator.shouldDelayFinish(closestDrop.getRight(), isPickupTaskContinuing());
         if (shouldDelay) {
             diagnostics.recordPostMiningSweepFinishDelay();
             debugLogger.state("post mining sweep delays finish",
                     "post mining sweep delays finish: closest="
                             + closestDrop.getRight().map(this::describeDrop).orElse("none")
                             + ", pickupTaskContinuing=" + isPickupTaskContinuing()
-                            + ", sweepTicksRemaining=" + postMiningSweepPolicy.sweepTicksRemaining());
+                            + ", sweepTicksRemaining=" + pickupCoordinator.sweepTicksRemaining());
         }
         return shouldDelay;
     }
 
     private boolean isPickupTaskContinuing() {
-        return _pickupTask.isActive()
-                && !_pickupTask.isFinished()
-                && !_pickupTask.thisOrChildAreTimedOut();
+        return pickupCoordinator.isPickupTaskContinuing();
     }
 
     private void handleMiningTargetSkip(MiningTargetTracker.Skip skip) {
@@ -393,7 +296,7 @@ public class MineOrCollectTask extends AbstractDoToClosestObjectTask<Object> {
     private void handleMiningTargetRelease(MiningTargetTracker.Release release) {
         diagnostics.recordMiningTargetRelease();
         if (release.blockChanged()) {
-            postMiningSweepPolicy.armAfterBlockBreak(release.pos());
+            pickupCoordinator.armAfterBlockBreak(release.pos());
             localMiningSessionPolicy.armAfterBlockBreak(release.pos());
         }
         debugLogger.state("release mining target " + release.pos().toShortString() + " " + release.reason(),
