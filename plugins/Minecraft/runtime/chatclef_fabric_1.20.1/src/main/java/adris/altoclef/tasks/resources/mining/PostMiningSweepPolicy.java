@@ -7,7 +7,7 @@ import net.minecraft.util.math.Vec3d;
 
 import java.util.Optional;
 
-//20260728_kpopmodder: Keeps a short local pickup sweep after a mined block produces item drops.
+//20260728_kpopmodder: Keeps visible drop sweep separate from the short settle wait after a mined block breaks.
 final class PostMiningSweepPolicy {
     private final int sweepTicks;
     private final int settleTicks;
@@ -43,7 +43,8 @@ final class PostMiningSweepPolicy {
             sweepOrigin = drop.getBlockPos();
         }
         sweepUntilTick = Math.max(sweepUntilTick, now + sweepTicks);
-        settleUntilTick = Math.max(settleUntilTick, now + settleTicks);
+        //20260728_kpopmodder: Once pickup has targeted a real drop, do not wait for invisible/consumed drops.
+        settleUntilTick = 0;
     }
 
     Optional<ItemEntity> getPreferredSweepDrop(Optional<ItemEntity> closestDrop) {

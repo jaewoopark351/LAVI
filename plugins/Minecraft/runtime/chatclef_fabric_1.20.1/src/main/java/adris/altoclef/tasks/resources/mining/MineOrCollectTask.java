@@ -29,9 +29,9 @@ public class MineOrCollectTask extends AbstractDoToClosestObjectTask<Object> {
     private static final int DROPPED_ITEM_PICKUP_GRACE_TICKS = 20 * 6;
     private static final int ACTIVE_PICKUP_CONTINUATION_TICKS = 20 * 4;
     private static final double DROPPED_ITEM_PICKUP_GRACE_RANGE = 16;
-    //20260728_kpopmodder: Sweep nearby drops briefly after a mined block disappears before chasing more blocks.
+    //20260728_kpopmodder: Let a freshly mined block settle briefly, while visible drops get a longer sweep window.
     private static final int POST_MINING_SWEEP_TICKS = 20 * 5;
-    private static final int POST_MINING_SETTLE_TICKS = 15;
+    private static final int POST_MINING_SETTLE_TICKS = 6;
     private static final double POST_MINING_SWEEP_RANGE = 12;
 
     private static final PickupContinuationGoal PICKUP_CONTINUATION_GOAL = new PickupContinuationGoal();
@@ -116,8 +116,8 @@ public class MineOrCollectTask extends AbstractDoToClosestObjectTask<Object> {
 
         if (postMiningSweepPolicy.shouldWaitForPotentialDrops(closestDrop.getRight())) {
             diagnostics.recordPostMiningSweepWait();
-            debugLogger.state("post mining sweep settling",
-                    "post mining sweep settling: waiting for nearby drops"
+            debugLogger.state("post mining settle wait",
+                    "post mining settle wait: waiting briefly for newly mined drops"
                             + ", block=" + closestBlock.getRight().map(BlockPos::toShortString).orElse("none")
                             + ", settleTicksRemaining=" + postMiningSweepPolicy.settleTicksRemaining()
                             + ", sweepTicksRemaining=" + postMiningSweepPolicy.sweepTicksRemaining());
@@ -274,9 +274,9 @@ public class MineOrCollectTask extends AbstractDoToClosestObjectTask<Object> {
             return _pickupTask;
         }
         if (obj instanceof PostMiningSweepGoal) {
-            diagnostics.recordGoalSelection("drop:post-mining-sweep", false);
-            debugLogger.state("wait for post mining sweep",
-                    "wait for post mining sweep: settleTicksRemaining="
+            diagnostics.recordGoalSelection("drop:post-mining-settle", false);
+            debugLogger.state("wait for post mining settle",
+                    "wait for post mining settle: settleTicksRemaining="
                             + postMiningSweepPolicy.settleTicksRemaining()
                             + ", sweepTicksRemaining=" + postMiningSweepPolicy.sweepTicksRemaining());
             miningTargetTracker.clear();

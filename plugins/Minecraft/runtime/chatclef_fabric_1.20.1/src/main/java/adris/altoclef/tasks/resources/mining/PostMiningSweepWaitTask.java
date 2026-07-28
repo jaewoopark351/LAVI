@@ -18,7 +18,7 @@ final class PostMiningSweepWaitTask extends Task {
 
     @Override
     protected Task onTick() {
-        setDebugState("Waiting for nearby drops");
+        setDebugState("Settling after mined block");
         return null;
     }
 
@@ -38,6 +38,6 @@ final class PostMiningSweepWaitTask extends Task {
 
     @Override
     protected String toDebugString() {
-        return "Post mining pickup sweep";
+        return "Post mining settle wait";
     }
 }
