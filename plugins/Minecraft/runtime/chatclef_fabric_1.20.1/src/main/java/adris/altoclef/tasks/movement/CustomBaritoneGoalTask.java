@@ -26,6 +26,7 @@ import net.minecraft.entity.passive.WanderingTraderEntity;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -74,6 +75,7 @@ public abstract class CustomBaritoneGoalTask extends Task implements ITaskRequir
     private LocalTerrainEscapeTask localTerrainEscapeTask = null;
     private Vec3d lastBlockingProgressPos = null;
     private int lastBlockingProgressTick = 0;
+    private String lastTerrainEscapeDiagnosticKey = "";
 
     // This happens all the time in mineshafts and swamps/jungles
 
@@ -139,6 +141,7 @@ public abstract class CustomBaritoneGoalTask extends Task implements ITaskRequir
         stuckCheck.reset();
         clearBlockingEntityTask = null;
         localTerrainEscapeTask = null;
+        lastTerrainEscapeDiagnosticKey = "";
         AltoClef mod = AltoClef.getInstance();
         if (mod.getPlayer() != null) {
             lastBlockingProgressPos = mod.getPlayer().getPos();
@@ -231,6 +234,7 @@ public abstract class CustomBaritoneGoalTask extends Task implements ITaskRequir
                         + ", task=" + toDebugString());
             }
             localTerrainEscapeTask = null;
+            lastTerrainEscapeDiagnosticKey = "";
             resetBlockingEntityProgress(mod);
             checker.reset();
             stuckCheck.reset();
@@ -327,19 +331,45 @@ public abstract class CustomBaritoneGoalTask extends Task implements ITaskRequir
 
     private Optional<EscapePlan> getTerrainEscapePlan(AltoClef mod) {
         pruneTerrainEscapeRetryCooldowns();
-        if (!isLocallyStalled(mod)) {
+        String skipReason = getLocalRecoverySkipReason(mod);
+        if (skipReason != null) {
+            logTerrainEscapeDiagnostic("skip:" + skipReasonCategory(skipReason),
+                    "terrain escape not eligible: " + skipReason);
             return Optional.empty();
         }
-        return LocalTerrainEscapeTask.findPlan(mod, terrainEscapeRetryCooldowns.keySet());
+        BlockPos origin = mod.getPlayer().getBlockPos();
+        logTerrainEscapeDiagnostic("eligible:" + origin.toShortString(),
+                "terrain escape eligible: local stall detected at origin=" + origin.toShortString()
+                        + ", cooldowns=" + describeTerrainEscapeCooldowns());
+        Optional<EscapePlan> plan = LocalTerrainEscapeTask.findPlan(mod, terrainEscapeRetryCooldowns.keySet(), debugLogger);
+        if (plan.isEmpty()) {
+            logTerrainEscapeDiagnostic("no-plan:" + origin.toShortString(),
+                    "terrain escape plan unavailable after local stall: origin=" + origin.toShortString()
+                            + ", cooldowns=" + describeTerrainEscapeCooldowns()
+                            + ", reason=" + LocalTerrainEscapeTask.describePlanSearchFailure(mod, terrainEscapeRetryCooldowns.keySet()));
+        }
+        return plan;
     }
 
     private boolean isLocallyStalled(AltoClef mod) {
+        return getLocalRecoverySkipReason(mod) == null;
+    }
+
+    private String getLocalRecoverySkipReason(AltoClef mod) {
         if (mod.getPlayer() == null || mod.getPlayer().getPos() == null) {
-            return false;
+            return "player unavailable";
         }
         if (isFinished() || mod.getFoodChain().needsToEat() || mod.getControllerExtras().isBreakingBlock()) {
+            String reason;
+            if (isFinished()) {
+                reason = "goal already reached";
+            } else if (mod.getFoodChain().needsToEat()) {
+                reason = "food chain needs to eat";
+            } else {
+                reason = "already breaking block";
+            }
             resetBlockingEntityProgress(mod);
-            return false;
+            return reason;
         }
 
         Vec3d currentPos = mod.getPlayer().getPos();
@@ -347,14 +377,23 @@ public abstract class CustomBaritoneGoalTask extends Task implements ITaskRequir
         if (lastBlockingProgressPos == null) {
             lastBlockingProgressPos = currentPos;
             lastBlockingProgressTick = now;
-            return false;
+            return "local recovery progress tracker initialized at player=" + formatVec(currentPos);
         }
-        if (currentPos.squaredDistanceTo(lastBlockingProgressPos) > BLOCKING_ENTITY_MIN_PROGRESS_SQ) {
+        double movementSq = currentPos.squaredDistanceTo(lastBlockingProgressPos);
+        if (movementSq > BLOCKING_ENTITY_MIN_PROGRESS_SQ) {
             lastBlockingProgressPos = currentPos;
             lastBlockingProgressTick = now;
-            return false;
+            return "movement progress observed: moved=" + formatDouble(Math.sqrt(movementSq))
+                    + ", threshold=" + formatDouble(Math.sqrt(BLOCKING_ENTITY_MIN_PROGRESS_SQ))
+                    + ", player=" + formatVec(currentPos);
         }
-        return now - lastBlockingProgressTick >= BLOCKING_ENTITY_STUCK_TICKS;
+        int stationaryTicks = now - lastBlockingProgressTick;
+        if (stationaryTicks < BLOCKING_ENTITY_STUCK_TICKS) {
+            return "waiting for local stall: stationaryTicks=" + stationaryTicks
+                    + "/" + BLOCKING_ENTITY_STUCK_TICKS
+                    + ", player=" + formatVec(currentPos);
+        }
+        return null;
     }
 
     private void resetBlockingEntityProgress(AltoClef mod) {
@@ -423,6 +462,45 @@ public abstract class CustomBaritoneGoalTask extends Task implements ITaskRequir
     private void pruneTerrainEscapeRetryCooldowns() {
         int now = WorldHelper.getTicks();
         terrainEscapeRetryCooldowns.entrySet().removeIf(entry -> entry.getValue() <= now);
+    }
+
+    private void logTerrainEscapeDiagnostic(String stateKey, String detail) {
+        if (stateKey.equals(lastTerrainEscapeDiagnosticKey)) {
+            return;
+        }
+        lastTerrainEscapeDiagnosticKey = stateKey;
+        debugLogger.event(detail + ", task=" + toDebugString());
+    }
+
+    private String skipReasonCategory(String skipReason) {
+        int separatorIndex = skipReason.indexOf(':');
+        if (separatorIndex >= 0) {
+            return skipReason.substring(0, separatorIndex);
+        }
+        return skipReason;
+    }
+
+    private String describeTerrainEscapeCooldowns() {
+        if (terrainEscapeRetryCooldowns.isEmpty()) {
+            return "none";
+        }
+        int now = WorldHelper.getTicks();
+        List<String> entries = new ArrayList<>();
+        for (Map.Entry<BlockPos, Integer> entry : terrainEscapeRetryCooldowns.entrySet()) {
+            entries.add(entry.getKey().toShortString() + ":" + Math.max(0, entry.getValue() - now) + "t");
+        }
+        return entries.toString();
+    }
+
+    private static String formatDouble(double value) {
+        return String.format(Locale.ROOT, "%.2f", value);
+    }
+
+    private static String formatVec(Vec3d vec) {
+        if (vec == null) {
+            return "none";
+        }
+        return String.format(Locale.ROOT, "%.2f, %.2f, %.2f", vec.x, vec.y, vec.z);
     }
 
     private String describeEntity(AltoClef mod, Entity entity) {

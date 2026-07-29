@@ -68,6 +68,57 @@ public class EscapeBlockActionPolicy {
         return !(block instanceof FallingBlock) || WorldHelper.fallingBlockSafeToBreak(pos);
     }
 
+    String describeEscapeSpace(AltoClef mod, BlockPos pos) {
+        BlockState state = mod.getWorld().getBlockState(pos);
+        Block block = state.getBlock();
+        if (state.isAir()) {
+            return "clear air";
+        }
+        if (block instanceof FluidBlock) {
+            return "blocked by fluid block=" + block.getTranslationKey();
+        }
+        if (state.getCollisionShape(mod.getWorld(), pos).isEmpty()) {
+            return "clear non-colliding block=" + block.getTranslationKey();
+        }
+        return "blocked by solid collision block=" + block.getTranslationKey();
+    }
+
+    String describeFloorSafety(AltoClef mod, BlockPos pos) {
+        BlockState state = mod.getWorld().getBlockState(pos);
+        Block block = state.getBlock();
+        if (state.isAir()) {
+            return "unsafe floor: air";
+        }
+        if (block instanceof FluidBlock) {
+            return "unsafe floor: fluid block=" + block.getTranslationKey();
+        }
+        if (block instanceof CactusBlock
+                || block instanceof CampfireBlock
+                || block instanceof MagmaBlock
+                || block instanceof AbstractFireBlock) {
+            return "unsafe floor: damaging block=" + block.getTranslationKey();
+        }
+        if (!state.isSolidBlock(mod.getWorld(), pos)) {
+            return "unsafe floor: not solid block=" + block.getTranslationKey();
+        }
+        return "safe floor: block=" + block.getTranslationKey();
+    }
+
+    String describeBreakSafety(AltoClef mod, BlockPos pos) {
+        BlockState state = mod.getWorld().getBlockState(pos);
+        Block block = state.getBlock();
+        if (isProtectedBlock(pos, block)) {
+            return "unsafe break: protected block=" + block.getTranslationKey();
+        }
+        if (!WorldHelper.canBreak(pos)) {
+            return "unsafe break: WorldHelper.canBreak=false block=" + block.getTranslationKey();
+        }
+        if (block instanceof FallingBlock && !WorldHelper.fallingBlockSafeToBreak(pos)) {
+            return "unsafe break: falling block not safe block=" + block.getTranslationKey();
+        }
+        return "safe break: block=" + block.getTranslationKey();
+    }
+
     private boolean isProtectedBlock(BlockPos pos, Block block) {
         return WorldHelper.isInteractableBlock(pos)
                 || block instanceof BedBlock

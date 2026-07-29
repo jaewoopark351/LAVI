@@ -38,6 +38,14 @@ public class LocalTerrainEscapeTask extends Task implements ITaskRequiresGrounde
         return CANDIDATE_SELECTOR.findPlan(mod, cooldownOrigins);
     }
 
+    public static Optional<EscapePlan> findPlan(AltoClef mod, Set<BlockPos> cooldownOrigins, StateChangeLogger debugLogger) {
+        return CANDIDATE_SELECTOR.findPlan(mod, cooldownOrigins, debugLogger);
+    }
+
+    public static String describePlanSearchFailure(AltoClef mod, Set<BlockPos> cooldownOrigins) {
+        return CANDIDATE_SELECTOR.describePlanSearchFailure(mod, cooldownOrigins);
+    }
+
     @Override
     protected void onStart() {
         timeout.reset();
@@ -72,6 +80,12 @@ public class LocalTerrainEscapeTask extends Task implements ITaskRequiresGrounde
 
         while (clearIndex < plan.getBlocksToClear().size()
                 && BLOCK_ACTION_POLICY.isEscapeSpaceClear(mod, plan.getBlocksToClear().get(clearIndex))) {
+            debugLogger.state("skip clear escape block " + plan.getBlocksToClear().get(clearIndex).toShortString(),
+                    "skip already clear escape block: index=" + (clearIndex + 1)
+                            + "/" + plan.getBlocksToClear().size()
+                            + ", target=" + plan.getBlocksToClear().get(clearIndex).toShortString()
+                            + ", reason=" + BLOCK_ACTION_POLICY.describeEscapeSpace(mod, plan.getBlocksToClear().get(clearIndex))
+                            + ", " + describePlan());
             clearIndex++;
         }
         if (clearIndex >= plan.getBlocksToClear().size()) {
@@ -84,11 +98,19 @@ public class LocalTerrainEscapeTask extends Task implements ITaskRequiresGrounde
         if (!BLOCK_ACTION_POLICY.isSafeBreakTarget(mod, target)) {
             finished = true;
             debugLogger.event("finished: target no longer safe to clear: target=" + target.toShortString()
+                    + ", reason=" + BLOCK_ACTION_POLICY.describeBreakSafety(mod, target)
                     + ", " + describePlan());
             return null;
         }
 
         setDebugState("Clearing terrain " + (clearIndex + 1) + "/" + plan.getBlocksToClear().size());
+        debugLogger.state("clear escape block " + target.toShortString(),
+                "clearing escape block: index=" + (clearIndex + 1)
+                        + "/" + plan.getBlocksToClear().size()
+                        + ", target=" + target.toShortString()
+                        + ", space=" + BLOCK_ACTION_POLICY.describeEscapeSpace(mod, target)
+                        + ", break=" + BLOCK_ACTION_POLICY.describeBreakSafety(mod, target)
+                        + ", " + describePlan());
         return new DestroyBlockTask(target);
     }
 
