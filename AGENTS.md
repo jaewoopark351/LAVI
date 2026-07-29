@@ -1063,16 +1063,48 @@ When adding logs:
 
 * Use existing logger utilities if available.
 * Avoid printing secrets.
-* Avoid excessive spam in real-time audio loops.
-* Prefer clear messages that help locate the failing module.
+* Prefer clear, structured messages that identify the exact operation, component, branch, state, and result.
+* During active troubleshooting, diagnostic completeness has priority over quiet console output.
+* Temporary high-volume `DEBUG` logging is explicitly allowed when the cause is unknown.
+* Do not omit necessary diagnostics merely because the logs may be noisy.
+* For real-time audio, video, model-token, game-tick, polling, event, and queue loops, keep the investigation bounded or configurable, but log every state transition, rejection reason, retry, timeout, cancellation, and terminal result needed to reconstruct the failure.
 
 Do not remove useful debug logs during active troubleshooting unless the user asks.
+Do not reduce or silence investigation logs until the root cause has been verified and permanent observability remains.
 
 ---
 
 ## 21.1 Diagnostic Logging First Rule
 
 When a feature fails, behaves inconsistently, hangs, returns an unexpected result, or cannot be reproduced reliably, Codex must first determine whether the existing logs are sufficient to identify the exact failing step.
+
+### Absolute No-Guessing Gate
+
+If Codex cannot prove the exact cause using a stack trace, compiler error, failing test, validated reproduction, direct code evidence, or diagnostic logs, the root cause is unknown.
+
+When the root cause is unknown, Codex must:
+
+1. State clearly that the root cause is still unknown.
+2. Stop proposing or applying behavior changes based only on likelihood, intuition, code appearance, or a plausible story.
+3. Identify every execution boundary, branch, value, state transition, callback, queue operation, external response, retry, fallback, timeout, cancellation, cleanup step, or background-task result that is still unobservable.
+4. Add diagnostic logs across those unobservable points.
+5. Reproduce the symptom again.
+6. Continue adding logs repeatedly until the exact last successful boundary and the exact failing boundary are observable.
+7. Apply a fix only after the evidence identifies the failure mechanism.
+
+One small logging patch is not automatically sufficient.
+If uncertainty remains after the first reproduction, Codex must add more logs and reproduce again instead of choosing the most likely explanation.
+
+During active investigation, verbose and repetitive `DEBUG` logs are preferable to speculation.
+It is acceptable for the console or log file to become noisy while tracing an unknown failure, provided that:
+
+* secrets, credentials, raw microphone audio, private conversations, and sensitive payloads are not logged
+* each message identifies its component, operation, branch, state, attempt, or correlation identifier
+* high-frequency logging is bounded to the affected test session, controlled by an existing debug setting when practical, or removed/downgraded only after verification
+* logging volume does not cause a new resource-exhaustion failure
+
+Do not optimize for clean output while the failing path is still invisible.
+Do not treat "probably", "likely", "appears to be", or "seems related" as proof.
 
 ### Core Rule
 
@@ -1083,17 +1115,22 @@ Use this order:
 ```text
 reproduce the symptom
     -> inspect existing logs and error output
-    -> identify the unobservable execution boundary
-    -> add focused diagnostic logs
+    -> identify every unobservable execution boundary
+    -> add structured diagnostic logs across the affected path
     -> reproduce again
-    -> verify the actual failing step and state
+    -> if any material uncertainty remains, add more logs
+    -> reproduce again as many times as required
+    -> verify the exact last successful step, failing step, and triggering state
     -> apply the smallest root-cause fix
     -> validate the fix using tests and logs
 ```
 
 A suspected cause is not a verified cause.
 
-Do not skip diagnostic logging merely because one module appears likely to be responsible. Logging-first may be skipped only when existing evidence already identifies the exact failing operation and the required correction.
+Do not skip diagnostic logging merely because one module appears likely to be responsible.
+Do not stop after adding only entry and final-error logs when intermediate decisions remain invisible.
+Logging-first may be skipped only when existing evidence already identifies the exact failing operation, triggering state, and required correction.
+When in doubt, add more logs rather than more hypotheses.
 
 ### Mandatory Diagnostic Review Trigger
 
@@ -1249,7 +1286,10 @@ Do not use `ERROR` for a normal optional absence.
 
 Do not use `INFO` for high-frequency loop details.
 
-Real-time audio, video, model-token, game-tick, polling, event, and queue loops must not emit unbounded logs. Use state-change logging, sampling, rate limiting, aggregation, or configurable debug logging when necessary.
+During active troubleshooting, high-volume `DEBUG` output is allowed and preferred over guessing when it is required to expose the failing path.
+Real-time audio, video, model-token, game-tick, polling, event, and queue loops must not emit permanently unbounded logs, but this restriction must not be used as a reason to leave a failure unobservable.
+Use a bounded reproduction session, state-change logging, attempt counters, correlation identifiers, sampling, rate limiting, aggregation, or a configurable debug switch as appropriate.
+For the affected test run, log enough detail to reconstruct every relevant transition and terminal result.
 
 ### Correlation and Traceability
 
@@ -1273,6 +1313,10 @@ Use the project's existing logging context mechanism when one exists. Do not add
 
 Before the failure boundary is verified, do not attempt to solve an unknown problem by:
 
+* selecting a cause because it is the most likely explanation
+* presenting a hypothesis as the root cause
+* changing behavior before the missing execution path has been instrumented
+* stopping diagnostic work after one logging patch while material uncertainty remains
 * rewriting the affected component
 * changing dependency or runtime versions
 * adding broad `try/catch` or `try/except` blocks
@@ -1344,9 +1388,17 @@ Validation:
 
 Remaining uncertainty:
 - <anything not yet proven>
+
+Unobserved boundaries remaining:
+- <every branch, transition, value, callback, queue operation, external response, or terminal state that is still invisible>
+
+Next diagnostic logs required:
+- <exact files and events to add before any behavioral fix>
 ```
 
-If the root cause remains unknown after logging is added, state that it remains unknown. Do not present a suspected cause as verified.
+If the root cause remains unknown after logging is added, state that it remains unknown, add more diagnostic coverage, and reproduce again.
+Do not present a suspected cause as verified.
+Do not proceed to a behavioral fix while a material failure boundary remains unobserved.
 
 ### Forbidden Patterns
 
@@ -1359,13 +1411,15 @@ Do not:
 * return success after logging a required operation failure
 * print secrets or complete sensitive payloads
 * rely on console `print` when an existing logger is available
-* add so much logging that the relevant failure becomes harder to find
+* use vague, unlabeled, or uncorrelated log messages that make a high-volume trace impossible to follow
+* refuse to add required diagnostic logs merely because the output may be noisy
 * remove useful diagnostic logs immediately after the first successful run
 * claim that the problem is fixed without reproducing and observing the affected path
+* stop investigating while the report still contains material unobserved boundaries
 
-The purpose of logging is not to produce more output.
-
-The purpose is to make the exact failing boundary observable before code behavior is changed.
+The purpose of logging is to make the exact failing boundary observable before code behavior is changed.
+Output volume is secondary during an active investigation.
+Structured verbose logging is acceptable; unsupported guessing is not.
 
 ---
 
@@ -1578,70 +1632,255 @@ __pycache__/
 
 ## 29. Refactoring Rules
 
-Refactoring is allowed only when it improves maintainability without breaking behavior.
+Refactoring is mandatory whenever the code touched by the current task violates the responsibility rules below.
 
-Mandatory responsibility split trigger:
+Maintaining working behavior remains required, but existing behavior is not a reason to keep mixed responsibilities in the same class, module, source file, service, manager, controller, adapter, facade, worker, handler, or package.
 
-* If a class, module, source file, service, manager, controller, adapter, or facade has two or more independent responsibilities, Codex must split those responsibilities into separate focused units before adding more behavior.
-* Do not postpone this split as a future cleanup when the current task touches that code.
-* Keep each extracted unit focused on one primary responsibility, with a name that states that responsibility clearly.
-* Preserve public APIs, config keys, runtime behavior, and compatibility paths unless the user explicitly approves a breaking change.
-* If the split cannot be done safely within the current task, stop expanding the mixed-responsibility code and report the blocker instead of adding more logic to it.
+### Non-Negotiable Two-Responsibility Rule
 
-Readability-first separation preference:
+Use this rule without exception:
 
-* Prefer more small, explicit classes/files over fewer dense classes when that makes the code easier to read, test, and extend.
+```text
+one responsibility        -> the unit may remain as-is
+two or more responsibilities -> refactor, separate files, and evaluate folder/package separation immediately
+```
+
+If a production unit has two or more independent responsibilities, Codex must split it during the current task before adding, extending, or fixing behavior in that unit.
+
+This is a mandatory execution gate, not a recommendation, optional cleanup, future improvement, or style preference.
+
+A responsibility is independent when one or more of the following is true:
+
+* it can change for a different reason
+* it has a separate lifecycle, state, dependency, or failure mode
+* it can be tested independently
+* it belongs to a different feature, domain, layer, integration, or ownership boundary
+* it performs a distinct stage such as parsing, validation, orchestration, execution, persistence, transport, UI rendering, logging, retry, cleanup, or result conversion
+* it could be replaced, reused, disabled, or extended without replacing the other behavior
+
+Common mixed-responsibility examples that require immediate separation include:
+
+```text
+parsing + command execution
+validation + external transport
+UI rendering + application orchestration
+state storage + business decisions
+plugin loading + plugin lifecycle execution
+HTTP/WebSocket transport + game logic
+configuration loading + path normalization
+queue ownership + worker execution
+model invocation + response formatting
+logging/diagnostics + behavioral recovery policy
+```
+
+Do not use line count as the deciding factor. A small class or file with two responsibilities must still be split.
+
+### Mandatory Refactoring Procedure
+
+Before modifying production code, Codex must:
+
+1. Inspect every directly affected class, module, source file, service, manager, controller, adapter, facade, worker, handler, and package.
+2. List the responsibilities currently owned by each affected unit.
+3. Count independent responsibilities by reason-to-change, lifecycle, dependency, failure mode, and ownership boundary.
+4. If the count is two or more, stop adding behavior to that unit.
+5. Define focused replacement units with one primary responsibility each.
+6. Place the extracted units in responsibility-oriented, feature-oriented, domain-oriented, or component-oriented folders/packages.
+7. Perform the split in the same task before implementing the requested feature or fix.
+8. Update imports, exports, package declarations, registrations, dynamic loading paths, configuration references, tests, mocks, build files, and documentation affected by the split.
+9. Preserve public APIs, config keys, runtime behavior, result shapes, and compatibility paths unless the user explicitly approves a breaking change.
+10. Run the smallest relevant syntax, compile, unit, integration, and runtime-loading checks.
+
+The required order is:
+
+```text
+inspect responsibilities
+    -> split mixed responsibilities
+    -> organize files into clear folders/packages
+    -> update references and compatibility paths
+    -> implement the requested behavior
+    -> validate structure and runtime behavior
+```
+
+Do not implement the requested behavior first and postpone the split until later.
+
+### Folderization Is Part of the Refactor
+
+Separating classes or functions into new files is not sufficient when the files still remain in a folder that mixes unrelated responsibilities.
+
+When a responsibility split creates multiple focused units, Codex must also evaluate and, when needed, reorganize the directly affected folder/package structure in the same task.
+
+Required outcome:
+
+```text
+one primary responsibility per class/type/file
+related responsibilities grouped in one clear component boundary
+unrelated responsibilities placed in separate folders/packages
+```
+
+Do not leave extracted files beside unrelated code merely to avoid updating imports.
+Do not create meaningless folders only to satisfy the wording of this rule.
+Every new or reorganized folder must represent a clear responsibility, feature, domain, component, integration, or lifecycle boundary.
+
+The detailed folder rules in section 29.1 remain mandatory.
+
+### No Deferral or Avoidance
+
+The following are not valid reasons to skip or postpone the split:
+
+* the requested change is small
+* the current code already works
+* only a few lines are being added
+* the class or file is not yet large
+* creating more files feels inconvenient
+* imports or tests need updates
+* the user did not explicitly ask for refactoring in the current prompt
+* the task is described as a bug fix, hotfix, compatibility fix, logging change, or minor feature
+* the existing mixed-responsibility design was created by a previous Codex task
+* the split increases class count or file count
+* a generic manager, service, helper, utility, facade, or controller could hide the additional responsibility
+
+Do not respond only with a future refactoring recommendation.
+Do not add `TODO`, `later`, `follow-up`, or backlog notes as a substitute for performing the required split.
+Do not continue expanding a mixed-responsibility unit.
+
+### Safety and Blocker Handling
+
+The responsibility split remains mandatory even when a filesystem safety rule, move/rename confirmation, external dependency, unavailable runtime, or compatibility risk temporarily blocks completion.
+
+When blocked, Codex must:
+
+1. Stop adding behavior to the mixed-responsibility unit.
+2. Print the exact current responsibilities.
+3. Print the exact proposed files and folder/package structure.
+4. Print every exact source and destination path requiring confirmation.
+5. Explain the specific blocker.
+6. Ask only for the confirmation or missing external condition required by the safety rules.
+7. Mark the task as structurally incomplete until the split is completed.
+
+A blocker may delay execution, but it must not be used to justify adding more logic to the mixed-responsibility code.
+
+### Readability-First Separation Rule
+
+* Prefer more small, explicit classes and files over fewer dense classes when that makes ownership easier to understand, test, replace, and extend.
 * Do not avoid a split merely because it increases the class or file count.
-* Optimize for clear responsibility boundaries first; performance, allocation count, and class-count efficiency are secondary unless there is a measured runtime problem or a user explicitly asks for optimization.
-* Avoid clever consolidation that hides responsibilities behind generic utility classes, broad managers, or overloaded facades.
-* If in doubt, choose the structure that a future maintainer can understand fastest.
+* Optimize for clear responsibility boundaries first. Performance, allocation count, and class-count efficiency are secondary unless a measured runtime problem exists or the user explicitly asks for optimization.
+* Avoid clever consolidation that hides responsibilities behind generic utility classes, broad managers, overloaded facades, configurable god objects, or unrelated helper modules.
+* If there is doubt whether two behaviors are independent, prefer separation when they have different reasons to change or different failure modes.
 
-Preferred refactoring style:
+### Required Refactoring Report
 
-* Extract small helper class.
-* Extract small helper function.
-* Keep old behavior intact.
-* Preserve public method names.
-* Preserve config keys.
-* Add fallback path if needed.
+Before editing mixed-responsibility code, Codex must report:
+
+```text
+Affected unit:
+- <exact path and class/type/module>
+
+Current responsibilities:
+- <responsibility 1>
+- <responsibility 2>
+- <additional responsibilities>
+
+Mandatory split:
+- <exact new or retained path>: <one responsibility>
+
+Folder/package organization:
+- <folder path>: <component boundary>
+
+References to update:
+- imports
+- exports
+- registrations
+- dynamic loading paths
+- configuration references
+- tests and mocks
+- build or packaging files
+- documentation
+
+Compatibility to preserve:
+- public APIs
+- config keys
+- result shapes
+- runtime behavior
+- legacy import/loading paths
+
+Validation:
+- <commands and runtime checks>
+```
+
+After completing the change, Codex must report:
+
+```text
+Responsibilities separated:
+- <old mixed responsibility> -> <new focused units>
+
+Created folders:
+- <exact folder>: <responsibility boundary>
+
+Created files:
+- <exact file>: <single responsibility>
+
+Moved files:
+- <old path> -> <new path>
+
+Updated references:
+- <imports, exports, registrations, config, tests, dynamic loading>
+
+Compatibility preserved:
+- <public and legacy paths>
+
+Validation completed:
+- <command>: <result>
+
+Remaining runtime validation:
+- <manual or integration test, if any>
+```
+
+### Preferred Refactoring Style
+
+* Extract one focused class, type, module, or function for each independent responsibility.
+* Preserve existing behavior while relocating ownership.
+* Preserve public method names and config keys when possible.
+* Use compatibility exports, adapters, or staged migration paths when required.
+* Extract shared contracts when separation would otherwise create circular dependencies.
+* Keep each structural change limited to the directly affected component, but complete the responsibility split inside that component.
 
 Avoid:
 
-* large rewrites
-* speculative abstractions
-* dependency injection frameworks
-* changing too many files at once
-* replacing stable code only for style reasons
+* repository-wide uncontrolled rewrites
+* speculative abstractions unrelated to an observed responsibility boundary
+* dependency injection frameworks added only for style
+* combining the responsibility split with unrelated dependency upgrades or feature changes
+* replacing stable behavior only to rename or restyle it
 
-## Code Structure / Refactoring Awareness Rule
+## Code Structure / Refactoring Enforcement Rule
 
-When writing or modifying code, always consider refactoring opportunities and folder structure.
+When writing or modifying production code, Codex must check both behavior and structure.
 
-Do not only make the code “work”; also check whether the new code belongs in the correct module, class, or folder.
+Do not only make the code work. Confirm that every affected behavior belongs to the correct class, module, file, folder, package, feature, domain, or component.
 
 Before adding new logic:
 
-* Check whether an existing module, helper, service, manager, controller, or utility file already handles similar behavior.
-* Avoid putting too much logic into one large file or one large class.
-* If a function, class, or file becomes too large, propose a small safe extraction instead of continuing to expand it.
-* Keep related code grouped together by responsibility, feature, domain, or component.
-* Evaluate folder and package placement during every production code change, not only during class or file separation.
-* Create or reorganize folders when the current structure does not clearly represent responsibility, feature, domain, or component boundaries.
-* Do not create arbitrary folders that add depth without establishing a meaningful ownership boundary.
-* Prefer clear boundaries between UI, application logic, core logic, game integration, memory, audio, TTS, STT, vision, configuration, infrastructure, and adapters.
-* Preserve existing behavior while improving structure.
-* Refactor only in small, safe steps.
+* Check whether an existing focused unit already owns the responsibility.
+* Do not append a second responsibility to an existing class, module, file, service, manager, controller, adapter, facade, worker, or handler.
+* If the target already owns another independent responsibility, perform the mandatory split first.
+* Group related code by responsibility, feature, domain, component, integration, or lifecycle.
+* Evaluate folder and package placement during every production code change.
+* Create or reorganize folders when the current structure does not clearly represent ownership.
+* Do not create arbitrary directory depth without a meaningful boundary.
+* Prefer clear boundaries between UI, application logic, domain/core logic, game integration, memory, audio, TTS, STT, vision, configuration, infrastructure, transport, persistence, and adapters.
+* Preserve existing behavior and compatibility while improving structure.
+* Perform the refactor in small, safe, complete steps. “Small” limits scope; it does not permit leaving two responsibilities together.
 
 When refactoring:
 
 * Preserve public method names unless the user explicitly approves a rename.
-* Preserve config keys and file paths unless the user explicitly approves a change.
-* Keep backward-compatible fallback paths when possible.
-* Avoid large rewrites.
-* Explain why the refactor improves maintainability, portability, or extensibility.
-
+* Preserve config keys and externally referenced paths unless the user explicitly approves a change.
+* Keep backward-compatible import, loading, registration, and fallback paths when practical.
+* Avoid unrelated large rewrites.
+* Explain why each extracted unit and folder represents a clearer responsibility boundary.
 
 ---
+
 
 ## 29.1 Folder and Package Organization Rule
 
@@ -3341,12 +3580,15 @@ Before editing:
 
 1. Inspect the relevant files.
 2. For a failure or unexpected behavior, inspect the existing logs, stack traces, tests, and reproduction evidence.
-3. If the root cause is not proven, add focused diagnostic logs and reproduce the problem before changing behavior.
-4. Summarize the planned change.
-5. Make the smallest safe patch.
-6. Show what changed.
-7. Suggest a test command.
-8. Before any cleanup, deletion, move, rename, reset, or mass file operation, print the exact target list and stop for user confirmation.
+3. If the root cause is not proven, state that it is unknown and add structured diagnostic logs before changing behavior.
+4. Reproduce the problem and inspect the new trace.
+5. If any material boundary, branch, state, value, callback, queue operation, external response, timeout, fallback, cleanup step, or terminal result remains unobservable, add more logs and reproduce again.
+6. Continue the logging and reproduction cycle until the exact failure mechanism is verified. No speculative behavioral patch is allowed before this point.
+7. Summarize the planned root-cause change.
+8. Make the smallest safe patch.
+9. Show what changed.
+10. Suggest a test command.
+11. Before any cleanup, deletion, move, rename, reset, or mass file operation, print the exact target list and stop for user confirmation.
 
 After editing:
 
@@ -3367,6 +3609,9 @@ Do not break working behavior for unnecessary cleanup.
 When in doubt:
 
 * preserve existing behavior
+* do not guess the root cause
+* add more structured diagnostic logs until the failing boundary is proven
+* accept noisy investigation logs rather than an unsupported behavioral change
 * make smaller changes
 * document fragile assumptions
 * ask before changing versions
