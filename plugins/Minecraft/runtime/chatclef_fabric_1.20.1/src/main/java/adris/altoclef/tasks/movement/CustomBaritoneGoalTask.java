@@ -5,6 +5,7 @@ import adris.altoclef.Debug;
 import adris.altoclef.control.InputControls;
 import adris.altoclef.multiversion.versionedfields.Blocks;
 import adris.altoclef.tasks.entity.KillEntityTask;
+import adris.altoclef.tasks.movement.escape.EscapePlan;
 import adris.altoclef.tasks.movement.escape.LocalTerrainEscapeTask;
 import adris.altoclef.tasks.movement.escape.TimeoutWanderTask;
 import adris.altoclef.tasksystem.ITaskRequiresGrounded;
@@ -234,7 +235,7 @@ public abstract class CustomBaritoneGoalTask extends Task implements ITaskRequir
             checker.reset();
             stuckCheck.reset();
         }
-        Optional<LocalTerrainEscapeTask.Plan> terrainEscapePlan = getTerrainEscapePlan(mod);
+        Optional<EscapePlan> terrainEscapePlan = getTerrainEscapePlan(mod);
         if (terrainEscapePlan.isPresent()) {
             localTerrainEscapeTask = new LocalTerrainEscapeTask(terrainEscapePlan.get(), toDebugString());
             setDebugState("Clearing local terrain escape route.");
@@ -324,7 +325,7 @@ public abstract class CustomBaritoneGoalTask extends Task implements ITaskRequir
         return Optional.empty();
     }
 
-    private Optional<LocalTerrainEscapeTask.Plan> getTerrainEscapePlan(AltoClef mod) {
+    private Optional<EscapePlan> getTerrainEscapePlan(AltoClef mod) {
         pruneTerrainEscapeRetryCooldowns();
         if (!isLocallyStalled(mod)) {
             return Optional.empty();
