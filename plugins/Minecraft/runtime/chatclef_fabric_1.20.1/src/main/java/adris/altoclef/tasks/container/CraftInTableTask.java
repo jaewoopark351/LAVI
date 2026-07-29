@@ -6,6 +6,7 @@ import adris.altoclef.tasks.CraftGenericManuallyTask;
 import adris.altoclef.tasks.CraftGenericWithRecipeBooksTask;
 import adris.altoclef.tasks.CraftInInventoryTask;
 import adris.altoclef.tasks.ResourceTask;
+import adris.altoclef.tasks.container.access.DoStuffInContainerTask;
 import adris.altoclef.tasks.movement.escape.TimeoutWanderTask;
 import adris.altoclef.tasks.resources.CollectRecipeCataloguedResourcesTask;
 import adris.altoclef.tasks.slot.MoveInaccessibleItemToInventoryTask;
@@ -149,7 +150,7 @@ public class CraftInTableTask extends ResourceTask {
         // Check if the other task is an instance of CraftInTableTask
         if (other instanceof CraftInTableTask task) {
             // Compare the craftTask of the two tasks
-            return craftTask.isEqual(task.craftTask);
+            return craftTask.isSameContainerTask(task.craftTask);
         }
         // The other task is not a CraftInTableTask, return false
         return false;
@@ -164,7 +165,7 @@ public class CraftInTableTask extends ResourceTask {
      */
     @Override
     protected String toDebugStringName() {
-        return (craftTask != null) ? craftTask.toDebugString() : null;
+        return (craftTask != null) ? craftTask.getContainerDebugString() : null;
     }
 
     /**

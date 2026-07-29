@@ -6,7 +6,7 @@ import adris.altoclef.Debug;
 import adris.altoclef.catalogue.TaskCatalogue;
 import adris.altoclef.commands.BlockScanner;
 import adris.altoclef.tasks.construction.destroy.DestroyBlockTask;
-import adris.altoclef.tasks.interaction.InteractWithBlockTask;
+import adris.altoclef.tasks.interaction.block.InteractWithBlockTask;
 import adris.altoclef.tasks.movement.GetToBlockTask;
 import adris.altoclef.tasks.movement.escape.TimeoutWanderTask;
 import adris.altoclef.tasksystem.Task;

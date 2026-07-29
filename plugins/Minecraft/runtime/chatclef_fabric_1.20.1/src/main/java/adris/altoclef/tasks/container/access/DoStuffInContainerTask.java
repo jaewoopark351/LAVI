@@ -1,16 +1,9 @@
-package adris.altoclef.tasks.container;
+package adris.altoclef.tasks.container.access;
 
 import adris.altoclef.AltoClef;
 import adris.altoclef.catalogue.TaskCatalogue;
-import adris.altoclef.tasks.container.access.CarryOnContainerController;
-import adris.altoclef.tasks.container.access.ContainerBlockValidator;
-import adris.altoclef.tasks.container.access.ContainerCursorHandler;
-import adris.altoclef.tasks.container.access.ContainerPlanLogger;
-import adris.altoclef.tasks.container.access.ContainerTargetPlan;
-import adris.altoclef.tasks.container.access.ContainerTargetSelector;
-import adris.altoclef.tasks.container.access.ContainerTaskDiagnostics;
 import adris.altoclef.tasks.construction.PlaceBlockNearbyTask;
-import adris.altoclef.tasks.interaction.InteractWithBlockTask;
+import adris.altoclef.tasks.interaction.block.InteractWithBlockTask;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.ItemTarget;
 import adris.altoclef.util.helpers.ItemHelper;
@@ -23,6 +16,7 @@ import net.minecraft.util.math.BlockPos;
 import java.util.Arrays;
 
 
+//20260730_kpopmodder: Moved this container access coordinator into the access package without behavior changes.
 /**
  * Interacts with a container, obtaining and placing one if none were found nearby.
  */
@@ -100,8 +94,22 @@ public abstract class DoStuffInContainerTask extends Task {
                         + ", " + ContainerTaskDiagnostics.describeInteractionContext(mod));
 
         Task carriedPlacement = carryOnController.getCarriedContainerPlacementTask(mod,
-                pos -> cachedContainerPosition = pos,
-                justPlacedTimer::reset,
+                pos -> {
+                    BlockPos oldCached = cachedContainerPosition;
+                    cachedContainerPosition = pos;
+                    debugLogger.event("carried placement cache update: tick=" + debugTickCount
+                            + ", oldCached=" + ContainerTaskDiagnostics.describePos(oldCached)
+                            + ", newCached=" + ContainerTaskDiagnostics.describePos(pos)
+                            + ", " + carryOnController.describeStatus(mod)
+                            + ", " + ContainerTaskDiagnostics.describeInteractionContext(mod));
+                },
+                () -> {
+                    debugLogger.event("carried placement justPlacedTimer reset: tick=" + debugTickCount
+                            + ", cached=" + ContainerTaskDiagnostics.describePos(cachedContainerPosition)
+                            + ", " + carryOnController.describeStatus(mod)
+                            + ", " + ContainerTaskDiagnostics.describeInteractionContext(mod));
+                    justPlacedTimer.reset();
+                },
                 this::setDebugState);
         if (carriedPlacement != null) {
             debugLogger.state("container return carried placement:" + debugTickCount,
@@ -215,6 +223,12 @@ public abstract class DoStuffInContainerTask extends Task {
             // It's cheaper to make a new one, or our only option.
 
             // We're no longer going to our previous container.
+            debugLogger.event("container cache cleared before new container flow: tick=" + debugTickCount
+                    + ", oldCached=" + ContainerTaskDiagnostics.describePos(cachedContainerPosition)
+                    + ", reason=" + plan.actionReason()
+                    + ", shouldUseNewContainer=true"
+                    + ", " + carryOnController.describeStatus(mod)
+                    + ", " + ContainerTaskDiagnostics.describeInteractionContext(mod));
             cachedContainerPosition = null;
 
             // Get if we don't have...
@@ -256,7 +270,17 @@ public abstract class DoStuffInContainerTask extends Task {
 
         // This is insanely cursed.
         // TODO: Finish committing to optionals, this is ugly.
-        cachedContainerPosition = plan.requireTargetPosition();
+        BlockPos previousCached = cachedContainerPosition;
+        BlockPos selectedTarget = plan.requireTargetPosition();
+        cachedContainerPosition = selectedTarget;
+        debugLogger.state("container cached target selected:" + debugTickCount + ":" + selectedTarget.toShortString(),
+                "container cached target selected: tick=" + debugTickCount
+                        + ", previousCached=" + ContainerTaskDiagnostics.describePos(previousCached)
+                        + ", selected=" + selectedTarget.toShortString()
+                        + ", usingPlacedContainer=" + plan.usingPlacedContainer()
+                        + ", reason=" + plan.actionReason()
+                        + ", " + carryOnController.describeStatus(mod)
+                        + ", " + ContainerTaskDiagnostics.describeInteractionContext(mod));
 
         // Walk to it and open it
 
@@ -312,6 +336,15 @@ public abstract class DoStuffInContainerTask extends Task {
 
     public ItemTarget getContainerTarget() {
         return containerTarget;
+    }
+
+    //20260730_kpopmodder: Public adapters preserve old same-package callers after moving this class into access.
+    public final boolean isSameContainerTask(Task other) {
+        return isEqual(other);
+    }
+
+    public final String getContainerDebugString() {
+        return toDebugString();
     }
 
     // Virtual

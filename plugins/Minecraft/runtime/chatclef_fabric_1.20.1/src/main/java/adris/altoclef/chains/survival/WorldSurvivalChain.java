@@ -3,7 +3,7 @@ package adris.altoclef.chains.survival;
 import adris.altoclef.AltoClef;
 import adris.altoclef.chains.SingleTaskChain;
 import adris.altoclef.tasks.DoToClosestBlockTask;
-import adris.altoclef.tasks.interaction.InteractWithBlockTask;
+import adris.altoclef.tasks.interaction.block.InteractWithBlockTask;
 import adris.altoclef.tasks.construction.PutOutFireTask;
 import adris.altoclef.tasks.movement.EnterNetherPortalTask;
 import adris.altoclef.tasks.movement.escape.EscapeFromLavaTask;

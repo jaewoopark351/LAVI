@@ -5,6 +5,7 @@ import adris.altoclef.BotBehaviour;
 import adris.altoclef.Debug;
 import adris.altoclef.catalogue.TaskCatalogue;
 import adris.altoclef.tasks.ResourceTask;
+import adris.altoclef.tasks.container.access.DoStuffInContainerTask;
 import adris.altoclef.tasks.container.smelt.SmeltContainerSnapshot;
 import adris.altoclef.tasks.container.smelt.SmeltFuelPlanner;
 import adris.altoclef.tasks.container.smelt.SmeltPlan;
@@ -114,14 +115,14 @@ public abstract class AbstractSmeltInContainerTask<T extends AbstractDoSmeltInCo
     @Override
     protected boolean isEqualResource(ResourceTask other) {
         if (other != null && other.getClass() == getClass() && other instanceof AbstractSmeltInContainerTask<?> task) {
-            return task.doTask.isEqual(doTask);
+            return task.doTask.isSameContainerTask(doTask);
         }
         return false;
     }
 
     @Override
     protected String toDebugStringName() {
-        return doTask.toDebugString();
+        return doTask.getContainerDebugString();
     }
 
     public SmeltTarget[] getTargets() {

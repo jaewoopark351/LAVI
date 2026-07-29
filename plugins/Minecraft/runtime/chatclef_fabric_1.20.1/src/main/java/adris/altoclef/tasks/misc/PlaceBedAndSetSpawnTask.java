@@ -9,7 +9,7 @@ import adris.altoclef.eventbus.events.ChatMessageEvent;
 import adris.altoclef.eventbus.events.GameOverlayEvent;
 import adris.altoclef.multiversion.blockpos.BlockPosVer;
 import adris.altoclef.tasks.DoToClosestBlockTask;
-import adris.altoclef.tasks.interaction.InteractWithBlockTask;
+import adris.altoclef.tasks.interaction.block.InteractWithBlockTask;
 import adris.altoclef.tasks.construction.destroy.DestroyBlockTask;
 import adris.altoclef.tasks.construction.PlaceStructureBlockTask;
 import adris.altoclef.tasks.movement.DefaultGoToDimensionTask;

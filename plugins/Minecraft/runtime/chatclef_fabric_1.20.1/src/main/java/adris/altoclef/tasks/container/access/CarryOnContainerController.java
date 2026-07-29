@@ -100,6 +100,7 @@ public final class CarryOnContainerController {
                         "carried container finished validation: tick=" + debugTickCount
                                 + ", placedCandidate=" + ContainerTaskDiagnostics.describePos(placeCarriedTask.getPlaced())
                                 + ", validPlaced=" + ContainerTaskDiagnostics.describeOptionalPos(placed)
+                                + ", " + describeLocalPlaceTask()
                                 + ", " + ContainerTaskDiagnostics.describeInteractionContext(mod));
                 if (placed.isPresent()) {
                     cachedContainerUpdater.accept(placed.get());
@@ -146,12 +147,19 @@ public final class CarryOnContainerController {
 
         cachedContainerUpdater.accept(null);
         justPlacedTimerReset.run();
-        placeCarriedTask = new PlaceCarriedBlockTask(containerBlocks);
+        placeCarriedTask = new PlaceCarriedBlockTask("container-access-local", containerBlocks);
         localPlaceTaskCreateCount++;
+        debugLogger.event("carried container local placement task created: "
+                + placeCarriedTask.describeDiagnostic()
+                + ", createCount=" + localPlaceTaskCreateCount
+                + ", carried=" + carriedContainer.get().getBlock().getTranslationKey()
+                + ", cachedWillClear=true"
+                + ", " + ContainerTaskDiagnostics.describeInteractionContext(mod));
         debugLogger.state("carried container before release:" + debugTickCount,
                 "carried container before release: tick=" + debugTickCount
                         + ", createCount=" + localPlaceTaskCreateCount
                         + ", carried=" + carriedContainer.get().getBlock().getTranslationKey()
+                        + ", " + placeCarriedTask.describeDiagnostic()
                         + ", " + ContainerTaskDiagnostics.describeInteractionContext(mod));
         mod.getInputControls().release(Input.SNEAK);
         debugStateSetter.accept("Placing carried container");
@@ -159,6 +167,7 @@ public final class CarryOnContainerController {
                         + ":after-release:" + ContainerTaskDiagnostics.describeInputState(mod),
                 "detected carried container block: " + carriedContainer.get().getBlock().getTranslationKey()
                         + ", localPlaceTaskCreated=true"
+                        + ", " + placeCarriedTask.describeDiagnostic()
                         + ", " + ContainerTaskDiagnostics.describeInteractionContext(mod));
         return placeCarriedTask;
     }
@@ -168,6 +177,7 @@ public final class CarryOnContainerController {
             return "localTask=none";
         }
         return "localTask=present"
+                + ", " + placeCarriedTask.describeDiagnostic()
                 + ", localTaskPlaced=" + ContainerTaskDiagnostics.describePos(placeCarriedTask.getPlaced())
                 + ", localTaskFailed=" + placeCarriedTask.hasFailed()
                 + ", localTaskActive=" + placeCarriedTask.isActive()

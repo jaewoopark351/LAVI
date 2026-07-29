@@ -42,9 +42,11 @@ public class CarryOnFixChain extends SingleTaskChain {
 
     @Override
     protected void onTaskFinish(AltoClef mod) {
-        if (mainTask instanceof PlaceCarriedBlockTask) {
+        if (mainTask instanceof PlaceCarriedBlockTask placeTask) {
             successCooldownTicks = SUCCESS_COOLDOWN_TICKS;
-            debugLogger.event("carried block preflight finished; success cooldown started: ticks=" + successCooldownTicks
+            debugLogger.event("carried block preflight finished; success cooldown started: "
+                    + placeTask.describeDiagnostic()
+                    + ", ticks=" + successCooldownTicks
                     + ", " + describeChainContext(mod));
         } else {
             debugLogger.event("carried block preflight finished: task=" + describeTask(mainTask)
@@ -87,6 +89,7 @@ public class CarryOnFixChain extends SingleTaskChain {
                             + ":successCooldown=" + successCooldownTicks
                             + ":failureCooldown=" + failureCooldownTicks,
                     "active carried placement task: placed=" + describePos(placeTask.getPlaced())
+                            + ", " + placeTask.describeDiagnostic()
                             + ", failed=" + placeTask.hasFailed()
                             + ", successCooldownTicks=" + successCooldownTicks
                             + ", failureCooldownTicks=" + failureCooldownTicks
@@ -96,6 +99,7 @@ public class CarryOnFixChain extends SingleTaskChain {
                 debugLogger.state("priority inactive placement failed:" + priorityCheckCount,
                         "priority inactive: carried placement task failed: tick=" + priorityCheckCount
                                 + ", task=" + describeTask(placeTask)
+                                + ", " + placeTask.describeDiagnostic()
                                 + ", " + describeChainContext(mod));
                 clearCurrentPlacementTask();
                 return INACTIVE_PRIORITY;
@@ -103,6 +107,7 @@ public class CarryOnFixChain extends SingleTaskChain {
             debugLogger.state("priority active existing placement:" + priorityCheckCount,
                     "priority active: existing carried placement task: tick=" + priorityCheckCount
                             + ", task=" + describeTask(placeTask)
+                            + ", " + placeTask.describeDiagnostic()
                             + ", " + describeChainContext(mod));
             return PRIORITY;
         }
@@ -151,11 +156,19 @@ public class CarryOnFixChain extends SingleTaskChain {
                 + ", detectedCount=" + detectedCarriedCount
                 + ", priorityTick=" + priorityCheckCount
                 + ", " + describeChainContext(mod));
-        setTask(new PlaceCarriedBlockTask(carriedBlock));
+        PlaceCarriedBlockTask placeTask = new PlaceCarriedBlockTask("carry-on-fix-chain", carriedBlock);
+        debugLogger.event("creating global carried placement task: " + placeTask.describeDiagnostic()
+                + ", block=" + policy.describeBlock(state)
+                + ", reason=" + policy.describeReason(state)
+                + ", detectedCount=" + detectedCarriedCount
+                + ", priorityTick=" + priorityCheckCount
+                + ", " + describeChainContext(mod));
+        setTask(placeTask);
         debugLogger.state("priority active new placement:" + priorityCheckCount,
                 "priority active: new carried placement task created: tick=" + priorityCheckCount
                         + ", detectedCount=" + detectedCarriedCount
                         + ", block=" + policy.describeBlock(state)
+                        + ", " + placeTask.describeDiagnostic()
                         + ", mainTask=" + describeTask(mainTask)
                         + ", " + describeChainContext(mod));
         return PRIORITY;

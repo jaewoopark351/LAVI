@@ -24,15 +24,21 @@ import org.apache.commons.lang3.ArrayUtils;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 
 //20260728_kpopmodder: Added this task to place blocks carried by the Carry On mod before normal item-crafting fallback starts.
 public class PlaceCarriedBlockTask extends Task {
+
+    //20260730_kpopmodder: Identify each carried placement attempt so task-chain handoffs can be traced in logs.
+    private static final AtomicInteger NEXT_DIAGNOSTIC_ID = new AtomicInteger(1);
 
     private static final int MAX_TICKS = 20 * 10;
     private static final int CLICK_INTERVAL_TICKS = 2;
     private static final int MAX_EMPTY_SPACE_CANDIDATES = 8;
     private static final int RELEASE_CONFIRM_TICKS = 2;
 
+    private final int diagnosticId;
+    private final String diagnosticSource;
     private final Block[] expectedBlocks;
     private final CarriedBlockPlacementPlanner planner = new CarriedBlockPlacementPlanner();
     private final CarryOnEmptySpacePlacementPlanner emptySpacePlanner = new CarryOnEmptySpacePlacementPlanner();
@@ -53,7 +59,19 @@ public class PlaceCarriedBlockTask extends Task {
     private int attempts;
 
     public PlaceCarriedBlockTask(Block... expectedBlocks) {
+        this("unspecified", expectedBlocks);
+    }
+
+    public PlaceCarriedBlockTask(String diagnosticSource, Block... expectedBlocks) {
+        this.diagnosticId = NEXT_DIAGNOSTIC_ID.getAndIncrement();
+        this.diagnosticSource = diagnosticSource == null || diagnosticSource.trim().isEmpty()
+                ? "unspecified"
+                : diagnosticSource;
         this.expectedBlocks = expectedBlocks;
+    }
+
+    public String describeDiagnostic() {
+        return "placementId=" + diagnosticId + ", source=" + diagnosticSource;
     }
 
     public boolean hasFailed() {
@@ -92,7 +110,8 @@ public class PlaceCarriedBlockTask extends Task {
             boolean firstObservation = placed == null || !placed.equals(event.blockPos);
             placed = event.blockPos;
             if (firstObservation) {
-                debugLogger.event("observed carried placement at " + event.blockPos.toShortString()
+                debugLogger.event(describeDiagnostic()
+                        + ", observed carried placement at " + event.blockPos.toShortString()
                         + " block=" + event.blockState.getBlock().getTranslationKey());
             }
         });
@@ -124,7 +143,8 @@ public class PlaceCarriedBlockTask extends Task {
                         + ", " + describeRuntimeContext(mod));
         if (ticks > MAX_TICKS) {
             failed = true;
-            debugLogger.event("failed: timed out while placing carried block after attempts=" + attempts
+            debugLogger.event(describeDiagnostic()
+                    + ", failed: timed out while placing carried block after attempts=" + attempts
                     + ", target=" + describeTarget()
                     + ", " + describeRuntimeContext(mod));
             return null;
@@ -190,7 +210,8 @@ public class PlaceCarriedBlockTask extends Task {
                 return null;
             }
             failed = true;
-            debugLogger.event("failed: expected carried block was not available at task start: "
+            debugLogger.event(describeDiagnostic()
+                    + ", failed: expected carried block was not available at task start: "
                     + describeRuntimeContext(mod));
             return null;
         }
@@ -283,6 +304,7 @@ public class PlaceCarriedBlockTask extends Task {
             blockPlaceSubscription = null;
         }
         debugLogger.event("stop carried placement: interruptedBy=" + describeTask(interruptTask)
+                + ", " + describeDiagnostic()
                 + ", completed=" + completed
                 + ", failed=" + failed
                 + ", ticks=" + ticks
@@ -343,6 +365,7 @@ public class PlaceCarriedBlockTask extends Task {
             noCarryTicks = 0;
             debugLogger.state("confirm release still carrying:" + ticks,
                     "confirm release: still carrying after placement: tick=" + ticks
+                            + ", " + describeDiagnostic()
                             + ", target=" + describeTarget()
                             + ", carriedState=" + describeOptionalBlockState(carriedState));
             return false;
@@ -353,6 +376,7 @@ public class PlaceCarriedBlockTask extends Task {
         if (noCarryTicks < RELEASE_CONFIRM_TICKS) {
             debugLogger.state("confirm release waiting:" + ticks,
                     "confirm release waiting: tick=" + ticks
+                            + ", " + describeDiagnostic()
                             + ", noCarryTicks=" + noCarryTicks
                             + ", releaseConfirmTicks=" + RELEASE_CONFIRM_TICKS
                             + ", target=" + describeTarget());
@@ -360,7 +384,8 @@ public class PlaceCarriedBlockTask extends Task {
         }
 
         completed = true;
-        debugLogger.event("carried block released after placement; treating Carry On placement as complete: target="
+        debugLogger.event(describeDiagnostic()
+                + ", carried block released after placement; treating Carry On placement as complete: target="
                 + describeTarget());
         return true;
     }
@@ -451,7 +476,8 @@ public class PlaceCarriedBlockTask extends Task {
                 + ", candidates=" + candidateCount
                 + " place=" + target.placePos().toShortString()
                 + " support=" + target.supportPos().toShortString()
-                + " face=" + target.supportFace());
+                + " face=" + target.supportFace()
+                + ", " + describeDiagnostic());
     }
 
     private String describeExpectedBlocks() {
@@ -486,9 +512,10 @@ public class PlaceCarriedBlockTask extends Task {
 
     private String describeRuntimeContext(AltoClef mod) {
         if (mod == null || mod.getPlayer() == null) {
-            return "context=missing-client";
+            return describeDiagnostic() + ", context=missing-client";
         }
-        return "screen=" + describeCurrentScreen()
+        return describeDiagnostic()
+                + ", screen=" + describeCurrentScreen()
                 + ", handler=" + (mod.getPlayer().currentScreenHandler == null
                 ? "none"
                 : mod.getPlayer().currentScreenHandler.getClass().getSimpleName())
