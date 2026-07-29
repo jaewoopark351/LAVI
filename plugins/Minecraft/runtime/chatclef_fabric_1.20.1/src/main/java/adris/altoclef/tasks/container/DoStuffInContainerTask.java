@@ -2,33 +2,25 @@ package adris.altoclef.tasks.container;
 
 import adris.altoclef.AltoClef;
 import adris.altoclef.catalogue.TaskCatalogue;
-import adris.altoclef.tasks.interaction.InteractWithBlockTask;
+import adris.altoclef.tasks.container.access.CarryOnContainerController;
+import adris.altoclef.tasks.container.access.ContainerBlockValidator;
+import adris.altoclef.tasks.container.access.ContainerCursorHandler;
+import adris.altoclef.tasks.container.access.ContainerPlanLogger;
+import adris.altoclef.tasks.container.access.ContainerTargetPlan;
+import adris.altoclef.tasks.container.access.ContainerTargetSelector;
+import adris.altoclef.tasks.container.access.ContainerTaskDiagnostics;
 import adris.altoclef.tasks.construction.PlaceBlockNearbyTask;
-import adris.altoclef.tasks.construction.carryon.PlaceCarriedBlockTask;
-import adris.altoclef.tasks.slot.EnsureFreeInventorySlotTask;
+import adris.altoclef.tasks.interaction.InteractWithBlockTask;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.ItemTarget;
-import adris.altoclef.util.compat.CarryOnCompat;
-import adris.altoclef.util.helpers.BaritoneHelper;
 import adris.altoclef.util.helpers.ItemHelper;
-import adris.altoclef.util.helpers.StorageHelper;
-import adris.altoclef.util.helpers.WorldHelper;
 import adris.altoclef.util.logging.StateChangeLogger;
-import adris.altoclef.util.slots.Slot;
 import adris.altoclef.util.time.TimerGame;
 import baritone.api.utils.input.Input;
 import net.minecraft.block.Block;
-import net.minecraft.block.BlockState;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.item.ItemStack;
-import net.minecraft.screen.slot.SlotActionType;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Vec3d;
 
 import java.util.Arrays;
-import java.util.Objects;
-import java.util.Optional;
 
 
 /**
@@ -40,7 +32,6 @@ public abstract class DoStuffInContainerTask extends Task {
     private final Block[] containerBlocks;
 
     private final PlaceBlockNearbyTask placeTask;
-    private PlaceCarriedBlockTask placeCarriedTask;
     // If we decided on placing, force place for at least 1 second
     // (originally 10)
     private final TimerGame placeForceTimer = new TimerGame(1);
@@ -50,13 +41,24 @@ public abstract class DoStuffInContainerTask extends Task {
     private BlockPos cachedContainerPosition = null;
     //20260729_kpopmodder: Keep container fallback diagnostics visible before changing any crafting-table behavior.
     private final StateChangeLogger debugLogger = new StateChangeLogger("DoStuffInContainerTask");
-    private String lastPlanEventKey = "";
+    private final ContainerBlockValidator blockValidator;
+    private final ContainerTargetSelector targetSelector;
+    private final ContainerPlanLogger planLogger;
+    private final ContainerCursorHandler cursorHandler;
+    private final CarryOnContainerController carryOnController;
+    private int debugTickCount;
+    private int safeOpenAttemptCount;
 
     public DoStuffInContainerTask(Block[] containerBlocks, ItemTarget containerTarget) {
         this.containerBlocks = containerBlocks;
         this.containerTarget = containerTarget;
 
         placeTask = new PlaceBlockNearbyTask(this.containerBlocks);
+        blockValidator = new ContainerBlockValidator(this.containerBlocks, debugLogger);
+        targetSelector = new ContainerTargetSelector(this.containerBlocks, blockValidator, debugLogger);
+        planLogger = new ContainerPlanLogger(debugLogger);
+        cursorHandler = new ContainerCursorHandler(debugLogger);
+        carryOnController = new CarryOnContainerController(this.containerBlocks, blockValidator, debugLogger);
     }
 
     public DoStuffInContainerTask(Block containerBlock, ItemTarget containerTarget) {
@@ -70,111 +72,146 @@ public abstract class DoStuffInContainerTask extends Task {
 
         // Protect container since we might place it.
         mod.getBehaviour().addProtectedItems(ItemHelper.blocksToItems(containerBlocks));
-        placeCarriedTask = null;
-        lastPlanEventKey = "";
+        carryOnController.reset();
+        planLogger.reset();
+        debugTickCount = 0;
+        safeOpenAttemptCount = 0;
         debugLogger.event("start: containerTarget=" + containerTarget
-                + ", carryOnSafeSneak=" + shouldUseCarryOnSafeInteraction());
+                + ", carryOnSafeSneak=" + carryOnController.shouldUseSafeInteraction()
+                + ", normalPlaceTaskActive=" + placeTask.isActive()
+                + ", normalPlaceTaskFinished=" + placeTask.isFinished()
+                + ", normalPlaced=" + ContainerTaskDiagnostics.describePos(placeTask.getPlaced())
+                + ", " + carryOnController.describeStatus(mod)
+                + ", " + ContainerTaskDiagnostics.describeInteractionContext(mod));
     }
 
     @Override
     protected Task onTick() {
         AltoClef mod = AltoClef.getInstance();
+        debugTickCount++;
+        debugLogger.state("container tick:" + debugTickCount,
+                "container tick=" + debugTickCount
+                        + ", containerTarget=" + containerTarget
+                        + ", cached=" + ContainerTaskDiagnostics.describePos(cachedContainerPosition)
+                        + ", normalPlaceTaskActive=" + placeTask.isActive()
+                        + ", normalPlaceTaskFinished=" + placeTask.isFinished()
+                        + ", normalPlaced=" + ContainerTaskDiagnostics.describePos(placeTask.getPlaced())
+                        + ", " + carryOnController.describeStatus(mod)
+                        + ", " + ContainerTaskDiagnostics.describeInteractionContext(mod));
 
-        Task carriedPlacement = getCarryOnCarriedContainerPlacementTask(mod);
+        Task carriedPlacement = carryOnController.getCarriedContainerPlacementTask(mod,
+                pos -> cachedContainerPosition = pos,
+                justPlacedTimer::reset,
+                this::setDebugState);
         if (carriedPlacement != null) {
+            debugLogger.state("container return carried placement:" + debugTickCount,
+                    "container return carried placement: tick=" + debugTickCount
+                            + ", task=" + ContainerTaskDiagnostics.describeTask(carriedPlacement)
+                            + ", cached=" + ContainerTaskDiagnostics.describePos(cachedContainerPosition)
+                            + ", " + carryOnController.describeStatus(mod)
+                            + ", " + ContainerTaskDiagnostics.describeInteractionContext(mod));
             return carriedPlacement;
         }
 
         // If we're placing, keep on placing.
         if (placeTask.isActive() && !placeTask.isFinished()) {
+            debugLogger.state("normal place task branch:" + debugTickCount,
+                    "normal place task branch: tick=" + debugTickCount
+                            + ", hasContainerBlockItem=" + mod.getItemStorage().hasItem(ItemHelper.blocksToItems(containerBlocks))
+                            + ", normalPlaced=" + ContainerTaskDiagnostics.describePos(placeTask.getPlaced())
+                            + ", " + carryOnController.describeStatus(mod)
+                            + ", " + ContainerTaskDiagnostics.describeInteractionContext(mod));
             if (mod.getItemStorage().hasItem(ItemHelper.blocksToItems(containerBlocks))) {
                 setDebugState("Placing container");
-                debugLogger.state("continue placing container: placed=" + describePos(placeTask.getPlaced()));
+                debugLogger.state("continue placing container:" + debugTickCount,
+                        "continue placing container: tick=" + debugTickCount
+                                + ", placed=" + ContainerTaskDiagnostics.describePos(placeTask.getPlaced())
+                                + ", " + ContainerTaskDiagnostics.describeInteractionContext(mod));
                 return placeTask;
             }
-            if (shouldUseCarryOnSafeInteraction() && !justPlacedTimer.elapsed()) {
+            if (carryOnController.shouldUseSafeInteraction() && !justPlacedTimer.elapsed()) {
                 mod.getInputControls().release(Input.SNEAK);
                 setDebugState("Waiting for placed container verification");
-                debugLogger.state("wait for carry-on-safe placed container verification: placed=" + describePos(placeTask.getPlaced()));
+                debugLogger.state("wait for carry-on-safe placed container verification:" + debugTickCount,
+                        "wait for carry-on-safe placed container verification: tick=" + debugTickCount
+                                + ", placed=" + ContainerTaskDiagnostics.describePos(placeTask.getPlaced())
+                                + ", justPlacedElapsed=false"
+                                + ", " + ContainerTaskDiagnostics.describeInteractionContext(mod));
                 return null;
             }
         }
 
-        if (isContainerOpen(mod)) {
-            debugLogger.state("container open: targetPosition=" + describePos(cachedContainerPosition),
-                    "container open: targetPosition=" + describePos(cachedContainerPosition)
-                            + ", " + describeInteractionContext(mod));
+        boolean containerOpen = isContainerOpen(mod);
+        debugLogger.state("container open check:" + debugTickCount,
+                "container open check: tick=" + debugTickCount
+                        + ", open=" + containerOpen
+                        + ", cached=" + ContainerTaskDiagnostics.describePos(cachedContainerPosition)
+                        + ", " + carryOnController.describeStatus(mod)
+                        + ", " + ContainerTaskDiagnostics.describeInteractionContext(mod));
+        if (containerOpen) {
+            debugLogger.state("container open: targetPosition="
+                            + ContainerTaskDiagnostics.describePos(cachedContainerPosition),
+                    "container open: targetPosition="
+                            + ContainerTaskDiagnostics.describePos(cachedContainerPosition)
+                            + ", " + ContainerTaskDiagnostics.describeInteractionContext(mod));
             return containerSubTask(mod);
         }
 
-        // infinity if such a container does not exist.
-        double costToWalk = Double.POSITIVE_INFINITY;
-
-        Optional<BlockPos> nearest;
-        boolean usingPlacedContainer = false;
-
-        Vec3d currentPos = mod.getPlayer().getPos();
         BlockPos override = overrideContainerPosition(mod);
-        Optional<BlockPos> placedContainer = getPlacedContainerIfValid(mod);
-
-        if (placedContainer.isPresent()) {
-            nearest = placedContainer;
-            usingPlacedContainer = true;
-            debugLogger.state("prefer placed container:" + nearest.get().toShortString(),
-                    "prefer placed container: targetPosition=" + nearest.get().toShortString());
-        } else if (override != null && mod.getBlockScanner().isBlockAtPosition(override, containerBlocks)) {
-            // We have an override so go there instead.
-            nearest = Optional.of(override);
-        } else {
-            // Track nearest container
-            nearest = mod.getBlockScanner().getNearestBlock(currentPos, blockPos -> WorldHelper.canReach(blockPos), containerBlocks);
-        }
-        if (nearest.isEmpty()) {
-            // If all else fails, try using our placed task
-            nearest = getPlacedContainerIfValid(mod);
-        }
-        if (nearest.isPresent()) {
-            costToWalk = BaritoneHelper.calculateGenericHeuristic(currentPos, WorldHelper.toVec3d(nearest.get()));
-        }
         double makeCost = getCostToMakeNew(mod);
-        String actionReason = describeContainerActionReason(nearest, usingPlacedContainer, costToWalk, makeCost);
-        logPlanEvent(actionReason + ":" + describeOptionalPos(nearest),
-                "container plan transition: target=" + containerTarget
-                        + ", action=" + actionReason
-                        + ", nearest=" + describeOptionalPos(nearest)
-                        + ", usingPlacedContainer=" + usingPlacedContainer
-                        + ", override=" + describePos(override)
-                        + ", placedTask=" + describePos(placeTask.getPlaced())
-                        + ", carriedPlaced=" + describePos(placeCarriedTask == null ? null : placeCarriedTask.getPlaced())
-                        + ", walkCost=" + formatDouble(costToWalk)
-                        + ", makeCost=" + formatDouble(makeCost)
-                        + ", placeForceElapsed=" + placeForceTimer.elapsed()
-                        + ", justPlacedElapsed=" + justPlacedTimer.elapsed()
-                        + ", hasContainerItem=" + mod.getItemStorage().hasItem(containerTarget)
-                        + ", " + describeInteractionContext(mod));
-        debugLogger.state("container decision:" + containerTarget
-                        + ":nearest=" + describeOptionalPos(nearest)
-                        + ":placed=" + usingPlacedContainer
-                        + ":walk=" + formatDouble(costToWalk),
-                "container decision: target=" + containerTarget
-                        + ", nearest=" + describeOptionalPos(nearest)
-                        + ", usingPlacedContainer=" + usingPlacedContainer
-                        + ", override=" + describePos(override)
-                        + ", placedTask=" + describePos(placeTask.getPlaced())
-                        + ", carriedPlaced=" + describePos(placeCarriedTask == null ? null : placeCarriedTask.getPlaced())
-                        + ", walkCost=" + formatDouble(costToWalk)
-                        + ", makeCost=" + formatDouble(makeCost)
-                        + ", placeForceElapsed=" + placeForceTimer.elapsed()
-                        + ", justPlacedElapsed=" + justPlacedTimer.elapsed()
-                        + ", hasContainerItem=" + mod.getItemStorage().hasItem(containerTarget)
-                        + ", " + describeInteractionContext(mod));
+        boolean placeForceElapsedBeforePlan = placeForceTimer.elapsed();
+        boolean justPlacedElapsedBeforePlan = justPlacedTimer.elapsed();
+        ContainerTargetPlan plan = targetSelector.select(mod,
+                override,
+                placeTask.getPlaced(),
+                carryOnController.getCarriedPlacedPosition(),
+                makeCost,
+                placeForceElapsedBeforePlan,
+                justPlacedElapsedBeforePlan);
+        planLogger.logPlan(containerTarget,
+                plan,
+                mod.getItemStorage().hasItem(containerTarget),
+                ContainerTaskDiagnostics.describeInteractionContext(mod));
 
         // Make a new container if going to the container is a pretty bad cost.
         // Also keep on making the container if we're stuck in some
-        if (!usingPlacedContainer && costToWalk > makeCost) {
+        boolean shouldResetPlaceForceTimer = plan.shouldResetPlaceForceTimer();
+        debugLogger.state("container plan branch:" + debugTickCount,
+                "container plan branch: tick=" + debugTickCount
+                        + ", override=" + ContainerTaskDiagnostics.describePos(override)
+                        + ", nearest=" + ContainerTaskDiagnostics.describeOptionalPos(plan.nearest())
+                        + ", usingPlacedContainer=" + plan.usingPlacedContainer()
+                        + ", actionReason=" + plan.actionReason()
+                        + ", walkCost=" + ContainerTaskDiagnostics.formatDouble(plan.walkCost())
+                        + ", makeCost=" + ContainerTaskDiagnostics.formatDouble(plan.makeCost())
+                        + ", placeForceElapsedBeforePlan=" + placeForceElapsedBeforePlan
+                        + ", justPlacedElapsedBeforePlan=" + justPlacedElapsedBeforePlan
+                        + ", shouldResetPlaceForceTimer=" + shouldResetPlaceForceTimer
+                        + ", " + carryOnController.describeStatus(mod)
+                        + ", " + ContainerTaskDiagnostics.describeInteractionContext(mod));
+        if (shouldResetPlaceForceTimer) {
+            debugLogger.state("container reset place force timer:" + debugTickCount,
+                    "container reset place force timer: tick=" + debugTickCount
+                            + ", reason=" + plan.actionReason()
+                            + ", nearest=" + ContainerTaskDiagnostics.describeOptionalPos(plan.nearest())
+                            + ", " + ContainerTaskDiagnostics.describeInteractionContext(mod));
             placeForceTimer.reset();
         }
-        if (nearest.isEmpty() || (!usingPlacedContainer && !placeForceTimer.elapsed() && justPlacedTimer.elapsed())) {
+        boolean placeForceElapsedAfterReset = placeForceTimer.elapsed();
+        boolean justPlacedElapsedAfterPlan = justPlacedTimer.elapsed();
+        boolean shouldUseNewContainer = plan.shouldUseNewContainer(placeForceElapsedAfterReset, justPlacedElapsedAfterPlan);
+        debugLogger.state("container plan decision:" + debugTickCount,
+                "container plan decision: tick=" + debugTickCount
+                        + ", shouldUseNewContainer=" + shouldUseNewContainer
+                        + ", placeForceElapsedAfterReset=" + placeForceElapsedAfterReset
+                        + ", justPlacedElapsedAfterPlan=" + justPlacedElapsedAfterPlan
+                        + ", hasContainerTarget=" + mod.getItemStorage().hasItem(containerTarget)
+                        + ", hasContainerBlockItem=" + mod.getItemStorage().hasItem(ItemHelper.blocksToItems(containerBlocks))
+                        + ", reason=" + plan.actionReason()
+                        + ", cachedBeforeDecision=" + ContainerTaskDiagnostics.describePos(cachedContainerPosition)
+                        + ", " + carryOnController.describeStatus(mod)
+                        + ", " + ContainerTaskDiagnostics.describeInteractionContext(mod));
+        if (shouldUseNewContainer) {
             // It's cheaper to make a new one, or our only option.
 
             // We're no longer going to our previous container.
@@ -183,72 +220,93 @@ public abstract class DoStuffInContainerTask extends Task {
             // Get if we don't have...
             if (!mod.getItemStorage().hasItem(containerTarget)) {
                 setDebugState("Getting container item");
-                debugLogger.state("get container item: target=" + containerTarget
-                        + ", nearest=" + describeOptionalPos(nearest)
-                        + ", walkCost=" + formatDouble(costToWalk)
-                        + ", makeCost=" + formatDouble(makeCost)
-                        + ", reason=" + actionReason
-                        + ", " + describeInteractionContext(mod));
+                debugLogger.state("get container item:" + debugTickCount,
+                        "get container item: tick=" + debugTickCount
+                        + ", target=" + containerTarget
+                        + ", nearest=" + ContainerTaskDiagnostics.describeOptionalPos(plan.nearest())
+                        + ", walkCost=" + ContainerTaskDiagnostics.formatDouble(plan.walkCost())
+                        + ", makeCost=" + ContainerTaskDiagnostics.formatDouble(plan.makeCost())
+                        + ", reason=" + plan.actionReason()
+                        + ", " + ContainerTaskDiagnostics.describeInteractionContext(mod));
                 return TaskCatalogue.getItemTask(containerTarget);
             }
 
             setDebugState("Placing container...");
-            debugLogger.state("place new container: target=" + containerTarget
-                    + ", nearest=" + describeOptionalPos(nearest)
-                    + ", walkCost=" + formatDouble(costToWalk)
-                    + ", makeCost=" + formatDouble(makeCost)
-                    + ", previousPlaced=" + describePos(placeTask.getPlaced())
-                    + ", reason=" + actionReason
-                    + ", " + describeInteractionContext(mod));
+            debugLogger.state("place new container:" + debugTickCount,
+                    "place new container: tick=" + debugTickCount
+                    + ", target=" + containerTarget
+                    + ", nearest=" + ContainerTaskDiagnostics.describeOptionalPos(plan.nearest())
+                    + ", walkCost=" + ContainerTaskDiagnostics.formatDouble(plan.walkCost())
+                    + ", makeCost=" + ContainerTaskDiagnostics.formatDouble(plan.makeCost())
+                    + ", previousPlaced=" + ContainerTaskDiagnostics.describePos(placeTask.getPlaced())
+                    + ", reason=" + plan.actionReason()
+                    + ", " + ContainerTaskDiagnostics.describeInteractionContext(mod));
 
             justPlacedTimer.reset();
-            if (shouldUseCarryOnSafeInteraction()) {
+            if (carryOnController.shouldUseSafeInteraction()) {
                 mod.getInputControls().release(Input.SNEAK);
             }
             // Now place!
+            debugLogger.state("container return normal place task:" + debugTickCount,
+                    "container return normal place task: tick=" + debugTickCount
+                            + ", task=" + ContainerTaskDiagnostics.describeTask(placeTask)
+                            + ", " + ContainerTaskDiagnostics.describeInteractionContext(mod));
             return placeTask;
         }
 
         // This is insanely cursed.
         // TODO: Finish committing to optionals, this is ugly.
-        cachedContainerPosition = nearest.get();
+        cachedContainerPosition = plan.requireTargetPosition();
 
         // Walk to it and open it
 
         // Wait for food
         if (mod.getFoodChain().needsToEat()) {
             setDebugState("Waiting for eating...");
-            debugLogger.state("wait for eating before opening container: targetPosition=" + describePos(cachedContainerPosition));
+            debugLogger.state("wait for eating before opening container:" + debugTickCount,
+                    "wait for eating before opening container: tick=" + debugTickCount
+                            + ", targetPosition=" + ContainerTaskDiagnostics.describePos(cachedContainerPosition)
+                            + ", " + ContainerTaskDiagnostics.describeInteractionContext(mod));
             return null;
         }
-        setDebugState("Walking to container... " + nearest.get().toShortString());
-        debugLogger.state("walk/open container:" + nearest.get().toShortString(),
-                "walk/open container: targetPosition=" + nearest.get().toShortString()
-                + ", walkCost=" + formatDouble(costToWalk)
-                + ", makeCost=" + formatDouble(makeCost)
-                + ", usingPlacedContainer=" + usingPlacedContainer
-                + ", cached=" + describePos(cachedContainerPosition)
-                + ", " + describeInteractionContext(mod));
+        setDebugState("Walking to container... " + cachedContainerPosition.toShortString());
+        debugLogger.state("walk/open container:" + cachedContainerPosition.toShortString(),
+                "walk/open container: targetPosition=" + cachedContainerPosition.toShortString()
+                + ", walkCost=" + ContainerTaskDiagnostics.formatDouble(plan.walkCost())
+                + ", makeCost=" + ContainerTaskDiagnostics.formatDouble(plan.makeCost())
+                + ", usingPlacedContainer=" + plan.usingPlacedContainer()
+                + ", cached=" + ContainerTaskDiagnostics.describePos(cachedContainerPosition)
+                + ", " + ContainerTaskDiagnostics.describeInteractionContext(mod));
 
-        if (!StorageHelper.getItemStackInCursorSlot().isEmpty()) {
-            debugLogger.state("clear cursor before opening container: cursor=" + describeStack(StorageHelper.getItemStackInCursorSlot()));
-            Optional<Slot> toMoveTo = mod.getItemStorage().getSlotThatCanFitInPlayerInventory(StorageHelper.getItemStackInCursorSlot(), false);
-            if (toMoveTo.isEmpty()) {
-                return new EnsureFreeInventorySlotTask();
-            }
-            if (ItemHelper.canThrowAwayStack(mod, StorageHelper.getItemStackInCursorSlot())) {
-                mod.getSlotHandler().clickSlot(Slot.UNDEFINED, 0, SlotActionType.PICKUP);
-                return null;
-            }
-            mod.getSlotHandler().clickSlot(toMoveTo.get(), 0, SlotActionType.PICKUP);
-            return null;
+        if (cursorHandler.hasCursorItem()) {
+            debugLogger.state("container return cursor handler:" + debugTickCount,
+                    "container return cursor handler: tick=" + debugTickCount
+                            + ", targetPosition=" + cachedContainerPosition.toShortString()
+                            + ", " + ContainerTaskDiagnostics.describeInteractionContext(mod));
+            return cursorHandler.handleCursorItem(mod);
         }
-        if (shouldUseCarryOnSafeInteraction()) {
+        if (carryOnController.shouldUseSafeInteraction()) {
+            safeOpenAttemptCount++;
+            debugLogger.state("carry-on-safe open pre-release:" + debugTickCount + ":" + safeOpenAttemptCount,
+                    "carry-on-safe open pre-release: tick=" + debugTickCount
+                            + ", attempt=" + safeOpenAttemptCount
+                            + ", targetPosition=" + cachedContainerPosition.toShortString()
+                            + ", " + ContainerTaskDiagnostics.describeInteractionContext(mod));
             mod.getInputControls().release(Input.SNEAK);
-            debugLogger.state("carry-on-safe open container:" + cachedContainerPosition.toShortString(),
-                    "carry-on-safe open container: release sneak before targetPosition=" + cachedContainerPosition.toShortString());
+            debugLogger.state("carry-on-safe open post-release:" + debugTickCount + ":" + safeOpenAttemptCount,
+                    "carry-on-safe open post-release: tick=" + debugTickCount
+                            + ", attempt=" + safeOpenAttemptCount
+                            + ", targetPosition=" + cachedContainerPosition.toShortString()
+                            + ", " + ContainerTaskDiagnostics.describeInteractionContext(mod));
         }
-        return new InteractWithBlockTask(cachedContainerPosition, false);
+        InteractWithBlockTask interactTask = new InteractWithBlockTask(cachedContainerPosition, false);
+        debugLogger.state("container interact task created:" + debugTickCount,
+                "container interact task created: tick=" + debugTickCount
+                        + ", targetPosition=" + cachedContainerPosition.toShortString()
+                        + ", shiftClick=false"
+                        + ", task=" + ContainerTaskDiagnostics.describeTask(interactTask)
+                        + ", " + ContainerTaskDiagnostics.describeInteractionContext(mod));
+        return interactTask;
         //return new GetToBlockTask(nearest, true);
     }
 
@@ -265,113 +323,19 @@ public abstract class DoStuffInContainerTask extends Task {
         return cachedContainerPosition;
     }
 
-    private Optional<BlockPos> getPlacedContainerIfValid(AltoClef mod) {
-        Optional<BlockPos> carriedPlaced = getPlacedContainerIfValid(mod,
-                placeCarriedTask == null ? null : placeCarriedTask.getPlaced());
-        if (carriedPlaced.isPresent()) {
-            return carriedPlaced;
-        }
-        return getPlacedContainerIfValid(mod, placeTask.getPlaced());
-    }
-
-    private Optional<BlockPos> getPlacedContainerIfValid(AltoClef mod, BlockPos placed) {
-        if (placed == null) {
-            return Optional.empty();
-        }
-        if (!isPlacedContainerBlock(mod, placed)) {
-            debugLogger.state("placed container rejected:" + placed.toShortString() + ":not-block",
-                    "placed container rejected: pos=" + placed.toShortString()
-                            + ", reason=not-container-block-or-unloaded");
-            return Optional.empty();
-        }
-        if (!WorldHelper.canReach(placed)) {
-            debugLogger.state("placed container rejected:" + placed.toShortString() + ":unreachable",
-                    "placed container rejected: pos=" + placed.toShortString()
-                            + ", reason=unreachable");
-            return Optional.empty();
-        }
-        return Optional.of(placed);
-    }
-
-    private Task getCarryOnCarriedContainerPlacementTask(AltoClef mod) {
-        if (!shouldUseCarryOnSafeInteraction()) {
-            return null;
-        }
-
-        if (placeCarriedTask != null) {
-            if (placeCarriedTask.isFinished()) {
-                //20260729_kpopmodder: Only cache a Carry On placement after the task confirms the carried state cleared.
-                Optional<BlockPos> placed = getPlacedContainerIfValid(mod, placeCarriedTask.getPlaced());
-                if (placed.isPresent()) {
-                    cachedContainerPosition = placed.get();
-                    justPlacedTimer.reset();
-                    debugLogger.state("carried container placed: targetPosition=" + cachedContainerPosition.toShortString());
-                    placeCarriedTask = null;
-                    return null;
-                }
-                debugLogger.state("carried container placement completed without reachable placed container");
-                placeCarriedTask = null;
-                return null;
-            }
-            if (placeCarriedTask.hasFailed()) {
-                debugLogger.state("carried container placement failed, falling back to normal container flow");
-                placeCarriedTask = null;
-                return null;
-            }
-            if (placeCarriedTask.isActive() && !placeCarriedTask.isFinished()) {
-                setDebugState("Placing carried container");
-                return placeCarriedTask;
-            }
-        }
-
-        Optional<BlockState> carriedContainer = getCarriedContainerState(mod);
-        if (carriedContainer.isEmpty()) {
-            return null;
-        }
-
-        cachedContainerPosition = null;
-        justPlacedTimer.reset();
-        placeCarriedTask = new PlaceCarriedBlockTask(containerBlocks);
-        mod.getInputControls().release(Input.SNEAK);
-        setDebugState("Placing carried container");
-        debugLogger.state("detected carried container block: " + carriedContainer.get().getBlock().getTranslationKey());
-        return placeCarriedTask;
-    }
-
-    private boolean isPlacedContainerBlock(AltoClef mod, BlockPos placed) {
-        if (!mod.getChunkTracker().isChunkLoaded(placed)) {
-            return false;
-        }
-        return isContainerBlock(mod.getWorld().getBlockState(placed).getBlock());
-    }
-
-    private Optional<BlockState> getCarriedContainerState(AltoClef mod) {
-        return CarryOnCompat.getCarriedBlockState(mod.getPlayer())
-                .filter(state -> isContainerBlock(state.getBlock()));
-    }
-
-    private boolean isContainerBlock(Block block) {
-        for (Block containerBlock : containerBlocks) {
-            if (block == containerBlock) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     @Override
     protected void onStop(Task interruptTask) {
         AltoClef mod = AltoClef.getInstance();
-        debugLogger.event("stop diagnostics: interruptedBy=" + describeTask(interruptTask)
+        debugLogger.event("stop diagnostics: interruptedBy=" + ContainerTaskDiagnostics.describeTask(interruptTask)
                 + ", containerTarget=" + containerTarget
-                + ", cached=" + describePos(cachedContainerPosition)
-                + ", placedTask=" + describePos(placeTask.getPlaced())
-                + ", carriedPlaced=" + describePos(placeCarriedTask == null ? null : placeCarriedTask.getPlaced())
+                + ", cached=" + ContainerTaskDiagnostics.describePos(cachedContainerPosition)
+                + ", placedTask=" + ContainerTaskDiagnostics.describePos(placeTask.getPlaced())
+                + ", carriedPlaced=" + ContainerTaskDiagnostics.describePos(carryOnController.getCarriedPlacedPosition())
                 + ", placeTaskActive=" + placeTask.isActive()
                 + ", placeTaskFinished=" + placeTask.isFinished()
-                + ", carriedTaskActive=" + (placeCarriedTask != null && placeCarriedTask.isActive())
-                + ", carriedTaskFinished=" + (placeCarriedTask != null && placeCarriedTask.isFinished())
-                + ", " + describeInteractionContext(mod));
+                + ", carriedTaskActive=" + carryOnController.isCarriedTaskActive()
+                + ", carriedTaskFinished=" + carryOnController.isCarriedTaskFinished()
+                + ", " + ContainerTaskDiagnostics.describeInteractionContext(mod));
         mod.getBehaviour().pop();
     }
 
@@ -397,77 +361,4 @@ public abstract class DoStuffInContainerTask extends Task {
     protected abstract Task containerSubTask(AltoClef mod);
 
     protected abstract double getCostToMakeNew(AltoClef mod);
-
-    private boolean shouldUseCarryOnSafeInteraction() {
-        return CarryOnCompat.shouldAvoidSneakRightClick(containerBlocks);
-    }
-
-    private String describeOptionalPos(Optional<BlockPos> pos) {
-        return pos.map(BlockPos::toShortString).orElse("none");
-    }
-
-    private String describePos(BlockPos pos) {
-        return pos == null ? "none" : pos.toShortString();
-    }
-
-    private String describeStack(ItemStack stack) {
-        if (stack == null || stack.isEmpty()) {
-            return "empty";
-        }
-        return stack.getItem().getTranslationKey() + " x " + stack.getCount();
-    }
-
-    private String describeInteractionContext(AltoClef mod) {
-        if (mod == null || mod.getPlayer() == null) {
-            return "context=missing-client";
-        }
-        Screen screen = MinecraftClient.getInstance().currentScreen;
-        return "screen=" + (screen == null ? "none" : screen.getClass().getSimpleName())
-                + ", handler=" + (mod.getPlayer().currentScreenHandler == null
-                ? "none"
-                : mod.getPlayer().currentScreenHandler.getClass().getSimpleName())
-                + ", cursor=" + describeStack(StorageHelper.getItemStackInCursorSlot())
-                + ", pathing=" + mod.getClientBaritone().getPathingBehavior().isPathing()
-                + ", breaking=" + mod.getControllerExtras().isBreakingBlock();
-    }
-
-    private String describeContainerActionReason(Optional<BlockPos> nearest, boolean usingPlacedContainer, double costToWalk, double makeCost) {
-        if (nearest.isEmpty()) {
-            return "no-reachable-container";
-        }
-        if (!usingPlacedContainer && costToWalk > makeCost) {
-            return "new-container-cheaper";
-        }
-        if (!usingPlacedContainer && !placeForceTimer.elapsed() && justPlacedTimer.elapsed()) {
-            return "place-force-window-active";
-        }
-        return "use-existing-container";
-    }
-
-    private void logPlanEvent(String stateKey, String detail) {
-        if (Objects.equals(lastPlanEventKey, stateKey)) {
-            return;
-        }
-        lastPlanEventKey = stateKey;
-        debugLogger.event(detail);
-    }
-
-    private String describeTask(Task task) {
-        if (task == null) {
-            return "none";
-        }
-        try {
-            return task.getClass().getSimpleName() + "{" + task + "}";
-        } catch (RuntimeException ex) {
-            return task.getClass().getSimpleName() + "{debugString failed: "
-                    + ex.getClass().getSimpleName() + ": " + ex.getMessage() + "}";
-        }
-    }
-
-    private String formatDouble(double value) {
-        if (Double.isInfinite(value)) {
-            return "infinity";
-        }
-        return String.format(java.util.Locale.ROOT, "%.1f", value);
-    }
 }

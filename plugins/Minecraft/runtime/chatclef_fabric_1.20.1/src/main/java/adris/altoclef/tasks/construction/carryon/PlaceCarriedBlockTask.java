@@ -10,6 +10,7 @@ import adris.altoclef.util.helpers.LookHelper;
 import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.logging.StateChangeLogger;
 import baritone.api.utils.Rotation;
+import baritone.api.utils.input.Input;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
@@ -95,7 +96,10 @@ public class PlaceCarriedBlockTask extends Task {
                         + " block=" + event.blockState.getBlock().getTranslationKey());
             }
         });
-        debugLogger.state("starting carried placement for " + describeExpectedBlocks());
+        debugLogger.state("starting carried placement for " + describeExpectedBlocks(),
+                "starting carried placement for " + describeExpectedBlocks()
+                        + ", wasCarryingTarget=" + wasCarryingTarget
+                        + ", " + describeRuntimeContext(mod));
     }
 
     @Override
@@ -103,28 +107,64 @@ public class PlaceCarriedBlockTask extends Task {
         AltoClef mod = AltoClef.getInstance();
         ticks++;
         Optional<BlockState> carriedState = getCarriedTargetState(mod);
+        boolean observedPlacement = hasObservedPlacement(mod);
+        debugLogger.state("carried placement tick:" + ticks,
+                "carried placement tick=" + ticks
+                        + ", attempts=" + attempts
+                        + ", clickCooldown=" + clickCooldown
+                        + ", completed=" + completed
+                        + ", failed=" + failed
+                        + ", wasCarryingTarget=" + wasCarryingTarget
+                        + ", noCarryTicks=" + noCarryTicks
+                        + ", observedPlacement=" + observedPlacement
+                        + ", target=" + describeTarget()
+                        + ", placed=" + describePos(placed)
+                        + ", carriedState=" + describeOptionalBlockState(carriedState)
+                        + ", expected=" + describeExpectedBlocks()
+                        + ", " + describeRuntimeContext(mod));
         if (ticks > MAX_TICKS) {
             failed = true;
             debugLogger.event("failed: timed out while placing carried block after attempts=" + attempts
-                    + ", target=" + describeTarget());
+                    + ", target=" + describeTarget()
+                    + ", " + describeRuntimeContext(mod));
             return null;
         }
-        if (hasObservedPlacement(mod)) {
+        if (observedPlacement) {
             if (target != null && isPlaced(mod, target.placePos())) {
                 placed = target.placePos();
+                debugLogger.state("observed placement target confirmed:" + ticks,
+                        "observed placement target confirmed: tick=" + ticks
+                                + ", placed=" + describePos(placed)
+                                + ", target=" + describeTarget()
+                                + ", carriedState=" + describeOptionalBlockState(carriedState)
+                                + ", " + describeRuntimeContext(mod));
             }
             if (confirmReleasedAfterPlacement(carriedState)) {
+                debugLogger.state("observed placement confirm release returned:" + ticks,
+                        "observed placement confirm release returned: tick=" + ticks
+                                + ", completed=" + completed
+                                + ", noCarryTicks=" + noCarryTicks
+                                + ", carriedState=" + describeOptionalBlockState(carriedState)
+                                + ", target=" + describeTarget()
+                                + ", " + describeRuntimeContext(mod));
                 return null;
             }
             inputController.release(mod);
             setDebugState("Waiting for Carry On to release carried block");
-            debugLogger.state("waiting-carried-release",
-                    "waiting: placed block observed but Carry On still reports carried block: target=" + describeTarget());
+            debugLogger.state("waiting-carried-release:" + ticks,
+                    "waiting: placed block observed but Carry On still reports carried block: tick=" + ticks
+                            + ", target=" + describeTarget()
+                            + ", carriedState=" + describeOptionalBlockState(carriedState)
+                            + ", " + describeRuntimeContext(mod));
             return null;
         }
 
         if (closeBlockingScreen(mod)) {
             setDebugState("Closing screen before placing carried block");
+            debugLogger.state("closed or waiting blocking screen:" + ticks,
+                    "closed or waiting blocking screen before placing carried block: tick=" + ticks
+                            + ", target=" + describeTarget()
+                            + ", " + describeRuntimeContext(mod));
             return null;
         }
 
@@ -132,29 +172,52 @@ public class PlaceCarriedBlockTask extends Task {
             if (wasCarryingTarget) {
                 noCarryTicks++;
                 setDebugState("Confirming carried block was placed");
+                debugLogger.state("no carried state after previously carrying:" + ticks,
+                        "no carried state after previously carrying: tick=" + ticks
+                                + ", noCarryTicks=" + noCarryTicks
+                                + ", releaseConfirmTicks=" + RELEASE_CONFIRM_TICKS
+                                + ", target=" + describeTarget()
+                                + ", placed=" + describePos(placed)
+                                + ", " + describeRuntimeContext(mod));
                 if (noCarryTicks >= RELEASE_CONFIRM_TICKS) {
                     completed = true;
                     placed = getPlaced();
                     debugLogger.event("carried block released; treating Carry On placement as complete: target="
-                            + describeTarget());
+                            + describeTarget()
+                            + ", placed=" + describePos(placed)
+                            + ", " + describeRuntimeContext(mod));
                 }
                 return null;
             }
             failed = true;
-            debugLogger.event("failed: expected carried block was not available at task start");
+            debugLogger.event("failed: expected carried block was not available at task start: "
+                    + describeRuntimeContext(mod));
             return null;
         }
         wasCarryingTarget = true;
         noCarryTicks = 0;
 
         mod.getClientBaritone().getPathingBehavior().forceCancel();
+        debugLogger.state("force cancel pathing for carried placement:" + ticks,
+                "force cancel pathing for carried placement: tick=" + ticks
+                        + ", carriedState=" + describeOptionalBlockState(carriedState)
+                        + ", target=" + describeTarget()
+                        + ", " + describeRuntimeContext(mod));
 
         if (target == null || !isTargetValid(mod, target, carriedState.get())) {
+            debugLogger.state("select carried placement target needed:" + ticks,
+                    "select carried placement target needed: tick=" + ticks
+                            + ", currentTarget=" + describeTarget()
+                            + ", carriedState=" + describeOptionalBlockState(carriedState)
+                            + ", targetNull=" + (target == null)
+                            + ", " + describeRuntimeContext(mod));
             selectPlacementTarget(mod, carriedState.get());
             if (target == null) {
                 setDebugState("Searching empty placement spot for carried block");
-                debugLogger.state("waiting: no block-empty nearby Carry On placement support for "
-                        + describeBlock(carriedState.get().getBlock()));
+                debugLogger.state("waiting no carried placement target:" + ticks,
+                        "waiting: no block-empty nearby Carry On placement support: tick=" + ticks
+                                + ", carriedBlock=" + describeBlock(carriedState.get().getBlock())
+                                + ", " + describeRuntimeContext(mod));
                 return null;
             }
         }
@@ -163,20 +226,49 @@ public class PlaceCarriedBlockTask extends Task {
                 + " at " + target.placePos().toShortString());
 
         if (!prepareTargetForClick(mod)) {
+            debugLogger.state("prepare carried target not ready:" + ticks,
+                    "prepare carried target not ready: tick=" + ticks
+                            + ", target=" + describeTarget()
+                            + ", carriedState=" + describeOptionalBlockState(carriedState)
+                            + ", " + describeRuntimeContext(mod));
             return null;
         }
 
         if (clickCooldown > 0) {
             clickCooldown--;
+            debugLogger.state("carried placement click cooldown:" + ticks,
+                    "carried placement click cooldown: tick=" + ticks
+                            + ", remaining=" + clickCooldown
+                            + ", target=" + describeTarget()
+                            + ", " + describeRuntimeContext(mod));
             return null;
         }
         clickCooldown = CLICK_INTERVAL_TICKS;
         int nextAttempt = attempts + 1;
+        debugLogger.state("carried placement click attempt start:" + ticks,
+                "carried placement click attempt start: tick=" + ticks
+                        + ", nextAttempt=" + nextAttempt
+                        + ", target=" + describeTarget()
+                        + ", carriedState=" + describeOptionalBlockState(carriedState)
+                        + ", " + describeRuntimeContext(mod));
         if (inputController.tryShiftRightClickSupport(mod, target, nextAttempt)) {
             attempts = nextAttempt;
+            debugLogger.state("carried placement click attempt accepted:" + ticks,
+                    "carried placement click attempt accepted: tick=" + ticks
+                            + ", attempts=" + attempts
+                            + ", target=" + describeTarget()
+                            + ", targetCycleMode=" + targetCycle.mode()
+                            + ", targetCycleSize=" + targetCycle.size()
+                            + ", " + describeRuntimeContext(mod));
             if (targetCycle.isBlockEmptyFallback()) {
                 targetCycle.advance();
                 target = targetCycle.current();
+                debugLogger.state("carried placement target cycle advanced:" + ticks,
+                        "carried placement target cycle advanced: tick=" + ticks
+                                + ", nextTarget=" + describeTarget()
+                                + ", targetCycleMode=" + targetCycle.mode()
+                                + ", targetCycleSize=" + targetCycle.size()
+                                + ", " + describeRuntimeContext(mod));
             }
         }
         return null;
@@ -190,6 +282,14 @@ public class PlaceCarriedBlockTask extends Task {
             EventBus.unsubscribe(blockPlaceSubscription);
             blockPlaceSubscription = null;
         }
+        debugLogger.event("stop carried placement: interruptedBy=" + describeTask(interruptTask)
+                + ", completed=" + completed
+                + ", failed=" + failed
+                + ", ticks=" + ticks
+                + ", attempts=" + attempts
+                + ", placed=" + describePos(placed)
+                + ", target=" + describeTarget()
+                + ", " + describeRuntimeContext(mod));
     }
 
     @Override
@@ -218,7 +318,13 @@ public class PlaceCarriedBlockTask extends Task {
         if (screen == null) {
             return false;
         }
-        if (!(screen instanceof GameMenuScreen) && !(screen instanceof GameOptionsScreen) && !(screen instanceof ChatScreen)) {
+        boolean closeAllowed = !(screen instanceof GameMenuScreen) && !(screen instanceof GameOptionsScreen) && !(screen instanceof ChatScreen);
+        debugLogger.state("blocking screen before carried placement:" + ticks,
+                "blocking screen before carried placement: tick=" + ticks
+                        + ", screen=" + screen.getClass().getSimpleName()
+                        + ", closeAllowed=" + closeAllowed
+                        + ", " + describeRuntimeContext(mod));
+        if (closeAllowed) {
             StorageHelper.closeScreen();
         }
         return true;
@@ -235,12 +341,21 @@ public class PlaceCarriedBlockTask extends Task {
     private boolean confirmReleasedAfterPlacement(Optional<BlockState> carriedState) {
         if (carriedState.isPresent()) {
             noCarryTicks = 0;
+            debugLogger.state("confirm release still carrying:" + ticks,
+                    "confirm release: still carrying after placement: tick=" + ticks
+                            + ", target=" + describeTarget()
+                            + ", carriedState=" + describeOptionalBlockState(carriedState));
             return false;
         }
 
         noCarryTicks++;
         setDebugState("Confirming carried block was placed");
         if (noCarryTicks < RELEASE_CONFIRM_TICKS) {
+            debugLogger.state("confirm release waiting:" + ticks,
+                    "confirm release waiting: tick=" + ticks
+                            + ", noCarryTicks=" + noCarryTicks
+                            + ", releaseConfirmTicks=" + RELEASE_CONFIRM_TICKS
+                            + ", target=" + describeTarget());
             return true;
         }
 
@@ -253,6 +368,11 @@ public class PlaceCarriedBlockTask extends Task {
     private void selectPlacementTarget(AltoClef mod, BlockState carriedState) {
         List<CarriedBlockPlacementPlanner.PlacementTarget> emptySpaceTargets =
                 emptySpacePlanner.findNearestCandidates(mod, carriedState, MAX_EMPTY_SPACE_CANDIDATES);
+        debugLogger.state("empty-space carried target candidates:" + ticks,
+                "empty-space carried target candidates: tick=" + ticks
+                        + ", count=" + emptySpaceTargets.size()
+                        + ", carriedState=" + describeOptionalBlockState(Optional.ofNullable(carriedState))
+                        + ", " + describeRuntimeContext(mod));
         if (!emptySpaceTargets.isEmpty()) {
             targetCycle.setBlockEmptyFallback(emptySpaceTargets);
             target = targetCycle.current();
@@ -262,6 +382,11 @@ public class PlaceCarriedBlockTask extends Task {
         }
 
         Optional<CarriedBlockPlacementPlanner.PlacementTarget> strictTarget = planner.findNearest(mod, carriedState);
+        debugLogger.state("strict carried target candidate:" + ticks,
+                "strict carried target candidate: tick=" + ticks
+                        + ", present=" + strictTarget.isPresent()
+                        + ", carriedState=" + describeOptionalBlockState(Optional.ofNullable(carriedState))
+                        + ", " + describeRuntimeContext(mod));
         if (strictTarget.isPresent()) {
             targetCycle.setStrict(strictTarget.get());
             target = targetCycle.current();
@@ -278,12 +403,20 @@ public class PlaceCarriedBlockTask extends Task {
     private boolean prepareTargetForClick(AltoClef mod) {
         if (targetFromEmptySpaceFallback) {
             LookHelper.lookAt(mod, target.supportPos(), target.supportFace());
+            debugLogger.state("prepare carried target empty-space look:" + ticks,
+                    "prepare carried target empty-space look: tick=" + ticks
+                            + ", target=" + describeTarget()
+                            + ", " + describeRuntimeContext(mod));
             return true;
         }
 
         Optional<Rotation> reach = LookHelper.getReach(target.supportPos(), target.supportFace());
         if (reach.isEmpty()) {
-            debugLogger.state("retry: support no longer reachable at " + target.supportPos().toShortString());
+            debugLogger.state("retry support no longer reachable:" + ticks,
+                    "retry: support no longer reachable: tick=" + ticks
+                            + ", support=" + target.supportPos().toShortString()
+                            + ", target=" + describeTarget()
+                            + ", " + describeRuntimeContext(mod));
             target = null;
             targetCycle.reset();
             return false;
@@ -291,8 +424,18 @@ public class PlaceCarriedBlockTask extends Task {
 
         LookHelper.lookAt(reach.get());
         if (!LookHelper.isLookingAt(mod, reach.get())) {
+            debugLogger.state("prepare carried target waiting look:" + ticks,
+                    "prepare carried target waiting look: tick=" + ticks
+                            + ", rotation=" + reach.get()
+                            + ", target=" + describeTarget()
+                            + ", " + describeRuntimeContext(mod));
             return false;
         }
+        debugLogger.state("prepare carried target ready:" + ticks,
+                "prepare carried target ready: tick=" + ticks
+                        + ", rotation=" + reach.get()
+                        + ", target=" + describeTarget()
+                        + ", " + describeRuntimeContext(mod));
         return true;
     }
 
@@ -331,5 +474,45 @@ public class PlaceCarriedBlockTask extends Task {
                 + ", face=" + target.supportFace()
                 + ", mode=" + (targetFromEmptySpaceFallback ? targetCycle.mode() : "strict")
                 + ", candidates=" + targetCycle.size();
+    }
+
+    private String describePos(BlockPos pos) {
+        return pos == null ? "none" : pos.toShortString();
+    }
+
+    private String describeOptionalBlockState(Optional<BlockState> state) {
+        return state.map(blockState -> describeBlock(blockState.getBlock())).orElse("none");
+    }
+
+    private String describeRuntimeContext(AltoClef mod) {
+        if (mod == null || mod.getPlayer() == null) {
+            return "context=missing-client";
+        }
+        return "screen=" + describeCurrentScreen()
+                + ", handler=" + (mod.getPlayer().currentScreenHandler == null
+                ? "none"
+                : mod.getPlayer().currentScreenHandler.getClass().getSimpleName())
+                + ", pathing=" + mod.getClientBaritone().getPathingBehavior().isPathing()
+                + ", playerSneaking=" + mod.getPlayer().isSneaking()
+                + ", inputSneaking=" + mod.getPlayer().input.sneaking
+                + ", sneakKeyHeld=" + mod.getInputControls().isHeldDown(Input.SNEAK)
+                + ", useKeyHeld=" + mod.getInputControls().isHeldDown(Input.CLICK_RIGHT);
+    }
+
+    private String describeCurrentScreen() {
+        Screen screen = MinecraftClient.getInstance().currentScreen;
+        return screen == null ? "none" : screen.getClass().getSimpleName();
+    }
+
+    private String describeTask(Task task) {
+        if (task == null) {
+            return "none";
+        }
+        try {
+            return task.getClass().getSimpleName() + "{" + task + "}";
+        } catch (RuntimeException ex) {
+            return task.getClass().getSimpleName() + "{debugString failed: "
+                    + ex.getClass().getSimpleName() + ": " + ex.getMessage() + "}";
+        }
     }
 }

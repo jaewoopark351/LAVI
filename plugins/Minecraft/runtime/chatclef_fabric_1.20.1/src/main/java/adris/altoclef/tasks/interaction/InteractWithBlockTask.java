@@ -50,6 +50,7 @@ public class InteractWithBlockTask extends Task {
     private int waitingForClickTicks = 0;
     private final StateChangeLogger debugLogger = new StateChangeLogger("InteractWithBlockTask");
     private final BlockInteractionClickController clickController;
+    private int debugTickCount;
 
     public InteractWithBlockTask(ItemTarget toUse, Direction direction, BlockPos target, Input interactInput, boolean walkInto, Vec3i interactOffset, boolean shiftClick) {
         this.toUse = toUse;
@@ -166,6 +167,7 @@ public class InteractWithBlockTask extends Task {
         stuckCheck.reset();
         wanderTask.resetWander();
         clickTimer.reset();
+        debugTickCount = 0;
         debugLogger.event("start: target=" + target.toShortString()
                 + ", toUse=" + toUse
                 + ", direction=" + direction
@@ -176,6 +178,20 @@ public class InteractWithBlockTask extends Task {
     @Override
     protected Task onTick() {
         AltoClef mod = AltoClef.getInstance();
+        debugTickCount++;
+        debugLogger.state("interact tick:" + debugTickCount,
+                "interact tick=" + debugTickCount
+                        + ", target=" + target.toShortString()
+                        + ", toUse=" + toUse
+                        + ", direction=" + direction
+                        + ", walkInto=" + walkInto
+                        + ", interactInput=" + interactInput
+                        + ", shiftClick=" + shiftClick
+                        + ", waitingForClickTicks=" + waitingForClickTicks
+                        + ", cachedClickStatus=" + cachedClickStatus
+                        + ", pathing=" + mod.getClientBaritone().getPathingBehavior().isPathing()
+                        + ", customGoalActive=" + mod.getClientBaritone().getCustomGoalProcess().isActive()
+                        + ", " + clickController.describeInteractionContext(mod));
 
         if (mod.getClientBaritone().getPathingBehavior().isPathing()) {
             moveChecker.reset();
@@ -185,6 +201,9 @@ public class InteractWithBlockTask extends Task {
                 setDebugState("Getting out from nether portal");
                 mod.getInputControls().hold(Input.SNEAK);
                 mod.getInputControls().hold(Input.MOVE_FORWARD);
+                debugLogger.state("interact return nether portal forward:" + debugTickCount,
+                        "interact return: getting out from nether portal: tick=" + debugTickCount
+                                + ", " + clickController.describeInteractionContext(mod));
                 return null;
             } else {
                 mod.getInputControls().release(Input.SNEAK);
@@ -207,12 +226,21 @@ public class InteractWithBlockTask extends Task {
             // Stop other tasks, we are JUST shimmying
             mod.getClientBaritone().getCustomGoalProcess().onLostControl();
             mod.getClientBaritone().getExploreProcess().onLostControl();
+            debugLogger.state("interact return unstuck task:" + debugTickCount,
+                    "interact return unstuck task: tick=" + debugTickCount
+                            + ", task=" + unstuckTask
+                            + ", " + clickController.describeInteractionContext(mod));
             return unstuckTask;
         }
         if (!moveChecker.check(mod) || !stuckCheck.check(mod)) {
             BlockPos blockStuck = annoyingBlockDetector.findNearbyAnnoyingBlock(mod);
             if (blockStuck != null) {
                 unstuckTask = getFenceUnstuckTask();
+                debugLogger.state("interact return new unstuck task:" + debugTickCount,
+                        "interact return new unstuck task: tick=" + debugTickCount
+                                + ", blockStuck=" + blockStuck.toShortString()
+                                + ", task=" + unstuckTask
+                                + ", " + clickController.describeInteractionContext(mod));
                 return unstuckTask;
             }
             stuckCheck.reset();
@@ -224,7 +252,11 @@ public class InteractWithBlockTask extends Task {
         if (!ItemTarget.nullOrEmpty(toUse) && !StorageHelper.itemTargetsMet(mod, toUse)) {
             moveChecker.reset();
             clickTimer.reset();
-            debugLogger.state("get interact item: target=" + target.toShortString() + ", item=" + toUse);
+            debugLogger.state("get interact item:" + debugTickCount,
+                    "get interact item: tick=" + debugTickCount
+                            + ", target=" + target.toShortString()
+                            + ", item=" + toUse
+                            + ", " + clickController.describeInteractionContext(mod));
             return TaskCatalogue.getItemTask(toUse);
         }
 
@@ -232,12 +264,18 @@ public class InteractWithBlockTask extends Task {
         if (wanderTask.isActive() && !wanderTask.isFinished()) {
             moveChecker.reset();
             clickTimer.reset();
-            debugLogger.state("wander before interact retry: target=" + target.toShortString());
+            debugLogger.state("wander before interact retry:" + debugTickCount,
+                    "wander before interact retry: tick=" + debugTickCount
+                            + ", target=" + target.toShortString()
+                            + ", " + clickController.describeInteractionContext(mod));
             return wanderTask;
         }
         if (!moveChecker.check(mod)) {
             Debug.logMessage("Failed, blacklisting and wandering.");
-            debugLogger.state("interact movement failed; blacklisting target=" + target.toShortString());
+            debugLogger.state("interact movement failed:" + debugTickCount,
+                    "interact movement failed; blacklisting target=" + target.toShortString()
+                            + ", tick=" + debugTickCount
+                            + ", " + clickController.describeInteractionContext(mod));
             mod.getBlockScanner().requestBlockUnreachable(target);
             return wanderTask;
         }
@@ -247,12 +285,23 @@ public class InteractWithBlockTask extends Task {
         ICustomGoalProcess proc = mod.getClientBaritone().getCustomGoalProcess();
 
         cachedClickStatus = clickController.click(mod);
+        debugLogger.state("interact click response:" + debugTickCount,
+                "interact click response: tick=" + debugTickCount
+                        + ", response=" + cachedClickStatus
+                        + ", customGoalActiveBeforeSwitch=" + proc.isActive()
+                        + ", target=" + target.toShortString()
+                        + ", " + clickController.describeInteractionContext(mod));
         switch (Objects.requireNonNull(cachedClickStatus)) {
             case CANT_REACH -> {
                 setDebugState("Getting to our goal");
                 // Get to our goal then
                 if (!proc.isActive()) {
                     proc.setGoalAndPath(moveGoal);
+                    debugLogger.state("interact set goal and path:" + debugTickCount,
+                            "interact set goal and path: tick=" + debugTickCount
+                                    + ", target=" + target.toShortString()
+                                    + ", goal=" + moveGoal
+                                    + ", " + clickController.describeInteractionContext(mod));
                 }
                 clickTimer.reset();
             }
@@ -260,6 +309,10 @@ public class InteractWithBlockTask extends Task {
                 setDebugState("Waiting for click");
                 if (proc.isActive()) {
                     proc.onLostControl();
+                    debugLogger.state("interact lost control wait click:" + debugTickCount,
+                            "interact lost custom goal control while waiting for click: tick=" + debugTickCount
+                                    + ", target=" + target.toShortString()
+                                    + ", " + clickController.describeInteractionContext(mod));
                 }
                 clickTimer.reset();
 
@@ -268,11 +321,19 @@ public class InteractWithBlockTask extends Task {
                 if (waitingForClickTicks % 25 == 0 && shiftClick) {
                     mod.getInputControls().hold(Input.SNEAK);
                     mod.log("trying to press shift");
+                    debugLogger.state("interact wait click hold shift:" + debugTickCount,
+                            "interact wait click hold shift: tick=" + debugTickCount
+                                    + ", waitingForClickTicks=" + waitingForClickTicks
+                                    + ", " + clickController.describeInteractionContext(mod));
                 }
 
                 if (waitingForClickTicks > 10*20) {
                     mod.log("trying to wander");
                     waitingForClickTicks = 0;
+                    debugLogger.state("interact wait click timeout wander:" + debugTickCount,
+                            "interact wait click timeout wander: tick=" + debugTickCount
+                                    + ", target=" + target.toShortString()
+                                    + ", " + clickController.describeInteractionContext(mod));
                     return wanderTask;
                 }
             }
@@ -280,10 +341,18 @@ public class InteractWithBlockTask extends Task {
                 setDebugState("Clicking.");
                 if (proc.isActive()) {
                     proc.onLostControl();
+                    debugLogger.state("interact lost control clicked:" + debugTickCount,
+                            "interact lost custom goal control after click attempted: tick=" + debugTickCount
+                                    + ", target=" + target.toShortString()
+                                    + ", " + clickController.describeInteractionContext(mod));
                 }
                 if (clickTimer.elapsed()) {
                     // We tried clicking but failed.
                     clickTimer.reset();
+                    debugLogger.state("interact click timeout wander:" + debugTickCount,
+                            "interact click timeout wander: tick=" + debugTickCount
+                                    + ", target=" + target.toShortString()
+                                    + ", " + clickController.describeInteractionContext(mod));
                     return wanderTask;
                 }
             }
@@ -296,6 +365,12 @@ public class InteractWithBlockTask extends Task {
     protected void onStop(Task interruptTask) {
         AltoClef mod = AltoClef.getInstance();
 
+        debugLogger.event("stop: interruptedBy=" + describeTask(interruptTask)
+                + ", target=" + target.toShortString()
+                + ", ticks=" + debugTickCount
+                + ", cachedClickStatus=" + cachedClickStatus
+                + ", waitingForClickTicks=" + waitingForClickTicks
+                + ", " + clickController.describeInteractionContext(mod));
         mod.getClientBaritone().getPathingBehavior().forceCancel();
         mod.getInputControls().release(Input.SNEAK);
     }
@@ -331,6 +406,18 @@ public class InteractWithBlockTask extends Task {
 
     public Optional<Rotation> getCurrentReach() {
         return clickController.getCurrentReach();
+    }
+
+    private String describeTask(Task task) {
+        if (task == null) {
+            return "none";
+        }
+        try {
+            return task.getClass().getSimpleName() + "{" + task + "}";
+        } catch (RuntimeException ex) {
+            return task.getClass().getSimpleName() + "{debugString failed: "
+                    + ex.getClass().getSimpleName() + ": " + ex.getMessage() + "}";
+        }
     }
 
     public enum ClickResponse {

@@ -18,9 +18,13 @@ public final class CarryOnPlacementInputController {
     private final StateChangeLogger debugLogger = new StateChangeLogger("CarryOnPlacementInputController");
 
     private int sneakTicks;
+    private int releaseCount;
+    private int shiftRightClickCallCount;
 
     public void reset() {
         sneakTicks = 0;
+        releaseCount = 0;
+        shiftRightClickCallCount = 0;
         debugLogger.reset();
     }
 
@@ -28,27 +32,56 @@ public final class CarryOnPlacementInputController {
         if (mod == null) {
             return;
         }
+        releaseCount++;
+        debugLogger.state("release input before:" + releaseCount,
+                "release input before: count=" + releaseCount
+                        + ", sneakTicks=" + sneakTicks
+                        + ", " + describeInputState(mod)
+                        + ", screen=" + describeCurrentScreen());
         mod.getInputControls().release(Input.CLICK_RIGHT);
         mod.getInputControls().release(Input.SNEAK);
         if (mod.getPlayer() != null) {
             mod.getPlayer().input.sneaking = false;
         }
+        debugLogger.state("release input after:" + releaseCount,
+                "release input after: count=" + releaseCount
+                        + ", sneakTicks=" + sneakTicks
+                        + ", " + describeInputState(mod)
+                        + ", screen=" + describeCurrentScreen());
     }
 
     public boolean tryShiftRightClickSupport(AltoClef mod, CarriedBlockPlacementPlanner.PlacementTarget target, int attempt) {
+        shiftRightClickCallCount++;
+        debugLogger.state("shift-right-click entry:" + shiftRightClickCallCount,
+                "shift-right-click entry: call=" + shiftRightClickCallCount
+                        + ", attempt=" + attempt
+                        + ", target=" + describeTarget(target)
+                        + ", screen=" + describeCurrentScreen()
+                        + ", crosshair=" + describeCrosshair()
+                        + ", modOrPlayerMissing=" + (mod == null || mod.getPlayer() == null)
+                        + ", " + describeInputState(mod));
         if (mod == null || mod.getPlayer() == null || target == null) {
             return false;
         }
 
         holdSneak(mod);
         if (sneakTicks < SNEAK_WARMUP_TICKS) {
-            debugLogger.state("warming-up-sneak", "waiting for sneak before Carry On placement: ticks=" + sneakTicks);
+            debugLogger.state("warming-up-sneak:" + shiftRightClickCallCount,
+                    "waiting for sneak before Carry On placement: call=" + shiftRightClickCallCount
+                            + ", attempt=" + attempt
+                            + ", ticks=" + sneakTicks
+                            + ", " + describeInputState(mod)
+                            + ", target=" + describeTarget(target));
             return false;
         }
 
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.interactionManager == null) {
-            debugLogger.state("waiting-interaction-manager", "waiting: no interaction manager for Carry On placement");
+            debugLogger.state("waiting-interaction-manager:" + shiftRightClickCallCount,
+                    "waiting: no interaction manager for Carry On placement: call=" + shiftRightClickCallCount
+                            + ", attempt=" + attempt
+                            + ", target=" + describeTarget(target)
+                            + ", " + describeInputState(mod));
             return false;
         }
 
@@ -61,23 +94,24 @@ public final class CarryOnPlacementInputController {
                 : createDirectSupportHit(target);
 
         if (!usingCrosshairTarget) {
-            debugLogger.state("waiting-crosshair",
-                    "using direct Carry On support hit because crosshair is not exact: support=" + target.supportPos().toShortString()
-                            + " face=" + target.supportFace());
+            debugLogger.state("direct-support-hit:" + shiftRightClickCallCount,
+                    "using direct Carry On support hit because crosshair is not exact: call=" + shiftRightClickCallCount
+                            + ", attempt=" + attempt
+                            + ", support=" + target.supportPos().toShortString()
+                            + ", face=" + target.supportFace()
+                            + ", crosshair=" + describeCrosshair()
+                            + ", " + describeInputState(mod));
         }
 
         ActionResult result = client.interactionManager.interactBlock(mod.getPlayer(), Hand.MAIN_HAND, blockHitResult);
         mod.getPlayer().swingHand(Hand.MAIN_HAND);
-        if (shouldLogAttempt(attempt)) {
-            debugLogger.event("shift-right-click carried block attempt=" + attempt
-                    + ", result=" + result
-                    + ", hitSource=" + (usingCrosshairTarget ? "crosshair" : "direct")
-                    + ", playerSneaking=" + mod.getPlayer().isSneaking()
-                    + ", inputSneaking=" + mod.getPlayer().input.sneaking
-                    + ", support=" + target.supportPos().toShortString()
-                    + ", face=" + target.supportFace()
-                    + ", place=" + target.placePos().toShortString());
-        }
+        debugLogger.event("shift-right-click carried block attempt=" + attempt
+                + ", call=" + shiftRightClickCallCount
+                + ", result=" + result
+                + ", hitSource=" + (usingCrosshairTarget ? "crosshair" : "direct")
+                + ", target=" + describeTarget(target)
+                + ", crosshair=" + describeCrosshair()
+                + ", " + describeInputState(mod));
         return true;
     }
 
@@ -93,9 +127,47 @@ public final class CarryOnPlacementInputController {
         mod.getInputControls().hold(Input.SNEAK);
         mod.getPlayer().input.sneaking = true;
         sneakTicks++;
+        debugLogger.state("hold sneak:" + sneakTicks + ":" + shiftRightClickCallCount,
+                "hold sneak for Carry On placement: call=" + shiftRightClickCallCount
+                        + ", sneakTicks=" + sneakTicks
+                        + ", " + describeInputState(mod)
+                        + ", screen=" + describeCurrentScreen());
     }
 
-    private boolean shouldLogAttempt(int attempt) {
-        return attempt <= 3 || attempt % 5 == 0;
+    private String describeInputState(AltoClef mod) {
+        if (mod == null || mod.getPlayer() == null) {
+            return "input=context-missing";
+        }
+        return "playerSneaking=" + mod.getPlayer().isSneaking()
+                + ", inputSneaking=" + mod.getPlayer().input.sneaking
+                + ", sneakKeyHeld=" + mod.getInputControls().isHeldDown(Input.SNEAK)
+                + ", useKeyHeld=" + mod.getInputControls().isHeldDown(Input.CLICK_RIGHT);
+    }
+
+    private String describeCurrentScreen() {
+        Object screen = MinecraftClient.getInstance().currentScreen;
+        return screen == null ? "none" : screen.getClass().getSimpleName();
+    }
+
+    private String describeCrosshair() {
+        HitResult hitResult = MinecraftClient.getInstance().crosshairTarget;
+        if (hitResult == null) {
+            return "none";
+        }
+        if (hitResult instanceof BlockHitResult blockHit) {
+            return "block:" + blockHit.getBlockPos().toShortString()
+                    + ", side=" + blockHit.getSide()
+                    + ", type=" + blockHit.getType();
+        }
+        return hitResult.getType().toString();
+    }
+
+    private String describeTarget(CarriedBlockPlacementPlanner.PlacementTarget target) {
+        if (target == null) {
+            return "none";
+        }
+        return "place=" + target.placePos().toShortString()
+                + ", support=" + target.supportPos().toShortString()
+                + ", face=" + target.supportFace();
     }
 }
