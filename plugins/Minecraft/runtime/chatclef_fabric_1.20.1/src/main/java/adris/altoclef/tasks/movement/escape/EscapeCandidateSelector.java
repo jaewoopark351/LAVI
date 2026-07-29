@@ -49,39 +49,29 @@ public class EscapeCandidateSelector {
         }
 
         List<Direction> directions = orderedDirections(mod);
-        String firstStairFailure = "none";
-        for (Direction direction : directions) {
-            Optional<EscapePlan> stairPlan = stepPlanner.buildStairPlan(mod, origin, direction);
-            if (stairPlan.isPresent()) {
-                logState(debugLogger, "terrain escape plan selected " + stairPlan.get().describe(),
-                        "terrain escape plan selected: " + stairPlan.get().describe());
-                return EscapePlanSearchResult.selected(stairPlan.get());
-            }
-            if ("none".equals(firstStairFailure)) {
-                firstStairFailure = direction.getName() + ": "
-                        + stepPlanner.describeStairPlanFailure(mod, origin, direction);
-            }
+        DirectionalPlanSearch stairSearch = searchDirectionalPlans(mod, origin, directions,
+                stepPlanner::buildStairPlan,
+                stepPlanner::describeStairPlanFailure,
+                debugLogger);
+        if (stairSearch.getPlan().isPresent()) {
+            return EscapePlanSearchResult.selected(stairSearch.getPlan().get());
         }
-        String firstSideFailure = "none";
-        for (Direction direction : directions) {
-            Optional<EscapePlan> sidePlan = stepPlanner.buildSidePocketPlan(mod, origin, direction);
-            if (sidePlan.isPresent()) {
-                logState(debugLogger, "terrain escape plan selected " + sidePlan.get().describe(),
-                        "terrain escape plan selected: " + sidePlan.get().describe());
-                return EscapePlanSearchResult.selected(sidePlan.get());
-            }
-            if ("none".equals(firstSideFailure)) {
-                firstSideFailure = direction.getName() + ": "
-                        + stepPlanner.describeSidePocketPlanFailure(mod, origin, direction);
-            }
+
+        DirectionalPlanSearch sideSearch = searchDirectionalPlans(mod, origin, directions,
+                stepPlanner::buildSidePocketPlan,
+                stepPlanner::describeSidePocketPlanFailure,
+                debugLogger);
+        if (sideSearch.getPlan().isPresent()) {
+            return EscapePlanSearchResult.selected(sideSearch.getPlan().get());
         }
+
         Optional<EscapePlan> headroomPlan = stepPlanner.buildVerticalHeadroomPlan(mod, origin);
         if (headroomPlan.isPresent()) {
             logState(debugLogger, "terrain escape plan selected " + headroomPlan.get().describe(),
                     "terrain escape plan selected: " + headroomPlan.get().describe());
             return EscapePlanSearchResult.selected(headroomPlan.get());
         }
-        String failureReason = describeSearchFailure(origin, directions, firstStairFailure, firstSideFailure,
+        String failureReason = describeSearchFailure(origin, directions, stairSearch.getFirstFailure(), sideSearch.getFirstFailure(),
                 stepPlanner.describeVerticalHeadroomPlanFailure(mod, origin));
         logState(debugLogger, "terrain escape plan not found " + origin.toShortString(),
                 "terrain escape plan not found: " + failureReason);
@@ -99,6 +89,26 @@ public class EscapeCandidateSelector {
                 + ", firstStairFailure=" + firstStairFailure
                 + ", firstSideFailure=" + firstSideFailure
                 + ", headroomFailure=" + headroomFailure;
+    }
+
+    //20260729_kpopmodder: Keep directional candidate scanning reusable before adding riskier escape shapes.
+    private DirectionalPlanSearch searchDirectionalPlans(AltoClef mod, BlockPos origin, List<Direction> directions,
+                                                         DirectionalPlanBuilder planBuilder,
+                                                         DirectionalFailureDescriber failureDescriber,
+                                                         StateChangeLogger debugLogger) {
+        String firstFailure = "none";
+        for (Direction direction : directions) {
+            Optional<EscapePlan> plan = planBuilder.build(mod, origin, direction);
+            if (plan.isPresent()) {
+                logState(debugLogger, "terrain escape plan selected " + plan.get().describe(),
+                        "terrain escape plan selected: " + plan.get().describe());
+                return DirectionalPlanSearch.selected(plan.get(), firstFailure);
+            }
+            if ("none".equals(firstFailure)) {
+                firstFailure = direction.getName() + ": " + failureDescriber.describe(mod, origin, direction);
+            }
+        }
+        return DirectionalPlanSearch.unavailable(firstFailure);
     }
 
     private boolean isOriginOnCooldown(BlockPos origin, Set<BlockPos> cooldownOrigins) {
@@ -136,6 +146,42 @@ public class EscapeCandidateSelector {
     private void logState(StateChangeLogger debugLogger, String stateKey, String detail) {
         if (debugLogger != null) {
             debugLogger.state(stateKey, detail);
+        }
+    }
+
+    @FunctionalInterface
+    private interface DirectionalPlanBuilder {
+        Optional<EscapePlan> build(AltoClef mod, BlockPos origin, Direction direction);
+    }
+
+    @FunctionalInterface
+    private interface DirectionalFailureDescriber {
+        String describe(AltoClef mod, BlockPos origin, Direction direction);
+    }
+
+    private static final class DirectionalPlanSearch {
+        private final Optional<EscapePlan> plan;
+        private final String firstFailure;
+
+        private DirectionalPlanSearch(Optional<EscapePlan> plan, String firstFailure) {
+            this.plan = plan;
+            this.firstFailure = firstFailure;
+        }
+
+        private static DirectionalPlanSearch selected(EscapePlan plan, String firstFailure) {
+            return new DirectionalPlanSearch(Optional.of(plan), firstFailure);
+        }
+
+        private static DirectionalPlanSearch unavailable(String firstFailure) {
+            return new DirectionalPlanSearch(Optional.empty(), firstFailure);
+        }
+
+        private Optional<EscapePlan> getPlan() {
+            return plan;
+        }
+
+        private String getFirstFailure() {
+            return firstFailure;
         }
     }
 }
