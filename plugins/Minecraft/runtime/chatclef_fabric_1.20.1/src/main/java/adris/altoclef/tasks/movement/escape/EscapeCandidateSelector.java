@@ -23,21 +23,29 @@ public class EscapeCandidateSelector {
     }
 
     public Optional<EscapePlan> findPlan(AltoClef mod, Set<BlockPos> cooldownOrigins) {
-        return findPlan(mod, cooldownOrigins, null);
+        return searchPlan(mod, cooldownOrigins).getPlan();
     }
 
     public Optional<EscapePlan> findPlan(AltoClef mod, Set<BlockPos> cooldownOrigins, StateChangeLogger debugLogger) {
+        return searchPlan(mod, cooldownOrigins, debugLogger).getPlan();
+    }
+
+    public EscapePlanSearchResult searchPlan(AltoClef mod, Set<BlockPos> cooldownOrigins) {
+        return searchPlan(mod, cooldownOrigins, null);
+    }
+
+    public EscapePlanSearchResult searchPlan(AltoClef mod, Set<BlockPos> cooldownOrigins, StateChangeLogger debugLogger) {
         if (mod.getPlayer() == null) {
             logState(debugLogger, "terrain escape plan skipped player unavailable",
                     "terrain escape plan skipped: player unavailable");
-            return Optional.empty();
+            return EscapePlanSearchResult.unavailable("player unavailable");
         }
 
         BlockPos origin = mod.getPlayer().getBlockPos();
         if (isOriginOnCooldown(origin, cooldownOrigins)) {
             logState(debugLogger, "terrain escape plan skipped cooldown " + origin.toShortString(),
                     "terrain escape plan skipped: origin on cooldown, origin=" + origin.toShortString());
-            return Optional.empty();
+            return EscapePlanSearchResult.unavailable("origin on cooldown, origin=" + origin.toShortString());
         }
 
         List<Direction> directions = orderedDirections(mod);
@@ -47,7 +55,7 @@ public class EscapeCandidateSelector {
             if (stairPlan.isPresent()) {
                 logState(debugLogger, "terrain escape plan selected " + stairPlan.get().describe(),
                         "terrain escape plan selected: " + stairPlan.get().describe());
-                return stairPlan;
+                return EscapePlanSearchResult.selected(stairPlan.get());
             }
             if ("none".equals(firstStairFailure)) {
                 firstStairFailure = direction.getName() + ": "
@@ -60,7 +68,7 @@ public class EscapeCandidateSelector {
             if (sidePlan.isPresent()) {
                 logState(debugLogger, "terrain escape plan selected " + sidePlan.get().describe(),
                         "terrain escape plan selected: " + sidePlan.get().describe());
-                return sidePlan;
+                return EscapePlanSearchResult.selected(sidePlan.get());
             }
             if ("none".equals(firstSideFailure)) {
                 firstSideFailure = direction.getName() + ": "
@@ -71,49 +79,26 @@ public class EscapeCandidateSelector {
         if (headroomPlan.isPresent()) {
             logState(debugLogger, "terrain escape plan selected " + headroomPlan.get().describe(),
                     "terrain escape plan selected: " + headroomPlan.get().describe());
-            return headroomPlan;
+            return EscapePlanSearchResult.selected(headroomPlan.get());
         }
+        String failureReason = describeSearchFailure(origin, directions, firstStairFailure, firstSideFailure,
+                stepPlanner.describeVerticalHeadroomPlanFailure(mod, origin));
         logState(debugLogger, "terrain escape plan not found " + origin.toShortString(),
-                "terrain escape plan not found: origin=" + origin.toShortString()
-                        + ", directions=" + describeDirections(directions)
-                        + ", firstStairFailure=" + firstStairFailure
-                        + ", firstSideFailure=" + firstSideFailure
-                        + ", headroomFailure=" + stepPlanner.describeVerticalHeadroomPlanFailure(mod, origin));
-        return Optional.empty();
+                "terrain escape plan not found: " + failureReason);
+        return EscapePlanSearchResult.unavailable(failureReason);
     }
 
     public String describePlanSearchFailure(AltoClef mod, Set<BlockPos> cooldownOrigins) {
-        if (mod.getPlayer() == null) {
-            return "player unavailable";
-        }
+        return searchPlan(mod, cooldownOrigins).describeFailure();
+    }
 
-        BlockPos origin = mod.getPlayer().getBlockPos();
-        if (isOriginOnCooldown(origin, cooldownOrigins)) {
-            return "origin on cooldown, origin=" + origin.toShortString();
-        }
-
-        List<Direction> directions = orderedDirections(mod);
-        String firstStairFailure = "none";
-        for (Direction direction : directions) {
-            if ("none".equals(firstStairFailure)) {
-                firstStairFailure = direction.getName() + ": "
-                        + stepPlanner.describeStairPlanFailure(mod, origin, direction);
-            }
-        }
-
-        String firstSideFailure = "none";
-        for (Direction direction : directions) {
-            if ("none".equals(firstSideFailure)) {
-                firstSideFailure = direction.getName() + ": "
-                        + stepPlanner.describeSidePocketPlanFailure(mod, origin, direction);
-            }
-        }
-
+    private String describeSearchFailure(BlockPos origin, List<Direction> directions, String firstStairFailure,
+                                        String firstSideFailure, String headroomFailure) {
         return "origin=" + origin.toShortString()
                 + ", directions=" + describeDirections(directions)
                 + ", firstStairFailure=" + firstStairFailure
                 + ", firstSideFailure=" + firstSideFailure
-                + ", headroomFailure=" + stepPlanner.describeVerticalHeadroomPlanFailure(mod, origin);
+                + ", headroomFailure=" + headroomFailure;
     }
 
     private boolean isOriginOnCooldown(BlockPos origin, Set<BlockPos> cooldownOrigins) {

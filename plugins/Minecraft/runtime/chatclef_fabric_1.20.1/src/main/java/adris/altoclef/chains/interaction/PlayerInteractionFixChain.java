@@ -35,6 +35,7 @@ public class PlayerInteractionFixChain extends TaskChain {
 
     private Screen lastScreen;
     private Rotation lastLookRotation;
+    //20260729_kpopmodder: Record the screen-close context so one-tick crafting UI interruptions are diagnosable.
     private final StateChangeLogger debugLogger = new StateChangeLogger("PlayerInteractionFixChain");
 
     public PlayerInteractionFixChain(TaskRunner runner) {
@@ -200,7 +201,9 @@ public class PlayerInteractionFixChain extends TaskChain {
                 debugLogger.event("screen close requested after look change: screen=" + describeScreen(openScreen)
                         + ", deltaYaw=" + delta.getYaw()
                         + ", deltaPitch=" + delta.getPitch()
-                        + ", handler=" + describeScreenHandler(AltoClef.getInstance()));
+                        + ", lastLook=" + describeRotation(lastLookRotation)
+                        + ", currentLook=" + describeRotation(look)
+                        + ", " + describeInteractionContext(AltoClef.getInstance()));
                 return true;
             }
             // do NOT update our last look rotation, just because we want to measure long term rotation.
@@ -248,5 +251,12 @@ public class PlayerInteractionFixChain extends TaskChain {
             return "empty";
         }
         return stack.getItem().getTranslationKey() + " x " + stack.getCount();
+    }
+
+    private String describeRotation(Rotation rotation) {
+        if (rotation == null) {
+            return "none";
+        }
+        return String.format(java.util.Locale.ROOT, "%.2f/%.2f", rotation.getYaw(), rotation.getPitch());
     }
 }

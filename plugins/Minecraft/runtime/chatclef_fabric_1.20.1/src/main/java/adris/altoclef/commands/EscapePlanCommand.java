@@ -5,11 +5,11 @@ import adris.altoclef.Debug;
 import adris.altoclef.commandsystem.ArgParser;
 import adris.altoclef.commandsystem.Command;
 import adris.altoclef.tasks.movement.escape.EscapePlan;
+import adris.altoclef.tasks.movement.escape.EscapePlanSearchResult;
 import adris.altoclef.tasks.movement.escape.LocalTerrainEscapeTask;
 import net.minecraft.util.math.BlockPos;
 
 import java.util.Collections;
-import java.util.Optional;
 
 //20260729_kpopmodder: Added a dry-run command to inspect local terrain escape planning without executing block actions.
 public class EscapePlanCommand extends Command {
@@ -51,13 +51,13 @@ public class EscapePlanCommand extends Command {
                 + ", facing=" + mod.getPlayer().getHorizontalFacing().getName()
                 + ", action=none");
 
-        Optional<EscapePlan> plan = LocalTerrainEscapeTask.findPlan(mod, Collections.emptySet());
-        if (plan.isPresent()) {
-            String detail = plan.get().describe();
+        EscapePlanSearchResult planSearch = LocalTerrainEscapeTask.searchPlan(mod, Collections.emptySet());
+        if (planSearch.getPlan().isPresent()) {
+            String detail = planSearch.getPlan().get().describe();
             Debug.logWarning("[EscapePlanCommand] dry-run plan selected: " + detail + ", action=none");
             Debug.logMessage("Escape plan dry-run selected: " + detail + ". No action executed.");
         } else {
-            String reason = LocalTerrainEscapeTask.describePlanSearchFailure(mod, Collections.emptySet());
+            String reason = planSearch.describeFailure();
             Debug.logWarning("[EscapePlanCommand] dry-run plan unavailable: " + reason + ", action=none");
             Debug.logMessage("Escape plan dry-run unavailable: " + reason + ". No action executed.");
         }
@@ -77,16 +77,16 @@ public class EscapePlanCommand extends Command {
                 + ", maxClearBlocks=" + MAX_TEST_CLEAR_BLOCKS
                 + ", action=run-confirmed");
 
-        Optional<EscapePlan> plan = LocalTerrainEscapeTask.findPlan(mod, Collections.emptySet());
-        if (plan.isEmpty()) {
-            String reason = LocalTerrainEscapeTask.describePlanSearchFailure(mod, Collections.emptySet());
+        EscapePlanSearchResult planSearch = LocalTerrainEscapeTask.searchPlan(mod, Collections.emptySet());
+        if (planSearch.getPlan().isEmpty()) {
+            String reason = planSearch.describeFailure();
             Debug.logWarning("[EscapePlanCommand] TEST run rejected: no plan available, reason=" + reason + ", action=none");
             Debug.logMessage("Escape plan TEST run unavailable: " + reason + ". No action executed.");
             finish();
             return;
         }
 
-        EscapePlan selectedPlan = plan.get();
+        EscapePlan selectedPlan = planSearch.getPlan().get();
         String rejectionReason = getRunRejectionReason(mod, origin, selectedPlan);
         if (rejectionReason != null) {
             Debug.logWarning("[EscapePlanCommand] TEST run rejected: " + rejectionReason

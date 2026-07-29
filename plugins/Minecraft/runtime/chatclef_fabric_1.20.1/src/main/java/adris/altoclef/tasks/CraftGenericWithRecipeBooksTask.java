@@ -11,6 +11,7 @@ import adris.altoclef.util.JankCraftingRecipeMapping;
 import adris.altoclef.util.RecipeTarget;
 import adris.altoclef.util.helpers.ItemHelper;
 import adris.altoclef.util.helpers.StorageHelper;
+import adris.altoclef.util.logging.StateChangeLogger;
 import adris.altoclef.util.slots.CraftingTableSlot;
 import adris.altoclef.util.slots.PlayerSlot;
 import adris.altoclef.util.slots.Slot;
@@ -24,6 +25,8 @@ import java.util.Optional;
 public class CraftGenericWithRecipeBooksTask extends Task implements ITaskUsesCraftingGrid {
 
     private final RecipeTarget target;
+    //20260729_kpopmodder: Add recipe-book diagnostics for brief crafting UI interruptions.
+    private final StateChangeLogger debugLogger = new StateChangeLogger("CraftGenericWithRecipeBooksTask");
 
     public CraftGenericWithRecipeBooksTask(RecipeTarget target) {
         this.target = target;
@@ -34,7 +37,7 @@ public class CraftGenericWithRecipeBooksTask extends Task implements ITaskUsesCr
      */
     @Override
     protected void onStart() {
-
+        debugLogger.event("start diagnostics: target=" + target);
     }
 
     /**
@@ -60,6 +63,10 @@ public class CraftGenericWithRecipeBooksTask extends Task implements ITaskUsesCr
 
         // Check if neither the big crafting UI nor the player inventory UI is open
         if (!isBigCraftingOpen && !isPlayerInventoryOpen) {
+            debugLogger.state("craft ui missing:" + target,
+                    "craft ui missing before recipe-book craft: target=" + target
+                            + ", cursor=" + describeStack(cursorStack)
+                            + ", " + describeInteractionContext(mod));
             // Check if the cursor stack is not empty
             if (!cursorStack.isEmpty()) {
                 // Find a slot in the player's inventory to move the item to
@@ -96,6 +103,13 @@ public class CraftGenericWithRecipeBooksTask extends Task implements ITaskUsesCr
         // Check if the output item matches the target item and the target count has not been reached
         if (target.getOutputItem() == output.getItem() && mod.getItemStorage().getItemCount(target.getOutputItem()) < target.getTargetCount()) {
             // Return a task to receive the crafting output slot
+            debugLogger.state("receive recipe output:" + target,
+                    "receive recipe output: target=" + target
+                            + ", output=" + describeStack(output)
+                            + ", count=" + mod.getItemStorage().getItemCount(target.getOutputItem())
+                            + "/" + target.getTargetCount()
+                            + ", outputSlot=" + outputSlot
+                            + ", " + describeInteractionContext(mod));
             return new ReceiveCraftingOutputSlotTask(outputSlot, target.getTargetCount());
         }
 
@@ -140,9 +154,20 @@ public class CraftGenericWithRecipeBooksTask extends Task implements ITaskUsesCr
                 ClientPlayerEntity player = MinecraftClient.getInstance().player;
                 assert player != null;
                 // Click the recipe to send it
+                debugLogger.state("click recipe book:" + recipeToSend.get().id(),
+                        "click recipe book: target=" + target
+                                + ", recipe=" + recipeToSend.get().id()
+                                + ", syncId=" + player.currentScreenHandler.syncId
+                                + ", bigCraftingOpen=" + isBigCraftingOpen
+                                + ", playerInventoryOpen=" + isPlayerInventoryOpen
+                                + ", " + describeInteractionContext(mod));
                 mod.getController().clickRecipe(player.currentScreenHandler.syncId, recipeToSend.get().asRecipe(), true);
                 mod.getSlotHandler().registerSlotAction();
             }
+        } else {
+            debugLogger.state("recipe mapping missing:" + target,
+                    "recipe mapping missing in recipe-book craft: target=" + target
+                            + ", " + describeInteractionContext(mod));
         }
 
         return null;
@@ -198,5 +223,26 @@ public class CraftGenericWithRecipeBooksTask extends Task implements ITaskUsesCr
     protected String toDebugString() {
         // Return the debug string.
         return getClass().getSimpleName() + " (w/ RECIPE): " + target;
+    }
+
+    private String describeInteractionContext(AltoClef mod) {
+        if (mod == null || mod.getPlayer() == null) {
+            return "context=missing-client";
+        }
+        return "screen=" + (MinecraftClient.getInstance().currentScreen == null
+                ? "none"
+                : MinecraftClient.getInstance().currentScreen.getClass().getSimpleName())
+                + ", handler=" + (mod.getPlayer().currentScreenHandler == null
+                ? "none"
+                : mod.getPlayer().currentScreenHandler.getClass().getSimpleName())
+                + ", cursor=" + describeStack(StorageHelper.getItemStackInCursorSlot())
+                + ", pathing=" + mod.getClientBaritone().getPathingBehavior().isPathing();
+    }
+
+    private String describeStack(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return "empty";
+        }
+        return stack.getItem().getTranslationKey() + " x " + stack.getCount();
     }
 }

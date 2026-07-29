@@ -16,6 +16,7 @@ import adris.altoclef.util.JankCraftingRecipeMapping;
 import adris.altoclef.util.RecipeTarget;
 import adris.altoclef.util.helpers.ItemHelper;
 import adris.altoclef.util.helpers.StorageHelper;
+import adris.altoclef.util.logging.StateChangeLogger;
 import adris.altoclef.util.slots.PlayerSlot;
 import adris.altoclef.util.slots.Slot;
 import adris.altoclef.util.time.TimerGame;
@@ -187,7 +188,10 @@ class DoCraftInTableTask extends DoStuffInContainerTask {
 
     private final CollectRecipeCataloguedResourcesTask _collectTask;
     private final TimerGame _craftResetTimer = new TimerGame(CRAFT_RESET_TIMER_BONUS_SECONDS);
+    //20260729_kpopmodder: Log crafting-table retry decisions before changing any recipe-book fallback behavior.
+    private final StateChangeLogger debugLogger = new StateChangeLogger("DoCraftInTableTask");
     private int _craftCount;
+    private String lastPlanEventKey = "";
 
     public DoCraftInTableTask(RecipeTarget[] targets, boolean collect, boolean ignoreUncataloguedSlots) {
         super(Blocks.CRAFTING_TABLE, new ItemTarget("crafting_table"));
@@ -212,6 +216,7 @@ class DoCraftInTableTask extends DoStuffInContainerTask {
         // Save the current behaviour and craft count
         mod.getBehaviour().push();
         _craftCount = 0;
+        lastPlanEventKey = "";
 
         // Check if there is an item in the cursor slot
         ItemStack cursorStack = StorageHelper.getItemStackInCursorSlot();
@@ -242,6 +247,9 @@ class DoCraftInTableTask extends DoStuffInContainerTask {
 
         // Add protected items to the behaviour
         mod.getBehaviour().addProtectedItems(getMaterialsArray());
+        debugLogger.event("start diagnostics: targets=" + describeTargets()
+                + ", collect=" + _collect
+                + ", " + describeInteractionContext(mod));
     }
 
     /**
@@ -255,6 +263,14 @@ class DoCraftInTableTask extends DoStuffInContainerTask {
         // Get the item stack in the cursor slot
         ItemStack cursorStack = StorageHelper.getItemStackInCursorSlot();
         AltoClef mod = AltoClef.getInstance();
+        debugLogger.event("stop diagnostics: interruptedBy=" + describeTask(interruptTask)
+                + ", targets=" + describeTargets()
+                + ", collect=" + _collect
+                + ", collectTaskFinished=" + _collectTask.isFinished()
+                + ", materialsReady=" + StorageHelper.hasRecipeMaterialsOrTarget(mod, _targets)
+                + ", targetContainerPosition=" + describePos(getTargetContainerPosition())
+                + ", containerOpen=" + isContainerOpen(mod)
+                + ", " + describeInteractionContext(mod));
 
         // If the cursor stack is empty, close the screen
         if (cursorStack.isEmpty()) {
@@ -310,13 +326,32 @@ class DoCraftInTableTask extends DoStuffInContainerTask {
             // Check if the output item matches any of the targets and the target count is not reached
             for (RecipeTarget target : _targets) {
                 if (target.getOutputItem() == outputItem && mod.getItemStorage().getItemCount(target.getOutputItem()) < target.getTargetCount()) {
+                    logPlanEvent("receive-output:" + target,
+                            "craft plan transition: action=receive-output"
+                                    + ", target=" + target
+                                    + ", count=" + mod.getItemStorage().getItemCount(target.getOutputItem())
+                                    + "/" + target.getTargetCount()
+                                    + ", " + describeInteractionContext(mod));
                     return new ReceiveCraftingOutputSlotTask(PlayerSlot.CRAFT_OUTPUT_SLOT, target.getTargetCount());
                 }
             }
         }
 
         // Check if we need to collect items and the collect task is not finished
-        if (_collect && !_collectTask.isFinished() && !StorageHelper.hasRecipeMaterialsOrTarget(mod, _targets)) {
+        boolean collectTaskFinished = _collectTask.isFinished();
+        boolean materialsReady = StorageHelper.hasRecipeMaterialsOrTarget(mod, _targets);
+        if (_collect && !collectTaskFinished && !materialsReady) {
+            logPlanEvent("collect-resources:" + describeTargets(),
+                    "craft plan transition: action=collect-resources"
+                            + ", targets=" + describeTargets()
+                            + ", collectTaskFinished=" + collectTaskFinished
+                            + ", materialsReady=" + materialsReady
+                            + ", targetContainerPosition=" + describePos(getTargetContainerPosition())
+                            + ", " + describeInteractionContext(mod));
+            debugLogger.state("collect recipe resources:" + describeTargets(),
+                    "collect recipe resources before crafting: targets=" + describeTargets()
+                            + ", collectTaskFinished=" + collectTaskFinished
+                            + ", " + describeInteractionContext(mod));
             return _collectTask;
         }
 
@@ -331,6 +366,11 @@ class DoCraftInTableTask extends DoStuffInContainerTask {
                 for (int slot = 0; slot < target.getRecipe().getSlotCount(); ++slot) {
                     ItemTarget toCheck = target.getRecipe().getSlot(slot);
                     if (StorageHelper.isItemInaccessibleToContainer(mod, toCheck)) {
+                        logPlanEvent("move-inaccessible:" + toCheck,
+                                "craft plan transition: action=move-inaccessible-item"
+                                        + ", item=" + toCheck
+                                        + ", target=" + target
+                                        + ", " + describeInteractionContext(mod));
                         return new MoveInaccessibleItemToInventoryTask(toCheck);
                     }
                 }
@@ -338,6 +378,14 @@ class DoCraftInTableTask extends DoStuffInContainerTask {
         }
 
         // Call the parent method
+        logPlanEvent("use-crafting-container:" + describeTargets() + ":open=" + isContainerOpen(mod),
+                "craft plan transition: action=use-crafting-container"
+                        + ", targets=" + describeTargets()
+                        + ", collectTaskFinished=" + collectTaskFinished
+                        + ", materialsReady=" + materialsReady
+                        + ", targetContainerPosition=" + describePos(getTargetContainerPosition())
+                        + ", containerOpen=" + isContainerOpen(mod)
+                        + ", " + describeInteractionContext(mod));
         return super.onTick();
     }
 
@@ -383,6 +431,10 @@ class DoCraftInTableTask extends DoStuffInContainerTask {
 
         // If the craft reset timer has elapsed, return a TimeoutWanderTask
         if (_craftResetTimer.elapsed()) {
+            debugLogger.event("craft reset timer elapsed; wandering before retry: targets=" + describeTargets()
+                    + ", duration=" + formatDouble(_craftResetTimer.getDuration())
+                    + ", interval=" + formatDouble(interval)
+                    + ", " + describeInteractionContext(mod));
             return new TimeoutWanderTask(5);
         }
 
@@ -403,8 +455,41 @@ class DoCraftInTableTask extends DoStuffInContainerTask {
             if (mod.getModSettings().shouldUseCraftingBookToCraft() && recipeToSend.isPresent()) {
                 assert player != null;
                 if (player.getRecipeBook().contains(recipeToSend.get().id())) {
+                    logPlanEvent("recipe-book:" + target,
+                            "craft plan transition: action=recipe-book"
+                                    + ", target=" + target
+                                    + ", recipe=" + recipeToSend.get().id()
+                                    + ", count=" + mod.getItemStorage().getItemCount(target.getOutputItem())
+                                    + "/" + target.getTargetCount()
+                                    + ", " + describeInteractionContext(mod));
+                    debugLogger.state("recipe book craft:" + target,
+                            "recipe book craft selected: target=" + target
+                                    + ", recipe=" + recipeToSend.get().id()
+                                    + ", count=" + mod.getItemStorage().getItemCount(target.getOutputItem())
+                                    + "/" + target.getTargetCount()
+                                    + ", " + describeInteractionContext(mod));
                     return new CraftGenericWithRecipeBooksTask(target);
                 }
+                debugLogger.state("recipe book missing:" + target,
+                        "recipe book missing mapped recipe: target=" + target
+                                + ", recipe=" + recipeToSend.get().id()
+                                + ", " + describeInteractionContext(mod));
+            } else if (!mod.getModSettings().shouldUseCraftingBookToCraft()) {
+                logPlanEvent("manual-recipe-book-disabled:" + target,
+                        "craft plan transition: action=manual-craft, reason=recipe-book-disabled"
+                                + ", target=" + target
+                                + ", " + describeInteractionContext(mod));
+                debugLogger.state("manual craft because recipe book disabled:" + target,
+                        "manual craft selected because recipe book is disabled: target=" + target
+                                + ", " + describeInteractionContext(mod));
+            } else {
+                logPlanEvent("manual-recipe-mapping-missing:" + target,
+                        "craft plan transition: action=manual-craft, reason=recipe-mapping-missing"
+                                + ", target=" + target
+                                + ", " + describeInteractionContext(mod));
+                debugLogger.state("manual craft because recipe mapping missing:" + target,
+                        "manual craft selected because recipe mapping is missing: target=" + target
+                                + ", " + describeInteractionContext(mod));
             }
 
             // Return a CraftGenericManuallyTask by default
@@ -473,6 +558,62 @@ class DoCraftInTableTask extends DoStuffInContainerTask {
 
         // Convert the result list to an array and return it
         return result.toArray(new Item[0]);
+    }
+
+    private String describeTargets() {
+        return Arrays.toString(_targets);
+    }
+
+    private String describeInteractionContext(AltoClef mod) {
+        if (mod == null || mod.getPlayer() == null) {
+            return "context=missing-client";
+        }
+        return "screen=" + (MinecraftClient.getInstance().currentScreen == null
+                ? "none"
+                : MinecraftClient.getInstance().currentScreen.getClass().getSimpleName())
+                + ", handler=" + (mod.getPlayer().currentScreenHandler == null
+                ? "none"
+                : mod.getPlayer().currentScreenHandler.getClass().getSimpleName())
+                + ", cursor=" + describeStack(StorageHelper.getItemStackInCursorSlot())
+                + ", pathing=" + mod.getClientBaritone().getPathingBehavior().isPathing();
+    }
+
+    private String describePos(BlockPos pos) {
+        return pos == null ? "none" : pos.toShortString();
+    }
+
+    private String describeStack(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return "empty";
+        }
+        return stack.getItem().getTranslationKey() + " x " + stack.getCount();
+    }
+
+    private void logPlanEvent(String stateKey, String detail) {
+        if (Objects.equals(lastPlanEventKey, stateKey)) {
+            return;
+        }
+        lastPlanEventKey = stateKey;
+        debugLogger.event(detail);
+    }
+
+    private String describeTask(Task task) {
+        if (task == null) {
+            return "none";
+        }
+        try {
+            return task.getClass().getSimpleName() + "{" + task + "}";
+        } catch (RuntimeException ex) {
+            return task.getClass().getSimpleName() + "{debugString failed: "
+                    + ex.getClass().getSimpleName() + ": " + ex.getMessage() + "}";
+        }
+    }
+
+    private String formatDouble(double value) {
+        if (Double.isInfinite(value)) {
+            return "infinity";
+        }
+        return String.format(java.util.Locale.ROOT, "%.1f", value);
     }
 
 }

@@ -23,12 +23,15 @@ public class CarryOnFixChain extends SingleTaskChain {
     private static final float PRIORITY = 52;
     private static final float INACTIVE_PRIORITY = -100;
     private static final int FAILURE_COOLDOWN_TICKS = 80;
+    //20260729_kpopmodder: Give Carry On a short tick window to clear stale carried state after successful placement.
+    private static final int SUCCESS_COOLDOWN_TICKS = 8;
 
     private final CarriedBlockPreflightPolicy policy = new CarriedBlockPreflightPolicy();
     private final StateChangeLogger debugLogger = new StateChangeLogger("CarryOnFixChain");
 
     private Block lastFailedBlock;
     private int failureCooldownTicks;
+    private int successCooldownTicks;
 
     public CarryOnFixChain(TaskRunner runner) {
         super(runner);
@@ -36,7 +39,12 @@ public class CarryOnFixChain extends SingleTaskChain {
 
     @Override
     protected void onTaskFinish(AltoClef mod) {
-        debugLogger.event("carried block preflight finished");
+        if (mainTask instanceof PlaceCarriedBlockTask) {
+            successCooldownTicks = SUCCESS_COOLDOWN_TICKS;
+            debugLogger.event("carried block preflight finished; success cooldown started: ticks=" + successCooldownTicks);
+        } else {
+            debugLogger.event("carried block preflight finished");
+        }
         mainTask = null;
     }
 
@@ -48,7 +56,7 @@ public class CarryOnFixChain extends SingleTaskChain {
             return INACTIVE_PRIORITY;
         }
 
-        tickFailureCooldown();
+        tickCooldowns();
 
         if (mainTask instanceof PlaceCarriedBlockTask placeTask) {
             if (placeTask.hasFailed()) {
@@ -72,6 +80,11 @@ public class CarryOnFixChain extends SingleTaskChain {
         }
 
         Block carriedBlock = state.getBlock();
+        if (successCooldownTicks > 0) {
+            debugLogger.state("cooldown after placement success: block=" + policy.describeBlock(carriedBlock)
+                    + ", ticks_left=" + successCooldownTicks);
+            return INACTIVE_PRIORITY;
+        }
         if (isInFailureCooldown(carriedBlock)) {
             debugLogger.state("cooldown after placement failure: block=" + policy.describeBlock(carriedBlock)
                     + ", ticks_left=" + failureCooldownTicks);
@@ -131,9 +144,12 @@ public class CarryOnFixChain extends SingleTaskChain {
         }
     }
 
-    private void tickFailureCooldown() {
+    private void tickCooldowns() {
         if (failureCooldownTicks > 0) {
             failureCooldownTicks--;
+        }
+        if (successCooldownTicks > 0) {
+            successCooldownTicks--;
         }
     }
 

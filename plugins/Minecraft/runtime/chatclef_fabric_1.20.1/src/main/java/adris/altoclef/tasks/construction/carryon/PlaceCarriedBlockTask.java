@@ -30,6 +30,7 @@ public class PlaceCarriedBlockTask extends Task {
     private static final int MAX_TICKS = 20 * 10;
     private static final int CLICK_INTERVAL_TICKS = 2;
     private static final int MAX_EMPTY_SPACE_CANDIDATES = 8;
+    private static final int RELEASE_CONFIRM_TICKS = 2;
 
     private final Block[] expectedBlocks;
     private final CarriedBlockPlacementPlanner planner = new CarriedBlockPlacementPlanner();
@@ -86,10 +87,13 @@ public class PlaceCarriedBlockTask extends Task {
             if (!ArrayUtils.contains(expectedBlocks, event.blockState.getBlock())) {
                 return;
             }
+            //20260729_kpopmodder: Carry On may clear the carried state a few ticks after the block place event.
+            boolean firstObservation = placed == null || !placed.equals(event.blockPos);
             placed = event.blockPos;
-            completed = true;
-            debugLogger.event("observed carried placement at " + event.blockPos.toShortString()
-                    + " block=" + event.blockState.getBlock().getTranslationKey());
+            if (firstObservation) {
+                debugLogger.event("observed carried placement at " + event.blockPos.toShortString()
+                        + " block=" + event.blockState.getBlock().getTranslationKey());
+            }
         });
         debugLogger.state("starting carried placement for " + describeExpectedBlocks());
     }
@@ -98,19 +102,24 @@ public class PlaceCarriedBlockTask extends Task {
     protected Task onTick() {
         AltoClef mod = AltoClef.getInstance();
         ticks++;
-        if (isPlaced(mod, placed)) {
-            completed = true;
-            return null;
-        }
-        if (target != null && isPlaced(mod, target.placePos())) {
-            placed = target.placePos();
-            completed = true;
-            return null;
-        }
+        Optional<BlockState> carriedState = getCarriedTargetState(mod);
         if (ticks > MAX_TICKS) {
             failed = true;
             debugLogger.event("failed: timed out while placing carried block after attempts=" + attempts
                     + ", target=" + describeTarget());
+            return null;
+        }
+        if (hasObservedPlacement(mod)) {
+            if (target != null && isPlaced(mod, target.placePos())) {
+                placed = target.placePos();
+            }
+            if (confirmReleasedAfterPlacement(carriedState)) {
+                return null;
+            }
+            inputController.release(mod);
+            setDebugState("Waiting for Carry On to release carried block");
+            debugLogger.state("waiting-carried-release",
+                    "waiting: placed block observed but Carry On still reports carried block: target=" + describeTarget());
             return null;
         }
 
@@ -119,12 +128,11 @@ public class PlaceCarriedBlockTask extends Task {
             return null;
         }
 
-        Optional<BlockState> carriedState = getCarriedTargetState(mod);
         if (carriedState.isEmpty()) {
             if (wasCarryingTarget) {
                 noCarryTicks++;
                 setDebugState("Confirming carried block was placed");
-                if (noCarryTicks >= 2) {
+                if (noCarryTicks >= RELEASE_CONFIRM_TICKS) {
                     completed = true;
                     placed = getPlaced();
                     debugLogger.event("carried block released; treating Carry On placement as complete: target="
@@ -186,8 +194,7 @@ public class PlaceCarriedBlockTask extends Task {
 
     @Override
     public boolean isFinished() {
-        AltoClef mod = AltoClef.getInstance();
-        return completed || isPlaced(mod, placed) || target != null && isPlaced(mod, target.placePos());
+        return completed;
     }
 
     @Override
@@ -219,6 +226,28 @@ public class PlaceCarriedBlockTask extends Task {
 
     private boolean isPlaced(AltoClef mod, BlockPos pos) {
         return pos != null && ArrayUtils.contains(expectedBlocks, mod.getWorld().getBlockState(pos).getBlock());
+    }
+
+    private boolean hasObservedPlacement(AltoClef mod) {
+        return isPlaced(mod, placed) || target != null && isPlaced(mod, target.placePos());
+    }
+
+    private boolean confirmReleasedAfterPlacement(Optional<BlockState> carriedState) {
+        if (carriedState.isPresent()) {
+            noCarryTicks = 0;
+            return false;
+        }
+
+        noCarryTicks++;
+        setDebugState("Confirming carried block was placed");
+        if (noCarryTicks < RELEASE_CONFIRM_TICKS) {
+            return true;
+        }
+
+        completed = true;
+        debugLogger.event("carried block released after placement; treating Carry On placement as complete: target="
+                + describeTarget());
+        return true;
     }
 
     private void selectPlacementTarget(AltoClef mod, BlockState carriedState) {

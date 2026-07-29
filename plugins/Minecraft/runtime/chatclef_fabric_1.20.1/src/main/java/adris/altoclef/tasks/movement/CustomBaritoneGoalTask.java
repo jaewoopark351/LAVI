@@ -6,6 +6,7 @@ import adris.altoclef.control.InputControls;
 import adris.altoclef.multiversion.versionedfields.Blocks;
 import adris.altoclef.tasks.entity.KillEntityTask;
 import adris.altoclef.tasks.movement.escape.EscapePlan;
+import adris.altoclef.tasks.movement.escape.EscapePlanSearchResult;
 import adris.altoclef.tasks.movement.escape.EscapeRetryCooldowns;
 import adris.altoclef.tasks.movement.escape.LocalTerrainEscapeTask;
 import adris.altoclef.tasks.movement.escape.TimeoutWanderTask;
@@ -341,12 +342,13 @@ public abstract class CustomBaritoneGoalTask extends Task implements ITaskRequir
         logTerrainEscapeDiagnostic("eligible:" + origin.toShortString(),
                 "terrain escape eligible: local stall detected at origin=" + origin.toShortString()
                         + ", cooldowns=" + terrainEscapeRetryCooldowns.describe());
-        Optional<EscapePlan> plan = LocalTerrainEscapeTask.findPlan(mod, terrainEscapeRetryCooldowns.activeOrigins(), debugLogger);
+        EscapePlanSearchResult planSearch = LocalTerrainEscapeTask.searchPlan(mod, terrainEscapeRetryCooldowns.activeOrigins(), debugLogger);
+        Optional<EscapePlan> plan = planSearch.getPlan();
         if (plan.isEmpty()) {
             logTerrainEscapeDiagnostic("no-plan:" + origin.toShortString(),
                     "terrain escape plan unavailable after local stall: origin=" + origin.toShortString()
                             + ", cooldowns=" + terrainEscapeRetryCooldowns.describe()
-                            + ", reason=" + LocalTerrainEscapeTask.describePlanSearchFailure(mod, terrainEscapeRetryCooldowns.activeOrigins()));
+                            + ", reason=" + planSearch.describeFailure());
         }
         return plan;
     }

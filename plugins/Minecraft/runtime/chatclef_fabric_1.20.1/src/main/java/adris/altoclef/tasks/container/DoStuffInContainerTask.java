@@ -19,12 +19,15 @@ import adris.altoclef.util.time.TimerGame;
 import baritone.api.utils.input.Input;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.item.ItemStack;
 import net.minecraft.screen.slot.SlotActionType;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 
 import java.util.Arrays;
+import java.util.Objects;
 import java.util.Optional;
 
 
@@ -45,7 +48,9 @@ public abstract class DoStuffInContainerTask extends Task {
     // If we just placed something, stop placing and try going to the nearest container.
     private final TimerGame justPlacedTimer = new TimerGame(3);
     private BlockPos cachedContainerPosition = null;
+    //20260729_kpopmodder: Keep container fallback diagnostics visible before changing any crafting-table behavior.
     private final StateChangeLogger debugLogger = new StateChangeLogger("DoStuffInContainerTask");
+    private String lastPlanEventKey = "";
 
     public DoStuffInContainerTask(Block[] containerBlocks, ItemTarget containerTarget) {
         this.containerBlocks = containerBlocks;
@@ -66,6 +71,7 @@ public abstract class DoStuffInContainerTask extends Task {
         // Protect container since we might place it.
         mod.getBehaviour().addProtectedItems(ItemHelper.blocksToItems(containerBlocks));
         placeCarriedTask = null;
+        lastPlanEventKey = "";
         debugLogger.event("start: containerTarget=" + containerTarget
                 + ", carryOnSafeSneak=" + shouldUseCarryOnSafeInteraction());
     }
@@ -95,7 +101,9 @@ public abstract class DoStuffInContainerTask extends Task {
         }
 
         if (isContainerOpen(mod)) {
-            debugLogger.state("container open: targetPosition=" + describePos(cachedContainerPosition));
+            debugLogger.state("container open: targetPosition=" + describePos(cachedContainerPosition),
+                    "container open: targetPosition=" + describePos(cachedContainerPosition)
+                            + ", " + describeInteractionContext(mod));
             return containerSubTask(mod);
         }
 
@@ -128,10 +136,42 @@ public abstract class DoStuffInContainerTask extends Task {
         if (nearest.isPresent()) {
             costToWalk = BaritoneHelper.calculateGenericHeuristic(currentPos, WorldHelper.toVec3d(nearest.get()));
         }
+        double makeCost = getCostToMakeNew(mod);
+        String actionReason = describeContainerActionReason(nearest, usingPlacedContainer, costToWalk, makeCost);
+        logPlanEvent(actionReason + ":" + describeOptionalPos(nearest),
+                "container plan transition: target=" + containerTarget
+                        + ", action=" + actionReason
+                        + ", nearest=" + describeOptionalPos(nearest)
+                        + ", usingPlacedContainer=" + usingPlacedContainer
+                        + ", override=" + describePos(override)
+                        + ", placedTask=" + describePos(placeTask.getPlaced())
+                        + ", carriedPlaced=" + describePos(placeCarriedTask == null ? null : placeCarriedTask.getPlaced())
+                        + ", walkCost=" + formatDouble(costToWalk)
+                        + ", makeCost=" + formatDouble(makeCost)
+                        + ", placeForceElapsed=" + placeForceTimer.elapsed()
+                        + ", justPlacedElapsed=" + justPlacedTimer.elapsed()
+                        + ", hasContainerItem=" + mod.getItemStorage().hasItem(containerTarget)
+                        + ", " + describeInteractionContext(mod));
+        debugLogger.state("container decision:" + containerTarget
+                        + ":nearest=" + describeOptionalPos(nearest)
+                        + ":placed=" + usingPlacedContainer
+                        + ":walk=" + formatDouble(costToWalk),
+                "container decision: target=" + containerTarget
+                        + ", nearest=" + describeOptionalPos(nearest)
+                        + ", usingPlacedContainer=" + usingPlacedContainer
+                        + ", override=" + describePos(override)
+                        + ", placedTask=" + describePos(placeTask.getPlaced())
+                        + ", carriedPlaced=" + describePos(placeCarriedTask == null ? null : placeCarriedTask.getPlaced())
+                        + ", walkCost=" + formatDouble(costToWalk)
+                        + ", makeCost=" + formatDouble(makeCost)
+                        + ", placeForceElapsed=" + placeForceTimer.elapsed()
+                        + ", justPlacedElapsed=" + justPlacedTimer.elapsed()
+                        + ", hasContainerItem=" + mod.getItemStorage().hasItem(containerTarget)
+                        + ", " + describeInteractionContext(mod));
 
         // Make a new container if going to the container is a pretty bad cost.
         // Also keep on making the container if we're stuck in some
-        if (!usingPlacedContainer && costToWalk > getCostToMakeNew(mod)) {
+        if (!usingPlacedContainer && costToWalk > makeCost) {
             placeForceTimer.reset();
         }
         if (nearest.isEmpty() || (!usingPlacedContainer && !placeForceTimer.elapsed() && justPlacedTimer.elapsed())) {
@@ -146,7 +186,9 @@ public abstract class DoStuffInContainerTask extends Task {
                 debugLogger.state("get container item: target=" + containerTarget
                         + ", nearest=" + describeOptionalPos(nearest)
                         + ", walkCost=" + formatDouble(costToWalk)
-                        + ", makeCost=" + formatDouble(getCostToMakeNew(mod)));
+                        + ", makeCost=" + formatDouble(makeCost)
+                        + ", reason=" + actionReason
+                        + ", " + describeInteractionContext(mod));
                 return TaskCatalogue.getItemTask(containerTarget);
             }
 
@@ -154,8 +196,10 @@ public abstract class DoStuffInContainerTask extends Task {
             debugLogger.state("place new container: target=" + containerTarget
                     + ", nearest=" + describeOptionalPos(nearest)
                     + ", walkCost=" + formatDouble(costToWalk)
-                    + ", makeCost=" + formatDouble(getCostToMakeNew(mod))
-                    + ", previousPlaced=" + describePos(placeTask.getPlaced()));
+                    + ", makeCost=" + formatDouble(makeCost)
+                    + ", previousPlaced=" + describePos(placeTask.getPlaced())
+                    + ", reason=" + actionReason
+                    + ", " + describeInteractionContext(mod));
 
             justPlacedTimer.reset();
             if (shouldUseCarryOnSafeInteraction()) {
@@ -181,7 +225,10 @@ public abstract class DoStuffInContainerTask extends Task {
         debugLogger.state("walk/open container:" + nearest.get().toShortString(),
                 "walk/open container: targetPosition=" + nearest.get().toShortString()
                 + ", walkCost=" + formatDouble(costToWalk)
-                + ", makeCost=" + formatDouble(getCostToMakeNew(mod)));
+                + ", makeCost=" + formatDouble(makeCost)
+                + ", usingPlacedContainer=" + usingPlacedContainer
+                + ", cached=" + describePos(cachedContainerPosition)
+                + ", " + describeInteractionContext(mod));
 
         if (!StorageHelper.getItemStackInCursorSlot().isEmpty()) {
             debugLogger.state("clear cursor before opening container: cursor=" + describeStack(StorageHelper.getItemStackInCursorSlot()));
@@ -232,9 +279,15 @@ public abstract class DoStuffInContainerTask extends Task {
             return Optional.empty();
         }
         if (!isPlacedContainerBlock(mod, placed)) {
+            debugLogger.state("placed container rejected:" + placed.toShortString() + ":not-block",
+                    "placed container rejected: pos=" + placed.toShortString()
+                            + ", reason=not-container-block-or-unloaded");
             return Optional.empty();
         }
         if (!WorldHelper.canReach(placed)) {
+            debugLogger.state("placed container rejected:" + placed.toShortString() + ":unreachable",
+                    "placed container rejected: pos=" + placed.toShortString()
+                            + ", reason=unreachable");
             return Optional.empty();
         }
         return Optional.of(placed);
@@ -246,11 +299,18 @@ public abstract class DoStuffInContainerTask extends Task {
         }
 
         if (placeCarriedTask != null) {
-            Optional<BlockPos> placed = getPlacedContainerIfValid(mod, placeCarriedTask.getPlaced());
-            if (placed.isPresent()) {
-                cachedContainerPosition = placed.get();
-                justPlacedTimer.reset();
-                debugLogger.state("carried container placed: targetPosition=" + cachedContainerPosition.toShortString());
+            if (placeCarriedTask.isFinished()) {
+                //20260729_kpopmodder: Only cache a Carry On placement after the task confirms the carried state cleared.
+                Optional<BlockPos> placed = getPlacedContainerIfValid(mod, placeCarriedTask.getPlaced());
+                if (placed.isPresent()) {
+                    cachedContainerPosition = placed.get();
+                    justPlacedTimer.reset();
+                    debugLogger.state("carried container placed: targetPosition=" + cachedContainerPosition.toShortString());
+                    placeCarriedTask = null;
+                    return null;
+                }
+                debugLogger.state("carried container placement completed without reachable placed container");
+                placeCarriedTask = null;
                 return null;
             }
             if (placeCarriedTask.hasFailed()) {
@@ -301,7 +361,18 @@ public abstract class DoStuffInContainerTask extends Task {
 
     @Override
     protected void onStop(Task interruptTask) {
-        AltoClef.getInstance().getBehaviour().pop();
+        AltoClef mod = AltoClef.getInstance();
+        debugLogger.event("stop diagnostics: interruptedBy=" + describeTask(interruptTask)
+                + ", containerTarget=" + containerTarget
+                + ", cached=" + describePos(cachedContainerPosition)
+                + ", placedTask=" + describePos(placeTask.getPlaced())
+                + ", carriedPlaced=" + describePos(placeCarriedTask == null ? null : placeCarriedTask.getPlaced())
+                + ", placeTaskActive=" + placeTask.isActive()
+                + ", placeTaskFinished=" + placeTask.isFinished()
+                + ", carriedTaskActive=" + (placeCarriedTask != null && placeCarriedTask.isActive())
+                + ", carriedTaskFinished=" + (placeCarriedTask != null && placeCarriedTask.isFinished())
+                + ", " + describeInteractionContext(mod));
+        mod.getBehaviour().pop();
     }
 
     @Override
@@ -344,6 +415,53 @@ public abstract class DoStuffInContainerTask extends Task {
             return "empty";
         }
         return stack.getItem().getTranslationKey() + " x " + stack.getCount();
+    }
+
+    private String describeInteractionContext(AltoClef mod) {
+        if (mod == null || mod.getPlayer() == null) {
+            return "context=missing-client";
+        }
+        Screen screen = MinecraftClient.getInstance().currentScreen;
+        return "screen=" + (screen == null ? "none" : screen.getClass().getSimpleName())
+                + ", handler=" + (mod.getPlayer().currentScreenHandler == null
+                ? "none"
+                : mod.getPlayer().currentScreenHandler.getClass().getSimpleName())
+                + ", cursor=" + describeStack(StorageHelper.getItemStackInCursorSlot())
+                + ", pathing=" + mod.getClientBaritone().getPathingBehavior().isPathing()
+                + ", breaking=" + mod.getControllerExtras().isBreakingBlock();
+    }
+
+    private String describeContainerActionReason(Optional<BlockPos> nearest, boolean usingPlacedContainer, double costToWalk, double makeCost) {
+        if (nearest.isEmpty()) {
+            return "no-reachable-container";
+        }
+        if (!usingPlacedContainer && costToWalk > makeCost) {
+            return "new-container-cheaper";
+        }
+        if (!usingPlacedContainer && !placeForceTimer.elapsed() && justPlacedTimer.elapsed()) {
+            return "place-force-window-active";
+        }
+        return "use-existing-container";
+    }
+
+    private void logPlanEvent(String stateKey, String detail) {
+        if (Objects.equals(lastPlanEventKey, stateKey)) {
+            return;
+        }
+        lastPlanEventKey = stateKey;
+        debugLogger.event(detail);
+    }
+
+    private String describeTask(Task task) {
+        if (task == null) {
+            return "none";
+        }
+        try {
+            return task.getClass().getSimpleName() + "{" + task + "}";
+        } catch (RuntimeException ex) {
+            return task.getClass().getSimpleName() + "{debugString failed: "
+                    + ex.getClass().getSimpleName() + ": " + ex.getMessage() + "}";
+        }
     }
 
     private String formatDouble(double value) {
