@@ -18,13 +18,16 @@ import java.util.Set;
 public class EscapePlanCommand extends Command {
     private static final int MAX_TEST_CLEAR_BLOCKS = 8;
     private static final int TEST_COOLDOWN_TICKS = 20 * 8;
+    private static final String AUTO_MODE = "auto";
     private static final String RUN_MODE = "run";
+    private static final String SIDE_MODE = "side";
     private static final String SPIRAL_MODE = "spiral";
+    private static final String HEADROOM_MODE = "headroom";
     private static final String COOLDOWN_MODE = "cooldown";
     private static final String CONFIRM_TOKEN = "confirm";
 
     public EscapePlanCommand() {
-        super("escapeplan", "Dry-runs local terrain escape planning. Use 'escapeplan spiral', 'escapeplan cooldown confirm', or 'escapeplan run confirm'.");
+        super("escapeplan", "Dry-runs local terrain escape planning. Use 'escapeplan side', 'escapeplan headroom', 'escapeplan spiral', 'escapeplan cooldown confirm', or 'escapeplan run confirm'.");
     }
 
     @Override
@@ -40,15 +43,24 @@ public class EscapePlanCommand extends Command {
             finish();
             return;
         }
+        if (isCandidateDryRun(args)) {
+            runCandidateDryRun(mod, normalizeCandidateMode(args[0]));
+            finish();
+            return;
+        }
         if (isCooldownConfirmed(args)) {
             runCooldownConfirmedTest(mod);
             finish();
             return;
         }
+        if (isCandidateRunConfirmed(args)) {
+            runConfirmedTest(mod, normalizeCandidateMode(args[0]));
+            return;
+        }
         if (!isRunConfirmed(args)) {
             Debug.logWarning("[EscapePlanCommand] rejected: args=" + describeArgs(args)
-                    + ", usage=@escapeplan OR @escapeplan spiral OR @escapeplan cooldown confirm OR @escapeplan run confirm, action=none");
-            Debug.logMessage("Usage: @escapeplan OR @escapeplan spiral OR @escapeplan cooldown confirm OR @escapeplan run confirm. No action executed.");
+                    + ", usage=@escapeplan OR @escapeplan side OR @escapeplan headroom OR @escapeplan spiral OR @escapeplan cooldown confirm OR @escapeplan run confirm OR @escapeplan side run confirm OR @escapeplan headroom run confirm, action=none");
+            Debug.logMessage("Usage: @escapeplan OR @escapeplan side OR @escapeplan headroom OR @escapeplan spiral OR @escapeplan cooldown confirm OR @escapeplan run confirm OR @escapeplan side run confirm OR @escapeplan headroom run confirm. No action executed.");
             finish();
             return;
         }
@@ -101,6 +113,31 @@ public class EscapePlanCommand extends Command {
             String reason = planSearch.describeFailure();
             Debug.logWarning("[EscapePlanCommand] spiral dry-run plan unavailable: " + reason + ", action=none");
             Debug.logMessage("Escape plan spiral dry-run unavailable: " + reason + ". No action executed.");
+        }
+    }
+
+    //20260729_kpopmodder: Candidate-specific dry-runs let side/headroom success cases be verified without changing escape ordering.
+    private void runCandidateDryRun(AltoClef mod, String planMode) {
+        if (mod.getPlayer() == null || mod.getWorld() == null) {
+            Debug.logWarning("[EscapePlanCommand] " + planMode + " dry-run skipped: player or world unavailable; action=none");
+            Debug.logMessage("Escape plan " + planMode + " dry-run skipped: player or world unavailable.");
+            return;
+        }
+
+        BlockPos origin = mod.getPlayer().getBlockPos();
+        Debug.logWarning("[EscapePlanCommand] " + planMode + " dry-run requested: origin=" + origin.toShortString()
+                + ", facing=" + mod.getPlayer().getHorizontalFacing().getName()
+                + ", action=none");
+
+        EscapePlanSearchResult planSearch = searchPlanForMode(mod, planMode);
+        if (planSearch.getPlan().isPresent()) {
+            String detail = planSearch.getPlan().get().describe();
+            Debug.logWarning("[EscapePlanCommand] " + planMode + " dry-run plan selected: " + detail + ", action=none");
+            Debug.logMessage("Escape plan " + planMode + " dry-run selected: " + detail + ". No action executed.");
+        } else {
+            String reason = planSearch.describeFailure();
+            Debug.logWarning("[EscapePlanCommand] " + planMode + " dry-run plan unavailable: " + reason + ", action=none");
+            Debug.logMessage("Escape plan " + planMode + " dry-run unavailable: " + reason + ". No action executed.");
         }
     }
 
@@ -169,8 +206,12 @@ public class EscapePlanCommand extends Command {
     }
 
     private void runConfirmedTest(AltoClef mod) {
+        runConfirmedTest(mod, AUTO_MODE);
+    }
+
+    private void runConfirmedTest(AltoClef mod, String planMode) {
         if (mod.getPlayer() == null || mod.getWorld() == null) {
-            Debug.logWarning("[EscapePlanCommand] TEST run skipped: player or world unavailable; action=none");
+            Debug.logWarning("[EscapePlanCommand] TEST run skipped: player or world unavailable, planMode=" + planMode + ", action=none");
             Debug.logMessage("Escape plan TEST run skipped: player or world unavailable.");
             finish();
             return;
@@ -179,13 +220,15 @@ public class EscapePlanCommand extends Command {
         BlockPos origin = mod.getPlayer().getBlockPos();
         Debug.logWarning("[EscapePlanCommand] TEST run requested: origin=" + origin.toShortString()
                 + ", facing=" + mod.getPlayer().getHorizontalFacing().getName()
+                + ", planMode=" + planMode
                 + ", maxClearBlocks=" + MAX_TEST_CLEAR_BLOCKS
                 + ", action=run-confirmed");
 
-        EscapePlanSearchResult planSearch = LocalTerrainEscapeTask.searchPlan(mod, Collections.emptySet());
+        EscapePlanSearchResult planSearch = searchPlanForMode(mod, planMode);
         if (planSearch.getPlan().isEmpty()) {
             String reason = planSearch.describeFailure();
-            Debug.logWarning("[EscapePlanCommand] TEST run rejected: no plan available, reason=" + reason + ", action=none");
+            Debug.logWarning("[EscapePlanCommand] TEST run rejected: no plan available, planMode=" + planMode
+                    + ", reason=" + reason + ", action=none");
             Debug.logMessage("Escape plan TEST run unavailable: " + reason + ". No action executed.");
             finish();
             return;
@@ -204,11 +247,13 @@ public class EscapePlanCommand extends Command {
 
         Debug.logWarning("[EscapePlanCommand] TEST run starting LocalTerrainEscapeTask: "
                 + selectedPlan.describe()
+                + ", planMode=" + planMode
                 + ", clearBlockCount=" + selectedPlan.getClearBlockCount()
                 + ", action=run-confirmed");
         Debug.logMessage("Escape plan TEST run started: " + selectedPlan.describe() + ". It may break listed blocks.");
-        mod.runUserTask(new LocalTerrainEscapeTask(selectedPlan, "EscapePlanCommand TEST run confirm"), () -> {
+        mod.runUserTask(new LocalTerrainEscapeTask(selectedPlan, "EscapePlanCommand TEST " + planMode + " run confirm"), () -> {
             Debug.logWarning("[EscapePlanCommand] TEST run finished: " + selectedPlan.describe()
+                    + ", planMode=" + planMode
                     + ", action=run-confirmed");
             Debug.logMessage("Escape plan TEST run finished: " + selectedPlan.describe());
             finish();
@@ -225,6 +270,12 @@ public class EscapePlanCommand extends Command {
                 && SPIRAL_MODE.equalsIgnoreCase(args[0]);
     }
 
+    private boolean isCandidateDryRun(String[] args) {
+        return args != null
+                && args.length == 1
+                && isCandidateMode(args[0]);
+    }
+
     private boolean isCooldownConfirmed(String[] args) {
         return args != null
                 && args.length == 2
@@ -232,11 +283,44 @@ public class EscapePlanCommand extends Command {
                 && CONFIRM_TOKEN.equalsIgnoreCase(args[1]);
     }
 
+    private boolean isCandidateRunConfirmed(String[] args) {
+        return args != null
+                && args.length == 3
+                && isCandidateMode(args[0])
+                && RUN_MODE.equalsIgnoreCase(args[1])
+                && CONFIRM_TOKEN.equalsIgnoreCase(args[2]);
+    }
+
     private boolean isRunConfirmed(String[] args) {
         return args != null
                 && args.length == 2
                 && RUN_MODE.equalsIgnoreCase(args[0])
                 && CONFIRM_TOKEN.equalsIgnoreCase(args[1]);
+    }
+
+    private boolean isCandidateMode(String mode) {
+        return SIDE_MODE.equalsIgnoreCase(mode)
+                || HEADROOM_MODE.equalsIgnoreCase(mode);
+    }
+
+    private String normalizeCandidateMode(String mode) {
+        if (SIDE_MODE.equalsIgnoreCase(mode)) {
+            return SIDE_MODE;
+        }
+        if (HEADROOM_MODE.equalsIgnoreCase(mode)) {
+            return HEADROOM_MODE;
+        }
+        return AUTO_MODE;
+    }
+
+    private EscapePlanSearchResult searchPlanForMode(AltoClef mod, String planMode) {
+        if (SIDE_MODE.equals(planMode)) {
+            return LocalTerrainEscapeTask.searchSidePlan(mod, Collections.emptySet());
+        }
+        if (HEADROOM_MODE.equals(planMode)) {
+            return LocalTerrainEscapeTask.searchHeadroomPlan(mod, Collections.emptySet());
+        }
+        return LocalTerrainEscapeTask.searchPlan(mod, Collections.emptySet());
     }
 
     private String getRunRejectionReason(AltoClef mod, BlockPos origin, EscapePlan plan) {

@@ -83,6 +83,46 @@ public class LocalTerrainEscapeTask extends Task implements ITaskRequiresGrounde
         return CANDIDATE_SELECTOR.searchSpiralPlan(mod, cooldownOrigins, cooldownCandidates);
     }
 
+    public static EscapePlanSearchResult searchSidePlan(AltoClef mod, Set<BlockPos> cooldownOrigins) {
+        return CANDIDATE_SELECTOR.searchSidePlan(mod, cooldownOrigins);
+    }
+
+    public static EscapePlanSearchResult searchSidePlan(AltoClef mod, Set<BlockPos> cooldownOrigins,
+                                                        Set<EscapeCandidateKey> cooldownCandidates) {
+        return CANDIDATE_SELECTOR.searchSidePlan(mod, cooldownOrigins, cooldownCandidates);
+    }
+
+    public static EscapePlanSearchResult searchSidePlan(AltoClef mod, Set<BlockPos> cooldownOrigins,
+                                                        StateChangeLogger debugLogger) {
+        return CANDIDATE_SELECTOR.searchSidePlan(mod, cooldownOrigins, debugLogger);
+    }
+
+    public static EscapePlanSearchResult searchSidePlan(AltoClef mod, Set<BlockPos> cooldownOrigins,
+                                                        Set<EscapeCandidateKey> cooldownCandidates,
+                                                        StateChangeLogger debugLogger) {
+        return CANDIDATE_SELECTOR.searchSidePlan(mod, cooldownOrigins, cooldownCandidates, debugLogger);
+    }
+
+    public static EscapePlanSearchResult searchHeadroomPlan(AltoClef mod, Set<BlockPos> cooldownOrigins) {
+        return CANDIDATE_SELECTOR.searchHeadroomPlan(mod, cooldownOrigins);
+    }
+
+    public static EscapePlanSearchResult searchHeadroomPlan(AltoClef mod, Set<BlockPos> cooldownOrigins,
+                                                            Set<EscapeCandidateKey> cooldownCandidates) {
+        return CANDIDATE_SELECTOR.searchHeadroomPlan(mod, cooldownOrigins, cooldownCandidates);
+    }
+
+    public static EscapePlanSearchResult searchHeadroomPlan(AltoClef mod, Set<BlockPos> cooldownOrigins,
+                                                            StateChangeLogger debugLogger) {
+        return CANDIDATE_SELECTOR.searchHeadroomPlan(mod, cooldownOrigins, debugLogger);
+    }
+
+    public static EscapePlanSearchResult searchHeadroomPlan(AltoClef mod, Set<BlockPos> cooldownOrigins,
+                                                            Set<EscapeCandidateKey> cooldownCandidates,
+                                                            StateChangeLogger debugLogger) {
+        return CANDIDATE_SELECTOR.searchHeadroomPlan(mod, cooldownOrigins, cooldownCandidates, debugLogger);
+    }
+
     public static String describePlanSearchFailure(AltoClef mod, Set<BlockPos> cooldownOrigins) {
         return CANDIDATE_SELECTOR.describePlanSearchFailure(mod, cooldownOrigins);
     }

@@ -126,6 +126,108 @@ public class EscapeCandidateSelector {
         return searchSpiralPlan(mod, cooldownOrigins, Set.of(), null);
     }
 
+    public EscapePlanSearchResult searchSidePlan(AltoClef mod, Set<BlockPos> cooldownOrigins) {
+        return searchSidePlan(mod, cooldownOrigins, Set.of(), null);
+    }
+
+    public EscapePlanSearchResult searchSidePlan(AltoClef mod, Set<BlockPos> cooldownOrigins,
+                                                 Set<EscapeCandidateKey> cooldownCandidates) {
+        return searchSidePlan(mod, cooldownOrigins, cooldownCandidates, null);
+    }
+
+    public EscapePlanSearchResult searchSidePlan(AltoClef mod, Set<BlockPos> cooldownOrigins, StateChangeLogger debugLogger) {
+        return searchSidePlan(mod, cooldownOrigins, Set.of(), debugLogger);
+    }
+
+    public EscapePlanSearchResult searchSidePlan(AltoClef mod, Set<BlockPos> cooldownOrigins,
+                                                 Set<EscapeCandidateKey> cooldownCandidates,
+                                                 StateChangeLogger debugLogger) {
+        if (mod.getPlayer() == null) {
+            logState(debugLogger, "terrain side escape plan skipped player unavailable",
+                    "terrain side escape plan skipped: player unavailable");
+            return EscapePlanSearchResult.unavailable("player unavailable");
+        }
+
+        BlockPos origin = mod.getPlayer().getBlockPos();
+        if (isOriginOnCooldown(origin, cooldownOrigins)) {
+            logState(debugLogger, "terrain side escape plan skipped cooldown " + origin.toShortString(),
+                    "terrain side escape plan skipped: origin on cooldown, origin=" + origin.toShortString());
+            return EscapePlanSearchResult.unavailable("origin on cooldown, origin=" + origin.toShortString());
+        }
+
+        List<Direction> directions = orderedDirections(mod);
+        DirectionalPlanSearch sideSearch = searchDirectionalPlans(mod, origin, directions,
+                "side",
+                stepPlanner::buildSidePocketPlan,
+                stepPlanner::describeSidePocketPlanFailure,
+                cooldownCandidates,
+                debugLogger);
+        if (sideSearch.getPlan().isPresent()) {
+            return EscapePlanSearchResult.selected(sideSearch.getPlan().get());
+        }
+
+        String failureReason = "origin=" + origin.toShortString()
+                + ", directions=" + describeDirections(directions)
+                + ", firstSideFailure=" + sideSearch.getFirstFailure();
+        logState(debugLogger, "terrain side escape plan not found " + origin.toShortString(),
+                "terrain side escape plan not found: " + failureReason);
+        return EscapePlanSearchResult.unavailable(failureReason);
+    }
+
+    public EscapePlanSearchResult searchHeadroomPlan(AltoClef mod, Set<BlockPos> cooldownOrigins) {
+        return searchHeadroomPlan(mod, cooldownOrigins, Set.of(), null);
+    }
+
+    public EscapePlanSearchResult searchHeadroomPlan(AltoClef mod, Set<BlockPos> cooldownOrigins,
+                                                     Set<EscapeCandidateKey> cooldownCandidates) {
+        return searchHeadroomPlan(mod, cooldownOrigins, cooldownCandidates, null);
+    }
+
+    public EscapePlanSearchResult searchHeadroomPlan(AltoClef mod, Set<BlockPos> cooldownOrigins,
+                                                     StateChangeLogger debugLogger) {
+        return searchHeadroomPlan(mod, cooldownOrigins, Set.of(), debugLogger);
+    }
+
+    public EscapePlanSearchResult searchHeadroomPlan(AltoClef mod, Set<BlockPos> cooldownOrigins,
+                                                     Set<EscapeCandidateKey> cooldownCandidates,
+                                                     StateChangeLogger debugLogger) {
+        if (mod.getPlayer() == null) {
+            logState(debugLogger, "terrain headroom escape plan skipped player unavailable",
+                    "terrain headroom escape plan skipped: player unavailable");
+            return EscapePlanSearchResult.unavailable("player unavailable");
+        }
+
+        BlockPos origin = mod.getPlayer().getBlockPos();
+        if (isOriginOnCooldown(origin, cooldownOrigins)) {
+            logState(debugLogger, "terrain headroom escape plan skipped cooldown " + origin.toShortString(),
+                    "terrain headroom escape plan skipped: origin on cooldown, origin=" + origin.toShortString());
+            return EscapePlanSearchResult.unavailable("origin on cooldown, origin=" + origin.toShortString());
+        }
+
+        String headroomFailure;
+        Optional<EscapePlan> headroomPlan = Optional.empty();
+        EscapeCandidateKey headroomCandidate = new EscapeCandidateKey(origin, "headroom", Direction.UP);
+        if (isCandidateOnCooldown(headroomCandidate, cooldownCandidates)) {
+            headroomFailure = "headroom candidate on cooldown, " + headroomCandidate.describe();
+            logState(debugLogger, "terrain escape plan skipped candidate cooldown " + headroomCandidate.describe(),
+                    "terrain escape plan skipped: candidate on cooldown, " + headroomCandidate.describe());
+        } else {
+            headroomPlan = stepPlanner.buildVerticalHeadroomPlan(mod, origin);
+            headroomFailure = stepPlanner.describeVerticalHeadroomPlanFailure(mod, origin);
+        }
+        if (headroomPlan.isPresent()) {
+            logState(debugLogger, "terrain escape plan selected " + headroomPlan.get().describe(),
+                    "terrain escape plan selected: " + headroomPlan.get().describe());
+            return EscapePlanSearchResult.selected(headroomPlan.get());
+        }
+
+        String failureReason = "origin=" + origin.toShortString()
+                + ", headroomFailure=" + headroomFailure;
+        logState(debugLogger, "terrain headroom escape plan not found " + origin.toShortString(),
+                "terrain headroom escape plan not found: " + failureReason);
+        return EscapePlanSearchResult.unavailable(failureReason);
+    }
+
     public EscapePlanSearchResult searchSpiralPlan(AltoClef mod, Set<BlockPos> cooldownOrigins,
                                                    Set<EscapeCandidateKey> cooldownCandidates) {
         return searchSpiralPlan(mod, cooldownOrigins, cooldownCandidates, null);
