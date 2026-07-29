@@ -6,6 +6,7 @@ import adris.altoclef.control.InputControls;
 import adris.altoclef.multiversion.versionedfields.Blocks;
 import adris.altoclef.tasks.entity.KillEntityTask;
 import adris.altoclef.tasks.movement.escape.EscapePlan;
+import adris.altoclef.tasks.movement.escape.EscapeRetryCooldowns;
 import adris.altoclef.tasks.movement.escape.LocalTerrainEscapeTask;
 import adris.altoclef.tasks.movement.escape.TimeoutWanderTask;
 import adris.altoclef.tasksystem.ITaskRequiresGrounded;
@@ -26,7 +27,6 @@ import net.minecraft.entity.passive.WanderingTraderEntity;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -50,7 +50,7 @@ public abstract class CustomBaritoneGoalTask extends Task implements ITaskRequir
     private final MovementProgressChecker stuckCheck = new MovementProgressChecker();
     private final StateChangeLogger debugLogger = new StateChangeLogger("CustomBaritoneGoalTask");
     private final Map<UUID, Integer> blockingEntityRetryCooldowns = new HashMap<>();
-    private final Map<BlockPos, Integer> terrainEscapeRetryCooldowns = new HashMap<>();
+    private final EscapeRetryCooldowns terrainEscapeRetryCooldowns = new EscapeRetryCooldowns(TERRAIN_ESCAPE_RETRY_COOLDOWN_TICKS);
     private final boolean wander;
     protected MovementProgressChecker checker = new MovementProgressChecker();
     protected Goal cachedGoal = null;
@@ -148,7 +148,7 @@ public abstract class CustomBaritoneGoalTask extends Task implements ITaskRequir
             lastBlockingProgressTick = WorldHelper.getTicks();
         }
         pruneBlockingEntityRetryCooldowns();
-        pruneTerrainEscapeRetryCooldowns();
+        terrainEscapeRetryCooldowns.pruneExpired();
     }
 
     @Override
@@ -223,7 +223,7 @@ public abstract class CustomBaritoneGoalTask extends Task implements ITaskRequir
                 return localTerrainEscapeTask;
             }
             if (localTerrainEscapeTask.didTimeOut()) {
-                cooldownTerrainEscape(localTerrainEscapeTask.getOrigin());
+                terrainEscapeRetryCooldowns.rememberFailure(localTerrainEscapeTask.getOrigin());
                 debugLogger.event("local terrain escape timed out: "
                         + localTerrainEscapeTask.describePlan()
                         + ", task=" + toDebugString()
@@ -330,7 +330,7 @@ public abstract class CustomBaritoneGoalTask extends Task implements ITaskRequir
     }
 
     private Optional<EscapePlan> getTerrainEscapePlan(AltoClef mod) {
-        pruneTerrainEscapeRetryCooldowns();
+        terrainEscapeRetryCooldowns.pruneExpired();
         String skipReason = getLocalRecoverySkipReason(mod);
         if (skipReason != null) {
             logTerrainEscapeDiagnostic("skip:" + skipReasonCategory(skipReason),
@@ -340,13 +340,13 @@ public abstract class CustomBaritoneGoalTask extends Task implements ITaskRequir
         BlockPos origin = mod.getPlayer().getBlockPos();
         logTerrainEscapeDiagnostic("eligible:" + origin.toShortString(),
                 "terrain escape eligible: local stall detected at origin=" + origin.toShortString()
-                        + ", cooldowns=" + describeTerrainEscapeCooldowns());
-        Optional<EscapePlan> plan = LocalTerrainEscapeTask.findPlan(mod, terrainEscapeRetryCooldowns.keySet(), debugLogger);
+                        + ", cooldowns=" + terrainEscapeRetryCooldowns.describe());
+        Optional<EscapePlan> plan = LocalTerrainEscapeTask.findPlan(mod, terrainEscapeRetryCooldowns.activeOrigins(), debugLogger);
         if (plan.isEmpty()) {
             logTerrainEscapeDiagnostic("no-plan:" + origin.toShortString(),
                     "terrain escape plan unavailable after local stall: origin=" + origin.toShortString()
-                            + ", cooldowns=" + describeTerrainEscapeCooldowns()
-                            + ", reason=" + LocalTerrainEscapeTask.describePlanSearchFailure(mod, terrainEscapeRetryCooldowns.keySet()));
+                            + ", cooldowns=" + terrainEscapeRetryCooldowns.describe()
+                            + ", reason=" + LocalTerrainEscapeTask.describePlanSearchFailure(mod, terrainEscapeRetryCooldowns.activeOrigins()));
         }
         return plan;
     }
@@ -453,17 +453,6 @@ public abstract class CustomBaritoneGoalTask extends Task implements ITaskRequir
         blockingEntityRetryCooldowns.entrySet().removeIf(entry -> entry.getValue() <= now);
     }
 
-    private void cooldownTerrainEscape(BlockPos origin) {
-        if (origin != null) {
-            terrainEscapeRetryCooldowns.put(origin, WorldHelper.getTicks() + TERRAIN_ESCAPE_RETRY_COOLDOWN_TICKS);
-        }
-    }
-
-    private void pruneTerrainEscapeRetryCooldowns() {
-        int now = WorldHelper.getTicks();
-        terrainEscapeRetryCooldowns.entrySet().removeIf(entry -> entry.getValue() <= now);
-    }
-
     private void logTerrainEscapeDiagnostic(String stateKey, String detail) {
         if (stateKey.equals(lastTerrainEscapeDiagnosticKey)) {
             return;
@@ -478,18 +467,6 @@ public abstract class CustomBaritoneGoalTask extends Task implements ITaskRequir
             return skipReason.substring(0, separatorIndex);
         }
         return skipReason;
-    }
-
-    private String describeTerrainEscapeCooldowns() {
-        if (terrainEscapeRetryCooldowns.isEmpty()) {
-            return "none";
-        }
-        int now = WorldHelper.getTicks();
-        List<String> entries = new ArrayList<>();
-        for (Map.Entry<BlockPos, Integer> entry : terrainEscapeRetryCooldowns.entrySet()) {
-            entries.add(entry.getKey().toShortString() + ":" + Math.max(0, entry.getValue() - now) + "t");
-        }
-        return entries.toString();
     }
 
     private static String formatDouble(double value) {
