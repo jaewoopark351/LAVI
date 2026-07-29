@@ -71,10 +71,52 @@ public class EscapeCandidateSelector {
                     "terrain escape plan selected: " + headroomPlan.get().describe());
             return EscapePlanSearchResult.selected(headroomPlan.get());
         }
+
+        DirectionalPlanSearch spiralSearch = searchDirectionalPlans(mod, origin, directions,
+                stepPlanner::buildSpiralPlan,
+                stepPlanner::describeSpiralPlanFailure,
+                debugLogger);
+        if (spiralSearch.getPlan().isPresent()) {
+            return EscapePlanSearchResult.selected(spiralSearch.getPlan().get());
+        }
+
         String failureReason = describeSearchFailure(origin, directions, stairSearch.getFirstFailure(), sideSearch.getFirstFailure(),
-                stepPlanner.describeVerticalHeadroomPlanFailure(mod, origin));
+                stepPlanner.describeVerticalHeadroomPlanFailure(mod, origin), spiralSearch.getFirstFailure());
         logState(debugLogger, "terrain escape plan not found " + origin.toShortString(),
                 "terrain escape plan not found: " + failureReason);
+        return EscapePlanSearchResult.unavailable(failureReason);
+    }
+
+    public EscapePlanSearchResult searchSpiralPlan(AltoClef mod, Set<BlockPos> cooldownOrigins) {
+        return searchSpiralPlan(mod, cooldownOrigins, null);
+    }
+
+    public EscapePlanSearchResult searchSpiralPlan(AltoClef mod, Set<BlockPos> cooldownOrigins, StateChangeLogger debugLogger) {
+        if (mod.getPlayer() == null) {
+            logState(debugLogger, "terrain spiral escape plan skipped player unavailable",
+                    "terrain spiral escape plan skipped: player unavailable");
+            return EscapePlanSearchResult.unavailable("player unavailable");
+        }
+
+        BlockPos origin = mod.getPlayer().getBlockPos();
+        if (isOriginOnCooldown(origin, cooldownOrigins)) {
+            logState(debugLogger, "terrain spiral escape plan skipped cooldown " + origin.toShortString(),
+                    "terrain spiral escape plan skipped: origin on cooldown, origin=" + origin.toShortString());
+            return EscapePlanSearchResult.unavailable("origin on cooldown, origin=" + origin.toShortString());
+        }
+
+        List<Direction> directions = orderedDirections(mod);
+        DirectionalPlanSearch spiralSearch = searchDirectionalPlans(mod, origin, directions,
+                stepPlanner::buildSpiralPlan,
+                stepPlanner::describeSpiralPlanFailure,
+                debugLogger);
+        if (spiralSearch.getPlan().isPresent()) {
+            return EscapePlanSearchResult.selected(spiralSearch.getPlan().get());
+        }
+
+        String failureReason = describeSpiralSearchFailure(origin, directions, spiralSearch.getFirstFailure());
+        logState(debugLogger, "terrain spiral escape plan not found " + origin.toShortString(),
+                "terrain spiral escape plan not found: " + failureReason);
         return EscapePlanSearchResult.unavailable(failureReason);
     }
 
@@ -83,12 +125,19 @@ public class EscapeCandidateSelector {
     }
 
     private String describeSearchFailure(BlockPos origin, List<Direction> directions, String firstStairFailure,
-                                        String firstSideFailure, String headroomFailure) {
+                                        String firstSideFailure, String headroomFailure, String firstSpiralFailure) {
         return "origin=" + origin.toShortString()
                 + ", directions=" + describeDirections(directions)
                 + ", firstStairFailure=" + firstStairFailure
                 + ", firstSideFailure=" + firstSideFailure
-                + ", headroomFailure=" + headroomFailure;
+                + ", headroomFailure=" + headroomFailure
+                + ", firstSpiralFailure=" + firstSpiralFailure;
+    }
+
+    private String describeSpiralSearchFailure(BlockPos origin, List<Direction> directions, String firstSpiralFailure) {
+        return "origin=" + origin.toShortString()
+                + ", directions=" + describeDirections(directions)
+                + ", firstSpiralFailure=" + firstSpiralFailure;
     }
 
     //20260729_kpopmodder: Keep directional candidate scanning reusable before adding riskier escape shapes.

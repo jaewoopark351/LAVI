@@ -15,10 +15,11 @@ import java.util.Collections;
 public class EscapePlanCommand extends Command {
     private static final int MAX_TEST_CLEAR_BLOCKS = 8;
     private static final String RUN_MODE = "run";
+    private static final String SPIRAL_MODE = "spiral";
     private static final String CONFIRM_TOKEN = "confirm";
 
     public EscapePlanCommand() {
-        super("escapeplan", "Dry-runs local terrain escape planning. Use 'escapeplan run confirm' for a guarded test run.");
+        super("escapeplan", "Dry-runs local terrain escape planning. Use 'escapeplan spiral' to dry-run spiral fallback only, or 'escapeplan run confirm' for a guarded test run.");
     }
 
     @Override
@@ -29,10 +30,15 @@ public class EscapePlanCommand extends Command {
             finish();
             return;
         }
+        if (isSpiralDryRun(args)) {
+            runSpiralDryRun(mod);
+            finish();
+            return;
+        }
         if (!isRunConfirmed(args)) {
             Debug.logWarning("[EscapePlanCommand] rejected: args=" + describeArgs(args)
-                    + ", usage=@escapeplan OR @escapeplan run confirm, action=none");
-            Debug.logMessage("Usage: @escapeplan OR @escapeplan run confirm. No action executed.");
+                    + ", usage=@escapeplan OR @escapeplan spiral OR @escapeplan run confirm, action=none");
+            Debug.logMessage("Usage: @escapeplan OR @escapeplan spiral OR @escapeplan run confirm. No action executed.");
             finish();
             return;
         }
@@ -60,6 +66,31 @@ public class EscapePlanCommand extends Command {
             String reason = planSearch.describeFailure();
             Debug.logWarning("[EscapePlanCommand] dry-run plan unavailable: " + reason + ", action=none");
             Debug.logMessage("Escape plan dry-run unavailable: " + reason + ". No action executed.");
+        }
+    }
+
+    //20260729_kpopmodder: Spiral-only dry-run lets us validate the fallback candidate without changing block actions.
+    private void runSpiralDryRun(AltoClef mod) {
+        if (mod.getPlayer() == null || mod.getWorld() == null) {
+            Debug.logWarning("[EscapePlanCommand] spiral dry-run skipped: player or world unavailable; action=none");
+            Debug.logMessage("Escape plan spiral dry-run skipped: player or world unavailable.");
+            return;
+        }
+
+        BlockPos origin = mod.getPlayer().getBlockPos();
+        Debug.logWarning("[EscapePlanCommand] spiral dry-run requested: origin=" + origin.toShortString()
+                + ", facing=" + mod.getPlayer().getHorizontalFacing().getName()
+                + ", action=none");
+
+        EscapePlanSearchResult planSearch = LocalTerrainEscapeTask.searchSpiralPlan(mod, Collections.emptySet());
+        if (planSearch.getPlan().isPresent()) {
+            String detail = planSearch.getPlan().get().describe();
+            Debug.logWarning("[EscapePlanCommand] spiral dry-run plan selected: " + detail + ", action=none");
+            Debug.logMessage("Escape plan spiral dry-run selected: " + detail + ". No action executed.");
+        } else {
+            String reason = planSearch.describeFailure();
+            Debug.logWarning("[EscapePlanCommand] spiral dry-run plan unavailable: " + reason + ", action=none");
+            Debug.logMessage("Escape plan spiral dry-run unavailable: " + reason + ". No action executed.");
         }
     }
 
@@ -112,6 +143,12 @@ public class EscapePlanCommand extends Command {
 
     private boolean isDryRun(String[] args) {
         return args == null || args.length == 0;
+    }
+
+    private boolean isSpiralDryRun(String[] args) {
+        return args != null
+                && args.length == 1
+                && SPIRAL_MODE.equalsIgnoreCase(args[0]);
     }
 
     private boolean isRunConfirmed(String[] args) {

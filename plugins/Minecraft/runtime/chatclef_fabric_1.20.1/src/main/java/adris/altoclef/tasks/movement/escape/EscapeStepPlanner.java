@@ -30,6 +30,15 @@ public class EscapeStepPlanner {
         return planVerticalHeadroomBlocks(mod, origin).toPlan(origin, Direction.UP, "headroom");
     }
 
+    Optional<EscapePlan> buildSpiralPlan(AltoClef mod, BlockPos origin, Direction direction) {
+        StepPlanAttempt clockwiseAttempt = planSpiralBlocks(mod, origin, direction, true);
+        Optional<EscapePlan> clockwisePlan = clockwiseAttempt.toPlan(origin, direction, "spiral_clockwise");
+        if (clockwisePlan.isPresent()) {
+            return clockwisePlan;
+        }
+        return planSpiralBlocks(mod, origin, direction, false).toPlan(origin, direction, "spiral_counterclockwise");
+    }
+
     String describeStairPlanFailure(AltoClef mod, BlockPos origin, Direction direction) {
         return planStairBlocks(mod, origin, direction).describe(
                 "stair route already clear; no blocks to clear",
@@ -46,6 +55,17 @@ public class EscapeStepPlanner {
         return planVerticalHeadroomBlocks(mod, origin).describe(
                 "headroom already clear; no blocks to clear",
                 "headroom appears available");
+    }
+
+    String describeSpiralPlanFailure(AltoClef mod, BlockPos origin, Direction direction) {
+        StepPlanAttempt clockwiseAttempt = planSpiralBlocks(mod, origin, direction, true);
+        StepPlanAttempt counterClockwiseAttempt = planSpiralBlocks(mod, origin, direction, false);
+        return "clockwise=" + clockwiseAttempt.describe(
+                "spiral clockwise route already clear; no blocks to clear",
+                "spiral clockwise appears available")
+                + ", counterclockwise=" + counterClockwiseAttempt.describe(
+                "spiral counterclockwise route already clear; no blocks to clear",
+                "spiral counterclockwise appears available");
     }
 
     //20260729_kpopmodder: Build and failure diagnostics now share the same route-planning result.
@@ -100,6 +120,55 @@ public class EscapeStepPlanner {
             return StepPlanAttempt.failed("upper headroom failed: target=" + upperHeadroom.toShortString()
                     + ", space=" + blockActionPolicy.describeEscapeSpace(mod, upperHeadroom)
                     + ", break=" + blockActionPolicy.describeBreakSafety(mod, upperHeadroom));
+        }
+        return StepPlanAttempt.available(blocksToClear);
+    }
+
+    //20260729_kpopmodder: Spiral routes are kept as the final fallback so existing escape ordering stays stable.
+    private StepPlanAttempt planSpiralBlocks(AltoClef mod, BlockPos origin, Direction direction, boolean clockwise) {
+        String turnName = clockwise ? "clockwise" : "counterclockwise";
+        Direction turnDirection = clockwise ? direction.rotateYClockwise() : direction.rotateYCounterclockwise();
+        List<BlockPos> blocksToClear = new ArrayList<>();
+
+        StepPlanAttempt sidePocketAttempt = appendSidePocketBlocks(mod, origin, direction, blocksToClear);
+        if (sidePocketAttempt.hasFailure()) {
+            return StepPlanAttempt.failed("spiral " + turnName + " side pocket failed: "
+                    + sidePocketAttempt.getFailureReason());
+        }
+
+        BlockPos cornerFoot = offset(offset(origin, direction, 1), turnDirection, 1).up(1);
+        StepPlanAttempt cornerAttempt = appendSpiralStepBlocks(mod, cornerFoot, blocksToClear, turnName, 1);
+        if (cornerAttempt.hasFailure()) {
+            return cornerAttempt;
+        }
+
+        BlockPos exitFoot = offset(origin, turnDirection, 1).up(2);
+        StepPlanAttempt exitAttempt = appendSpiralStepBlocks(mod, exitFoot, blocksToClear, turnName, 2);
+        if (exitAttempt.hasFailure()) {
+            return exitAttempt;
+        }
+
+        return StepPlanAttempt.available(blocksToClear);
+    }
+
+    private StepPlanAttempt appendSpiralStepBlocks(AltoClef mod, BlockPos foot, List<BlockPos> blocksToClear,
+                                                   String turnName, int step) {
+        if (!blockActionPolicy.hasSafeFloor(mod, foot.down())) {
+            return StepPlanAttempt.failed("spiral " + turnName + " step floor failed: step=" + step
+                    + ", floor=" + foot.down().toShortString()
+                    + ", reason=" + blockActionPolicy.describeFloorSafety(mod, foot.down()));
+        }
+        if (!blockActionPolicy.appendClearBlock(mod, foot, blocksToClear)) {
+            return StepPlanAttempt.failed("spiral " + turnName + " step foot failed: step=" + step
+                    + ", target=" + foot.toShortString()
+                    + ", space=" + blockActionPolicy.describeEscapeSpace(mod, foot)
+                    + ", break=" + blockActionPolicy.describeBreakSafety(mod, foot));
+        }
+        if (!blockActionPolicy.appendClearBlock(mod, foot.up(), blocksToClear)) {
+            return StepPlanAttempt.failed("spiral " + turnName + " step head failed: step=" + step
+                    + ", target=" + foot.up().toShortString()
+                    + ", space=" + blockActionPolicy.describeEscapeSpace(mod, foot.up())
+                    + ", break=" + blockActionPolicy.describeBreakSafety(mod, foot.up()));
         }
         return StepPlanAttempt.available(blocksToClear);
     }

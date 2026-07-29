@@ -50,6 +50,10 @@ public class LocalTerrainEscapeTask extends Task implements ITaskRequiresGrounde
         return CANDIDATE_SELECTOR.searchPlan(mod, cooldownOrigins, debugLogger);
     }
 
+    public static EscapePlanSearchResult searchSpiralPlan(AltoClef mod, Set<BlockPos> cooldownOrigins) {
+        return CANDIDATE_SELECTOR.searchSpiralPlan(mod, cooldownOrigins);
+    }
+
     public static String describePlanSearchFailure(AltoClef mod, Set<BlockPos> cooldownOrigins) {
         return CANDIDATE_SELECTOR.describePlanSearchFailure(mod, cooldownOrigins);
     }
