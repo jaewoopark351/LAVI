@@ -86,24 +86,19 @@ public class LocalTerrainEscapeTask extends Task implements ITaskRequiresGrounde
             return null;
         }
 
-        while (clearIndex < plan.getBlocksToClear().size()
-                && BLOCK_ACTION_POLICY.isEscapeSpaceClear(mod, plan.getBlocksToClear().get(clearIndex))) {
-            debugLogger.state("skip clear escape block " + plan.getBlocksToClear().get(clearIndex).toShortString(),
-                    "skip already clear escape block: index=" + (clearIndex + 1)
-                            + "/" + plan.getBlocksToClear().size()
-                            + ", target=" + plan.getBlocksToClear().get(clearIndex).toShortString()
-                            + ", reason=" + BLOCK_ACTION_POLICY.describeEscapeSpace(mod, plan.getBlocksToClear().get(clearIndex))
-                            + ", " + describePlan());
-            clearIndex++;
-        }
-        if (clearIndex >= plan.getBlocksToClear().size()) {
+        EscapeBlockActionPolicy.ClearanceDecision clearanceDecision =
+                BLOCK_ACTION_POLICY.planNextClearance(mod, plan, clearIndex);
+        logSkippedClearBlocks(mod, clearIndex, clearanceDecision.getClearIndex());
+        clearIndex = clearanceDecision.getClearIndex();
+
+        if (clearanceDecision.isRouteCleared()) {
             finished = true;
             debugLogger.event("finished: route cleared, " + describePlan());
             return null;
         }
 
-        BlockPos target = plan.getBlocksToClear().get(clearIndex);
-        if (!BLOCK_ACTION_POLICY.isSafeBreakTarget(mod, target)) {
+        BlockPos target = clearanceDecision.getTarget();
+        if (clearanceDecision.isTargetUnsafe()) {
             finished = true;
             debugLogger.event("finished: target no longer safe to clear: target=" + target.toShortString()
                     + ", reason=" + BLOCK_ACTION_POLICY.describeBreakSafety(mod, target)
@@ -120,6 +115,18 @@ public class LocalTerrainEscapeTask extends Task implements ITaskRequiresGrounde
                         + ", break=" + BLOCK_ACTION_POLICY.describeBreakSafety(mod, target)
                         + ", " + describePlan());
         return new DestroyBlockTask(target);
+    }
+
+    private void logSkippedClearBlocks(AltoClef mod, int fromIndex, int toIndex) {
+        for (int skippedIndex = fromIndex; skippedIndex < toIndex; skippedIndex++) {
+            BlockPos skipped = plan.getBlocksToClear().get(skippedIndex);
+            debugLogger.state("skip clear escape block " + skipped.toShortString(),
+                    "skip already clear escape block: index=" + (skippedIndex + 1)
+                            + "/" + plan.getBlocksToClear().size()
+                            + ", target=" + skipped.toShortString()
+                            + ", reason=" + BLOCK_ACTION_POLICY.describeEscapeSpace(mod, skipped)
+                            + ", " + describePlan());
+        }
     }
 
     @Override

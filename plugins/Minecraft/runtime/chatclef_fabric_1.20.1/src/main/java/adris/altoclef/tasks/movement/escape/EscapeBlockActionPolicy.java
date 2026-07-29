@@ -68,6 +68,29 @@ public class EscapeBlockActionPolicy {
         return !(block instanceof FallingBlock) || WorldHelper.fallingBlockSafeToBreak(pos);
     }
 
+    //20260729_kpopmodder: Keep the next clear-block decision separate from LocalTerrainEscapeTask action execution.
+    ClearanceDecision planNextClearance(AltoClef mod, EscapePlan plan, int startIndex) {
+        int clearIndex = firstBlockedClearIndex(mod, plan, startIndex);
+        if (clearIndex >= plan.getBlocksToClear().size()) {
+            return ClearanceDecision.routeCleared(clearIndex);
+        }
+
+        BlockPos target = plan.getBlocksToClear().get(clearIndex);
+        if (!isSafeBreakTarget(mod, target)) {
+            return ClearanceDecision.targetUnsafe(clearIndex, target);
+        }
+        return ClearanceDecision.clearTarget(clearIndex, target);
+    }
+
+    private int firstBlockedClearIndex(AltoClef mod, EscapePlan plan, int startIndex) {
+        int clearIndex = startIndex;
+        while (clearIndex < plan.getBlocksToClear().size()
+                && isEscapeSpaceClear(mod, plan.getBlocksToClear().get(clearIndex))) {
+            clearIndex++;
+        }
+        return clearIndex;
+    }
+
     String describeEscapeSpace(AltoClef mod, BlockPos pos) {
         BlockState state = mod.getWorld().getBlockState(pos);
         Block block = state.getBlock();
@@ -127,5 +150,51 @@ public class EscapeBlockActionPolicy {
                 || block instanceof EndPortalBlock
                 || block instanceof EndPortalFrameBlock
                 || block instanceof FluidBlock;
+    }
+
+    static final class ClearanceDecision {
+        private final ClearanceStatus status;
+        private final int clearIndex;
+        private final BlockPos target;
+
+        private ClearanceDecision(ClearanceStatus status, int clearIndex, BlockPos target) {
+            this.status = status;
+            this.clearIndex = clearIndex;
+            this.target = target;
+        }
+
+        static ClearanceDecision clearTarget(int clearIndex, BlockPos target) {
+            return new ClearanceDecision(ClearanceStatus.CLEAR_TARGET, clearIndex, target);
+        }
+
+        static ClearanceDecision routeCleared(int clearIndex) {
+            return new ClearanceDecision(ClearanceStatus.ROUTE_CLEARED, clearIndex, null);
+        }
+
+        static ClearanceDecision targetUnsafe(int clearIndex, BlockPos target) {
+            return new ClearanceDecision(ClearanceStatus.TARGET_UNSAFE, clearIndex, target);
+        }
+
+        int getClearIndex() {
+            return clearIndex;
+        }
+
+        BlockPos getTarget() {
+            return target;
+        }
+
+        boolean isRouteCleared() {
+            return status == ClearanceStatus.ROUTE_CLEARED;
+        }
+
+        boolean isTargetUnsafe() {
+            return status == ClearanceStatus.TARGET_UNSAFE;
+        }
+    }
+
+    private enum ClearanceStatus {
+        CLEAR_TARGET,
+        ROUTE_CLEARED,
+        TARGET_UNSAFE
     }
 }
