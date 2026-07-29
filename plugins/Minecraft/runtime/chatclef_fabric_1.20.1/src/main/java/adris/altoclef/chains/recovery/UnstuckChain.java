@@ -9,7 +9,7 @@ import adris.altoclef.chains.food.FoodChain;
 import adris.altoclef.Debug;
 import adris.altoclef.multiversion.entity.PlayerVer;
 import adris.altoclef.multiversion.versionedfields.Blocks;
-import adris.altoclef.tasks.construction.DestroyBlockTask;
+import adris.altoclef.tasks.construction.destroy.DestroyBlockTask;
 import adris.altoclef.tasks.movement.GetOutOfWaterTask;
 import adris.altoclef.tasks.movement.GetToBlockTask;
 import adris.altoclef.tasks.movement.SafeRandomShimmyTask;

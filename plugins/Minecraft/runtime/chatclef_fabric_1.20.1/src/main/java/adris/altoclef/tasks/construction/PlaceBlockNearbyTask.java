@@ -6,6 +6,7 @@ import adris.altoclef.eventbus.EventBus;
 import adris.altoclef.eventbus.Subscription;
 import adris.altoclef.eventbus.events.BlockPlaceEvent;
 import adris.altoclef.multiversion.blockpos.BlockPosVer;
+import adris.altoclef.tasks.construction.destroy.DestroyBlockTask;
 import adris.altoclef.tasks.movement.escape.TimeoutWanderTask;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.compat.CarryOnCompat;

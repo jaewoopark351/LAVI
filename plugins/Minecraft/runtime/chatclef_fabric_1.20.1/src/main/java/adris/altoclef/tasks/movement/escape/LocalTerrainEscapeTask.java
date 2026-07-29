@@ -1,7 +1,7 @@
 package adris.altoclef.tasks.movement.escape;
 
 import adris.altoclef.AltoClef;
-import adris.altoclef.tasks.construction.DestroyBlockTask;
+import adris.altoclef.tasks.construction.destroy.DestroyBlockTask;
 import adris.altoclef.tasksystem.ITaskRequiresGrounded;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.helpers.WorldHelper;

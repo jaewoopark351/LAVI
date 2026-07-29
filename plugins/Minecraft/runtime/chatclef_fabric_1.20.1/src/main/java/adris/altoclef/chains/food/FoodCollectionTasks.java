@@ -4,7 +4,7 @@ import adris.altoclef.AltoClef;
 import adris.altoclef.multiversion.item.ItemVer;
 import adris.altoclef.tasks.CraftInInventoryTask;
 import adris.altoclef.tasks.DoToClosestBlockTask;
-import adris.altoclef.tasks.construction.DestroyBlockTask;
+import adris.altoclef.tasks.construction.destroy.DestroyBlockTask;
 import adris.altoclef.tasks.container.CraftInTableTask;
 import adris.altoclef.tasks.movement.pickup.PickupDroppedItemTask;
 import adris.altoclef.tasks.resources.KillAndLootTask;

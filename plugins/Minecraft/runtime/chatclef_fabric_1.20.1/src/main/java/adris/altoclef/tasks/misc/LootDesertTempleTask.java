@@ -1,7 +1,7 @@
 package adris.altoclef.tasks.misc;
 
 import adris.altoclef.AltoClef;
-import adris.altoclef.tasks.construction.DestroyBlockTask;
+import adris.altoclef.tasks.construction.destroy.DestroyBlockTask;
 import adris.altoclef.tasks.container.LootContainerTask;
 import adris.altoclef.tasksystem.Task;
 import net.minecraft.block.Blocks;

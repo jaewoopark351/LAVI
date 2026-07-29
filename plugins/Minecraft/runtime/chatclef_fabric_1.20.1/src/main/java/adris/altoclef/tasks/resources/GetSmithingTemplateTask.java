@@ -4,7 +4,7 @@ import adris.altoclef.AltoClef;
 import adris.altoclef.multiversion.versionedfields.Blocks;
 import adris.altoclef.multiversion.versionedfields.Items;
 import adris.altoclef.tasks.ResourceTask;
-import adris.altoclef.tasks.construction.DestroyBlockTask;
+import adris.altoclef.tasks.construction.destroy.DestroyBlockTask;
 import adris.altoclef.tasks.movement.DefaultGoToDimensionTask;
 import adris.altoclef.tasks.movement.SearchChunkForBlockTask;
 import adris.altoclef.tasksystem.Task;

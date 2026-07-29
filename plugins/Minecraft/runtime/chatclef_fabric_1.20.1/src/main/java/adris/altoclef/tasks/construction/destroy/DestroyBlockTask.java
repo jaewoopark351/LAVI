@@ -1,8 +1,7 @@
-package adris.altoclef.tasks.construction;
+package adris.altoclef.tasks.construction.destroy;
 
 import adris.altoclef.AltoClef;
 import adris.altoclef.Debug;
-import adris.altoclef.tasks.construction.destroy.DestroyBlockPlan;
 import adris.altoclef.tasks.movement.RunAwayFromPositionTask;
 import adris.altoclef.tasks.movement.SafeRandomShimmyTask;
 import adris.altoclef.tasksystem.ITaskRequiresGrounded;
