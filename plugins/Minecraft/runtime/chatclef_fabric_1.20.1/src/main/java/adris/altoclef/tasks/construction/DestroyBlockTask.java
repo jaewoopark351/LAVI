@@ -2,6 +2,7 @@ package adris.altoclef.tasks.construction;
 
 import adris.altoclef.AltoClef;
 import adris.altoclef.Debug;
+import adris.altoclef.tasks.construction.destroy.DestroyBlockPlan;
 import adris.altoclef.tasks.movement.RunAwayFromPositionTask;
 import adris.altoclef.tasks.movement.SafeRandomShimmyTask;
 import adris.altoclef.tasksystem.ITaskRequiresGrounded;
@@ -53,6 +54,7 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
     private Task unstuckTask = null;
     private boolean isMining;
     private final StateChangeLogger debugLogger = new StateChangeLogger("DestroyBlockTask");
+    private final StateChangeLogger plannerLogger = new StateChangeLogger("DestroyBlockPlanner");
 
     public DestroyBlockTask(BlockPos pos) {
         this.pos = pos;
@@ -200,6 +202,7 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
         // Reset move checker and stuck check.
         _moveChecker.reset();
         stuckCheck.reset();
+        plannerLogger.reset();
 
         // Get the item stack in the cursor slot.
         ItemStack cursorStack = StorageHelper.getItemStackInCursorSlot();
@@ -252,6 +255,7 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
     @Override
     protected Task onTick() {
         AltoClef mod = AltoClef.getInstance();
+        logObservedPlan(mod);
 
         // Check if there is white wool at the specified position
         if (mod.getWorld().getBlockState(pos).getBlock() == Blocks.WHITE_WOOL) {
@@ -487,5 +491,12 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
             return "empty";
         }
         return stack.getItem().getTranslationKey() + " x " + stack.getCount();
+    }
+
+    private void logObservedPlan(AltoClef mod) {
+        if (mod.getModSettings() == null || !mod.getModSettings().shouldLogChatClefDebug()) {
+            return;
+        }
+        DestroyBlockPlan.observe(mod, pos, isMining, unstuckTask != null && unstuckTask.isActive()).log(plannerLogger);
     }
 }
