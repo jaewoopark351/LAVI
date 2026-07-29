@@ -71,11 +71,11 @@ public class EscapeBlockActionPolicy {
     //20260729_kpopmodder: Keep the next clear-block decision separate from LocalTerrainEscapeTask action execution.
     ClearanceDecision planNextClearance(AltoClef mod, EscapePlan plan, int startIndex) {
         int clearIndex = firstBlockedClearIndex(mod, plan, startIndex);
-        if (clearIndex >= plan.getBlocksToClear().size()) {
+        if (plan.isClearComplete(clearIndex)) {
             return ClearanceDecision.routeCleared(clearIndex);
         }
 
-        BlockPos target = plan.getBlocksToClear().get(clearIndex);
+        BlockPos target = plan.getBlockToClear(clearIndex);
         if (!isSafeBreakTarget(mod, target)) {
             return ClearanceDecision.targetUnsafe(clearIndex, target);
         }
@@ -84,8 +84,8 @@ public class EscapeBlockActionPolicy {
 
     private int firstBlockedClearIndex(AltoClef mod, EscapePlan plan, int startIndex) {
         int clearIndex = startIndex;
-        while (clearIndex < plan.getBlocksToClear().size()
-                && isEscapeSpaceClear(mod, plan.getBlocksToClear().get(clearIndex))) {
+        while (!plan.isClearComplete(clearIndex)
+                && isEscapeSpaceClear(mod, plan.getBlockToClear(clearIndex))) {
             clearIndex++;
         }
         return clearIndex;

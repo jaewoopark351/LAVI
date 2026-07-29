@@ -106,10 +106,9 @@ public class LocalTerrainEscapeTask extends Task implements ITaskRequiresGrounde
             return null;
         }
 
-        setDebugState("Clearing terrain " + (clearIndex + 1) + "/" + plan.getBlocksToClear().size());
+        setDebugState("Clearing terrain " + plan.describeClearProgress(clearIndex));
         debugLogger.state("clear escape block " + target.toShortString(),
-                "clearing escape block: index=" + (clearIndex + 1)
-                        + "/" + plan.getBlocksToClear().size()
+                "clearing escape block: index=" + plan.describeClearProgress(clearIndex)
                         + ", target=" + target.toShortString()
                         + ", space=" + BLOCK_ACTION_POLICY.describeEscapeSpace(mod, target)
                         + ", break=" + BLOCK_ACTION_POLICY.describeBreakSafety(mod, target)
@@ -119,10 +118,9 @@ public class LocalTerrainEscapeTask extends Task implements ITaskRequiresGrounde
 
     private void logSkippedClearBlocks(AltoClef mod, int fromIndex, int toIndex) {
         for (int skippedIndex = fromIndex; skippedIndex < toIndex; skippedIndex++) {
-            BlockPos skipped = plan.getBlocksToClear().get(skippedIndex);
+            BlockPos skipped = plan.getBlockToClear(skippedIndex);
             debugLogger.state("skip clear escape block " + skipped.toShortString(),
-                    "skip already clear escape block: index=" + (skippedIndex + 1)
-                            + "/" + plan.getBlocksToClear().size()
+                    "skip already clear escape block: index=" + plan.describeClearProgress(skippedIndex)
                             + ", target=" + skipped.toShortString()
                             + ", reason=" + BLOCK_ACTION_POLICY.describeEscapeSpace(mod, skipped)
                             + ", " + describePlan());

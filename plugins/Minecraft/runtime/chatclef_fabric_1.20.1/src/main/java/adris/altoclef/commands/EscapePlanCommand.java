@@ -99,7 +99,7 @@ public class EscapePlanCommand extends Command {
 
         Debug.logWarning("[EscapePlanCommand] TEST run starting LocalTerrainEscapeTask: "
                 + selectedPlan.describe()
-                + ", clearBlockCount=" + selectedPlan.getBlocksToClear().size()
+                + ", clearBlockCount=" + selectedPlan.getClearBlockCount()
                 + ", action=run-confirmed");
         Debug.logMessage("Escape plan TEST run started: " + selectedPlan.describe() + ". It may break listed blocks.");
         mod.runUserTask(new LocalTerrainEscapeTask(selectedPlan, "EscapePlanCommand TEST run confirm"), () -> {
@@ -126,11 +126,11 @@ public class EscapePlanCommand extends Command {
             return "player origin changed before run, expected=" + origin.toShortString()
                     + ", planOrigin=" + plan.getOrigin().toShortString();
         }
-        if (plan.getBlocksToClear().isEmpty()) {
+        if (!plan.hasBlocksToClear()) {
             return "plan has no blocks to clear";
         }
-        if (plan.getBlocksToClear().size() > MAX_TEST_CLEAR_BLOCKS) {
-            return "plan has too many blocks to clear, count=" + plan.getBlocksToClear().size()
+        if (plan.getClearBlockCount() > MAX_TEST_CLEAR_BLOCKS) {
+            return "plan has too many blocks to clear, count=" + plan.getClearBlockCount()
                     + ", max=" + MAX_TEST_CLEAR_BLOCKS;
         }
         if (mod.getFoodChain().needsToEat()) {

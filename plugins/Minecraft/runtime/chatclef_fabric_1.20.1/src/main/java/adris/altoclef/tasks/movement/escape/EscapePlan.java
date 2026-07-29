@@ -37,6 +37,26 @@ public class EscapePlan {
         return blocksToClear;
     }
 
+    public int getClearBlockCount() {
+        return blocksToClear.size();
+    }
+
+    public boolean hasBlocksToClear() {
+        return !blocksToClear.isEmpty();
+    }
+
+    public boolean isClearComplete(int clearIndex) {
+        return clearIndex >= blocksToClear.size();
+    }
+
+    public BlockPos getBlockToClear(int clearIndex) {
+        return blocksToClear.get(clearIndex);
+    }
+
+    public String describeClearProgress(int clearIndex) {
+        return (clearIndex + 1) + "/" + getClearBlockCount();
+    }
+
     public String describe() {
         return "kind=" + kind
                 + ", origin=" + origin.toShortString()
