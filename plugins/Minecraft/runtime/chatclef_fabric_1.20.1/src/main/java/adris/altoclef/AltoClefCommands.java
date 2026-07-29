@@ -3,6 +3,7 @@ package adris.altoclef;
 import adris.altoclef.commands.AttackPlayerOrMobCommand;
 import adris.altoclef.commands.DepositCommand;
 import adris.altoclef.commands.EquipCommand;
+import adris.altoclef.commands.EscapePlanCommand;
 import adris.altoclef.commands.FollowCommand;
 import adris.altoclef.commands.FoodCommand;
 import adris.altoclef.commands.GamerCommand;
@@ -47,6 +48,7 @@ public class AltoClefCommands {
                 new ReloadSettingsCommand(),
                 new ResetMemoryCommand(),
                 new OverlayCommand(),
+                new EscapePlanCommand(),
                 new GamerCommand(),
                 new FollowCommand(),
                 new GiveCommand(),
