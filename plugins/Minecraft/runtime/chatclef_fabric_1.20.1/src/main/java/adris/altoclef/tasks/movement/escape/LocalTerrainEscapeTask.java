@@ -28,6 +28,8 @@ public class LocalTerrainEscapeTask extends Task implements ITaskRequiresGrounde
     private int clearIndex;
     private boolean finished;
     private boolean timedOut;
+    private boolean failed;
+    private String failureReason;
 
     public LocalTerrainEscapeTask(EscapePlan plan, String parentTaskDebug) {
         this.plan = plan;
@@ -38,24 +40,56 @@ public class LocalTerrainEscapeTask extends Task implements ITaskRequiresGrounde
         return CANDIDATE_SELECTOR.findPlan(mod, cooldownOrigins);
     }
 
+    public static Optional<EscapePlan> findPlan(AltoClef mod, Set<BlockPos> cooldownOrigins,
+                                                Set<EscapeCandidateKey> cooldownCandidates) {
+        return CANDIDATE_SELECTOR.findPlan(mod, cooldownOrigins, cooldownCandidates);
+    }
+
     public static Optional<EscapePlan> findPlan(AltoClef mod, Set<BlockPos> cooldownOrigins, StateChangeLogger debugLogger) {
         return CANDIDATE_SELECTOR.findPlan(mod, cooldownOrigins, debugLogger);
+    }
+
+    public static Optional<EscapePlan> findPlan(AltoClef mod, Set<BlockPos> cooldownOrigins,
+                                                Set<EscapeCandidateKey> cooldownCandidates,
+                                                StateChangeLogger debugLogger) {
+        return CANDIDATE_SELECTOR.findPlan(mod, cooldownOrigins, cooldownCandidates, debugLogger);
     }
 
     public static EscapePlanSearchResult searchPlan(AltoClef mod, Set<BlockPos> cooldownOrigins) {
         return CANDIDATE_SELECTOR.searchPlan(mod, cooldownOrigins);
     }
 
+    public static EscapePlanSearchResult searchPlan(AltoClef mod, Set<BlockPos> cooldownOrigins,
+                                                    Set<EscapeCandidateKey> cooldownCandidates) {
+        return CANDIDATE_SELECTOR.searchPlan(mod, cooldownOrigins, cooldownCandidates);
+    }
+
     public static EscapePlanSearchResult searchPlan(AltoClef mod, Set<BlockPos> cooldownOrigins, StateChangeLogger debugLogger) {
         return CANDIDATE_SELECTOR.searchPlan(mod, cooldownOrigins, debugLogger);
+    }
+
+    public static EscapePlanSearchResult searchPlan(AltoClef mod, Set<BlockPos> cooldownOrigins,
+                                                    Set<EscapeCandidateKey> cooldownCandidates,
+                                                    StateChangeLogger debugLogger) {
+        return CANDIDATE_SELECTOR.searchPlan(mod, cooldownOrigins, cooldownCandidates, debugLogger);
     }
 
     public static EscapePlanSearchResult searchSpiralPlan(AltoClef mod, Set<BlockPos> cooldownOrigins) {
         return CANDIDATE_SELECTOR.searchSpiralPlan(mod, cooldownOrigins);
     }
 
+    public static EscapePlanSearchResult searchSpiralPlan(AltoClef mod, Set<BlockPos> cooldownOrigins,
+                                                          Set<EscapeCandidateKey> cooldownCandidates) {
+        return CANDIDATE_SELECTOR.searchSpiralPlan(mod, cooldownOrigins, cooldownCandidates);
+    }
+
     public static String describePlanSearchFailure(AltoClef mod, Set<BlockPos> cooldownOrigins) {
         return CANDIDATE_SELECTOR.describePlanSearchFailure(mod, cooldownOrigins);
+    }
+
+    public static String describePlanSearchFailure(AltoClef mod, Set<BlockPos> cooldownOrigins,
+                                                   Set<EscapeCandidateKey> cooldownCandidates) {
+        return CANDIDATE_SELECTOR.describePlanSearchFailure(mod, cooldownOrigins, cooldownCandidates);
     }
 
     @Override
@@ -64,6 +98,8 @@ public class LocalTerrainEscapeTask extends Task implements ITaskRequiresGrounde
         clearIndex = 0;
         finished = false;
         timedOut = false;
+        failed = false;
+        failureReason = "none";
         debugLogger.event("start: " + describePlan()
                 + ", parentTask=" + parentTaskDebug
                 + ", timeoutSeconds=" + TIMEOUT_SECONDS);
@@ -79,6 +115,8 @@ public class LocalTerrainEscapeTask extends Task implements ITaskRequiresGrounde
         }
         if (timeout.elapsed()) {
             timedOut = true;
+            failed = true;
+            failureReason = "timeout";
             finished = true;
             debugLogger.event("timed out: " + describePlan());
             return null;
@@ -103,9 +141,11 @@ public class LocalTerrainEscapeTask extends Task implements ITaskRequiresGrounde
 
         BlockPos target = clearanceDecision.getTarget();
         if (clearanceDecision.isTargetUnsafe()) {
+            failed = true;
+            failureReason = "target unsafe: target=" + target.toShortString()
+                    + ", reason=" + BLOCK_ACTION_POLICY.describeBreakSafety(mod, target);
             finished = true;
-            debugLogger.event("finished: target no longer safe to clear: target=" + target.toShortString()
-                    + ", reason=" + BLOCK_ACTION_POLICY.describeBreakSafety(mod, target)
+            debugLogger.event("finished: " + failureReason
                     + ", " + describePlan());
             return null;
         }
@@ -144,8 +184,20 @@ public class LocalTerrainEscapeTask extends Task implements ITaskRequiresGrounde
         return timedOut;
     }
 
+    public boolean didFail() {
+        return failed;
+    }
+
+    public String describeFailureReason() {
+        return failureReason;
+    }
+
     public BlockPos getOrigin() {
         return plan.getOrigin();
+    }
+
+    public EscapePlan getPlan() {
+        return plan;
     }
 
     public String describePlan() {

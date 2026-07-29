@@ -40,6 +40,10 @@ public class EscapePlan {
         return kind;
     }
 
+    public EscapeCandidateKey getCandidateKey() {
+        return EscapeCandidateKey.fromPlan(this);
+    }
+
     public List<BlockPos> getBlocksToClear() {
         return blocksToClear;
     }

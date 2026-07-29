@@ -23,18 +23,40 @@ public class EscapeCandidateSelector {
     }
 
     public Optional<EscapePlan> findPlan(AltoClef mod, Set<BlockPos> cooldownOrigins) {
-        return searchPlan(mod, cooldownOrigins).getPlan();
+        return searchPlan(mod, cooldownOrigins, Set.of()).getPlan();
+    }
+
+    public Optional<EscapePlan> findPlan(AltoClef mod, Set<BlockPos> cooldownOrigins,
+                                         Set<EscapeCandidateKey> cooldownCandidates) {
+        return searchPlan(mod, cooldownOrigins, cooldownCandidates).getPlan();
     }
 
     public Optional<EscapePlan> findPlan(AltoClef mod, Set<BlockPos> cooldownOrigins, StateChangeLogger debugLogger) {
-        return searchPlan(mod, cooldownOrigins, debugLogger).getPlan();
+        return searchPlan(mod, cooldownOrigins, Set.of(), debugLogger).getPlan();
+    }
+
+    public Optional<EscapePlan> findPlan(AltoClef mod, Set<BlockPos> cooldownOrigins,
+                                         Set<EscapeCandidateKey> cooldownCandidates,
+                                         StateChangeLogger debugLogger) {
+        return searchPlan(mod, cooldownOrigins, cooldownCandidates, debugLogger).getPlan();
     }
 
     public EscapePlanSearchResult searchPlan(AltoClef mod, Set<BlockPos> cooldownOrigins) {
-        return searchPlan(mod, cooldownOrigins, null);
+        return searchPlan(mod, cooldownOrigins, Set.of(), null);
+    }
+
+    public EscapePlanSearchResult searchPlan(AltoClef mod, Set<BlockPos> cooldownOrigins,
+                                             Set<EscapeCandidateKey> cooldownCandidates) {
+        return searchPlan(mod, cooldownOrigins, cooldownCandidates, null);
     }
 
     public EscapePlanSearchResult searchPlan(AltoClef mod, Set<BlockPos> cooldownOrigins, StateChangeLogger debugLogger) {
+        return searchPlan(mod, cooldownOrigins, Set.of(), debugLogger);
+    }
+
+    public EscapePlanSearchResult searchPlan(AltoClef mod, Set<BlockPos> cooldownOrigins,
+                                             Set<EscapeCandidateKey> cooldownCandidates,
+                                             StateChangeLogger debugLogger) {
         if (mod.getPlayer() == null) {
             logState(debugLogger, "terrain escape plan skipped player unavailable",
                     "terrain escape plan skipped: player unavailable");
@@ -50,48 +72,72 @@ public class EscapeCandidateSelector {
 
         List<Direction> directions = orderedDirections(mod);
         DirectionalPlanSearch stairSearch = searchDirectionalPlans(mod, origin, directions,
+                "stair",
                 stepPlanner::buildStairPlan,
                 stepPlanner::describeStairPlanFailure,
+                cooldownCandidates,
                 debugLogger);
         if (stairSearch.getPlan().isPresent()) {
             return EscapePlanSearchResult.selected(stairSearch.getPlan().get());
         }
 
         DirectionalPlanSearch sideSearch = searchDirectionalPlans(mod, origin, directions,
+                "side",
                 stepPlanner::buildSidePocketPlan,
                 stepPlanner::describeSidePocketPlanFailure,
+                cooldownCandidates,
                 debugLogger);
         if (sideSearch.getPlan().isPresent()) {
             return EscapePlanSearchResult.selected(sideSearch.getPlan().get());
         }
 
-        Optional<EscapePlan> headroomPlan = stepPlanner.buildVerticalHeadroomPlan(mod, origin);
+        String headroomFailure;
+        Optional<EscapePlan> headroomPlan = Optional.empty();
+        EscapeCandidateKey headroomCandidate = new EscapeCandidateKey(origin, "headroom", Direction.UP);
+        if (isCandidateOnCooldown(headroomCandidate, cooldownCandidates)) {
+            headroomFailure = "headroom candidate on cooldown, " + headroomCandidate.describe();
+            logState(debugLogger, "terrain escape plan skipped candidate cooldown " + headroomCandidate.describe(),
+                    "terrain escape plan skipped: candidate on cooldown, " + headroomCandidate.describe());
+        } else {
+            headroomPlan = stepPlanner.buildVerticalHeadroomPlan(mod, origin);
+            headroomFailure = stepPlanner.describeVerticalHeadroomPlanFailure(mod, origin);
+        }
         if (headroomPlan.isPresent()) {
             logState(debugLogger, "terrain escape plan selected " + headroomPlan.get().describe(),
                     "terrain escape plan selected: " + headroomPlan.get().describe());
             return EscapePlanSearchResult.selected(headroomPlan.get());
         }
 
-        DirectionalPlanSearch spiralSearch = searchDirectionalPlans(mod, origin, directions,
-                stepPlanner::buildSpiralPlan,
-                stepPlanner::describeSpiralPlanFailure,
+        DirectionalPlanSearch spiralSearch = searchSpiralDirectionalPlans(mod, origin, directions,
+                cooldownCandidates,
                 debugLogger);
         if (spiralSearch.getPlan().isPresent()) {
             return EscapePlanSearchResult.selected(spiralSearch.getPlan().get());
         }
 
         String failureReason = describeSearchFailure(origin, directions, stairSearch.getFirstFailure(), sideSearch.getFirstFailure(),
-                stepPlanner.describeVerticalHeadroomPlanFailure(mod, origin), spiralSearch.getFirstFailure());
+                headroomFailure, spiralSearch.getFirstFailure());
         logState(debugLogger, "terrain escape plan not found " + origin.toShortString(),
                 "terrain escape plan not found: " + failureReason);
         return EscapePlanSearchResult.unavailable(failureReason);
     }
 
     public EscapePlanSearchResult searchSpiralPlan(AltoClef mod, Set<BlockPos> cooldownOrigins) {
-        return searchSpiralPlan(mod, cooldownOrigins, null);
+        return searchSpiralPlan(mod, cooldownOrigins, Set.of(), null);
+    }
+
+    public EscapePlanSearchResult searchSpiralPlan(AltoClef mod, Set<BlockPos> cooldownOrigins,
+                                                   Set<EscapeCandidateKey> cooldownCandidates) {
+        return searchSpiralPlan(mod, cooldownOrigins, cooldownCandidates, null);
     }
 
     public EscapePlanSearchResult searchSpiralPlan(AltoClef mod, Set<BlockPos> cooldownOrigins, StateChangeLogger debugLogger) {
+        return searchSpiralPlan(mod, cooldownOrigins, Set.of(), debugLogger);
+    }
+
+    public EscapePlanSearchResult searchSpiralPlan(AltoClef mod, Set<BlockPos> cooldownOrigins,
+                                                   Set<EscapeCandidateKey> cooldownCandidates,
+                                                   StateChangeLogger debugLogger) {
         if (mod.getPlayer() == null) {
             logState(debugLogger, "terrain spiral escape plan skipped player unavailable",
                     "terrain spiral escape plan skipped: player unavailable");
@@ -106,9 +152,8 @@ public class EscapeCandidateSelector {
         }
 
         List<Direction> directions = orderedDirections(mod);
-        DirectionalPlanSearch spiralSearch = searchDirectionalPlans(mod, origin, directions,
-                stepPlanner::buildSpiralPlan,
-                stepPlanner::describeSpiralPlanFailure,
+        DirectionalPlanSearch spiralSearch = searchSpiralDirectionalPlans(mod, origin, directions,
+                cooldownCandidates,
                 debugLogger);
         if (spiralSearch.getPlan().isPresent()) {
             return EscapePlanSearchResult.selected(spiralSearch.getPlan().get());
@@ -121,7 +166,12 @@ public class EscapeCandidateSelector {
     }
 
     public String describePlanSearchFailure(AltoClef mod, Set<BlockPos> cooldownOrigins) {
-        return searchPlan(mod, cooldownOrigins).describeFailure();
+        return searchPlan(mod, cooldownOrigins, Set.of()).describeFailure();
+    }
+
+    public String describePlanSearchFailure(AltoClef mod, Set<BlockPos> cooldownOrigins,
+                                            Set<EscapeCandidateKey> cooldownCandidates) {
+        return searchPlan(mod, cooldownOrigins, cooldownCandidates).describeFailure();
     }
 
     private String describeSearchFailure(BlockPos origin, List<Direction> directions, String firstStairFailure,
@@ -142,26 +192,85 @@ public class EscapeCandidateSelector {
 
     //20260729_kpopmodder: Keep directional candidate scanning reusable before adding riskier escape shapes.
     private DirectionalPlanSearch searchDirectionalPlans(AltoClef mod, BlockPos origin, List<Direction> directions,
+                                                         String kind,
                                                          DirectionalPlanBuilder planBuilder,
                                                          DirectionalFailureDescriber failureDescriber,
+                                                         Set<EscapeCandidateKey> cooldownCandidates,
                                                          StateChangeLogger debugLogger) {
         String firstFailure = "none";
         for (Direction direction : directions) {
-            Optional<EscapePlan> plan = planBuilder.build(mod, origin, direction);
-            if (plan.isPresent()) {
-                logState(debugLogger, "terrain escape plan selected " + plan.get().describe(),
-                        "terrain escape plan selected: " + plan.get().describe());
-                return DirectionalPlanSearch.selected(plan.get(), firstFailure);
+            DirectionalPlanSearch candidateSearch = searchCandidatePlan(mod, origin, direction, kind,
+                    planBuilder, failureDescriber, cooldownCandidates, debugLogger);
+            if (candidateSearch.getPlan().isPresent()) {
+                return DirectionalPlanSearch.selected(candidateSearch.getPlan().get(), firstFailure);
             }
             if ("none".equals(firstFailure)) {
-                firstFailure = direction.getName() + ": " + failureDescriber.describe(mod, origin, direction);
+                firstFailure = direction.getName() + ": " + candidateSearch.getFirstFailure();
             }
         }
         return DirectionalPlanSearch.unavailable(firstFailure);
     }
 
+    //20260729_kpopmodder: Spiral clockwise/counterclockwise are separate cooldown candidates.
+    private DirectionalPlanSearch searchSpiralDirectionalPlans(AltoClef mod, BlockPos origin, List<Direction> directions,
+                                                               Set<EscapeCandidateKey> cooldownCandidates,
+                                                               StateChangeLogger debugLogger) {
+        String firstFailure = "none";
+        for (Direction direction : directions) {
+            DirectionalPlanSearch clockwiseSearch = searchCandidatePlan(mod, origin, direction, "spiral_clockwise",
+                    stepPlanner::buildSpiralClockwisePlan,
+                    stepPlanner::describeSpiralClockwisePlanFailure,
+                    cooldownCandidates,
+                    debugLogger);
+            if (clockwiseSearch.getPlan().isPresent()) {
+                return DirectionalPlanSearch.selected(clockwiseSearch.getPlan().get(), firstFailure);
+            }
+
+            DirectionalPlanSearch counterClockwiseSearch = searchCandidatePlan(mod, origin, direction,
+                    "spiral_counterclockwise",
+                    stepPlanner::buildSpiralCounterClockwisePlan,
+                    stepPlanner::describeSpiralCounterClockwisePlanFailure,
+                    cooldownCandidates,
+                    debugLogger);
+            if (counterClockwiseSearch.getPlan().isPresent()) {
+                return DirectionalPlanSearch.selected(counterClockwiseSearch.getPlan().get(), firstFailure);
+            }
+            if ("none".equals(firstFailure)) {
+                firstFailure = direction.getName()
+                        + ": clockwise=" + clockwiseSearch.getFirstFailure()
+                        + ", counterclockwise=" + counterClockwiseSearch.getFirstFailure();
+            }
+        }
+        return DirectionalPlanSearch.unavailable(firstFailure);
+    }
+
+    private DirectionalPlanSearch searchCandidatePlan(AltoClef mod, BlockPos origin, Direction direction, String kind,
+                                                      DirectionalPlanBuilder planBuilder,
+                                                      DirectionalFailureDescriber failureDescriber,
+                                                      Set<EscapeCandidateKey> cooldownCandidates,
+                                                      StateChangeLogger debugLogger) {
+        EscapeCandidateKey candidateKey = new EscapeCandidateKey(origin, kind, direction);
+        if (isCandidateOnCooldown(candidateKey, cooldownCandidates)) {
+            logState(debugLogger, "terrain escape plan skipped candidate cooldown " + candidateKey.describe(),
+                    "terrain escape plan skipped: candidate on cooldown, " + candidateKey.describe());
+            return DirectionalPlanSearch.unavailable("candidate on cooldown, " + candidateKey.describe());
+        }
+
+        Optional<EscapePlan> plan = planBuilder.build(mod, origin, direction);
+        if (plan.isPresent()) {
+            logState(debugLogger, "terrain escape plan selected " + plan.get().describe(),
+                    "terrain escape plan selected: " + plan.get().describe());
+            return DirectionalPlanSearch.selected(plan.get(), "none");
+        }
+        return DirectionalPlanSearch.unavailable(failureDescriber.describe(mod, origin, direction));
+    }
+
     private boolean isOriginOnCooldown(BlockPos origin, Set<BlockPos> cooldownOrigins) {
         return cooldownOrigins != null && cooldownOrigins.contains(origin);
+    }
+
+    private boolean isCandidateOnCooldown(EscapeCandidateKey candidateKey, Set<EscapeCandidateKey> cooldownCandidates) {
+        return cooldownCandidates != null && cooldownCandidates.contains(candidateKey);
     }
 
     private List<Direction> orderedDirections(AltoClef mod) {

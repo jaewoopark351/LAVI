@@ -31,11 +31,18 @@ public class EscapeStepPlanner {
     }
 
     Optional<EscapePlan> buildSpiralPlan(AltoClef mod, BlockPos origin, Direction direction) {
-        StepPlanAttempt clockwiseAttempt = planSpiralBlocks(mod, origin, direction, true);
-        Optional<EscapePlan> clockwisePlan = clockwiseAttempt.toPlan(origin, direction, "spiral_clockwise");
+        Optional<EscapePlan> clockwisePlan = buildSpiralClockwisePlan(mod, origin, direction);
         if (clockwisePlan.isPresent()) {
             return clockwisePlan;
         }
+        return buildSpiralCounterClockwisePlan(mod, origin, direction);
+    }
+
+    Optional<EscapePlan> buildSpiralClockwisePlan(AltoClef mod, BlockPos origin, Direction direction) {
+        return planSpiralBlocks(mod, origin, direction, true).toPlan(origin, direction, "spiral_clockwise");
+    }
+
+    Optional<EscapePlan> buildSpiralCounterClockwisePlan(AltoClef mod, BlockPos origin, Direction direction) {
         return planSpiralBlocks(mod, origin, direction, false).toPlan(origin, direction, "spiral_counterclockwise");
     }
 
@@ -64,6 +71,18 @@ public class EscapeStepPlanner {
                 "spiral clockwise route already clear; no blocks to clear",
                 "spiral clockwise appears available")
                 + ", counterclockwise=" + counterClockwiseAttempt.describe(
+                "spiral counterclockwise route already clear; no blocks to clear",
+                "spiral counterclockwise appears available");
+    }
+
+    String describeSpiralClockwisePlanFailure(AltoClef mod, BlockPos origin, Direction direction) {
+        return planSpiralBlocks(mod, origin, direction, true).describe(
+                "spiral clockwise route already clear; no blocks to clear",
+                "spiral clockwise appears available");
+    }
+
+    String describeSpiralCounterClockwisePlanFailure(AltoClef mod, BlockPos origin, Direction direction) {
+        return planSpiralBlocks(mod, origin, direction, false).describe(
                 "spiral counterclockwise route already clear; no blocks to clear",
                 "spiral counterclockwise appears available");
     }

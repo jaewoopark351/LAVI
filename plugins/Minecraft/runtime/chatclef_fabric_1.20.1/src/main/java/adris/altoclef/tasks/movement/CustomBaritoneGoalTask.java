@@ -223,12 +223,16 @@ public abstract class CustomBaritoneGoalTask extends Task implements ITaskRequir
                 mod.getClientBaritone().getExploreProcess().onLostControl();
                 return localTerrainEscapeTask;
             }
-            if (localTerrainEscapeTask.didTimeOut()) {
-                terrainEscapeRetryCooldowns.rememberFailure(localTerrainEscapeTask.getOrigin());
-                debugLogger.event("local terrain escape timed out: "
+            if (localTerrainEscapeTask.didFail()) {
+                terrainEscapeRetryCooldowns.rememberFailure(localTerrainEscapeTask.getPlan());
+                debugLogger.event("local terrain escape failed: reason="
+                        + localTerrainEscapeTask.describeFailureReason()
+                        + ", timedOut=" + localTerrainEscapeTask.didTimeOut()
+                        + ", "
                         + localTerrainEscapeTask.describePlan()
                         + ", task=" + toDebugString()
-                        + ", cooldownTicks=" + TERRAIN_ESCAPE_RETRY_COOLDOWN_TICKS);
+                        + ", candidateCooldownTicks=" + TERRAIN_ESCAPE_RETRY_COOLDOWN_TICKS
+                        + ", cooldowns=" + terrainEscapeRetryCooldowns.describe());
             } else {
                 debugLogger.event("local terrain escape finished: "
                         + localTerrainEscapeTask.describePlan()
@@ -342,7 +346,10 @@ public abstract class CustomBaritoneGoalTask extends Task implements ITaskRequir
         logTerrainEscapeDiagnostic("eligible:" + origin.toShortString(),
                 "terrain escape eligible: local stall detected at origin=" + origin.toShortString()
                         + ", cooldowns=" + terrainEscapeRetryCooldowns.describe());
-        EscapePlanSearchResult planSearch = LocalTerrainEscapeTask.searchPlan(mod, terrainEscapeRetryCooldowns.activeOrigins(), debugLogger);
+        EscapePlanSearchResult planSearch = LocalTerrainEscapeTask.searchPlan(mod,
+                terrainEscapeRetryCooldowns.activeOrigins(),
+                terrainEscapeRetryCooldowns.activeCandidates(),
+                debugLogger);
         Optional<EscapePlan> plan = planSearch.getPlan();
         if (plan.isEmpty()) {
             logTerrainEscapeDiagnostic("no-plan:" + origin.toShortString(),
