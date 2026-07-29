@@ -13,12 +13,19 @@ public class EscapePlan {
     private final Direction direction;
     private final String kind;
     private final List<BlockPos> blocksToClear;
+    private final List<EscapePlaceCandidate> placeCandidates;
 
     EscapePlan(BlockPos origin, Direction direction, String kind, List<BlockPos> blocksToClear) {
+        this(origin, direction, kind, blocksToClear, List.of());
+    }
+
+    EscapePlan(BlockPos origin, Direction direction, String kind, List<BlockPos> blocksToClear,
+               List<EscapePlaceCandidate> placeCandidates) {
         this.origin = origin;
         this.direction = direction;
         this.kind = kind;
         this.blocksToClear = List.copyOf(blocksToClear);
+        this.placeCandidates = List.copyOf(placeCandidates);
     }
 
     public BlockPos getOrigin() {
@@ -37,12 +44,24 @@ public class EscapePlan {
         return blocksToClear;
     }
 
+    public List<EscapePlaceCandidate> getPlaceCandidates() {
+        return placeCandidates;
+    }
+
     public int getClearBlockCount() {
         return blocksToClear.size();
     }
 
     public boolean hasBlocksToClear() {
         return !blocksToClear.isEmpty();
+    }
+
+    public int getPlaceCandidateCount() {
+        return placeCandidates.size();
+    }
+
+    public boolean hasPlaceCandidates() {
+        return !placeCandidates.isEmpty();
     }
 
     public boolean isClearComplete(int clearIndex) {
@@ -61,7 +80,8 @@ public class EscapePlan {
         return "kind=" + kind
                 + ", origin=" + origin.toShortString()
                 + ", direction=" + direction.getName()
-                + ", blocks=" + describeBlocks();
+                + ", blocks=" + describeBlocks()
+                + ", placeCandidates=" + describePlaceCandidates();
     }
 
     private String describeBlocks() {
@@ -70,6 +90,14 @@ public class EscapePlan {
             blockStrings.add(block.toShortString());
         }
         return blockStrings.toString();
+    }
+
+    private String describePlaceCandidates() {
+        List<String> placeStrings = new ArrayList<>();
+        for (EscapePlaceCandidate candidate : placeCandidates) {
+            placeStrings.add(candidate.describe());
+        }
+        return placeStrings.toString();
     }
 
     @Override
@@ -83,11 +111,12 @@ public class EscapePlan {
         return origin.equals(plan.origin)
                 && direction == plan.direction
                 && kind.equals(plan.kind)
-                && blocksToClear.equals(plan.blocksToClear);
+                && blocksToClear.equals(plan.blocksToClear)
+                && placeCandidates.equals(plan.placeCandidates);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(origin, direction, kind, blocksToClear);
+        return Objects.hash(origin, direction, kind, blocksToClear, placeCandidates);
     }
 }

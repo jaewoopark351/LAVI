@@ -78,9 +78,10 @@ public class EscapeStepPlanner {
         for (int step = 1; step <= STAIR_STEPS; step++) {
             BlockPos foot = offset(origin, direction, step + 1).up(step);
             if (!blockActionPolicy.hasSafeFloor(mod, foot.down())) {
-                return StepPlanAttempt.failed("stair step floor failed: step=" + step
-                        + ", floor=" + foot.down().toShortString()
-                        + ", reason=" + blockActionPolicy.describeFloorSafety(mod, foot.down()));
+                return StepPlanAttempt.failed(describeFloorFailure(mod,
+                        "stair step floor failed: step=" + step,
+                        foot.down(),
+                        "stair step " + step + " support"));
             }
             if (!blockActionPolicy.appendClearBlock(mod, foot, blocksToClear)) {
                 return StepPlanAttempt.failed("stair step foot failed: step=" + step
@@ -154,9 +155,10 @@ public class EscapeStepPlanner {
     private StepPlanAttempt appendSpiralStepBlocks(AltoClef mod, BlockPos foot, List<BlockPos> blocksToClear,
                                                    String turnName, int step) {
         if (!blockActionPolicy.hasSafeFloor(mod, foot.down())) {
-            return StepPlanAttempt.failed("spiral " + turnName + " step floor failed: step=" + step
-                    + ", floor=" + foot.down().toShortString()
-                    + ", reason=" + blockActionPolicy.describeFloorSafety(mod, foot.down()));
+            return StepPlanAttempt.failed(describeFloorFailure(mod,
+                    "spiral " + turnName + " step floor failed: step=" + step,
+                    foot.down(),
+                    "spiral " + turnName + " step " + step + " support"));
         }
         if (!blockActionPolicy.appendClearBlock(mod, foot, blocksToClear)) {
             return StepPlanAttempt.failed("spiral " + turnName + " step foot failed: step=" + step
@@ -177,8 +179,10 @@ public class EscapeStepPlanner {
                                                    List<BlockPos> blocksToClear) {
         BlockPos sideFoot = offset(origin, direction, 1);
         if (!blockActionPolicy.hasSafeFloor(mod, sideFoot.down())) {
-            return StepPlanAttempt.failed("side floor failed: floor=" + sideFoot.down().toShortString()
-                    + ", reason=" + blockActionPolicy.describeFloorSafety(mod, sideFoot.down()));
+            return StepPlanAttempt.failed(describeFloorFailure(mod,
+                    "side floor failed",
+                    sideFoot.down(),
+                    "side pocket support"));
         }
         if (!blockActionPolicy.appendClearBlock(mod, sideFoot, blocksToClear)) {
             return StepPlanAttempt.failed("side foot failed: target=" + sideFoot.toShortString()
@@ -200,21 +204,36 @@ public class EscapeStepPlanner {
                 direction.getOffsetZ() * distance);
     }
 
+    private String describeFloorFailure(AltoClef mod, String prefix, BlockPos floor, String placeReason) {
+        return prefix
+                + ", floor=" + floor.toShortString()
+                + ", reason=" + blockActionPolicy.describeFloorSafety(mod, floor)
+                + ", placeCandidate=" + blockActionPolicy.describeSupportPlaceCandidate(mod, floor, placeReason);
+    }
+
     private static final class StepPlanAttempt {
         private final List<BlockPos> blocksToClear;
+        private final List<EscapePlaceCandidate> placeCandidates;
         private final String failureReason;
 
-        private StepPlanAttempt(List<BlockPos> blocksToClear, String failureReason) {
+        private StepPlanAttempt(List<BlockPos> blocksToClear, List<EscapePlaceCandidate> placeCandidates,
+                                String failureReason) {
             this.blocksToClear = blocksToClear;
+            this.placeCandidates = placeCandidates;
             this.failureReason = failureReason;
         }
 
         private static StepPlanAttempt available(List<BlockPos> blocksToClear) {
-            return new StepPlanAttempt(blocksToClear, null);
+            return available(blocksToClear, List.of());
+        }
+
+        private static StepPlanAttempt available(List<BlockPos> blocksToClear,
+                                                 List<EscapePlaceCandidate> placeCandidates) {
+            return new StepPlanAttempt(blocksToClear, placeCandidates, null);
         }
 
         private static StepPlanAttempt failed(String failureReason) {
-            return new StepPlanAttempt(List.of(), failureReason);
+            return new StepPlanAttempt(List.of(), List.of(), failureReason);
         }
 
         private boolean hasFailure() {
@@ -229,7 +248,7 @@ public class EscapeStepPlanner {
             if (hasFailure() || blocksToClear.isEmpty()) {
                 return Optional.empty();
             }
-            return Optional.of(new EscapePlan(origin, direction, kind, blocksToClear));
+            return Optional.of(new EscapePlan(origin, direction, kind, blocksToClear, placeCandidates));
         }
 
         private String describe(String emptyMessage, String availableMessage) {

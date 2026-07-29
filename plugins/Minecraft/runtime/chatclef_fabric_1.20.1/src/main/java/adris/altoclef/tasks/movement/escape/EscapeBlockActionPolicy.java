@@ -18,6 +18,7 @@ import net.minecraft.block.SpawnerBlock;
 import net.minecraft.util.math.BlockPos;
 
 import java.util.List;
+import java.util.Optional;
 
 //20260729_kpopmodder: Added this policy to keep block safety decisions separate from terrain escape execution.
 public class EscapeBlockActionPolicy {
@@ -57,6 +58,22 @@ public class EscapeBlockActionPolicy {
                 && !(block instanceof MagmaBlock)
                 && !(block instanceof AbstractFireBlock)
                 && state.isSolidBlock(mod.getWorld(), pos);
+    }
+
+    //20260729_kpopmodder: This only describes a possible support block; escape execution still never places blocks.
+    Optional<EscapePlaceCandidate> planSupportPlaceCandidate(AltoClef mod, BlockPos target, String reason) {
+        BlockState targetState = mod.getWorld().getBlockState(target);
+        BlockPos support = target.down();
+        if (!targetState.isAir() || !hasSafeFloor(mod, support)) {
+            return Optional.empty();
+        }
+        return Optional.of(new EscapePlaceCandidate(target, support, reason));
+    }
+
+    String describeSupportPlaceCandidate(AltoClef mod, BlockPos target, String reason) {
+        return planSupportPlaceCandidate(mod, target, reason)
+                .map(EscapePlaceCandidate::describe)
+                .orElse("none");
     }
 
     boolean isSafeBreakTarget(AltoClef mod, BlockPos pos) {
