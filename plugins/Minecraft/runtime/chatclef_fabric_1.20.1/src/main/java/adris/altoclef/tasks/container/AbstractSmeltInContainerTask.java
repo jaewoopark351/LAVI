@@ -5,6 +5,11 @@ import adris.altoclef.BotBehaviour;
 import adris.altoclef.Debug;
 import adris.altoclef.catalogue.TaskCatalogue;
 import adris.altoclef.tasks.ResourceTask;
+import adris.altoclef.tasks.container.smelt.SmeltContainerSnapshot;
+import adris.altoclef.tasks.container.smelt.SmeltFuelPlanner;
+import adris.altoclef.tasks.container.smelt.SmeltPlan;
+import adris.altoclef.tasks.container.smelt.SmeltSlotPlanner;
+import adris.altoclef.tasks.container.smelt.SmeltTransferPolicy;
 import adris.altoclef.tasks.resources.CollectFuelTask;
 import adris.altoclef.tasks.slot.MoveInaccessibleItemToInventoryTask;
 import adris.altoclef.tasks.slot.MoveItemToSlotFromInventoryTask;
@@ -131,7 +136,10 @@ public abstract class AbstractSmeltInContainerTask<T extends AbstractDoSmeltInCo
 // #20260727_kpopmodder: Added this base class to keep the smelting slot algorithm in one place.
 abstract class AbstractDoSmeltInContainerTask extends DoStuffInContainerTask {
     private final SmeltTarget target;
-    private final SmeltingContainerCache containerCache = new SmeltingContainerCache();
+    private SmeltContainerSnapshot containerSnapshot = SmeltContainerSnapshot.empty();
+    private final SmeltSlotPlanner slotPlanner = new SmeltSlotPlanner();
+    private final SmeltFuelPlanner fuelPlanner = new SmeltFuelPlanner();
+    private final SmeltTransferPolicy transferPolicy = new SmeltTransferPolicy();
     private final ItemTarget allMaterials;
     private final Class<? extends AbstractFurnaceScreenHandler> screenHandlerClass;
     private final Slot materialSlot;
@@ -217,26 +225,22 @@ abstract class AbstractDoSmeltInContainerTask extends DoStuffInContainerTask {
         updatePendingInsertedFuel(mod);
         ItemTarget materialTarget = allMaterials;
         ItemTarget outputTarget = target.getItem();
-        int materialsNeeded = materialTarget.getTargetCount()
-                /*- mod.getItemStorage().getItemCountInventoryOnly(materialTarget.getMatches())*/ // See comment above
-                - mod.getItemStorage().getItemCountInventoryOnly(outputTarget.getMatches())
-                - (materialTarget.matches(containerCache.materialSlot.getItem()) ? containerCache.materialSlot.getCount() : 0)
-                - (outputTarget.matches(containerCache.outputSlot.getItem()) ? containerCache.outputSlot.getCount() : 0);
+        int inventoryOutputCount = mod.getItemStorage().getItemCountInventoryOnly(outputTarget.getMatches());
+        int inventoryMaterialCount = mod.getItemStorage().getItemCount(materialTarget.getMatches());
+        double inventoryFuelCount = StorageHelper.calculateInventoryFuelCount(mod);
         double totalFuelInContainer = getTotalPlannedFuelInContainer(mod);
-        double fuelNeeded = ignoreMaterials
-                ? Math.min(materialTarget.matches(containerCache.materialSlot.getItem()) ? containerCache.materialSlot.getCount() : 0, materialTarget.getTargetCount())
-                : materialTarget.getTargetCount()
-                /* - mod.getItemStorage().getItemCountInventoryOnly(materialTarget.getMatches()) */
-                - mod.getItemStorage().getItemCountInventoryOnly(outputTarget.getMatches())
-                - (outputTarget.matches(containerCache.outputSlot.getItem()) ? containerCache.outputSlot.getCount() : 0)
-                - totalFuelInContainer;
+        int materialsNeeded = slotPlanner.calculateMaterialsNeeded(materialTarget, outputTarget, inventoryOutputCount, containerSnapshot);
+        double fuelNeeded = slotPlanner.calculateFuelNeeded(ignoreMaterials, materialTarget, outputTarget, inventoryOutputCount, totalFuelInContainer, containerSnapshot);
 
-        if (mod.getItemStorage().getItemCount(materialTarget.getMatches()) < materialsNeeded) {
+        if (inventoryMaterialCount < materialsNeeded) {
             setDebugState("Getting Materials");
             debugLogger.state("get materials: needed=" + materialsNeeded
-                    + ", inventory=" + mod.getItemStorage().getItemCount(materialTarget.getMatches())
+                    + ", inventory=" + inventoryMaterialCount
                     + ", materialTarget=" + materialTarget
-                    + ", " + describeCache());
+                    + ", " + describePlan(SmeltPlan.Action.GET_MATERIALS,
+                    "inventory material count is below required input",
+                    "needed=" + materialsNeeded + ", inventory=" + inventoryMaterialCount + ", materialTarget=" + materialTarget,
+                    containerSnapshot));
             return getMaterialTask(target.getMaterial());
         }
 
@@ -244,36 +248,47 @@ abstract class AbstractDoSmeltInContainerTask extends DoStuffInContainerTask {
         if (pendingFuelMove != null) {
             setDebugState("Filling fuel");
             debugLogger.state("continue fuel move",
-                    "continue fuel move: " + describeCache());
+                    "continue fuel move: " + describePlan(SmeltPlan.Action.CONTINUE_FUEL_MOVE,
+                            "previous fuel slot transfer is still active",
+                            "task=" + pendingFuelMove,
+                            containerSnapshot));
             return pendingFuelMove;
         }
 
-        if (containerCache.burningFuelCount <= 0 && StorageHelper.calculateInventoryFuelCount(mod) < fuelNeeded) {
+        if (containerSnapshot.getBurningFuelCount() <= 0 && inventoryFuelCount < fuelNeeded) {
             if (isPendingFuelInsertActive()) {
                 setDebugState("Waiting for fuel slot");
                 debugLogger.state("wait for pending fuel insert",
-                        "wait for pending fuel insert: needed=" + formatDouble(fuelNeeded)
-                                + ", inventoryFuel=" + formatDouble(StorageHelper.calculateInventoryFuelCount(mod))
-                                + ", " + describeCache());
+                        "wait for pending fuel insert: " + describePlan(SmeltPlan.Action.WAIT_PENDING_FUEL_INSERT,
+                                "fuel slot may not reflect a recent fuel move yet",
+                                "needed=" + formatDouble(fuelNeeded) + ", inventoryFuel=" + formatDouble(inventoryFuelCount),
+                                containerSnapshot));
                 return null;
             }
             setDebugState("Getting Fuel");
             debugLogger.state("get fuel: needed=" + formatDouble(fuelNeeded)
-                    + ", inventoryFuel=" + formatDouble(StorageHelper.calculateInventoryFuelCount(mod))
-                    + ", " + describeCache());
+                    + ", inventoryFuel=" + formatDouble(inventoryFuelCount)
+                    + ", " + describePlan(SmeltPlan.Action.GET_FUEL,
+                    "inventory fuel is below planned fuel need",
+                    "needed=" + formatDouble(fuelNeeded) + ", inventoryFuel=" + formatDouble(inventoryFuelCount),
+                    containerSnapshot));
             return new CollectFuelTask(fuelNeeded + 1);
         }
 
         if (StorageHelper.isItemInaccessibleToContainer(mod, allMaterials)) {
-            debugLogger.state("move inaccessible materials: " + allMaterials + ", " + describeCache());
+            debugLogger.state("move inaccessible materials: " + describePlan(SmeltPlan.Action.MOVE_INACCESSIBLE_MATERIALS,
+                    "material stack cannot be inserted into container from its current slot",
+                    "materials=" + allMaterials,
+                    containerSnapshot));
             return new MoveInaccessibleItemToInventoryTask(allMaterials);
         }
 
         if (!isContainerOpen(mod)) {
             debugLogger.state("ready for " + containerDebugName + " interaction",
-                    "ready for " + containerDebugName + " interaction: materialsNeeded=" + materialsNeeded
-                    + ", fuelNeeded=" + formatDouble(fuelNeeded)
-                    + ", " + describeCache());
+                    "ready for " + containerDebugName + " interaction: " + describePlan(SmeltPlan.Action.READY_FOR_CONTAINER,
+                            "inventory/material/fuel gates passed and container is not open",
+                            "materialsNeeded=" + materialsNeeded + ", fuelNeeded=" + formatDouble(fuelNeeded),
+                            containerSnapshot));
         }
         return super.onTick();
     }
@@ -284,17 +299,31 @@ abstract class AbstractDoSmeltInContainerTask extends DoStuffInContainerTask {
 
     @Override
     protected Task containerSubTask(AltoClef mod) {
+        tryUpdateOpenContainer(mod);
         ItemStack output = StorageHelper.getItemStackInSlot(outputSlot);
         ItemStack material = StorageHelper.getItemStackInSlot(materialSlot);
         ItemStack fuel = StorageHelper.getItemStackInSlot(fuelSlot);
+        SmeltContainerSnapshot currentSnapshot = SmeltContainerSnapshot.of(
+                isContainerOpen(mod),
+                material,
+                fuel,
+                output,
+                containerSnapshot.getBurningFuelCount(),
+                containerSnapshot.getCookProgress()
+        );
+        containerSnapshot = currentSnapshot;
 
-        double currentlyCachedWhileCooking = getCurrentFuelAndCookProgress(mod);
+        double currentlyCachedWhileCooking = fuelPlanner.getCurrentFuelAndCookProgress(mod);
         double needsWhileCooking = material.getCount() - currentlyCachedWhileCooking;
         if (needsWhileCooking <= 0 && !fuel.isEmpty()) {
-            debugLogger.state("remove extra fuel: fuel=" + describeStack(fuel)
-                    + ", material=" + describeStack(material)
-                    + ", output=" + describeStack(output));
-            if (!ensureCursorCanStackWith(mod, fuel)) {
+            debugLogger.state("remove extra fuel: " + describePlan(SmeltPlan.Action.REMOVE_EXTRA_FUEL,
+                    "current burn/cook progress covers the remaining material and fuel slot still has fuel",
+                    "fuel=" + describeStack(fuel)
+                            + ", material=" + describeStack(material)
+                            + ", output=" + describeStack(output)
+                            + ", needsWhileCooking=" + formatDouble(needsWhileCooking),
+                    currentSnapshot));
+            if (!transferPolicy.ensureCursorCanStackWith(mod, fuel)) {
                 return null;
             }
             mod.getSlotHandler().clickSlot(fuelSlot, 0, SlotActionType.PICKUP);
@@ -303,10 +332,13 @@ abstract class AbstractDoSmeltInContainerTask extends DoStuffInContainerTask {
 
         if (!output.isEmpty()) {
             setDebugState("Receiving Output");
-            debugLogger.state("receive output: output=" + describeStack(output)
-                    + ", material=" + describeStack(material)
-                    + ", fuel=" + describeStack(fuel));
-            if (!ensureCursorCanStackWith(mod, output)) {
+            debugLogger.state("receive output: " + describePlan(SmeltPlan.Action.RECEIVE_OUTPUT,
+                    "output slot is not empty",
+                    "output=" + describeStack(output)
+                            + ", material=" + describeStack(material)
+                            + ", fuel=" + describeStack(fuel),
+                    currentSnapshot));
+            if (!transferPolicy.ensureCursorCanStackWith(mod, output)) {
                 return null;
             }
             mod.getSlotHandler().clickSlot(outputSlot, 0, SlotActionType.PICKUP);
@@ -314,29 +346,39 @@ abstract class AbstractDoSmeltInContainerTask extends DoStuffInContainerTask {
         }
 
         ItemTarget materialTarget = allMaterials;
-        int neededMaterialsInSlot = materialTarget.getTargetCount()
-                - mod.getItemStorage().getItemCountInventoryOnly(target.getItem().getMatches())
-                - (target.getItem().matches(output.getItem()) ? output.getCount() : 0);
+        int outputInventoryCount = mod.getItemStorage().getItemCountInventoryOnly(target.getItem().getMatches());
+        int neededMaterialsInSlot = slotPlanner.calculateNeededMaterialsInSlot(
+                materialTarget,
+                target.getItem(),
+                outputInventoryCount,
+                currentSnapshot
+        );
         if (!allMaterials.matches(material.getItem()) || neededMaterialsInSlot > material.getCount()) {
             int materialsAlreadyIn = (materialTarget.matches(material.getItem()) ? material.getCount() : 0);
             setDebugState("Moving Materials");
-            debugLogger.state("move materials into " + containerDebugName + ": needInSlot=" + neededMaterialsInSlot
-                    + ", alreadyIn=" + materialsAlreadyIn
-                    + ", materialSlot=" + describeStack(material)
-                    + ", output=" + describeStack(output));
+            debugLogger.state("move materials into " + containerDebugName + ": " + describePlan(SmeltPlan.Action.MOVE_MATERIALS,
+                    "material slot is empty, has the wrong item, or is underfilled",
+                    "needInSlot=" + neededMaterialsInSlot
+                            + ", alreadyIn=" + materialsAlreadyIn
+                            + ", materialSlot=" + describeStack(material)
+                            + ", output=" + describeStack(output),
+                    currentSnapshot));
             return new MoveItemToSlotFromInventoryTask(new ItemTarget(materialTarget, neededMaterialsInSlot - materialsAlreadyIn), materialSlot);
         }
 
         if (fuel.isEmpty() || ItemHelper.isFuel(fuel.getItem())) {
-            double currentlyCached = getCurrentFuelAndCookProgress(mod);
+            double currentlyCached = fuelPlanner.getCurrentFuelAndCookProgress(mod);
             double needs = material.getCount() - currentlyCached;
             if (needs > 0) {
-                ItemStack bestStack = getBestFuelStack(mod, needs);
+                ItemStack bestStack = fuelPlanner.getBestFuelStack(mod, needs);
                 if (bestStack != null) {
                     setDebugState("Filling fuel");
-                    debugLogger.state("fill fuel: bestStack=" + describeStack(bestStack)
-                            + ", needs=" + formatDouble(needs)
-                            + ", fuelSlot=" + describeStack(fuel));
+                    debugLogger.state("fill fuel: " + describePlan(SmeltPlan.Action.FILL_FUEL,
+                            "material slot needs more fuel and a supported fuel stack was found",
+                            "bestStack=" + describeStack(bestStack)
+                                    + ", needs=" + formatDouble(needs)
+                                    + ", fuelSlot=" + describeStack(fuel),
+                            currentSnapshot));
                     Task fuelMoveTask = new MoveItemToSlotFromInventoryTask(new ItemTarget(bestStack.getItem(), bestStack.getCount()), fuelSlot);
                     rememberPendingFuelMove(fuelMoveTask, bestStack);
                     return fuelMoveTask;
@@ -346,9 +388,12 @@ abstract class AbstractDoSmeltInContainerTask extends DoStuffInContainerTask {
 
         setDebugState("Waiting...");
         debugLogger.state("wait for smelting",
-                "wait for smelting: material=" + describeStack(material)
-                + ", fuel=" + describeStack(fuel)
-                + ", output=" + describeStack(output));
+                "wait for smelting: " + describePlan(SmeltPlan.Action.WAIT_FOR_SMELTING,
+                        "no slot transfer is currently required",
+                        "material=" + describeStack(material)
+                                + ", fuel=" + describeStack(fuel)
+                                + ", output=" + describeStack(output),
+                        currentSnapshot));
         return null;
     }
 
@@ -358,31 +403,21 @@ abstract class AbstractDoSmeltInContainerTask extends DoStuffInContainerTask {
     }
 
     protected final boolean hasActiveSmeltingCache() {
-        return containerCache.burnPercentage > 0 || containerCache.burningFuelCount > 0 ||
-                isNotEmpty(containerCache.fuelSlot) || isNotEmpty(containerCache.materialSlot) ||
-                isNotEmpty(containerCache.outputSlot);
-    }
-
-    private boolean isNotEmpty(ItemStack stack) {
-        return stack != null && !stack.isEmpty();
+        return containerSnapshot.hasActiveSmeltingState();
     }
 
     private void tryUpdateOpenContainer(AltoClef mod) {
         if (isContainerOpen(mod) && mod.getPlayer().currentScreenHandler instanceof AbstractFurnaceScreenHandler handler) {
-            containerCache.burnPercentage = StorageHelper.getFurnaceCookPercent(handler);
-            containerCache.burningFuelCount = StorageHelper.getFurnaceFuel(handler);
-            containerCache.fuelSlot = StorageHelper.getItemStackInSlot(fuelSlot);
-            containerCache.materialSlot = StorageHelper.getItemStackInSlot(materialSlot);
-            containerCache.outputSlot = StorageHelper.getItemStackInSlot(outputSlot);
+            containerSnapshot = SmeltContainerSnapshot.fromOpenContainer(handler, materialSlot, fuelSlot, outputSlot);
         }
     }
 
     private double getTotalPlannedFuelInContainer(AltoClef mod) {
-        return ItemHelper.getFuelAmount(containerCache.fuelSlot)
-                + containerCache.burningFuelCount
-                + containerCache.burnPercentage
-                + pendingInsertedFuelAmount
-                + getCursorFuelAmount(mod);
+        return fuelPlanner.calculateTotalPlannedFuelInContainer(
+                containerSnapshot,
+                pendingInsertedFuelAmount,
+                fuelPlanner.getCursorFuelAmount(mod)
+        );
     }
 
     private void notePendingInsertedFuel(ItemStack fuelStack) {
@@ -421,7 +456,7 @@ abstract class AbstractDoSmeltInContainerTask extends DoStuffInContainerTask {
         if (pendingInsertedFuelAmount <= 0) {
             return;
         }
-        double cursorFuel = getCursorFuelAmount(mod);
+        double cursorFuel = fuelPlanner.getCursorFuelAmount(mod);
         if (cursorFuel > 0) {
             pendingInsertedFuelAmount = Math.max(pendingInsertedFuelAmount, cursorFuel);
             pendingInsertedFuelTicks = FUEL_INSERTION_CACHE_GRACE_TICKS;
@@ -438,89 +473,15 @@ abstract class AbstractDoSmeltInContainerTask extends DoStuffInContainerTask {
         pendingInsertedFuelTicks = 0;
     }
 
-    private double getCurrentFuelAndCookProgress(AltoClef mod) {
-        if (mod.getPlayer().currentScreenHandler instanceof AbstractFurnaceScreenHandler handler) {
-            return StorageHelper.getFurnaceFuel(handler) + StorageHelper.getFurnaceCookPercent(handler);
-        }
-        return 0;
-    }
-
-    private double getCursorFuelAmount(AltoClef mod) {
-        ItemStack cursor = StorageHelper.getItemStackInCursorSlot();
-        if (cursor.isEmpty() || !mod.getModSettings().isSupportedFuel(cursor.getItem())) {
-            return 0;
-        }
-        return ItemHelper.getFuelAmount(cursor);
-    }
-
-    private boolean ensureCursorCanStackWith(AltoClef mod, ItemStack targetStack) {
-        ItemStack cursor = StorageHelper.getItemStackInCursorSlot();
-        if (ItemHelper.canStackTogether(targetStack, cursor)) {
-            return true;
-        }
-        Optional<Slot> toFit = mod.getItemStorage().getSlotThatCanFitInPlayerInventory(cursor, false);
-        if (toFit.isPresent()) {
-            mod.getSlotHandler().clickSlot(toFit.get(), 0, SlotActionType.PICKUP);
-            return false;
-        }
-        if (ItemHelper.canThrowAwayStack(mod, cursor)) {
-            mod.getSlotHandler().clickSlot(Slot.UNDEFINED, 0, SlotActionType.PICKUP);
-            return false;
-        }
-        return true;
-    }
-
-    private ItemStack getBestFuelStack(AltoClef mod, double needs) {
-        double closestDelta = Double.NEGATIVE_INFINITY;
-        ItemStack bestStack = null;
-        for (ItemStack stack : mod.getItemStorage().getItemStacksPlayerInventory(true)) {
-            if (mod.getModSettings().isSupportedFuel(stack.getItem())) {
-                double fuelAmount = ItemHelper.getFuelAmount(stack.getItem()) * stack.getCount();
-                double delta = needs - fuelAmount;
-                if (
-                        (bestStack == null) ||
-                                (closestDelta > 0 && delta < closestDelta) ||
-                                (delta < 0 && delta > closestDelta)
-                ) {
-                    bestStack = stack;
-                    closestDelta = delta;
-                }
-            }
-        }
-        return bestStack;
-    }
-
-    private String describeCache() {
-        return "cache[input=" + describeStack(containerCache.materialSlot)
-                + ", fuel=" + describeStack(containerCache.fuelSlot)
-                + ", output=" + describeStack(containerCache.outputSlot)
-                + ", burningFuel=" + formatDouble(containerCache.burningFuelCount)
-                + ", cook=" + formatDouble(containerCache.burnPercentage)
-                + ", pendingFuel=" + formatDouble(pendingInsertedFuelAmount)
-                + ", pendingFuelTicks=" + pendingInsertedFuelTicks
-                + ", pendingFuelMoveTicks=" + pendingFuelMoveTicks
-                + "]";
+    private String describePlan(SmeltPlan.Action action, String reason, String details, SmeltContainerSnapshot snapshot) {
+        return SmeltPlan.of(action, reason, details, snapshot, pendingInsertedFuelAmount, pendingInsertedFuelTicks, pendingFuelMoveTicks).describe();
     }
 
     private String describeStack(ItemStack stack) {
-        if (stack == null || stack.isEmpty()) {
-            return "empty";
-        }
-        return stack.getItem().getTranslationKey() + " x " + stack.getCount();
+        return SmeltContainerSnapshot.describeStack(stack);
     }
 
     private String formatDouble(double value) {
-        if (Double.isInfinite(value)) {
-            return "infinity";
-        }
-        return String.format(java.util.Locale.ROOT, "%.1f", value);
-    }
-
-    private static class SmeltingContainerCache {
-        private ItemStack materialSlot = ItemStack.EMPTY;
-        private ItemStack fuelSlot = ItemStack.EMPTY;
-        private ItemStack outputSlot = ItemStack.EMPTY;
-        private double burningFuelCount = 0;
-        private double burnPercentage = 0;
+        return SmeltContainerSnapshot.formatDouble(value);
     }
 }
