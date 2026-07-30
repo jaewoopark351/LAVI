@@ -181,14 +181,20 @@ test/test_Isolation/
 tests/tmp*/
 
 # Minecraft plugin local runtime/build artifacts
+#20260730_kpopmodder: Keep Gradle caches, generated classes, and runnable jars out of Git.
 plugins/Minecraft/runtime/.gradle_user_home/
 plugins/Minecraft/runtime/.tmp/
-plugins/Minecraft/runtime/gradle-8.8/
-plugins/Minecraft/runtime/chatclef_fabric_1.20.1/.github/
-plugins/Minecraft/runtime/chatclef_fabric_1.20.1/.gradle/
-plugins/Minecraft/runtime/chatclef_fabric_1.20.1/gradle/wrapper/gradle-wrapper.jar
-plugins/Minecraft/runtime/chatclef_fabric_1.20.1/**/build/
-plugins/Minecraft/runtime/chatclef_fabric_1.20.1/**/bin/
+plugins/Minecraft/runtime/gradle-*/
+plugins/Minecraft/runtime/**/.github/
+plugins/Minecraft/runtime/**/.gradle/
+plugins/Minecraft/runtime/**/build/
+plugins/Minecraft/runtime/**/bin/
+plugins/Minecraft/runtime/**/out/
+plugins/Minecraft/runtime/**/run/
+plugins/Minecraft/runtime/**/*.class
+plugins/Minecraft/runtime/**/*.jar
+plugins/Minecraft/runtime/**/*.zip
+plugins/Minecraft/runtime/**/*.log
 
 !ai_character_system_prompt.txt
 
