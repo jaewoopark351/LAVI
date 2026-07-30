@@ -351,6 +351,187 @@ Phase 3은 실패 boundary가 로그와 재현으로 증명된 뒤에만 검토�
 4. behavior가 바뀌는지 여부 보고
 5. 반드시 정지
 
+<!-- 20260730_kpopmodder: Recorded provisional Carry On design directions without approving Java implementation. -->
+
+## Provisional Direction Before Runtime Evidence
+
+이 section은 Phase 0 source audit과 실제 runtime evidence 전의 provisional direction이다.
+Java 구현, Gradle 변경, dependency 변경, diagnostics patch, Carry On adapter 구현, Task 추가, root-cause fix를 승인하지 않는다.
+Phase 0에서 existing namespace convention, Task contract, installed Carry On version, reproduction evidence를 확인한 뒤 세부 package, class, method 이름은 변경될 수 있다.
+
+### Optional Bridge Placement
+
+Carry On optional bridge는 현재 Fabric Java module의 `src/main/java` 안에 두되, `adris.altoclef` namespace 밖의 LAVI-owned namespace에 둔다.
+
+물리적 경계는 다음처럼 유지한다.
+
+```text
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/
+    adris/altoclef/**
+        upstream-derived ChatClef engine
+
+    <LAVI-owned-namespace>/minecraft/integration/carryon/**
+        LAVI-owned optional integration
+```
+
+정확한 LAVI package 이름은 Phase 0에서 existing namespace convention을 확인하기 전에는 확정하지 않는다.
+현재 단계에서는 별도 Gradle module, 별도 Fabric mod, Python orchestration layer가 Minecraft client state를 직접 읽는 구조를 선택하지 않는다.
+
+generic ChatClef 또는 LAVI class의 field, parameter, return type, generic signature, annotation, superclass, implemented interface, static initializer, class literal, exception type에 Carry On class를 노출하지 않는다.
+mod presence와 version은 가능한 경우 Fabric Loader metadata로 관찰하고, version-specific reflection은 하나의 좁은 optional bridge에 격리한다.
+
+### Carry On Parent Task Placement
+
+Carry On 전용 parent Task가 필요하다는 것이 증명되면 같은 LAVI-owned namespace 아래 task package에 둔다.
+`adris.altoclef.tasks` 또는 `adris.altoclef.chains`에 새 LAVI-specific Task를 추가하지 않는다.
+
+새 Task가 `adris.altoclef.tasksystem.Task`를 상속하여 existing Task contract에 참여하는 것은 허용할 수 있다.
+다만 다음 상속은 금지한다.
+
+- `AltoClef` subclass
+- `TaskRunner` subclass
+- `InteractWithBlockTask` subclass
+- `PlayerInteractionFixChain` subclass
+- engine-wide lifecycle override
+
+parent Task는 Carry On state reader와 generic child Task를 composition으로 사용한다.
+parent Task가 completion, retry, terminal reason을 소유하고, `InteractWithBlockTask`는 approach, look, click attempt만 담당하도록 검토한다.
+
+### Task Equality
+
+correlationId는 logging identity이고 `isEqual()`은 semantic operation identity다.
+새 correlationId를 `isEqual()`에 포함하지 않는다.
+
+`isEqual()`을 구현하기 전에 `Task.tick`, `SingleTaskChain.setTask`, parent-child replacement, interruption 흐름을 실제 코드와 로그로 확인한다.
+semantic identity 후보는 operation type, dimension, target position, target type, expected carry state이지만 현재 확정 구현으로 보지 않는다.
+
+### Target Identity And Transition Confidence
+
+`NOT_CARRYING -> CARRYING` 또는 `CARRYING -> NOT_CARRYING` 전환은 성공의 필요조건이다.
+boolean transition만 관찰된 경우 operation-level transition은 판정할 수 있지만 target-level success는 `UNVERIFIED`일 수 있다.
+
+transition confidence는 다음처럼 구분한다.
+
+```text
+TRANSITION_NOT_OBSERVED
+TRANSITION_OBSERVED_TARGET_UNVERIFIED
+TARGET_CORROBORATED
+TARGET_VERIFIED
+```
+
+target identity를 확인할 수 없으면 특정 target 완료를 확정하거나 target-specific 후속 처리를 시작하지 않는다.
+단, 같은 operation과 click에 귀속된 transition이 충분히 증명되면 동일 click의 무한 retry를 종료하는 제한된 patch는 검토할 수 있다.
+
+### Input Ownership
+
+현재 boolean pressed state는 ownership 증거가 아니다.
+diagnostics Phase에서는 input cleanup behavior를 변경하지 않는다.
+
+root-cause Phase에서 input 변경이 필요하면 operation-local input lease 또는 wrapper를 먼저 검토한다.
+최소 추적 정보는 다음과 같다.
+
+- previous state
+- operation이 실제로 input을 변경했는지
+- operation 또는 Task identity
+- acquisition tick
+- release path
+- cleanup result
+
+previous state가 true이면 operation이 획득한 것으로 간주하지 않는다.
+snapshot만으로 다른 Task 또는 사용자 input ownership을 증명할 수 없으므로, 소유권이 확인되지 않은 input은 전역 release하지 않는다.
+기존 `InputControls`에 owner-aware API를 추가하는 것은 별도 global-change Phase와 회귀 검증이 필요한 마지막 수단이다.
+
+### PlayerInteractionFixChain
+
+`PlayerInteractionFixChain`은 global boundary다.
+logging-only hunk는 다음 조건으로 제한적으로 허용할 수 있다.
+
+- behavior, return value, timer, input state 변경 없음
+- state-change 또는 correlation 기반 logging
+- 매 tick reflection discovery 없음
+- 기존 실행 순서 변경 없음
+
+behavior hunk는 다음이 증명된 경우에만 검토한다.
+
+- 해당 chain action이 first failing boundary
+- 같은 Carry On correlation과 연결됨
+- parent Task 또는 adapter에서 격리할 수 없음
+- generic interaction regression matrix 통과 가능
+- Carry On absent 상태 보존
+
+### Diagnostics Observation Order
+
+Phase 1의 기본 관찰 순서는 다음과 같다.
+
+1. operation entry와 correlation
+2. parent Task lifecycle
+3. Carry On capability/state before
+4. `InteractWithBlockTask` right-click boundary
+5. bounded Carry On state after
+6. child equality, replacement, interruption
+7. input, custom goal, path state와 ownership evidence
+8. `PlayerInteractionFixChain`
+9. Task/TaskRunner global instrumentation
+
+앞 단계에서 failure boundary가 보이면 뒤의 global instrumentation을 추가하지 않는다.
+`InteractWithBlockTask.isFinished()` behavior는 변경하지 않는다.
+
+### Document And Legacy Handling
+
+canonical 문서는 다음 파일이다.
+
+```text
+plugins/Minecraft/docs/chatclef-carryon-integration-direction.md
+```
+
+legacy candidate는 다음 파일이다.
+
+```text
+plugins/Minecraft/docs/chatclef_carryon_integration.md
+```
+
+legacy 파일은 현재 Phase에서 수정, stage, 삭제하지 않는다.
+D0.1에서 고유 내용과 참조가 없다는 것이 확인되었으므로, commit 전에 별도 D0.7 exact-path deletion approval을 받아 삭제하는 방향을 우선 권고한다.
+두 문서를 함께 commit하지 않으며, legacy 문서를 untracked 상태로 영구 방치하지 않는다.
+
+### Phase Evidence Requirements
+
+Phase 0 source audit에는 외부 Minecraft 경로가 필요하지 않다.
+
+Phase 1 diagnostics 설계에는 최소한 다음이 필요하다.
+
+- `PICKUP` 또는 `PLACEMENT`
+- exact command 또는 Task
+- target block/state
+- expected result
+- observed loop
+- existing related logs
+
+Carry On API bridge를 설계하거나 적용하려면 다음도 필요하다.
+
+- exact installed Carry On JAR
+- exact Carry On version
+- Minecraft/Fabric version
+
+Phase 2 runtime reproduction 전에는 다음이 필요하다.
+
+- Minecraft instance root
+- mods directory
+- Carry On JAR absolute path
+- related mod list
+- log path and reproduction time
+
+### Additional Documentation Topics
+
+canonical 또는 operational 문서에 다음을 보강한다.
+
+- Carry On operation state machine
+- ownership ledger
+- regression gate matrix
+- upstream divergence manifest
+
+정확한 Phase 1 diagnostic method/file plan은 Phase 0 결과 전에는 만들지 않는다.
+
 ## Required Evidence Before Root-Cause Patch
 
 root-cause patch를 제안하려면 최소한 다음이 증명되어야 한다.
@@ -512,4 +693,3 @@ Codex 환경에서 build가 불가능하면 Gradle, wrapper, Java, dependency를
 - 실패 시 전달받아야 할 전체 출력
 
 사용자가 직접 빌드한 결과를 받기 전에는 컴파일 성공, 테스트 통과, 수정 완료라고 보고하지 않는다.
-
