@@ -29,6 +29,197 @@ git rev-parse --show-toplevel
 
 If the current directory or Git root is not the intended repository root, Codex must stop and ask the user.
 
+### Minecraft ChatClef Upstream Baseline Override
+
+This subsection is a scoped safety override for the following tree:
+
+```text
+Absolute path:
+C:\Vtuber_Souorce_Code\LAVI\plugins\Minecraft\runtime\chatclef_fabric_1.20.1\**
+
+Repository-relative path:
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/**
+```
+
+This subsection has higher priority for that tree than:
+
+* Section 29 refactoring rules
+* Section 29.1 folder and package organization rules
+* Section 29.2 file and type separation rules
+* Section 29.3 inheritance rules
+* general cleanup, modernization, style, folderization, or responsibility-splitting rules
+* any general rule that would require restructuring existing code merely because the current task touches it
+
+The ChatClef runtime tree is an upstream-derived compatibility baseline. Treat it as stable third-party-derived code with LAVI-specific compatibility patches, not as ordinary LAVI-owned production code that must be retroactively redesigned.
+
+#### Required ownership classification
+
+Before changing a file in this tree, Codex must determine whether the target is:
+
+1. untouched or substantially upstream-derived ChatClef/AltoClef code
+2. an existing LAVI-specific compatibility patch
+3. a new LAVI-owned integration file
+
+If ownership is uncertain, preserve the existing structure and inspect provenance before editing. Do not classify a file as LAVI-owned merely because it exists inside the LAVI repository.
+
+#### Baseline preservation rules
+
+For this tree:
+
+* Prefer the smallest method-level or diff-hunk-level patch.
+* Do not replace a whole file when a local change is sufficient.
+* Do not rename, move, repackage, split, merge, or broadly refactor upstream-derived classes during a bug fix.
+* Do not redesign Task, TaskRunner, chain, behavior, input, event, or Baritone lifecycle architecture unless the user explicitly requests that exact structural change.
+* Do not apply the mandatory two-responsibility split retroactively to existing upstream-derived files.
+* Do not create new folders merely to make the upstream tree match general LAVI folder rules.
+* Do not introduce a new abstract base class, inheritance hierarchy, framework, service layer, manager, adapter layer, or generic utility solely to make a small compatibility fix look cleaner.
+* Do not change Minecraft, Fabric, Fabric Loader, Loom, Java, Gradle, ChatClef, AltoClef, Baritone, or Carry On versions unless the user explicitly approves the exact version change.
+* Do not add a hard runtime dependency on Carry On. ChatClef must remain loadable when Carry On is absent, disabled, incompatible, or fails to expose the expected API.
+* Do not download, regenerate, replace, or remove Gradle wrapper files without explicit user approval.
+* Do not treat `gradle/wrapper/gradle-wrapper.jar`, required API JARs, vendor JARs, or runtime JARs as disposable build artifacts.
+* Do not add broad `*.jar` ignore rules that can hide required wrapper, API, vendor, or runtime JARs. Verify every ignored JAR path with `git check-ignore -v` before proposing an ignore change.
+
+General refactoring rules still apply to newly created LAVI-owned code when that code is not replacing, restructuring, or forcing changes across the upstream baseline. Any such new structure must remain narrow and optional.
+
+#### Previous failed AI work is reference-only
+
+A previous branch, ZIP, patch, backup, or AI-generated implementation that damaged or destabilized this component must be treated as reference material only.
+
+Do not:
+
+* copy previous files over the restored baseline
+* merge or cherry-pick the previous implementation as a whole
+* reapply an old patch blindly
+* treat an old class or package structure as authoritative
+* preserve a workaround merely because significant effort was previously spent on it
+
+Compare previous work against the restored baseline at method and diff-hunk level. Classify each change as:
+
+1. evidence-backed and reusable as-is
+2. idea-only and requiring a fresh minimal implementation
+3. a hypothesis requiring diagnostic logs
+4. unsafe and to be discarded
+
+#### Diagnostic-only first pass
+
+When the root cause is not already proven, the first change in this tree must be diagnostic-only and must not alter runtime behavior.
+
+The diagnostic pass should make the following observable when applicable:
+
+```text
+correlationId
+gameTick
+topLevelTask
+childTask
+previousTask
+nextTask
+targetType
+targetId
+targetPosition
+dimension
+carryOnLoaded
+carryOnVersion
+carryStateBefore
+carryStateAfter
+rightClickState
+sneakState
+leftClickState
+clickResult
+attemptCount
+elapsedTicks
+screenName
+equippedItem
+baritonePathing
+customGoalOwner
+stopReason
+exceptionType
+```
+
+Use state-change logging, attempt counters, correlation identifiers, bounded debug sessions, rate limiting, or sampling for high-frequency game-tick paths. Logging volume must not be used as a reason to leave a material transition unobservable.
+
+Do not add timeout, retry, blacklist, cancellation, input release, path cancellation, or fallback behavior until logs or direct evidence prove the exact failing boundary and the ownership of the state being changed.
+
+#### Carry On compatibility guard
+
+Carry On-specific behavior must remain isolated from generic ChatClef and AltoClef interaction behavior.
+
+Do not:
+
+* globally change `InteractWithBlockTask.isFinished()` to make one Carry On scenario complete
+* place a Carry On workaround into `PlayerInteractionFixChain` or another global interaction chain without direct evidence that the global chain is the exact root-cause boundary
+* globally suppress right-click, left-click, sneak, jump, movement, or Baritone pathing
+* stop the entire TaskRunner because one Carry On attempt failed
+* cancel a path, goal, input override, or task that the Carry On operation does not own
+* treat a click attempt, timeout, or lack of exception as successful pickup or placement
+* assume a Carry On API from a newer Minecraft branch matches the installed Minecraft 1.20.1 version
+
+A Carry On operation must use observed state transition as the success condition whenever the installed version exposes a reliable state:
+
+```text
+Pickup success:
+NOT_CARRYING -> CARRYING
+
+Placement success:
+CARRYING -> NOT_CARRYING
+```
+
+Retry behavior must be bounded. On retry exhaustion or interruption:
+
+* release only inputs owned by that operation
+* cancel only goals or paths created by that operation
+* retain unrelated Baritone and TaskRunner state
+* record the exact terminal reason
+* return control without crashing ChatClef
+
+Carry On absence, API lookup failure, version mismatch, invalid state, unexpected return value, or integration exception must remain observable and must not crash generic ChatClef startup or normal block interaction.
+
+#### Java marker rule for this tree
+
+Do not insert project-history markers retroactively into untouched upstream files.
+
+A new LAVI-specific Java file, class, or important LAVI-specific compatibility block must use Java comment syntax:
+
+```java
+//YYYYMMDD_kpopmodder: Reason for this LAVI-specific change.
+```
+
+Preserve existing markers. If marked code must be disabled, keep the smallest necessary old block commented with a reason unless the user explicitly approves deletion.
+
+#### Minimum validation for Carry On changes
+
+A Carry On compatibility change is not verified by compilation alone. Validate the smallest applicable set of scenarios:
+
+* ChatClef loads when Carry On is not installed
+* normal Carry On pickup completes
+* normal Carry On placement completes
+* an invalid, protected, unreachable, or non-pickable target does not cause an infinite loop
+* normal chest, door, bed, button, lever, block-placement, and generic right-click behavior remains unchanged
+* user interruption releases only operation-owned input
+* task interruption, death, dimension change, disconnect, and reconnect do not retain stale operation state
+* retry exhaustion produces a bounded terminal result
+* Baritone continues operating outside the failed Carry On action
+* logs show start, state transition, retry, success, cancellation, cleanup, and terminal reason
+
+#### Required report before a behavior change
+
+Before applying a non-diagnostic Carry On or ChatClef behavior change, Codex must report:
+
+```text
+Observed symptom:
+Existing evidence:
+Verified last successful boundary:
+Verified failing boundary:
+Affected file and method:
+Why the proposed change is the smallest root-cause fix:
+Generic interactions that could be affected:
+Inputs, goals, paths, and state owned by the operation:
+Exact files to modify:
+Tests to run:
+Remaining uncertainty:
+```
+
+If the exact failure boundary is still unknown, stop at diagnostics and do not apply the behavioral change.
+
 ### Write permission boundary
 
 By default, Codex may only modify files inside:
@@ -86,9 +277,17 @@ Never run broad destructive commands.
 Forbidden commands include, but are not limited to:
 
 ```bat
+git clean -fd
 git clean -fdx
 git clean -xdf
 git reset --hard
+git checkout -- .
+git restore .
+git checkout -f
+git switch -f
+git branch -D
+git push --force
+git push --force-with-lease
 rm -rf
 del /s
 rmdir /s
@@ -420,14 +619,23 @@ Prefer the Visual Studio version documented in `README.md`.
 
 ## 9. Git Rules
 
-Before editing files, check the current Git state.
+Before editing files, verify the current directory, Git root, branch, upstream, and working tree without changing them.
 
-Recommended commands:
+Recommended read-only commands:
 
 ```bat
-git status
-git branch
+cd
+git rev-parse --show-toplevel
+git status --short --branch
+git branch -vv
+git remote -v
 ```
+
+Do not modify the working tree merely to obtain a clean status.
+
+Do not discard, overwrite, hide, stash, restore, reset, or force-checkout user changes unless the user explicitly approves the exact paths and exact operation.
+
+Do not delete a branch or force-push unless the user explicitly requests the exact branch and understands the remote-history impact.
 
 Do not commit automatically unless explicitly asked.
 
@@ -1632,20 +1840,24 @@ __pycache__/
 
 ## 29. Refactoring Rules
 
-Refactoring is mandatory whenever the code touched by the current task violates the responsibility rules below.
+This section applies to LAVI-owned production code.
 
-Maintaining working behavior remains required, but existing behavior is not a reason to keep mixed responsibilities in the same class, module, source file, service, manager, controller, adapter, facade, worker, handler, or package.
+It does not override the scoped Minecraft ChatClef upstream baseline rules in Section 0, and it does not require retroactive restructuring of vendored, upstream-derived, generated, or third-party code. When ownership is uncertain, classify the code before applying this section.
+
+For LAVI-owned production code covered by this section, refactoring is mandatory whenever the code touched by the current task violates the responsibility rules below.
+
+Maintaining working behavior remains required, but existing behavior is not a reason to keep mixed responsibilities in the same LAVI-owned class, module, source file, service, manager, controller, adapter, facade, worker, handler, or package.
 
 ### Non-Negotiable Two-Responsibility Rule
 
-Use this rule without exception:
+Use this rule as a mandatory gate for LAVI-owned production code, subject to the higher-priority scoped exceptions in Section 0:
 
 ```text
 one responsibility        -> the unit may remain as-is
 two or more responsibilities -> refactor, separate files, and evaluate folder/package separation immediately
 ```
 
-If a production unit has two or more independent responsibilities, Codex must split it during the current task before adding, extending, or fixing behavior in that unit.
+If a LAVI-owned production unit has two or more independent responsibilities, Codex must split it during the current task before adding, extending, or fixing behavior in that unit.
 
 This is a mandatory execution gate, not a recommendation, optional cleanup, future improvement, or style preference.
 
@@ -1884,7 +2096,9 @@ When refactoring:
 
 ## 29.1 Folder and Package Organization Rule
 
-Production files must be grouped into folders and packages by responsibility, feature, domain, or component boundary.
+This section applies to LAVI-owned production files and is subordinate to the scoped upstream baseline override in Section 0. Do not move or reorganize the ChatClef runtime baseline merely because a compatibility task touches it.
+
+LAVI-owned production files must be grouped into folders and packages by responsibility, feature, domain, or component boundary.
 
 Folder organization is a continuous code-structure rule. It is not a subordinate task that applies only when classes are split into separate files.
 
@@ -2307,7 +2521,9 @@ It is complete only after responsibility boundaries, references, backward compat
 
 ## 29.2 File and Type Separation Rule
 
-Production code must follow a one-primary-type-or-responsibility-per-file rule.
+This section applies to LAVI-owned production code and is subordinate to the scoped upstream baseline override in Section 0. Existing vendored or upstream-derived files are not retroactive split targets unless the user explicitly requests that migration.
+
+LAVI-owned production code must follow a one-primary-type-or-responsibility-per-file rule.
 
 The purpose of this rule is to keep classes, types, and modules independently maintainable without changing existing runtime behavior.
 
@@ -2488,7 +2704,9 @@ Do not combine file separation with unrelated feature work or large architectura
 
 ## 29.3 Inheritance and Common Base Class Rule
 
-Inheritance must be actively considered when multiple project classes share the same stable responsibility, lifecycle, validation flow, execution sequence, or error-handling template.
+This section applies to LAVI-owned project classes and is subordinate to the scoped upstream baseline override in Section 0. Do not introduce or reshape inheritance in upstream-derived ChatClef code merely to remove duplication or satisfy a general architecture preference.
+
+Inheritance must be actively considered when multiple LAVI-owned project classes share the same stable responsibility, lifecycle, validation flow, execution sequence, or error-handling template.
 
 Do not repeatedly copy the same control flow into sibling classes when the differences can be expressed as small subclass-specific steps.
 
@@ -3578,25 +3796,29 @@ Any change in these areas should be small and carefully explained.
 
 Before editing:
 
-1. Inspect the relevant files.
-2. For a failure or unexpected behavior, inspect the existing logs, stack traces, tests, and reproduction evidence.
-3. If the root cause is not proven, state that it is unknown and add structured diagnostic logs before changing behavior.
-4. Reproduce the problem and inspect the new trace.
-5. If any material boundary, branch, state, value, callback, queue operation, external response, timeout, fallback, cleanup step, or terminal result remains unobservable, add more logs and reproduce again.
-6. Continue the logging and reproduction cycle until the exact failure mechanism is verified. No speculative behavioral patch is allowed before this point.
-7. Summarize the planned root-cause change.
-8. Make the smallest safe patch.
-9. Show what changed.
-10. Suggest a test command.
-11. Before any cleanup, deletion, move, rename, reset, or mass file operation, print the exact target list and stop for user confirmation.
+1. Verify the current directory, Git root, branch, upstream, and working tree using read-only commands.
+2. Classify each affected file as LAVI-owned, upstream-derived, vendored, generated, or third-party, and apply the highest-priority scoped rule before evaluating refactoring.
+3. Inspect the relevant files, surrounding callers, fallback paths, cleanup ownership, and existing tests.
+4. For a failure or unexpected behavior, inspect the existing logs, stack traces, compiler output, tests, and reproduction evidence.
+5. If the root cause is not proven, state that it is unknown and add structured diagnostic logs before changing behavior.
+6. Reproduce the problem and inspect the new trace.
+7. If any material boundary, branch, state, value, callback, queue operation, external response, timeout, fallback, cleanup step, or terminal result remains unobservable, add more logs and reproduce again.
+8. Continue the logging and reproduction cycle until the exact failure mechanism is verified. No speculative behavioral patch is allowed before this point.
+9. Summarize the planned root-cause change, exact files, ownership boundaries, and compatibility that must be preserved.
+10. Make the smallest safe patch allowed by the applicable scoped rules.
+11. Show what changed.
+12. Suggest the smallest relevant test command and any required manual runtime scenario.
+13. Before any cleanup, deletion, move, rename, reset, branch deletion, force operation, or mass file operation, print the exact target list and stop for user confirmation.
 
 After editing:
 
-1. Check syntax if possible.
-2. Check Git diff.
-3. Warn about runtime tests that still need to be done.
-4. Do not commit or push unless asked.
-5. If cleanup candidates were found, report them only. Do not delete them automatically.
+1. Check syntax or compilation if possible.
+2. Run the smallest relevant test and inspect diagnostic output.
+3. Check `git diff --check`, inspect the actual diff, and check `git status --short --branch`.
+4. Warn about runtime tests that still need to be done.
+5. Report every file created, modified, moved, or proposed for deletion.
+6. Do not commit or push unless asked.
+7. If cleanup candidates were found, report them only. Do not delete them automatically.
 
 ---
 
