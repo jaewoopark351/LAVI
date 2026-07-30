@@ -22,6 +22,8 @@ import baritone.api.pathing.goals.GoalTwoBlocks;
 import baritone.api.process.ICustomGoalProcess;
 import baritone.api.utils.Rotation;
 import baritone.api.utils.input.Input;
+import lavi.minecraft.integration.carryon.CarryOnDiagnostics;
+import lavi.minecraft.integration.carryon.CarryOnObservation;
 import net.minecraft.block.*;
 import adris.altoclef.multiversion.versionedfields.Blocks;
 import net.minecraft.item.Item;
@@ -68,6 +70,11 @@ public class InteractWithBlockTask extends Task {
     private Task unstuckTask = null;
     private ClickResponse cachedClickStatus = ClickResponse.CANT_REACH;
     private int waitingForClickTicks = 0;
+    //20260730_kpopmodder: Added diagnostic logging to prove the Carry On interaction failure boundary.
+    private final long carryOnDiagnosticCorrelationId = CarryOnDiagnostics.nextCorrelationId();
+    private String lastCarryOnDiagnosticKey = "";
+    private int carryOnDiagnosticAttemptCount = 0;
+    private int carryOnDiagnosticElapsedTicks = 0;
 
     public InteractWithBlockTask(ItemTarget toUse, Direction direction, BlockPos target, Input interactInput, boolean walkInto, Vec3i interactOffset, boolean shiftClick) {
         this.toUse = toUse;
@@ -229,11 +236,16 @@ public class InteractWithBlockTask extends Task {
         stuckCheck.reset();
         wanderTask.resetWander();
         clickTimer.reset();
+        carryOnDiagnosticAttemptCount = 0;
+        carryOnDiagnosticElapsedTicks = 0;
+        lastCarryOnDiagnosticKey = "";
+        CarryOnDiagnostics.logInteractionStart(carryOnDiagnosticCorrelationId, this, target, direction, toUse, interactInput, shiftClick, walkInto);
     }
 
     @Override
     protected Task onTick() {
         AltoClef mod = AltoClef.getInstance();
+        carryOnDiagnosticElapsedTicks++;
 
         if (mod.getClientBaritone().getPathingBehavior().isPathing()) {
             moveChecker.reset();
@@ -298,7 +310,26 @@ public class InteractWithBlockTask extends Task {
         Goal moveGoal = createGoalForInteract(target, reachDistance, direction, interactOffset, walkInto);
         ICustomGoalProcess proc = mod.getClientBaritone().getCustomGoalProcess();
 
+        CarryOnObservation carryOnStateBefore = CarryOnDiagnostics.observe();
         cachedClickStatus = rightClick(mod);
+        CarryOnObservation carryOnStateAfter = CarryOnDiagnostics.observe();
+        if (cachedClickStatus == ClickResponse.CLICK_ATTEMPTED) {
+            carryOnDiagnosticAttemptCount++;
+        }
+        lastCarryOnDiagnosticKey = CarryOnDiagnostics.logInteractionStateChange(
+                carryOnDiagnosticCorrelationId,
+                this,
+                target,
+                direction,
+                toUse,
+                interactInput,
+                carryOnStateBefore,
+                carryOnStateAfter,
+                cachedClickStatus,
+                carryOnDiagnosticAttemptCount,
+                carryOnDiagnosticElapsedTicks,
+                lastCarryOnDiagnosticKey
+        );
         switch (Objects.requireNonNull(cachedClickStatus)) {
             case CANT_REACH -> {
                 setDebugState("Getting to our goal");
@@ -348,6 +379,7 @@ public class InteractWithBlockTask extends Task {
     protected void onStop(Task interruptTask) {
         AltoClef mod = AltoClef.getInstance();
 
+        CarryOnDiagnostics.logInteractionStop(carryOnDiagnosticCorrelationId, this, target, interactInput, interruptTask, carryOnDiagnosticAttemptCount, carryOnDiagnosticElapsedTicks);
         mod.getClientBaritone().getPathingBehavior().forceCancel();
         mod.getInputControls().release(Input.SNEAK);
     }
