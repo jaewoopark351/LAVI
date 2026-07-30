@@ -2,6 +2,7 @@ package adris.altoclef.tasksystem;
 
 import adris.altoclef.Debug;
 import adris.altoclef.tasks.movement.TimeoutWanderTask;
+import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 
 import java.util.function.Predicate;
 
@@ -19,45 +20,81 @@ public abstract class Task {
     private boolean active = false;
 
     public void tick(TaskChain parentChain) {
-        parentChain.addTaskToChain(this);
-        if (first) {
-            Debug.logInternal("Task START: " + this);
-            active = true;
-            onStart();
-            first = false;
-            stopped = false;
-        }
-        if (stopped) return;
+        ChatClefDiagnostics.enterTask(this);
+        try {
+            parentChain.addTaskToChain(this);
+            if (first) {
+                ChatClefDiagnostics.beginTaskRun(this, parentChain);
+                Debug.logInternal("Task START: " + this);
+                active = true;
+                ChatClefDiagnostics.logEvent("TASK", "ON_START_BEGIN", "first_tick", this,
+                        "parentChain", ChatClefDiagnostics.chainName(parentChain));
+                onStart();
+                ChatClefDiagnostics.logEvent("TASK", "ON_START_END", "first_tick", this,
+                        "parentChain", ChatClefDiagnostics.chainName(parentChain));
+                first = false;
+                stopped = false;
+            }
+            if (stopped) {
+                ChatClefDiagnostics.logEvent("TASK", "SKIP", "stopped_before_onTick", this);
+                return;
+            }
 
-        Task newSub = onTick();
-        // Debug state print
-        if (!oldDebugState.equals(debugState)) {
-            Debug.logInternal(toString());
-            oldDebugState = debugState;
-        }
-        // We have a sub task
-        if (newSub != null) {
-            if (!newSub.isEqual(sub)) {
-                if (canBeInterrupted(sub, newSub)) {
-                    // Our sub task is new
-                    if (sub != null) {
-                        // Our previous sub must be interrupted.
-                        sub.stop(newSub);
+            ChatClefDiagnostics.logEvent("TASK", "ON_TICK_BEGIN", "tick_begin", this,
+                    "parentChain", ChatClefDiagnostics.chainName(parentChain));
+            Task newSub = onTick();
+            ChatClefDiagnostics.logTaskTransition(this, sub, newSub, "onTick_result");
+            // Debug state print
+            if (!oldDebugState.equals(debugState)) {
+                Debug.logInternal(toString());
+                oldDebugState = debugState;
+            }
+            // We have a sub task
+            if (newSub != null) {
+                boolean subTasksEqual = newSub.isEqual(sub);
+                ChatClefDiagnostics.logTaskTransition(this, sub, newSub, "child_isEqual_result",
+                        "isEqualResult", subTasksEqual);
+                if (!subTasksEqual) {
+                    boolean canInterrupt = canBeInterrupted(sub, newSub);
+                    ChatClefDiagnostics.logTaskTransition(this, sub, newSub, "child_interruptibility_result",
+                            "canInterruptPreviousChild", canInterrupt);
+                    if (canInterrupt) {
+                        // Our sub task is new
+                        if (sub != null) {
+                            // Our previous sub must be interrupted.
+                            ChatClefDiagnostics.logTaskTransition(this, sub, newSub, "previous_child_stop_begin");
+                            sub.stop(newSub);
+                            ChatClefDiagnostics.logTaskTransition(this, sub, newSub, "previous_child_stop_end");
+                        }
+
+                        sub = newSub;
+                        ChatClefDiagnostics.setParent(sub, this);
+                        ChatClefDiagnostics.logTaskTransition(this, null, sub, "child_replaced");
                     }
+                }
 
-                    sub = newSub;
+                // Run our child
+                ChatClefDiagnostics.logEvent("TASK_CHILD", "TICK_BEGIN", "child_tick_begin", sub,
+                        "parentChain", ChatClefDiagnostics.chainName(parentChain));
+                sub.tick(parentChain);
+                ChatClefDiagnostics.logEvent("TASK_CHILD", "TICK_END", "child_tick_end", sub,
+                        "parentChain", ChatClefDiagnostics.chainName(parentChain));
+            } else {
+                // We are null
+                boolean canInterrupt = sub == null || canBeInterrupted(sub, null);
+                ChatClefDiagnostics.logTaskTransition(this, sub, null, "null_child_result",
+                        "canInterruptPreviousChild", canInterrupt);
+                if (sub != null && canInterrupt) {
+                    // Our previous sub must be interrupted.
+                    ChatClefDiagnostics.logTaskTransition(this, sub, null, "previous_child_stop_begin");
+                    sub.stop();
+                    ChatClefDiagnostics.logTaskTransition(this, sub, null, "previous_child_stop_end");
+                    sub = null;
+                    ChatClefDiagnostics.logTaskTransition(this, null, null, "child_cleared");
                 }
             }
-
-            // Run our child
-            sub.tick(parentChain);
-        } else {
-            // We are null
-            if (sub != null && canBeInterrupted(sub, null)) {
-                // Our previous sub must be interrupted.
-                sub.stop();
-                sub = null;
-            }
+        } finally {
+            ChatClefDiagnostics.exitTask(this);
         }
     }
 
@@ -75,19 +112,27 @@ public abstract class Task {
      * Stops the task. Next time it's run it will run `onStart`
      */
     public void stop(Task interruptTask) {
-        if (!active) return;
+        if (!active) {
+            ChatClefDiagnostics.logTaskTransition(this, this, interruptTask, "stop_skipped_inactive");
+            return;
+        }
+        ChatClefDiagnostics.logTaskTransition(this, this, interruptTask, "stop_begin");
         Debug.logInternal("Task STOP: " + this + ", interrupted by " + interruptTask);
         if (!first) {
             onStop(interruptTask);
+            ChatClefDiagnostics.logTaskTransition(this, this, interruptTask, "onStop_end");
         }
 
         if (sub != null && !sub.stopped()) {
+            ChatClefDiagnostics.logTaskTransition(this, sub, interruptTask, "child_stop_from_parent_stop_begin");
             sub.stop(interruptTask);
+            ChatClefDiagnostics.logTaskTransition(this, sub, interruptTask, "child_stop_from_parent_stop_end");
         }
 
         first = true;
         active = false;
         stopped = true;
+        ChatClefDiagnostics.logTaskTransition(this, this, interruptTask, "stop_end");
     }
 
     public void fail(String reason) {
@@ -103,16 +148,24 @@ public abstract class Task {
      * Doesn't stop it all-together (meaning `isActive` still returns true)
      */
     public void interrupt(Task interruptTask) {
-        if (!active) return;
+        if (!active) {
+            ChatClefDiagnostics.logTaskTransition(this, this, interruptTask, "interrupt_skipped_inactive");
+            return;
+        }
+        ChatClefDiagnostics.logTaskTransition(this, this, interruptTask, "interrupt_begin");
         if (!first) {
             onStop(interruptTask);
+            ChatClefDiagnostics.logTaskTransition(this, this, interruptTask, "interrupt_onStop_end");
         }
 
         if (sub != null && !sub.stopped()) {
+            ChatClefDiagnostics.logTaskTransition(this, sub, interruptTask, "child_interrupt_begin");
             sub.interrupt(interruptTask);
+            ChatClefDiagnostics.logTaskTransition(this, sub, interruptTask, "child_interrupt_end");
         }
 
         first = true;
+        ChatClefDiagnostics.logTaskTransition(this, this, interruptTask, "interrupt_end");
     }
 
     protected void setDebugState(String state) {

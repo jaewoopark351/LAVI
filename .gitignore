@@ -193,6 +193,7 @@ plugins/Minecraft/runtime/**/out/
 plugins/Minecraft/runtime/**/run/
 plugins/Minecraft/runtime/**/*.class
 plugins/Minecraft/runtime/**/*.jar
+!plugins/Minecraft/runtime/**/gradle/wrapper/gradle-wrapper.jar
 plugins/Minecraft/runtime/**/*.zip
 plugins/Minecraft/runtime/**/*.log
 

@@ -13,6 +13,7 @@ import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.progresscheck.MovementProgressChecker;
 import adris.altoclef.util.slots.Slot;
 import baritone.api.pathing.goals.GoalRunAway;
+import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 import net.minecraft.entity.Entity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.screen.slot.SlotActionType;
@@ -53,6 +54,12 @@ public abstract class AbstractDoToEntityTask extends Task implements ITaskRequir
 
         progress.reset();
         ItemStack cursorStack = StorageHelper.getItemStackInCursorSlot();
+        //20260730_kpopmodder: Diagnostics-only LAVI log for entity interaction loop investigation; no behavior change.
+        ChatClefDiagnostics.logEvent("ENTITY_INTERACT", "ON_START", "do_to_entity_start", this,
+                "maintainDistance", maintainDistance,
+                "combatGuardLowerRange", combatGuardLowerRange,
+                "combatGuardLowerFieldRadius", combatGuardLowerFieldRadius,
+                "cursorStack", ChatClefDiagnostics.itemStackSummary(cursorStack));
         if (!cursorStack.isEmpty()) {
             Optional<Slot> moveTo = mod.getItemStorage().getSlotThatCanFitInPlayerInventory(cursorStack, false);
             moveTo.ifPresent(slot -> mod.getSlotHandler().clickSlot(slot, 0, SlotActionType.PICKUP));
@@ -72,15 +79,24 @@ public abstract class AbstractDoToEntityTask extends Task implements ITaskRequir
     protected Task onTick() {
         AltoClef mod = AltoClef.getInstance();
 
-        if (mod.getClientBaritone().getPathingBehavior().isPathing()) {
+        boolean pathing = mod.getClientBaritone().getPathingBehavior().isPathing();
+        ChatClefDiagnostics.logEvent("ENTITY_INTERACT", "ON_TICK", "do_to_entity_tick_begin", this,
+                "pathing", pathing,
+                "playerPosition", ChatClefDiagnostics.playerPosition(mod));
+        if (pathing) {
+            ChatClefDiagnostics.logEvent("ENTITY_INTERACT", "OBSERVE", "pathing_active_resets_progress", this);
             progress.reset();
         }
 
         Optional<Entity> checkEntity = getEntityTarget(mod);
+        ChatClefDiagnostics.logEvent("ENTITY_INTERACT", "OBSERVE", "entity_target_result", this,
+                "targetPresent", checkEntity.isPresent(),
+                "targetEntity", checkEntity.map(ChatClefDiagnostics::entitySummary).orElse("none"));
 
 
         // Oof
         if (checkEntity.isEmpty()) {
+            ChatClefDiagnostics.logEvent("ENTITY_INTERACT", "DECISION", "clear_mob_defense_no_target", this);
             mod.getMobDefenseChain().resetTargetEntity();
             mod.getMobDefenseChain().resetForceField();
         } else {
@@ -97,8 +113,17 @@ public abstract class AbstractDoToEntityTask extends Task implements ITaskRequir
             double sqDist = entity.squaredDistanceTo(mod.getPlayer());
 
             if (sqDist < combatGuardLowerRange * combatGuardLowerRange) {
+                ChatClefDiagnostics.logEvent("ENTITY_INTERACT", "DECISION", "lower_combat_force_field", this,
+                        "entity", ChatClefDiagnostics.entitySummary(entity),
+                        "squaredDistance", sqDist,
+                        "combatGuardLowerRange", combatGuardLowerRange,
+                        "combatGuardLowerFieldRadius", combatGuardLowerFieldRadius);
                 mod.getMobDefenseChain().setForceFieldRange(combatGuardLowerFieldRadius);
             } else {
+                ChatClefDiagnostics.logEvent("ENTITY_INTERACT", "DECISION", "reset_combat_force_field", this,
+                        "entity", ChatClefDiagnostics.entitySummary(entity),
+                        "squaredDistance", sqDist,
+                        "combatGuardLowerRange", combatGuardLowerRange);
                 mod.getMobDefenseChain().resetForceField();
             }
 
@@ -106,9 +131,29 @@ public abstract class AbstractDoToEntityTask extends Task implements ITaskRequir
             double maintainDistance = this.maintainDistance >= 0 ? this.maintainDistance : playerReach - 1;
 
             boolean tooClose = sqDist < maintainDistance * maintainDistance;
+            boolean customGoalActive = mod.getClientBaritone().getCustomGoalProcess().isActive();
+            ChatClefDiagnostics.logEvent("ENTITY_INTERACT", "OBSERVE", "entity_interaction_conditions", this,
+                    "entity", ChatClefDiagnostics.entitySummary(entity),
+                    "playerReach", playerReach,
+                    "raycastResult", result == null ? "none" : ChatClefDiagnostics.className(result),
+                    "raycastType", result == null ? "none" : result.getType(),
+                    "squaredDistance", sqDist,
+                    "maintainDistance", maintainDistance,
+                    "tooClose", tooClose,
+                    "customGoalActive", customGoalActive,
+                    "controllerInRange", ChatClefDiagnostics.safeValue(() -> mod.getControllerExtras().inRange(entity)),
+                    "needsToEat", ChatClefDiagnostics.safeValue(() -> mod.getFoodChain().needsToEat()),
+                    "mlgFalling", ChatClefDiagnostics.safeValue(() -> mod.getMLGBucketChain().isFalling(mod)),
+                    "mlgDone", ChatClefDiagnostics.safeValue(() -> mod.getMLGBucketChain().doneMLG()),
+                    "chorusFruiting", ChatClefDiagnostics.safeValue(() -> mod.getMLGBucketChain().isChorusFruiting()),
+                    "safeToCancel", ChatClefDiagnostics.safeValue(() -> mod.getClientBaritone().getPathingBehavior().isSafeToCancel()),
+                    "onGround", ChatClefDiagnostics.safeValue(() -> mod.getPlayer().isOnGround()));
 
             // Step away if we're too close
-            if (tooClose && !mod.getClientBaritone().getCustomGoalProcess().isActive()) {
+            if (tooClose && !customGoalActive) {
+                ChatClefDiagnostics.logEvent("ENTITY_INTERACT", "DECISION", "set_goal_run_away", this,
+                        "entity", ChatClefDiagnostics.entitySummary(entity),
+                        "maintainDistance", maintainDistance);
                 mod.getClientBaritone().getCustomGoalProcess().setGoalAndPath(new GoalRunAway(maintainDistance, entity.getBlockPos()));
             }
 
@@ -118,27 +163,48 @@ public abstract class AbstractDoToEntityTask extends Task implements ITaskRequir
                     !mod.getMLGBucketChain().isChorusFruiting() &&
                     mod.getClientBaritone().getPathingBehavior().isSafeToCancel() &&
                     mod.getPlayer().isOnGround()) {
+                ChatClefDiagnostics.logEvent("ENTITY_INTERACT", "DECISION", "interact_with_entity", this,
+                        "entity", ChatClefDiagnostics.entitySummary(entity),
+                        "squaredDistance", sqDist);
                 progress.reset();
                 return onEntityInteract(mod, entity);
             } else if (!tooClose) {
                 setDebugState("Approaching target");
-                if (!progress.check(mod)) {
+                boolean progressOk = progress.check(mod);
+                ChatClefDiagnostics.logEvent("ENTITY_INTERACT", "OBSERVE", "approach_progress_check", this,
+                        "entity", ChatClefDiagnostics.entitySummary(entity),
+                        "progressOk", progressOk,
+                        "squaredDistance", sqDist,
+                        "maintainDistance", maintainDistance);
+                if (!progressOk) {
                     progress.reset();
                     Debug.logMessage("Failed to get to target, blacklisting.");
+                    ChatClefDiagnostics.logEvent("ENTITY_INTERACT", "DECISION", "blacklist_unreachable_entity", this,
+                            "entity", ChatClefDiagnostics.entitySummary(entity));
                     mod.getEntityTracker().requestEntityUnreachable(entity);
                 }
                 // Move to target
-                return new GetToEntityTask(entity, maintainDistance);
+                Task getToEntityTask = new GetToEntityTask(entity, maintainDistance);
+                ChatClefDiagnostics.logEvent("ENTITY_INTERACT", "DECISION", "return_get_to_entity_task", this,
+                        "entity", ChatClefDiagnostics.entitySummary(entity),
+                        "getToEntityTask", ChatClefDiagnostics.taskSummary(getToEntityTask),
+                        "maintainDistance", maintainDistance);
+                return getToEntityTask;
             }
         }
         if (BeatMinecraftTask.isTaskRunning(mod,wanderTask)) {
+            ChatClefDiagnostics.logEvent("ENTITY_INTERACT", "DECISION", "reuse_entity_wander_task", this,
+                    "wanderTask", ChatClefDiagnostics.taskSummary(wanderTask));
             return wanderTask;
         }
 
         if (!mod.getClientBaritone().getPathingBehavior().isSafeToCancel()) {
+            ChatClefDiagnostics.logEvent("ENTITY_INTERACT", "DECISION", "wait_for_safe_cancel_before_wander", this);
             return null;
         }
         wanderTask = new TimeoutWanderTask();
+        ChatClefDiagnostics.logEvent("ENTITY_INTERACT", "DECISION", "start_entity_wander_task", this,
+                "wanderTask", ChatClefDiagnostics.taskSummary(wanderTask));
         return wanderTask;
     }
 
@@ -167,6 +233,8 @@ public abstract class AbstractDoToEntityTask extends Task implements ITaskRequir
     protected void onStop(Task interruptTask) {
         AltoClef mod = AltoClef.getInstance();
 
+        ChatClefDiagnostics.logEvent("ENTITY_INTERACT", "ON_STOP", "do_to_entity_stop", this,
+                "interruptTask", ChatClefDiagnostics.taskSummary(interruptTask));
         mod.getMobDefenseChain().setTargetEntity(null);
         mod.getMobDefenseChain().resetForceField();
     }

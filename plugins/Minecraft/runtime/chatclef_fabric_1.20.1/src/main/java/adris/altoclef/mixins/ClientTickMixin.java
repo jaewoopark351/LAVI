@@ -2,6 +2,7 @@ package adris.altoclef.mixins;
 
 import adris.altoclef.eventbus.EventBus;
 import adris.altoclef.eventbus.events.ClientTickEvent;
+import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 import net.minecraft.client.MinecraftClient;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -16,6 +17,7 @@ public final class  ClientTickMixin {
             at = @At("HEAD")
     )
     private void clientTick(CallbackInfo ci) {
+        ChatClefDiagnostics.onClientTickHead();
         EventBus.publish(new ClientTickEvent());
     }
 }

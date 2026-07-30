@@ -6,6 +6,7 @@ import adris.altoclef.util.helpers.LookHelper;
 import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.slots.PlayerSlot;
 import adris.altoclef.chains.MobDefenseChain;
+import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 import net.minecraft.entity.Entity;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
@@ -77,12 +78,32 @@ public abstract class AbstractKillEntityTask extends AbstractDoToEntityTask {
     @Override
     protected Task onEntityInteract(AltoClef mod, Entity entity) {
         // Equip weapon
-        if (!equipWeapon(mod)) {
+        boolean equippedWeapon = equipWeapon(mod);
+        //20260730_kpopmodder: Diagnostics-only LAVI log for entity attack boundary investigation; no behavior change.
+        ChatClefDiagnostics.logEvent("ENTITY_ATTACK", "OBSERVE", "kill_entity_interact", this,
+                "entity", ChatClefDiagnostics.entitySummary(entity),
+                "equippedWeapon", equippedWeapon,
+                "currentWeapon", ChatClefDiagnostics.itemStackSummary(StorageHelper.getItemStackInSlot(PlayerSlot.getEquipSlot())),
+                "attackCooldown", ChatClefDiagnostics.safeValue(() -> mod.getPlayer().getAttackCooldownProgress(0)),
+                "playerOnGround", ChatClefDiagnostics.safeValue(() -> mod.getPlayer().isOnGround()),
+                "playerVelocity", ChatClefDiagnostics.safeValue(() -> ChatClefDiagnostics.vec3d(mod.getPlayer().getVelocity())),
+                "touchingWater", ChatClefDiagnostics.safeValue(() -> mod.getPlayer().isTouchingWater()));
+        if (!equippedWeapon) {
             float hitProg = mod.getPlayer().getAttackCooldownProgress(0);
             if (hitProg >= 1 && (mod.getPlayer().isOnGround() || mod.getPlayer().getVelocity().getY() < 0 || mod.getPlayer().isTouchingWater())) {
+                ChatClefDiagnostics.logEvent("ENTITY_ATTACK", "DECISION", "attack_entity", this,
+                        "entity", ChatClefDiagnostics.entitySummary(entity),
+                        "hitProgress", hitProg);
                 LookHelper.lookAt(mod, entity.getEyePos());
                 mod.getControllerExtras().attack(entity);
+            } else {
+                ChatClefDiagnostics.logEvent("ENTITY_ATTACK", "DECISION", "wait_for_attack_ready", this,
+                        "entity", ChatClefDiagnostics.entitySummary(entity),
+                        "hitProgress", hitProg);
             }
+        } else {
+            ChatClefDiagnostics.logEvent("ENTITY_ATTACK", "DECISION", "weapon_equipped_wait_next_tick", this,
+                    "entity", ChatClefDiagnostics.entitySummary(entity));
         }
         return null;
     }

@@ -13,6 +13,7 @@ import adris.altoclef.util.progresscheck.MovementProgressChecker;
 import adris.altoclef.util.slots.Slot;
 import adris.altoclef.util.time.TimerGame;
 import baritone.api.utils.input.Input;
+import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 import net.minecraft.block.*;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.entity.Entity;
@@ -133,6 +134,13 @@ public class TimeoutWanderTask extends Task implements ITaskRequiresGrounded {
     protected void onStart() {
         AltoClef mod = AltoClef.getInstance();
 
+        //20260730_kpopmodder: Diagnostics-only LAVI log for wander fallback loop investigation; no behavior change.
+        ChatClefDiagnostics.logEvent("WANDER", "ON_START", "timeout_wander_start", this,
+                "distanceToWander", distanceToWander,
+                "increaseRange", increaseRange,
+                "forceExplore", _forceExplore,
+                "wanderDistanceExtension", _wanderDistanceExtension,
+                "pathingBeforeForceCancel", ChatClefDiagnostics.safeValue(() -> mod.getClientBaritone().getPathingBehavior().isPathing()));
         timer.reset();
         mod.getClientBaritone().getPathingBehavior().forceCancel();
         origin = mod.getPlayer().getPos();
@@ -153,6 +161,10 @@ public class TimeoutWanderTask extends Task implements ITaskRequiresGrounded {
         } else {
             StorageHelper.closeScreen();
         }
+        ChatClefDiagnostics.logEvent("WANDER", "ON_START", "timeout_wander_start_after_setup", this,
+                "origin", ChatClefDiagnostics.vec3d(origin),
+                "cursorStack", ChatClefDiagnostics.itemStackSummary(cursorStack),
+                "pathingAfterForceCancel", ChatClefDiagnostics.safeValue(() -> mod.getClientBaritone().getPathingBehavior().isPathing()));
     }
 
     @Override
@@ -160,41 +172,75 @@ public class TimeoutWanderTask extends Task implements ITaskRequiresGrounded {
         AltoClef mod = AltoClef.getInstance();
 
 
-        if (mod.getClientBaritone().getPathingBehavior().isPathing()) {
+        boolean pathing = mod.getClientBaritone().getPathingBehavior().isPathing();
+        ChatClefDiagnostics.logEvent("WANDER", "ON_TICK", "timeout_wander_tick_begin", this,
+                "origin", ChatClefDiagnostics.vec3d(origin),
+                "playerPosition", ChatClefDiagnostics.playerPosition(mod),
+                "distanceToWander", distanceToWander,
+                "wanderDistanceExtension", _wanderDistanceExtension,
+                "failCounter", failCounter,
+                "pathing", pathing,
+                "exploreActive", ChatClefDiagnostics.safeValue(() -> mod.getClientBaritone().getExploreProcess().isActive()),
+                "unstuckTask", ChatClefDiagnostics.taskSummary(_unstuckTask));
+
+        if (pathing) {
+            ChatClefDiagnostics.logEvent("WANDER", "OBSERVE", "pathing_active_resets_progress", this);
             progressChecker.reset();
         }
         if (WorldHelper.isInNetherPortal()) {
             if (!mod.getClientBaritone().getPathingBehavior().isPathing()) {
+                ChatClefDiagnostics.logEvent("WANDER", "DECISION", "nether_portal_manual_move", this);
                 setDebugState("Getting out from nether portal");
                 mod.getInputControls().hold(Input.SNEAK);
                 mod.getInputControls().hold(Input.MOVE_FORWARD);
                 return null;
             } else {
+                ChatClefDiagnostics.logEvent("WANDER", "DECISION", "nether_portal_release_manual_move", this);
                 mod.getInputControls().release(Input.SNEAK);
                 mod.getInputControls().release(Input.MOVE_BACK);
                 mod.getInputControls().release(Input.MOVE_FORWARD);
             }
         } else {
             if (mod.getClientBaritone().getPathingBehavior().isPathing()) {
+                ChatClefDiagnostics.logEvent("WANDER", "DECISION", "pathing_release_manual_move", this);
                 mod.getInputControls().release(Input.SNEAK);
                 mod.getInputControls().release(Input.MOVE_BACK);
                 mod.getInputControls().release(Input.MOVE_FORWARD);
             }
         }
-        if (_unstuckTask != null && _unstuckTask.isActive() && !_unstuckTask.isFinished() && stuckInBlock(mod) != null) {
+        BlockPos activeUnstuckBlock = null;
+        if (_unstuckTask != null && _unstuckTask.isActive() && !_unstuckTask.isFinished()) {
+            activeUnstuckBlock = stuckInBlock(mod);
+        }
+        if (_unstuckTask != null && _unstuckTask.isActive() && !_unstuckTask.isFinished() && activeUnstuckBlock != null) {
             setDebugState("Getting unstuck from block.");
+            ChatClefDiagnostics.logEvent("WANDER", "DECISION", "continue_unstuck_task", this,
+                    "stuckBlock", ChatClefDiagnostics.blockPos(activeUnstuckBlock),
+                    "unstuckTask", ChatClefDiagnostics.taskSummary(_unstuckTask));
             stuckCheck.reset();
             // Stop other tasks, we are JUST shimmying
             mod.getClientBaritone().getCustomGoalProcess().onLostControl();
             mod.getClientBaritone().getExploreProcess().onLostControl();
             return _unstuckTask;
         }
-        if (!progressChecker.check(mod) || !stuckCheck.check(mod)) {
+        boolean progressOk = progressChecker.check(mod);
+        boolean stuckOk = true;
+        if (progressOk) {
+            stuckOk = stuckCheck.check(mod);
+        }
+        if (!progressOk || !stuckOk) {
             List<Entity> closeEntities = mod.getEntityTracker().getCloseEntities();
+            ChatClefDiagnostics.logEvent("WANDER", "OBSERVE", "wander_progress_failed", this,
+                    "progressOk", progressOk,
+                    "stuckOk", stuckOk,
+                    "closeEntityCount", closeEntities.size(),
+                    "playerPosition", ChatClefDiagnostics.playerPosition(mod));
             for (Entity CloseEntities : closeEntities) {
                 if (CloseEntities instanceof MobEntity &&
                         CloseEntities.getPos().isInRange(mod.getPlayer().getPos(), 1)) {
                     setDebugState("Killing annoying entity.");
+                    ChatClefDiagnostics.logEvent("WANDER", "DECISION", "kill_close_annoying_entity", this,
+                            "entity", ChatClefDiagnostics.entitySummary(CloseEntities));
                     return new KillEntitiesTask(CloseEntities.getClass());
                 }
             }
@@ -202,33 +248,56 @@ public class TimeoutWanderTask extends Task implements ITaskRequiresGrounded {
             if (blockStuck != null) {
                 failCounter++;
                 _unstuckTask = getFenceUnstuckTask();
+                ChatClefDiagnostics.logEvent("WANDER", "DECISION", "start_unstuck_task", this,
+                        "stuckBlock", ChatClefDiagnostics.blockPos(blockStuck),
+                        "failCounter", failCounter,
+                        "unstuckTask", ChatClefDiagnostics.taskSummary(_unstuckTask));
                 return _unstuckTask;
             }
             stuckCheck.reset();
         }
         setDebugState("Exploring.");
+        ChatClefDiagnostics.logEvent("WANDER", "DECISION", "explore_tick", this,
+                "dimension", ChatClefDiagnostics.safeValue(WorldHelper::getCurrentDimension),
+                "exploreActive", ChatClefDiagnostics.safeValue(() -> mod.getClientBaritone().getExploreProcess().isActive()));
         switch (WorldHelper.getCurrentDimension()) {
             case END -> {
-                if (timer.getDuration() >= 30) {
+                double timerDuration = timer.getDuration();
+                if (timerDuration >= 30) {
+                    ChatClefDiagnostics.logEvent("WANDER", "DECISION", "reset_timer_end_dimension", this,
+                            "timerDuration", timerDuration);
                     timer.reset();
                 }
             }
             case OVERWORLD, NETHER -> {
-                if (timer.getDuration() >= 30) {
+                double timerDuration = timer.getDuration();
+                if (timerDuration >= 30) {
                 }
                 if (timer.elapsed()) {
+                    ChatClefDiagnostics.logEvent("WANDER", "DECISION", "reset_elapsed_timer", this,
+                            "dimension", WorldHelper.getCurrentDimension(),
+                            "timerDuration", timerDuration);
                     timer.reset();
                 }
             }
         }
         if (!mod.getClientBaritone().getExploreProcess().isActive()) {
+            ChatClefDiagnostics.logEvent("WANDER", "DECISION", "start_explore_process", this,
+                    "origin", ChatClefDiagnostics.vec3d(origin));
             mod.getClientBaritone().getExploreProcess().explore((int) origin.getX(), (int) origin.getZ());
         }
-        if (!progressChecker.check(mod)) {
+        boolean progressOkAfterExplore = progressChecker.check(mod);
+        ChatClefDiagnostics.logEvent("WANDER", "OBSERVE", "post_explore_progress_check", this,
+                "progressOk", progressOkAfterExplore,
+                "forceExplore", _forceExplore,
+                "failCounter", failCounter);
+        if (!progressOkAfterExplore) {
             progressChecker.reset();
             if (!_forceExplore) {
                 failCounter++;
                 Debug.logMessage("Failed exploring.");
+                ChatClefDiagnostics.logEvent("WANDER", "DECISION", "failed_exploring_increment", this,
+                        "failCounter", failCounter);
             }
         }
         return null;
@@ -236,11 +305,24 @@ public class TimeoutWanderTask extends Task implements ITaskRequiresGrounded {
 
     @Override
     protected void onStop(Task interruptTask) {
+        ChatClefDiagnostics.logEvent("WANDER", "ON_STOP", "timeout_wander_stop_begin", this,
+                "interruptTask", ChatClefDiagnostics.taskSummary(interruptTask),
+                "failCounter", failCounter,
+                "pathingBeforeForceCancel", ChatClefDiagnostics.safeValue(() -> AltoClef.getInstance().getClientBaritone().getPathingBehavior().isPathing()));
         AltoClef.getInstance().getClientBaritone().getPathingBehavior().forceCancel();
-        if (isFinished()) {
+        boolean finished = isFinished();
+        ChatClefDiagnostics.logEvent("WANDER", "ON_STOP", "timeout_wander_stop_after_force_cancel", this,
+                "interruptTask", ChatClefDiagnostics.taskSummary(interruptTask),
+                "finished", finished,
+                "failCounter", failCounter,
+                "pathingAfterForceCancel", ChatClefDiagnostics.safeValue(() -> AltoClef.getInstance().getClientBaritone().getPathingBehavior().isPathing()));
+        if (finished) {
             if (increaseRange) {
                 _wanderDistanceExtension += distanceToWander;
                 Debug.logMessage("Increased wander range");
+                ChatClefDiagnostics.logEvent("WANDER", "DECISION", "increase_wander_range", this,
+                        "distanceToWander", distanceToWander,
+                        "wanderDistanceExtension", _wanderDistanceExtension);
             }
         }
     }

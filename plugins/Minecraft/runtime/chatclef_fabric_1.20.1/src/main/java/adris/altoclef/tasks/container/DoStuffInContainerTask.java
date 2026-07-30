@@ -14,6 +14,7 @@ import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.helpers.WorldHelper;
 import adris.altoclef.util.slots.Slot;
 import adris.altoclef.util.time.TimerGame;
+import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 import net.minecraft.block.Block;
 import net.minecraft.screen.slot.SlotActionType;
 import net.minecraft.util.math.BlockPos;
@@ -55,26 +56,53 @@ public abstract class DoStuffInContainerTask extends Task {
     @Override
     protected void onStart() {
         AltoClef mod = AltoClef.getInstance();
+        ChatClefDiagnostics.logEvent("CONTAINER_TASK", "ON_START_BEGIN", "do_stuff_in_container_start", this,
+                "containerTarget", containerTarget,
+                "containerBlocks", Arrays.toString(containerBlocks),
+                "openTableTaskExists", openTableTask != null);
         mod.getBehaviour().push();
         if (openTableTask == null) {
             openTableTask = new DoToClosestBlockTask(InteractWithBlockTask::new, containerBlocks);
+            ChatClefDiagnostics.logTaskTransition(this, null, openTableTask, "open_table_task_created",
+                    "containerTarget", containerTarget,
+                    "containerBlocks", Arrays.toString(containerBlocks));
         }
 
         // Protect container since we might place it.
         mod.getBehaviour().addProtectedItems(ItemHelper.blocksToItems(containerBlocks));
+        ChatClefDiagnostics.logEvent("CONTAINER_TASK", "ON_START_END", "do_stuff_in_container_start", this,
+                "containerTarget", containerTarget,
+                "containerBlocks", Arrays.toString(containerBlocks));
     }
 
     @Override
     protected Task onTick() {
         AltoClef mod = AltoClef.getInstance();
+        ChatClefDiagnostics.logEvent("CONTAINER_TASK", "ON_TICK_BEGIN", "container_tick_begin", this,
+                "containerTarget", containerTarget,
+                "cachedContainerPosition", cachedContainerPosition);
         // If we're placing, keep on placing.
         if (mod.getItemStorage().hasItem(ItemHelper.blocksToItems(containerBlocks)) && placeTask.isActive() && !placeTask.isFinished()) {
             setDebugState("Placing container");
+            ChatClefDiagnostics.logTaskTransition(this, null, placeTask, "return_active_place_task",
+                    "containerTarget", containerTarget);
             return placeTask;
         }
 
-        if (isContainerOpen(mod)) {
-            return containerSubTask(mod);
+        ChatClefDiagnostics.logEvent("CONTAINER_TASK", "CONTAINER_OPEN_CHECK_BEFORE", "before_isContainerOpen", this,
+                "containerTarget", containerTarget,
+                "cachedContainerPosition", cachedContainerPosition);
+        boolean containerOpen = isContainerOpen(mod);
+        ChatClefDiagnostics.logEvent("CONTAINER_TASK", "CONTAINER_OPEN_CHECK_AFTER", "after_isContainerOpen", this,
+                "containerTarget", containerTarget,
+                "cachedContainerPosition", cachedContainerPosition,
+                "containerOpen", containerOpen);
+        if (containerOpen) {
+            Task containerTask = containerSubTask(mod);
+            ChatClefDiagnostics.logTaskTransition(this, null, containerTask, "return_container_sub_task",
+                    "containerTarget", containerTarget,
+                    "containerOpen", true);
+            return containerTask;
         }
 
         // infinity if such a container does not exist.
@@ -117,6 +145,8 @@ public abstract class DoStuffInContainerTask extends Task {
             // Get if we don't have...
             if (!mod.getItemStorage().hasItem(containerTarget)) {
                 setDebugState("Getting container item");
+                ChatClefDiagnostics.logEvent("CONTAINER_TASK", "RETURN", "return_get_container_item_task", this,
+                        "containerTarget", containerTarget);
                 return TaskCatalogue.getItemTask(containerTarget);
             }
 
@@ -124,6 +154,9 @@ public abstract class DoStuffInContainerTask extends Task {
 
             justPlacedTimer.reset();
             // Now place!
+            ChatClefDiagnostics.logTaskTransition(this, null, placeTask, "return_place_task",
+                    "containerTarget", containerTarget,
+                    "nearestPresent", nearest.isPresent());
             return placeTask;
         }
 
@@ -136,22 +169,43 @@ public abstract class DoStuffInContainerTask extends Task {
         // Wait for food
         if (mod.getFoodChain().needsToEat()) {
             setDebugState("Waiting for eating...");
+            ChatClefDiagnostics.logEvent("CONTAINER_TASK", "RETURN", "return_wait_for_food", this,
+                    "containerTarget", containerTarget,
+                    "cachedContainerPosition", cachedContainerPosition);
             return null;
         }
         setDebugState("Walking to container... " + nearest.get().toShortString());
 
-        if (!StorageHelper.getItemStackInCursorSlot().isEmpty()) {
-            Optional<Slot> toMoveTo = mod.getItemStorage().getSlotThatCanFitInPlayerInventory(StorageHelper.getItemStackInCursorSlot(), false);
+        var cursorStack = StorageHelper.getItemStackInCursorSlot();
+        if (!cursorStack.isEmpty()) {
+            Optional<Slot> toMoveTo = mod.getItemStorage().getSlotThatCanFitInPlayerInventory(cursorStack, false);
             if (toMoveTo.isEmpty()) {
+                ChatClefDiagnostics.logEvent("CONTAINER_TASK", "RETURN", "return_ensure_free_inventory_slot", this,
+                        "containerTarget", containerTarget,
+                        "cursorStack", cursorStack);
                 return new EnsureFreeInventorySlotTask();
             }
-            if (ItemHelper.canThrowAwayStack(mod, StorageHelper.getItemStackInCursorSlot())) {
+            if (ItemHelper.canThrowAwayStack(mod, cursorStack)) {
                 mod.getSlotHandler().clickSlot(Slot.UNDEFINED, 0, SlotActionType.PICKUP);
+                ChatClefDiagnostics.logEvent("CONTAINER_TASK", "RETURN", "return_after_cursor_throwaway_click", this,
+                        "containerTarget", containerTarget,
+                        "cursorStack", cursorStack);
                 return null;
             }
             mod.getSlotHandler().clickSlot(toMoveTo.get(), 0, SlotActionType.PICKUP);
+            ChatClefDiagnostics.logEvent("CONTAINER_TASK", "RETURN", "return_after_cursor_move_click", this,
+                    "containerTarget", containerTarget,
+                    "cursorStack", cursorStack,
+                    "slot", toMoveTo.get());
             return null;
         }
+        ChatClefDiagnostics.startTrace("container_open_intent", this,
+                "containerTarget", containerTarget,
+                "cachedContainerPosition", cachedContainerPosition,
+                "openTableTaskClass", ChatClefDiagnostics.className(openTableTask));
+        ChatClefDiagnostics.logTaskTransition(this, null, openTableTask, "return_open_table_task",
+                "containerTarget", containerTarget,
+                "cachedContainerPosition", cachedContainerPosition);
         return openTableTask;
         //return new GetToBlockTask(nearest, true);
     }
@@ -171,7 +225,13 @@ public abstract class DoStuffInContainerTask extends Task {
 
     @Override
     protected void onStop(Task interruptTask) {
+        ChatClefDiagnostics.logTaskTransition(this, this, interruptTask, "container_task_onStop_begin",
+                "containerTarget", containerTarget,
+                "cachedContainerPosition", cachedContainerPosition);
         AltoClef.getInstance().getBehaviour().pop();
+        ChatClefDiagnostics.logTaskTransition(this, this, interruptTask, "container_task_onStop_end",
+                "containerTarget", containerTarget,
+                "cachedContainerPosition", cachedContainerPosition);
     }
 
     @Override

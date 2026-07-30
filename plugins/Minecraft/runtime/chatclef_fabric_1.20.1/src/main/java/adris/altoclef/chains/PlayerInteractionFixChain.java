@@ -12,6 +12,7 @@ import adris.altoclef.util.slots.Slot;
 import adris.altoclef.util.time.TimerGame;
 import baritone.api.utils.Rotation;
 import baritone.api.utils.input.Input;
+import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.ChatScreen;
@@ -55,9 +56,15 @@ public class PlayerInteractionFixChain extends TaskChain {
 
     @Override
     public float getPriority() {
-        if (!AltoClef.inGame()) return Float.NEGATIVE_INFINITY;
+        if (!AltoClef.inGame()) {
+            ChatClefDiagnostics.logEvent("PLAYER_INTERACTION_FIX_CHAIN", "PRIORITY_RETURN", "not_in_game", null);
+            return Float.NEGATIVE_INFINITY;
+        }
 
         AltoClef mod = AltoClef.getInstance();
+        ChatClefDiagnostics.logEvent("PLAYER_INTERACTION_FIX_CHAIN", "PRIORITY_BEGIN", "getPriority_begin", null,
+                "userTaskChainActive", ChatClefDiagnostics.safeValue(() -> mod.getUserTaskChain().isActive()),
+                "isBreakingBlock", ChatClefDiagnostics.safeValue(() -> mod.getControllerExtras().isBreakingBlock()));
 
         if (mod.getUserTaskChain().isActive() && betterToolTimer.elapsed()) {
             // Equip the right tool for the job if we're not using one.
@@ -76,6 +83,10 @@ public class PlayerInteractionFixChain extends TaskChain {
                                 bestToolSlot.get().getInventorySlot() >= 9) && !mod.getFoodChain().isTryingToEat();
                         if (isAllowedToManage) {
                             Debug.logMessage("Found better tool in inventory, equipping.");
+                            ChatClefDiagnostics.logEvent("PLAYER_INTERACTION_FIX_CHAIN", "SIDE_EFFECT", "force_equip_better_tool", null,
+                                    "bestToolSlot", bestToolSlot.get(),
+                                    "currentEquipped", currentEquipped,
+                                    "baritonePathing", ChatClefDiagnostics.safeValue(() -> mod.getClientBaritone().getPathingBehavior().isPathing()));
                             ItemStack bestToolItemStack = StorageHelper.getItemStackInSlot(bestToolSlot.get());
                             Item bestToolItem = bestToolItemStack.getItem();
                             mod.getSlotHandler().forceEquipItem(bestToolItem);
@@ -88,6 +99,9 @@ public class PlayerInteractionFixChain extends TaskChain {
         // Unpress shift (it gets stuck for some reason???)
         if (mod.getInputControls().isHeldDown(Input.SNEAK)) {
             if (shiftDepressTimeout.elapsed()) {
+                ChatClefDiagnostics.logInput("RELEASE_REQUEST", "player_interaction_fix_chain_shift_depress_release", Input.SNEAK,
+                        "inputReleased", true,
+                        "inputAutoReleased", false);
                 mod.getInputControls().release(Input.SNEAK);
             }
         } else {
@@ -98,6 +112,7 @@ public class PlayerInteractionFixChain extends TaskChain {
         if (generalDuctTapeSwapTimeout.elapsed()) {
             if (!mod.getControllerExtras().isBreakingBlock()) {
                 Debug.logMessage("Refreshed inventory...");
+                ChatClefDiagnostics.logEvent("PLAYER_INTERACTION_FIX_CHAIN", "SIDE_EFFECT", "refresh_inventory", null);
                 mod.getSlotHandler().refreshInventory();
                 generalDuctTapeSwapTimeout.reset();
                 return Float.NEGATIVE_INFINITY;
@@ -122,44 +137,69 @@ public class PlayerInteractionFixChain extends TaskChain {
         if (lastHandStack != null && stackHeldTimeout.elapsed()) {
             Optional<Slot> moveTo = mod.getItemStorage().getSlotThatCanFitInPlayerInventory(lastHandStack, false);
             if (moveTo.isPresent()) {
+                ChatClefDiagnostics.logEvent("PLAYER_INTERACTION_FIX_CHAIN", "SIDE_EFFECT", "cursor_stack_move_to_inventory", null,
+                        "cursorStack", lastHandStack,
+                        "slot", moveTo.get());
                 mod.getSlotHandler().clickSlot(moveTo.get(), 0, SlotActionType.PICKUP);
                 return Float.NEGATIVE_INFINITY;
             }
             if (ItemHelper.canThrowAwayStack(mod, StorageHelper.getItemStackInCursorSlot())) {
+                ChatClefDiagnostics.logEvent("PLAYER_INTERACTION_FIX_CHAIN", "SIDE_EFFECT", "cursor_stack_throwaway", null,
+                        "cursorStack", lastHandStack);
                 mod.getSlotHandler().clickSlot(Slot.UNDEFINED, 0, SlotActionType.PICKUP);
                 return Float.NEGATIVE_INFINITY;
             }
             Optional<Slot> garbage = StorageHelper.getGarbageSlot(mod);
             // Try throwing away cursor slot if it's garbage
             if (garbage.isPresent()) {
+                ChatClefDiagnostics.logEvent("PLAYER_INTERACTION_FIX_CHAIN", "SIDE_EFFECT", "cursor_stack_to_garbage_slot", null,
+                        "cursorStack", lastHandStack,
+                        "slot", garbage.get());
                 mod.getSlotHandler().clickSlot(garbage.get(), 0, SlotActionType.PICKUP);
                 return Float.NEGATIVE_INFINITY;
             }
+            ChatClefDiagnostics.logEvent("PLAYER_INTERACTION_FIX_CHAIN", "SIDE_EFFECT", "cursor_stack_pickup_undefined", null,
+                    "cursorStack", lastHandStack);
             mod.getSlotHandler().clickSlot(Slot.UNDEFINED, 0, SlotActionType.PICKUP);
             return Float.NEGATIVE_INFINITY;
         }
 
-        if (shouldCloseOpenScreen()) {
+        boolean closeOpenScreen = shouldCloseOpenScreen();
+        ChatClefDiagnostics.logEvent("PLAYER_INTERACTION_FIX_CHAIN", "SCREEN_CLOSE_DECISION", "shouldCloseOpenScreen_result", null,
+                "shouldCloseOpenScreen", closeOpenScreen);
+        if (closeOpenScreen) {
             //Debug.logMessage("Closed screen since we changed our look.");
             ItemStack cursorStack = StorageHelper.getItemStackInCursorSlot();
             if (!cursorStack.isEmpty()) {
                 Optional<Slot> moveTo = mod.getItemStorage().getSlotThatCanFitInPlayerInventory(cursorStack, false);
                 if (moveTo.isPresent()) {
+                    ChatClefDiagnostics.logEvent("PLAYER_INTERACTION_FIX_CHAIN", "SIDE_EFFECT", "screen_close_cursor_stack_move_to_inventory", null,
+                            "cursorStack", cursorStack,
+                            "slot", moveTo.get());
                     mod.getSlotHandler().clickSlot(moveTo.get(), 0, SlotActionType.PICKUP);
                     return Float.NEGATIVE_INFINITY;
                 }
                 if (ItemHelper.canThrowAwayStack(mod, cursorStack)) {
+                    ChatClefDiagnostics.logEvent("PLAYER_INTERACTION_FIX_CHAIN", "SIDE_EFFECT", "screen_close_cursor_stack_throwaway", null,
+                            "cursorStack", cursorStack);
                     mod.getSlotHandler().clickSlot(Slot.UNDEFINED, 0, SlotActionType.PICKUP);
                     return Float.NEGATIVE_INFINITY;
                 }
                 Optional<Slot> garbage = StorageHelper.getGarbageSlot(mod);
                 // Try throwing away cursor slot if it's garbage
                 if (garbage.isPresent()) {
+                    ChatClefDiagnostics.logEvent("PLAYER_INTERACTION_FIX_CHAIN", "SIDE_EFFECT", "screen_close_cursor_stack_to_garbage_slot", null,
+                            "cursorStack", cursorStack,
+                            "slot", garbage.get());
                     mod.getSlotHandler().clickSlot(garbage.get(), 0, SlotActionType.PICKUP);
                     return Float.NEGATIVE_INFINITY;
                 }
+                ChatClefDiagnostics.logEvent("PLAYER_INTERACTION_FIX_CHAIN", "SIDE_EFFECT", "screen_close_cursor_stack_pickup_undefined", null,
+                        "cursorStack", cursorStack);
                 mod.getSlotHandler().clickSlot(Slot.UNDEFINED, 0, SlotActionType.PICKUP);
             } else {
+                ChatClefDiagnostics.logEvent("PLAYER_INTERACTION_FIX_CHAIN", "SIDE_EFFECT", "close_screen", null,
+                        "cursorStackEmpty", true);
                 StorageHelper.closeScreen();
             }
             return Float.NEGATIVE_INFINITY;
@@ -169,17 +209,27 @@ public class PlayerInteractionFixChain extends TaskChain {
     }
 
     private boolean shouldCloseOpenScreen() {
-        if (!AltoClef.getInstance().getModSettings().shouldCloseScreenWhenLookingOrMining())
+        ChatClefDiagnostics.logEvent("PLAYER_INTERACTION_FIX_CHAIN", "SHOULD_CLOSE_SCREEN_BEGIN", "shouldCloseOpenScreen_begin", null);
+        if (!AltoClef.getInstance().getModSettings().shouldCloseScreenWhenLookingOrMining()) {
+            ChatClefDiagnostics.logEvent("PLAYER_INTERACTION_FIX_CHAIN", "SHOULD_CLOSE_SCREEN_RETURN", "setting_disabled", null,
+                    "shouldCloseOpenScreen", false);
             return false;
+        }
 
         // Only check look if we've had the same screen open for a while
         Screen openScreen = MinecraftClient.getInstance().currentScreen;
         if (openScreen != lastScreen) {
+            ChatClefDiagnostics.logEvent("PLAYER_INTERACTION_FIX_CHAIN", "SHOULD_CLOSE_SCREEN_STATE", "screen_changed_reset_timer", null,
+                    "openScreenClass", ChatClefDiagnostics.className(openScreen),
+                    "lastScreenClass", ChatClefDiagnostics.className(lastScreen));
             mouseMovingButScreenOpenTimeout.reset();
         }
         // We're in the player screen/a screen we DON'T want to cancel out of
         if (openScreen == null || openScreen instanceof ChatScreen || openScreen instanceof GameMenuScreen || openScreen instanceof DeathScreen) {
             mouseMovingButScreenOpenTimeout.reset();
+            ChatClefDiagnostics.logEvent("PLAYER_INTERACTION_FIX_CHAIN", "SHOULD_CLOSE_SCREEN_RETURN", "screen_exempt_or_none", null,
+                    "openScreenClass", ChatClefDiagnostics.className(openScreen),
+                    "shouldCloseOpenScreen", false);
             return false;
         }
         // Check for rotation change
@@ -188,6 +238,11 @@ public class PlayerInteractionFixChain extends TaskChain {
             Rotation delta = look.subtract(lastLookRotation);
             if (Math.abs(delta.getYaw()) > 0.1f || Math.abs(delta.getPitch()) > 0.1f) {
                 lastLookRotation = look;
+                ChatClefDiagnostics.logEvent("PLAYER_INTERACTION_FIX_CHAIN", "SHOULD_CLOSE_SCREEN_RETURN", "look_delta_exceeded", null,
+                        "openScreenClass", ChatClefDiagnostics.className(openScreen),
+                        "deltaYaw", delta.getYaw(),
+                        "deltaPitch", delta.getPitch(),
+                        "shouldCloseOpenScreen", true);
                 return true;
             }
             // do NOT update our last look rotation, just because we want to measure long term rotation.
@@ -195,6 +250,9 @@ public class PlayerInteractionFixChain extends TaskChain {
             lastLookRotation = look;
         }
         lastScreen = openScreen;
+        ChatClefDiagnostics.logEvent("PLAYER_INTERACTION_FIX_CHAIN", "SHOULD_CLOSE_SCREEN_RETURN", "look_delta_not_exceeded", null,
+                "openScreenClass", ChatClefDiagnostics.className(openScreen),
+                "shouldCloseOpenScreen", false);
         return false;
     }
 

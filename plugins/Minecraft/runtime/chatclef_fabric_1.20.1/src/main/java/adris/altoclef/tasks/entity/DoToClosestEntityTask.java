@@ -3,6 +3,7 @@ package adris.altoclef.tasks.entity;
 import adris.altoclef.AltoClef;
 import adris.altoclef.tasks.AbstractDoToClosestObjectTask;
 import adris.altoclef.tasksystem.Task;
+import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 import net.minecraft.entity.Entity;
 import net.minecraft.util.math.Vec3d;
 
@@ -52,8 +53,20 @@ public class DoToClosestEntityTask extends AbstractDoToClosestObjectTask<Entity>
 
     @Override
     protected Optional<Entity> getClosestTo(AltoClef mod, Vec3d pos) {
-        if (!mod.getEntityTracker().entityFound(targetEntities)) return Optional.empty();
-        return mod.getEntityTracker().getClosestEntity(pos, shouldInteractWith, targetEntities);
+        boolean entityFound = mod.getEntityTracker().entityFound(targetEntities);
+        ChatClefDiagnostics.logEvent("ENTITY_SELECT", "OBSERVE", "entity_found_before_closest", this,
+                "targetEntities", ChatClefDiagnostics.classList(targetEntities),
+                "origin", ChatClefDiagnostics.vec3d(pos),
+                "entityFound", entityFound);
+        if (!entityFound) return Optional.empty();
+        Optional<Entity> closest = mod.getEntityTracker().getClosestEntity(pos, shouldInteractWith, targetEntities);
+        ChatClefDiagnostics.logEvent("ENTITY_SELECT", "OBSERVE", "closest_entity_result", this,
+                "targetEntities", ChatClefDiagnostics.classList(targetEntities),
+                "origin", ChatClefDiagnostics.vec3d(pos),
+                "closestPresent", closest.isPresent(),
+                "closestEntity", closest.map(ChatClefDiagnostics::entitySummary).orElse("none"),
+                "closestDistanceSqr", closest.map(entity -> ChatClefDiagnostics.entityDistanceSqrToPlayer(mod, entity)).orElse("unavailable"));
+        return closest;
     }
 
     @Override
@@ -66,20 +79,38 @@ public class DoToClosestEntityTask extends AbstractDoToClosestObjectTask<Entity>
 
     @Override
     protected Task getGoalTask(Entity obj) {
-        return getTargetTask.apply(obj);
+        Task task = getTargetTask.apply(obj);
+        ChatClefDiagnostics.logEvent("ENTITY_SELECT", "DECISION", "create_entity_goal_task", this,
+                "entity", ChatClefDiagnostics.entitySummary(obj),
+                "goalTask", ChatClefDiagnostics.taskSummary(task));
+        return task;
     }
 
     @Override
     protected boolean isValid(AltoClef mod, Entity obj) {
-        return obj.isAlive() && mod.getEntityTracker().isEntityReachable(obj);
+        boolean alive = obj.isAlive();
+        boolean reachable = mod.getEntityTracker().isEntityReachable(obj);
+        boolean valid = alive && reachable;
+        ChatClefDiagnostics.logEvent("ENTITY_SELECT", "OBSERVE", "entity_validity_check", this,
+                "entity", ChatClefDiagnostics.entitySummary(obj),
+                "alive", alive,
+                "reachable", reachable,
+                "valid", valid);
+        return valid;
     }
 
     @Override
     protected void onStart() {
+        //20260730_kpopmodder: Diagnostics-only LAVI log for entity selection loop investigation; no behavior change.
+        ChatClefDiagnostics.logEvent("ENTITY_SELECT", "ON_START", "do_to_closest_entity_start", this,
+                "targetEntities", ChatClefDiagnostics.classList(targetEntities));
     }
 
     @Override
     protected void onStop(Task interruptTask) {
+        ChatClefDiagnostics.logEvent("ENTITY_SELECT", "ON_STOP", "do_to_closest_entity_stop", this,
+                "targetEntities", ChatClefDiagnostics.classList(targetEntities),
+                "interruptTask", ChatClefDiagnostics.taskSummary(interruptTask));
     }
 
     @Override

@@ -13,6 +13,7 @@ import adris.altoclef.util.helpers.ItemHelper;
 import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.slots.SmokerSlot;
 import adris.altoclef.util.time.TimerGame;
+import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.ItemEntity;
 import net.minecraft.entity.LivingEntity;
@@ -72,16 +73,27 @@ public class CollectMeatTask extends Task {
 
     @Override
     protected void onStart() {
-
+        //20260730_kpopmodder: Diagnostics-only LAVI log for entity resource loop investigation; no behavior change.
+        ChatClefDiagnostics.logEvent("RESOURCE", "ON_START", "collect_meat_start", this,
+                "unitsNeeded", unitsNeeded);
     }
 
     @Override
     protected Task onTick() {
         AltoClef mod = AltoClef.getInstance();
 
+        ChatClefDiagnostics.logEvent("RESOURCE", "ON_TICK", "collect_meat_tick_begin", this,
+                "unitsNeeded", unitsNeeded,
+                "playerPosition", ChatClefDiagnostics.playerPosition(mod),
+                "smeltTask", ChatClefDiagnostics.taskSummary(smeltTask),
+                "currentResourceTask", ChatClefDiagnostics.taskSummary(currentResourceTask),
+                "baritonePathing", ChatClefDiagnostics.safeValue(() -> mod.getClientBaritone().getPathingBehavior().isPathing()));
+
         CollectFoodTask.blackListChickenJockeys(mod);
         // If we were previously smelting, keep on smelting.
         if (smeltTask != null && smeltTask.isActive() && !smeltTask.isFinished()) {
+            ChatClefDiagnostics.logEvent("RESOURCE", "DECISION", "resume_smelt_task", this,
+                    "smeltTask", ChatClefDiagnostics.taskSummary(smeltTask));
             setDebugState("Cooking...");
             return smeltTask;
         } else {
@@ -89,14 +101,21 @@ public class CollectMeatTask extends Task {
         }
         if (checkNewOptionsTimer.elapsed()) {
             // Try a new resource task
+            ChatClefDiagnostics.logEvent("RESOURCE", "DECISION", "refresh_resource_options", this,
+                    "previousResourceTask", ChatClefDiagnostics.taskSummary(currentResourceTask));
             checkNewOptionsTimer.reset();
             currentResourceTask = null;
         }
         if (currentResourceTask != null && currentResourceTask.isActive() && !currentResourceTask.isFinished() && !currentResourceTask.thisOrChildAreTimedOut()) {
+            ChatClefDiagnostics.logEvent("RESOURCE", "DECISION", "reuse_current_resource_task", this,
+                    "currentResourceTask", ChatClefDiagnostics.taskSummary(currentResourceTask));
             return currentResourceTask;
         }
         // Calculate potential
         double potentialFood = calculateFoodPotential(mod);
+        ChatClefDiagnostics.logEvent("RESOURCE", "OBSERVE", "calculated_food_potential", this,
+                "potentialFood", potentialFood,
+                "unitsNeeded", unitsNeeded);
         if (potentialFood >= unitsNeeded) {
             // Convert our raw foods
             // PLAN:
@@ -107,6 +126,11 @@ public class CollectMeatTask extends Task {
                 if (rawCount > 0) {
                     //Debug.logMessage("STARTING COOK OF " + cookable.getRaw().getTranslationKey());
                     int toSmelt = rawCount + mod.getItemStorage().getItemCount(cookable.getCooked());
+                    ChatClefDiagnostics.logEvent("RESOURCE", "DECISION", "start_smelt_raw_food", this,
+                            "rawFood", cookable.rawFood,
+                            "cookedFood", cookable.cookedFood,
+                            "rawCount", rawCount,
+                            "toSmelt", toSmelt);
                     smeltTask = new SmeltInSmokerTask(new SmeltTarget(new ItemTarget(cookable.cookedFood, toSmelt), new ItemTarget(cookable.rawFood, rawCount)));
                     smeltTask.ignoreMaterials();
                     return smeltTask;
@@ -118,6 +142,10 @@ public class CollectMeatTask extends Task {
                 Task t = this.pickupTaskOrNull(mod, cookable.getRaw(), 20);
                 if (t == null) t = this.pickupTaskOrNull(mod, cookable.getCooked(), 40);
                 if (t != null) {
+                    ChatClefDiagnostics.logEvent("RESOURCE", "DECISION", "pickup_cookable_food", this,
+                            "rawFood", cookable.rawFood,
+                            "cookedFood", cookable.cookedFood,
+                            "pickupTask", ChatClefDiagnostics.taskSummary(t));
                     setDebugState("Picking up Cookable food");
                     currentResourceTask = t;
                     return currentResourceTask;
@@ -128,12 +156,30 @@ public class CollectMeatTask extends Task {
             Entity bestEntity = null;
             Item bestRawFood = null;
             for (CookableFoodTarget cookable : COOKABLE_FOODS) {
-                if (!mod.getEntityTracker().entityFound(cookable.mobToKill)) continue;
+                boolean entityFound = mod.getEntityTracker().entityFound(cookable.mobToKill);
+                ChatClefDiagnostics.logEvent("RESOURCE", "OBSERVE", "cookable_mob_found_check", this,
+                        "rawFood", cookable.rawFood,
+                        "cookedFood", cookable.cookedFood,
+                        "mobClass", ChatClefDiagnostics.classList(new Class<?>[]{cookable.mobToKill}),
+                        "entityFound", entityFound);
+                if (!entityFound) continue;
                 Optional<Entity> nearest = mod.getEntityTracker().getClosestEntity(mod.getPlayer().getPos(), cookable.mobToKill);
+                ChatClefDiagnostics.logEvent("RESOURCE", "OBSERVE", "cookable_mob_nearest_check", this,
+                        "rawFood", cookable.rawFood,
+                        "nearestEntityPresent", nearest.isPresent(),
+                        "nearestEntity", nearest.map(ChatClefDiagnostics::entitySummary).orElse("none"),
+                        "nearestDistanceSqr", nearest.map(entity -> ChatClefDiagnostics.entityDistanceSqrToPlayer(mod, entity)).orElse("unavailable"));
                 if (nearest.isEmpty()) continue; // ?? This crashed once?
                 int hungerPerformance = cookable.getCookedUnits();
                 double sqDistance = nearest.get().squaredDistanceTo(mod.getPlayer());
                 double score = (double) 100 * hungerPerformance / (sqDistance);
+                ChatClefDiagnostics.logEvent("RESOURCE", "OBSERVE", "cookable_mob_candidate_score", this,
+                        "rawFood", cookable.rawFood,
+                        "candidateEntity", ChatClefDiagnostics.entitySummary(nearest.get()),
+                        "hungerPerformance", hungerPerformance,
+                        "squaredDistance", sqDistance,
+                        "score", score,
+                        "previousBestScore", bestScore);
                 if (score > bestScore) {
                     bestScore = score;
                     bestEntity = nearest.get();
@@ -141,6 +187,11 @@ public class CollectMeatTask extends Task {
                 }
             }
             if (bestEntity != null) {
+                String bestRawFoodName = bestRawFood == null ? "none" : bestRawFood.getTranslationKey();
+                ChatClefDiagnostics.logEvent("RESOURCE", "DECISION", "kill_best_food_mob", this,
+                        "bestEntity", ChatClefDiagnostics.entitySummary(bestEntity),
+                        "bestRawFood", bestRawFoodName,
+                        "bestScore", bestScore);
                 setDebugState("Killing " + bestEntity.getType().getTranslationKey());
                 Predicate<Entity> notBaby = entity -> entity instanceof LivingEntity livingEntity && !livingEntity.isBaby();
                 currentResourceTask = killTaskOrNull(bestEntity, notBaby, bestRawFood);
@@ -152,12 +203,19 @@ public class CollectMeatTask extends Task {
                 Optional<Item> cooked = ItemHelper.getCookedFood(raw);
                 if (cooked.isPresent()) {
                     int targetCount = mod.getItemStorage().getItemCount(cooked.get()) + mod.getItemStorage().getItemCount(raw);
+                    ChatClefDiagnostics.logEvent("RESOURCE", "DECISION", "smelt_existing_raw_food", this,
+                            "rawFood", ChatClefDiagnostics.safeValue(raw::getTranslationKey),
+                            "cookedFood", ChatClefDiagnostics.safeValue(() -> cooked.get().getTranslationKey()),
+                            "targetCount", targetCount);
                     smeltTask = new SmeltInSmokerTask(new SmeltTarget(new ItemTarget(cooked.get(), targetCount), new ItemTarget(raw, targetCount)));
                     return smeltTask;
                 }
             }
         }
         // Look for food.
+        ChatClefDiagnostics.logEvent("RESOURCE", "DECISION", "search_food_with_wander", this,
+                "potentialFood", potentialFood,
+                "unitsNeeded", unitsNeeded);
         setDebugState("Searching...");
         return new TimeoutWanderTask();
     }
@@ -168,11 +226,26 @@ public class CollectMeatTask extends Task {
 
     private Task pickupTaskOrNull(AltoClef mod, Item itemToGrab, double maxRange) {
         Optional<ItemEntity> nearestDrop = Optional.empty();
-        if (mod.getEntityTracker().itemDropped(itemToGrab)) {
+        boolean itemDropped = mod.getEntityTracker().itemDropped(itemToGrab);
+        ChatClefDiagnostics.logEvent("RESOURCE", "OBSERVE", "pickup_drop_presence_check", this,
+                "item", ChatClefDiagnostics.safeValue(itemToGrab::getTranslationKey),
+                "maxRange", maxRange,
+                "itemDropped", itemDropped);
+        if (itemDropped) {
             nearestDrop = mod.getEntityTracker().getClosestItemDrop(mod.getPlayer().getPos(), itemToGrab);
         }
         if (nearestDrop.isPresent()) {
-            if (nearestDrop.get().isInRange(mod.getPlayer(), maxRange)) {
+            boolean inRange = nearestDrop.get().isInRange(mod.getPlayer(), maxRange);
+            ChatClefDiagnostics.logEvent("RESOURCE", "OBSERVE", "pickup_drop_candidate", this,
+                    "item", ChatClefDiagnostics.safeValue(itemToGrab::getTranslationKey),
+                    "dropEntity", ChatClefDiagnostics.entitySummary(nearestDrop.get()),
+                    "dropDistanceSqr", ChatClefDiagnostics.entityDistanceSqrToPlayer(mod, nearestDrop.get()),
+                    "maxRange", maxRange,
+                    "inRange", inRange);
+            if (inRange) {
+                ChatClefDiagnostics.logEvent("RESOURCE", "DECISION", "create_pickup_drop_task", this,
+                        "item", ChatClefDiagnostics.safeValue(itemToGrab::getTranslationKey),
+                        "dropEntity", ChatClefDiagnostics.entitySummary(nearestDrop.get()));
                 return new PickupDroppedItemTask(new ItemTarget(itemToGrab), true);
             }
             //return new GetToBlockTask(nearestDrop.getBlockPos(), false);
@@ -186,7 +259,10 @@ public class CollectMeatTask extends Task {
 
     @Override
     protected void onStop(Task interruptTask) {
-
+        ChatClefDiagnostics.logEvent("RESOURCE", "ON_STOP", "collect_meat_stop", this,
+                "interruptTask", ChatClefDiagnostics.taskSummary(interruptTask),
+                "smeltTask", ChatClefDiagnostics.taskSummary(smeltTask),
+                "currentResourceTask", ChatClefDiagnostics.taskSummary(currentResourceTask));
     }
 
     @Override

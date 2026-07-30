@@ -119,5 +119,5 @@ run/
 !gradle-wrapper.jar
 .vscode/settings.json
 
-#20260730_kpopmodder: Keep Gradle wrapper binaries local-only in the LAVI repo.
-gradle-wrapper.jar
+#20260730_kpopmodder: Keep Gradle wrapper binaries trackable while build output jars stay ignored.
+!gradle-wrapper.jar

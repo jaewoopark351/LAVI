@@ -19,7 +19,8 @@
   "environment": "*",
   "entrypoints": {
     "main": [
-      "adris.altoclef.AltoClef"
+      "adris.altoclef.AltoClef",
+      "lavi.minecraft.integration.carryon.CarryOnDiagnosticEntrypoint"
     ]
   },
   "mixins": [

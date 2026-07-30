@@ -2,6 +2,7 @@ package adris.altoclef.mixins;
 
 import adris.altoclef.eventbus.EventBus;
 import adris.altoclef.eventbus.events.BlockInteractEvent;
+import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.client.network.ClientPlayerInteractionManager;
 import net.minecraft.client.world.ClientWorld;
@@ -25,10 +26,24 @@ public final class ClientInteractWithBlockMixin {
     //#else
     //$$ private void onClientBlockInteract(ClientPlayerEntity player, ClientWorld world, Hand hand, BlockHitResult hitResult, CallbackInfoReturnable<ActionResult> cir) {
     //#endif
+        ChatClefDiagnostics.logInteractBlock("HEAD", "interactBlock_begin", hand, hitResult, "unavailable");
         //Debug.logMessage("(client) INTERACTED WITH: " + (hitResult != null? hitResult.getBlockPos() : "(nothing)"));
         if (hitResult != null) {
             EventBus.publish(new BlockInteractEvent(hitResult));
         }
 
+    }
+
+    @Inject(
+            method = "interactBlock",
+            at = @At("RETURN")
+    )
+
+    //#if MC >= 11904
+    private void onClientBlockInteractReturn(ClientPlayerEntity player, Hand hand, BlockHitResult hitResult, CallbackInfoReturnable<ActionResult> cir) {
+    //#else
+    //$$ private void onClientBlockInteractReturn(ClientPlayerEntity player, ClientWorld world, Hand hand, BlockHitResult hitResult, CallbackInfoReturnable<ActionResult> cir) {
+    //#endif
+        ChatClefDiagnostics.logInteractBlock("RETURN", "interactBlock_return", hand, hitResult, cir.getReturnValue());
     }
 }

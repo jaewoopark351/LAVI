@@ -2,25 +2,31 @@ package adris.altoclef.tasks.construction;
 
 import adris.altoclef.AltoClef;
 import adris.altoclef.Debug;
+import adris.altoclef.multiversion.ToolMaterialVer;
 import adris.altoclef.tasks.movement.RunAwayFromPositionTask;
 import adris.altoclef.tasks.movement.SafeRandomShimmyTask;
 import adris.altoclef.tasksystem.ITaskRequiresGrounded;
 import adris.altoclef.tasksystem.Task;
+import adris.altoclef.util.MiningRequirement;
 import adris.altoclef.util.helpers.ItemHelper;
 import adris.altoclef.util.helpers.LookHelper;
 import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.helpers.WorldHelper;
 import adris.altoclef.util.progresscheck.MovementProgressChecker;
+import adris.altoclef.util.slots.PlayerSlot;
 import adris.altoclef.util.slots.Slot;
 import baritone.api.pathing.goals.GoalBlock;
 import baritone.api.pathing.goals.GoalNear;
 import baritone.api.utils.Rotation;
 import baritone.api.utils.input.Input;
+import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 import net.minecraft.block.*;
 import adris.altoclef.multiversion.versionedfields.Blocks;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.mob.PillagerEntity;
+import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
+import net.minecraft.item.ToolItem;
 import net.minecraft.screen.slot.SlotActionType;
 import net.minecraft.util.math.BlockPos;
 
@@ -336,6 +342,36 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
                 LookHelper.lookAt(reach.get());
             }
             // Tool equip is handled in `PlayerInteractionFixChain`. Oof.
+            //20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
+            // Diagnostics-only: prove harvest/tool state immediately before the existing CLICK_LEFT request.
+            ChatClefDiagnostics.logEvent("DESTROY_BLOCK", "CLICK_LEFT_PRE", "before_click_left_force_state", this,
+                    "targetPosition", ChatClefDiagnostics.blockPos(pos),
+                    "targetBlockState", ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(pos)),
+                    "targetBlock", ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(pos).getBlock()),
+                    "targetRequiresTool", ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(pos).isToolRequired()),
+                    "targetMinimumMiningRequirement", ChatClefDiagnostics.safeValue(() -> MiningRequirement.getMinimumRequirementForBlock(mod.getWorld().getBlockState(pos).getBlock())),
+                    "currentMiningRequirement", ChatClefDiagnostics.safeValue(StorageHelper::getCurrentMiningRequirement),
+                    "stoneRequirementMet", ChatClefDiagnostics.safeValue(() -> StorageHelper.miningRequirementMet(MiningRequirement.STONE)),
+                    "stoneRequirementMetInventory", ChatClefDiagnostics.safeValue(() -> StorageHelper.miningRequirementMetInventory(MiningRequirement.STONE)),
+                    "mainHandSlot", ChatClefDiagnostics.safeValue(PlayerSlot::getEquipSlot),
+                    "mainHandStack", ChatClefDiagnostics.safeValue(() -> ChatClefDiagnostics.itemStackSummary(StorageHelper.getItemStackInSlot(PlayerSlot.getEquipSlot()))),
+                    "mainHandItem", ChatClefDiagnostics.safeValue(() -> StorageHelper.getItemStackInSlot(PlayerSlot.getEquipSlot()).getItem()),
+                    "mainHandSuitableForTarget", ChatClefDiagnostics.safeValue(() -> StorageHelper.getItemStackInSlot(PlayerSlot.getEquipSlot()).getItem().getDefaultStack().isSuitableFor(mod.getWorld().getBlockState(pos))),
+                    "mainHandMiningLevel", ChatClefDiagnostics.safeValue(() -> {
+                        Item item = StorageHelper.getItemStackInSlot(PlayerSlot.getEquipSlot()).getItem();
+                        return item instanceof ToolItem tool ? ToolMaterialVer.getMiningLevel(tool) : "not_tool";
+                    }),
+                    "bestToolSlot", ChatClefDiagnostics.safeValue(() -> StorageHelper.getBestToolSlot(mod, mod.getWorld().getBlockState(pos)).map(Object::toString).orElse("none")),
+                    "bestToolStack", ChatClefDiagnostics.safeValue(() -> StorageHelper.getBestToolSlot(mod, mod.getWorld().getBlockState(pos))
+                            .map(slot -> ChatClefDiagnostics.itemStackSummary(StorageHelper.getItemStackInSlot(slot))).orElse("none")),
+                    "bestToolItem", ChatClefDiagnostics.safeValue(() -> StorageHelper.getBestToolSlot(mod, mod.getWorld().getBlockState(pos))
+                            .map(slot -> StorageHelper.getItemStackInSlot(slot).getItem()).orElse(null)),
+                    "bestToolSuitableForTarget", ChatClefDiagnostics.safeValue(() -> StorageHelper.getBestToolSlot(mod, mod.getWorld().getBlockState(pos))
+                            .map(slot -> StorageHelper.getItemStackInSlot(slot).getItem().getDefaultStack().isSuitableFor(mod.getWorld().getBlockState(pos))).orElse(false)),
+                    "leftClickHeldBefore", ChatClefDiagnostics.safeValue(() -> mod.getInputControls().isHeldDown(Input.CLICK_LEFT)),
+                    "baritonePathing", ChatClefDiagnostics.safeValue(() -> mod.getClientBaritone().getPathingBehavior().isPathing()),
+                    "customGoalActive", ChatClefDiagnostics.safeValue(() -> mod.getClientBaritone().getCustomGoalProcess().isActive()),
+                    "willRequestClickLeft", true);
             mod.getClientBaritone().getInputOverrideHandler().setInputForceState(Input.CLICK_LEFT, true);
         } else {
             setDebugState("Getting to block...");

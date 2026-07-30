@@ -1,6 +1,7 @@
 package adris.altoclef.control;
 
 import baritone.api.utils.input.Input;
+import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.option.GameOptions;
 import net.minecraft.client.option.KeyBinding;
@@ -44,24 +45,57 @@ public class InputControls {
     public void tryPress(Input input) {
         // We just pressed, so let us release.
         if (_waitForRelease.contains(input)) {
+            ChatClefDiagnostics.logInput("SUPPRESSED", "waitForRelease_suppression", input,
+                    "inputRequested", true,
+                    "inputAccepted", false,
+                    "inputHeldBefore", "unavailable",
+                    "waitForReleaseSuppression", true);
             return;
         }
+        boolean heldBefore = inputToKeyBinding(input).isPressed();
+        ChatClefDiagnostics.logInput("REQUEST", "tryPress_begin", input,
+                "inputRequested", true,
+                "inputAccepted", false,
+                "inputHeldBefore", heldBefore,
+                "waitForReleaseSuppression", false);
         inputToKeyBinding(input).setPressed(true);
         // Also necessary to ensure the game registers the input as "pressed"
         KeyBinding.onKeyPressed(inputToKeyBinding(input).getDefaultKey());
         toUnpress.add(input);
         _waitForRelease.add(input);
+        ChatClefDiagnostics.logInput("ACCEPTED", "tryPress_end", input,
+                "inputRequested", true,
+                "inputAccepted", true,
+                "inputHeldBefore", heldBefore,
+                "inputHeldAfter", ChatClefDiagnostics.safeValue(() -> inputToKeyBinding(input).isPressed()),
+                "queuedForAutoRelease", true,
+                "waitForReleaseSuppression", false);
     }
 
     public void hold(Input input) {
-        if (!inputToKeyBinding(input).isPressed()) {
+        boolean heldBefore = inputToKeyBinding(input).isPressed();
+        ChatClefDiagnostics.logInput("REQUEST", "hold_begin", input,
+                "inputRequested", true,
+                "inputAccepted", false,
+                "inputHeldBefore", heldBefore);
+        if (!heldBefore) {
             KeyBinding.onKeyPressed(inputToKeyBinding(input).getDefaultKey());
         }
         inputToKeyBinding(input).setPressed(true);
+        ChatClefDiagnostics.logInput("HELD", "hold_end", input,
+                "inputRequested", true,
+                "inputAccepted", true,
+                "inputHeldBefore", heldBefore,
+                "inputHeldAfter", ChatClefDiagnostics.safeValue(() -> inputToKeyBinding(input).isPressed()));
     }
 
     public void release(Input input) {
+        boolean heldBefore = inputToKeyBinding(input).isPressed();
         inputToKeyBinding(input).setPressed(false);
+        ChatClefDiagnostics.logInput("RELEASED", "release_end", input,
+                "inputReleased", true,
+                "inputHeldBefore", heldBefore,
+                "inputHeldAfter", ChatClefDiagnostics.safeValue(() -> inputToKeyBinding(input).isPressed()));
     }
 
     public boolean isHeldDown(Input input) {
@@ -78,12 +112,22 @@ public class InputControls {
     // Before the user calls input commands for the frame
     public void onTickPre() {
         while (!toUnpress.isEmpty()) {
-            inputToKeyBinding(toUnpress.remove()).setPressed(false);
+            Input input = toUnpress.remove();
+            boolean heldBefore = inputToKeyBinding(input).isPressed();
+            inputToKeyBinding(input).setPressed(false);
+            ChatClefDiagnostics.logInput("AUTO_RELEASED", "onTickPre_auto_release", input,
+                    "inputAutoReleased", true,
+                    "inputHeldBefore", heldBefore,
+                    "inputHeldAfter", ChatClefDiagnostics.safeValue(() -> inputToKeyBinding(input).isPressed()));
         }
     }
 
     // After the user calls input commands for the frame
     public void onTickPost() {
+        if (!_waitForRelease.isEmpty()) {
+            ChatClefDiagnostics.logEvent("INPUT", "WAIT_FOR_RELEASE_CLEAR", "onTickPost_clear", null,
+                    "waitForReleaseCount", _waitForRelease.size());
+        }
         _waitForRelease.clear();
     }
 }

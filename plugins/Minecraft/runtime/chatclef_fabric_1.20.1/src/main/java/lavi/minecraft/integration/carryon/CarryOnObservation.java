@@ -1,5 +1,6 @@
 package lavi.minecraft.integration.carryon;
 
+//20260730_kpopmodder: Normalize optional Carry On state reads without reporting fabricated success.
 public final class CarryOnObservation {
     private final boolean loaded;
     private final String version;
