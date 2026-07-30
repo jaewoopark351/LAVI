@@ -555,6 +555,317 @@ root-cause patch를 제안하려면 최소한 다음이 증명되어야 한다.
 
 하나라도 빠지면 root cause는 추정 또는 확인 불가로 유지하고 diagnostics 단계에서 멈춘다.
 
+## ChatClef Engine Modification Last-Resort Gate
+
+Direct modification of upstream-derived ChatClef or AltoClef behavior is allowed only when runtime evidence proves that the first failing boundary is inside the engine and the defect cannot be safely contained in a LAVI-owned layer.
+
+### Engine Divergence Categories
+
+Any modification to upstream-derived ChatClef or AltoClef source is an engine divergence.
+
+Classify the proposed divergence as one of the following:
+
+1. Diagnostics-only divergence
+   - adds observation only
+   - does not alter behavior, lifecycle, state, ownership, return values, or exception handling
+
+2. Behavior-changing divergence
+   - changes any engine decision, state, lifecycle, completion, retry, timeout, input, goal/path, fallback, cleanup, or result
+
+A diagnostics-only approval is not approval for a behavior-changing divergence.
+
+### Diagnostics-Only Engine Divergence Gate
+
+A diagnostics-only engine hunk may be proposed only when the required boundary cannot be observed from LAVI orchestration, the optional Carry On bridge, a task-local helper, or a LAVI-owned parent Task.
+
+It must preserve all of the following:
+
+- return values
+- branch conditions
+- branch ordering
+- Task selection
+- Task completion
+- retry behavior
+- timeout behavior
+- input state
+- Baritone goal and path state
+- fallback behavior
+- exception propagation and handling
+- interruption behavior
+- cleanup behavior
+- lifecycle ordering
+
+Logging must use the existing logger when one exists.
+Logging must be state-change, operation, attempt, or correlation based when the method is called frequently.
+
+A diagnostics-only engine hunk must not perform per-tick reflection discovery, state-changing probing, Carry On API invocation with side effects, or hidden recovery behavior.
+After proposing the exact logging hunk, stop and wait for explicit approval.
+
+### Mandatory Pre-Change Report
+
+Before proposing a behavior-changing engine modification, report all of the following:
+
+1. Verified symptom
+   - exact reproduced behavior
+   - reproduction identifier
+   - relevant correlation identifier
+
+2. Verified failing boundary
+   - repository-relative file
+   - class
+   - method
+   - current line range
+   - game tick
+   - state before and after
+
+3. Last successful boundary
+   - last operation confirmed to have completed correctly
+
+4. First failing boundary
+   - first operation or state transition confirmed to be incorrect
+
+5. Existing engine contract
+   - responsibility owned by the method
+   - callers
+   - parent/child Task relationship
+   - completion, interruption, and cleanup semantics
+   - evidence supporting the contract
+
+6. Containment analysis
+   - why LAVI orchestration is insufficient
+   - why the optional Carry On bridge is insufficient
+   - why a task-local helper is insufficient
+   - why a LAVI-owned parent Task is insufficient
+
+7. Exact proposed engine hunk
+   - exact file
+   - exact method
+   - smallest proposed line or condition change
+   - behavior intentionally changed
+   - behavior intentionally left unchanged
+
+8. Ownership impact
+   - input
+   - retry
+   - timeout
+   - custom goal
+   - path
+   - interruption
+   - cleanup
+   - global state
+
+9. Generic interaction regression matrix
+   - Carry On absent
+   - generic right-click
+   - container opening
+   - door and trapdoor
+   - bed
+   - button and lever
+   - block placement
+   - item use
+   - Baritone pathing
+   - Task replacement and interruption
+   - cleanup after failure
+
+10. Rollback plan
+    - baseline commit and file hash
+    - exact rollback unit
+    - inverse hunk or independently revertible commit
+    - state and logs required to verify rollback
+
+After this report, stop and wait for explicit user approval.
+
+### First Behavior Patch Scope
+
+The first direct behavior-changing engine patch should normally be limited to:
+
+- one upstream-derived file
+- one method
+- one minimal hunk
+
+This is a scope gate, not permission to compress multiple responsibilities into one file.
+The limit applies to the first direct behavior-changing engine patch.
+It does not allow several unrelated changes to be hidden inside one large conditional, one method, or one file.
+
+If the language or compiler requires a separate generic contract file for a proven extension seam, report:
+
+- the exact contract file
+- the exact engine wiring file
+- the exact wiring method
+- why one file is insufficient
+- why the default path remains behavior-preserving
+
+Then stop and request separate approval before creating or changing either file.
+
+Do not continue automatically when any of the following is required:
+
+- behavior changes in two or more upstream lifecycle classes
+- behavior changes in two or more behavior-owning methods
+- simultaneous changes to `InteractWithBlockTask` and `PlayerInteractionFixChain`
+- `TaskRunner` modification
+- `AltoClef` modification
+- global input ownership modification
+- global Baritone goal or path cancellation modification
+- package movement
+- class renaming
+- Task hierarchy redesign
+
+A wider scope is evidence that the failure may not yet be isolated.
+
+### Generic Extension Seam Rule
+
+A generic engine extension seam may be introduced only when evidence proves that no existing LAVI-owned boundary can observe or contain the verified failure.
+
+The engine-side contract must:
+
+- contain no Carry On types or imports
+- contain no Carry On version logic
+- contain no Carry On retry policy
+- contain no Carry On timeout policy
+- contain no Carry On success criteria
+- contain no Carry On cleanup policy
+- preserve existing behavior when no implementation is attached
+- preserve existing return values and exception semantics
+- preserve existing call order and lifecycle ownership
+- avoid state-changing discovery or probing
+- avoid per-tick reflection discovery
+- avoid introducing a general hook framework for speculative future use
+
+Observation hooks must use a default no-op implementation.
+Decision hooks must use an explicit no-override or unchanged result.
+
+Absence of an observer or decision implementation must never be interpreted as:
+
+- success
+- Task completion
+- retry authorization
+- fallback authorization
+- cleanup authorization
+
+The Carry On implementation must remain in a LAVI-owned namespace and must be connected through external composition.
+The generic engine must not know that the attached implementation is for Carry On.
+
+### Carry On Policy Boundary
+
+The following must remain outside generic ChatClef engine classes:
+
+- Carry On class or interface types
+- Carry On imports
+- Carry On mod ID or version policy
+- Carry On capability interpretation
+- Carry On pickup and placement success criteria
+- Carry On retry count
+- Carry On timeout
+- Carry On target attribution
+- Carry On-specific blacklist or cooldown
+- Carry On-specific cleanup
+- Carry On-specific fallback
+
+These responsibilities belong in a LAVI-owned optional bridge, task-local helper, parent Task, or orchestration boundary.
+
+### Engine Divergence Marker
+
+Place the following marker immediately next to the approved engine hunk:
+
+```java
+//20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
+```
+
+The marker must be adjacent to a short comment or divergence reference that identifies:
+
+- evidence or reproduction ID
+- verified failing boundary
+- engine baseline reference
+- modified method
+- behavior intentionally changed
+- behavior intentionally preserved
+- rollback record
+
+The marker alone is not sufficient evidence or documentation.
+Do not add this marker to untouched upstream files.
+Do not add it retroactively to the entire upstream source tree.
+
+### Divergence Record
+
+Record every approved engine divergence with:
+
+```text
+Upstream component:
+Engine baseline reference:
+Repository HEAD at change time:
+Modified file:
+Modified class:
+Modified method:
+Baseline file hash:
+Exact LAVI hunk:
+Divergence category:
+Verified reason:
+Evidence:
+Last successful boundary:
+First failing boundary:
+Containment analysis:
+Ownership impact:
+Generic behavior preserved:
+Regression tests:
+Runtime reproduction result:
+Rollback:
+Upstream comparison status:
+Verification status:
+```
+
+Verification status must distinguish at least:
+
+```text
+PROPOSED
+APPROVED_NOT_APPLIED
+APPLIED_NOT_BUILT
+BUILT_NOT_REPRODUCED
+PARTIALLY_VERIFIED
+VERIFIED
+ROLLED_BACK
+```
+
+Do not mark a divergence as `VERIFIED` when build, runtime reproduction, or the required regression checks have not been completed.
+
+### Rollback Rule
+
+Every engine divergence must have a rollback unit that can be applied without removing unrelated documentation, adapters, diagnostics, or other fixes.
+
+Preferred rollback units include:
+
+- an exact inverse hunk
+- an independently revertible engine-patch commit
+- an exact file-and-method restoration against the recorded baseline hash
+
+Do not use broad reset, checkout, restore, or cleanup commands as the rollback plan.
+Rollback approval is separate from patch approval.
+
+### Separate Approval Gates
+
+The following approvals are independent:
+
+- diagnostics-only engine hunk proposal
+- diagnostics-only engine hunk application
+- behavior-changing engine patch proposal
+- behavior-changing engine patch application
+- generic extension contract creation
+- build
+- runtime reproduction
+- regression testing
+- rollback
+- commit
+- push
+
+Approval for one action must not be interpreted as approval for any later action.
+
+At the end of each approved action:
+
+1. report the exact evidence and result
+2. report remaining uncertainty
+3. report the exact proposed next files and actions
+4. state whether runtime behavior changed
+5. stop and wait for explicit approval
+
 ## Diagnostic Log Fields
 
 diagnostic 설계에는 최소한 다음 필드를 고려한다.

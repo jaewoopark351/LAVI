@@ -372,6 +372,38 @@ Upstream comparison and rollback method:
 Remaining risk:
 ```
 
+##### ChatClef Engine Modification Last-Resort Gate
+
+Any edit to upstream-derived ChatClef or AltoClef source is an engine divergence.
+
+A diagnostics-only engine divergence may be proposed only when the required failure boundary cannot be observed from a LAVI-owned layer. It must not change return values, task selection, completion, retry, timeout, input state, Baritone goal or path state, fallback behavior, exception handling, cleanup, or lifecycle ordering.
+
+A behavior-changing engine divergence is a last-resort operation.
+
+Before proposing such a change, Codex must complete the `ChatClef Engine Modification Last-Resort Gate` procedure in:
+
+[ChatClef / Carry On Integration Direction](plugins/Minecraft/docs/chatclef-carryon-integration-direction.md)
+
+Codex must prove why the defect cannot be contained in LAVI orchestration, the optional Carry On bridge, a task-local helper, or a LAVI-owned parent Task. Codex must then report the exact proposed files, methods, and hunks and stop for explicit user approval.
+
+The first direct behavior-changing engine patch should normally be limited to:
+
+* one upstream-derived file
+* one method
+* one minimal hunk
+
+If more than one upstream lifecycle class, more than one behavior-owning method, or a wider engine boundary is required, Codex must stop and report why the failure cannot be isolated more narrowly.
+
+Carry On-specific types, imports, version checks, retry policy, timeout policy, success criteria, and cleanup policy must remain outside generic engine classes.
+
+When a generic extension seam is proven necessary, it must use a generic contract and a behavior-preserving default. Observation hooks must default to no-op. Decision hooks must default to an explicit no-override or unchanged result, never to success. The Carry On implementation must be connected through external composition from a LAVI-owned namespace.
+
+Every approved engine divergence must include the required marker near the exact hunk and must be recorded with its evidence, baseline, regression scope, and rollback procedure:
+
+`//20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.`
+
+Approval for an engine patch does not authorize build, runtime reproduction, commit, or push. Each action requires separate explicit approval.
+
 ##### Required design report before implementation
 
 Before implementing a Carry On integration or root-cause fix, report:
