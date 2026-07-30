@@ -72,7 +72,7 @@ For this tree:
 * Do not redesign Task, TaskRunner, chain, behavior, input, event, or Baritone lifecycle architecture unless the user explicitly requests that exact structural change.
 * Do not apply the mandatory two-responsibility split retroactively to existing upstream-derived files.
 * Do not create new folders merely to make the upstream tree match general LAVI folder rules.
-* Do not introduce a new abstract base class, inheritance hierarchy, framework, service layer, manager, adapter layer, or generic utility solely to make a small compatibility fix look cleaner.
+* Do not introduce a broad abstract base class, inheritance hierarchy, framework, service layer, manager layer, or generic utility solely to make a small compatibility fix look cleaner. A narrow LAVI-owned optional adapter, wrapper, observer, or Task-local helper is preferred when it keeps Carry On-specific policy out of the upstream engine.
 * Do not change Minecraft, Fabric, Fabric Loader, Loom, Java, Gradle, ChatClef, AltoClef, Baritone, or Carry On versions unless the user explicitly approves the exact version change.
 * Do not add a hard runtime dependency on Carry On. ChatClef must remain loadable when Carry On is absent, disabled, incompatible, or fails to expose the expected API.
 * Do not download, regenerate, replace, or remove Gradle wrapper files without explicit user approval.
@@ -80,6 +80,309 @@ For this tree:
 * Do not add broad `*.jar` ignore rules that can hide required wrapper, API, vendor, or runtime JARs. Verify every ignored JAR path with `git check-ignore -v` before proposing an ignore change.
 
 General refactoring rules still apply to newly created LAVI-owned code when that code is not replacing, restructuring, or forcing changes across the upstream baseline. Any such new structure must remain narrow and optional.
+
+#### ChatClef engine boundary and composition-first design rule
+
+For this scoped tree, and for LAVI-owned Carry On integration code that calls into it, treat ChatClef and AltoClef as a third-party automation engine. Do not absorb the engine into LAVI, fork its lifecycle through inheritance, or redesign it into a new LAVI-specific engine.
+
+This subsection overrides Section 29.3's mandatory inheritance evaluation trigger and any general preference for extracting a common base class when the affected behavior belongs to ChatClef, AltoClef, Baritone interaction, or optional Carry On integration. In this scope, composition, delegation, observation, and a narrow optional boundary are the default. Inheritance is allowed only where the existing upstream framework requires a type to participate in its established Task contract, and even then the new type must not override engine-wide lifecycle ownership.
+
+##### Required architecture view
+
+Use the following ownership model:
+
+```text
+ChatClef / AltoClef
+    -> preserved third-party automation engine
+
+LAVI Minecraft plugin
+    -> external orchestration and command layer
+
+Carry On integration
+    -> optional capability layer
+
+Diagnostics
+    -> side-effect-free observation layer
+
+Root-cause fix
+    -> smallest evidence-backed hunk at the verified failure boundary
+```
+
+Do not redesign ChatClef internals around LAVI-specific concepts. Package moves, class renames, upstream class splitting, Task hierarchy rewrites, parallel engine subclasses, and broad lifecycle overrides are unsafe by default and belong in the discard category unless the user explicitly requests that exact structural change.
+
+##### Composition-first gate
+
+Do not create a LAVI-specific subclass of `AltoClef`, `TaskRunner`, `PlayerInteractionFixChain`, or another engine-wide lifecycle owner to split the engine into a parallel implementation.
+
+Do not use inheritance to override or duplicate:
+
+* global Task selection or scheduling
+* TaskRunner lifecycle
+* chain registration or priority
+* generic interaction completion
+* global interruption or cancellation
+* Baritone input ownership
+* Baritone goal or path ownership
+* generic right-click behavior
+* engine startup, shutdown, or reload behavior
+
+Prefer narrowly scoped LAVI-owned collaborators such as:
+
+* a small adapter
+* an optional integration wrapper
+* a diagnostic observer
+* a task-local helper
+* an interface-based state reader
+* a side-effect-free reflection bridge
+* a Carry On availability and version probe
+* a dedicated Carry On parent Task with explicit local ownership
+
+A new Carry On-specific Task may extend the existing upstream Task abstraction only when that inheritance is required to participate in the established Task lifecycle. Such a Task must compose optional capability readers and helpers, own only its local operation state, and must not replace or override engine-wide lifecycle behavior.
+
+Do not deepen existing upstream inheritance merely to reuse a few helpers. Do not introduce an abstract base class for Carry On integration unless direct evidence shows a stable `is-a` contract that cannot be represented safely by composition and the user explicitly approves the hierarchy.
+
+Before proposing inheritance in this scope, report:
+
+```text
+Proposed subclass:
+Exact base class:
+Exact methods to override:
+Why composition is insufficient:
+Lifecycle owned by the base:
+Lifecycle newly owned by the subclass:
+Inputs, goals, paths, and cleanup affected:
+Generic ChatClef behavior that could regress:
+Upstream comparison impact:
+User approval required:
+```
+
+If these questions cannot be answered with direct code and runtime evidence, reject the inheritance proposal and use composition or diagnostics instead.
+
+##### Layer and dependency direction
+
+Keep dependencies directed toward the preserved engine boundary:
+
+```text
+LAVI orchestration
+    -> optional Carry On capability boundary
+        -> ChatClef / AltoClef public or already-established behavior
+
+Diagnostics observer
+    -> reads operation and engine state
+    -> does not choose behavior or mutate state
+```
+
+Do not make broad upstream engine classes depend on LAVI orchestration, LAVI UI, or LAVI-specific command policy.
+
+Do not place Carry On-specific policy into a generic ChatClef class merely because that class is easy to reach. Place policy in the narrowest LAVI-owned Task, adapter, wrapper, or helper that owns the operation.
+
+A diagnostic observer must not become a hidden recovery controller. Observation, retry policy, timeout policy, success classification, and cleanup ownership are separate responsibilities.
+
+##### Strict Task and resource ownership
+
+Before proposing any non-diagnostic Carry On behavior, identify ownership explicitly:
+
+```text
+Operation or correlation ID:
+Parent Task:
+Child Task:
+Task that owns completion:
+Task that initiates the click:
+Task that owns retry count:
+Task that owns timeout or terminal reason:
+Task that acquires each input override:
+Task that releases each input override:
+Task that creates each custom goal or path:
+Task that cancels each custom goal or path:
+Interruption entry point:
+Cleanup entry point:
+Fallback owner:
+Global state touched:
+Evidence for each ownership claim:
+```
+
+Apply these rules:
+
+* The Task that acquires an input may release only that input and only for the operation it owns.
+* The Task that creates a custom goal or path may cancel only that goal or path.
+* The Task that starts a retry sequence owns the retry count, retry reason, retry limit, and terminal result.
+* The Task that owns a timeout owns the timeout start, elapsed-time calculation, terminal reason, and cleanup.
+* If a parent Task owns completion, do not globally change a child Task's `isFinished()` contract.
+* Do not stop the entire TaskRunner because one optional capability attempt failed.
+* Do not cancel all Baritone pathing because one operation failed.
+* Do not release every right-click, sneak, jump, movement, or attack input as generic cleanup.
+* Do not mutate state whose owner cannot be proven.
+* Keep operation-specific state local to the owning Task or narrow collaborator. Do not use broad static state to coordinate Carry On attempts.
+* Log cleanup start, each owned resource released, each resource intentionally retained, and the final terminal reason.
+
+`InteractWithBlockTask.isFinished()` is a generic interaction completion contract. Carry On state observation must not be implemented by globally changing this method. Prefer a Carry On-specific parent Task or adapter that observes the child interaction and owns the Carry On-specific completion condition.
+
+##### Carry On success and state-observation contract
+
+A click request, click callback, interaction result, elapsed timeout, or lack of exception is not proof of Carry On success.
+
+When a reliable state can be observed, success requires the expected transition:
+
+```text
+Pickup success:
+NOT_CARRYING -> CARRYING
+
+Placement success:
+CARRYING -> NOT_CARRYING
+```
+
+Record both the pre-action state and post-action state with the same correlation identifier and relevant game tick.
+
+A state reader should distinguish at least these semantic outcomes without inventing success:
+
+```text
+Carry On absent
+Carry On available and NOT_CARRYING
+Carry On available and CARRYING
+Carry On present but incompatible
+Carry On state unavailable or unreadable
+Carry On observation failed
+```
+
+An unavailable, unreadable, incompatible, or failed observation must not be converted into success. It must not trigger blind retry. Preserve observability and fall back to generic ChatClef behavior when the optional capability cannot be used safely.
+
+Do not call a state-changing Carry On method merely to discover whether Carry On is installed or whether the player is carrying something. Detection and state observation must be side-effect-free.
+
+##### Optional Carry On dependency boundary
+
+Carry On must be treated as optional.
+
+Do not:
+
+* place unconditional Carry On class references in a generic class-loading path when absence can cause startup or linkage failure
+* assume that a class, method, field, signature, return type, or state name from another Minecraft or Carry On version exists in the installed version
+* swallow reflection, linkage, API, or state-read failures and report success
+* retry an action when Carry On state cannot be read
+* break generic ChatClef behavior when Carry On is absent, disabled, incompatible, or unavailable
+* add or change a Carry On dependency version without explicit user approval
+
+Prefer one narrow optional boundary that:
+
+1. detects absence without mutating game state
+2. reports the detected version when available
+3. validates reflected classes, methods, signatures, and return values before use
+4. normalizes observation into explicit capability and carry-state results
+5. logs failure with operation context
+6. returns an unavailable result rather than fabricated success
+7. allows generic ChatClef behavior to continue when Carry On is unavailable
+
+Reflection may be used only inside this narrow optional bridge and only when it avoids a hard class-loading dependency. Reflection is not permission to bypass type checks, ignore version differences, or invoke side-effecting methods during detection.
+
+##### `PlayerInteractionFixChain` global-impact gate
+
+Treat `PlayerInteractionFixChain` as a global interaction boundary, not a Carry On-local hook.
+
+The following changes in that chain are unsafe by default:
+
+* Carry On-specific branches
+* forced sneak release
+* forced right-click retry
+* Carry On-specific cooldown
+* Carry On-specific blacklist
+* Carry On-specific fallback
+* global input cleanup
+* generic interaction completion changes
+
+Do not modify this chain for Carry On unless diagnostic evidence proves that the chain is the exact first failing boundary and the proposed hunk cannot be placed in a narrower owner.
+
+Before modifying it, prove and report that the change preserves:
+
+* generic right-click interaction
+* container opening
+* doors and trapdoors
+* beds
+* buttons and levers
+* block placement
+* item use
+* Carry On-absent class loading
+* unrelated Task interruption and cleanup
+* unrelated Baritone input, goal, and path state
+
+A compilation result is not proof of preservation. The applicable interaction scenarios must be reproduced and observed.
+
+##### Diagnostics before behavior
+
+At the current investigation stage, prefer a diagnostic observer or the smallest logging hunk over a behavior fix.
+
+Before proposing a root-cause patch, logs must establish:
+
+* active parent Task and child Task
+* Task transition path
+* tick of each right-click attempt
+* Carry On presence and version
+* carry state before the click
+* carry state after the click
+* input state and input owner
+* Baritone pathing state
+* custom goal or path owner
+* retry owner, attempt number, and retry reason
+* stop reason
+* interruption, cancellation, and cleanup path
+* last successful boundary
+* first failing boundary
+
+Diagnostics must not change return values, Task selection, retry count, timeout, cooldown, input state, pathing, goal ownership, fallback, exception handling, or cleanup behavior.
+
+Use this marker at the first LAVI-specific Java diagnostic block added for this investigation:
+
+```java
+//20260730_kpopmodder: Added diagnostic logging to prove the Carry On interaction failure boundary.
+```
+
+##### Root-cause patch placement order
+
+After evidence proves the failure, evaluate patch placement in this order:
+
+1. side-effect-free diagnostic observer
+2. optional Carry On availability or state adapter
+3. task-local helper owned by the affected operation
+4. dedicated Carry On parent Task with explicit input, retry, completion, and cleanup ownership
+5. smallest method-level upstream hunk only when evidence proves the upstream method is the exact failure boundary and no narrower LAVI-owned boundary can correct it
+
+Do not skip directly to an upstream engine modification because it requires fewer files.
+
+If an upstream hunk is necessary, report:
+
+```text
+Verified failing boundary:
+Why a LAVI-owned adapter or Task cannot contain the fix:
+Exact upstream file and method:
+Exact minimal hunk:
+Behavior preserved outside the hunk:
+Generic interactions tested:
+Upstream comparison and rollback method:
+Remaining risk:
+```
+
+##### Required design report before implementation
+
+Before implementing a Carry On integration or root-cause fix, report:
+
+```text
+Engine behavior being preserved:
+LAVI-owned orchestration boundary:
+Optional Carry On boundary:
+Diagnostic observation boundary:
+Owning parent and child Tasks:
+Completion owner and predicate:
+Input owner and release path:
+Retry owner and terminal reason:
+Custom goal or path owner and cleanup path:
+Carry On absence fallback:
+Carry state observation contract:
+Why composition is safer than inheritance here:
+Exact files proposed for creation or modification:
+Existing upstream files intentionally left unchanged:
+Evidence still missing:
+Tests required before behavior change:
+```
+
+If ownership, state transition, or the exact failing boundary remains unproven, stop at diagnostics. Do not implement the behavioral change.
 
 #### Previous failed AI work is reference-only
 
@@ -219,6 +522,532 @@ Remaining uncertainty:
 ```
 
 If the exact failure boundary is still unknown, stop at diagnostics and do not apply the behavioral change.
+
+#### Read-only restoration baseline audit and failed-work salvage protocol
+
+This protocol applies when the user asks for either or both of the following:
+
+* confirmation of a clean restored baseline
+* identification of the smallest reusable ideas from a previous failed or destabilizing implementation
+
+When both goals are requested, complete the baseline audit even if the previous-work source is a placeholder or unavailable. In that case, do not fabricate the salvage analysis.
+
+This is an audit and evidence-collection mode, not an implementation mode. It overrides general brevity guidance in Section 32 and any normal workflow step that would proceed from inspection to editing. The report must be detailed enough for another engineer to reproduce every conclusion without relying on an unsupported summary.
+
+##### Strict read-only mode
+
+During this protocol, do not modify repository state or project files.
+
+Do not:
+
+* edit, create, delete, move, rename, overwrite, format, or regenerate files
+* extract an archive over the current baseline
+* extract an archive into a temporary repository subdirectory or another location merely to simplify comparison
+* create temporary source copies, generated reports, caches, test artifacts, or comparison outputs inside the repository
+* copy files or diff hunks from previous work into the current baseline
+* apply a patch or create a patch for automatic application
+* run a build, compiler, Gradle task, test task, application startup, or runtime reproduction
+* install, remove, upgrade, downgrade, or resolve dependencies
+* download or generate Gradle wrapper files
+* run `git commit`, `git push`, `git fetch`, `git pull`, `git merge`, `git rebase`, `git cherry-pick`, `git am`, or `git apply`
+* switch, create, delete, reset, rewrite, or force-update branches
+* stash, restore, reset, checkout, clean, or otherwise alter the working tree or index
+
+Read-only commands such as `git status`, `git show`, `git diff`, `git ls-files`, `git check-ignore`, `git rev-parse`, `git branch -vv`, and `git ls-remote` are allowed. `git ls-remote` may query the remote without updating local refs; it must not be replaced with `fetch` merely to make remote state easier to inspect.
+
+If a requested fact cannot be established without a prohibited operation, report it as `[확인 불가]` and explain the exact missing evidence. Do not perform the prohibited operation.
+
+##### Mandatory evidence labels
+
+Every material conclusion must use one of these labels:
+
+```text
+[근거 있음] Directly supported by command output, file content, line numbers, method body, a local diff, an existing Git object, or another explicitly identified artifact.
+[추정] An inference that is plausible but not yet proven by direct evidence.
+[확인 불가] The required artifact, command capability, authoritative comparison source, runtime result, or exact path is unavailable.
+```
+
+Do not use vague conclusions such as:
+
+```text
+문제가 없어 보인다.
+대체로 정상이다.
+아마 upstream과 같다.
+Carry On 코드가 없는 것 같다.
+```
+
+Replace them with a specific label, exact evidence, and the file, line, section, method, command, hash, or output that supports the statement.
+
+##### Full command transcript requirement
+
+For every command actually executed, report all of the following:
+
+```text
+Command number:
+Purpose:
+Working directory:
+Exact command:
+Exit code:
+Actual stdout:
+Actual stderr:
+Expected result:
+Actual result:
+Expected and actual state comparison:
+Evidence classification: [근거 있음] / [추정] / [확인 불가]
+Interpretation:
+```
+
+Do not report a command that was not actually executed. Do not replace actual output with a paraphrase. Preserve output order and significant whitespace where practical.
+
+Redact only secrets, credentials, tokens, authentication headers, or a credential embedded in a remote URL. When redaction is required, keep the non-sensitive structure and mark the exact field as `[REDACTED_SECRET]`. Do not hide ordinary paths, branch names, hashes, status entries, warnings, or errors merely to shorten the report.
+
+If a command produces no stdout or no stderr, state `(no output)` for that stream. If an exit code cannot be captured by the available shell or tool, state `[확인 불가] exit code was not exposed by the execution environment` rather than inventing one.
+
+##### Required baseline command set
+
+Use the smallest applicable read-only commands needed to establish the baseline. The report must include the exact commands that were actually run and their complete results.
+
+Recommended baseline commands for Windows CMD are:
+
+```bat
+cd /d C:\Vtuber_Souorce_Code\LAVI
+cd
+git rev-parse --show-toplevel
+git status --short --branch
+git status --porcelain=v1 --untracked-files=all
+git branch -vv
+git rev-parse --abbrev-ref HEAD
+git rev-parse HEAD
+git rev-parse "76026f8^{commit}"
+git show -s --decorate=full --format=fuller HEAD
+git rev-parse --abbrev-ref --symbolic-full-name "@{upstream}"
+git rev-list --left-right --count HEAD..."@{upstream}"
+git remote -v
+git ls-remote --heads origin refs/heads/minecraft-plugin-fix/alto-clef-infinite-loop refs/heads/p1a-plugin-lifecycle
+git diff --name-status
+git diff --cached --name-status
+```
+
+A command that is unsupported, unavailable, fails because an upstream is not configured, or cannot reach the remote must remain in the report with its actual error. Do not hide a failed command and do not substitute a state-changing command.
+
+For the expected baseline commit `76026f8`, compare the full object ID resolved by:
+
+```bat
+git rev-parse HEAD
+git rev-parse "76026f8^{commit}"
+```
+
+Classify the result precisely:
+
+* `[근거 있음] exact match` only when the two full commit IDs are identical
+* `[근거 있음] mismatch` when both resolve and differ
+* `[확인 불가]` when either object cannot be resolved
+
+Do not treat an ancestor relationship, similar subject line, abbreviated display, or remote branch name as an exact commit match.
+
+For upstream state, report separately:
+
+* configured upstream ref
+* local HEAD commit
+* locally recorded upstream commit
+* ahead and behind counts when available
+* live remote ref returned by `git ls-remote`
+
+Do not claim that all branches are uploaded merely because the current branch is synchronized.
+Do not claim that a remote branch is absent when `git ls-remote` failed, timed out, was blocked, or returned an authentication/network error. In that case classify the live remote state as `[확인 불가]` and preserve the exact error.
+
+##### Required working-tree inventory
+
+Report separately:
+
+* modified tracked files
+* staged files
+* deleted tracked files
+* renamed or copied files reported by Git
+* untracked files
+* ignored files only when directly relevant to Gradle wrapper, required JAR, build input, or the current audit
+
+Preserve exact repository-relative paths. If the working tree is clean, support the claim with the exact `git status` output. Do not modify, stash, restore, or hide any item to obtain a clean result.
+
+##### Required files and line-level evidence
+
+At minimum, read and list these files when they exist:
+
+```text
+AGENTS.md
+.gitignore
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/.gitignore
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/gradle.properties
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/gradle/wrapper/gradle-wrapper.properties
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/gradlew
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/gradlew.bat
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/settings.gradle
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/settings.gradle.kts
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/build.gradle
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/build.gradle.kts
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/adris/altoclef/AltoClef.java
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/adris/altoclef/chains/PlayerInteractionFixChain.java
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/adris/altoclef/tasks/InteractWithBlockTask.java
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/adris/altoclef/tasks/construction/DestroyBlockTask.java
+```
+
+Also read every directly relevant caller, parent task, task chain, input owner, goal owner, fallback, and interruption/cleanup path discovered while tracing the behavior.
+
+For every file used as evidence, report:
+
+```text
+Repository-relative path:
+Absolute path:
+File existence:
+Relevant line range:
+Relevant class, method, field, or section:
+Observed behavior:
+Why this evidence matters:
+Evidence classification:
+```
+
+Use current line numbers from the inspected baseline. If a method spans multiple non-contiguous ranges, cite each range. Do not cite only a class name when the conclusion depends on one branch or statement inside a method.
+
+##### Gradle wrapper, Java, Gradle, and JAR audit
+
+Without building or downloading anything, inspect and report:
+
+* Java runtime executable path
+* Java runtime version output
+* Java compiler executable path
+* Java compiler version output
+* system Gradle presence and path
+* system Gradle version only when the current execution environment can run `gradle --version` without creating caches or other files; otherwise report the path and classify the version as `[확인 불가]`
+* `gradlew.bat` existence
+* `gradle/wrapper/gradle-wrapper.properties` existence and relevant distribution settings
+* `gradle/wrapper/gradle-wrapper.jar` existence
+* whether the wrapper JAR is tracked
+* whether root or nested `.gitignore` rules would ignore the wrapper JAR
+* whether any broad JAR rule may also ignore required API, vendor, or runtime JARs
+* exact factors that would prevent `gradlew.bat` from starting
+* whether a build would require a download, generated file, dependency resolution, or external tool that is not currently present
+* whether each download or file-generation requirement is directly proven, merely possible from configuration, or not verifiable without running a prohibited command
+
+Recommended read-only checks include:
+
+```bat
+where java
+java -version
+where javac
+javac -version
+where gradle
+rem Run gradle --version only when it is confirmed not to create files or caches.
+gradle --version
+dir /a:-d /b C:\Vtuber_Souorce_Code\LAVI\plugins\Minecraft\runtime\chatclef_fabric_1.20.1\gradle\wrapper
+git ls-files --stage -- plugins/Minecraft/runtime/chatclef_fabric_1.20.1/gradle/wrapper/gradle-wrapper.jar
+git check-ignore -v --no-index plugins/Minecraft/runtime/chatclef_fabric_1.20.1/gradle/wrapper/gradle-wrapper.jar
+```
+
+A `git check-ignore` exit code indicating no matching ignore rule is evidence of no match for that exact path, not proof that all JARs are safe. Evaluate each relevant broad rule and each required JAR path separately.
+
+Do not download `gradle-wrapper.jar`, run `gradle wrapper`, invoke `gradlew.bat`, or start dependency resolution during this audit.
+
+##### Required ChatClef baseline analysis
+
+The report must distinguish direct local evidence from an authoritative upstream comparison.
+
+To claim that the baseline preserves ChatClef `0.18.23` upstream behavior, identify the exact authoritative upstream source used for comparison, its commit or release identity, and the comparison method. Compare at file, method, and diff-hunk level where practical.
+
+If an authoritative ChatClef `0.18.23` source is not locally or otherwise read-only accessible under the current instruction, report:
+
+```text
+[확인 불가] Exact preservation against ChatClef 0.18.23 upstream could not be verified because the authoritative upstream source or exact commit was not available for read-only comparison.
+```
+
+Do not replace this missing comparison with model memory or a general description of AltoClef.
+
+At minimum, trace and report:
+
+* whether any Carry On-specific class, package, import, field, branch, method call, event hook, mixin, reflection path, or optional integration currently exists
+* the exact body and return behavior of `InteractWithBlockTask.isFinished()`
+* every right-click attempt and retry site directly relevant to the failure
+* which caller or parent Task owns the actual completion condition for each inspected use of `InteractWithBlockTask`
+* the construction and call sites of `InteractWithBlockTask`
+* the scope of `PlayerInteractionFixChain`, including whether it is global and which interactions it can affect
+* every directly relevant Baritone input override call
+* every directly relevant custom goal set, replace, cancel, or clear site
+* existing fallback behavior
+* interruption, cancellation, `onStop`, cleanup, and terminal-state behavior
+* which existing chest, door, bed, button, lever, block-placement, generic right-click, movement, pathing, or Task behavior could be affected by a proposed Carry On change
+
+Search broadly enough to establish callers and ownership. Useful read-only search targets include:
+
+```text
+InteractWithBlockTask
+isFinished(
+CLICK_RIGHT
+SNEAK
+setInputForceState
+InputOverrideHandler
+setCustomGoal
+setGoalAndPath
+cancelEverything
+onStop
+stop(
+reset
+PlayerInteractionFixChain
+CarryOn
+carryon
+```
+
+A search result count alone is not enough. Open and read each material result used in a conclusion.
+
+##### Previous-work artifact validation gate
+
+Before comparing previous failed work, validate that the user supplied at least one real, accessible artifact:
+
+* an exact ZIP or archive path
+* an exact directory path
+* an exact Git branch or commit that exists in the current repository or remote query
+* an exact patch or diff file path
+
+Treat values such as these as placeholders, not real artifacts:
+
+```text
+C:\정확한\경로\broken_work.zip
+<branch-name>
+<path>
+<commit>
+TODO
+PLACEHOLDER
+YOUR_PATH_HERE
+```
+
+Also treat a path that does not exist, an unreadable archive, a branch that cannot be resolved, or a branch name that is only described but not provided as unavailable.
+
+When no real artifact is available, state exactly:
+
+```text
+이전 작업 자료가 없어 비교 불가
+```
+
+Then:
+
+* do not invent previous changes
+* do not infer the previous implementation from conversation summaries alone
+* do not perform the salvage comparison
+* keep required report Sections 2 through 7, but mark each as `[확인 불가] 이전 작업 자료가 없어 비교 불가`
+* continue the baseline-only audit when it can be completed read-only
+
+A user-supplied archive outside the repository may be inspected read-only when its exact path is provided. Do not extract it into the current baseline. Prefer archive listing and in-memory or stream-based content comparison. Do not create temporary extracted files during strict read-only mode.
+
+A previous Git branch must be inspected with read-only operations such as `git show`, `git diff`, or `git log`. Do not checkout, merge, rebase, cherry-pick, or fetch it. If the branch is only on a remote that is not already locally available, `git ls-remote` may establish existence, but content comparison remains `[확인 불가]` unless the content is already accessible without a prohibited operation.
+
+For every supplied previous-work source, report this validation record before comparison:
+
+```text
+Provided source type:
+Literal value received:
+Placeholder detected:
+Exists or resolves:
+Read-only inspection method:
+Usable for comparison:
+Reason:
+Evidence classification:
+```
+
+##### Method and diff-hunk salvage analysis
+
+When valid previous-work material exists, compare it against the restored baseline at method and diff-hunk level. Do not classify an entire file as reusable merely because one small hunk is useful.
+
+Assign every material change to exactly one category:
+
+```text
+1. 증거가 있어 그대로 재사용 가능한 변경
+2. 아이디어만 재사용하고 코드는 다시 작성해야 하는 변경
+3. diagnostic log로 먼저 검증해야 하는 가설
+4. 기존 동작을 훼손하므로 폐기해야 하는 변경
+```
+
+For every changed hunk, use this exact report schema:
+
+```text
+파일:
+메서드 또는 범위:
+분류:
+이전 변경의 의도:
+실제 변경 내용:
+근거가 있는가:
+재사용 가능한 최소 hunk:
+폐기해야 하는 부분:
+폐기 이유:
+영향받을 수 있는 기존 동작:
+필요한 diagnostic log:
+필요한 재현 테스트:
+```
+
+`재사용 가능한 최소 hunk` must identify the smallest statements or idea that can be isolated. Do not paste a whole changed file when only one guard, field, log event, or state check is relevant.
+
+A change may be category 1 only when direct evidence supports both its necessity and its safety against the restored baseline. The report must identify the exact source artifact, file, method, and hunk boundaries. Compilation success, absence of an exception, or a previously observed symptom disappearing is not enough by itself.
+
+##### Mandatory separate risky-change list
+
+List risky changes separately from the salvage matrix. The following are risky by default and normally belong in category 3 or 4 unless direct evidence proves a narrower safe case:
+
+* a global completion-condition change in `InteractWithBlockTask.isFinished()`
+* inserting Carry On-specific behavior into `PlayerInteractionFixChain` or another global chain
+* stopping the entire TaskRunner
+* stopping all Baritone pathing
+* globally releasing or suppressing all right-click, sneak, jump, movement, or other input
+* adding duplicate timeout behavior across multiple classes
+* treating a click attempt as successful completion
+* retrying without observing Carry On state
+* broad decomposition of upstream-derived classes
+* moving packages or renaming upstream files
+* swallowing an exception and returning success
+* adding cooldown, blacklist, fallback, retry, sleep, timeout, or silent recovery without diagnostic evidence
+* adding a hard dependency that prevents startup when Carry On is absent
+
+For each risky change, identify the exact previous file, method, hunk, affected global state, and likely existing behavior exposed to regression. Mark regression impact as `[추정]` unless a caller or test directly proves it.
+
+##### Diagnostics-only patch proposal rules
+
+A diagnostics-only patch may be proposed in the report, but it must not be applied, saved as an applicable patch file, or written into the working tree.
+
+For each proposed diagnostic hunk, report:
+
+```text
+Target file:
+Target class and method:
+Insertion boundary:
+Why this boundary is currently unobservable:
+Why the proposal does not change behavior:
+Smallest proposed hunk:
+Log level:
+Correlation identifier source:
+Fields logged:
+State-change or rate-limiting rule:
+Sensitive data excluded:
+Java marker location:
+Expected diagnostic result:
+```
+
+Use this exact marker for the proposed Java diagnostic block:
+
+```java
+//20260730_kpopmodder: Added diagnostic logging to prove the Carry On interaction failure boundary.
+```
+
+The marker belongs immediately above the first LAVI-specific diagnostic field, helper, or log block. Do not add it to unrelated upstream lines and do not insert markers throughout untouched upstream code.
+
+The proposed logs should include applicable fields from:
+
+```text
+correlationId
+gameTick
+topLevelTask
+childTask
+previousTask
+nextTask
+targetType
+targetId
+targetPosition
+dimension
+carryOnLoaded
+carryOnVersion
+carryStateBefore
+carryStateAfter
+rightClickState
+sneakState
+leftClickState
+clickResult
+attemptCount
+elapsedTicks
+screenName
+equippedItem
+baritonePathing
+customGoalOwner
+stopReason
+exceptionType
+exceptionMessage
+```
+
+High-frequency paths must use state-transition logging, first-attempt and terminal-attempt logging, bounded attempt counters, a per-operation correlation identifier, and/or a documented rate limit. The rate limit must not hide the transition that proves success, retry, interruption, or terminal failure.
+
+A diagnostics-only proposal must not:
+
+* alter return values
+* change task completion
+* add or change retry behavior
+* release input
+* cancel goals or paths
+* add cooldowns, timeouts, blacklists, sleeps, or fallbacks
+* catch and suppress new exceptions
+* change task ordering or ownership
+* change synchronization, thread scheduling, exception propagation, fallback result, object lifecycle, or cleanup ownership
+* call a side-effecting Carry On or Baritone API merely to populate a log field
+
+##### Root-cause patch evidence gate
+
+Do not apply or fully specify a behavioral root-cause patch during the read-only audit. Report only the evidence conditions that must be satisfied before such a patch is allowed.
+
+At minimum, the evidence must prove:
+
+* the exact Task, method, game tick, branch, and state transition where progress stops or repeats
+* Carry On installation state and exact installed version
+* whether pickup success is observed as `NOT_CARRYING -> CARRYING`
+* whether placement success is observed as `CARRYING -> NOT_CARRYING`
+* whether each right-click attempt corresponds to an actual Carry On state transition
+* the exact retry owner and retry count
+* which input overrides were acquired by the failing operation
+* which custom goal or path was created by the failing operation
+* which operation-owned input and custom goal must be cleaned up on terminal failure
+* that unrelated TaskRunner and Baritone global state do not need to be changed
+* that generic right-click behavior remains unaffected in the relevant regression scenarios
+
+If any item remains unproven, label it `[추정]` or `[확인 불가]` and keep the root-cause patch blocked.
+
+##### Required final report order
+
+Do not replace the full report with a brief summary. Use these exact top-level sections and this order:
+
+```text
+1. 기준선 상태
+2. 이전 작업에서 변경된 파일
+3. 위험 변경 목록
+4. salvage matrix
+5. 재사용 가능한 아이디어
+6. 그대로 재사용 가능한 최소 hunk
+7. 폐기해야 할 코드
+8. diagnostics-only patch 제안
+9. root-cause patch를 적용하기 위한 증거 조건
+10. 예상 영향 범위
+11. 테스트 계획
+12. 사용자 승인이 필요한 정확한 파일 목록
+13. 아직 증명되지 않은 가설
+14. 실행하지 않은 작업과 그 이유
+```
+
+Section 1 must contain the complete command transcript, expected-versus-actual comparisons, current directory, Git root, branch, HEAD, expected commit comparison, upstream, working tree, untracked files, remote branch results, read-file inventory, line-level findings, ignore analysis, wrapper presence, Java/Gradle status, and build blockers.
+
+Sections 2 through 7 must contain method/diff-hunk evidence when valid previous-work material exists. If no valid material exists, retain the headings and state `[확인 불가] 이전 작업 자료가 없어 비교 불가` under each.
+
+Section 12 must list exact repository-relative and absolute paths that would require approval for any future modification. A diagnostic proposal is not approval to edit those files.
+
+Section 13 must contain only unproven propositions and must label every item `[추정]` or `[확인 불가]`. Do not repeat verified facts there.
+
+Section 14 must enumerate every prohibited or intentionally omitted action, including file edits, archive extraction, build, tests, dependency changes, Git writes, remote updates, patch application, commit, and push, with the reason each was not performed.
+
+End the report with one of the following truthful statements, without weakening or shortening its meaning.
+
+When valid previous-work material was inspected:
+
+```text
+읽기 전용 점검만 수행했으며 파일 수정, 삭제, dependency 변경, build, commit, push는 수행하지 않았다. 이전 작업은 참고 자료로만 분석했으며 현재 기준선에 파일을 복사하거나 변경을 적용하지 않았다.
+```
+
+When previous-work material was a placeholder, missing, unresolved, unreadable, or otherwise unusable:
+
+```text
+읽기 전용 점검만 수행했으며 파일 수정, 삭제, dependency 변경, build, commit, push는 수행하지 않았다. 이전 작업 자료가 없어 비교 분석은 수행하지 않았으며 현재 기준선에 파일을 복사하거나 변경을 적용하지 않았다.
+```
+
+Do not claim that previous work was analyzed when no valid previous-work source was available.
 
 ### Write permission boundary
 
