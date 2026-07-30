@@ -41,6 +41,19 @@ Repository-relative path:
 plugins/Minecraft/runtime/chatclef_fabric_1.20.1/**
 ```
 
+<!-- 20260730_kpopmodder: Linked the canonical ChatClef / Carry On integration direction document. -->
+
+Required companion design document:
+
+[ChatClef / Carry On Integration Direction](plugins/Minecraft/docs/chatclef-carryon-integration-direction.md)
+
+Codex must read and apply this document before proposing or modifying
+ChatClef, AltoClef, Baritone interaction, Carry On integration, or related
+diagnostic behavior.
+
+This link does not authorize a later phase, Java modification, diagnostics
+patch, behavioral fix, build, commit, or push.
+
 This subsection has higher priority for that tree than:
 
 * Section 29 refactoring rules
