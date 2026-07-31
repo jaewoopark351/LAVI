@@ -31,6 +31,7 @@ public final class OverlayCommand extends Command {
         baritoneSettings.renderPath.value = visible;
         baritoneSettings.renderGoal.value = visible;
         ChatClefDiagnostics.setBoundaryEnabled(visible);
-        log("LAVI overlay " + (visible ? "ON" : "OFF") + "; diagnostics=" + (visible ? "BOUNDARY" : "OFF"));
+        System.out.println("ALTO CLEF: LAVI overlay " + (visible ? "ON" : "OFF")
+                + "; diagnostics=" + (visible ? "BOUNDARY" : "OFF"));
     }
 }
