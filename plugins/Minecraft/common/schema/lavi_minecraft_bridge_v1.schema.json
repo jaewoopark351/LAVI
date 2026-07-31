@@ -1,0 +1,173 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lavi.local/schemas/minecraft/lavi_minecraft_bridge_v1.schema.json",
+  "title": "LAVI Minecraft Bridge Protocol v1",
+  "type": "object",
+  "oneOf": [
+    { "$ref": "#/$defs/bridge_envelope" },
+    { "$ref": "#/$defs/command_request" },
+    { "$ref": "#/$defs/command_result" },
+    { "$ref": "#/$defs/status_snapshot" }
+  ],
+  "$defs": {
+    "bridge_envelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocol_version",
+        "message_type",
+        "message_id",
+        "correlation_id",
+        "session_id",
+        "timestamp_ms",
+        "payload"
+      ],
+      "properties": {
+        "protocol_version": { "const": 1 },
+        "message_type": {
+          "type": "string",
+          "enum": [
+            "handshake",
+            "handshake_ack",
+            "command_request",
+            "command_result",
+            "status_request",
+            "status_snapshot",
+            "event",
+            "error"
+          ]
+        },
+        "message_id": { "type": "string" },
+        "correlation_id": { "type": ["string", "null"] },
+        "session_id": { "type": ["string", "null"] },
+        "timestamp_ms": { "type": "integer" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "command_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "request_id",
+        "command",
+        "source",
+        "deadline_ms",
+        "metadata"
+      ],
+      "properties": {
+        "request_id": { "type": "string" },
+        "command": { "type": "string" },
+        "source": { "type": "string" },
+        "deadline_ms": { "type": ["integer", "null"] },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "command_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "request_id",
+        "ok",
+        "status",
+        "error_code",
+        "message",
+        "data"
+      ],
+      "properties": {
+        "request_id": { "type": "string" },
+        "ok": { "type": "boolean" },
+        "status": {
+          "type": "string",
+          "enum": [
+            "accepted",
+            "running",
+            "completed",
+            "rejected",
+            "failed",
+            "cancelled",
+            "deadline_exceeded",
+            "unknown"
+          ]
+        },
+        "error_code": {
+          "type": ["string", "null"],
+          "enum": [
+            "not_implemented",
+            "not_connected",
+            "bridge_disabled",
+            "invalid_request",
+            "invalid_message_type",
+            "unsupported_protocol_version",
+            "deadline_exceeded",
+            "internal_error",
+            null
+          ]
+        },
+        "message": { "type": "string" },
+        "data": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "status_snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "backend_id",
+        "enabled",
+        "connected",
+        "lifecycle_state",
+        "detail",
+        "details",
+        "last_error_code",
+        "last_error_message"
+      ],
+      "properties": {
+        "backend_id": { "type": "string" },
+        "enabled": { "type": "boolean" },
+        "connected": { "type": "boolean" },
+        "lifecycle_state": {
+          "type": "string",
+          "enum": [
+            "not_implemented",
+            "disabled",
+            "stopped",
+            "starting",
+            "connecting",
+            "connected",
+            "disconnected",
+            "stopping",
+            "failed"
+          ]
+        },
+        "detail": { "type": "string" },
+        "details": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "last_error_code": {
+          "type": ["string", "null"],
+          "enum": [
+            "not_implemented",
+            "not_connected",
+            "bridge_disabled",
+            "invalid_request",
+            "invalid_message_type",
+            "unsupported_protocol_version",
+            "deadline_exceeded",
+            "internal_error",
+            null
+          ]
+        },
+        "last_error_message": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

@@ -29,6 +29,35 @@ git rev-parse --show-toplevel
 
 If the current directory or Git root is not the intended repository root, Codex must stop and ask the user.
 
+### Minecraft Backend Loader and Engine Complete Separation Rule
+
+This subsection applies to the full Minecraft plugin tree:
+
+```text
+plugins/Minecraft/**
+```
+
+<!-- 20260801_kpopmodder: Added a hard boundary for separate Minecraft backend loaders and engines. -->
+
+Required companion design document:
+
+[Minecraft Backend Separation](plugins/Minecraft/docs/minecraft-backend-separation.md)
+
+Codex must preserve the following backend ownership model:
+
+```text
+LAVI -> Fabric adapter -> Fabric mod -> ChatClef / AltoClef
+LAVI -> Forge adapter  -> Forge mod  -> MineMind
+```
+
+Fabric ChatClef and Forge MineMind are independent sibling backends. They must not share implementation, build/runtime ownership, lifecycle state, GUI, configuration namespace, diagnostics implementation, transport/session/reconnect implementation, tests, or packaging artifacts.
+
+Shared Minecraft code is limited to backend-neutral protocol contracts, interfaces, DTOs, JSON schema, error codes, and documentation. Do not put WebSocket, HTTP, socket, thread, asyncio, retry, reconnect, session registry, config loader, logger, GUI, Fabric implementation, Forge implementation, ChatClef adapter, or MineMind adapter code in the common layer.
+
+The currently approved implementation scope is Fabric ChatClef only. Do not create Forge/MineMind placeholder directories, classes, enums, config keys, module IDs, GUI tabs, tests, runtime dependencies, or protocol values before a separate explicit approval for that backend.
+
+Do not implement a generic Minecraft Java bridge that chooses Fabric or Forge through loader detection. Do not create a shared Minecraft Java module, shared Gradle project, shared WebSocket server, shared session registry, or shared reconnect manager for Fabric and Forge.
+
 ### Minecraft ChatClef Upstream Baseline Override
 
 This subsection is a scoped safety override for the following tree:
