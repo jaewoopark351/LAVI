@@ -59,15 +59,6 @@ public final class CarryOnDiagnosticSampler {
     }
 
     private boolean compatibilityFailure(CarryOnSnapshot snapshot) {
-        return isCompatibilityFailure(snapshot.stateBefore()) || isCompatibilityFailure(snapshot.stateAfter());
-    }
-
-    private boolean isCompatibilityFailure(CarryOnObservation observation) {
-        if (observation == null) {
-            return false;
-        }
-        return observation.state() == CarryOnCarryState.INCOMPATIBLE
-                || observation.state() == CarryOnCarryState.STATE_UNREADABLE
-                || observation.state() == CarryOnCarryState.OBSERVATION_FAILED;
+        return CarryOnObservationClassifier.capabilityFailure(snapshot.stateBefore(), snapshot.stateAfter());
     }
 }

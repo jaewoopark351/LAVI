@@ -3,7 +3,7 @@ package lavi.minecraft.integration.carryon;
 import net.minecraft.client.MinecraftClient;
 
 public final class CarryOnDiagnostics {
-    private static final ReflectiveCarryOnStateReader STATE_READER = new ReflectiveCarryOnStateReader();
+    private static final CarryOnStateReader STATE_READER = new ReflectiveCarryOnStateReader();
 
     private CarryOnDiagnostics() {
     }

@@ -23,19 +23,8 @@ public final class CarryOnDiagnosticLogger {
     }
 
     private static boolean warningSnapshot(CarryOnSnapshot snapshot) {
-        return capabilityFailure(snapshot.stateBefore())
-                || capabilityFailure(snapshot.stateAfter())
-                || snapshot.terminalReason() == CarryOnTerminalReason.CAPABILITY_INCOMPATIBLE
-                || snapshot.terminalReason() == CarryOnTerminalReason.STATE_UNREADABLE
-                || snapshot.terminalReason() == CarryOnTerminalReason.OBSERVATION_FAILED;
-    }
-
-    private static boolean capabilityFailure(CarryOnObservation observation) {
-        if (observation == null) {
-            return false;
-        }
-        return observation.state() == CarryOnCarryState.INCOMPATIBLE
-                || observation.state() == CarryOnCarryState.STATE_UNREADABLE
-                || observation.state() == CarryOnCarryState.OBSERVATION_FAILED;
+        return CarryOnObservationClassifier.capabilityFailure(snapshot.stateBefore())
+                || CarryOnObservationClassifier.capabilityFailure(snapshot.stateAfter())
+                || CarryOnObservationClassifier.warningTerminal(snapshot.terminalReason());
     }
 }

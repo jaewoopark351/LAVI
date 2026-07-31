@@ -13,7 +13,7 @@ public final class CarryOnDiagnosticSession {
     private final String targetType;
     private final String targetId;
     private final String targetPosition;
-    private final ReflectiveCarryOnStateReader stateReader;
+    private final CarryOnStateReader stateReader;
     private final CarryOnDiagnosticSampler sampler = new CarryOnDiagnosticSampler();
     private int attemptCount;
     private int elapsedTicks;
@@ -26,7 +26,7 @@ public final class CarryOnDiagnosticSession {
                                      String targetType,
                                      String targetId,
                                      String targetPosition,
-                                     ReflectiveCarryOnStateReader stateReader) {
+                                     CarryOnStateReader stateReader) {
         this.taskInstanceId = taskInstanceId;
         this.operationId = operationId;
         this.operationType = operationType;
@@ -46,7 +46,7 @@ public final class CarryOnDiagnosticSession {
                                                  String targetType,
                                                  String targetId,
                                                  String targetPosition,
-                                                 ReflectiveCarryOnStateReader stateReader) {
+                                                 CarryOnStateReader stateReader) {
         CarryOnDiagnosticSession session = new CarryOnDiagnosticSession(
                 taskInstanceId,
                 operationId,
@@ -93,7 +93,7 @@ public final class CarryOnDiagnosticSession {
     }
 
     public void logState(CarryOnObservation before, CarryOnObservation after, String clickResult) {
-        if (!ChatClefDiagnostics.isVerboseEnabled() && !capabilityFailure(before, after)) {
+        if (!ChatClefDiagnostics.isVerboseEnabled() && !CarryOnObservationClassifier.capabilityFailure(before, after)) {
             return;
         }
         log("state", before, after, clickResult, false, CarryOnTerminalReason.UNAVAILABLE);
@@ -107,7 +107,7 @@ public final class CarryOnDiagnosticSession {
     }
 
     public void logTerminal(CarryOnTerminalReason terminalReason, String clickResult) {
-        if (!ChatClefDiagnostics.isVerboseEnabled() && !warningTerminal(terminalReason)) {
+        if (!ChatClefDiagnostics.isVerboseEnabled() && !CarryOnObservationClassifier.warningTerminal(terminalReason)) {
             return;
         }
         CarryOnObservation observation = observe();
@@ -116,8 +116,8 @@ public final class CarryOnDiagnosticSession {
 
     public void logTerminal(CarryOnObservation before, CarryOnObservation after, CarryOnTerminalReason terminalReason, String clickResult) {
         if (!ChatClefDiagnostics.isVerboseEnabled()
-                && !warningTerminal(terminalReason)
-                && !capabilityFailure(before, after)) {
+                && !CarryOnObservationClassifier.warningTerminal(terminalReason)
+                && !CarryOnObservationClassifier.capabilityFailure(before, after)) {
             return;
         }
         log("terminal", before, after, clickResult, false, terminalReason);
@@ -159,22 +159,4 @@ public final class CarryOnDiagnosticSession {
         }
     }
 
-    private static boolean capabilityFailure(CarryOnObservation before, CarryOnObservation after) {
-        return capabilityFailure(before) || capabilityFailure(after);
-    }
-
-    private static boolean capabilityFailure(CarryOnObservation observation) {
-        if (observation == null) {
-            return false;
-        }
-        return observation.state() == CarryOnCarryState.INCOMPATIBLE
-                || observation.state() == CarryOnCarryState.STATE_UNREADABLE
-                || observation.state() == CarryOnCarryState.OBSERVATION_FAILED;
-    }
-
-    private static boolean warningTerminal(CarryOnTerminalReason terminalReason) {
-        return terminalReason == CarryOnTerminalReason.CAPABILITY_INCOMPATIBLE
-                || terminalReason == CarryOnTerminalReason.STATE_UNREADABLE
-                || terminalReason == CarryOnTerminalReason.OBSERVATION_FAILED;
-    }
 }

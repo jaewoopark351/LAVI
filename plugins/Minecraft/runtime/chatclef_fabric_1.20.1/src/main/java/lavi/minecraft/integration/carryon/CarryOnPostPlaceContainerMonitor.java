@@ -2,18 +2,18 @@ package lavi.minecraft.integration.carryon;
 
 import baritone.api.utils.input.Input;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.diagnostics.postplace.PostPlaceContainerInteractionObserver;
+import lavi.minecraft.diagnostics.postplace.PostPlaceContainerOpenIntent;
 import net.minecraft.client.network.ClientPlayerEntity;
 
 //20260731_kpopmodder: Keep Carry On post-place pickup warnings in the optional integration layer.
-public final class CarryOnPostPlaceContainerMonitor {
-    private static long pendingOperationId = -1;
-    private static int pendingAttempt = -1;
-    private static CarryOnObservation stateBefore;
+public final class CarryOnPostPlaceContainerMonitor implements PostPlaceContainerInteractionObserver {
+    private long pendingOperationId = -1;
+    private int pendingAttempt = -1;
+    private CarryOnObservation stateBefore;
 
-    private CarryOnPostPlaceContainerMonitor() {
-    }
-
-    public static void beforeInteract(ChatClefDiagnostics.PostPlaceContainerOpenIntent intent) {
+    @Override
+    public void beforeInteract(PostPlaceContainerOpenIntent intent) {
         if (intent == null) {
             clearPending();
             return;
@@ -23,9 +23,10 @@ public final class CarryOnPostPlaceContainerMonitor {
         stateBefore = CarryOnDiagnostics.observe();
     }
 
-    public static void afterInteract(ChatClefDiagnostics.PostPlaceContainerOpenIntent intent,
-                                     ClientPlayerEntity player,
-                                     Object interactResult) {
+    @Override
+    public void afterInteract(PostPlaceContainerOpenIntent intent,
+                              ClientPlayerEntity player,
+                              Object interactResult) {
         if (intent == null || pendingOperationId != intent.operationId()) {
             clearPending();
             return;
@@ -34,7 +35,7 @@ public final class CarryOnPostPlaceContainerMonitor {
         CarryOnObservation stateAfter = CarryOnDiagnostics.observe();
         if (unexpectedPickup(stateBefore, stateAfter)
                 && !ChatClefDiagnostics.isPostPlaceContainerGuiOpened(intent.operationId())
-                && ChatClefDiagnostics.markPostPlaceCarryOnWarningLogged(intent.operationId())) {
+                && ChatClefDiagnostics.markPostPlaceContainerWarningLogged(intent.operationId())) {
             ChatClefDiagnostics.logWarningEvent("CARRY_ON_UNEXPECTED_PICKUP", "post_place_container_carry_on_pickup",
                     null,
                     "operationId", intent.operationId(),
@@ -51,18 +52,18 @@ public final class CarryOnPostPlaceContainerMonitor {
         clearPending();
     }
 
-    private static boolean unexpectedPickup(CarryOnObservation before, CarryOnObservation after) {
+    private boolean unexpectedPickup(CarryOnObservation before, CarryOnObservation after) {
         return before != null
                 && after != null
                 && before.state() == CarryOnCarryState.AVAILABLE_NOT_CARRYING
                 && after.state() == CarryOnCarryState.AVAILABLE_CARRYING;
     }
 
-    private static String stateName(CarryOnObservation observation) {
+    private String stateName(CarryOnObservation observation) {
         return observation == null ? "unavailable" : String.valueOf(observation.state());
     }
 
-    private static void clearPending() {
+    private void clearPending() {
         pendingOperationId = -1;
         pendingAttempt = -1;
         stateBefore = null;

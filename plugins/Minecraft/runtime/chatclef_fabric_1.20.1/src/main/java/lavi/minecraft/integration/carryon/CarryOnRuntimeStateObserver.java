@@ -31,10 +31,10 @@ public final class CarryOnRuntimeStateObserver {
         ticksSinceObservation = 0;
 
         CarryOnObservation currentObservation = CarryOnDiagnostics.observe();
-        boolean stateChanged = !sameObservation(previousObservation, currentObservation);
-        boolean carrying = isCarrying(currentObservation);
-        boolean observedCarryRelease = observedCarryRelease(previousObservation, currentObservation);
-        boolean capabilityFailure = isCapabilityFailure(currentObservation);
+        boolean stateChanged = !CarryOnObservationClassifier.sameObservation(previousObservation, currentObservation);
+        boolean carrying = CarryOnObservationClassifier.isCarrying(currentObservation);
+        boolean observedCarryRelease = CarryOnObservationClassifier.observedCarryRelease(previousObservation, currentObservation);
+        boolean capabilityFailure = CarryOnObservationClassifier.capabilityFailure(currentObservation);
         boolean taskRunnerActive = isTaskRunnerActive();
 
         if (session == null) {
@@ -70,7 +70,7 @@ public final class CarryOnRuntimeStateObserver {
             session.logTerminal(
                     before,
                     currentObservation,
-                    terminalReason(before, currentObservation, CarryOnTransition.NONE, observedCarryRelease, observationWindowExpired, sessionEnded),
+                    CarryOnObservationClassifier.terminalReason(before, currentObservation, CarryOnTransition.NONE, observedCarryRelease, observationWindowExpired, sessionEnded),
                     "runtime_observe"
             );
             session = null;
@@ -100,84 +100,6 @@ public final class CarryOnRuntimeStateObserver {
         } catch (RuntimeException | LinkageError e) {
             return false;
         }
-    }
-
-    private static boolean sameObservation(CarryOnObservation previous, CarryOnObservation current) {
-        if (previous == current) {
-            return true;
-        }
-        if (previous == null || current == null) {
-            return false;
-        }
-        return previous.loaded() == current.loaded()
-                && previous.state() == current.state()
-                && previous.version().equals(current.version())
-                && previous.exceptionType().equals(current.exceptionType());
-    }
-
-    private static boolean isCarrying(CarryOnObservation observation) {
-        return observation != null && observation.state() == CarryOnCarryState.AVAILABLE_CARRYING;
-    }
-
-    private static boolean observedCarryRelease(CarryOnObservation before, CarryOnObservation after) {
-        return before != null
-                && after != null
-                && before.state() == CarryOnCarryState.AVAILABLE_CARRYING
-                && after.state() == CarryOnCarryState.AVAILABLE_NOT_CARRYING;
-    }
-
-    private static boolean isCapabilityFailure(CarryOnObservation observation) {
-        if (observation == null) {
-            return false;
-        }
-        return observation.state() == CarryOnCarryState.INCOMPATIBLE
-                || observation.state() == CarryOnCarryState.STATE_UNREADABLE
-                || observation.state() == CarryOnCarryState.OBSERVATION_FAILED;
-    }
-
-    private static CarryOnTerminalReason terminalReason(CarryOnObservation before,
-                                                        CarryOnObservation after,
-                                                        CarryOnTransition expectedTransition,
-                                                        boolean observedCarryRelease,
-                                                        boolean observationWindowExpired,
-                                                        boolean sessionEnded) {
-        if (before == null || after == null) {
-            return CarryOnTerminalReason.OBSERVATION_FAILED;
-        }
-        CarryOnTerminalReason capabilityTerminal = capabilityTerminal(before);
-        if (capabilityTerminal != CarryOnTerminalReason.UNAVAILABLE) {
-            return capabilityTerminal;
-        }
-        capabilityTerminal = capabilityTerminal(after);
-        if (capabilityTerminal != CarryOnTerminalReason.UNAVAILABLE) {
-            return capabilityTerminal;
-        }
-        if (observationWindowExpired) {
-            return CarryOnTerminalReason.OBSERVATION_WINDOW_EXPIRED;
-        }
-        if (expectedTransition != CarryOnTransition.NONE && expectedTransition.matches(before, after)) {
-            return CarryOnTerminalReason.SUCCESS;
-        }
-        if (observedCarryRelease) {
-            return CarryOnTerminalReason.STATE_TRANSITION_OBSERVED;
-        }
-        if (sessionEnded) {
-            return CarryOnTerminalReason.SESSION_ENDED;
-        }
-        return CarryOnTerminalReason.UNAVAILABLE;
-    }
-
-    private static CarryOnTerminalReason capabilityTerminal(CarryOnObservation observation) {
-        if (observation == null) {
-            return CarryOnTerminalReason.OBSERVATION_FAILED;
-        }
-        return switch (observation.state()) {
-            case ABSENT -> CarryOnTerminalReason.CAPABILITY_ABSENT;
-            case INCOMPATIBLE -> CarryOnTerminalReason.CAPABILITY_INCOMPATIBLE;
-            case STATE_UNREADABLE -> CarryOnTerminalReason.STATE_UNREADABLE;
-            case OBSERVATION_FAILED -> CarryOnTerminalReason.OBSERVATION_FAILED;
-            default -> CarryOnTerminalReason.UNAVAILABLE;
-        };
     }
 
     private void resetSession() {
