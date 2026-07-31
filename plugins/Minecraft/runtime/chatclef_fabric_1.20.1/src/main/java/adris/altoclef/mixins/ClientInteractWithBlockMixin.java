@@ -26,7 +26,8 @@ public final class ClientInteractWithBlockMixin {
     //#else
     //$$ private void onClientBlockInteract(ClientPlayerEntity player, ClientWorld world, Hand hand, BlockHitResult hitResult, CallbackInfoReturnable<ActionResult> cir) {
     //#endif
-        ChatClefDiagnostics.logInteractBlock("HEAD", "interactBlock_begin", hand, hitResult, "unavailable");
+        ChatClefDiagnostics.logInputSnapshot("INTERACT_BLOCK_HEAD_PRE", "before_interactBlock_head", "boundary", "mixin_head");
+        ChatClefDiagnostics.logInteractBlock("HEAD", "interactBlock_begin", player, hand, hitResult, "unavailable");
         //Debug.logMessage("(client) INTERACTED WITH: " + (hitResult != null? hitResult.getBlockPos() : "(nothing)"));
         if (hitResult != null) {
             EventBus.publish(new BlockInteractEvent(hitResult));
@@ -44,6 +45,7 @@ public final class ClientInteractWithBlockMixin {
     //#else
     //$$ private void onClientBlockInteractReturn(ClientPlayerEntity player, ClientWorld world, Hand hand, BlockHitResult hitResult, CallbackInfoReturnable<ActionResult> cir) {
     //#endif
-        ChatClefDiagnostics.logInteractBlock("RETURN", "interactBlock_return", hand, hitResult, cir.getReturnValue());
+        ChatClefDiagnostics.logInteractBlock("RETURN", "interactBlock_return", player, hand, hitResult, cir.getReturnValue());
+        ChatClefDiagnostics.logInputSnapshot("INTERACT_BLOCK_RETURN_POST", "after_interactBlock_return", "boundary", "mixin_return");
     }
 }

@@ -5,9 +5,12 @@ import adris.altoclef.Debug;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.tasksystem.TaskChain;
 import adris.altoclef.util.ItemTarget;
+import adris.altoclef.util.slots.Slot;
 import baritone.api.utils.input.Input;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
+import net.minecraft.client.option.GameOptions;
+import net.minecraft.client.option.KeyBinding;
 import net.minecraft.entity.Entity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.screen.ScreenHandler;
@@ -125,16 +128,51 @@ public final class ChatClefDiagnostics {
     }
 
     public static void logInput(String phase, String reason, Input input, Object... fields) {
-        Object[] merged = mergeFields(fields, "input", inputName(input));
+        Object[] merged = mergeFields(fields,
+                "input", inputName(input),
+                "inputCallerStack", callerStack());
         safeLog("INPUT", phase, reason, currentTask(), merged, false);
     }
 
+    public static void logInputSnapshot(String phase, String reason, Object... fields) {
+        Object[] merged = mergeFields(inputSnapshotFields(), fields);
+        safeLog("INPUT_SNAPSHOT", phase, reason, currentTask(), merged, false);
+    }
+
+    public static void logSlotClick(String phase, String reason, Slot slot, int mouseButton, Object type, Object... fields) {
+        Object[] merged = mergeFields(fields,
+                "slot", slotSummary(slot),
+                "mouseButton", Integer.toString(mouseButton),
+                "slotActionType", value(type),
+                "cursorStack", safeValue(() -> MinecraftClient.getInstance().player.currentScreenHandler.getCursorStack()));
+        safeLog("SLOT", phase, reason, currentTask(), merged, false);
+    }
+
     public static void logInteractBlock(String phase, String reason, Object hand, BlockHitResult hitResult, Object result) {
+        logInteractBlock(phase, reason, MinecraftClient.getInstance().player, hand, hitResult, result);
+    }
+
+    public static void logInteractBlock(String phase, String reason, ClientPlayerEntity player, Object hand, BlockHitResult hitResult, Object result) {
+        BlockPos blockPos = hitResult == null ? null : hitResult.getBlockPos();
         safeLog("MINECRAFT_INTERACTION", phase, reason, currentTask(), new Object[]{
                 "hand", value(hand),
-                "hitBlockPos", hitResult == null ? "unavailable" : value(hitResult.getBlockPos()),
+                "hitBlockPos", blockPos == null ? "unavailable" : value(blockPos),
                 "hitSide", hitResult == null ? "unavailable" : value(hitResult.getSide()),
                 "hitType", hitResult == null ? "unavailable" : value(hitResult.getType()),
+                "targetBlockState", blockPos == null ? "unavailable" : safeValue(() -> MinecraftClient.getInstance().world.getBlockState(blockPos)),
+                "clientPlayerSneaking", safeValue(() -> MinecraftClient.getInstance().player.isSneaking()),
+                "argumentPlayerSneaking", safeValue(() -> player == null ? null : player.isSneaking()),
+                "clientPlayerSameAsArgument", safeValue(() -> MinecraftClient.getInstance().player == player),
+                "rawUseKeyPressed", rawKeyHeld(Input.CLICK_RIGHT),
+                "rawSneakKeyPressed", rawKeyHeld(Input.SNEAK),
+                "rawAttackKeyPressed", rawKeyHeld(Input.CLICK_LEFT),
+                "sneakAndUsePressedTogether", sneakAndUsePressedTogether(),
+                "clientPlayerPosition", safeValue(() -> MinecraftClient.getInstance().player.getPos()),
+                "argumentPlayerPosition", safeValue(() -> player == null ? null : player.getPos()),
+                "clientMainHandItem", safeValue(() -> MinecraftClient.getInstance().player.getMainHandStack()),
+                "argumentMainHandItem", safeValue(() -> player == null ? null : player.getMainHandStack()),
+                "clientOffHandItem", safeValue(() -> MinecraftClient.getInstance().player.getOffHandStack()),
+                "argumentOffHandItem", safeValue(() -> player == null ? null : player.getOffHandStack()),
                 "result", value(result)
         }, false);
     }
@@ -236,6 +274,20 @@ public final class ChatClefDiagnostics {
         }
         try {
             return stack.getCount() + "x" + stack.getItem().getTranslationKey() + "#empty=" + stack.isEmpty();
+        } catch (RuntimeException | LinkageError ignored) {
+            return "unavailable";
+        }
+    }
+
+    public static String slotSummary(Slot slot) {
+        if (slot == null) {
+            return "none";
+        }
+        try {
+            return value(slot)
+                    + "#inventorySlot=" + slot.getInventorySlot()
+                    + "#windowSlot=" + slot.getWindowSlot()
+                    + "#playerInventory=" + slot.isSlotInPlayerInventory();
         } catch (RuntimeException | LinkageError ignored) {
             return "unavailable";
         }
@@ -400,6 +452,57 @@ public final class ChatClefDiagnostics {
         append(log, "rightClickHeld", inputHeld(Input.CLICK_RIGHT));
         append(log, "leftClickHeld", inputHeld(Input.CLICK_LEFT));
         append(log, "sneakHeld", inputHeld(Input.SNEAK));
+        append(log, "rawUseKeyPressed", rawKeyHeld(Input.CLICK_RIGHT));
+        append(log, "rawAttackKeyPressed", rawKeyHeld(Input.CLICK_LEFT));
+        append(log, "rawSneakKeyPressed", rawKeyHeld(Input.SNEAK));
+        append(log, "playerSneaking", safeValue(() -> MinecraftClient.getInstance().player.isSneaking()));
+        append(log, "sneakAndUsePressedTogether", sneakAndUsePressedTogether());
+    }
+
+    private static Object[] inputSnapshotFields() {
+        return new Object[]{
+                "snapshotRightClickHeld", inputHeld(Input.CLICK_RIGHT),
+                "snapshotLeftClickHeld", inputHeld(Input.CLICK_LEFT),
+                "snapshotSneakHeld", inputHeld(Input.SNEAK),
+                "snapshotRawUseKeyPressed", rawKeyHeld(Input.CLICK_RIGHT),
+                "snapshotRawAttackKeyPressed", rawKeyHeld(Input.CLICK_LEFT),
+                "snapshotRawSneakKeyPressed", rawKeyHeld(Input.SNEAK),
+                "snapshotPlayerSneaking", safeValue(() -> MinecraftClient.getInstance().player.isSneaking()),
+                "snapshotSneakAndUsePressedTogether", sneakAndUsePressedTogether(),
+                "snapshotMainHandItem", safeValue(() -> MinecraftClient.getInstance().player.getMainHandStack()),
+                "snapshotOffHandItem", safeValue(() -> MinecraftClient.getInstance().player.getOffHandStack()),
+                "snapshotPlayerPosition", safeValue(() -> MinecraftClient.getInstance().player.getPos()),
+                "snapshotCrosshairTarget", safeValue(() -> MinecraftClient.getInstance().crosshairTarget)
+        };
+    }
+
+    private static String sneakAndUsePressedTogether() {
+        try {
+            return Boolean.toString(Boolean.parseBoolean(rawKeyHeld(Input.SNEAK))
+                    && Boolean.parseBoolean(rawKeyHeld(Input.CLICK_RIGHT)));
+        } catch (RuntimeException | LinkageError ignored) {
+            return "unavailable";
+        }
+    }
+
+    private static String callerStack() {
+        try {
+            StackTraceElement[] stack = Thread.currentThread().getStackTrace();
+            StringJoiner joiner = new StringJoiner("<-");
+            int added = 0;
+            for (int i = 3; i < stack.length && added < 10; i++) {
+                StackTraceElement element = stack[i];
+                String className = element.getClassName();
+                if (className.equals(ChatClefDiagnostics.class.getName())) {
+                    continue;
+                }
+                joiner.add(className + "." + element.getMethodName() + ":" + element.getLineNumber());
+                added++;
+            }
+            return added == 0 ? "unavailable" : joiner.toString();
+        } catch (RuntimeException | LinkageError ignored) {
+            return "unavailable";
+        }
     }
 
     private static String inputHeld(Input input) {
@@ -412,6 +515,38 @@ public final class ChatClefDiagnostics {
         } catch (RuntimeException | LinkageError ignored) {
             return "unavailable";
         }
+    }
+
+    private static String rawKeyHeld(Input input) {
+        try {
+            KeyBinding key = inputToKeyBinding(input);
+            return key == null ? "unavailable" : Boolean.toString(key.isPressed());
+        } catch (RuntimeException | LinkageError ignored) {
+            return "unavailable";
+        }
+    }
+
+    private static KeyBinding inputToKeyBinding(Input input) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client == null) {
+            return null;
+        }
+        GameOptions options = client.options;
+        if (options == null || input == null) {
+            return null;
+        }
+        return switch (input) {
+            case MOVE_FORWARD -> options.forwardKey;
+            case MOVE_BACK -> options.backKey;
+            case MOVE_LEFT -> options.leftKey;
+            case MOVE_RIGHT -> options.rightKey;
+            case CLICK_LEFT -> options.attackKey;
+            case CLICK_RIGHT -> options.useKey;
+            case JUMP -> options.jumpKey;
+            case SNEAK -> options.sneakKey;
+            case SPRINT -> options.sprintKey;
+            default -> null;
+        };
     }
 
     private static void appendPairs(StringJoiner log, Object... fields) {

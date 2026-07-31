@@ -3,6 +3,7 @@ package adris.altoclef.tasks;
 import adris.altoclef.AltoClef;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.helpers.WorldHelper;
+import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 import net.minecraft.block.Block;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
@@ -54,10 +55,19 @@ public class DoToClosestBlockTask extends AbstractDoToClosestObjectTask<BlockPos
 
     @Override
     protected Optional<BlockPos> getClosestTo(AltoClef mod, Vec3d pos) {
+        Optional<BlockPos> result;
         if (getClosest != null) {
-            return getClosest.apply(pos);
+            result = getClosest.apply(pos);
+        } else {
+            result = mod.getBlockScanner().getNearestBlock(pos, isValid, targetBlocks);
         }
-        return mod.getBlockScanner().getNearestBlock(pos, isValid, targetBlocks);
+        ChatClefDiagnostics.logEvent("CLOSEST_BLOCK", "GET_CLOSEST", "closest_block_result", this,
+                "origin", pos,
+                "targetBlocks", Arrays.toString(targetBlocks),
+                "resultPresent", result.isPresent(),
+                "result", result.map(Object::toString).orElse("none"),
+                "resultBlockState", result.map(blockPos -> ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(blockPos))).orElse("unavailable"));
+        return result;
     }
 
     @Override
@@ -70,17 +80,41 @@ public class DoToClosestBlockTask extends AbstractDoToClosestObjectTask<BlockPos
 
     @Override
     protected Task getGoalTask(BlockPos obj) {
-        return getTargetTask.apply(obj);
+        Task task = getTargetTask.apply(obj);
+        ChatClefDiagnostics.logTaskTransition(this, null, task, "closest_block_goal_task_created",
+                "targetBlocks", Arrays.toString(targetBlocks),
+                "goalBlockPosition", obj,
+                "goalBlockState", ChatClefDiagnostics.safeValue(() -> AltoClef.getInstance().getWorld().getBlockState(obj)));
+        return task;
     }
 
     @Override
     protected boolean isValid(AltoClef mod, BlockPos obj) {
         // Assume we're valid since we're in the same chunk.
-        if (!mod.getChunkTracker().isChunkLoaded(obj)) return true;
+        boolean chunkLoaded = mod.getChunkTracker().isChunkLoaded(obj);
+        if (!chunkLoaded) {
+            ChatClefDiagnostics.logEvent("CLOSEST_BLOCK", "VALIDATE", "chunk_unloaded_assume_valid", this,
+                    "targetBlocks", Arrays.toString(targetBlocks),
+                    "blockPosition", obj);
+            return true;
+        }
         // Our valid predicate
-        if (isValid != null && !isValid.test(obj)) return false;
+        boolean predicateValid = isValid == null || isValid.test(obj);
+        if (!predicateValid) {
+            ChatClefDiagnostics.logEvent("CLOSEST_BLOCK", "VALIDATE", "predicate_rejected_block", this,
+                    "targetBlocks", Arrays.toString(targetBlocks),
+                    "blockPosition", obj,
+                    "blockState", ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(obj)));
+            return false;
+        }
         // Correct block
-        return mod.getBlockScanner().isBlockAtPosition(obj, targetBlocks);
+        boolean blockMatches = mod.getBlockScanner().isBlockAtPosition(obj, targetBlocks);
+        ChatClefDiagnostics.logEvent("CLOSEST_BLOCK", "VALIDATE", "block_match_check", this,
+                "targetBlocks", Arrays.toString(targetBlocks),
+                "blockPosition", obj,
+                "blockState", ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(obj)),
+                "blockMatches", blockMatches);
+        return blockMatches;
     }
 
     @Override

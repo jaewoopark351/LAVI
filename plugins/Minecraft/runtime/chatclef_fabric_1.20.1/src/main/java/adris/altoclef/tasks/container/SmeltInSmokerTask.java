@@ -15,6 +15,7 @@ import adris.altoclef.util.helpers.ItemHelper;
 import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.slots.Slot;
 import adris.altoclef.util.slots.SmokerSlot;
+import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 import net.minecraft.block.Blocks;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
@@ -71,18 +72,31 @@ public class SmeltInSmokerTask extends ResourceTask {
 
     @Override
     protected void onResourceStart(AltoClef mod) {
+        ChatClefDiagnostics.startTrace("smelt_in_smoker_start", this,
+                "target", target);
+        ChatClefDiagnostics.logEvent("SMELT_SMOKER", "RESOURCE_START", "smelt_in_smoker_resource_start", this,
+                "target", target);
         mod.getBehaviour().push();
     }
 
     @Override
     protected Task onResourceTick(AltoClef mod) {
         Optional<BlockPos> smokerPos = mod.getBlockScanner().getNearestBlock(Blocks.SMOKER);
+        ChatClefDiagnostics.logEvent("SMELT_SMOKER", "RESOURCE_TICK", "smelt_in_smoker_resource_tick", this,
+                "target", target,
+                "nearestSmokerPresent", smokerPos.isPresent(),
+                "nearestSmokerPosition", smokerPos.map(Object::toString).orElse("none"),
+                "nearestSmokerState", smokerPos.map(blockPos -> ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(blockPos))).orElse("unavailable"),
+                "doTask", ChatClefDiagnostics.taskSummary(doTask));
         smokerPos.ifPresent(blockPos -> mod.getBehaviour().avoidBlockBreaking(blockPos));
         return doTask;
     }
 
     @Override
     protected void onResourceStop(AltoClef mod, Task interruptTask) {
+        ChatClefDiagnostics.logTaskTransition(this, this, interruptTask, "smelt_in_smoker_resource_stop_begin",
+                "target", target,
+                "cursorStack", ChatClefDiagnostics.safeValue(StorageHelper::getItemStackInCursorSlot));
         mod.getBehaviour().pop();
         // Close smoker screen
         ItemStack cursorStack = StorageHelper.getItemStackInCursorSlot();
@@ -99,6 +113,9 @@ public class SmeltInSmokerTask extends ResourceTask {
         } else {
             StorageHelper.closeScreen();
         }
+        ChatClefDiagnostics.logTaskTransition(this, this, interruptTask, "smelt_in_smoker_resource_stop_end",
+                "target", target,
+                "cursorStack", ChatClefDiagnostics.safeValue(StorageHelper::getItemStackInCursorSlot));
     }
 
     @Override
@@ -152,11 +169,19 @@ public class SmeltInSmokerTask extends ResourceTask {
 
         @Override
         protected boolean isContainerOpen(AltoClef mod) {
-            return (mod.getPlayer().currentScreenHandler instanceof SmokerScreenHandler);
+            boolean open = mod.getPlayer().currentScreenHandler instanceof SmokerScreenHandler;
+            ChatClefDiagnostics.logEvent("SMELT_SMOKER", "CONTAINER_OPEN_CHECK", "smoker_screen_handler_check", this,
+                    "isContainerOpen", open,
+                    "screenHandler", ChatClefDiagnostics.className(mod.getPlayer().currentScreenHandler));
+            return open;
         }
 
         @Override
         protected void onStart() {
+            ChatClefDiagnostics.logEvent("SMELT_SMOKER", "DO_START_BEGIN", "do_smelt_in_smoker_start", this,
+                    "target", _target,
+                    "allMaterials", _allMaterials,
+                    "ignoreMaterials", _ignoreMaterials);
             super.onStart();
             BotBehaviour botBehaviour = AltoClef.getInstance().getBehaviour();
 
@@ -164,6 +189,10 @@ public class SmeltInSmokerTask extends ResourceTask {
             botBehaviour.addProtectedItems(Items.COAL);
             botBehaviour.addProtectedItems(_allMaterials.getMatches());
             botBehaviour.addProtectedItems(_target.getMaterial().getMatches());
+            ChatClefDiagnostics.logEvent("SMELT_SMOKER", "DO_START_END", "do_smelt_in_smoker_start", this,
+                    "target", _target,
+                    "allMaterials", _allMaterials,
+                    "ignoreMaterials", _ignoreMaterials);
         }
 
         @Override
@@ -190,25 +219,53 @@ public class SmeltInSmokerTask extends ResourceTask {
                     - mod.getItemStorage().getItemCountInventoryOnly(outputTarget.getMatches())
                     - (outputTarget.matches(_smokerCache.outputSlot.getItem()) ? _smokerCache.outputSlot.getCount() : 0)
                     - totalFuelInSmoker;
+            ChatClefDiagnostics.logEvent("SMELT_SMOKER", "DO_TICK_STATE", "do_smelt_in_smoker_material_fuel_state", this,
+                    "target", _target,
+                    "materialTarget", materialTarget,
+                    "outputTarget", outputTarget,
+                    "materialsNeeded", materialsNeeded,
+                    "fuelNeeded", fuelNeeded,
+                    "totalFuelInSmoker", totalFuelInSmoker,
+                    "cachedMaterialSlot", ChatClefDiagnostics.itemStackSummary(_smokerCache.materialSlot),
+                    "cachedFuelSlot", ChatClefDiagnostics.itemStackSummary(_smokerCache.fuelSlot),
+                    "cachedOutputSlot", ChatClefDiagnostics.itemStackSummary(_smokerCache.outputSlot),
+                    "burningFuelCount", _smokerCache.burningFuelCount,
+                    "burnPercentage", _smokerCache.burnPercentage,
+                    "inventoryMaterialCount", ChatClefDiagnostics.safeValue(() -> mod.getItemStorage().getItemCount(materialTarget.getMatches())),
+                    "inventoryFuelCount", ChatClefDiagnostics.safeValue(() -> StorageHelper.calculateInventoryFuelCount(mod)));
 
             // We don't have enough materials...
             if (mod.getItemStorage().getItemCount(materialTarget.getMatches()) < materialsNeeded) {
                 setDebugState("Getting Materials");
-                return getMaterialTask(_target.getMaterial());
+                Task materialTask = getMaterialTask(_target.getMaterial());
+                ChatClefDiagnostics.logTaskTransition(this, null, materialTask, "do_smelt_in_smoker_return_material_task",
+                        "materialsNeeded", materialsNeeded,
+                        "materialTarget", materialTarget);
+                return materialTask;
             }
 
             // We don't have enough fuel...
             if (_smokerCache.burningFuelCount <= 0 && StorageHelper.calculateInventoryFuelCount(mod) < fuelNeeded) {
                 setDebugState("Getting Fuel");
-                return new CollectFuelTask(fuelNeeded + 1);
+                Task fuelTask = new CollectFuelTask(fuelNeeded + 1);
+                ChatClefDiagnostics.logTaskTransition(this, null, fuelTask, "do_smelt_in_smoker_return_fuel_task",
+                        "fuelNeeded", fuelNeeded,
+                        "inventoryFuelCount", StorageHelper.calculateInventoryFuelCount(mod));
+                return fuelTask;
             }
 
             // Make sure our materials are accessible in our inventory
             if (StorageHelper.isItemInaccessibleToContainer(mod, _allMaterials)) {
-                return new MoveInaccessibleItemToInventoryTask(_allMaterials);
+                Task moveTask = new MoveInaccessibleItemToInventoryTask(_allMaterials);
+                ChatClefDiagnostics.logTaskTransition(this, null, moveTask, "do_smelt_in_smoker_return_accessible_material_task",
+                        "allMaterials", _allMaterials);
+                return moveTask;
             }
 
             // We have fuel and materials. Get to our container and smelt!
+            ChatClefDiagnostics.logEvent("SMELT_SMOKER", "DO_TICK_DECISION", "do_smelt_in_smoker_enter_container_flow", this,
+                    "materialsNeeded", materialsNeeded,
+                    "fuelNeeded", fuelNeeded);
             return super.onTick();
         }
 
@@ -230,26 +287,44 @@ public class SmeltInSmokerTask extends ResourceTask {
             ItemStack output = StorageHelper.getItemStackInSlot(SmokerSlot.OUTPUT_SLOT);
             ItemStack material = StorageHelper.getItemStackInSlot(SmokerSlot.INPUT_SLOT_MATERIALS);
             ItemStack fuel = StorageHelper.getItemStackInSlot(SmokerSlot.INPUT_SLOT_FUEL);
+            ChatClefDiagnostics.logEvent("SMELT_SMOKER", "CONTAINER_SUBTASK_BEGIN", "smoker_container_subtask_state", this,
+                    "outputSlot", ChatClefDiagnostics.itemStackSummary(output),
+                    "materialSlot", ChatClefDiagnostics.itemStackSummary(material),
+                    "fuelSlot", ChatClefDiagnostics.itemStackSummary(fuel),
+                    "cursorStack", ChatClefDiagnostics.safeValue(StorageHelper::getItemStackInCursorSlot),
+                    "smokerFuel", ChatClefDiagnostics.safeValue(StorageHelper::getSmokerFuel),
+                    "smokerCookPercent", ChatClefDiagnostics.safeValue(StorageHelper::getSmokerCookPercent));
 
             // Receive from output if present
             double currentlyCachedWhileCooking = StorageHelper.getSmokerFuel() + StorageHelper.getSmokerCookPercent();
             double needsWhileCooking = material.getCount() - currentlyCachedWhileCooking;
+            ChatClefDiagnostics.logEvent("SMELT_SMOKER", "CONTAINER_SUBTASK_COOKING_STATE", "smoker_cooking_state", this,
+                    "currentlyCachedWhileCooking", currentlyCachedWhileCooking,
+                    "needsWhileCooking", needsWhileCooking);
             if (needsWhileCooking <= 0) {
                 if (!fuel.isEmpty()) {
                     ItemStack cursor = StorageHelper.getItemStackInCursorSlot();
                     if (!ItemHelper.canStackTogether(fuel, cursor)) {
                         Optional<Slot> toFit = mod.getItemStorage().getSlotThatCanFitInPlayerInventory(cursor, false);
                         if (toFit.isPresent()) {
+                            ChatClefDiagnostics.logSlotClick("REQUEST", "smoker_move_cursor_before_take_fuel", toFit.get(), 0, SlotActionType.PICKUP,
+                                    "cursorStack", ChatClefDiagnostics.itemStackSummary(cursor),
+                                    "fuelSlot", ChatClefDiagnostics.itemStackSummary(fuel));
                             mod.getSlotHandler().clickSlot(toFit.get(), 0, SlotActionType.PICKUP);
                             return null;
                         } else {
                             // Eh screw it
                             if (ItemHelper.canThrowAwayStack(mod, cursor)) {
+                                ChatClefDiagnostics.logSlotClick("REQUEST", "smoker_throw_cursor_before_take_fuel", Slot.UNDEFINED, 0, SlotActionType.PICKUP,
+                                        "cursorStack", ChatClefDiagnostics.itemStackSummary(cursor));
                                 mod.getSlotHandler().clickSlot(Slot.UNDEFINED, 0, SlotActionType.PICKUP);
                                 return null;
                             }
                         }
                     }
+                    ChatClefDiagnostics.logSlotClick("REQUEST", "smoker_take_back_fuel_slot", SmokerSlot.INPUT_SLOT_FUEL, 0, SlotActionType.PICKUP,
+                            "fuelSlot", ChatClefDiagnostics.itemStackSummary(fuel),
+                            "needsWhileCooking", needsWhileCooking);
                     mod.getSlotHandler().clickSlot(SmokerSlot.INPUT_SLOT_FUEL, 0, SlotActionType.PICKUP);
                     return null;
                 }
@@ -261,17 +336,24 @@ public class SmeltInSmokerTask extends ResourceTask {
                 if (!ItemHelper.canStackTogether(output, cursor)) {
                     Optional<Slot> toFit = mod.getItemStorage().getSlotThatCanFitInPlayerInventory(cursor, false);
                     if (toFit.isPresent()) {
+                        ChatClefDiagnostics.logSlotClick("REQUEST", "smoker_move_cursor_before_output", toFit.get(), 0, SlotActionType.PICKUP,
+                                "cursorStack", ChatClefDiagnostics.itemStackSummary(cursor),
+                                "outputSlot", ChatClefDiagnostics.itemStackSummary(output));
                         mod.getSlotHandler().clickSlot(toFit.get(), 0, SlotActionType.PICKUP);
                         return null;
                     } else {
                         // Eh screw it
                         if (ItemHelper.canThrowAwayStack(mod, cursor)) {
+                            ChatClefDiagnostics.logSlotClick("REQUEST", "smoker_throw_cursor_before_output", Slot.UNDEFINED, 0, SlotActionType.PICKUP,
+                                    "cursorStack", ChatClefDiagnostics.itemStackSummary(cursor));
                             mod.getSlotHandler().clickSlot(Slot.UNDEFINED, 0, SlotActionType.PICKUP);
                             return null;
                         }
                     }
                 }
                 // Pick up
+                ChatClefDiagnostics.logSlotClick("REQUEST", "smoker_pickup_output", SmokerSlot.OUTPUT_SLOT, 0, SlotActionType.PICKUP,
+                        "outputSlot", ChatClefDiagnostics.itemStackSummary(output));
                 mod.getSlotHandler().clickSlot(SmokerSlot.OUTPUT_SLOT, 0, SlotActionType.PICKUP);
                 return null;
                 // return new MoveItemToSlotTask(new ItemTarget(output.getItem(), output.getCount()), toMoveTo.get(), mod -> FurnaceSlot.OUTPUT_SLOT);
@@ -288,7 +370,12 @@ public class SmeltInSmokerTask extends ResourceTask {
             if (!_allMaterials.matches(material.getItem()) || neededMaterialsInSlot > material.getCount()) {
                 int materialsAlreadyIn = (materialTarget.matches(material.getItem()) ? material.getCount() : 0);
                 setDebugState("Moving Materials");
-                return new MoveItemToSlotFromInventoryTask(new ItemTarget(materialTarget, neededMaterialsInSlot - materialsAlreadyIn), SmokerSlot.INPUT_SLOT_MATERIALS);
+                Task moveMaterialsTask = new MoveItemToSlotFromInventoryTask(new ItemTarget(materialTarget, neededMaterialsInSlot - materialsAlreadyIn), SmokerSlot.INPUT_SLOT_MATERIALS);
+                ChatClefDiagnostics.logTaskTransition(this, null, moveMaterialsTask, "smoker_return_move_materials_task",
+                        "neededMaterialsInSlot", neededMaterialsInSlot,
+                        "materialsAlreadyIn", materialsAlreadyIn,
+                        "materialSlot", ChatClefDiagnostics.itemStackSummary(material));
+                return moveMaterialsTask;
             }
 
             /*
@@ -326,12 +413,21 @@ public class SmeltInSmokerTask extends ResourceTask {
                     }
                     if (bestStack != null) {
                         setDebugState("Filling fuel");
-                        return new MoveItemToSlotFromInventoryTask(new ItemTarget(bestStack.getItem(), bestStack.getCount()), SmokerSlot.INPUT_SLOT_FUEL);
+                        Task moveFuelTask = new MoveItemToSlotFromInventoryTask(new ItemTarget(bestStack.getItem(), bestStack.getCount()), SmokerSlot.INPUT_SLOT_FUEL);
+                        ChatClefDiagnostics.logTaskTransition(this, null, moveFuelTask, "smoker_return_move_fuel_task",
+                                "needs", needs,
+                                "bestStack", ChatClefDiagnostics.itemStackSummary(bestStack),
+                                "closestDelta", closestDelta);
+                        return moveFuelTask;
                     }
                 }
             }
 
             setDebugState("Waiting...");
+            ChatClefDiagnostics.logEvent("SMELT_SMOKER", "CONTAINER_SUBTASK_RETURN", "smoker_waiting_for_cook", this,
+                    "materialSlot", ChatClefDiagnostics.itemStackSummary(material),
+                    "fuelSlot", ChatClefDiagnostics.itemStackSummary(fuel),
+                    "outputSlot", ChatClefDiagnostics.itemStackSummary(output));
             return null;
         }
 
@@ -340,15 +436,29 @@ public class SmeltInSmokerTask extends ResourceTask {
             if (_smokerCache.burnPercentage > 0 || _smokerCache.burningFuelCount > 0 ||
                     _smokerCache.fuelSlot != null || _smokerCache.materialSlot != null ||
                     _smokerCache.outputSlot != null) {
+                ChatClefDiagnostics.logEvent("SMELT_SMOKER", "COST_TO_MAKE_NEW", "smoker_cache_non_empty_cost", this,
+                        "cost", 9999999.0,
+                        "cachedMaterialSlot", ChatClefDiagnostics.itemStackSummary(_smokerCache.materialSlot),
+                        "cachedFuelSlot", ChatClefDiagnostics.itemStackSummary(_smokerCache.fuelSlot),
+                        "cachedOutputSlot", ChatClefDiagnostics.itemStackSummary(_smokerCache.outputSlot));
                 return 9999999.0;
             }
             if (mod.getItemStorage().getItemCount(Items.COBBLESTONE) > 8 &&
                     mod.getItemStorage().getItemCount(ItemHelper.LOG) > 4) {
                 double cost = 100.0 - 90.0 * (((double) mod.getItemStorage().getItemCount(new Item[]{Items.COBBLESTONE})
                         / 8.0) + ((double) mod.getItemStorage().getItemCount(ItemHelper.LOG) / 4.0));
-                return Math.max(cost, 10.0);
+                double boundedCost = Math.max(cost, 10.0);
+                ChatClefDiagnostics.logEvent("SMELT_SMOKER", "COST_TO_MAKE_NEW", "smoker_inventory_cost", this,
+                        "cost", boundedCost,
+                        "cobblestoneCount", mod.getItemStorage().getItemCount(Items.COBBLESTONE),
+                        "logCount", mod.getItemStorage().getItemCount(ItemHelper.LOG));
+                return boundedCost;
             }
-            return StorageHelper.miningRequirementMetInventory(MiningRequirement.WOOD) ? 50.0 : 100.0;
+            double fallbackCost = StorageHelper.miningRequirementMetInventory(MiningRequirement.WOOD) ? 50.0 : 100.0;
+            ChatClefDiagnostics.logEvent("SMELT_SMOKER", "COST_TO_MAKE_NEW", "smoker_fallback_cost", this,
+                    "cost", fallbackCost,
+                    "woodRequirementMet", StorageHelper.miningRequirementMetInventory(MiningRequirement.WOOD));
+            return fallbackCost;
         }
 
         @Override
@@ -365,6 +475,14 @@ public class SmeltInSmokerTask extends ResourceTask {
                 _smokerCache.fuelSlot = StorageHelper.getItemStackInSlot(SmokerSlot.INPUT_SLOT_FUEL);
                 _smokerCache.materialSlot = StorageHelper.getItemStackInSlot(SmokerSlot.INPUT_SLOT_MATERIALS);
                 _smokerCache.outputSlot = StorageHelper.getItemStackInSlot(SmokerSlot.OUTPUT_SLOT);
+                ChatClefDiagnostics.logEvent("SMELT_SMOKER", "CACHE_UPDATE", "smoker_cache_updated_from_open_screen", this,
+                        "materialSlot", ChatClefDiagnostics.itemStackSummary(_smokerCache.materialSlot),
+                        "fuelSlot", ChatClefDiagnostics.itemStackSummary(_smokerCache.fuelSlot),
+                        "outputSlot", ChatClefDiagnostics.itemStackSummary(_smokerCache.outputSlot),
+                        "burningFuelCount", _smokerCache.burningFuelCount,
+                        "burnPercentage", _smokerCache.burnPercentage);
+            } else {
+                ChatClefDiagnostics.logEvent("SMELT_SMOKER", "CACHE_SKIP", "smoker_cache_not_updated_screen_closed", this);
             }
         }
     }

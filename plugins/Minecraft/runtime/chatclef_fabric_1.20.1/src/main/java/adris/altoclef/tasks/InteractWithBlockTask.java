@@ -226,6 +226,7 @@ public class InteractWithBlockTask extends Task {
     protected void onStart() {
         ChatClefDiagnostics.logEvent("INTERACT_BLOCK", "ON_START_BEGIN", "interact_block_start", this,
                 "targetPosition", target,
+                "targetBlockState", ChatClefDiagnostics.safeValue(() -> AltoClef.getInstance().getWorld().getBlockState(target)),
                 "direction", direction,
                 "interactInput", interactInput,
                 "shiftClick", shiftClick,
@@ -379,6 +380,7 @@ public class InteractWithBlockTask extends Task {
 
         ChatClefDiagnostics.logEvent("INTERACT_BLOCK", "RIGHT_CLICK_BEGIN", "before_rightClick", this,
                 "targetPosition", target,
+                "targetBlockState", ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(target)),
                 "interactInput", interactInput,
                 "shiftClick", shiftClick,
                 "customGoalActive", ChatClefDiagnostics.safeValue(proc::isActive));
@@ -502,8 +504,10 @@ public class InteractWithBlockTask extends Task {
     private ClickResponse rightClick(AltoClef mod) {
         ChatClefDiagnostics.logEvent("INTERACT_BLOCK", "RIGHT_CLICK_ENTRY", "rightClick_entry", this,
                 "targetPosition", target,
+                "targetBlockState", ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(target)),
                 "interactInput", interactInput,
-                "shiftClick", shiftClick);
+                "shiftClick", shiftClick,
+                "crosshairTarget", ChatClefDiagnostics.className(net.minecraft.client.MinecraftClient.getInstance().crosshairTarget));
 
         // Don't interact if baritone can't interact.
         if (mod.getExtraBaritoneSettings().isInteractionPaused()) {
@@ -598,7 +602,16 @@ public class InteractWithBlockTask extends Task {
                 ChatClefDiagnostics.logInput("REQUEST", "rightClick_tryPress_before", interactInput,
                         "inputRequested", true,
                         "targetPosition", target,
-                        "shiftClick", shiftClick);
+                        "targetBlockState", ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(target)),
+                        "shiftClick", shiftClick,
+                        "playerSneakingBeforePress", ChatClefDiagnostics.safeValue(() -> mod.getPlayer().isSneaking()),
+                        "mainHandItemBeforePress", ChatClefDiagnostics.safeValue(() -> mod.getPlayer().getMainHandStack()));
+                ChatClefDiagnostics.logInputSnapshot("BEFORE_RIGHT_CLICK_TRY_PRESS", "rightClick_before_tryPress_snapshot",
+                        "targetPosition", target,
+                        "targetBlockState", ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(target)),
+                        "interactInput", interactInput,
+                        "taskShiftClick", shiftClick,
+                        "mainHandItemBeforePress", ChatClefDiagnostics.safeValue(() -> mod.getPlayer().getMainHandStack()));
                 mod.getInputControls().tryPress(interactInput);
                 boolean interactHeld = mod.getInputControls().isHeldDown(interactInput);
                 ChatClefDiagnostics.logInput(interactHeld ? "HELD" : "NOT_HELD", "rightClick_tryPress_after", interactInput,
@@ -606,16 +619,42 @@ public class InteractWithBlockTask extends Task {
                         "inputAccepted", interactHeld,
                         "inputHeldAfter", interactHeld,
                         "targetPosition", target,
-                        "shiftClick", shiftClick);
+                        "targetBlockState", ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(target)),
+                        "shiftClick", shiftClick,
+                        "playerSneakingAfterPress", ChatClefDiagnostics.safeValue(() -> mod.getPlayer().isSneaking()),
+                        "mainHandItemAfterPress", ChatClefDiagnostics.safeValue(() -> mod.getPlayer().getMainHandStack()));
+                ChatClefDiagnostics.logInputSnapshot("AFTER_RIGHT_CLICK_TRY_PRESS", "rightClick_after_tryPress_snapshot",
+                        "targetPosition", target,
+                        "targetBlockState", ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(target)),
+                        "interactInput", interactInput,
+                        "taskShiftClick", shiftClick,
+                        "inputAccepted", interactHeld,
+                        "mainHandItemAfterPress", ChatClefDiagnostics.safeValue(() -> mod.getPlayer().getMainHandStack()));
                 if (interactHeld) {
                     if (shiftClick) {
                         ChatClefDiagnostics.logInput("REQUEST", "rightClick_shift_hold_before_click_attempted", Input.SNEAK,
                                 "inputRequested", true,
-                                "targetPosition", target);
+                                "targetPosition", target,
+                                "targetBlockState", ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(target)),
+                                "playerSneakingBeforeShiftHold", ChatClefDiagnostics.safeValue(() -> mod.getPlayer().isSneaking()));
                         mod.getInputControls().hold(Input.SNEAK);
+                        ChatClefDiagnostics.logInput("HELD", "rightClick_shift_hold_after_click_attempted", Input.SNEAK,
+                                "inputRequested", true,
+                                "targetPosition", target,
+                                "targetBlockState", ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(target)),
+                                "playerSneakingAfterShiftHold", ChatClefDiagnostics.safeValue(() -> mod.getPlayer().isSneaking()));
                     }
+                    ChatClefDiagnostics.logInputSnapshot("BEFORE_CLICK_ATTEMPT_RETURN", "rightClick_before_click_attempted_return_snapshot",
+                            "targetPosition", target,
+                            "targetBlockState", ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(target)),
+                            "interactInput", interactInput,
+                            "taskShiftClick", shiftClick,
+                            "clickResponse", ClickResponse.CLICK_ATTEMPTED);
                     ChatClefDiagnostics.logEvent("INTERACT_BLOCK", "RIGHT_CLICK_RETURN", "click_attempted", this,
                             "targetPosition", target,
+                            "targetBlockState", ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(target)),
+                            "interactInput", interactInput,
+                            "shiftClick", shiftClick,
                             "clickResponse", ClickResponse.CLICK_ATTEMPTED);
                     return ClickResponse.CLICK_ATTEMPTED;
                 }

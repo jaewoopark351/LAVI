@@ -2,6 +2,7 @@ package adris.altoclef.mixins;
 
 import adris.altoclef.eventbus.EventBus;
 import adris.altoclef.eventbus.events.BlockPlaceEvent;
+import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.util.math.BlockPos;
@@ -25,7 +26,15 @@ public class WorldBlockModifiedMixin {
             at = @At("HEAD")
     )
     public void onBlockWasChanged(BlockPos pos, BlockState oldBlock, BlockState newBlock, CallbackInfo ci) {
-        if (!hasBlock(oldBlock, pos) && hasBlock(newBlock, pos)) {
+        boolean oldHasBlock = hasBlock(oldBlock, pos);
+        boolean newHasBlock = hasBlock(newBlock, pos);
+        ChatClefDiagnostics.logEvent("WORLD_BLOCK", "CHANGED", "world_onBlockChanged", null,
+                "blockPosition", pos,
+                "oldBlockState", oldBlock,
+                "newBlockState", newBlock,
+                "oldHasBlock", oldHasBlock,
+                "newHasBlock", newHasBlock);
+        if (!oldHasBlock && newHasBlock) {
             BlockPlaceEvent evt = new BlockPlaceEvent(pos, newBlock);
             EventBus.publish(evt);
         }

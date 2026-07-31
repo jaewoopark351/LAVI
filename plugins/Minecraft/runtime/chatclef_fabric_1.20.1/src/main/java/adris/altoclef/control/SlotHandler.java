@@ -9,6 +9,7 @@ import adris.altoclef.util.slots.CursorSlot;
 import adris.altoclef.util.slots.PlayerSlot;
 import adris.altoclef.util.slots.Slot;
 import adris.altoclef.util.time.TimerGame;
+import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.item.*;
@@ -38,31 +39,48 @@ public class SlotHandler {
     public boolean canDoSlotAction() {
         if (overrideTimerOnce) {
             overrideTimerOnce = false;
+            ChatClefDiagnostics.logEvent("SLOT", "CAN_DO_ACTION", "override_timer_once_allowed", null,
+                    "overrideTimerOnce", true);
             return true;
         }
         slotActionTimer.setInterval(mod.getModSettings().getContainerItemMoveDelay());
-        return slotActionTimer.elapsed();
+        boolean allowed = slotActionTimer.elapsed();
+        ChatClefDiagnostics.logEvent("SLOT", "CAN_DO_ACTION", "slot_action_timer_check", null,
+                "allowed", allowed,
+                "containerItemMoveDelay", mod.getModSettings().getContainerItemMoveDelay());
+        return allowed;
     }
 
     public void registerSlotAction() {
+        ChatClefDiagnostics.logEvent("SLOT", "REGISTER_ACTION", "slot_action_registered", null);
         mod.getItemStorage().registerSlotAction();
         slotActionTimer.reset();
     }
 
 
     public void clickSlot(Slot slot, int mouseButton, SlotActionType type) {
+        ChatClefDiagnostics.logSlotClick("REQUEST", "clickSlot_requested", slot, mouseButton, type,
+                "slotStackBefore", ChatClefDiagnostics.safeValue(() -> StorageHelper.getItemStackInSlot(slot)));
         if (!canDoSlotAction()) {
+            ChatClefDiagnostics.logSlotClick("SUPPRESSED", "clickSlot_timer_blocked", slot, mouseButton, type);
             return;
         }
 
         if (slot.getWindowSlot() == -1) {
+            ChatClefDiagnostics.logSlotClick("REDIRECT", "clickSlot_cursor_redirect_to_undefined", slot, mouseButton, type);
             clickSlot(PlayerSlot.UNDEFINED, 0, SlotActionType.PICKUP);
             return;
         }
         // NOT THE CASE! We may have something in the cursor slot to place.
         //if (getItemStackInSlot(slot).isEmpty()) return getItemStackInSlot(slot);
 
+        ChatClefDiagnostics.logSlotClick("ACCEPTED", "clickSlot_before_window_click", slot, mouseButton, type,
+                "windowSlot", slot.getWindowSlot(),
+                "slotStackBefore", ChatClefDiagnostics.safeValue(() -> StorageHelper.getItemStackInSlot(slot)));
         clickWindowSlot(slot.getWindowSlot(), mouseButton, type);
+        ChatClefDiagnostics.logSlotClick("RETURN", "clickSlot_after_window_click", slot, mouseButton, type,
+                "windowSlot", slot.getWindowSlot(),
+                "slotStackAfter", ChatClefDiagnostics.safeValue(() -> StorageHelper.getItemStackInSlot(slot)));
     }
 
     private void clickSlotForce(Slot slot, int mouseButton, SlotActionType type) {
@@ -73,14 +91,36 @@ public class SlotHandler {
     private void clickWindowSlot(int windowSlot, int mouseButton, SlotActionType type) {
         ClientPlayerEntity player = MinecraftClient.getInstance().player;
         if (player == null) {
+            ChatClefDiagnostics.logEvent("SLOT", "RETURN", "clickWindowSlot_no_player", null,
+                    "windowSlot", windowSlot,
+                    "mouseButton", mouseButton,
+                    "slotActionType", type);
             return;
         }
         registerSlotAction();
         int syncId = player.currentScreenHandler.syncId;
 
         try {
+            ChatClefDiagnostics.logEvent("SLOT", "WINDOW_CLICK_HEAD", "controller_clickSlot_begin", null,
+                    "syncId", syncId,
+                    "windowSlot", windowSlot,
+                    "mouseButton", mouseButton,
+                    "slotActionType", type,
+                    "cursorStackBefore", ChatClefDiagnostics.safeValue(() -> player.currentScreenHandler.getCursorStack()));
             mod.getController().clickSlot(syncId, windowSlot, mouseButton, type, player);
+            ChatClefDiagnostics.logEvent("SLOT", "WINDOW_CLICK_RETURN", "controller_clickSlot_end", null,
+                    "syncId", syncId,
+                    "windowSlot", windowSlot,
+                    "mouseButton", mouseButton,
+                    "slotActionType", type,
+                    "cursorStackAfter", ChatClefDiagnostics.safeValue(() -> player.currentScreenHandler.getCursorStack()));
         } catch (Exception e) {
+            ChatClefDiagnostics.logEvent("SLOT", "WINDOW_CLICK_EXCEPTION", "controller_clickSlot_exception", null,
+                    "syncId", syncId,
+                    "windowSlot", windowSlot,
+                    "mouseButton", mouseButton,
+                    "slotActionType", type,
+                    "exceptionType", e.getClass().getName());
             Debug.logWarning("Slot Click Error (ignored)");
             e.printStackTrace();
         }
@@ -102,9 +142,17 @@ public class SlotHandler {
     }
 
     public boolean forceEquipItem(Item toEquip) {
+        ChatClefDiagnostics.logEvent("SLOT", "FORCE_EQUIP_BEGIN", "forceEquipItem_begin", null,
+                "toEquip", toEquip,
+                "selectedSlotBefore", ChatClefDiagnostics.safeValue(() -> mod.getPlayer().getInventory().selectedSlot),
+                "equippedBefore", ChatClefDiagnostics.safeValue(() -> StorageHelper.getItemStackInSlot(PlayerSlot.getEquipSlot())));
 
         // Already equipped
-        if (StorageHelper.getItemStackInSlot(PlayerSlot.getEquipSlot()).getItem() == toEquip) return true;
+        if (StorageHelper.getItemStackInSlot(PlayerSlot.getEquipSlot()).getItem() == toEquip) {
+            ChatClefDiagnostics.logEvent("SLOT", "FORCE_EQUIP_RETURN", "forceEquipItem_already_equipped", null,
+                    "toEquip", toEquip);
+            return true;
+        }
 
         // Always equip to the second slot. First + last is occupied by baritone.
         mod.getPlayer().getInventory().selectedSlot = 1;
@@ -117,11 +165,20 @@ public class SlotHandler {
             for (Slot ItemSlots : itemSlots) {
                 int hotbar = 1;
                 //_mod.getPlayer().getInventory().swapSlotWithHotbar();
+                ChatClefDiagnostics.logSlotClick("FORCE_EQUIP_CLICK", "forceEquipItem_click_source_slot", ItemSlots, inCursor ? 0 : hotbar, inCursor ? SlotActionType.PICKUP : SlotActionType.SWAP,
+                        "toEquip", toEquip,
+                        "inCursor", inCursor);
                 clickSlotForce(Objects.requireNonNull(ItemSlots), inCursor ? 0 : hotbar, inCursor ? SlotActionType.PICKUP : SlotActionType.SWAP);
                 //registerSlotAction();
             }
+            ChatClefDiagnostics.logEvent("SLOT", "FORCE_EQUIP_RETURN", "forceEquipItem_success", null,
+                    "toEquip", toEquip,
+                    "selectedSlotAfter", ChatClefDiagnostics.safeValue(() -> mod.getPlayer().getInventory().selectedSlot),
+                    "equippedAfter", ChatClefDiagnostics.safeValue(() -> StorageHelper.getItemStackInSlot(PlayerSlot.getEquipSlot())));
             return true;
         }
+        ChatClefDiagnostics.logEvent("SLOT", "FORCE_EQUIP_RETURN", "forceEquipItem_missing_item", null,
+                "toEquip", toEquip);
         return false;
     }
 

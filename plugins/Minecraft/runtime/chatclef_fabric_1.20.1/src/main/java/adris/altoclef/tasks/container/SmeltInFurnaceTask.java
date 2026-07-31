@@ -16,6 +16,7 @@ import adris.altoclef.util.helpers.ItemHelper;
 import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.slots.FurnaceSlot;
 import adris.altoclef.util.slots.Slot;
+import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 import net.minecraft.block.Blocks;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
@@ -72,6 +73,10 @@ public class SmeltInFurnaceTask extends ResourceTask {
 
     @Override
     protected void onResourceStart(AltoClef mod) {
+        ChatClefDiagnostics.startTrace("smelt_in_furnace_start", this,
+                "targets", Arrays.toString(_targets));
+        ChatClefDiagnostics.logEvent("SMELT_FURNACE", "RESOURCE_START", "smelt_in_furnace_resource_start", this,
+                "targets", Arrays.toString(_targets));
         mod.getBehaviour().push();
         if (_targets.length != 1) {
             Debug.logWarning("Tried smelting multiple targets, only one target is supported at a time!");
@@ -81,12 +86,21 @@ public class SmeltInFurnaceTask extends ResourceTask {
     @Override
     protected Task onResourceTick(AltoClef mod) {
         Optional<BlockPos> furnacePos = mod.getBlockScanner().getNearestBlock(Blocks.FURNACE);
+        ChatClefDiagnostics.logEvent("SMELT_FURNACE", "RESOURCE_TICK", "smelt_in_furnace_resource_tick", this,
+                "targets", Arrays.toString(_targets),
+                "nearestFurnacePresent", furnacePos.isPresent(),
+                "nearestFurnacePosition", furnacePos.map(Object::toString).orElse("none"),
+                "nearestFurnaceState", furnacePos.map(blockPos -> ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(blockPos))).orElse("unavailable"),
+                "doTask", ChatClefDiagnostics.taskSummary(_doTask));
         furnacePos.ifPresent(blockPos -> mod.getBehaviour().avoidBlockBreaking(blockPos));
         return _doTask;
     }
 
     @Override
     protected void onResourceStop(AltoClef mod, Task interruptTask) {
+        ChatClefDiagnostics.logTaskTransition(this, this, interruptTask, "smelt_in_furnace_resource_stop_begin",
+                "targets", Arrays.toString(_targets),
+                "cursorStack", ChatClefDiagnostics.safeValue(StorageHelper::getItemStackInCursorSlot));
         mod.getBehaviour().pop();
         // Close furnace screen
         ItemStack cursorStack = StorageHelper.getItemStackInCursorSlot();
@@ -103,6 +117,9 @@ public class SmeltInFurnaceTask extends ResourceTask {
         } else {
             StorageHelper.closeScreen();
         }
+        ChatClefDiagnostics.logTaskTransition(this, this, interruptTask, "smelt_in_furnace_resource_stop_end",
+                "targets", Arrays.toString(_targets),
+                "cursorStack", ChatClefDiagnostics.safeValue(StorageHelper::getItemStackInCursorSlot));
     }
 
     @Override
@@ -155,11 +172,19 @@ public class SmeltInFurnaceTask extends ResourceTask {
 
         @Override
         protected boolean isContainerOpen(AltoClef mod) {
-            return (mod.getPlayer().currentScreenHandler instanceof FurnaceScreenHandler);
+            boolean open = mod.getPlayer().currentScreenHandler instanceof FurnaceScreenHandler;
+            ChatClefDiagnostics.logEvent("SMELT_FURNACE", "CONTAINER_OPEN_CHECK", "furnace_screen_handler_check", this,
+                    "isContainerOpen", open,
+                    "screenHandler", ChatClefDiagnostics.className(mod.getPlayer().currentScreenHandler));
+            return open;
         }
 
         @Override
         protected void onStart() {
+            ChatClefDiagnostics.logEvent("SMELT_FURNACE", "DO_START_BEGIN", "do_smelt_in_furnace_start", this,
+                    "target", target,
+                    "allMaterials", allMaterials,
+                    "ignoreMaterials", ignoreMaterials);
             super.onStart();
             BotBehaviour botBehaviour = AltoClef.getInstance().getBehaviour();
 
@@ -167,6 +192,10 @@ public class SmeltInFurnaceTask extends ResourceTask {
             botBehaviour.addProtectedItems(Items.COAL);
             botBehaviour.addProtectedItems(allMaterials.getMatches());
             botBehaviour.addProtectedItems(target.getMaterial().getMatches());
+            ChatClefDiagnostics.logEvent("SMELT_FURNACE", "DO_START_END", "do_smelt_in_furnace_start", this,
+                    "target", target,
+                    "allMaterials", allMaterials,
+                    "ignoreMaterials", ignoreMaterials);
         }
 
         @Override
@@ -193,25 +222,53 @@ public class SmeltInFurnaceTask extends ResourceTask {
                     - mod.getItemStorage().getItemCountInventoryOnly(outputTarget.getMatches())
                     - (outputTarget.matches(furnaceCache.outputSlot.getItem()) ? furnaceCache.outputSlot.getCount() : 0)
                     - totalFuelInFurnace;
+            ChatClefDiagnostics.logEvent("SMELT_FURNACE", "DO_TICK_STATE", "do_smelt_in_furnace_material_fuel_state", this,
+                    "target", target,
+                    "materialTarget", materialTarget,
+                    "outputTarget", outputTarget,
+                    "materialsNeeded", materialsNeeded,
+                    "fuelNeeded", fuelNeeded,
+                    "totalFuelInFurnace", totalFuelInFurnace,
+                    "cachedMaterialSlot", ChatClefDiagnostics.itemStackSummary(furnaceCache.materialSlot),
+                    "cachedFuelSlot", ChatClefDiagnostics.itemStackSummary(furnaceCache.fuelSlot),
+                    "cachedOutputSlot", ChatClefDiagnostics.itemStackSummary(furnaceCache.outputSlot),
+                    "burningFuelCount", furnaceCache.burningFuelCount,
+                    "burnPercentage", furnaceCache.burnPercentage,
+                    "inventoryMaterialCount", ChatClefDiagnostics.safeValue(() -> mod.getItemStorage().getItemCount(materialTarget.getMatches())),
+                    "inventoryFuelCount", ChatClefDiagnostics.safeValue(() -> StorageHelper.calculateInventoryFuelCount(mod)));
 
             // We don't have enough materials...
             if (mod.getItemStorage().getItemCount(materialTarget.getMatches()) < materialsNeeded) {
                 setDebugState("Getting Materials");
-                return getMaterialTask(target.getMaterial());
+                Task materialTask = getMaterialTask(target.getMaterial());
+                ChatClefDiagnostics.logTaskTransition(this, null, materialTask, "do_smelt_in_furnace_return_material_task",
+                        "materialsNeeded", materialsNeeded,
+                        "materialTarget", materialTarget);
+                return materialTask;
             }
 
             // We don't have enough fuel...
             if (furnaceCache.burningFuelCount <= 0 && StorageHelper.calculateInventoryFuelCount(mod) < fuelNeeded) {
                 setDebugState("Getting Fuel");
-                return new CollectFuelTask(fuelNeeded + 1);
+                Task fuelTask = new CollectFuelTask(fuelNeeded + 1);
+                ChatClefDiagnostics.logTaskTransition(this, null, fuelTask, "do_smelt_in_furnace_return_fuel_task",
+                        "fuelNeeded", fuelNeeded,
+                        "inventoryFuelCount", StorageHelper.calculateInventoryFuelCount(mod));
+                return fuelTask;
             }
 
             // Make sure our materials are accessible in our inventory
             if (StorageHelper.isItemInaccessibleToContainer(mod, allMaterials)) {
-                return new MoveInaccessibleItemToInventoryTask(allMaterials);
+                Task moveTask = new MoveInaccessibleItemToInventoryTask(allMaterials);
+                ChatClefDiagnostics.logTaskTransition(this, null, moveTask, "do_smelt_in_furnace_return_accessible_material_task",
+                        "allMaterials", allMaterials);
+                return moveTask;
             }
 
             // We have fuel and materials. Get to our container and smelt!
+            ChatClefDiagnostics.logEvent("SMELT_FURNACE", "DO_TICK_DECISION", "do_smelt_in_furnace_enter_container_flow", this,
+                    "materialsNeeded", materialsNeeded,
+                    "fuelNeeded", fuelNeeded);
             return super.onTick();
         }
 
@@ -233,26 +290,44 @@ public class SmeltInFurnaceTask extends ResourceTask {
             ItemStack output = StorageHelper.getItemStackInSlot(FurnaceSlot.OUTPUT_SLOT);
             ItemStack material = StorageHelper.getItemStackInSlot(FurnaceSlot.INPUT_SLOT_MATERIALS);
             ItemStack fuel = StorageHelper.getItemStackInSlot(FurnaceSlot.INPUT_SLOT_FUEL);
+            ChatClefDiagnostics.logEvent("SMELT_FURNACE", "CONTAINER_SUBTASK_BEGIN", "furnace_container_subtask_state", this,
+                    "outputSlot", ChatClefDiagnostics.itemStackSummary(output),
+                    "materialSlot", ChatClefDiagnostics.itemStackSummary(material),
+                    "fuelSlot", ChatClefDiagnostics.itemStackSummary(fuel),
+                    "cursorStack", ChatClefDiagnostics.safeValue(StorageHelper::getItemStackInCursorSlot),
+                    "furnaceFuel", ChatClefDiagnostics.safeValue(StorageHelper::getFurnaceFuel),
+                    "furnaceCookPercent", ChatClefDiagnostics.safeValue(StorageHelper::getFurnaceCookPercent));
 
             // Receive from output if present
             double currentlyCachedWhileCooking = StorageHelper.getFurnaceFuel() + StorageHelper.getFurnaceCookPercent();
             double needsWhileCooking = material.getCount() - currentlyCachedWhileCooking;
+            ChatClefDiagnostics.logEvent("SMELT_FURNACE", "CONTAINER_SUBTASK_COOKING_STATE", "furnace_cooking_state", this,
+                    "currentlyCachedWhileCooking", currentlyCachedWhileCooking,
+                    "needsWhileCooking", needsWhileCooking);
             if (needsWhileCooking <= 0) {
                 if (!fuel.isEmpty()) {
                     ItemStack cursor = StorageHelper.getItemStackInCursorSlot();
                     if (!ItemHelper.canStackTogether(fuel, cursor)) {
                         Optional<Slot> toFit = mod.getItemStorage().getSlotThatCanFitInPlayerInventory(cursor, false);
                         if (toFit.isPresent()) {
+                            ChatClefDiagnostics.logSlotClick("REQUEST", "furnace_move_cursor_before_take_fuel", toFit.get(), 0, SlotActionType.PICKUP,
+                                    "cursorStack", ChatClefDiagnostics.itemStackSummary(cursor),
+                                    "fuelSlot", ChatClefDiagnostics.itemStackSummary(fuel));
                             mod.getSlotHandler().clickSlot(toFit.get(), 0, SlotActionType.PICKUP);
                             return null;
                         } else {
                             // Eh screw it
                             if (ItemHelper.canThrowAwayStack(mod, cursor)) {
+                                ChatClefDiagnostics.logSlotClick("REQUEST", "furnace_throw_cursor_before_take_fuel", Slot.UNDEFINED, 0, SlotActionType.PICKUP,
+                                        "cursorStack", ChatClefDiagnostics.itemStackSummary(cursor));
                                 mod.getSlotHandler().clickSlot(Slot.UNDEFINED, 0, SlotActionType.PICKUP);
                                 return null;
                             }
                         }
                     }
+                    ChatClefDiagnostics.logSlotClick("REQUEST", "furnace_take_back_fuel_slot", FurnaceSlot.INPUT_SLOT_FUEL, 0, SlotActionType.PICKUP,
+                            "fuelSlot", ChatClefDiagnostics.itemStackSummary(fuel),
+                            "needsWhileCooking", needsWhileCooking);
                     mod.getSlotHandler().clickSlot(FurnaceSlot.INPUT_SLOT_FUEL, 0, SlotActionType.PICKUP);
                     return null;
                 }
@@ -264,17 +339,24 @@ public class SmeltInFurnaceTask extends ResourceTask {
                 if (!ItemHelper.canStackTogether(output, cursor)) {
                     Optional<Slot> toFit = mod.getItemStorage().getSlotThatCanFitInPlayerInventory(cursor, false);
                     if (toFit.isPresent()) {
+                        ChatClefDiagnostics.logSlotClick("REQUEST", "furnace_move_cursor_before_output", toFit.get(), 0, SlotActionType.PICKUP,
+                                "cursorStack", ChatClefDiagnostics.itemStackSummary(cursor),
+                                "outputSlot", ChatClefDiagnostics.itemStackSummary(output));
                         mod.getSlotHandler().clickSlot(toFit.get(), 0, SlotActionType.PICKUP);
                         return null;
                     } else {
                         // Eh screw it
                         if (ItemHelper.canThrowAwayStack(mod, cursor)) {
+                            ChatClefDiagnostics.logSlotClick("REQUEST", "furnace_throw_cursor_before_output", Slot.UNDEFINED, 0, SlotActionType.PICKUP,
+                                    "cursorStack", ChatClefDiagnostics.itemStackSummary(cursor));
                             mod.getSlotHandler().clickSlot(Slot.UNDEFINED, 0, SlotActionType.PICKUP);
                             return null;
                         }
                     }
                 }
                 // Pick up
+                ChatClefDiagnostics.logSlotClick("REQUEST", "furnace_pickup_output", FurnaceSlot.OUTPUT_SLOT, 0, SlotActionType.PICKUP,
+                        "outputSlot", ChatClefDiagnostics.itemStackSummary(output));
                 mod.getSlotHandler().clickSlot(FurnaceSlot.OUTPUT_SLOT, 0, SlotActionType.PICKUP);
                 return null;
                 // return new MoveItemToSlotTask(new ItemTarget(output.getItem(), output.getCount()), toMoveTo.get(), mod -> FurnaceSlot.OUTPUT_SLOT);
@@ -291,7 +373,12 @@ public class SmeltInFurnaceTask extends ResourceTask {
             if (!allMaterials.matches(material.getItem()) || neededMaterialsInSlot > material.getCount()) {
                 int materialsAlreadyIn = (materialTarget.matches(material.getItem()) ? material.getCount() : 0);
                 setDebugState("Moving Materials");
-                return new MoveItemToSlotFromInventoryTask(new ItemTarget(materialTarget, neededMaterialsInSlot - materialsAlreadyIn), FurnaceSlot.INPUT_SLOT_MATERIALS);
+                Task moveMaterialsTask = new MoveItemToSlotFromInventoryTask(new ItemTarget(materialTarget, neededMaterialsInSlot - materialsAlreadyIn), FurnaceSlot.INPUT_SLOT_MATERIALS);
+                ChatClefDiagnostics.logTaskTransition(this, null, moveMaterialsTask, "furnace_return_move_materials_task",
+                        "neededMaterialsInSlot", neededMaterialsInSlot,
+                        "materialsAlreadyIn", materialsAlreadyIn,
+                        "materialSlot", ChatClefDiagnostics.itemStackSummary(material));
+                return moveMaterialsTask;
             }
 
             /*
@@ -329,12 +416,21 @@ public class SmeltInFurnaceTask extends ResourceTask {
                     }
                     if (bestStack != null) {
                         setDebugState("Filling fuel");
-                        return new MoveItemToSlotFromInventoryTask(new ItemTarget(bestStack.getItem(), bestStack.getCount()), FurnaceSlot.INPUT_SLOT_FUEL);
+                        Task moveFuelTask = new MoveItemToSlotFromInventoryTask(new ItemTarget(bestStack.getItem(), bestStack.getCount()), FurnaceSlot.INPUT_SLOT_FUEL);
+                        ChatClefDiagnostics.logTaskTransition(this, null, moveFuelTask, "furnace_return_move_fuel_task",
+                                "needs", needs,
+                                "bestStack", ChatClefDiagnostics.itemStackSummary(bestStack),
+                                "closestDelta", closestDelta);
+                        return moveFuelTask;
                     }
                 }
             }
 
             setDebugState("Waiting...");
+            ChatClefDiagnostics.logEvent("SMELT_FURNACE", "CONTAINER_SUBTASK_RETURN", "furnace_waiting_for_cook", this,
+                    "materialSlot", ChatClefDiagnostics.itemStackSummary(material),
+                    "fuelSlot", ChatClefDiagnostics.itemStackSummary(fuel),
+                    "outputSlot", ChatClefDiagnostics.itemStackSummary(output));
             return null;
         }
 
@@ -343,13 +439,26 @@ public class SmeltInFurnaceTask extends ResourceTask {
             if (furnaceCache.burnPercentage > 0 || furnaceCache.burningFuelCount > 0 ||
                     !furnaceCache.fuelSlot.isEmpty() || !furnaceCache.materialSlot.isEmpty() ||
                     !furnaceCache.outputSlot.isEmpty()) {
+                ChatClefDiagnostics.logEvent("SMELT_FURNACE", "COST_TO_MAKE_NEW", "furnace_cache_non_empty_cost", this,
+                        "cost", 9999999.0,
+                        "cachedMaterialSlot", ChatClefDiagnostics.itemStackSummary(furnaceCache.materialSlot),
+                        "cachedFuelSlot", ChatClefDiagnostics.itemStackSummary(furnaceCache.fuelSlot),
+                        "cachedOutputSlot", ChatClefDiagnostics.itemStackSummary(furnaceCache.outputSlot));
                 return 9999999.0;
             }
             if (mod.getItemStorage().getItemCount(Items.COBBLESTONE) > 8) {
                 double cost = 100.0 - 90.0 * (double) mod.getItemStorage().getItemCount(new Item[]{Items.COBBLESTONE}) / 8.0;
-                return Math.max(cost, 10.0);
+                double boundedCost = Math.max(cost, 10.0);
+                ChatClefDiagnostics.logEvent("SMELT_FURNACE", "COST_TO_MAKE_NEW", "furnace_inventory_cost", this,
+                        "cost", boundedCost,
+                        "cobblestoneCount", mod.getItemStorage().getItemCount(Items.COBBLESTONE));
+                return boundedCost;
             }
-            return StorageHelper.miningRequirementMetInventory(MiningRequirement.WOOD) ? 50.0 : 100.0;
+            double fallbackCost = StorageHelper.miningRequirementMetInventory(MiningRequirement.WOOD) ? 50.0 : 100.0;
+            ChatClefDiagnostics.logEvent("SMELT_FURNACE", "COST_TO_MAKE_NEW", "furnace_fallback_cost", this,
+                    "cost", fallbackCost,
+                    "woodRequirementMet", StorageHelper.miningRequirementMetInventory(MiningRequirement.WOOD));
+            return fallbackCost;
         }
 
         @Override
@@ -366,6 +475,14 @@ public class SmeltInFurnaceTask extends ResourceTask {
                 furnaceCache.fuelSlot = StorageHelper.getItemStackInSlot(FurnaceSlot.INPUT_SLOT_FUEL);
                 furnaceCache.materialSlot = StorageHelper.getItemStackInSlot(FurnaceSlot.INPUT_SLOT_MATERIALS);
                 furnaceCache.outputSlot = StorageHelper.getItemStackInSlot(FurnaceSlot.OUTPUT_SLOT);
+                ChatClefDiagnostics.logEvent("SMELT_FURNACE", "CACHE_UPDATE", "furnace_cache_updated_from_open_screen", this,
+                        "materialSlot", ChatClefDiagnostics.itemStackSummary(furnaceCache.materialSlot),
+                        "fuelSlot", ChatClefDiagnostics.itemStackSummary(furnaceCache.fuelSlot),
+                        "outputSlot", ChatClefDiagnostics.itemStackSummary(furnaceCache.outputSlot),
+                        "burningFuelCount", furnaceCache.burningFuelCount,
+                        "burnPercentage", furnaceCache.burnPercentage);
+            } else {
+                ChatClefDiagnostics.logEvent("SMELT_FURNACE", "CACHE_SKIP", "furnace_cache_not_updated_screen_closed", this);
             }
         }
     }
