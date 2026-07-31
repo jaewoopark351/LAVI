@@ -28,12 +28,14 @@ public class WorldBlockModifiedMixin {
     public void onBlockWasChanged(BlockPos pos, BlockState oldBlock, BlockState newBlock, CallbackInfo ci) {
         boolean oldHasBlock = hasBlock(oldBlock, pos);
         boolean newHasBlock = hasBlock(newBlock, pos);
-        ChatClefDiagnostics.logEvent("WORLD_BLOCK", "CHANGED", "world_onBlockChanged", null,
-                "blockPosition", pos,
-                "oldBlockState", oldBlock,
-                "newBlockState", newBlock,
-                "oldHasBlock", oldHasBlock,
-                "newHasBlock", newHasBlock);
+        if (ChatClefDiagnostics.isVerboseEnabled()) {
+            ChatClefDiagnostics.logEvent("WORLD_BLOCK", "CHANGED", "world_onBlockChanged", null,
+                    "blockPosition", pos,
+                    "oldBlockState", oldBlock,
+                    "newBlockState", newBlock,
+                    "oldHasBlock", oldHasBlock,
+                    "newHasBlock", newHasBlock);
+        }
         if (!oldHasBlock && newHasBlock) {
             BlockPlaceEvent evt = new BlockPlaceEvent(pos, newBlock);
             EventBus.publish(evt);

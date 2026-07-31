@@ -4,15 +4,19 @@
 
 ## Current Status
 
-Verification status: BUILT_NOT_REPRODUCED
+Verification status: APPLIED_NOT_BUILT
 
-Active behavior-changing engine divergence: NONE KNOWN
+Active behavior-changing engine divergence: PRESENT
 
-Active diagnostics-only engine divergence: NONE KNOWN after the current REQUEST CHANGES cleanup.
+Active diagnostics-only engine divergence: PRESENT, default OFF after the current REQUEST CHANGES cleanup.
 
 The previous diagnostics commit placed Carry On-specific imports, fields, observation, and logging inside
-`adris.altoclef.tasks.InteractWithBlockTask`. The current cleanup removes that Carry On-specific engine coupling
-and returns Carry On diagnostics to the LAVI-owned optional integration namespace.
+`adris.altoclef.tasks.InteractWithBlockTask`. The cleanup removed that Carry On-specific engine coupling
+and returned Carry On diagnostics to the LAVI-owned optional integration namespace.
+
+The current active behavior-changing divergence is the bounded post-place container handoff in
+`adris.altoclef.tasks.container.DoStuffInContainerTask`. It is an engine divergence because the class is a
+generic upstream-derived container workflow base class.
 
 ## Upstream Baseline Provenance
 
@@ -30,7 +34,143 @@ Verification method: runtime log observation only; no upstream repository compar
 
 Known LAVI-specific divergences: PARTIALLY_VERIFIED
 
-## REQUEST CHANGES Cleanup Record
+## Active Behavior-Changing Divergence Record
+
+Review baseline SHA: `a15037399aef1619dc8430b478c42443a47049bf`
+
+Modified engine file:
+
+- `plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/adris/altoclef/tasks/container/DoStuffInContainerTask.java`
+
+Modified class: `adris.altoclef.tasks.container.DoStuffInContainerTask`
+
+Modified methods:
+
+- `onStart`
+- `onTick`
+- `onStop`
+
+Behavior change:
+
+- After `PlaceBlockNearbyTask` reports finished, `DoStuffInContainerTask.onTick()` returns `null` once to let the
+  previous child Task stop through the existing lifecycle.
+- That first `null` return is the lifecycle handoff barrier that lets `PlaceBlockNearbyTask.onStop()` release the
+  SNEAK input it owns.
+- After the barrier, the task enters a post-place handoff phase and observes SNEAK stability for a bounded budget.
+- If `sneakHeld=false` and `playerSneaking=false`, the phase returns to `IDLE` and the existing container interaction
+  flow continues in the same tick.
+- If either SNEAK state remains true until the budget is exhausted, the phase returns to `IDLE`, records one handoff
+  budget diagnostic when diagnostics are enabled, and the existing container interaction flow continues in the same
+  tick.
+
+Exact stability budget:
+
+- `POST_PLACE_STABILITY_MAX_WAIT_TICKS = 3`
+
+Input ownership:
+
+- Unchanged.
+- The hunk does not acquire or release any input.
+- It does not force-release `Input.SNEAK`.
+
+Retry ownership:
+
+- Unchanged.
+- No retry loop, blacklist, cooldown, or fallback policy is added.
+
+Baritone ownership:
+
+- Unchanged.
+- No Baritone goal, path, process, or cancellation behavior is added.
+
+Global input release:
+
+- None.
+
+Carry On-specific engine coupling:
+
+- None.
+- `DoStuffInContainerTask` does not import Carry On types and does not contain Carry On policy.
+
+Affected generic subclasses and workflows:
+
+- Furnace
+- Smoker
+- Blast Furnace
+- Crafting Table
+- Anvil
+- Smithing Table
+- Any other workflow extending `DoStuffInContainerTask`
+
+Rollback unit:
+
+- Revert the exact bounded post-place handoff hunk in `DoStuffInContainerTask.java`.
+- Do not use `git reset`, broad checkout, broad restore, or cleanup commands as rollback.
+
+Build result:
+
+- NOT_RUN for the current working-tree hunk at the time this record was updated.
+
+Runtime reproduction result:
+
+- NOT_RUN for the current working-tree hunk at the time this record was updated.
+
+Verification status:
+
+- APPLIED_NOT_BUILT
+
+## Active Diagnostics Divergence Record
+
+Review baseline SHA: `a15037399aef1619dc8430b478c42443a47049bf`
+
+Modified engine or engine-adjacent files:
+
+- `adris/altoclef/tasksystem/Task.java`
+- `adris/altoclef/control/InputControls.java`
+- `adris/altoclef/control/SlotHandler.java`
+- `adris/altoclef/mixins/WorldBlockModifiedMixin.java`
+- `lavi/minecraft/diagnostics/ChatClefDiagnostics.java`
+- `lavi/minecraft/integration/carryon/CarryOnRuntimeStateObserver.java`
+
+Behavior intent:
+
+- Diagnostics default to OFF unless explicitly enabled by `-Dlavi.chatclef.diagnostics=boundary`,
+  `-Dlavi.chatclef.diagnostics=verbose`, `LAVI_CHATCLEF_DIAGNOSTICS=boundary`, or
+  `LAVI_CHATCLEF_DIAGNOSTICS=verbose`.
+- Unknown diagnostic mode values are treated as OFF.
+- AltoClef `logLevel=ALL` no longer implicitly enables LAVI diagnostics.
+- High-frequency diagnostic entry points return early when diagnostics are OFF.
+- When diagnostics are enabled, `ChatClefDiagnostics` logs one `DIAGNOSTICS_RUNTIME_IDENTITY` boundary event with
+  the active output mode, source marker, class code source, code source last-modified time, and implementation version.
+- Verbose slot diagnostics now report non-window or out-of-range slots as `not_read#reason=...` before reading the
+  backing `ScreenHandler` slot. This keeps diagnostic stack inspection from causing the existing upstream
+  `Screen Slot Error (ignored)` warning for `PlayerSlot.UNDEFINED` / `windowSlot=-999`.
+
+Behavior preserved:
+
+- No slot click branch, return value, timer, retry, input state, ScreenHandler state, or controller click call was
+  changed.
+- The slot-stack guard is diagnostics-only and runs only when verbose diagnostics are enabled.
+- The runtime identity event is observation-only and runs once per client session when diagnostics are enabled.
+
+Runtime evidence prompting this follow-up:
+
+- `C:\Users\jaewo\curseforge\minecraft\Instances\LAVI_TEST_Fabric01\logs\latest.log` showed successful furnace
+  boundary flow, but the tested jar timestamp could not be proven from the log alone.
+- The same log showed `Screen Slot Error (ignored)` / `Index -999` during `CraftInTableTask.onResourceStop`, with the
+  stack passing through `SlotHandler.clickSlot` and `ChatClefDiagnostics.safeValue`.
+
+Open P2 follow-up items:
+
+- `TASK_INSTANCE_IDS` lifecycle cleanup.
+- `TASK_RUN_IDS` lifecycle cleanup.
+- `PARENT_TASK_RUN_IDS` lifecycle cleanup.
+- True weak-identity diagnostic registry, if lifecycle cleanup is insufficient.
+- Global mutable `traceId` should not be used as causal correlation.
+- Observation session auto-restart and heartbeat policy should be redesigned or removed when verbose diagnostics are
+  revisited.
+
+## Previous REQUEST CHANGES Cleanup Record
 
 Repository HEAD at review baseline: `3e661eeef522253b106720675f907df80281b896`
 

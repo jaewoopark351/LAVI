@@ -21,29 +21,42 @@ public abstract class Task {
 
     public void tick(TaskChain parentChain) {
         ChatClefDiagnostics.enterTask(this);
+        boolean diagnosticsVerbose = ChatClefDiagnostics.isVerboseEnabled();
         try {
             parentChain.addTaskToChain(this);
             if (first) {
-                ChatClefDiagnostics.beginTaskRun(this, parentChain);
+                if (diagnosticsVerbose) {
+                    ChatClefDiagnostics.beginTaskRun(this, parentChain);
+                }
                 Debug.logInternal("Task START: " + this);
                 active = true;
-                ChatClefDiagnostics.logEvent("TASK", "ON_START_BEGIN", "first_tick", this,
-                        "parentChain", ChatClefDiagnostics.chainName(parentChain));
+                if (diagnosticsVerbose) {
+                    ChatClefDiagnostics.logEvent("TASK", "ON_START_BEGIN", "first_tick", this,
+                            "parentChain", ChatClefDiagnostics.chainName(parentChain));
+                }
                 onStart();
-                ChatClefDiagnostics.logEvent("TASK", "ON_START_END", "first_tick", this,
-                        "parentChain", ChatClefDiagnostics.chainName(parentChain));
+                if (diagnosticsVerbose) {
+                    ChatClefDiagnostics.logEvent("TASK", "ON_START_END", "first_tick", this,
+                            "parentChain", ChatClefDiagnostics.chainName(parentChain));
+                }
                 first = false;
                 stopped = false;
             }
             if (stopped) {
-                ChatClefDiagnostics.logEvent("TASK", "SKIP", "stopped_before_onTick", this);
+                if (diagnosticsVerbose) {
+                    ChatClefDiagnostics.logEvent("TASK", "SKIP", "stopped_before_onTick", this);
+                }
                 return;
             }
 
-            ChatClefDiagnostics.logEvent("TASK", "ON_TICK_BEGIN", "tick_begin", this,
-                    "parentChain", ChatClefDiagnostics.chainName(parentChain));
+            if (diagnosticsVerbose) {
+                ChatClefDiagnostics.logEvent("TASK", "ON_TICK_BEGIN", "tick_begin", this,
+                        "parentChain", ChatClefDiagnostics.chainName(parentChain));
+            }
             Task newSub = onTick();
-            ChatClefDiagnostics.logTaskTransition(this, sub, newSub, "onTick_result");
+            if (diagnosticsVerbose) {
+                ChatClefDiagnostics.logTaskTransition(this, sub, newSub, "onTick_result");
+            }
             // Debug state print
             if (!oldDebugState.equals(debugState)) {
                 Debug.logInternal(toString());
@@ -52,45 +65,67 @@ public abstract class Task {
             // We have a sub task
             if (newSub != null) {
                 boolean subTasksEqual = newSub.isEqual(sub);
-                ChatClefDiagnostics.logTaskTransition(this, sub, newSub, "child_isEqual_result",
-                        "isEqualResult", subTasksEqual);
+                if (diagnosticsVerbose) {
+                    ChatClefDiagnostics.logTaskTransition(this, sub, newSub, "child_isEqual_result",
+                            "isEqualResult", subTasksEqual);
+                }
                 if (!subTasksEqual) {
                     boolean canInterrupt = canBeInterrupted(sub, newSub);
-                    ChatClefDiagnostics.logTaskTransition(this, sub, newSub, "child_interruptibility_result",
-                            "canInterruptPreviousChild", canInterrupt);
+                    if (diagnosticsVerbose) {
+                        ChatClefDiagnostics.logTaskTransition(this, sub, newSub, "child_interruptibility_result",
+                                "canInterruptPreviousChild", canInterrupt);
+                    }
                     if (canInterrupt) {
                         // Our sub task is new
                         if (sub != null) {
                             // Our previous sub must be interrupted.
-                            ChatClefDiagnostics.logTaskTransition(this, sub, newSub, "previous_child_stop_begin");
+                            if (diagnosticsVerbose) {
+                                ChatClefDiagnostics.logTaskTransition(this, sub, newSub, "previous_child_stop_begin");
+                            }
                             sub.stop(newSub);
-                            ChatClefDiagnostics.logTaskTransition(this, sub, newSub, "previous_child_stop_end");
+                            if (diagnosticsVerbose) {
+                                ChatClefDiagnostics.logTaskTransition(this, sub, newSub, "previous_child_stop_end");
+                            }
                         }
 
                         sub = newSub;
                         ChatClefDiagnostics.setParent(sub, this);
-                        ChatClefDiagnostics.logTaskTransition(this, null, sub, "child_replaced");
+                        if (diagnosticsVerbose) {
+                            ChatClefDiagnostics.logTaskTransition(this, null, sub, "child_replaced");
+                        }
                     }
                 }
 
                 // Run our child
-                ChatClefDiagnostics.logEvent("TASK_CHILD", "TICK_BEGIN", "child_tick_begin", sub,
-                        "parentChain", ChatClefDiagnostics.chainName(parentChain));
+                if (diagnosticsVerbose) {
+                    ChatClefDiagnostics.logEvent("TASK_CHILD", "TICK_BEGIN", "child_tick_begin", sub,
+                            "parentChain", ChatClefDiagnostics.chainName(parentChain));
+                }
                 sub.tick(parentChain);
-                ChatClefDiagnostics.logEvent("TASK_CHILD", "TICK_END", "child_tick_end", sub,
-                        "parentChain", ChatClefDiagnostics.chainName(parentChain));
+                if (diagnosticsVerbose) {
+                    ChatClefDiagnostics.logEvent("TASK_CHILD", "TICK_END", "child_tick_end", sub,
+                            "parentChain", ChatClefDiagnostics.chainName(parentChain));
+                }
             } else {
                 // We are null
                 boolean canInterrupt = sub == null || canBeInterrupted(sub, null);
-                ChatClefDiagnostics.logTaskTransition(this, sub, null, "null_child_result",
-                        "canInterruptPreviousChild", canInterrupt);
+                if (diagnosticsVerbose) {
+                    ChatClefDiagnostics.logTaskTransition(this, sub, null, "null_child_result",
+                            "canInterruptPreviousChild", canInterrupt);
+                }
                 if (sub != null && canInterrupt) {
                     // Our previous sub must be interrupted.
-                    ChatClefDiagnostics.logTaskTransition(this, sub, null, "previous_child_stop_begin");
+                    if (diagnosticsVerbose) {
+                        ChatClefDiagnostics.logTaskTransition(this, sub, null, "previous_child_stop_begin");
+                    }
                     sub.stop();
-                    ChatClefDiagnostics.logTaskTransition(this, sub, null, "previous_child_stop_end");
+                    if (diagnosticsVerbose) {
+                        ChatClefDiagnostics.logTaskTransition(this, sub, null, "previous_child_stop_end");
+                    }
                     sub = null;
-                    ChatClefDiagnostics.logTaskTransition(this, null, null, "child_cleared");
+                    if (diagnosticsVerbose) {
+                        ChatClefDiagnostics.logTaskTransition(this, null, null, "child_cleared");
+                    }
                 }
             }
         } finally {
@@ -112,27 +147,40 @@ public abstract class Task {
      * Stops the task. Next time it's run it will run `onStart`
      */
     public void stop(Task interruptTask) {
+        boolean diagnosticsVerbose = ChatClefDiagnostics.isVerboseEnabled();
         if (!active) {
-            ChatClefDiagnostics.logTaskTransition(this, this, interruptTask, "stop_skipped_inactive");
+            if (diagnosticsVerbose) {
+                ChatClefDiagnostics.logTaskTransition(this, this, interruptTask, "stop_skipped_inactive");
+            }
             return;
         }
-        ChatClefDiagnostics.logTaskTransition(this, this, interruptTask, "stop_begin");
+        if (diagnosticsVerbose) {
+            ChatClefDiagnostics.logTaskTransition(this, this, interruptTask, "stop_begin");
+        }
         Debug.logInternal("Task STOP: " + this + ", interrupted by " + interruptTask);
         if (!first) {
             onStop(interruptTask);
-            ChatClefDiagnostics.logTaskTransition(this, this, interruptTask, "onStop_end");
+            if (diagnosticsVerbose) {
+                ChatClefDiagnostics.logTaskTransition(this, this, interruptTask, "onStop_end");
+            }
         }
 
         if (sub != null && !sub.stopped()) {
-            ChatClefDiagnostics.logTaskTransition(this, sub, interruptTask, "child_stop_from_parent_stop_begin");
+            if (diagnosticsVerbose) {
+                ChatClefDiagnostics.logTaskTransition(this, sub, interruptTask, "child_stop_from_parent_stop_begin");
+            }
             sub.stop(interruptTask);
-            ChatClefDiagnostics.logTaskTransition(this, sub, interruptTask, "child_stop_from_parent_stop_end");
+            if (diagnosticsVerbose) {
+                ChatClefDiagnostics.logTaskTransition(this, sub, interruptTask, "child_stop_from_parent_stop_end");
+            }
         }
 
         first = true;
         active = false;
         stopped = true;
-        ChatClefDiagnostics.logTaskTransition(this, this, interruptTask, "stop_end");
+        if (diagnosticsVerbose) {
+            ChatClefDiagnostics.logTaskTransition(this, this, interruptTask, "stop_end");
+        }
     }
 
     public void fail(String reason) {
@@ -148,24 +196,37 @@ public abstract class Task {
      * Doesn't stop it all-together (meaning `isActive` still returns true)
      */
     public void interrupt(Task interruptTask) {
+        boolean diagnosticsVerbose = ChatClefDiagnostics.isVerboseEnabled();
         if (!active) {
-            ChatClefDiagnostics.logTaskTransition(this, this, interruptTask, "interrupt_skipped_inactive");
+            if (diagnosticsVerbose) {
+                ChatClefDiagnostics.logTaskTransition(this, this, interruptTask, "interrupt_skipped_inactive");
+            }
             return;
         }
-        ChatClefDiagnostics.logTaskTransition(this, this, interruptTask, "interrupt_begin");
+        if (diagnosticsVerbose) {
+            ChatClefDiagnostics.logTaskTransition(this, this, interruptTask, "interrupt_begin");
+        }
         if (!first) {
             onStop(interruptTask);
-            ChatClefDiagnostics.logTaskTransition(this, this, interruptTask, "interrupt_onStop_end");
+            if (diagnosticsVerbose) {
+                ChatClefDiagnostics.logTaskTransition(this, this, interruptTask, "interrupt_onStop_end");
+            }
         }
 
         if (sub != null && !sub.stopped()) {
-            ChatClefDiagnostics.logTaskTransition(this, sub, interruptTask, "child_interrupt_begin");
+            if (diagnosticsVerbose) {
+                ChatClefDiagnostics.logTaskTransition(this, sub, interruptTask, "child_interrupt_begin");
+            }
             sub.interrupt(interruptTask);
-            ChatClefDiagnostics.logTaskTransition(this, sub, interruptTask, "child_interrupt_end");
+            if (diagnosticsVerbose) {
+                ChatClefDiagnostics.logTaskTransition(this, sub, interruptTask, "child_interrupt_end");
+            }
         }
 
         first = true;
-        ChatClefDiagnostics.logTaskTransition(this, this, interruptTask, "interrupt_end");
+        if (diagnosticsVerbose) {
+            ChatClefDiagnostics.logTaskTransition(this, this, interruptTask, "interrupt_end");
+        }
     }
 
     protected void setDebugState(String state) {

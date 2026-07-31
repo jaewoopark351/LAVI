@@ -43,71 +43,86 @@ public class InputControls {
     }
 
     public void tryPress(Input input) {
+        boolean diagnosticsVerbose = ChatClefDiagnostics.isVerboseEnabled();
         // We just pressed, so let us release.
         if (_waitForRelease.contains(input)) {
-            ChatClefDiagnostics.logInput("SUPPRESSED", "waitForRelease_suppression", input,
-                    "inputRequested", true,
-                    "inputAccepted", false,
-                    "inputHeldBefore", "unavailable",
-                    "waitForReleaseSuppression", true,
-                    "waitForReleaseCount", _waitForRelease.size(),
-                    "autoReleaseQueueCount", toUnpress.size());
+            if (diagnosticsVerbose) {
+                ChatClefDiagnostics.logInput("SUPPRESSED", "waitForRelease_suppression", input,
+                        "inputRequested", true,
+                        "inputAccepted", false,
+                        "inputHeldBefore", "unavailable",
+                        "waitForReleaseSuppression", true,
+                        "waitForReleaseCount", _waitForRelease.size(),
+                        "autoReleaseQueueCount", toUnpress.size());
+            }
             return;
         }
         boolean heldBefore = inputToKeyBinding(input).isPressed();
-        ChatClefDiagnostics.logInput("REQUEST", "tryPress_begin", input,
-                "inputRequested", true,
-                "inputAccepted", false,
-                "inputHeldBefore", heldBefore,
-                "waitForReleaseSuppression", false,
-                "waitForReleaseCountBefore", _waitForRelease.size(),
-                "autoReleaseQueueCountBefore", toUnpress.size());
+        if (diagnosticsVerbose) {
+            ChatClefDiagnostics.logInput("REQUEST", "tryPress_begin", input,
+                    "inputRequested", true,
+                    "inputAccepted", false,
+                    "inputHeldBefore", heldBefore,
+                    "waitForReleaseSuppression", false,
+                    "waitForReleaseCountBefore", _waitForRelease.size(),
+                    "autoReleaseQueueCountBefore", toUnpress.size());
+        }
         inputToKeyBinding(input).setPressed(true);
         // Also necessary to ensure the game registers the input as "pressed"
         KeyBinding.onKeyPressed(inputToKeyBinding(input).getDefaultKey());
         toUnpress.add(input);
         _waitForRelease.add(input);
-        ChatClefDiagnostics.logInput("ACCEPTED", "tryPress_end", input,
-                "inputRequested", true,
-                "inputAccepted", true,
-                "inputHeldBefore", heldBefore,
-                "inputHeldAfter", ChatClefDiagnostics.safeValue(() -> inputToKeyBinding(input).isPressed()),
-                "queuedForAutoRelease", true,
-                "waitForReleaseSuppression", false,
-                "waitForReleaseCountAfter", _waitForRelease.size(),
-                "autoReleaseQueueCountAfter", toUnpress.size());
+        if (diagnosticsVerbose) {
+            ChatClefDiagnostics.logInput("ACCEPTED", "tryPress_end", input,
+                    "inputRequested", true,
+                    "inputAccepted", true,
+                    "inputHeldBefore", heldBefore,
+                    "inputHeldAfter", ChatClefDiagnostics.safeValue(() -> inputToKeyBinding(input).isPressed()),
+                    "queuedForAutoRelease", true,
+                    "waitForReleaseSuppression", false,
+                    "waitForReleaseCountAfter", _waitForRelease.size(),
+                    "autoReleaseQueueCountAfter", toUnpress.size());
+        }
     }
 
     public void hold(Input input) {
+        boolean diagnosticsVerbose = ChatClefDiagnostics.isVerboseEnabled();
         boolean heldBefore = inputToKeyBinding(input).isPressed();
-        ChatClefDiagnostics.logInput("REQUEST", "hold_begin", input,
-                "inputRequested", true,
-                "inputAccepted", false,
-                "inputHeldBefore", heldBefore,
-                "waitForReleaseCountBefore", _waitForRelease.size(),
-                "autoReleaseQueueCountBefore", toUnpress.size());
+        if (diagnosticsVerbose) {
+            ChatClefDiagnostics.logInput("REQUEST", "hold_begin", input,
+                    "inputRequested", true,
+                    "inputAccepted", false,
+                    "inputHeldBefore", heldBefore,
+                    "waitForReleaseCountBefore", _waitForRelease.size(),
+                    "autoReleaseQueueCountBefore", toUnpress.size());
+        }
         if (!heldBefore) {
             KeyBinding.onKeyPressed(inputToKeyBinding(input).getDefaultKey());
         }
         inputToKeyBinding(input).setPressed(true);
-        ChatClefDiagnostics.logInput("HELD", "hold_end", input,
-                "inputRequested", true,
-                "inputAccepted", true,
-                "inputHeldBefore", heldBefore,
-                "inputHeldAfter", ChatClefDiagnostics.safeValue(() -> inputToKeyBinding(input).isPressed()),
-                "waitForReleaseCountAfter", _waitForRelease.size(),
-                "autoReleaseQueueCountAfter", toUnpress.size());
+        if (diagnosticsVerbose) {
+            ChatClefDiagnostics.logInput("HELD", "hold_end", input,
+                    "inputRequested", true,
+                    "inputAccepted", true,
+                    "inputHeldBefore", heldBefore,
+                    "inputHeldAfter", ChatClefDiagnostics.safeValue(() -> inputToKeyBinding(input).isPressed()),
+                    "waitForReleaseCountAfter", _waitForRelease.size(),
+                    "autoReleaseQueueCountAfter", toUnpress.size());
+        }
     }
 
     public void release(Input input) {
+        boolean diagnosticsVerbose = ChatClefDiagnostics.isVerboseEnabled();
         boolean heldBefore = inputToKeyBinding(input).isPressed();
         inputToKeyBinding(input).setPressed(false);
-        ChatClefDiagnostics.logInput("RELEASED", "release_end", input,
-                "inputReleased", true,
-                "inputHeldBefore", heldBefore,
-                "inputHeldAfter", ChatClefDiagnostics.safeValue(() -> inputToKeyBinding(input).isPressed()),
-                "waitForReleaseCountAfter", _waitForRelease.size(),
-                "autoReleaseQueueCountAfter", toUnpress.size());
+        if (diagnosticsVerbose) {
+            ChatClefDiagnostics.logInput("RELEASED", "release_end", input,
+                    "inputReleased", true,
+                    "inputHeldBefore", heldBefore,
+                    "inputHeldAfter", ChatClefDiagnostics.safeValue(() -> inputToKeyBinding(input).isPressed()),
+                    "waitForReleaseCountAfter", _waitForRelease.size(),
+                    "autoReleaseQueueCountAfter", toUnpress.size());
+        }
     }
 
     public boolean isHeldDown(Input input) {
@@ -123,37 +138,51 @@ public class InputControls {
 
     // Before the user calls input commands for the frame
     public void onTickPre() {
-        ChatClefDiagnostics.logInputSnapshot("TICK_PRE_BEGIN", "input_controls_tick_pre_begin",
-                "waitForReleaseCount", _waitForRelease.size(),
-                "autoReleaseQueueCount", toUnpress.size());
+        boolean diagnosticsVerbose = ChatClefDiagnostics.isVerboseEnabled();
+        if (diagnosticsVerbose) {
+            ChatClefDiagnostics.logInputSnapshot("TICK_PRE_BEGIN", "input_controls_tick_pre_begin",
+                    "waitForReleaseCount", _waitForRelease.size(),
+                    "autoReleaseQueueCount", toUnpress.size());
+        }
         while (!toUnpress.isEmpty()) {
             Input input = toUnpress.remove();
             boolean heldBefore = inputToKeyBinding(input).isPressed();
             inputToKeyBinding(input).setPressed(false);
-            ChatClefDiagnostics.logInput("AUTO_RELEASED", "onTickPre_auto_release", input,
-                    "inputAutoReleased", true,
-                    "inputHeldBefore", heldBefore,
-                    "inputHeldAfter", ChatClefDiagnostics.safeValue(() -> inputToKeyBinding(input).isPressed()),
+            if (diagnosticsVerbose) {
+                ChatClefDiagnostics.logInput("AUTO_RELEASED", "onTickPre_auto_release", input,
+                        "inputAutoReleased", true,
+                        "inputHeldBefore", heldBefore,
+                        "inputHeldAfter", ChatClefDiagnostics.safeValue(() -> inputToKeyBinding(input).isPressed()),
+                        "waitForReleaseCount", _waitForRelease.size(),
+                        "autoReleaseQueueCount", toUnpress.size());
+            }
+        }
+        if (diagnosticsVerbose) {
+            ChatClefDiagnostics.logInputSnapshot("TICK_PRE_END", "input_controls_tick_pre_end",
                     "waitForReleaseCount", _waitForRelease.size(),
                     "autoReleaseQueueCount", toUnpress.size());
         }
-        ChatClefDiagnostics.logInputSnapshot("TICK_PRE_END", "input_controls_tick_pre_end",
-                "waitForReleaseCount", _waitForRelease.size(),
-                "autoReleaseQueueCount", toUnpress.size());
     }
 
     // After the user calls input commands for the frame
     public void onTickPost() {
-        ChatClefDiagnostics.logInputSnapshot("TICK_POST_BEGIN", "input_controls_tick_post_begin",
-                "waitForReleaseCount", _waitForRelease.size(),
-                "autoReleaseQueueCount", toUnpress.size());
+        boolean diagnosticsVerbose = ChatClefDiagnostics.isVerboseEnabled();
+        if (diagnosticsVerbose) {
+            ChatClefDiagnostics.logInputSnapshot("TICK_POST_BEGIN", "input_controls_tick_post_begin",
+                    "waitForReleaseCount", _waitForRelease.size(),
+                    "autoReleaseQueueCount", toUnpress.size());
+        }
         if (!_waitForRelease.isEmpty()) {
-            ChatClefDiagnostics.logEvent("INPUT", "WAIT_FOR_RELEASE_CLEAR", "onTickPost_clear", null,
-                    "waitForReleaseCount", _waitForRelease.size());
+            if (diagnosticsVerbose) {
+                ChatClefDiagnostics.logEvent("INPUT", "WAIT_FOR_RELEASE_CLEAR", "onTickPost_clear", null,
+                        "waitForReleaseCount", _waitForRelease.size());
+            }
         }
         _waitForRelease.clear();
-        ChatClefDiagnostics.logInputSnapshot("TICK_POST_END", "input_controls_tick_post_end",
-                "waitForReleaseCount", _waitForRelease.size(),
-                "autoReleaseQueueCount", toUnpress.size());
+        if (diagnosticsVerbose) {
+            ChatClefDiagnostics.logInputSnapshot("TICK_POST_END", "input_controls_tick_post_end",
+                    "waitForReleaseCount", _waitForRelease.size(),
+                    "autoReleaseQueueCount", toUnpress.size());
+        }
     }
 }

@@ -60,7 +60,7 @@ public class SlotHandler {
 
     public void clickSlot(Slot slot, int mouseButton, SlotActionType type) {
         ChatClefDiagnostics.logSlotClick("REQUEST", "clickSlot_requested", slot, mouseButton, type,
-                "slotStackBefore", ChatClefDiagnostics.safeValue(() -> StorageHelper.getItemStackInSlot(slot)));
+                "slotStackBefore", ChatClefDiagnostics.slotStackSummary(slot));
         if (!canDoSlotAction()) {
             ChatClefDiagnostics.logSlotClick("SUPPRESSED", "clickSlot_timer_blocked", slot, mouseButton, type);
             return;
@@ -76,11 +76,11 @@ public class SlotHandler {
 
         ChatClefDiagnostics.logSlotClick("ACCEPTED", "clickSlot_before_window_click", slot, mouseButton, type,
                 "windowSlot", slot.getWindowSlot(),
-                "slotStackBefore", ChatClefDiagnostics.safeValue(() -> StorageHelper.getItemStackInSlot(slot)));
+                "slotStackBefore", ChatClefDiagnostics.slotStackSummary(slot));
         clickWindowSlot(slot.getWindowSlot(), mouseButton, type);
         ChatClefDiagnostics.logSlotClick("RETURN", "clickSlot_after_window_click", slot, mouseButton, type,
                 "windowSlot", slot.getWindowSlot(),
-                "slotStackAfter", ChatClefDiagnostics.safeValue(() -> StorageHelper.getItemStackInSlot(slot)));
+                "slotStackAfter", ChatClefDiagnostics.slotStackSummary(slot));
     }
 
     private void clickSlotForce(Slot slot, int mouseButton, SlotActionType type) {

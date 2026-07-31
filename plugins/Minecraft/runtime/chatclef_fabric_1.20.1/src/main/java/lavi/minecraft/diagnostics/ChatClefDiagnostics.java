@@ -5,6 +5,7 @@ import adris.altoclef.Debug;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.tasksystem.TaskChain;
 import adris.altoclef.util.ItemTarget;
+import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.slots.Slot;
 import baritone.api.utils.input.Input;
 import lavi.minecraft.integration.carryon.CarryOnPostPlaceContainerMonitor;
@@ -33,6 +34,7 @@ public final class ChatClefDiagnostics {
     private static final IdentityHashMap<Object, Long> TASK_RUN_IDS = new IdentityHashMap<>();
     private static final IdentityHashMap<Object, Long> PARENT_TASK_RUN_IDS = new IdentityHashMap<>();
     private static final ThreadLocal<Deque<Task>> TASK_STACK = ThreadLocal.withInitial(ArrayDeque::new);
+    private static final OutputMode OUTPUT_MODE = parseOutputMode();
 
     private static long nextTaskInstanceId = 1;
     private static long nextTaskRunId = 1;
@@ -42,6 +44,7 @@ public final class ChatClefDiagnostics {
     private static long eventSequence = 0;
     private static String traceId = "unavailable";
     private static PostPlaceContainerOpenIntent activePostPlaceContainerOpenIntent;
+    private static boolean runtimeIdentityLogged = false;
 
     private ChatClefDiagnostics() {
     }
@@ -106,10 +109,14 @@ public final class ChatClefDiagnostics {
     }
 
     public static void onClientTickHead() {
+        if (OUTPUT_MODE == OutputMode.OFF) {
+            return;
+        }
         try {
             synchronized (LOCK) {
                 clientTickId++;
             }
+            logRuntimeIdentityOnce();
         } catch (RuntimeException | LinkageError ignored) {
         }
     }
@@ -139,29 +146,38 @@ public final class ChatClefDiagnostics {
     }
 
     public static boolean isVerboseEnabled() {
-        return outputMode() == OutputMode.VERBOSE;
+        return OUTPUT_MODE == OutputMode.VERBOSE;
     }
 
     public static boolean isBoundaryEnabled() {
-        return outputMode() != OutputMode.OFF;
+        return OUTPUT_MODE != OutputMode.OFF;
     }
 
     public static String inputHeldState(Input input) {
+        if (OUTPUT_MODE == OutputMode.OFF) {
+            return "unavailable";
+        }
         return inputHeld(input);
     }
 
     public static String rawInputHeldState(Input input) {
+        if (OUTPUT_MODE == OutputMode.OFF) {
+            return "unavailable";
+        }
         return rawKeyHeld(input);
     }
 
     public static void startTrace(String reason, Task task, Object... fields) {
-        if (!isVerboseEnabled()) {
+        if (OUTPUT_MODE != OutputMode.VERBOSE) {
             return;
         }
         safeLog("TRACE", "START", reason, task, fields, true);
     }
 
     public static void enterTask(Task task) {
+        if (OUTPUT_MODE != OutputMode.VERBOSE) {
+            return;
+        }
         try {
             TASK_STACK.get().push(task);
         } catch (RuntimeException | LinkageError ignored) {
@@ -169,6 +185,9 @@ public final class ChatClefDiagnostics {
     }
 
     public static void exitTask(Task task) {
+        if (OUTPUT_MODE != OutputMode.VERBOSE) {
+            return;
+        }
         try {
             Deque<Task> stack = TASK_STACK.get();
             if (!stack.isEmpty() && stack.peek() == task) {
@@ -181,7 +200,7 @@ public final class ChatClefDiagnostics {
     }
 
     public static void beginTaskRun(Task task, TaskChain parentChain) {
-        if (!isVerboseEnabled()) {
+        if (OUTPUT_MODE != OutputMode.VERBOSE) {
             return;
         }
         safeLog("TASK", "START", "first_tick", task,
@@ -191,6 +210,9 @@ public final class ChatClefDiagnostics {
     }
 
     public static void setParent(Task child, Task parent) {
+        if (OUTPUT_MODE != OutputMode.VERBOSE) {
+            return;
+        }
         try {
             synchronized (LOCK) {
                 long parentRunId = existingRunId(parent);
@@ -203,14 +225,14 @@ public final class ChatClefDiagnostics {
     }
 
     public static void logEvent(String eventType, String phase, String reason, Task task, Object... fields) {
-        if (!isVerboseEnabled()) {
+        if (OUTPUT_MODE != OutputMode.VERBOSE) {
             return;
         }
         safeLog(eventType, phase, reason, task, fields, false);
     }
 
     public static void logTaskTransition(Task parent, Task previousTask, Task nextTask, String reason, Object... fields) {
-        if (!isVerboseEnabled()) {
+        if (OUTPUT_MODE != OutputMode.VERBOSE) {
             return;
         }
         Object[] merged = mergeFields(fields,
@@ -224,7 +246,7 @@ public final class ChatClefDiagnostics {
     }
 
     public static void logInput(String phase, String reason, Input input, Object... fields) {
-        if (!isVerboseEnabled()) {
+        if (OUTPUT_MODE != OutputMode.VERBOSE) {
             return;
         }
         Object[] merged = mergeFields(fields,
@@ -234,7 +256,7 @@ public final class ChatClefDiagnostics {
     }
 
     public static void logInputSnapshot(String phase, String reason, Object... fields) {
-        if (!isVerboseEnabled()) {
+        if (OUTPUT_MODE != OutputMode.VERBOSE) {
             return;
         }
         Object[] merged = mergeFields(inputSnapshotFields(), fields);
@@ -242,7 +264,7 @@ public final class ChatClefDiagnostics {
     }
 
     public static void logSlotClick(String phase, String reason, Slot slot, int mouseButton, Object type, Object... fields) {
-        if (!isVerboseEnabled()) {
+        if (OUTPUT_MODE != OutputMode.VERBOSE) {
             return;
         }
         Object[] merged = mergeFields(fields,
@@ -254,14 +276,17 @@ public final class ChatClefDiagnostics {
     }
 
     public static void logInteractBlock(String phase, String reason, Object hand, BlockHitResult hitResult, Object result) {
+        if (OUTPUT_MODE == OutputMode.OFF) {
+            return;
+        }
         logInteractBlock(phase, reason, MinecraftClient.getInstance().player, hand, hitResult, result);
     }
 
     public static void logInteractBlock(String phase, String reason, ClientPlayerEntity player, Object hand, BlockHitResult hitResult, Object result) {
-        if (isBoundaryEnabled()) {
+        if (OUTPUT_MODE != OutputMode.OFF) {
             logPostPlaceContainerInteractIfMatching(phase, player, hand, hitResult, result);
         }
-        if (!isVerboseEnabled()) {
+        if (OUTPUT_MODE != OutputMode.VERBOSE) {
             return;
         }
         BlockPos blockPos = hitResult == null ? null : hitResult.getBlockPos();
@@ -289,18 +314,21 @@ public final class ChatClefDiagnostics {
     }
 
     public static void logBoundary(String eventName, String reason, Task task, Object... fields) {
-        if (!isBoundaryEnabled()) {
+        if (OUTPUT_MODE == OutputMode.OFF) {
             return;
         }
         emitEvent("BOUNDARY", "[LAVI ChatClefBoundary]", eventName, reason, task, fields, false);
     }
 
     public static void logWarningEvent(String eventName, String reason, Task task, Object... fields) {
+        if (OUTPUT_MODE == OutputMode.OFF) {
+            return;
+        }
         emitEvent("WARN", "[LAVI ChatClefDiag]", eventName, reason, task, fields, true);
     }
 
     public static void logVerboseLine(String message) {
-        if (!isVerboseEnabled()) {
+        if (OUTPUT_MODE != OutputMode.VERBOSE) {
             return;
         }
         System.out.println("ALTO CLEF: " + value(message));
@@ -310,6 +338,9 @@ public final class ChatClefDiagnostics {
                                                          Object containerType,
                                                          BlockPos targetPosition,
                                                          Object targetBlockState) {
+        if (OUTPUT_MODE == OutputMode.OFF) {
+            return;
+        }
         if (operationId < 0 || targetPosition == null) {
             return;
         }
@@ -331,6 +362,9 @@ public final class ChatClefDiagnostics {
     }
 
     public static PostPlaceContainerOpenIntent activePostPlaceContainerOpenIntent(BlockPos targetPosition) {
+        if (OUTPUT_MODE == OutputMode.OFF) {
+            return null;
+        }
         synchronized (LOCK) {
             if (activePostPlaceContainerOpenIntent == null || targetPosition == null) {
                 return null;
@@ -345,6 +379,9 @@ public final class ChatClefDiagnostics {
     }
 
     public static int postPlaceContainerAttemptCount(long operationId) {
+        if (OUTPUT_MODE == OutputMode.OFF) {
+            return 0;
+        }
         synchronized (LOCK) {
             if (activePostPlaceContainerOpenIntent == null
                     || activePostPlaceContainerOpenIntent.operationId != operationId) {
@@ -355,6 +392,9 @@ public final class ChatClefDiagnostics {
     }
 
     public static String postPlaceContainerLastInteractResult(long operationId) {
+        if (OUTPUT_MODE == OutputMode.OFF) {
+            return "unavailable";
+        }
         synchronized (LOCK) {
             if (activePostPlaceContainerOpenIntent == null
                     || activePostPlaceContainerOpenIntent.operationId != operationId) {
@@ -365,6 +405,9 @@ public final class ChatClefDiagnostics {
     }
 
     public static long postPlaceContainerElapsedTicks(long operationId) {
+        if (OUTPUT_MODE == OutputMode.OFF) {
+            return -1;
+        }
         synchronized (LOCK) {
             if (activePostPlaceContainerOpenIntent == null
                     || activePostPlaceContainerOpenIntent.operationId != operationId) {
@@ -375,6 +418,9 @@ public final class ChatClefDiagnostics {
     }
 
     public static boolean markPostPlaceContainerGuiOpened(long operationId) {
+        if (OUTPUT_MODE == OutputMode.OFF) {
+            return false;
+        }
         synchronized (LOCK) {
             if (activePostPlaceContainerOpenIntent == null
                     || activePostPlaceContainerOpenIntent.operationId != operationId
@@ -387,6 +433,9 @@ public final class ChatClefDiagnostics {
     }
 
     public static boolean markPostPlaceContainerGuiTimeout(long operationId) {
+        if (OUTPUT_MODE == OutputMode.OFF) {
+            return false;
+        }
         synchronized (LOCK) {
             if (activePostPlaceContainerOpenIntent == null
                     || activePostPlaceContainerOpenIntent.operationId != operationId
@@ -400,6 +449,9 @@ public final class ChatClefDiagnostics {
     }
 
     public static boolean markPostPlaceCarryOnWarningLogged(long operationId) {
+        if (OUTPUT_MODE == OutputMode.OFF) {
+            return false;
+        }
         synchronized (LOCK) {
             if (activePostPlaceContainerOpenIntent == null
                     || activePostPlaceContainerOpenIntent.operationId != operationId
@@ -412,6 +464,9 @@ public final class ChatClefDiagnostics {
     }
 
     public static boolean isPostPlaceContainerGuiOpened(long operationId) {
+        if (OUTPUT_MODE == OutputMode.OFF) {
+            return false;
+        }
         synchronized (LOCK) {
             return activePostPlaceContainerOpenIntent != null
                     && activePostPlaceContainerOpenIntent.operationId == operationId
@@ -420,6 +475,9 @@ public final class ChatClefDiagnostics {
     }
 
     public static void clearPostPlaceContainerOpenIntent(long operationId) {
+        if (OUTPUT_MODE == OutputMode.OFF) {
+            return;
+        }
         synchronized (LOCK) {
             if (activePostPlaceContainerOpenIntent != null
                     && activePostPlaceContainerOpenIntent.operationId == operationId) {
@@ -440,6 +498,9 @@ public final class ChatClefDiagnostics {
     }
 
     public static String safeValue(Supplier<?> supplier) {
+        if (OUTPUT_MODE == OutputMode.OFF) {
+            return "unavailable";
+        }
         try {
             return value(supplier == null ? null : supplier.get());
         } catch (RuntimeException | LinkageError ignored) {
@@ -448,6 +509,9 @@ public final class ChatClefDiagnostics {
     }
 
     public static String taskSummary(Task task) {
+        if (OUTPUT_MODE == OutputMode.OFF) {
+            return "unavailable";
+        }
         if (task == null) {
             return "none";
         }
@@ -457,6 +521,9 @@ public final class ChatClefDiagnostics {
     }
 
     public static String entitySummary(Entity entity) {
+        if (OUTPUT_MODE == OutputMode.OFF) {
+            return "unavailable";
+        }
         if (entity == null) {
             return "none";
         }
@@ -476,6 +543,9 @@ public final class ChatClefDiagnostics {
     }
 
     public static String entityDistanceSqrToPlayer(AltoClef mod, Entity entity) {
+        if (OUTPUT_MODE == OutputMode.OFF) {
+            return "unavailable";
+        }
         try {
             if (mod == null || mod.getPlayer() == null || entity == null) {
                 return "unavailable";
@@ -487,6 +557,9 @@ public final class ChatClefDiagnostics {
     }
 
     public static String playerPosition(AltoClef mod) {
+        if (OUTPUT_MODE == OutputMode.OFF) {
+            return "unavailable";
+        }
         try {
             if (mod == null || mod.getPlayer() == null) {
                 return "unavailable";
@@ -520,6 +593,9 @@ public final class ChatClefDiagnostics {
     }
 
     public static String itemStackSummary(ItemStack stack) {
+        if (OUTPUT_MODE == OutputMode.OFF) {
+            return "unavailable";
+        }
         if (stack == null) {
             return "none";
         }
@@ -531,6 +607,9 @@ public final class ChatClefDiagnostics {
     }
 
     public static String slotSummary(Slot slot) {
+        if (OUTPUT_MODE == OutputMode.OFF) {
+            return "unavailable";
+        }
         if (slot == null) {
             return "none";
         }
@@ -544,7 +623,39 @@ public final class ChatClefDiagnostics {
         }
     }
 
+    public static String slotStackSummary(Slot slot) {
+        if (OUTPUT_MODE == OutputMode.OFF) {
+            return "unavailable";
+        }
+        if (slot == null) {
+            return "none";
+        }
+        try {
+            if (Slot.isCursor(slot)) {
+                return safeValue(() -> StorageHelper.getItemStackInSlot(slot));
+            }
+            int windowSlot = slot.getWindowSlot();
+            if (windowSlot < 0) {
+                return "not_read#reason=non_window_slot#windowSlot=" + windowSlot;
+            }
+            MinecraftClient client = MinecraftClient.getInstance();
+            if (client == null || client.player == null || client.player.currentScreenHandler == null) {
+                return "not_read#reason=no_screen_handler#windowSlot=" + windowSlot;
+            }
+            int slotCount = client.player.currentScreenHandler.slots.size();
+            if (windowSlot >= slotCount) {
+                return "not_read#reason=window_slot_out_of_range#windowSlot=" + windowSlot + "#slotCount=" + slotCount;
+            }
+            return safeValue(() -> StorageHelper.getItemStackInSlot(slot));
+        } catch (RuntimeException | LinkageError ignored) {
+            return "unavailable";
+        }
+    }
+
     public static String itemTargets(ItemTarget[] targets) {
+        if (OUTPUT_MODE == OutputMode.OFF) {
+            return "unavailable";
+        }
         if (targets == null) {
             return "null";
         }
@@ -560,6 +671,9 @@ public final class ChatClefDiagnostics {
     }
 
     public static String classList(Class<?>[] classes) {
+        if (OUTPUT_MODE == OutputMode.OFF) {
+            return "unavailable";
+        }
         if (classes == null) {
             return "all_tracked_entity_types";
         }
@@ -930,7 +1044,62 @@ public final class ChatClefDiagnostics {
         return merged;
     }
 
+    private static void logRuntimeIdentityOnce() {
+        boolean shouldLog;
+        synchronized (LOCK) {
+            shouldLog = !runtimeIdentityLogged;
+            runtimeIdentityLogged = true;
+        }
+        if (!shouldLog) {
+            return;
+        }
+        logBoundary("DIAGNOSTICS_RUNTIME_IDENTITY", "diagnostics_runtime_identity", null,
+                "outputMode", OUTPUT_MODE.name(),
+                "diagnosticsSourceMarker", "20260731_post_place_handoff_p2",
+                "diagnosticsClassCodeSource", diagnosticsCodeSourceLocation(),
+                "diagnosticsCodeSourceLastModified", diagnosticsCodeSourceLastModified(),
+                "diagnosticsImplementationVersion", diagnosticsImplementationVersion());
+    }
+
+    private static String diagnosticsCodeSourceLocation() {
+        try {
+            java.security.CodeSource source = ChatClefDiagnostics.class.getProtectionDomain().getCodeSource();
+            return source == null || source.getLocation() == null ? "unavailable" : source.getLocation().toString();
+        } catch (RuntimeException | LinkageError ignored) {
+            return "unavailable";
+        }
+    }
+
+    private static String diagnosticsCodeSourceLastModified() {
+        try {
+            java.security.CodeSource source = ChatClefDiagnostics.class.getProtectionDomain().getCodeSource();
+            if (source == null || source.getLocation() == null) {
+                return "unavailable";
+            }
+            java.nio.file.Path path = java.nio.file.Paths.get(source.getLocation().toURI());
+            if (!java.nio.file.Files.exists(path)) {
+                return "unavailable";
+            }
+            return java.nio.file.Files.getLastModifiedTime(path).toString();
+        } catch (Exception | LinkageError ignored) {
+            return "unavailable";
+        }
+    }
+
+    private static String diagnosticsImplementationVersion() {
+        try {
+            Package packageInfo = ChatClefDiagnostics.class.getPackage();
+            String implementationVersion = packageInfo == null ? null : packageInfo.getImplementationVersion();
+            return implementationVersion == null || implementationVersion.isBlank() ? "unavailable" : implementationVersion;
+        } catch (RuntimeException | LinkageError ignored) {
+            return "unavailable";
+        }
+    }
+
     public static String chainName(TaskChain chain) {
+        if (OUTPUT_MODE == OutputMode.OFF) {
+            return "unavailable";
+        }
         if (chain == null) {
             return "unavailable";
         }
@@ -979,27 +1148,19 @@ public final class ChatClefDiagnostics {
                 .replace('\t', ' ');
     }
 
-    private static OutputMode outputMode() {
+    private static OutputMode parseOutputMode() {
         String configured = System.getProperty("lavi.chatclef.diagnostics");
         if (configured == null || configured.isBlank()) {
             configured = System.getenv("LAVI_CHATCLEF_DIAGNOSTICS");
         }
         if (configured != null && !configured.isBlank()) {
             return switch (configured.trim().toLowerCase()) {
-                case "off", "false", "0", "none" -> OutputMode.OFF;
-                case "verbose", "debug", "true", "1", "all" -> OutputMode.VERBOSE;
-                default -> OutputMode.BOUNDARY;
+                case "off" -> OutputMode.OFF;
+                case "boundary" -> OutputMode.BOUNDARY;
+                case "verbose" -> OutputMode.VERBOSE;
+                default -> OutputMode.OFF;
             };
         }
-        try {
-            AltoClef instance = AltoClef.getInstance();
-            if (instance != null
-                    && instance.getModSettings() != null
-                    && "ALL".equalsIgnoreCase(instance.getModSettings().getLogLevel())) {
-                return OutputMode.VERBOSE;
-            }
-        } catch (RuntimeException | LinkageError ignored) {
-        }
-        return OutputMode.BOUNDARY;
+        return OutputMode.OFF;
     }
 }

@@ -1,6 +1,7 @@
 package lavi.minecraft.integration.carryon;
 
 import adris.altoclef.AltoClef;
+import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 import net.minecraft.client.MinecraftClient;
 
 //20260730_kpopmodder: Observe current Carry On stuck-state evidence from a LAVI-owned tick boundary only.
@@ -14,6 +15,9 @@ public final class CarryOnRuntimeStateObserver {
     private boolean capabilityFailureLogged;
 
     public void onEndClientTick(MinecraftClient client) {
+        if (!ChatClefDiagnostics.isBoundaryEnabled()) {
+            return;
+        }
         ticksSinceObservation++;
         if (!canObserve(client)) {
             resetSession();
@@ -29,12 +33,12 @@ public final class CarryOnRuntimeStateObserver {
         CarryOnObservation currentObservation = CarryOnDiagnostics.observe();
         boolean stateChanged = !sameObservation(previousObservation, currentObservation);
         boolean carrying = isCarrying(currentObservation);
-        boolean carryingEnded = isCarrying(previousObservation) && !carrying;
+        boolean observedCarryRelease = observedCarryRelease(previousObservation, currentObservation);
         boolean capabilityFailure = isCapabilityFailure(currentObservation);
         boolean taskRunnerActive = isTaskRunnerActive();
 
         if (session == null) {
-            if (!shouldStartSession(taskRunnerActive, carrying, carryingEnded, capabilityFailure)) {
+            if (!shouldStartSession(taskRunnerActive, carrying, observedCarryRelease, capabilityFailure)) {
                 previousObservation = currentObservation;
                 return;
             }
@@ -53,7 +57,7 @@ public final class CarryOnRuntimeStateObserver {
 
         CarryOnObservation before = previousObservation == null ? currentObservation : previousObservation;
         session.logHeartbeat(before, currentObservation, "runtime_tick");
-        if (stateChanged || carrying || carryingEnded || capabilityFailure) {
+        if (stateChanged || carrying || observedCarryRelease || capabilityFailure) {
             session.logState(before, currentObservation, "runtime_observe");
         }
 
@@ -62,11 +66,11 @@ public final class CarryOnRuntimeStateObserver {
         }
         boolean observationWindowExpired = session.elapsedTicks() >= MAX_SESSION_TICKS;
         boolean sessionEnded = !taskRunnerActive && !carrying && !capabilityFailure;
-        if (carryingEnded || capabilityFailure || observationWindowExpired || sessionEnded) {
+        if (observedCarryRelease || capabilityFailure || observationWindowExpired || sessionEnded) {
             session.logTerminal(
                     before,
                     currentObservation,
-                    terminalReason(currentObservation, carryingEnded, observationWindowExpired, sessionEnded),
+                    terminalReason(before, currentObservation, CarryOnTransition.NONE, observedCarryRelease, observationWindowExpired, sessionEnded),
                     "runtime_observe"
             );
             session = null;
@@ -79,11 +83,11 @@ public final class CarryOnRuntimeStateObserver {
         return client != null && client.player != null && client.world != null;
     }
 
-    private boolean shouldStartSession(boolean taskRunnerActive, boolean carrying, boolean carryingEnded, boolean capabilityFailure) {
+    private boolean shouldStartSession(boolean taskRunnerActive, boolean carrying, boolean observedCarryRelease, boolean capabilityFailure) {
         if (taskRunnerActive) {
             return true;
         }
-        if (carrying || carryingEnded) {
+        if (carrying || observedCarryRelease) {
             return true;
         }
         return capabilityFailure && !capabilityFailureLogged;
@@ -115,6 +119,13 @@ public final class CarryOnRuntimeStateObserver {
         return observation != null && observation.state() == CarryOnCarryState.AVAILABLE_CARRYING;
     }
 
+    private static boolean observedCarryRelease(CarryOnObservation before, CarryOnObservation after) {
+        return before != null
+                && after != null
+                && before.state() == CarryOnCarryState.AVAILABLE_CARRYING
+                && after.state() == CarryOnCarryState.AVAILABLE_NOT_CARRYING;
+    }
+
     private static boolean isCapabilityFailure(CarryOnObservation observation) {
         if (observation == null) {
             return false;
@@ -124,19 +135,39 @@ public final class CarryOnRuntimeStateObserver {
                 || observation.state() == CarryOnCarryState.OBSERVATION_FAILED;
     }
 
-    private static CarryOnTerminalReason terminalReason(CarryOnObservation observation,
-                                                        boolean carryingEnded,
+    private static CarryOnTerminalReason terminalReason(CarryOnObservation before,
+                                                        CarryOnObservation after,
+                                                        CarryOnTransition expectedTransition,
+                                                        boolean observedCarryRelease,
                                                         boolean observationWindowExpired,
                                                         boolean sessionEnded) {
-        if (carryingEnded) {
-            return CarryOnTerminalReason.SUCCESS;
+        if (before == null || after == null) {
+            return CarryOnTerminalReason.OBSERVATION_FAILED;
+        }
+        CarryOnTerminalReason capabilityTerminal = capabilityTerminal(before);
+        if (capabilityTerminal != CarryOnTerminalReason.UNAVAILABLE) {
+            return capabilityTerminal;
+        }
+        capabilityTerminal = capabilityTerminal(after);
+        if (capabilityTerminal != CarryOnTerminalReason.UNAVAILABLE) {
+            return capabilityTerminal;
         }
         if (observationWindowExpired) {
             return CarryOnTerminalReason.OBSERVATION_WINDOW_EXPIRED;
         }
+        if (expectedTransition != CarryOnTransition.NONE && expectedTransition.matches(before, after)) {
+            return CarryOnTerminalReason.SUCCESS;
+        }
+        if (observedCarryRelease) {
+            return CarryOnTerminalReason.STATE_TRANSITION_OBSERVED;
+        }
         if (sessionEnded) {
             return CarryOnTerminalReason.SESSION_ENDED;
         }
+        return CarryOnTerminalReason.UNAVAILABLE;
+    }
+
+    private static CarryOnTerminalReason capabilityTerminal(CarryOnObservation observation) {
         if (observation == null) {
             return CarryOnTerminalReason.OBSERVATION_FAILED;
         }

@@ -29,7 +29,13 @@ import java.util.Optional;
  * Interacts with a container, obtaining and placing one if none were found nearby.
  */
 public abstract class DoStuffInContainerTask extends Task {
+    private enum PostPlaceHandoffPhase {
+        IDLE,
+        WAITING_FOR_SNEAK_RELEASE
+    }
+
     private static final int POST_PLACE_GUI_OPEN_TIMEOUT_TICKS = 10;
+    private static final int POST_PLACE_STABILITY_MAX_WAIT_TICKS = 3;
 
     private final ItemTarget containerTarget;
     private final Block[] containerBlocks;
@@ -43,12 +49,13 @@ public abstract class DoStuffInContainerTask extends Task {
     private final TimerGame justPlacedTimer = new TimerGame(3);
     private BlockPos cachedContainerPosition = null;
     private Task openTableTask;
-    private boolean waitingForPlacedContainerInteractionStability;
+    private PostPlaceHandoffPhase postPlaceHandoffPhase = PostPlaceHandoffPhase.IDLE;
     private long postPlaceOperationId = -1;
     private BlockPos postPlaceContainerPosition = null;
     private int postPlaceStabilityWaitedTicks;
     private boolean postPlaceStabilityWaitLogged;
     private boolean postPlaceStabilityProceedLogged;
+    private boolean postPlaceStabilityBudgetExhaustedLogged;
     private boolean postPlaceOpenIntentStarted;
     private boolean postPlaceGuiOpenedLogged;
     private boolean postPlaceGuiTimeoutLogged;
@@ -67,24 +74,31 @@ public abstract class DoStuffInContainerTask extends Task {
     @Override
     protected void onStart() {
         AltoClef mod = AltoClef.getInstance();
-        resetPostPlaceDiagnostics();
-        ChatClefDiagnostics.logEvent("CONTAINER_TASK", "ON_START_BEGIN", "do_stuff_in_container_start", this,
-                "containerTarget", containerTarget,
-                "containerBlocks", Arrays.toString(containerBlocks),
-                "openTableTaskExists", openTableTask != null);
+        resetPostPlaceOperationState();
+        boolean diagnosticsVerbose = ChatClefDiagnostics.isVerboseEnabled();
+        if (diagnosticsVerbose) {
+            ChatClefDiagnostics.logEvent("CONTAINER_TASK", "ON_START_BEGIN", "do_stuff_in_container_start", this,
+                    "containerTarget", containerTarget,
+                    "containerBlocks", Arrays.toString(containerBlocks),
+                    "openTableTaskExists", openTableTask != null);
+        }
         mod.getBehaviour().push();
         if (openTableTask == null) {
             openTableTask = new DoToClosestBlockTask(InteractWithBlockTask::new, containerBlocks);
-            ChatClefDiagnostics.logTaskTransition(this, null, openTableTask, "open_table_task_created",
-                    "containerTarget", containerTarget,
-                    "containerBlocks", Arrays.toString(containerBlocks));
+            if (diagnosticsVerbose) {
+                ChatClefDiagnostics.logTaskTransition(this, null, openTableTask, "open_table_task_created",
+                        "containerTarget", containerTarget,
+                        "containerBlocks", Arrays.toString(containerBlocks));
+            }
         }
 
         // Protect container since we might place it.
         mod.getBehaviour().addProtectedItems(ItemHelper.blocksToItems(containerBlocks));
-        ChatClefDiagnostics.logEvent("CONTAINER_TASK", "ON_START_END", "do_stuff_in_container_start", this,
-                "containerTarget", containerTarget,
-                "containerBlocks", Arrays.toString(containerBlocks));
+        if (diagnosticsVerbose) {
+            ChatClefDiagnostics.logEvent("CONTAINER_TASK", "ON_START_END", "do_stuff_in_container_start", this,
+                    "containerTarget", containerTarget,
+                    "containerBlocks", Arrays.toString(containerBlocks));
+        }
     }
 
     @Override
@@ -93,94 +107,129 @@ public abstract class DoStuffInContainerTask extends Task {
         boolean hasContainerItem = mod.getItemStorage().hasItem(ItemHelper.blocksToItems(containerBlocks));
         boolean placeTaskActive = placeTask.isActive();
         boolean placeTaskFinished = placeTaskActive && placeTask.isFinished();
-        ChatClefDiagnostics.logEvent("CONTAINER_TASK", "ON_TICK_BEGIN", "container_tick_begin", this,
-                "containerTarget", containerTarget,
-                "containerBlocks", Arrays.toString(containerBlocks),
-                "cachedContainerPosition", cachedContainerPosition,
-                "hasContainerItem", hasContainerItem,
-                "containerItemCount", ChatClefDiagnostics.safeValue(() -> mod.getItemStorage().getItemCount(ItemHelper.blocksToItems(containerBlocks))),
-                "placeTaskActive", placeTaskActive,
-                "placeTaskFinished", placeTaskFinished,
-                "placeTaskPlaced", placeTask.getPlaced(),
-                "placeTaskPlacedBlockState", placeTask.getPlaced() == null ? "unavailable" : ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(placeTask.getPlaced())));
+        boolean diagnosticsVerbose = ChatClefDiagnostics.isVerboseEnabled();
+        boolean diagnosticsBoundary = ChatClefDiagnostics.isBoundaryEnabled();
+        if (diagnosticsVerbose) {
+            ChatClefDiagnostics.logEvent("CONTAINER_TASK", "ON_TICK_BEGIN", "container_tick_begin", this,
+                    "containerTarget", containerTarget,
+                    "containerBlocks", Arrays.toString(containerBlocks),
+                    "cachedContainerPosition", cachedContainerPosition,
+                    "hasContainerItem", hasContainerItem,
+                    "containerItemCount", ChatClefDiagnostics.safeValue(() -> mod.getItemStorage().getItemCount(ItemHelper.blocksToItems(containerBlocks))),
+                    "placeTaskActive", placeTaskActive,
+                    "placeTaskFinished", placeTaskFinished,
+                    "placeTaskPlaced", placeTask.getPlaced(),
+                    "placeTaskPlacedBlockState", placeTask.getPlaced() == null ? "unavailable" : ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(placeTask.getPlaced())));
+        }
         // If we're placing, keep on placing.
         if (hasContainerItem && placeTaskActive && !placeTaskFinished) {
             setDebugState("Placing container");
-            ChatClefDiagnostics.logTaskTransition(this, null, placeTask, "return_active_place_task",
-                    "containerTarget", containerTarget,
-                    "placeTaskPlaced", placeTask.getPlaced());
+            if (diagnosticsVerbose) {
+                ChatClefDiagnostics.logTaskTransition(this, null, placeTask, "return_active_place_task",
+                        "containerTarget", containerTarget,
+                        "placeTaskPlaced", placeTask.getPlaced());
+            }
             return placeTask;
         }
 
         //20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
         // trace-191: split the post-placement child handoff so SNEAK release can settle before normal container open.
         if (placeTaskFinished) {
-            waitingForPlacedContainerInteractionStability = true;
+            postPlaceHandoffPhase = PostPlaceHandoffPhase.WAITING_FOR_SNEAK_RELEASE;
             postPlaceOperationId = ChatClefDiagnostics.nextOperationId();
             postPlaceContainerPosition = placeTask.getPlaced();
             postPlaceStabilityWaitedTicks = 0;
             postPlaceStabilityWaitLogged = false;
             postPlaceStabilityProceedLogged = false;
+            postPlaceStabilityBudgetExhaustedLogged = false;
             postPlaceOpenIntentStarted = false;
             postPlaceGuiOpenedLogged = false;
             postPlaceGuiTimeoutLogged = false;
             setDebugState("Waiting for placed-container handoff");
-            ChatClefDiagnostics.logBoundary("POST_PLACE_HANDOFF", "placed_container_handoff_deferred", this,
-                    "operationId", postPlaceOperationId,
-                    "containerType", containerTarget,
-                    "placedPosition", postPlaceContainerPosition,
-                    "placedBlockState", postPlaceContainerPosition == null ? "unavailable" : ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(postPlaceContainerPosition)),
-                    "playerSneaking", ChatClefDiagnostics.safeValue(() -> mod.getPlayer().isSneaking()),
-                    "sneakHeld", ChatClefDiagnostics.inputHeldState(Input.SNEAK),
-                    "clientTick", ChatClefDiagnostics.currentClientTickId());
+            if (diagnosticsBoundary) {
+                ChatClefDiagnostics.logBoundary("POST_PLACE_HANDOFF", "placed_container_handoff_deferred", this,
+                        "operationId", postPlaceOperationId,
+                        "containerType", containerTarget,
+                        "placedPosition", postPlaceContainerPosition,
+                        "placedBlockState", postPlaceContainerPosition == null ? "unavailable" : ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(postPlaceContainerPosition)),
+                        "playerSneaking", ChatClefDiagnostics.safeValue(() -> mod.getPlayer().isSneaking()),
+                        "sneakHeld", ChatClefDiagnostics.inputHeldState(Input.SNEAK),
+                        "clientTick", ChatClefDiagnostics.currentClientTickId());
+            }
             return null;
         }
 
-        if (waitingForPlacedContainerInteractionStability) {
+        if (postPlaceHandoffPhase == PostPlaceHandoffPhase.WAITING_FOR_SNEAK_RELEASE) {
             boolean sneakHeld = mod.getInputControls().isHeldDown(Input.SNEAK);
             boolean playerSneaking = mod.getPlayer().isSneaking();
-            postPlaceStabilityWaitedTicks++;
             if (sneakHeld || playerSneaking) {
-                if (!postPlaceStabilityWaitLogged) {
-                    postPlaceStabilityWaitLogged = true;
+                postPlaceStabilityWaitedTicks++;
+                if (postPlaceStabilityWaitedTicks >= POST_PLACE_STABILITY_MAX_WAIT_TICKS) {
+                    if (diagnosticsBoundary && !postPlaceStabilityBudgetExhaustedLogged) {
+                        postPlaceStabilityBudgetExhaustedLogged = true;
+                        ChatClefDiagnostics.logWarningEvent("POST_PLACE_STABILITY_BUDGET_EXHAUSTED", "placed_container_handoff_stability_budget_exhausted", this,
+                                "operationId", postPlaceOperationId,
+                                "outcome", "SNEAK_RELEASE_BUDGET_EXHAUSTED_PROCEEDING",
+                                "waitedTicks", postPlaceStabilityWaitedTicks,
+                                "budgetTicks", POST_PLACE_STABILITY_MAX_WAIT_TICKS,
+                                "placedPosition", postPlaceContainerPosition,
+                                "playerSneaking", playerSneaking,
+                                "sneakHeld", sneakHeld);
+                    }
+                    postPlaceHandoffPhase = PostPlaceHandoffPhase.IDLE;
+                } else {
+                    if (diagnosticsBoundary && !postPlaceStabilityWaitLogged) {
+                        postPlaceStabilityWaitLogged = true;
+                        ChatClefDiagnostics.logBoundary("POST_PLACE_STABILITY", "placed_container_handoff_stability_check", this,
+                                "operationId", postPlaceOperationId,
+                                "decision", "WAIT",
+                                "outcome", "WAITING_FOR_SNEAK_RELEASE",
+                                "waitedTicks", postPlaceStabilityWaitedTicks,
+                                "budgetTicks", POST_PLACE_STABILITY_MAX_WAIT_TICKS,
+                                "placedPosition", postPlaceContainerPosition,
+                                "playerSneaking", playerSneaking,
+                                "sneakHeld", sneakHeld);
+                    }
+                    setDebugState("Waiting for post-placement interaction stability");
+                    return null;
+                }
+            } else {
+                if (diagnosticsBoundary && !postPlaceStabilityProceedLogged) {
+                    postPlaceStabilityProceedLogged = true;
                     ChatClefDiagnostics.logBoundary("POST_PLACE_STABILITY", "placed_container_handoff_stability_check", this,
                             "operationId", postPlaceOperationId,
-                            "decision", "WAIT",
+                            "decision", "PROCEED",
+                            "outcome", "SNEAK_RELEASE_OBSERVED",
                             "waitedTicks", postPlaceStabilityWaitedTicks,
+                            "budgetTicks", POST_PLACE_STABILITY_MAX_WAIT_TICKS,
                             "placedPosition", postPlaceContainerPosition,
                             "playerSneaking", playerSneaking,
                             "sneakHeld", sneakHeld);
                 }
-                setDebugState("Waiting for post-placement interaction stability");
-                return null;
+                postPlaceHandoffPhase = PostPlaceHandoffPhase.IDLE;
             }
-            if (!postPlaceStabilityProceedLogged) {
-                postPlaceStabilityProceedLogged = true;
-                ChatClefDiagnostics.logBoundary("POST_PLACE_STABILITY", "placed_container_handoff_stability_check", this,
-                        "operationId", postPlaceOperationId,
-                        "decision", "PROCEED",
-                        "waitedTicks", postPlaceStabilityWaitedTicks,
-                        "placedPosition", postPlaceContainerPosition,
-                        "playerSneaking", playerSneaking,
-                        "sneakHeld", sneakHeld);
-            }
-            waitingForPlacedContainerInteractionStability = false;
         }
 
-        ChatClefDiagnostics.logEvent("CONTAINER_TASK", "CONTAINER_OPEN_CHECK_BEFORE", "before_isContainerOpen", this,
-                "containerTarget", containerTarget,
-                "cachedContainerPosition", cachedContainerPosition);
+        if (diagnosticsVerbose) {
+            ChatClefDiagnostics.logEvent("CONTAINER_TASK", "CONTAINER_OPEN_CHECK_BEFORE", "before_isContainerOpen", this,
+                    "containerTarget", containerTarget,
+                    "cachedContainerPosition", cachedContainerPosition);
+        }
         boolean containerOpen = isContainerOpen(mod);
-        ChatClefDiagnostics.logEvent("CONTAINER_TASK", "CONTAINER_OPEN_CHECK_AFTER", "after_isContainerOpen", this,
-                "containerTarget", containerTarget,
-                "cachedContainerPosition", cachedContainerPosition,
-                "containerOpen", containerOpen);
+        if (diagnosticsVerbose) {
+            ChatClefDiagnostics.logEvent("CONTAINER_TASK", "CONTAINER_OPEN_CHECK_AFTER", "after_isContainerOpen", this,
+                    "containerTarget", containerTarget,
+                    "cachedContainerPosition", cachedContainerPosition,
+                    "containerOpen", containerOpen);
+        }
         if (containerOpen) {
             logPostPlaceGuiOpened(mod);
             Task containerTask = containerSubTask(mod);
-            ChatClefDiagnostics.logTaskTransition(this, null, containerTask, "return_container_sub_task",
-                    "containerTarget", containerTarget,
-                    "containerOpen", true);
+            if (diagnosticsVerbose) {
+                ChatClefDiagnostics.logTaskTransition(this, null, containerTask, "return_container_sub_task",
+                        "containerTarget", containerTarget,
+                        "containerOpen", true);
+            }
             return containerTask;
         }
         logPostPlaceGuiTimeoutIfNeeded(mod);
@@ -213,28 +262,32 @@ public abstract class DoStuffInContainerTask extends Task {
         double costToMakeNew = getCostToMakeNew(mod);
         boolean placeForceElapsed = placeForceTimer.elapsed();
         boolean justPlacedElapsed = justPlacedTimer.elapsed();
-        ChatClefDiagnostics.logEvent("CONTAINER_TASK", "NEAREST_DECISION", "container_nearest_decision", this,
-                "containerTarget", containerTarget,
-                "overrideContainerPosition", override,
-                "nearestPresent", nearest.isPresent(),
-                "nearestPosition", nearest.map(Object::toString).orElse("unavailable"),
-                "nearestBlockState", nearest.map(blockPos -> ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(blockPos))).orElse("unavailable"),
-                "placeTaskPlaced", placeTask.getPlaced(),
-                "placeTaskPlacedBlockState", placeTask.getPlaced() == null ? "unavailable" : ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(placeTask.getPlaced())),
-                "costToWalk", costToWalk,
-                "costToMakeNew", costToMakeNew,
-                "placeForceElapsed", placeForceElapsed,
-                "justPlacedElapsed", justPlacedElapsed,
-                "hasContainerItem", hasContainerItem);
+        if (diagnosticsVerbose) {
+            ChatClefDiagnostics.logEvent("CONTAINER_TASK", "NEAREST_DECISION", "container_nearest_decision", this,
+                    "containerTarget", containerTarget,
+                    "overrideContainerPosition", override,
+                    "nearestPresent", nearest.isPresent(),
+                    "nearestPosition", nearest.map(Object::toString).orElse("unavailable"),
+                    "nearestBlockState", nearest.map(blockPos -> ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(blockPos))).orElse("unavailable"),
+                    "placeTaskPlaced", placeTask.getPlaced(),
+                    "placeTaskPlacedBlockState", placeTask.getPlaced() == null ? "unavailable" : ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(placeTask.getPlaced())),
+                    "costToWalk", costToWalk,
+                    "costToMakeNew", costToMakeNew,
+                    "placeForceElapsed", placeForceElapsed,
+                    "justPlacedElapsed", justPlacedElapsed,
+                    "hasContainerItem", hasContainerItem);
+        }
 
         // Make a new container if going to the container is a pretty bad cost.
         // Also keep on making the container if we're stuck in some
         if (costToWalk > costToMakeNew) {
-            ChatClefDiagnostics.logEvent("CONTAINER_TASK", "PLACE_FORCE_RESET", "cost_to_walk_exceeds_make_new", this,
-                    "containerTarget", containerTarget,
-                    "costToWalk", costToWalk,
-                    "costToMakeNew", costToMakeNew,
-                    "nearestPresent", nearest.isPresent());
+            if (diagnosticsVerbose) {
+                ChatClefDiagnostics.logEvent("CONTAINER_TASK", "PLACE_FORCE_RESET", "cost_to_walk_exceeds_make_new", this,
+                        "containerTarget", containerTarget,
+                        "costToWalk", costToWalk,
+                        "costToMakeNew", costToMakeNew,
+                        "nearestPresent", nearest.isPresent());
+            }
             placeForceTimer.reset();
         }
         placeForceElapsed = placeForceTimer.elapsed();
@@ -244,21 +297,25 @@ public abstract class DoStuffInContainerTask extends Task {
 
             // We're no longer going to our previous container.
             cachedContainerPosition = null;
-            ChatClefDiagnostics.logEvent("CONTAINER_TASK", "MAKE_OR_PLACE_CONTAINER", "container_make_or_place_branch", this,
-                    "containerTarget", containerTarget,
-                    "nearestPresent", nearest.isPresent(),
-                    "placeForceElapsed", placeForceElapsed,
-                    "justPlacedElapsed", justPlacedElapsed,
-                    "hasContainerItem", hasContainerItem,
-                    "placeTaskPlaced", placeTask.getPlaced());
+            if (diagnosticsVerbose) {
+                ChatClefDiagnostics.logEvent("CONTAINER_TASK", "MAKE_OR_PLACE_CONTAINER", "container_make_or_place_branch", this,
+                        "containerTarget", containerTarget,
+                        "nearestPresent", nearest.isPresent(),
+                        "placeForceElapsed", placeForceElapsed,
+                        "justPlacedElapsed", justPlacedElapsed,
+                        "hasContainerItem", hasContainerItem,
+                        "placeTaskPlaced", placeTask.getPlaced());
+            }
 
             // Get if we don't have...
             if (!mod.getItemStorage().hasItem(containerTarget)) {
                 setDebugState("Getting container item");
-                ChatClefDiagnostics.logEvent("CONTAINER_TASK", "RETURN", "return_get_container_item_task", this,
-                        "containerTarget", containerTarget,
-                        "hasContainerItem", hasContainerItem,
-                        "placeTaskPlaced", placeTask.getPlaced());
+                if (diagnosticsVerbose) {
+                    ChatClefDiagnostics.logEvent("CONTAINER_TASK", "RETURN", "return_get_container_item_task", this,
+                            "containerTarget", containerTarget,
+                            "hasContainerItem", hasContainerItem,
+                            "placeTaskPlaced", placeTask.getPlaced());
+                }
                 return TaskCatalogue.getItemTask(containerTarget);
             }
 
@@ -266,10 +323,12 @@ public abstract class DoStuffInContainerTask extends Task {
 
             justPlacedTimer.reset();
             // Now place!
-            ChatClefDiagnostics.logTaskTransition(this, null, placeTask, "return_place_task",
-                    "containerTarget", containerTarget,
-                    "nearestPresent", nearest.isPresent(),
-                    "placeTaskPlaced", placeTask.getPlaced());
+            if (diagnosticsVerbose) {
+                ChatClefDiagnostics.logTaskTransition(this, null, placeTask, "return_place_task",
+                        "containerTarget", containerTarget,
+                        "nearestPresent", nearest.isPresent(),
+                        "placeTaskPlaced", placeTask.getPlaced());
+            }
             return placeTask;
         }
 
@@ -282,9 +341,11 @@ public abstract class DoStuffInContainerTask extends Task {
         // Wait for food
         if (mod.getFoodChain().needsToEat()) {
             setDebugState("Waiting for eating...");
-            ChatClefDiagnostics.logEvent("CONTAINER_TASK", "RETURN", "return_wait_for_food", this,
-                    "containerTarget", containerTarget,
-                    "cachedContainerPosition", cachedContainerPosition);
+            if (diagnosticsVerbose) {
+                ChatClefDiagnostics.logEvent("CONTAINER_TASK", "RETURN", "return_wait_for_food", this,
+                        "containerTarget", containerTarget,
+                        "cachedContainerPosition", cachedContainerPosition);
+            }
             return null;
         }
         setDebugState("Walking to container... " + nearest.get().toShortString());
@@ -293,35 +354,45 @@ public abstract class DoStuffInContainerTask extends Task {
         if (!cursorStack.isEmpty()) {
             Optional<Slot> toMoveTo = mod.getItemStorage().getSlotThatCanFitInPlayerInventory(cursorStack, false);
             if (toMoveTo.isEmpty()) {
-                ChatClefDiagnostics.logEvent("CONTAINER_TASK", "RETURN", "return_ensure_free_inventory_slot", this,
-                        "containerTarget", containerTarget,
-                        "cursorStack", cursorStack);
+                if (diagnosticsVerbose) {
+                    ChatClefDiagnostics.logEvent("CONTAINER_TASK", "RETURN", "return_ensure_free_inventory_slot", this,
+                            "containerTarget", containerTarget,
+                            "cursorStack", cursorStack);
+                }
                 return new EnsureFreeInventorySlotTask();
             }
             if (ItemHelper.canThrowAwayStack(mod, cursorStack)) {
                 mod.getSlotHandler().clickSlot(Slot.UNDEFINED, 0, SlotActionType.PICKUP);
-                ChatClefDiagnostics.logEvent("CONTAINER_TASK", "RETURN", "return_after_cursor_throwaway_click", this,
-                        "containerTarget", containerTarget,
-                        "cursorStack", cursorStack);
+                if (diagnosticsVerbose) {
+                    ChatClefDiagnostics.logEvent("CONTAINER_TASK", "RETURN", "return_after_cursor_throwaway_click", this,
+                            "containerTarget", containerTarget,
+                            "cursorStack", cursorStack);
+                }
                 return null;
             }
             mod.getSlotHandler().clickSlot(toMoveTo.get(), 0, SlotActionType.PICKUP);
-            ChatClefDiagnostics.logEvent("CONTAINER_TASK", "RETURN", "return_after_cursor_move_click", this,
-                    "containerTarget", containerTarget,
-                    "cursorStack", cursorStack,
-                    "slot", toMoveTo.get());
+            if (diagnosticsVerbose) {
+                ChatClefDiagnostics.logEvent("CONTAINER_TASK", "RETURN", "return_after_cursor_move_click", this,
+                        "containerTarget", containerTarget,
+                        "cursorStack", cursorStack,
+                        "slot", toMoveTo.get());
+            }
             return null;
         }
-        ChatClefDiagnostics.startTrace("container_open_intent", this,
-                "containerTarget", containerTarget,
-                "cachedContainerPosition", cachedContainerPosition,
-                "cachedContainerBlockState", cachedContainerPosition == null ? "unavailable" : ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(cachedContainerPosition)),
-                "openTableTaskClass", ChatClefDiagnostics.className(openTableTask));
+        if (diagnosticsVerbose) {
+            ChatClefDiagnostics.startTrace("container_open_intent", this,
+                    "containerTarget", containerTarget,
+                    "cachedContainerPosition", cachedContainerPosition,
+                    "cachedContainerBlockState", cachedContainerPosition == null ? "unavailable" : ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(cachedContainerPosition)),
+                    "openTableTaskClass", ChatClefDiagnostics.className(openTableTask));
+        }
         beginPostPlaceOpenIntentIfNeeded(mod);
-        ChatClefDiagnostics.logTaskTransition(this, null, openTableTask, "return_open_table_task",
-                "containerTarget", containerTarget,
-                "cachedContainerPosition", cachedContainerPosition,
-                "cachedContainerBlockState", cachedContainerPosition == null ? "unavailable" : ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(cachedContainerPosition)));
+        if (diagnosticsVerbose) {
+            ChatClefDiagnostics.logTaskTransition(this, null, openTableTask, "return_open_table_task",
+                    "containerTarget", containerTarget,
+                    "cachedContainerPosition", cachedContainerPosition,
+                    "cachedContainerBlockState", cachedContainerPosition == null ? "unavailable" : ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(cachedContainerPosition)));
+        }
         return openTableTask;
         //return new GetToBlockTask(nearest, true);
     }
@@ -341,15 +412,20 @@ public abstract class DoStuffInContainerTask extends Task {
 
     @Override
     protected void onStop(Task interruptTask) {
-        ChatClefDiagnostics.logTaskTransition(this, this, interruptTask, "container_task_onStop_begin",
-                "containerTarget", containerTarget,
-                "cachedContainerPosition", cachedContainerPosition);
+        boolean diagnosticsVerbose = ChatClefDiagnostics.isVerboseEnabled();
+        if (diagnosticsVerbose) {
+            ChatClefDiagnostics.logTaskTransition(this, this, interruptTask, "container_task_onStop_begin",
+                    "containerTarget", containerTarget,
+                    "cachedContainerPosition", cachedContainerPosition);
+        }
         ChatClefDiagnostics.clearPostPlaceContainerOpenIntent(postPlaceOperationId);
-        resetPostPlaceDiagnostics();
+        resetPostPlaceOperationState();
         AltoClef.getInstance().getBehaviour().pop();
-        ChatClefDiagnostics.logTaskTransition(this, this, interruptTask, "container_task_onStop_end",
-                "containerTarget", containerTarget,
-                "cachedContainerPosition", cachedContainerPosition);
+        if (diagnosticsVerbose) {
+            ChatClefDiagnostics.logTaskTransition(this, this, interruptTask, "container_task_onStop_end",
+                    "containerTarget", containerTarget,
+                    "cachedContainerPosition", cachedContainerPosition);
+        }
     }
 
     @Override
@@ -376,6 +452,9 @@ public abstract class DoStuffInContainerTask extends Task {
     protected abstract double getCostToMakeNew(AltoClef mod);
 
     private void beginPostPlaceOpenIntentIfNeeded(AltoClef mod) {
+        if (!ChatClefDiagnostics.isBoundaryEnabled()) {
+            return;
+        }
         if (postPlaceOperationId < 0
                 || postPlaceContainerPosition == null
                 || cachedContainerPosition == null
@@ -393,6 +472,9 @@ public abstract class DoStuffInContainerTask extends Task {
     }
 
     private void logPostPlaceGuiOpened(AltoClef mod) {
+        if (!ChatClefDiagnostics.isBoundaryEnabled()) {
+            return;
+        }
         if (postPlaceOperationId < 0 || !postPlaceOpenIntentStarted || postPlaceGuiOpenedLogged) {
             return;
         }
@@ -408,10 +490,13 @@ public abstract class DoStuffInContainerTask extends Task {
                 "syncId", ChatClefDiagnostics.safeValue(() -> mod.getPlayer().currentScreenHandler.syncId),
                 "elapsedTicks", ChatClefDiagnostics.postPlaceContainerElapsedTicks(operationId));
         ChatClefDiagnostics.clearPostPlaceContainerOpenIntent(operationId);
-        resetPostPlaceDiagnostics();
+        resetPostPlaceOperationState();
     }
 
     private void logPostPlaceGuiTimeoutIfNeeded(AltoClef mod) {
+        if (!ChatClefDiagnostics.isBoundaryEnabled()) {
+            return;
+        }
         if (postPlaceOperationId < 0
                 || !postPlaceOpenIntentStarted
                 || postPlaceGuiOpenedLogged
@@ -434,12 +519,14 @@ public abstract class DoStuffInContainerTask extends Task {
                 "elapsedTicks", elapsedTicks);
     }
 
-    private void resetPostPlaceDiagnostics() {
+    private void resetPostPlaceOperationState() {
+        postPlaceHandoffPhase = PostPlaceHandoffPhase.IDLE;
         postPlaceOperationId = -1;
         postPlaceContainerPosition = null;
         postPlaceStabilityWaitedTicks = 0;
         postPlaceStabilityWaitLogged = false;
         postPlaceStabilityProceedLogged = false;
+        postPlaceStabilityBudgetExhaustedLogged = false;
         postPlaceOpenIntentStarted = false;
         postPlaceGuiOpenedLogged = false;
         postPlaceGuiTimeoutLogged = false;
