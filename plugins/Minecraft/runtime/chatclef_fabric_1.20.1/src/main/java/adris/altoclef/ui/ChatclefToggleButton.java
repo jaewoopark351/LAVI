@@ -27,7 +27,8 @@ public class ChatclefToggleButton {
         // fill(matrices, x, y, x + WIDTH, y + HEIGHT, 0xAA000000);
 
         // Draw centered label with shadow
-        String label = commandBridgeOn ? "Chatclef: ON" : "Chatclef: OFF";
+        //String label = commandBridgeOn ? "Chatclef: ON" : "Chatclef: OFF";//20260731_kpopmodder
+        String label = commandBridgeOn ? "LAVI(old): ON" : "LAVI(old): OFF";//20260731_kpopmodder
         int textWidth = textRenderer.getWidth(label);
         int textHeight = textRenderer.fontHeight;
         float textX = x + (WIDTH - textWidth) / 2f;
