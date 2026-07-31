@@ -34,7 +34,7 @@ public final class ChatClefDiagnostics {
     private static final IdentityHashMap<Object, Long> TASK_RUN_IDS = new IdentityHashMap<>();
     private static final IdentityHashMap<Object, Long> PARENT_TASK_RUN_IDS = new IdentityHashMap<>();
     private static final ThreadLocal<Deque<Task>> TASK_STACK = ThreadLocal.withInitial(ArrayDeque::new);
-    private static final OutputMode OUTPUT_MODE = parseOutputMode();
+    private static volatile OutputMode OUTPUT_MODE = parseOutputMode();
 
     private static long nextTaskInstanceId = 1;
     private static long nextTaskRunId = 1;
@@ -151,6 +151,14 @@ public final class ChatClefDiagnostics {
 
     public static boolean isBoundaryEnabled() {
         return OUTPUT_MODE != OutputMode.OFF;
+    }
+
+    //20260731_kpopmodder: Allow the LAVI command layer to switch diagnostics between BOUNDARY and OFF without changing engine behavior.
+    public static void setBoundaryEnabled(boolean enabled) {
+        synchronized (LOCK) {
+            OUTPUT_MODE = enabled ? OutputMode.BOUNDARY : OutputMode.OFF;
+            runtimeIdentityLogged = false;
+        }
     }
 
     public static String inputHeldState(Input input) {

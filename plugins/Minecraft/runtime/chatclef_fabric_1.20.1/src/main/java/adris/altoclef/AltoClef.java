@@ -101,6 +101,9 @@ public class AltoClef implements ModInitializer {
     // Renderers
     private CommandStatusOverlay commandStatusOverlay;
     private AltoClefTickChart altoClefTickChart;
+    //20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
+    // Controls only the existing built-in HUD visibility and UI actions.
+    private boolean builtInHudVisible = true;
     // Settings
     private adris.altoclef.Settings settings;
     // Misc managers/input
@@ -335,10 +338,13 @@ public class AltoClef implements ModInitializer {
         }
 
         // Chatclef UI
-        if (ChatclefToggleButton.tick()) {
+        //20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
+        boolean chatclefToggleClicked = ChatclefToggleButton.tick();
+        if (builtInHudVisible && chatclefToggleClicked) {
             setChatClefEnabled(!getAiBridge().getEnabled());
         }
-        if (PlayerModeToggleButton.tick()) {
+        boolean playerModeToggleClicked = PlayerModeToggleButton.tick();
+        if (builtInHudVisible && playerModeToggleClicked) {
             setPlayerMode(!getAiBridge().getPlayerMode());
         }
     }
@@ -363,9 +369,16 @@ public class AltoClef implements ModInitializer {
         getAiBridge().setPlayerMode(enabled);
     }
 
+    //20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
+    // This setter changes display/UI visibility only.
+    public void setBuiltInHudVisible(boolean visible) {
+        builtInHudVisible = visible;
+    }
+
     private void onClientRenderOverlay(DrawContextWrapper context) {
         context.setRenderLayer(RenderLayerVer.getGuiOverlay());
-        if (settings.shouldShowTaskChain()) {
+        //20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
+        if (builtInHudVisible && settings.shouldShowTaskChain()) {
             commandStatusOverlay.render(this, context);
         }
 
@@ -373,8 +386,10 @@ public class AltoClef implements ModInitializer {
             altoClefTickChart.render(this, context, 1, context.getScaledWindowWidth() / 2 - 124);
         }
 
-        ChatclefToggleButton.render(context, context.getMatrices(), getAiBridge().getEnabled());
-        PlayerModeToggleButton.render(context, context.getMatrices(), getAiBridge().getPlayerMode());
+        if (builtInHudVisible) {
+            ChatclefToggleButton.render(context, context.getMatrices(), getAiBridge().getEnabled());
+            PlayerModeToggleButton.render(context, context.getMatrices(), getAiBridge().getPlayerMode());
+        }
         STTfeedback.render(context, context.getMatrices(), sttKeybind);
     }
 

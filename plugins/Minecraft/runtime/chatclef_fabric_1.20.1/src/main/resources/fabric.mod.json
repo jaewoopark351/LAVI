@@ -20,7 +20,8 @@
   "entrypoints": {
     "main": [
       "adris.altoclef.AltoClef",
-      "lavi.minecraft.integration.carryon.CarryOnDiagnosticEntrypoint"
+      "lavi.minecraft.integration.carryon.CarryOnDiagnosticEntrypoint",
+      "lavi.minecraft.overlay.OverlayEntrypoint"
     ]
   },
   "mixins": [
