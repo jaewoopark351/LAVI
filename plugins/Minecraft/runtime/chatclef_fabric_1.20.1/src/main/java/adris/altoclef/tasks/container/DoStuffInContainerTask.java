@@ -29,6 +29,7 @@ import java.util.Optional;
  * Interacts with a container, obtaining and placing one if none were found nearby.
  */
 public abstract class DoStuffInContainerTask extends Task {
+    private static final int POST_PLACE_GUI_OPEN_TIMEOUT_TICKS = 10;
 
     private final ItemTarget containerTarget;
     private final Block[] containerBlocks;
@@ -43,6 +44,14 @@ public abstract class DoStuffInContainerTask extends Task {
     private BlockPos cachedContainerPosition = null;
     private Task openTableTask;
     private boolean waitingForPlacedContainerInteractionStability;
+    private long postPlaceOperationId = -1;
+    private BlockPos postPlaceContainerPosition = null;
+    private int postPlaceStabilityWaitedTicks;
+    private boolean postPlaceStabilityWaitLogged;
+    private boolean postPlaceStabilityProceedLogged;
+    private boolean postPlaceOpenIntentStarted;
+    private boolean postPlaceGuiOpenedLogged;
+    private boolean postPlaceGuiTimeoutLogged;
 
     public DoStuffInContainerTask(Block[] containerBlocks, ItemTarget containerTarget) {
         this.containerBlocks = containerBlocks;
@@ -58,6 +67,7 @@ public abstract class DoStuffInContainerTask extends Task {
     @Override
     protected void onStart() {
         AltoClef mod = AltoClef.getInstance();
+        resetPostPlaceDiagnostics();
         ChatClefDiagnostics.logEvent("CONTAINER_TASK", "ON_START_BEGIN", "do_stuff_in_container_start", this,
                 "containerTarget", containerTarget,
                 "containerBlocks", Arrays.toString(containerBlocks),
@@ -106,27 +116,53 @@ public abstract class DoStuffInContainerTask extends Task {
         // trace-191: split the post-placement child handoff so SNEAK release can settle before normal container open.
         if (placeTaskFinished) {
             waitingForPlacedContainerInteractionStability = true;
+            postPlaceOperationId = ChatClefDiagnostics.nextOperationId();
+            postPlaceContainerPosition = placeTask.getPlaced();
+            postPlaceStabilityWaitedTicks = 0;
+            postPlaceStabilityWaitLogged = false;
+            postPlaceStabilityProceedLogged = false;
+            postPlaceOpenIntentStarted = false;
+            postPlaceGuiOpenedLogged = false;
+            postPlaceGuiTimeoutLogged = false;
             setDebugState("Waiting for placed-container handoff");
-            ChatClefDiagnostics.logEvent("CONTAINER_TASK", "POST_PLACE_HANDOFF", "placed_container_handoff_deferred", this,
-                    "containerTarget", containerTarget,
-                    "containerBlocks", Arrays.toString(containerBlocks),
-                    "placeTaskPlaced", placeTask.getPlaced(),
-                    "placeTaskPlacedBlockState", placeTask.getPlaced() == null ? "unavailable" : ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(placeTask.getPlaced())));
+            ChatClefDiagnostics.logBoundary("POST_PLACE_HANDOFF", "placed_container_handoff_deferred", this,
+                    "operationId", postPlaceOperationId,
+                    "containerType", containerTarget,
+                    "placedPosition", postPlaceContainerPosition,
+                    "placedBlockState", postPlaceContainerPosition == null ? "unavailable" : ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(postPlaceContainerPosition)),
+                    "playerSneaking", ChatClefDiagnostics.safeValue(() -> mod.getPlayer().isSneaking()),
+                    "sneakHeld", ChatClefDiagnostics.inputHeldState(Input.SNEAK),
+                    "clientTick", ChatClefDiagnostics.currentClientTickId());
             return null;
         }
 
         if (waitingForPlacedContainerInteractionStability) {
             boolean sneakHeld = mod.getInputControls().isHeldDown(Input.SNEAK);
             boolean playerSneaking = mod.getPlayer().isSneaking();
-            ChatClefDiagnostics.logEvent("CONTAINER_TASK", "POST_PLACE_STABILITY", "placed_container_handoff_stability_check", this,
-                    "containerTarget", containerTarget,
-                    "containerBlocks", Arrays.toString(containerBlocks),
-                    "placeTaskPlaced", placeTask.getPlaced(),
-                    "sneakHeld", sneakHeld,
-                    "playerSneaking", playerSneaking);
+            postPlaceStabilityWaitedTicks++;
             if (sneakHeld || playerSneaking) {
+                if (!postPlaceStabilityWaitLogged) {
+                    postPlaceStabilityWaitLogged = true;
+                    ChatClefDiagnostics.logBoundary("POST_PLACE_STABILITY", "placed_container_handoff_stability_check", this,
+                            "operationId", postPlaceOperationId,
+                            "decision", "WAIT",
+                            "waitedTicks", postPlaceStabilityWaitedTicks,
+                            "placedPosition", postPlaceContainerPosition,
+                            "playerSneaking", playerSneaking,
+                            "sneakHeld", sneakHeld);
+                }
                 setDebugState("Waiting for post-placement interaction stability");
                 return null;
+            }
+            if (!postPlaceStabilityProceedLogged) {
+                postPlaceStabilityProceedLogged = true;
+                ChatClefDiagnostics.logBoundary("POST_PLACE_STABILITY", "placed_container_handoff_stability_check", this,
+                        "operationId", postPlaceOperationId,
+                        "decision", "PROCEED",
+                        "waitedTicks", postPlaceStabilityWaitedTicks,
+                        "placedPosition", postPlaceContainerPosition,
+                        "playerSneaking", playerSneaking,
+                        "sneakHeld", sneakHeld);
             }
             waitingForPlacedContainerInteractionStability = false;
         }
@@ -140,12 +176,14 @@ public abstract class DoStuffInContainerTask extends Task {
                 "cachedContainerPosition", cachedContainerPosition,
                 "containerOpen", containerOpen);
         if (containerOpen) {
+            logPostPlaceGuiOpened(mod);
             Task containerTask = containerSubTask(mod);
             ChatClefDiagnostics.logTaskTransition(this, null, containerTask, "return_container_sub_task",
                     "containerTarget", containerTarget,
                     "containerOpen", true);
             return containerTask;
         }
+        logPostPlaceGuiTimeoutIfNeeded(mod);
 
         // infinity if such a container does not exist.
         double costToWalk = Double.POSITIVE_INFINITY;
@@ -279,6 +317,7 @@ public abstract class DoStuffInContainerTask extends Task {
                 "cachedContainerPosition", cachedContainerPosition,
                 "cachedContainerBlockState", cachedContainerPosition == null ? "unavailable" : ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(cachedContainerPosition)),
                 "openTableTaskClass", ChatClefDiagnostics.className(openTableTask));
+        beginPostPlaceOpenIntentIfNeeded(mod);
         ChatClefDiagnostics.logTaskTransition(this, null, openTableTask, "return_open_table_task",
                 "containerTarget", containerTarget,
                 "cachedContainerPosition", cachedContainerPosition,
@@ -305,6 +344,8 @@ public abstract class DoStuffInContainerTask extends Task {
         ChatClefDiagnostics.logTaskTransition(this, this, interruptTask, "container_task_onStop_begin",
                 "containerTarget", containerTarget,
                 "cachedContainerPosition", cachedContainerPosition);
+        ChatClefDiagnostics.clearPostPlaceContainerOpenIntent(postPlaceOperationId);
+        resetPostPlaceDiagnostics();
         AltoClef.getInstance().getBehaviour().pop();
         ChatClefDiagnostics.logTaskTransition(this, this, interruptTask, "container_task_onStop_end",
                 "containerTarget", containerTarget,
@@ -333,4 +374,74 @@ public abstract class DoStuffInContainerTask extends Task {
     protected abstract Task containerSubTask(AltoClef mod);
 
     protected abstract double getCostToMakeNew(AltoClef mod);
+
+    private void beginPostPlaceOpenIntentIfNeeded(AltoClef mod) {
+        if (postPlaceOperationId < 0
+                || postPlaceContainerPosition == null
+                || cachedContainerPosition == null
+                || postPlaceOpenIntentStarted
+                || !postPlaceContainerPosition.equals(cachedContainerPosition)) {
+            return;
+        }
+        postPlaceOpenIntentStarted = true;
+        ChatClefDiagnostics.beginPostPlaceContainerOpenIntent(
+                postPlaceOperationId,
+                containerTarget,
+                cachedContainerPosition,
+                ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(cachedContainerPosition))
+        );
+    }
+
+    private void logPostPlaceGuiOpened(AltoClef mod) {
+        if (postPlaceOperationId < 0 || !postPlaceOpenIntentStarted || postPlaceGuiOpenedLogged) {
+            return;
+        }
+        long operationId = postPlaceOperationId;
+        if (!ChatClefDiagnostics.markPostPlaceContainerGuiOpened(operationId)) {
+            return;
+        }
+        postPlaceGuiOpenedLogged = true;
+        ChatClefDiagnostics.logBoundary("CONTAINER_GUI_OPENED", "post_place_container_gui_opened", this,
+                "operationId", operationId,
+                "isContainerOpen", true,
+                "screenHandler", ChatClefDiagnostics.safeValue(() -> mod.getPlayer().currentScreenHandler.getClass().getSimpleName()),
+                "syncId", ChatClefDiagnostics.safeValue(() -> mod.getPlayer().currentScreenHandler.syncId),
+                "elapsedTicks", ChatClefDiagnostics.postPlaceContainerElapsedTicks(operationId));
+        ChatClefDiagnostics.clearPostPlaceContainerOpenIntent(operationId);
+        resetPostPlaceDiagnostics();
+    }
+
+    private void logPostPlaceGuiTimeoutIfNeeded(AltoClef mod) {
+        if (postPlaceOperationId < 0
+                || !postPlaceOpenIntentStarted
+                || postPlaceGuiOpenedLogged
+                || postPlaceGuiTimeoutLogged) {
+            return;
+        }
+        long elapsedTicks = ChatClefDiagnostics.postPlaceContainerElapsedTicks(postPlaceOperationId);
+        if (elapsedTicks < POST_PLACE_GUI_OPEN_TIMEOUT_TICKS) {
+            return;
+        }
+        if (!ChatClefDiagnostics.markPostPlaceContainerGuiTimeout(postPlaceOperationId)) {
+            return;
+        }
+        postPlaceGuiTimeoutLogged = true;
+        ChatClefDiagnostics.logWarningEvent("CONTAINER_GUI_OPEN_TIMEOUT", "post_place_container_gui_open_timeout", this,
+                "operationId", postPlaceOperationId,
+                "attempts", ChatClefDiagnostics.postPlaceContainerAttemptCount(postPlaceOperationId),
+                "lastInteractResult", ChatClefDiagnostics.postPlaceContainerLastInteractResult(postPlaceOperationId),
+                "actualScreenHandler", ChatClefDiagnostics.safeValue(() -> mod.getPlayer().currentScreenHandler.getClass().getSimpleName()),
+                "elapsedTicks", elapsedTicks);
+    }
+
+    private void resetPostPlaceDiagnostics() {
+        postPlaceOperationId = -1;
+        postPlaceContainerPosition = null;
+        postPlaceStabilityWaitedTicks = 0;
+        postPlaceStabilityWaitLogged = false;
+        postPlaceStabilityProceedLogged = false;
+        postPlaceOpenIntentStarted = false;
+        postPlaceGuiOpenedLogged = false;
+        postPlaceGuiTimeoutLogged = false;
+    }
 }

@@ -7,6 +7,7 @@ import adris.altoclef.tasksystem.TaskChain;
 import adris.altoclef.util.ItemTarget;
 import adris.altoclef.util.slots.Slot;
 import baritone.api.utils.input.Input;
+import lavi.minecraft.integration.carryon.CarryOnPostPlaceContainerMonitor;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.client.option.GameOptions;
@@ -36,11 +37,72 @@ public final class ChatClefDiagnostics {
     private static long nextTaskInstanceId = 1;
     private static long nextTaskRunId = 1;
     private static long nextTraceId = 1;
+    private static long nextOperationId = 1;
     private static long clientTickId = 0;
     private static long eventSequence = 0;
     private static String traceId = "unavailable";
+    private static PostPlaceContainerOpenIntent activePostPlaceContainerOpenIntent;
 
     private ChatClefDiagnostics() {
+    }
+
+    public static final class PostPlaceContainerOpenIntent {
+        private final long operationId;
+        private final String containerType;
+        private final BlockPos targetPosition;
+        private final String targetBlockState;
+        private final long startClientTickId;
+        private int attemptCount;
+        private String lastInteractResult = "unavailable";
+        private boolean guiOpened;
+        private boolean timedOut;
+        private boolean carryOnWarningLogged;
+
+        private PostPlaceContainerOpenIntent(long operationId,
+                                             String containerType,
+                                             BlockPos targetPosition,
+                                             String targetBlockState,
+                                             long startClientTickId) {
+            this.operationId = operationId;
+            this.containerType = containerType;
+            this.targetPosition = targetPosition;
+            this.targetBlockState = targetBlockState;
+            this.startClientTickId = startClientTickId;
+        }
+
+        public long operationId() {
+            return operationId;
+        }
+
+        public String containerType() {
+            return containerType;
+        }
+
+        public BlockPos targetPosition() {
+            return targetPosition;
+        }
+
+        public String targetBlockState() {
+            return targetBlockState;
+        }
+
+        public long startClientTickId() {
+            return startClientTickId;
+        }
+
+        public int attemptCount() {
+            return attemptCount;
+        }
+
+        public String lastInteractResult() {
+            return lastInteractResult;
+        }
+    }
+
+    private enum OutputMode {
+        OFF,
+        BOUNDARY,
+        VERBOSE
     }
 
     public static void onClientTickHead() {
@@ -70,7 +132,32 @@ public final class ChatClefDiagnostics {
         }
     }
 
+    public static long nextOperationId() {
+        synchronized (LOCK) {
+            return nextOperationId++;
+        }
+    }
+
+    public static boolean isVerboseEnabled() {
+        return outputMode() == OutputMode.VERBOSE;
+    }
+
+    public static boolean isBoundaryEnabled() {
+        return outputMode() != OutputMode.OFF;
+    }
+
+    public static String inputHeldState(Input input) {
+        return inputHeld(input);
+    }
+
+    public static String rawInputHeldState(Input input) {
+        return rawKeyHeld(input);
+    }
+
     public static void startTrace(String reason, Task task, Object... fields) {
+        if (!isVerboseEnabled()) {
+            return;
+        }
         safeLog("TRACE", "START", reason, task, fields, true);
     }
 
@@ -94,6 +181,9 @@ public final class ChatClefDiagnostics {
     }
 
     public static void beginTaskRun(Task task, TaskChain parentChain) {
+        if (!isVerboseEnabled()) {
+            return;
+        }
         safeLog("TASK", "START", "first_tick", task,
                 new Object[]{"parentChain", chainName(parentChain)},
                 false,
@@ -113,10 +203,16 @@ public final class ChatClefDiagnostics {
     }
 
     public static void logEvent(String eventType, String phase, String reason, Task task, Object... fields) {
+        if (!isVerboseEnabled()) {
+            return;
+        }
         safeLog(eventType, phase, reason, task, fields, false);
     }
 
     public static void logTaskTransition(Task parent, Task previousTask, Task nextTask, String reason, Object... fields) {
+        if (!isVerboseEnabled()) {
+            return;
+        }
         Object[] merged = mergeFields(fields,
                 "previousTask", taskName(previousTask),
                 "previousTaskInstanceId", taskInstanceIdLabel(previousTask),
@@ -128,6 +224,9 @@ public final class ChatClefDiagnostics {
     }
 
     public static void logInput(String phase, String reason, Input input, Object... fields) {
+        if (!isVerboseEnabled()) {
+            return;
+        }
         Object[] merged = mergeFields(fields,
                 "input", inputName(input),
                 "inputCallerStack", callerStack());
@@ -135,11 +234,17 @@ public final class ChatClefDiagnostics {
     }
 
     public static void logInputSnapshot(String phase, String reason, Object... fields) {
+        if (!isVerboseEnabled()) {
+            return;
+        }
         Object[] merged = mergeFields(inputSnapshotFields(), fields);
         safeLog("INPUT_SNAPSHOT", phase, reason, currentTask(), merged, false);
     }
 
     public static void logSlotClick(String phase, String reason, Slot slot, int mouseButton, Object type, Object... fields) {
+        if (!isVerboseEnabled()) {
+            return;
+        }
         Object[] merged = mergeFields(fields,
                 "slot", slotSummary(slot),
                 "mouseButton", Integer.toString(mouseButton),
@@ -153,6 +258,12 @@ public final class ChatClefDiagnostics {
     }
 
     public static void logInteractBlock(String phase, String reason, ClientPlayerEntity player, Object hand, BlockHitResult hitResult, Object result) {
+        if (isBoundaryEnabled()) {
+            logPostPlaceContainerInteractIfMatching(phase, player, hand, hitResult, result);
+        }
+        if (!isVerboseEnabled()) {
+            return;
+        }
         BlockPos blockPos = hitResult == null ? null : hitResult.getBlockPos();
         safeLog("MINECRAFT_INTERACTION", phase, reason, currentTask(), new Object[]{
                 "hand", value(hand),
@@ -175,6 +286,146 @@ public final class ChatClefDiagnostics {
                 "argumentOffHandItem", safeValue(() -> player == null ? null : player.getOffHandStack()),
                 "result", value(result)
         }, false);
+    }
+
+    public static void logBoundary(String eventName, String reason, Task task, Object... fields) {
+        if (!isBoundaryEnabled()) {
+            return;
+        }
+        emitEvent("BOUNDARY", "[LAVI ChatClefBoundary]", eventName, reason, task, fields, false);
+    }
+
+    public static void logWarningEvent(String eventName, String reason, Task task, Object... fields) {
+        emitEvent("WARN", "[LAVI ChatClefDiag]", eventName, reason, task, fields, true);
+    }
+
+    public static void logVerboseLine(String message) {
+        if (!isVerboseEnabled()) {
+            return;
+        }
+        System.out.println("ALTO CLEF: " + value(message));
+    }
+
+    public static void beginPostPlaceContainerOpenIntent(long operationId,
+                                                         Object containerType,
+                                                         BlockPos targetPosition,
+                                                         Object targetBlockState) {
+        if (operationId < 0 || targetPosition == null) {
+            return;
+        }
+        synchronized (LOCK) {
+            if (activePostPlaceContainerOpenIntent != null
+                    && activePostPlaceContainerOpenIntent.operationId == operationId
+                    && !activePostPlaceContainerOpenIntent.guiOpened
+                    && !activePostPlaceContainerOpenIntent.timedOut) {
+                return;
+            }
+            activePostPlaceContainerOpenIntent = new PostPlaceContainerOpenIntent(
+                    operationId,
+                    value(containerType),
+                    targetPosition.toImmutable(),
+                    value(targetBlockState),
+                    clientTickId
+            );
+        }
+    }
+
+    public static PostPlaceContainerOpenIntent activePostPlaceContainerOpenIntent(BlockPos targetPosition) {
+        synchronized (LOCK) {
+            if (activePostPlaceContainerOpenIntent == null || targetPosition == null) {
+                return null;
+            }
+            if (activePostPlaceContainerOpenIntent.guiOpened || activePostPlaceContainerOpenIntent.timedOut) {
+                return null;
+            }
+            return activePostPlaceContainerOpenIntent.targetPosition.equals(targetPosition)
+                    ? activePostPlaceContainerOpenIntent
+                    : null;
+        }
+    }
+
+    public static int postPlaceContainerAttemptCount(long operationId) {
+        synchronized (LOCK) {
+            if (activePostPlaceContainerOpenIntent == null
+                    || activePostPlaceContainerOpenIntent.operationId != operationId) {
+                return 0;
+            }
+            return activePostPlaceContainerOpenIntent.attemptCount;
+        }
+    }
+
+    public static String postPlaceContainerLastInteractResult(long operationId) {
+        synchronized (LOCK) {
+            if (activePostPlaceContainerOpenIntent == null
+                    || activePostPlaceContainerOpenIntent.operationId != operationId) {
+                return "unavailable";
+            }
+            return activePostPlaceContainerOpenIntent.lastInteractResult;
+        }
+    }
+
+    public static long postPlaceContainerElapsedTicks(long operationId) {
+        synchronized (LOCK) {
+            if (activePostPlaceContainerOpenIntent == null
+                    || activePostPlaceContainerOpenIntent.operationId != operationId) {
+                return -1;
+            }
+            return Math.max(0, clientTickId - activePostPlaceContainerOpenIntent.startClientTickId);
+        }
+    }
+
+    public static boolean markPostPlaceContainerGuiOpened(long operationId) {
+        synchronized (LOCK) {
+            if (activePostPlaceContainerOpenIntent == null
+                    || activePostPlaceContainerOpenIntent.operationId != operationId
+                    || activePostPlaceContainerOpenIntent.guiOpened) {
+                return false;
+            }
+            activePostPlaceContainerOpenIntent.guiOpened = true;
+            return true;
+        }
+    }
+
+    public static boolean markPostPlaceContainerGuiTimeout(long operationId) {
+        synchronized (LOCK) {
+            if (activePostPlaceContainerOpenIntent == null
+                    || activePostPlaceContainerOpenIntent.operationId != operationId
+                    || activePostPlaceContainerOpenIntent.timedOut
+                    || activePostPlaceContainerOpenIntent.guiOpened) {
+                return false;
+            }
+            activePostPlaceContainerOpenIntent.timedOut = true;
+            return true;
+        }
+    }
+
+    public static boolean markPostPlaceCarryOnWarningLogged(long operationId) {
+        synchronized (LOCK) {
+            if (activePostPlaceContainerOpenIntent == null
+                    || activePostPlaceContainerOpenIntent.operationId != operationId
+                    || activePostPlaceContainerOpenIntent.carryOnWarningLogged) {
+                return false;
+            }
+            activePostPlaceContainerOpenIntent.carryOnWarningLogged = true;
+            return true;
+        }
+    }
+
+    public static boolean isPostPlaceContainerGuiOpened(long operationId) {
+        synchronized (LOCK) {
+            return activePostPlaceContainerOpenIntent != null
+                    && activePostPlaceContainerOpenIntent.operationId == operationId
+                    && activePostPlaceContainerOpenIntent.guiOpened;
+        }
+    }
+
+    public static void clearPostPlaceContainerOpenIntent(long operationId) {
+        synchronized (LOCK) {
+            if (activePostPlaceContainerOpenIntent != null
+                    && activePostPlaceContainerOpenIntent.operationId == operationId) {
+                activePostPlaceContainerOpenIntent = null;
+            }
+        }
     }
 
     public static String className(Object value) {
@@ -328,6 +579,9 @@ public final class ChatClefDiagnostics {
     }
 
     private static void safeLog(String eventType, String phase, String reason, Task task, Object[] fields, boolean startNewTrace, boolean startTaskRun) {
+        if (!isVerboseEnabled()) {
+            return;
+        }
         try {
             StringJoiner log = new StringJoiner(" ");
             long sequence;
@@ -368,8 +622,110 @@ public final class ChatClefDiagnostics {
             appendInputStates(log);
             appendPairs(log, fields);
 
-            Debug.logWarning("[LAVI ChatClefDiag] " + log);
+            System.out.println("ALTO CLEF: [LAVI ChatClefDiag] " + log);
         } catch (RuntimeException | LinkageError ignored) {
+        }
+    }
+
+    private static void emitEvent(String level,
+                                  String prefix,
+                                  String eventName,
+                                  String reason,
+                                  Task task,
+                                  Object[] fields,
+                                  boolean warning) {
+        try {
+            StringJoiner log = new StringJoiner(" ");
+            long sequence;
+            long tick;
+            String currentTrace;
+            long taskInstanceId;
+            long taskRunId;
+            long parentTaskRunId;
+            synchronized (LOCK) {
+                if ("unavailable".equals(traceId)) {
+                    traceId = "trace-" + nextTraceId++;
+                }
+                currentTrace = traceId;
+                sequence = ++eventSequence;
+                tick = clientTickId;
+                taskInstanceId = task == null ? -1 : instanceId(task);
+                taskRunId = task == null ? -1 : existingRunId(task);
+                parentTaskRunId = task == null ? -1 : parentRunId(task);
+            }
+
+            append(log, "traceId", currentTrace);
+            append(log, "clientTickId", tick);
+            append(log, "eventSequence", sequence);
+            append(log, "taskInstanceId", idLabel(taskInstanceId));
+            append(log, "taskRunId", idLabel(taskRunId));
+            append(log, "parentTaskRunId", idLabel(parentTaskRunId));
+            append(log, "threadName", Thread.currentThread().getName());
+            append(log, "level", level);
+            append(log, "event", eventName);
+            append(log, "reason", reason);
+            append(log, "taskClass", taskName(task));
+            appendPairs(log, fields);
+
+            if (warning) {
+                Debug.logWarning(prefix + " " + log);
+            } else {
+                System.out.println("ALTO CLEF: " + prefix + " " + log);
+            }
+        } catch (RuntimeException | LinkageError ignored) {
+        }
+    }
+
+    private static void logPostPlaceContainerInteractIfMatching(String phase,
+                                                                ClientPlayerEntity player,
+                                                                Object hand,
+                                                                BlockHitResult hitResult,
+                                                                Object result) {
+        if (hitResult == null) {
+            return;
+        }
+        PostPlaceContainerOpenIntent intent = activePostPlaceContainerOpenIntent(hitResult.getBlockPos());
+        if (intent == null) {
+            return;
+        }
+
+        int attempt;
+        synchronized (LOCK) {
+            if (activePostPlaceContainerOpenIntent == null
+                    || activePostPlaceContainerOpenIntent.operationId != intent.operationId) {
+                return;
+            }
+            if ("HEAD".equals(phase)) {
+                activePostPlaceContainerOpenIntent.attemptCount++;
+            }
+            if ("RETURN".equals(phase)) {
+                activePostPlaceContainerOpenIntent.lastInteractResult = value(result);
+            }
+            attempt = activePostPlaceContainerOpenIntent.attemptCount;
+        }
+
+        if ("HEAD".equals(phase)) {
+            CarryOnPostPlaceContainerMonitor.beforeInteract(intent);
+            logBoundary("CONTAINER_INTERACT_ATTEMPT", "post_place_container_interact_attempt", null,
+                    "operationId", intent.operationId(),
+                    "attempt", attempt,
+                    "targetPosition", blockPos(intent.targetPosition()),
+                    "targetBlockState", intent.targetBlockState(),
+                    "hand", value(hand),
+                    "shiftClick", false,
+                    "playerSneaking", safeValue(() -> player == null ? null : player.isSneaking()),
+                    "rawSneakKeyPressed", rawKeyHeld(Input.SNEAK));
+            return;
+        }
+
+        if ("RETURN".equals(phase)) {
+            logBoundary("CONTAINER_INTERACT_RESULT", "post_place_container_interact_result", null,
+                    "operationId", intent.operationId(),
+                    "attempt", attempt,
+                    "targetPosition", blockPos(intent.targetPosition()),
+                    "targetBlockState", intent.targetBlockState(),
+                    "result", value(result));
+            CarryOnPostPlaceContainerMonitor.afterInteract(intent, player, result);
         }
     }
 
@@ -621,5 +977,29 @@ public final class ChatClefDiagnostics {
                 .replace('\r', ' ')
                 .replace('\n', ' ')
                 .replace('\t', ' ');
+    }
+
+    private static OutputMode outputMode() {
+        String configured = System.getProperty("lavi.chatclef.diagnostics");
+        if (configured == null || configured.isBlank()) {
+            configured = System.getenv("LAVI_CHATCLEF_DIAGNOSTICS");
+        }
+        if (configured != null && !configured.isBlank()) {
+            return switch (configured.trim().toLowerCase()) {
+                case "off", "false", "0", "none" -> OutputMode.OFF;
+                case "verbose", "debug", "true", "1", "all" -> OutputMode.VERBOSE;
+                default -> OutputMode.BOUNDARY;
+            };
+        }
+        try {
+            AltoClef instance = AltoClef.getInstance();
+            if (instance != null
+                    && instance.getModSettings() != null
+                    && "ALL".equalsIgnoreCase(instance.getModSettings().getLogLevel())) {
+                return OutputMode.VERBOSE;
+            }
+        } catch (RuntimeException | LinkageError ignored) {
+        }
+        return OutputMode.BOUNDARY;
     }
 }
