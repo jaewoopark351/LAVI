@@ -29,6 +29,7 @@ class ActivePluginCombinationSmokeTests(unittest.TestCase):
         self.assertTrue(snapshot.is_enabled("Chess"))
         self.assertTrue(snapshot.is_enabled("StarCraft116"))
         self.assertTrue(snapshot.is_enabled("StarCraft2"))
+        self.assertTrue(snapshot.is_enabled("MinecraftFabricChatClef"))
         for module_name in ("rvc", "vitsTTS", "silero", "voicevox"):
             self.assertFalse(snapshot.is_enabled(module_name), module_name)
 
@@ -70,7 +71,14 @@ class ActivePluginCombinationSmokeTests(unittest.TestCase):
         constructed_names = [plugin.plugin_name for plugin in constructed]
 
         self.assertEqual(
-            ["SongPlayer", "Chess", "StarCraft116", "StarCraft2", "ScreenVision"],
+            [
+                "SongPlayer",
+                "Chess",
+                "StarCraft116",
+                "StarCraft2",
+                "MinecraftFabricChatClef",
+                "ScreenVision",
+            ],
             constructed_names,
         )
         self.assertNotIn("StarCraftRemastered", constructed_names)
@@ -78,6 +86,10 @@ class ActivePluginCombinationSmokeTests(unittest.TestCase):
         self.assertEqual("Chess", result.chess_plugin.plugin_name)
         self.assertEqual("StarCraft116", result.starcraft116_plugin.plugin_name)
         self.assertEqual("StarCraft2", result.starcraft2_plugin.plugin_name)
+        self.assertEqual(
+            "MinecraftFabricChatClef",
+            result.minecraft_fabric_chatclef_plugin.plugin_name,
+        )
 
     def test_active_game_plugins_register_through_extension_registry(self):
         registry = ExtensionRegistry()

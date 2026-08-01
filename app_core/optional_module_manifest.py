@@ -112,6 +112,32 @@ OPTIONAL_MODULE_MANIFEST = {
         "supports_offline": True,
         "supports_cpu": True,
     },
+    "MinecraftFabricChatClef": {
+        "id": "MinecraftFabricChatClef",
+        "display_name": "Minecraft Fabric",
+        "api_version": "1",
+        "module_path": (
+            "plugins.Minecraft.fabric.chatclef.minecraft_fabric_chatclef_plugin"
+        ),
+        "class_name": "MinecraftFabricChatClefPlugin",
+        "default_enabled": False,
+        "dependency_group": "Games",
+        "capabilities": ("game_extension", "minecraft", "fabric_chatclef"),
+        "config_schema": {
+            "MinecraftFabricChatClef": {
+                "enabled": False,
+                "host": "127.0.0.1",
+                "port": 4316,
+                "startup_timeout_sec": 3.0,
+            },
+        },
+        "required_python_packages": ("websockets",),
+        "required_files": (),
+        "required_executables": (),
+        "required_services": (),
+        "supports_offline": True,
+        "supports_cpu": True,
+    },
     "ScreenVision": {
         "id": "ScreenVision",
         "display_name": "Screen Vision",

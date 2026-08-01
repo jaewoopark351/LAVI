@@ -21,7 +21,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from core.profile_resolver import load_module_settings  # noqa: E402
 
 
-EXPECTED_MODULES_JSON_HASH = "ddffc5475ef92bd40e5b0e08bce42e0c6b2b1019"
+EXPECTED_MODULES_JSON_HASH = "83deb2ffe15767954e98d0b7bc7c084a808ffc8b"
 
 from scripts.smoke_startup_core import (  # noqa: E402
     AttemptCounters,
@@ -181,6 +181,9 @@ def _optional_component_state(composer):
         "StarCraftRemastered": composer.starcraft_plugin is not None,
         "StarCraft116": composer.starcraft116_plugin is not None,
         "StarCraft2": composer.starcraft2_plugin is not None,
+        "MinecraftFabricChatClef": (
+            composer.minecraft_fabric_chatclef_plugin is not None
+        ),
         "ScreenVision": composer.screen_vision is not None,
     }
 

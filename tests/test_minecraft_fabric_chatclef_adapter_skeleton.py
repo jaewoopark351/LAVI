@@ -1,4 +1,4 @@
-#20260801_kpopmodder: Verify Phase 1 Fabric ChatClef adapter fails closed.
+#20260801_kpopmodder: Verify Fabric ChatClef adapter fails closed by default.
 import importlib
 import sys
 import threading
@@ -19,7 +19,7 @@ ADAPTER_MODULE = (
 )
 
 
-class MinecraftFabricChatClefAdapterSkeletonTests(unittest.TestCase):
+class MinecraftFabricChatClefAdapterTests(unittest.TestCase):
     def test_import_does_not_start_thread_or_socket_module(self):
         sys.modules.pop(ADAPTER_MODULE, None)
         before_threads = threading.active_count()
@@ -30,7 +30,7 @@ class MinecraftFabricChatClefAdapterSkeletonTests(unittest.TestCase):
         self.assertFalse(hasattr(module, "socket"))
         self.assertFalse(hasattr(module, "websockets"))
 
-    def test_default_status_is_fail_closed_not_fake_connected(self):
+    def test_default_status_is_disabled_not_fake_connected(self):
         from plugins.Minecraft.fabric.chatclef.adapter.fabric_chatclef_adapter import (
             FabricChatClefAdapter,
         )
@@ -41,11 +41,11 @@ class MinecraftFabricChatClefAdapterSkeletonTests(unittest.TestCase):
         self.assertEqual("fabric_chatclef", adapter.backend_id)
         self.assertFalse(status.enabled)
         self.assertFalse(status.connected)
-        self.assertEqual(BridgeLifecycleState.NOT_IMPLEMENTED, status.lifecycle_state)
+        self.assertEqual(BridgeLifecycleState.DISABLED, status.lifecycle_state)
         self.assertIsNone(status.last_error_code)
         self.assertIsNone(status.last_error_message)
 
-    def test_submit_command_returns_not_implemented_rejection(self):
+    def test_submit_command_returns_disabled_rejection_by_default(self):
         from plugins.Minecraft.fabric.chatclef.adapter.fabric_chatclef_adapter import (
             FabricChatClefAdapter,
         )
@@ -58,8 +58,28 @@ class MinecraftFabricChatClefAdapterSkeletonTests(unittest.TestCase):
         self.assertFalse(result.ok)
         self.assertEqual("cmd-1", result.request_id)
         self.assertEqual(CommandResultStatus.REJECTED, result.status)
-        self.assertEqual(BridgeErrorCode.NOT_IMPLEMENTED, result.error_code)
+        self.assertEqual(BridgeErrorCode.BRIDGE_DISABLED, result.error_code)
         self.assertEqual({}, result.data)
+
+    def test_enabled_adapter_without_client_reports_not_connected(self):
+        from plugins.Minecraft.fabric.chatclef.adapter.fabric_chatclef_adapter import (
+            FabricChatClefAdapter,
+        )
+        from plugins.Minecraft.fabric.chatclef.config.fabric_chatclef_config import (
+            FabricChatClefConfig,
+        )
+
+        adapter = FabricChatClefAdapter(
+            config=FabricChatClefConfig(enabled=True, port=0)
+        )
+        result = adapter.submit_command(
+            CommandRequestDTO(request_id="cmd-2", command="@get dirt 1")
+        )
+
+        self.assertFalse(result.ok)
+        self.assertEqual("cmd-2", result.request_id)
+        self.assertEqual(CommandResultStatus.REJECTED, result.status)
+        self.assertEqual(BridgeErrorCode.NOT_CONNECTED, result.error_code)
 
 
 if __name__ == "__main__":

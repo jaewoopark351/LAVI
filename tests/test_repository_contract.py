@@ -233,6 +233,7 @@ class RepositoryContractTests(unittest.TestCase):
             "StarCraftRemastered": "Games",
             "StarCraft116": "Games",
             "StarCraft2": "Games",
+            "MinecraftFabricChatClef": "Games",
             "ScreenVision": "Vision",
         }
         actual_groups = {

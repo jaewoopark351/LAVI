@@ -46,6 +46,7 @@ class OptionalPluginCompositionTests(unittest.TestCase):
                 "StarCraftRemastered",
                 "StarCraft116",
                 "StarCraft2",
+                "MinecraftFabricChatClef",
                 "ScreenVision",
             ],
             [plugin.plugin_name for plugin in constructed],
@@ -65,6 +66,22 @@ class OptionalPluginCompositionTests(unittest.TestCase):
                 result.screen_vision,
             ],
             list(result.startup_components),
+        )
+        self.assertEqual(
+            "MinecraftFabricChatClef",
+            result.minecraft_fabric_chatclef_plugin.plugin_name,
+        )
+        self.assertEqual(
+            {"MinecraftFabricChatClef": {"enabled": True}},
+            result.minecraft_fabric_chatclef_plugin.kwargs["config"],
+        )
+        self.assertNotIn(
+            result.minecraft_fabric_chatclef_plugin,
+            result.optional_components,
+        )
+        self.assertNotIn(
+            result.minecraft_fabric_chatclef_plugin,
+            result.startup_components,
         )
         self.assertIs(memory_store, result.screen_vision.kwargs["memory_store"])
 

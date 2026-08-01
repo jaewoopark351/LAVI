@@ -11,6 +11,10 @@ def _screen_vision_kwargs(context):
     return {"memory_store": context.memory_store}
 
 
+def _minecraft_fabric_chatclef_kwargs(_context):
+    return {"config": {"MinecraftFabricChatClef": {"enabled": True}}}
+
+
 class OptionalPluginCompositionService:
     #20260717_kpopmodder: Owns optional direct plugin construction and lifecycle roles.
     DEFAULT_SPECS = (
@@ -29,6 +33,11 @@ class OptionalPluginCompositionService:
         ),
         OptionalPluginSpec("StarCraft116", "starcraft116_plugin"),
         OptionalPluginSpec("StarCraft2", "starcraft2_plugin"),
+        OptionalPluginSpec(
+            "MinecraftFabricChatClef",
+            "minecraft_fabric_chatclef_plugin",
+            kwargs_factory=_minecraft_fabric_chatclef_kwargs,
+        ),
         OptionalPluginSpec(
             "ScreenVision",
             "screen_vision",
@@ -81,6 +90,9 @@ class OptionalPluginCompositionService:
             starcraft_plugin=plugins.get("starcraft_plugin"),
             starcraft116_plugin=plugins.get("starcraft116_plugin"),
             starcraft2_plugin=plugins.get("starcraft2_plugin"),
+            minecraft_fabric_chatclef_plugin=plugins.get(
+                "minecraft_fabric_chatclef_plugin"
+            ),
             screen_vision=plugins.get("screen_vision"),
             optional_components=optional_components,
             startup_components=startup_components,

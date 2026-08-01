@@ -17,6 +17,7 @@ import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.slots.FurnaceSlot;
 import adris.altoclef.util.slots.Slot;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.diagnostics.tasktrace.VisibleTaskDiagnostics;
 import net.minecraft.block.Blocks;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
@@ -73,6 +74,8 @@ public class SmeltInFurnaceTask extends ResourceTask {
 
     @Override
     protected void onResourceStart(AltoClef mod) {
+        VisibleTaskDiagnostics.logLifecycle(mod, this, "START", "smelt_in_furnace_resource_start",
+                "targets", Arrays.toString(_targets));
         ChatClefDiagnostics.startTrace("smelt_in_furnace_start", this,
                 "targets", Arrays.toString(_targets));
         ChatClefDiagnostics.logEvent("SMELT_FURNACE", "RESOURCE_START", "smelt_in_furnace_resource_start", this,
@@ -93,11 +96,19 @@ public class SmeltInFurnaceTask extends ResourceTask {
                 "nearestFurnaceState", furnacePos.map(blockPos -> ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(blockPos))).orElse("unavailable"),
                 "doTask", ChatClefDiagnostics.taskSummary(_doTask));
         furnacePos.ifPresent(blockPos -> mod.getBehaviour().avoidBlockBreaking(blockPos));
+        VisibleTaskDiagnostics.logReturnTask(mod, this, _doTask, "smelt_in_furnace_return_do_task",
+                "furnace=" + furnacePos.map(Object::toString).orElse("none"),
+                "targets", Arrays.toString(_targets),
+                "nearestFurnacePresent", furnacePos.isPresent(),
+                "nearestFurnacePosition", furnacePos.map(Object::toString).orElse("none"));
         return _doTask;
     }
 
     @Override
     protected void onResourceStop(AltoClef mod, Task interruptTask) {
+        VisibleTaskDiagnostics.logLifecycle(mod, this, "STOP_BEGIN", "smelt_in_furnace_resource_stop",
+                "targets", Arrays.toString(_targets),
+                "interruptTask", ChatClefDiagnostics.taskSummary(interruptTask));
         ChatClefDiagnostics.logTaskTransition(this, this, interruptTask, "smelt_in_furnace_resource_stop_begin",
                 "targets", Arrays.toString(_targets),
                 "cursorStack", ChatClefDiagnostics.safeValue(StorageHelper::getItemStackInCursorSlot));
@@ -120,6 +131,9 @@ public class SmeltInFurnaceTask extends ResourceTask {
         ChatClefDiagnostics.logTaskTransition(this, this, interruptTask, "smelt_in_furnace_resource_stop_end",
                 "targets", Arrays.toString(_targets),
                 "cursorStack", ChatClefDiagnostics.safeValue(StorageHelper::getItemStackInCursorSlot));
+        VisibleTaskDiagnostics.logLifecycle(mod, this, "STOP_END", "smelt_in_furnace_resource_stop",
+                "targets", Arrays.toString(_targets),
+                "interruptTask", ChatClefDiagnostics.taskSummary(interruptTask));
     }
 
     @Override
@@ -181,6 +195,10 @@ public class SmeltInFurnaceTask extends ResourceTask {
 
         @Override
         protected void onStart() {
+            VisibleTaskDiagnostics.logLifecycle(AltoClef.getInstance(), this, "START", "do_smelt_in_furnace_start",
+                    "target", target,
+                    "allMaterials", allMaterials,
+                    "ignoreMaterials", ignoreMaterials);
             ChatClefDiagnostics.logEvent("SMELT_FURNACE", "DO_START_BEGIN", "do_smelt_in_furnace_start", this,
                     "target", target,
                     "allMaterials", allMaterials,
@@ -241,6 +259,11 @@ public class SmeltInFurnaceTask extends ResourceTask {
             if (mod.getItemStorage().getItemCount(materialTarget.getMatches()) < materialsNeeded) {
                 setDebugState("Getting Materials");
                 Task materialTask = getMaterialTask(target.getMaterial());
+                VisibleTaskDiagnostics.logReturnTask(mod, this, materialTask, "do_smelt_in_furnace_return_material_task",
+                        "materialsNeeded=" + materialsNeeded + "|target=" + materialTarget,
+                        "materialsNeeded", materialsNeeded,
+                        "materialTarget", materialTarget,
+                        "inventoryMaterialCount", ChatClefDiagnostics.safeValue(() -> mod.getItemStorage().getItemCount(materialTarget.getMatches())));
                 ChatClefDiagnostics.logTaskTransition(this, null, materialTask, "do_smelt_in_furnace_return_material_task",
                         "materialsNeeded", materialsNeeded,
                         "materialTarget", materialTarget);
@@ -251,6 +274,10 @@ public class SmeltInFurnaceTask extends ResourceTask {
             if (furnaceCache.burningFuelCount <= 0 && StorageHelper.calculateInventoryFuelCount(mod) < fuelNeeded) {
                 setDebugState("Getting Fuel");
                 Task fuelTask = new CollectFuelTask(fuelNeeded + 1);
+                VisibleTaskDiagnostics.logReturnTask(mod, this, fuelTask, "do_smelt_in_furnace_return_fuel_task",
+                        "fuelNeeded=" + fuelNeeded,
+                        "fuelNeeded", fuelNeeded,
+                        "inventoryFuelCount", StorageHelper.calculateInventoryFuelCount(mod));
                 ChatClefDiagnostics.logTaskTransition(this, null, fuelTask, "do_smelt_in_furnace_return_fuel_task",
                         "fuelNeeded", fuelNeeded,
                         "inventoryFuelCount", StorageHelper.calculateInventoryFuelCount(mod));
@@ -260,6 +287,9 @@ public class SmeltInFurnaceTask extends ResourceTask {
             // Make sure our materials are accessible in our inventory
             if (StorageHelper.isItemInaccessibleToContainer(mod, allMaterials)) {
                 Task moveTask = new MoveInaccessibleItemToInventoryTask(allMaterials);
+                VisibleTaskDiagnostics.logReturnTask(mod, this, moveTask, "do_smelt_in_furnace_return_accessible_material_task",
+                        "allMaterials=" + allMaterials,
+                        "allMaterials", allMaterials);
                 ChatClefDiagnostics.logTaskTransition(this, null, moveTask, "do_smelt_in_furnace_return_accessible_material_task",
                         "allMaterials", allMaterials);
                 return moveTask;
@@ -269,6 +299,13 @@ public class SmeltInFurnaceTask extends ResourceTask {
             ChatClefDiagnostics.logEvent("SMELT_FURNACE", "DO_TICK_DECISION", "do_smelt_in_furnace_enter_container_flow", this,
                     "materialsNeeded", materialsNeeded,
                     "fuelNeeded", fuelNeeded);
+            VisibleTaskDiagnostics.logDecision(mod, this, "do_smelt_in_furnace_enter_container_flow",
+                    "materialsNeeded=" + materialsNeeded + "|fuelNeeded=" + fuelNeeded,
+                    "materialsNeeded", materialsNeeded,
+                    "fuelNeeded", fuelNeeded,
+                    "cachedMaterialSlot", ChatClefDiagnostics.itemStackSummary(furnaceCache.materialSlot),
+                    "cachedFuelSlot", ChatClefDiagnostics.itemStackSummary(furnaceCache.fuelSlot),
+                    "cachedOutputSlot", ChatClefDiagnostics.itemStackSummary(furnaceCache.outputSlot));
             return super.onTick();
         }
 
@@ -374,6 +411,11 @@ public class SmeltInFurnaceTask extends ResourceTask {
                 int materialsAlreadyIn = (materialTarget.matches(material.getItem()) ? material.getCount() : 0);
                 setDebugState("Moving Materials");
                 Task moveMaterialsTask = new MoveItemToSlotFromInventoryTask(new ItemTarget(materialTarget, neededMaterialsInSlot - materialsAlreadyIn), FurnaceSlot.INPUT_SLOT_MATERIALS);
+                VisibleTaskDiagnostics.logReturnTask(mod, this, moveMaterialsTask, "furnace_return_move_materials_task",
+                        "neededMaterialsInSlot=" + neededMaterialsInSlot + "|materialsAlreadyIn=" + materialsAlreadyIn,
+                        "neededMaterialsInSlot", neededMaterialsInSlot,
+                        "materialsAlreadyIn", materialsAlreadyIn,
+                        "materialSlot", ChatClefDiagnostics.itemStackSummary(material));
                 ChatClefDiagnostics.logTaskTransition(this, null, moveMaterialsTask, "furnace_return_move_materials_task",
                         "neededMaterialsInSlot", neededMaterialsInSlot,
                         "materialsAlreadyIn", materialsAlreadyIn,
@@ -417,6 +459,11 @@ public class SmeltInFurnaceTask extends ResourceTask {
                     if (bestStack != null) {
                         setDebugState("Filling fuel");
                         Task moveFuelTask = new MoveItemToSlotFromInventoryTask(new ItemTarget(bestStack.getItem(), bestStack.getCount()), FurnaceSlot.INPUT_SLOT_FUEL);
+                        VisibleTaskDiagnostics.logReturnTask(mod, this, moveFuelTask, "furnace_return_move_fuel_task",
+                                "needs=" + needs + "|bestStack=" + ChatClefDiagnostics.itemStackSummary(bestStack),
+                                "needs", needs,
+                                "bestStack", ChatClefDiagnostics.itemStackSummary(bestStack),
+                                "closestDelta", closestDelta);
                         ChatClefDiagnostics.logTaskTransition(this, null, moveFuelTask, "furnace_return_move_fuel_task",
                                 "needs", needs,
                                 "bestStack", ChatClefDiagnostics.itemStackSummary(bestStack),
@@ -431,6 +478,15 @@ public class SmeltInFurnaceTask extends ResourceTask {
                     "materialSlot", ChatClefDiagnostics.itemStackSummary(material),
                     "fuelSlot", ChatClefDiagnostics.itemStackSummary(fuel),
                     "outputSlot", ChatClefDiagnostics.itemStackSummary(output));
+            VisibleTaskDiagnostics.logDecision(mod, this, "furnace_waiting_for_cook",
+                    "material=" + ChatClefDiagnostics.itemStackSummary(material)
+                            + "|fuel=" + ChatClefDiagnostics.itemStackSummary(fuel)
+                            + "|output=" + ChatClefDiagnostics.itemStackSummary(output),
+                    "materialSlot", ChatClefDiagnostics.itemStackSummary(material),
+                    "fuelSlot", ChatClefDiagnostics.itemStackSummary(fuel),
+                    "outputSlot", ChatClefDiagnostics.itemStackSummary(output),
+                    "furnaceFuel", ChatClefDiagnostics.safeValue(StorageHelper::getFurnaceFuel),
+                    "furnaceCookPercent", ChatClefDiagnostics.safeValue(StorageHelper::getFurnaceCookPercent));
             return null;
         }
 

@@ -20,6 +20,7 @@ import baritone.api.pathing.goals.GoalNear;
 import baritone.api.utils.Rotation;
 import baritone.api.utils.input.Input;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.diagnostics.tasktrace.VisibleTaskDiagnostics;
 import net.minecraft.block.*;
 import adris.altoclef.multiversion.versionedfields.Blocks;
 import net.minecraft.entity.Entity;
@@ -197,6 +198,10 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
     @Override
     protected void onStart() {
         AltoClef mod = AltoClef.getInstance();
+        VisibleTaskDiagnostics.logLifecycle(mod, this, "START", "destroy_block_start",
+                "targetPosition", ChatClefDiagnostics.blockPos(pos),
+                "targetBlockState", ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(pos)),
+                "cursorStack", ChatClefDiagnostics.safeValue(StorageHelper::getItemStackInCursorSlot));
 
         // Cancel any ongoing pathing behavior.
         mod.getClientBaritone().getPathingBehavior().forceCancel();
@@ -262,6 +267,10 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
                 // Check if the entity is a PillagerEntity and is within a distance of 144 blocks from the position
                 if (entity instanceof PillagerEntity && pos.isWithinDistance(entity.getPos(), 144)) {
                     Debug.logMessage("Blacklisting pillager wool.");
+                    VisibleTaskDiagnostics.logDecision(mod, this, "destroy_block_blacklist_pillager_wool",
+                            "targetPosition=" + ChatClefDiagnostics.blockPos(pos) + "|entity=" + ChatClefDiagnostics.entitySummary(entity),
+                            "targetPosition", ChatClefDiagnostics.blockPos(pos),
+                            "entity", ChatClefDiagnostics.entitySummary(entity));
                     // Request the block at the position to be marked as unreachable
                     mod.getBlockScanner().requestBlockUnreachable(pos, 0);
                 }
@@ -270,6 +279,9 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
 
         // Reset the move checker if Baritone is currently pathing
         if (mod.getClientBaritone().getPathingBehavior().isPathing()) {
+            VisibleTaskDiagnostics.logProgress(mod, this, "destroy_block_pathing_active_reset_move_checker",
+                    "targetPosition=" + ChatClefDiagnostics.blockPos(pos),
+                    "targetPosition", ChatClefDiagnostics.blockPos(pos));
             _moveChecker.reset();
         }
 
@@ -277,36 +289,60 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
         if (WorldHelper.isInNetherPortal()) {
             if (!mod.getClientBaritone().getPathingBehavior().isPathing()) {
                 setDebugState("Getting out from nether portal");
+                VisibleTaskDiagnostics.logDecision(mod, this, "destroy_block_nether_portal_hold_escape_inputs",
+                        "targetPosition=" + ChatClefDiagnostics.blockPos(pos),
+                        "targetPosition", ChatClefDiagnostics.blockPos(pos));
                 // Hold the sneak and move forward inputs to exit the Nether portal
                 mod.getInputControls().hold(Input.SNEAK);
                 mod.getInputControls().hold(Input.MOVE_FORWARD);
                 return null;
             } else {
+                VisibleTaskDiagnostics.logDecision(mod, this, "destroy_block_nether_portal_pathing_release_escape_inputs",
+                        "targetPosition=" + ChatClefDiagnostics.blockPos(pos),
+                        "targetPosition", ChatClefDiagnostics.blockPos(pos));
                 mod.getInputControls().release(Input.SNEAK);
                 mod.getInputControls().release(Input.MOVE_BACK);
                 mod.getInputControls().release(Input.MOVE_FORWARD);
             }
         } else if (mod.getClientBaritone().getPathingBehavior().isPathing()) {
+            VisibleTaskDiagnostics.logDecision(mod, this, "destroy_block_pathing_release_escape_inputs",
+                    "targetPosition=" + ChatClefDiagnostics.blockPos(pos),
+                    "targetPosition", ChatClefDiagnostics.blockPos(pos));
             mod.getInputControls().release(Input.SNEAK);
             mod.getInputControls().release(Input.MOVE_BACK);
             mod.getInputControls().release(Input.MOVE_FORWARD);
         }
 
         // Check if there is an active unstuck task and the player is stuck in a block
-        if (unstuckTask != null && unstuckTask.isActive() && !unstuckTask.isFinished() && stuckInBlock(mod) != null) {
-            setDebugState("Getting unstuck from block.");
-            stuckCheck.reset();
-            // Release control of Baritone's custom goal process and explore process
-            mod.getClientBaritone().getCustomGoalProcess().onLostControl();
-            mod.getClientBaritone().getExploreProcess().onLostControl();
-            return unstuckTask;
+        if (unstuckTask != null && unstuckTask.isActive() && !unstuckTask.isFinished()) {
+            BlockPos activeStuckBlock = stuckInBlock(mod);
+            if (activeStuckBlock != null) {
+                setDebugState("Getting unstuck from block.");
+                stuckCheck.reset();
+                // Release control of Baritone's custom goal process and explore process
+                mod.getClientBaritone().getCustomGoalProcess().onLostControl();
+                mod.getClientBaritone().getExploreProcess().onLostControl();
+                VisibleTaskDiagnostics.logReturnTask(mod, this, unstuckTask, "destroy_block_return_active_unstuck_task",
+                        "targetPosition=" + ChatClefDiagnostics.blockPos(pos),
+                        "targetPosition", ChatClefDiagnostics.blockPos(pos),
+                        "stuckBlock", ChatClefDiagnostics.blockPos(activeStuckBlock));
+                return unstuckTask;
+            }
         }
 
         // Check if the move checker or the stuck check failed
         if (!_moveChecker.check(mod) || !stuckCheck.check(mod)) {
             BlockPos blockStuck = stuckInBlock(mod);
+            VisibleTaskDiagnostics.logProgress(mod, this, "destroy_block_progress_check_failed",
+                    "targetPosition=" + ChatClefDiagnostics.blockPos(pos) + "|stuckBlock=" + ChatClefDiagnostics.blockPos(blockStuck),
+                    "targetPosition", ChatClefDiagnostics.blockPos(pos),
+                    "stuckBlock", ChatClefDiagnostics.blockPos(blockStuck));
             if (blockStuck != null) {
                 unstuckTask = getFenceUnstuckTask();
+                VisibleTaskDiagnostics.logReturnTask(mod, this, unstuckTask, "destroy_block_return_new_unstuck_task",
+                        "targetPosition=" + ChatClefDiagnostics.blockPos(pos) + "|stuckBlock=" + ChatClefDiagnostics.blockPos(blockStuck),
+                        "targetPosition", ChatClefDiagnostics.blockPos(pos),
+                        "stuckBlock", ChatClefDiagnostics.blockPos(blockStuck));
                 return unstuckTask;
             }
             stuckCheck.reset();
@@ -315,6 +351,10 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
         // Check if the move checker failed
         if (!_moveChecker.check(mod)) {
             _moveChecker.reset();
+            VisibleTaskDiagnostics.logProgress(mod, this, "destroy_block_move_checker_failed_request_unreachable",
+                    "targetPosition=" + ChatClefDiagnostics.blockPos(pos),
+                    "targetPosition", ChatClefDiagnostics.blockPos(pos),
+                    "targetBlockState", ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(pos)));
             // Request the block at the position to be marked as unreachable
             mod.getBlockScanner().requestBlockUnreachable(pos);
         }
@@ -324,13 +364,29 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
         if (!WorldHelper.isSolidBlock(pos.up()) && mod.getPlayer().getPos().y > pos.getY() && pos.isWithinDistance(mod.getPlayer().isOnGround() ? mod.getPlayer().getPos() : mod.getPlayer().getPos().add(0, -1, 0), 0.89)) {
             if (WorldHelper.dangerousToBreakIfRightAbove(pos)) {
                 setDebugState("It's dangerous to break as we're right above it, moving away and trying again.");
-                return new RunAwayFromPositionTask(3, pos.getY(), pos);
+                Task runAwayTask = new RunAwayFromPositionTask(3, pos.getY(), pos);
+                VisibleTaskDiagnostics.logReturnTask(mod, this, runAwayTask, "destroy_block_return_run_away_dangerous_break",
+                        "targetPosition=" + ChatClefDiagnostics.blockPos(pos),
+                        "targetPosition", ChatClefDiagnostics.blockPos(pos),
+                        "targetBlockState", ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(pos)));
+                return runAwayTask;
             }
         }
 
         Optional<Rotation> reach = LookHelper.getReach(pos);
         if (reach.isPresent() && (mod.getPlayer().isTouchingWater() || mod.getPlayer().isOnGround()) && !mod.getFoodChain().needsToEat() && !WorldHelper.isInNetherPortal() && mod.getClientBaritone().getPathingBehavior().isSafeToCancel()) {
             setDebugState("Block in range, mining...");
+            VisibleTaskDiagnostics.logDecision(mod, this, "destroy_block_in_range_mining",
+                    "targetPosition=" + ChatClefDiagnostics.blockPos(pos)
+                            + "|targetBlock=" + ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(pos).getBlock())
+                            + "|mainHand=" + ChatClefDiagnostics.safeValue(() -> mod.getPlayer().getMainHandStack().getItem()),
+                    "targetPosition", ChatClefDiagnostics.blockPos(pos),
+                    "targetBlockState", ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(pos)),
+                    "reach", reach.get(),
+                    "playerTouchingWater", mod.getPlayer().isTouchingWater(),
+                    "playerOnGround", mod.getPlayer().isOnGround(),
+                    "foodChainNeedsToEat", mod.getFoodChain().needsToEat(),
+                    "safeToCancel", mod.getClientBaritone().getPathingBehavior().isSafeToCancel());
             stuckCheck.reset();
             isMining = true;
             mod.getInputControls().release(Input.SNEAK);
@@ -375,9 +431,23 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
             mod.getClientBaritone().getInputOverrideHandler().setInputForceState(Input.CLICK_LEFT, true);
         } else {
             setDebugState("Getting to block...");
+            VisibleTaskDiagnostics.logDecision(mod, this, "destroy_block_getting_to_block",
+                    "targetPosition=" + ChatClefDiagnostics.blockPos(pos)
+                            + "|reachPresent=" + reach.isPresent()
+                            + "|isMining=" + isMining,
+                    "targetPosition", ChatClefDiagnostics.blockPos(pos),
+                    "targetBlockState", ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(pos)),
+                    "reachPresent", reach.isPresent(),
+                    "playerTouchingWater", mod.getPlayer().isTouchingWater(),
+                    "playerOnGround", mod.getPlayer().isOnGround(),
+                    "foodChainNeedsToEat", mod.getFoodChain().needsToEat(),
+                    "safeToCancel", mod.getClientBaritone().getPathingBehavior().isSafeToCancel());
             if (isMining && mod.getPlayer().isTouchingWater()) {
                 setDebugState("We are in water... holding break button");
                 isMining = false;
+                VisibleTaskDiagnostics.logProgress(mod, this, "destroy_block_water_mining_request_unreachable",
+                        "targetPosition=" + ChatClefDiagnostics.blockPos(pos),
+                        "targetPosition", ChatClefDiagnostics.blockPos(pos));
                 mod.getBlockScanner().requestBlockUnreachable(pos);
                 mod.getInputControls().hold(Input.CLICK_LEFT);
             } else {
@@ -387,15 +457,28 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
             if (isCloseToMoveBack) {
                 if (!mod.getClientBaritone().getPathingBehavior().isPathing() && !mod.getPlayer().isTouchingWater() &&
                         !mod.getFoodChain().needsToEat()) {
+                    VisibleTaskDiagnostics.logDecision(mod, this, "destroy_block_close_hold_move_back_sneak",
+                            "targetPosition=" + ChatClefDiagnostics.blockPos(pos),
+                            "targetPosition", ChatClefDiagnostics.blockPos(pos),
+                            "isCloseToMoveBack", true);
                     mod.getInputControls().hold(Input.MOVE_BACK);
                     mod.getInputControls().hold(Input.SNEAK);
                 } else {
+                    VisibleTaskDiagnostics.logDecision(mod, this, "destroy_block_close_release_move_back_sneak",
+                            "targetPosition=" + ChatClefDiagnostics.blockPos(pos),
+                            "targetPosition", ChatClefDiagnostics.blockPos(pos),
+                            "isCloseToMoveBack", true);
                     mod.getInputControls().release(Input.MOVE_BACK);
                     mod.getInputControls().release(Input.SNEAK);
                 }
             }
             if (!mod.getClientBaritone().getCustomGoalProcess().isActive()) {
                 mod.getClientBaritone().getBuilderProcess().onLostControl();
+                VisibleTaskDiagnostics.logDecision(mod, this, "destroy_block_set_goal_and_path",
+                        "targetPosition=" + ChatClefDiagnostics.blockPos(pos),
+                        "targetPosition", ChatClefDiagnostics.blockPos(pos),
+                        "targetBlockState", ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(pos)),
+                        "aboveBlockState", ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(pos.up())));
                 mod.getClientBaritone().getCustomGoalProcess().setGoalAndPath(mod.getWorld().getBlockState(pos.up()).getBlock() ==
                         Blocks.SNOW ? new GoalBlock(pos) : new GoalNear(pos, 1));
             }
@@ -412,12 +495,19 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
     @Override
     protected void onStop(Task interruptTask) {
         AltoClef mod = AltoClef.getInstance();
+        VisibleTaskDiagnostics.logLifecycle(mod, this, "STOP_BEGIN", "destroy_block_stop",
+                "targetPosition", ChatClefDiagnostics.blockPos(pos),
+                "targetBlockState", ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(pos)),
+                "interruptTask", ChatClefDiagnostics.taskSummary(interruptTask));
 
         // Cancel Baritone pathing
         mod.getClientBaritone().getPathingBehavior().forceCancel();
 
         // If not in game, return
         if (!AltoClef.inGame()) {
+            VisibleTaskDiagnostics.logLifecycle(mod, this, "STOP_END_NOT_IN_GAME", "destroy_block_stop",
+                    "targetPosition", ChatClefDiagnostics.blockPos(pos),
+                    "interruptTask", ChatClefDiagnostics.taskSummary(interruptTask));
             return;
         }
 
@@ -437,6 +527,9 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
         Debug.logInternal("Released sneak input control");
         Debug.logInternal("Released move back input control");
         Debug.logInternal("Released move forward input control");
+        VisibleTaskDiagnostics.logLifecycle(mod, this, "STOP_END", "destroy_block_stop",
+                "targetPosition", ChatClefDiagnostics.blockPos(pos),
+                "interruptTask", ChatClefDiagnostics.taskSummary(interruptTask));
     }
 
     /**
@@ -449,6 +542,9 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
         BlockState blockState = AltoClef.getInstance().getWorld().getBlockState(pos);
         boolean isAir = blockState.isAir();
         Debug.logInternal("Block at position " + pos + " is air: " + isAir);
+        VisibleTaskDiagnostics.logFinishedCheck(AltoClef.getInstance(), this, isAir, "destroy_block_is_finished",
+                "targetPosition", ChatClefDiagnostics.blockPos(pos),
+                "targetBlockState", ChatClefDiagnostics.safeValue(() -> blockState));
         return isAir;
     }
 

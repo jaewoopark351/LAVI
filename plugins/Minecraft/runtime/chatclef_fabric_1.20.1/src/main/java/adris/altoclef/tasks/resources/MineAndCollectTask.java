@@ -17,7 +17,11 @@ import adris.altoclef.util.progresscheck.MovementProgressChecker;
 import adris.altoclef.util.slots.CursorSlot;
 import adris.altoclef.util.slots.PlayerSlot;
 import adris.altoclef.util.time.TimerGame;
+import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.diagnostics.tasktrace.VisibleTaskDiagnostics;
+import lavi.minecraft.integration.mining.MiningToolReadiness;
 import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.ItemEntity;
 import net.minecraft.item.Item;
@@ -44,7 +48,7 @@ public class MineAndCollectTask extends ResourceTask {
         super(itemTargets);
         _requirement = requirement;
         _blocksToMine = blocksToMine;
-        _subtask = new MineOrCollectTask(_blocksToMine, this.itemTargets);
+        _subtask = new MineOrCollectTask(_blocksToMine, this.itemTargets, _requirement);
     }
 
     public MineAndCollectTask(ItemTarget[] blocksToMine, MiningRequirement requirement) {
@@ -74,6 +78,10 @@ public class MineAndCollectTask extends ResourceTask {
 
     @Override
     protected void onResourceStart(AltoClef mod) {
+        VisibleTaskDiagnostics.logLifecycle(mod, this, "START", "mine_and_collect_start",
+                "blocksToMine", Arrays.toString(_blocksToMine),
+                "itemTargets", Arrays.toString(itemTargets),
+                "miningRequirement", _requirement);
         mod.getBehaviour().push();
 
         // We're mining, so don't throw away pickaxes.
@@ -91,23 +99,45 @@ public class MineAndCollectTask extends ResourceTask {
     @Override
     protected Task onResourceTick(AltoClef mod) {
         if (!StorageHelper.miningRequirementMet(_requirement)) {
-            return new SatisfyMiningRequirementTask(_requirement);
+            Task requirementTask = new SatisfyMiningRequirementTask(_requirement);
+            VisibleTaskDiagnostics.logReturnTask(mod, this, requirementTask, "mine_and_collect_return_requirement_task",
+                    "requirement=" + _requirement,
+                    "miningRequirement", _requirement,
+                    "currentMiningRequirement", ChatClefDiagnostics.safeValue(StorageHelper::getCurrentMiningRequirement));
+            return requirementTask;
         }
 
         if (_subtask.isMining()) {
+            VisibleTaskDiagnostics.logDecision(mod, this, "mine_and_collect_subtask_is_mining",
+                    "miningPos=" + ChatClefDiagnostics.blockPos(_subtask.miningPos()),
+                    "miningPos", ChatClefDiagnostics.blockPos(_subtask.miningPos()));
             makeSureToolIsEquipped(mod);
         }
 
         // Wrong dimension check.
         if (_subtask.wasWandering() && isInWrongDimension(mod) && !mod.getBlockScanner().anyFound(_blocksToMine)) {
-            return getToCorrectDimensionTask(mod);
+            Task dimensionTask = getToCorrectDimensionTask(mod);
+            VisibleTaskDiagnostics.logReturnTask(mod, this, dimensionTask, "mine_and_collect_return_correct_dimension_task",
+                    "blocksToMine=" + Arrays.toString(_blocksToMine),
+                    "blocksToMine", Arrays.toString(_blocksToMine));
+            return dimensionTask;
         }
 
+        VisibleTaskDiagnostics.logReturnTask(mod, this, _subtask, "mine_and_collect_return_mine_or_collect_task",
+                "mining=" + _subtask.isMining() + "|miningPos=" + ChatClefDiagnostics.blockPos(_subtask.miningPos()),
+                "blocksToMine", Arrays.toString(_blocksToMine),
+                "itemTargets", Arrays.toString(itemTargets),
+                "subtaskMining", _subtask.isMining(),
+                "subtaskMiningPos", ChatClefDiagnostics.blockPos(_subtask.miningPos()));
         return _subtask;
     }
 
     @Override
     protected void onResourceStop(AltoClef mod, Task interruptTask) {
+        VisibleTaskDiagnostics.logLifecycle(mod, this, "STOP", "mine_and_collect_stop",
+                "blocksToMine", Arrays.toString(_blocksToMine),
+                "itemTargets", Arrays.toString(itemTargets),
+                "interruptTask", ChatClefDiagnostics.taskSummary(interruptTask));
         mod.getBehaviour().pop();
     }
 
@@ -139,10 +169,22 @@ public class MineAndCollectTask extends ResourceTask {
                             MiningToolItem swapPick = (MiningToolItem) item;
                             if (ToolMaterialVer.getMiningLevel(swapPick) > ToolMaterialVer.getMiningLevel(currentPick)) {
                                 // We can equip a better pickaxe.
+                                VisibleTaskDiagnostics.logDecision(mod, this, "mine_and_collect_cursor_tool_equip_slot",
+                                        "cursorItem=" + item + "|miningPos=" + ChatClefDiagnostics.blockPos(_subtask.miningPos()),
+                                        "cursorStack", ChatClefDiagnostics.itemStackSummary(cursorStack),
+                                        "currentlyEquipped", currentlyEquipped,
+                                        "swapMiningLevel", ToolMaterialVer.getMiningLevel(swapPick),
+                                        "currentMiningLevel", ToolMaterialVer.getMiningLevel(currentPick),
+                                        "miningPos", ChatClefDiagnostics.blockPos(_subtask.miningPos()));
                                 mod.getSlotHandler().forceEquipSlot(CursorSlot.SLOT);
                             }
                         } else {
                             // We're not equipped with a pickaxe...
+                            VisibleTaskDiagnostics.logDecision(mod, this, "mine_and_collect_cursor_tool_equip_slot",
+                                    "cursorItem=" + item + "|miningPos=" + ChatClefDiagnostics.blockPos(_subtask.miningPos()),
+                                    "cursorStack", ChatClefDiagnostics.itemStackSummary(cursorStack),
+                                    "currentlyEquipped", currentlyEquipped,
+                                    "miningPos", ChatClefDiagnostics.blockPos(_subtask.miningPos()));
                             mod.getSlotHandler().forceEquipSlot(CursorSlot.SLOT);
                         }
                     }
@@ -156,14 +198,20 @@ public class MineAndCollectTask extends ResourceTask {
 
         private final Block[] _blocks;
         private final ItemTarget[] _targets;
+        private final MiningRequirement _requirement;
         private final Set<BlockPos> blacklist = new HashSet<>();
         private final MovementProgressChecker progressChecker = new MovementProgressChecker();
         private final Task _pickupTask;
         private BlockPos miningPos;
 
         public MineOrCollectTask(Block[] blocks, ItemTarget[] targets) {
+            this(blocks, targets, MiningRequirement.HAND);
+        }
+
+        public MineOrCollectTask(Block[] blocks, ItemTarget[] targets, MiningRequirement requirement) {
             _blocks = blocks;
             _targets = targets;
+            _requirement = requirement;
             _pickupTask = new PickupDroppedItemTask(_targets, true);
         }
 
@@ -188,13 +236,40 @@ public class MineAndCollectTask extends ResourceTask {
 
             // We can't mine right now.
             if (mod.getExtraBaritoneSettings().isInteractionPaused()) {
-                return closestDrop.getRight().map(Object.class::cast);
+                Optional<Object> result = closestDrop.getRight().map(Object.class::cast);
+                VisibleTaskDiagnostics.logDecision(mod, this, "mine_or_collect_closest_choice",
+                        "choice=drop_interaction_paused|drop=" + result.map(Object::toString).orElse("none"),
+                        "choice", "drop_interaction_paused",
+                        "closestBlockDistanceSq", blockSq,
+                        "closestBlock", closestBlock.getRight().map(ChatClefDiagnostics::blockPos).orElse("none"),
+                        "closestDropDistanceSq", dropSq,
+                        "closestDrop", closestDrop.getRight().map(ChatClefDiagnostics::entitySummary).orElse("none"),
+                        "resultPresent", result.isPresent());
+                return result;
             }
 
             if (dropSq <= blockSq) {
-                return closestDrop.getRight().map(Object.class::cast);
+                Optional<Object> result = closestDrop.getRight().map(Object.class::cast);
+                VisibleTaskDiagnostics.logDecision(mod, this, "mine_or_collect_closest_choice",
+                        "choice=drop|drop=" + result.map(Object::toString).orElse("none"),
+                        "choice", "drop",
+                        "closestBlockDistanceSq", blockSq,
+                        "closestBlock", closestBlock.getRight().map(ChatClefDiagnostics::blockPos).orElse("none"),
+                        "closestDropDistanceSq", dropSq,
+                        "closestDrop", closestDrop.getRight().map(ChatClefDiagnostics::entitySummary).orElse("none"),
+                        "resultPresent", result.isPresent());
+                return result;
             } else {
-                return closestBlock.getRight().map(Object.class::cast);
+                Optional<Object> result = closestBlock.getRight().map(Object.class::cast);
+                VisibleTaskDiagnostics.logDecision(mod, this, "mine_or_collect_closest_choice",
+                        "choice=block|block=" + result.map(Object::toString).orElse("none"),
+                        "choice", "block",
+                        "closestBlockDistanceSq", blockSq,
+                        "closestBlock", closestBlock.getRight().map(ChatClefDiagnostics::blockPos).orElse("none"),
+                        "closestDropDistanceSq", dropSq,
+                        "closestDrop", closestDrop.getRight().map(ChatClefDiagnostics::entitySummary).orElse("none"),
+                        "resultPresent", result.isPresent());
+                return result;
             }
         }
 
@@ -237,6 +312,10 @@ public class MineAndCollectTask extends ResourceTask {
                 progressChecker.reset();
             }
             if (miningPos != null && !progressChecker.check(mod)) {
+                VisibleTaskDiagnostics.logProgress(mod, this, "mine_or_collect_progress_failed_blacklist",
+                        "miningPos=" + ChatClefDiagnostics.blockPos(miningPos),
+                        "miningPos", ChatClefDiagnostics.blockPos(miningPos),
+                        "blacklistSizeBefore", blacklist.size());
                 mod.getClientBaritone().getPathingBehavior().forceCancel();
                 Debug.logMessage("Failed to mine block. Suggesting it may be unreachable.");
                 mod.getBlockScanner().requestBlockUnreachable(miningPos, 2);
@@ -250,16 +329,48 @@ public class MineAndCollectTask extends ResourceTask {
         @Override
         protected Task getGoalTask(Object obj) {
             if (obj instanceof BlockPos newPos) {
+                AltoClef mod = AltoClef.getInstance();
+                BlockState targetState = mod.getWorld().getBlockState(newPos);
+                MiningToolReadiness.Readiness readiness = MiningToolReadiness.evaluate(mod, targetState, _requirement);
+                //20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
+                // Target-aware readiness keeps saved low-durability pickaxes protected and acquires a usable tool before mining.
+                if (readiness.requiresAcquisition()) {
+                    miningPos = null;
+                    progressChecker.reset();
+                    Task requirementTask = new SatisfyMiningRequirementTask(_requirement, targetState);
+                    VisibleTaskDiagnostics.logReturnTask(mod, this, requirementTask, "mine_or_collect_return_target_tool_requirement_task",
+                            "targetPosition=" + ChatClefDiagnostics.blockPos(newPos) + "|requirement=" + _requirement,
+                            "targetPosition", ChatClefDiagnostics.blockPos(newPos),
+                            "targetBlockState", targetState,
+                            "miningRequirement", _requirement,
+                            "broadRequirementMet", readiness.broadRequirementMet(),
+                            "selectableToolPresent", readiness.selectableToolPresent(),
+                            "rejectedBySavePolicy", readiness.rejectedBySavePolicy(),
+                            "miningPos", ChatClefDiagnostics.blockPos(miningPos));
+                    return requirementTask;
+                }
                 if (miningPos == null || !miningPos.equals(newPos)) {
                     progressChecker.reset();
                 }
                 miningPos = newPos;
-                return new DestroyBlockTask(miningPos);
+                Task destroyTask = new DestroyBlockTask(miningPos);
+                VisibleTaskDiagnostics.logReturnTask(mod, this, destroyTask, "mine_or_collect_return_destroy_block_task",
+                        "miningPos=" + ChatClefDiagnostics.blockPos(miningPos),
+                        "miningPos", ChatClefDiagnostics.blockPos(miningPos),
+                        "targetBlockState", targetState);
+                return destroyTask;
             }
             if (obj instanceof ItemEntity) {
                 miningPos = null;
+                VisibleTaskDiagnostics.logReturnTask(AltoClef.getInstance(), this, _pickupTask, "mine_or_collect_return_pickup_task",
+                        "drop=" + obj,
+                        "drop", ChatClefDiagnostics.entitySummary((ItemEntity) obj));
                 return _pickupTask;
             }
+            VisibleTaskDiagnostics.logDecision(AltoClef.getInstance(), this, "mine_or_collect_unsupported_goal_object",
+                    "object=" + obj,
+                    "objectClass", obj == null ? "null" : obj.getClass(),
+                    "object", obj);
             throw new UnsupportedOperationException("Shouldn't try to get the goal from object " + obj + " of type " + (obj != null ? obj.getClass().toString() : "(null object)"));
         }
 
@@ -282,19 +393,27 @@ public class MineAndCollectTask extends ResourceTask {
 
         @Override
         protected void onStart() {
+            VisibleTaskDiagnostics.logLifecycle(AltoClef.getInstance(), this, "START", "mine_or_collect_start",
+                    "blocks", Arrays.toString(_blocks),
+                    "targets", Arrays.toString(_targets));
             progressChecker.reset();
             miningPos = null;
         }
 
         @Override
         protected void onStop(Task interruptTask) {
-
+            VisibleTaskDiagnostics.logLifecycle(AltoClef.getInstance(), this, "STOP", "mine_or_collect_stop",
+                    "blocks", Arrays.toString(_blocks),
+                    "targets", Arrays.toString(_targets),
+                    "miningPos", ChatClefDiagnostics.blockPos(miningPos),
+                    "blacklistSize", blacklist.size(),
+                    "interruptTask", ChatClefDiagnostics.taskSummary(interruptTask));
         }
 
         @Override
         protected boolean isEqual(Task other) {
             if (other instanceof MineOrCollectTask task) {
-                return Arrays.equals(task._blocks, _blocks) && Arrays.equals(task._targets, _targets);
+                return Arrays.equals(task._blocks, _blocks) && Arrays.equals(task._targets, _targets) && task._requirement == _requirement;
             }
             return false;
         }

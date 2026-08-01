@@ -10,6 +10,7 @@ import adris.altoclef.util.slots.PlayerSlot;
 import adris.altoclef.util.slots.Slot;
 import adris.altoclef.util.time.TimerGame;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.diagnostics.toolselect.ToolEquipDiagnostics;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.item.*;
@@ -142,15 +143,32 @@ public class SlotHandler {
     }
 
     public boolean forceEquipItem(Item toEquip) {
+        return forceEquipItem(toEquip, -1L, null, null);
+    }
+
+    public boolean forceEquipItem(Item toEquip, long equipAttemptId, Slot expectedSourceSlot, ItemStack expectedSourceStack) {
+        int selectedSlotBefore = selectedSlotIndex();
+        Slot hotbarSlot1 = Slot.getFromCurrentScreenInventory(1);
+        ItemStack hotbarSlot1Before = copyStackInSlot(hotbarSlot1);
+        Slot equipSlotBefore = currentEquipSlot();
+        ItemStack mainHandBefore = copyStackInSlot(equipSlotBefore);
+        ItemStack expectedSourceStackSnapshot = expectedSourceStack == null ? copyStackInSlot(expectedSourceSlot) : expectedSourceStack.copy();
+
         ChatClefDiagnostics.logEvent("SLOT", "FORCE_EQUIP_BEGIN", "forceEquipItem_begin", null,
                 "toEquip", toEquip,
                 "selectedSlotBefore", ChatClefDiagnostics.safeValue(() -> mod.getPlayer().getInventory().selectedSlot),
-                "equippedBefore", ChatClefDiagnostics.safeValue(() -> StorageHelper.getItemStackInSlot(PlayerSlot.getEquipSlot())));
+                "equippedBefore", ChatClefDiagnostics.safeValue(() -> StorageHelper.getItemStackInSlot(PlayerSlot.getEquipSlot())),
+                "equipAttemptId", equipAttemptId,
+                "expectedSourceSlot", ChatClefDiagnostics.slotSummary(expectedSourceSlot));
 
         // Already equipped
         if (StorageHelper.getItemStackInSlot(PlayerSlot.getEquipSlot()).getItem() == toEquip) {
             ChatClefDiagnostics.logEvent("SLOT", "FORCE_EQUIP_RETURN", "forceEquipItem_already_equipped", null,
                     "toEquip", toEquip);
+            ToolEquipDiagnostics.logEquipResult(mod, toEquip, equipAttemptId, expectedSourceSlot, expectedSourceStackSnapshot,
+                    java.util.Collections.emptyList(), false, selectedSlotBefore, selectedSlotIndex(),
+                    hotbarSlot1Before, copyStackInSlot(hotbarSlot1), mainHandBefore, copyStackInSlot(currentEquipSlot()),
+                    true, "already_equipped");
             return true;
         }
 
@@ -175,11 +193,43 @@ public class SlotHandler {
                     "toEquip", toEquip,
                     "selectedSlotAfter", ChatClefDiagnostics.safeValue(() -> mod.getPlayer().getInventory().selectedSlot),
                     "equippedAfter", ChatClefDiagnostics.safeValue(() -> StorageHelper.getItemStackInSlot(PlayerSlot.getEquipSlot())));
+            ToolEquipDiagnostics.logEquipResult(mod, toEquip, equipAttemptId, expectedSourceSlot, expectedSourceStackSnapshot,
+                    itemSlots, inCursor, selectedSlotBefore, selectedSlotIndex(),
+                    hotbarSlot1Before, copyStackInSlot(hotbarSlot1), mainHandBefore, copyStackInSlot(currentEquipSlot()),
+                    true, "matching_slots_swapped");
             return true;
         }
         ChatClefDiagnostics.logEvent("SLOT", "FORCE_EQUIP_RETURN", "forceEquipItem_missing_item", null,
                 "toEquip", toEquip);
+        ToolEquipDiagnostics.logEquipResult(mod, toEquip, equipAttemptId, expectedSourceSlot, expectedSourceStackSnapshot,
+                itemSlots, inCursor, selectedSlotBefore, selectedSlotIndex(),
+                hotbarSlot1Before, copyStackInSlot(hotbarSlot1), mainHandBefore, copyStackInSlot(currentEquipSlot()),
+                false, "missing_item");
         return false;
+    }
+
+    private Slot currentEquipSlot() {
+        try {
+            return PlayerSlot.getEquipSlot();
+        } catch (RuntimeException | LinkageError ignored) {
+            return null;
+        }
+    }
+
+    private ItemStack copyStackInSlot(Slot slot) {
+        try {
+            return slot == null ? ItemStack.EMPTY : StorageHelper.getItemStackInSlot(slot).copy();
+        } catch (RuntimeException | LinkageError ignored) {
+            return ItemStack.EMPTY;
+        }
+    }
+
+    private int selectedSlotIndex() {
+        try {
+            return mod.getPlayer().getInventory().selectedSlot;
+        } catch (RuntimeException | LinkageError ignored) {
+            return -1;
+        }
     }
 
     public boolean forceDeequipHitTool() {

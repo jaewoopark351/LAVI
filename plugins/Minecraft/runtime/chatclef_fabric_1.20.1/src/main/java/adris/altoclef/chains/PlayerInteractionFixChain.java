@@ -13,6 +13,7 @@ import adris.altoclef.util.time.TimerGame;
 import baritone.api.utils.Rotation;
 import baritone.api.utils.input.Input;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.diagnostics.toolselect.ToolEquipDiagnostics;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.ChatScreen;
@@ -70,27 +71,46 @@ public class PlayerInteractionFixChain extends TaskChain {
             // Equip the right tool for the job if we're not using one.
             betterToolTimer.reset();
             if (mod.getControllerExtras().isBreakingBlock()) {
-                BlockState state = mod.getWorld().getBlockState(mod.getControllerExtras().getBreakingBlockPos());
+                net.minecraft.util.math.BlockPos targetPos = mod.getControllerExtras().getBreakingBlockPos();
+                BlockState state = mod.getWorld().getBlockState(targetPos);
                 Optional<Slot> bestToolSlot = StorageHelper.getBestToolSlot(mod, state);
                 Slot currentEquipped = PlayerSlot.getEquipSlot();
+                ItemStack currentStack = StorageHelper.getItemStackInSlot(currentEquipped).copy();
 
                 // if baritone is running, only accept tools OUTSIDE OF HOTBAR!
                 // Baritone will take care of tools inside the hotbar.
-                if (bestToolSlot.isPresent() && !bestToolSlot.get().equals(currentEquipped)) {
+                if (bestToolSlot.isEmpty()) {
+                    ToolEquipDiagnostics.logSelectionDecision(mod, targetPos, state, currentEquipped, currentStack, null, null, "NO_CANDIDATE");
+                } else if (bestToolSlot.get().equals(currentEquipped)) {
+                    ToolEquipDiagnostics.logSelectionDecision(mod, targetPos, state, currentEquipped, currentStack, bestToolSlot.get(),
+                            StorageHelper.getItemStackInSlot(bestToolSlot.get()).copy(), "ALREADY_SELECTED_SLOT");
+                } else {
+                    Slot selectedBestToolSlot = bestToolSlot.get();
+                    ItemStack selectedBestToolStack = StorageHelper.getItemStackInSlot(selectedBestToolSlot).copy();
                     // ONLY equip if the item class is STRICTLY different (otherwise we swap around a lot)
-                    if (StorageHelper.getItemStackInSlot(currentEquipped).getItem() != StorageHelper.getItemStackInSlot(bestToolSlot.get()).getItem()) {
-                        boolean isAllowedToManage = (!mod.getClientBaritone().getPathingBehavior().isPathing() ||
-                                bestToolSlot.get().getInventorySlot() >= 9) && !mod.getFoodChain().isTryingToEat();
+                    if (currentStack.getItem() != selectedBestToolStack.getItem()) {
+                        boolean baritonePathing = mod.getClientBaritone().getPathingBehavior().isPathing();
+                        boolean foodChainEating = mod.getFoodChain().isTryingToEat();
+                        boolean isAllowedToManage = (!baritonePathing ||
+                                selectedBestToolSlot.getInventorySlot() >= 9) && !foodChainEating;
                         if (isAllowedToManage) {
+                            long equipAttemptId = ToolEquipDiagnostics.logSelectionDecision(mod, targetPos, state, currentEquipped, currentStack,
+                                    selectedBestToolSlot, selectedBestToolStack, "EQUIP_REQUEST");
                             Debug.logMessage("Found better tool in inventory, equipping.");
                             ChatClefDiagnostics.logEvent("PLAYER_INTERACTION_FIX_CHAIN", "SIDE_EFFECT", "force_equip_better_tool", null,
-                                    "bestToolSlot", bestToolSlot.get(),
+                                    "equipAttemptId", equipAttemptId,
+                                    "bestToolSlot", selectedBestToolSlot,
                                     "currentEquipped", currentEquipped,
                                     "baritonePathing", ChatClefDiagnostics.safeValue(() -> mod.getClientBaritone().getPathingBehavior().isPathing()));
-                            ItemStack bestToolItemStack = StorageHelper.getItemStackInSlot(bestToolSlot.get());
-                            Item bestToolItem = bestToolItemStack.getItem();
-                            mod.getSlotHandler().forceEquipItem(bestToolItem);
+                            Item bestToolItem = selectedBestToolStack.getItem();
+                            mod.getSlotHandler().forceEquipItem(bestToolItem, equipAttemptId, selectedBestToolSlot, selectedBestToolStack);
+                        } else {
+                            ToolEquipDiagnostics.logSelectionDecision(mod, targetPos, state, currentEquipped, currentStack,
+                                    selectedBestToolSlot, selectedBestToolStack, foodChainEating ? "SKIP_EATING" : "SKIP_BARITONE_HOTBAR");
                         }
+                    } else {
+                        ToolEquipDiagnostics.logSelectionDecision(mod, targetPos, state, currentEquipped, currentStack,
+                                selectedBestToolSlot, selectedBestToolStack, "SAME_ITEM_TYPE_SKIP");
                     }
                 }
             }

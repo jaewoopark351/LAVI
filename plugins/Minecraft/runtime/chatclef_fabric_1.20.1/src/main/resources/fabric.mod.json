@@ -21,7 +21,8 @@
     "main": [
       "adris.altoclef.AltoClef",
       "lavi.minecraft.integration.carryon.CarryOnDiagnosticEntrypoint",
-      "lavi.minecraft.overlay.OverlayEntrypoint"
+      "lavi.minecraft.overlay.OverlayEntrypoint",
+      "lavi.minecraft.fabric.chatclef.bridge.FabricChatClefBridgeEntrypoint"
     ]
   },
   "mixins": [

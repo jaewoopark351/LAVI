@@ -18,16 +18,19 @@ class GameExtensionCompositionService:
         starcraft116_plugin=None,
         starcraft2_plugin=None,
         chess_plugin=None,
+        minecraft_fabric_chatclef_plugin=None,
         starcraft116_game_extension=None,
         starcraft2_game_extension=None,
         starcraft2_changeling_observer_extension=None,
         chess_game_extension=None,
+        minecraft_fabric_chatclef_extension=None,
     ) -> GameExtensionCompositionResult:
         result = GameExtensionCompositionResult(
             starcraft116_game_extension=starcraft116_game_extension,
             starcraft2_game_extension=starcraft2_game_extension,
             starcraft2_changeling_observer_extension=starcraft2_changeling_observer_extension,
             chess_game_extension=chess_game_extension,
+            minecraft_fabric_chatclef_extension=minecraft_fabric_chatclef_extension,
         )
 
         result.starcraft116_game_extension = self._register_starcraft116(
@@ -50,6 +53,13 @@ class GameExtensionCompositionService:
             chess_plugin,
             result.chess_game_extension,
             result,
+        )
+        result.minecraft_fabric_chatclef_extension = (
+            self._register_minecraft_fabric_chatclef(
+                minecraft_fabric_chatclef_plugin,
+                result.minecraft_fabric_chatclef_extension,
+                result,
+            )
         )
 
         if result.registered_extensions:
@@ -141,6 +151,27 @@ class GameExtensionCompositionService:
             )
             return None
 
+    def _register_minecraft_fabric_chatclef(self, plugin, existing, result):
+        if plugin is None or existing is not None:
+            return existing
+        try:
+            from plugins.Minecraft.fabric.chatclef.extension import (
+                MinecraftFabricChatClefExtension,
+            )
+
+            extension = MinecraftFabricChatClefExtension(plugin=plugin)
+            self.registry.register(extension)
+            result.registered_extensions.append(extension)
+            self.logger("[AppComposer] Minecraft Fabric ChatClef extension registered")
+            return extension
+        except Exception as e:
+            self._record_error(
+                result,
+                "register MinecraftFabricChatClefExtension failed",
+                e,
+            )
+            return None
+
     def _record_error(self, result, label: str, error: Exception) -> None:
         message = f"[AppComposer] {label}: {type(error).__name__}: {error}"
         result.errors.append(message)
@@ -154,6 +185,10 @@ class GameExtensionCompositionService:
             "starcraft2_changeling_observer",
         )
         self._log_lookup(result.chess_game_extension, "chess")
+        self._log_lookup(
+            result.minecraft_fabric_chatclef_extension,
+            "minecraft_fabric_chatclef",
+        )
 
     def _log_lookup(self, extension, name: str) -> None:
         if extension is None:

@@ -64,6 +64,8 @@ class AppComposer:
         self.starcraft2_plugin = None
         self.starcraft2_game_extension = None
         self.starcraft2_changeling_observer_extension = None
+        self.minecraft_fabric_chatclef_plugin = None
+        self.minecraft_fabric_chatclef_extension = None
         self.screen_vision = None
         self.game_extension_context = None
         self.game_runtime_contexts = GameRuntimeContextRegistry()
@@ -273,12 +275,16 @@ class AppComposer:
             starcraft116_plugin=self.starcraft116_plugin,
             starcraft2_plugin=self.starcraft2_plugin,
             chess_plugin=self.chess_plugin,
+            minecraft_fabric_chatclef_plugin=self.minecraft_fabric_chatclef_plugin,
             starcraft116_game_extension=self.starcraft116_game_extension,
             starcraft2_game_extension=self.starcraft2_game_extension,
             starcraft2_changeling_observer_extension=(
                 self.starcraft2_changeling_observer_extension
             ),
             chess_game_extension=self.chess_game_extension,
+            minecraft_fabric_chatclef_extension=(
+                self.minecraft_fabric_chatclef_extension
+            ),
         )
         self.starcraft116_game_extension = result.starcraft116_game_extension
         self.starcraft2_game_extension = result.starcraft2_game_extension
@@ -286,6 +292,9 @@ class AppComposer:
             result.starcraft2_changeling_observer_extension
         )
         self.chess_game_extension = result.chess_game_extension
+        self.minecraft_fabric_chatclef_extension = (
+            result.minecraft_fabric_chatclef_extension
+        )
 
     def create_component_ui(self):
         self.ui_composition_service.create_component_ui(
@@ -299,6 +308,10 @@ class AppComposer:
             starcraft_plugin=self.starcraft_plugin,
             starcraft116_plugin=self.starcraft116_plugin,
             starcraft2_plugin=self.starcraft2_plugin,
+            minecraft_fabric_chatclef_plugin=self.minecraft_fabric_chatclef_plugin,
+            minecraft_fabric_chatclef_extension=(
+                self.minecraft_fabric_chatclef_extension
+            ),
             screen_vision=self.screen_vision,
             memory_store=self.memory_store,
             memory_context_builder=self.memory_context_builder,

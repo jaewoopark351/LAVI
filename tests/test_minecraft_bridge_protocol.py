@@ -87,11 +87,27 @@ class MinecraftBridgeProtocolTests(unittest.TestCase):
         self.assertIsNone(accepted.error_code)
         self.assertFalse(rejected.ok)
         self.assertEqual("not_implemented", rejected.to_dict()["error_code"])
+        unknown = CommandResultDTO(
+            request_id="cmd-3",
+            ok=False,
+            status=CommandResultStatus.UNKNOWN,
+            error_code=None,
+            message="completion could not be verified",
+            data={},
+        )
+        self.assertFalse(unknown.ok)
+        self.assertEqual("unknown", unknown.to_dict()["status"])
         with self.assertRaises(ValueError):
             CommandResultDTO(
                 request_id="bad",
                 ok=True,
                 status=CommandResultStatus.REJECTED,
+            )
+        with self.assertRaises(ValueError):
+            CommandResultDTO(
+                request_id="bad-unknown",
+                ok=True,
+                status=CommandResultStatus.UNKNOWN,
             )
 
     def test_status_snapshot_round_trip_uses_nullable_last_error(self):

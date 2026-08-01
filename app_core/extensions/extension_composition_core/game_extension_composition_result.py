@@ -9,5 +9,6 @@ class GameExtensionCompositionResult:
     starcraft2_game_extension: Any = None
     starcraft2_changeling_observer_extension: Any = None
     chess_game_extension: Any = None
+    minecraft_fabric_chatclef_extension: Any = None
     registered_extensions: List[Any] = field(default_factory=list)
     errors: List[str] = field(default_factory=list)

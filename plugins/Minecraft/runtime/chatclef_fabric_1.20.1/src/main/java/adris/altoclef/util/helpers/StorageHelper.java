@@ -18,6 +18,7 @@ import adris.altoclef.util.slots.CursorSlot;
 import adris.altoclef.util.slots.PlayerSlot;
 import adris.altoclef.util.slots.Slot;
 import baritone.utils.ToolSet;
+import lavi.minecraft.diagnostics.toolselect.BestToolSlotDiagnostics;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
@@ -142,7 +143,14 @@ public class StorageHelper {
         //      PREFER (Always use silk touch if we have)
         //      AVOID  (Don't use silk touch if we can)
         //  }
-        if (state.getBlock().getHardness() == 0) return Optional.ofNullable(PlayerSlot.getEquipSlot());
+        //20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
+        // Diagnostics-only: observe the actual best-tool candidate filtering without changing selection behavior.
+        BestToolSlotDiagnostics.Scan bestToolDiagnostics = BestToolSlotDiagnostics.start(state);
+        if (state.getBlock().getHardness() == 0) {
+            Slot equipSlot = PlayerSlot.getEquipSlot();
+            bestToolDiagnostics.logReturn(equipSlot, BestToolSlotDiagnostics.DECISION_HARDNESS_ZERO_USE_EQUIP_SLOT, Double.NaN);
+            return Optional.ofNullable(equipSlot);
+        }
 
         Slot bestToolSlot = null;
         double highestSpeed = Double.NEGATIVE_INFINITY;
@@ -151,24 +159,38 @@ public class StorageHelper {
                 continue;
             ItemStack stack = getItemStackInSlot(slot);
             if (stack.getItem() instanceof ToolItem) {
-                if (stack.getItem().getDefaultStack().isSuitableFor(state)) {
-                    if (shouldSaveStack(mod,  state.getBlock(), stack)) continue;
+                boolean defaultSuitable = stack.getItem().getDefaultStack().isSuitableFor(state);
+                if (defaultSuitable) {
+                    boolean shouldSave = shouldSaveStack(mod,  state.getBlock(), stack);
+                    if (shouldSave) {
+                        bestToolDiagnostics.observeToolCandidate(mod, slot, stack, true, true, Double.NaN, false);
+                        continue;
+                    }
 
                     double speed = ToolSet.calculateSpeedVsBlock(stack, state);
+                    boolean becameBest = speed > highestSpeed;
                     if (speed > highestSpeed) {
                         highestSpeed = speed;
                         bestToolSlot = slot;
                     }
+                    bestToolDiagnostics.observeToolCandidate(mod, slot, stack, true, false, speed, becameBest);
+                } else {
+                    bestToolDiagnostics.observeToolCandidate(mod, slot, stack, false, false, Double.NaN, false);
                 }
             }
             if (stack.getItem() == Items.SHEARS) {
                 // Shears take priority over leaf blocks.
-                if (ItemHelper.areShearsEffective(state.getBlock())) {
+                boolean shearsEffective = ItemHelper.areShearsEffective(state.getBlock());
+                bestToolDiagnostics.observeShearsCandidate(slot, stack, shearsEffective, shearsEffective);
+                if (shearsEffective) {
                     bestToolSlot = slot;
                     break;
                 }
             }
         }
+        bestToolDiagnostics.logReturn(bestToolSlot, bestToolSlot == null
+                ? BestToolSlotDiagnostics.DECISION_NO_ELIGIBLE_TOOL
+                : BestToolSlotDiagnostics.DECISION_SELECTED_TOOL, highestSpeed);
         return Optional.ofNullable(bestToolSlot);
     }
 
