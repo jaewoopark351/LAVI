@@ -27,21 +27,28 @@ public final class FabricChatClefCommandDispatcher {
     }
 
     public void onEndClientTick(MinecraftClient client) {
-        if (commandQueue.hasActive()) {
+        long nowMs = System.currentTimeMillis();
+        Optional<FabricChatClefCommandContext> active = commandQueue.activeContext();
+        if (active.isPresent()) {
+            FabricChatClefCommandContext context = active.get();
+            if (context.isDeadlineExceeded(nowMs)) {
+                completeActiveDeadline(context);
+            }
             return;
         }
-        long nowMs = System.currentTimeMillis();
-        Optional<FabricChatClefCommandRequest> pending = commandQueue.peekPending();
+        Optional<FabricChatClefCommandContext> pending = commandQueue.peekPending();
         if (pending.isPresent() && pending.get().isDeadlineExceeded(nowMs)) {
-            FabricChatClefCommandRequest request = pending.get();
-            commandQueue.removePending(request.requestId);
-            resultSender.sendCommandResult(
-                    request.requestId,
-                    FabricChatClefCommandResult.deadlineExceeded(
-                            request.requestId,
-                            "Fabric ChatClef command deadline expired before dispatch."
-                    )
-            );
+            FabricChatClefCommandContext context = pending.get();
+            commandQueue.removePending(context);
+            if (context.markTerminalSent()) {
+                resultSender.sendCommandResult(
+                        context,
+                        FabricChatClefCommandResult.deadlineExceeded(
+                                context.requestId(),
+                                "Fabric ChatClef command deadline expired before dispatch."
+                        )
+                );
+            }
             return;
         }
         if (!isEngineReady()) {
@@ -58,16 +65,22 @@ public final class FabricChatClefCommandDispatcher {
                 && mod.getModSettings() != null;
     }
 
-    private void dispatch(FabricChatClefCommandRequest request) {
+    private void dispatch(FabricChatClefCommandContext context) {
+        FabricChatClefCommandRequest request = context.request();
         CommandExecutor executor = AltoClef.getCommandExecutor();
         String command = normalizeCommand(executor, request.command);
         FabricChatClefCommandExecution execution = new FabricChatClefCommandExecution(
-                request,
+                context,
                 command,
                 captureCurrentTask()
         );
-        diagnostics.info("dispatch command request=" + request.requestId);
-        resultSender.sendCommandResult(request.requestId, execution.runningResult());
+        diagnostics.info(
+                "dispatch command request="
+                        + context.requestId()
+                        + " generation="
+                        + context.connectionGeneration()
+        );
+        resultSender.sendCommandResult(context, execution.runningResult());
         try {
             executor.execute(
                     command,
@@ -111,8 +124,44 @@ public final class FabricChatClefCommandDispatcher {
             return;
         }
         java.util.Map<String, Object> result = resultFactory.get();
-        commandQueue.complete(execution.requestId());
-        resultSender.sendCommandResult(execution.requestId(), result);
+        if (!commandQueue.complete(execution.context())) {
+            diagnostics.warn(
+                    "ignored stale terminal result request="
+                            + execution.requestId()
+                            + " data="
+                            + execution.duplicateTerminalData("stale_terminal_result")
+            );
+            return;
+        }
+        resultSender.sendCommandResult(execution.context(), result);
+    }
+
+    private void completeActiveDeadline(FabricChatClefCommandContext context) {
+        if (!context.markTerminalSent()) {
+            diagnostics.warn(
+                    "ignored duplicate deadline result request="
+                            + context.requestId()
+                            + " data="
+                            + context.ownershipData()
+            );
+            return;
+        }
+        if (!commandQueue.complete(context)) {
+            diagnostics.warn(
+                    "ignored stale deadline result request="
+                            + context.requestId()
+                            + " data="
+                            + context.ownershipData()
+            );
+            return;
+        }
+        resultSender.sendCommandResult(
+                context,
+                FabricChatClefCommandResult.deadlineExceeded(
+                        context.requestId(),
+                        "Fabric ChatClef command deadline expired while active."
+                )
+        );
     }
 
     private FabricChatClefTaskSnapshot captureCurrentTask() {

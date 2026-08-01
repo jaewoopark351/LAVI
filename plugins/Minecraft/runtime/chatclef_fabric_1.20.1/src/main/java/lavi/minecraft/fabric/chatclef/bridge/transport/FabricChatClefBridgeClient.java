@@ -1,6 +1,7 @@
 package lavi.minecraft.fabric.chatclef.bridge.transport;
 
 import lavi.minecraft.fabric.chatclef.bridge.config.FabricChatClefBridgeConfig;
+import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandContext;
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandQueue;
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandRequest;
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandResult;
@@ -16,6 +17,7 @@ import java.net.http.WebSocket;
 import java.util.Map;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 //20260801_kpopmodder: Keep WebSocket callbacks to transport parsing and command queueing only.
 public final class FabricChatClefBridgeClient implements WebSocket.Listener, FabricChatClefCommandResultSender {
@@ -29,8 +31,10 @@ public final class FabricChatClefBridgeClient implements WebSocket.Listener, Fab
     private final HttpClient httpClient = HttpClient.newHttpClient();
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final AtomicBoolean connecting = new AtomicBoolean(false);
+    private final AtomicLong connectionGenerations = new AtomicLong(0);
     private final StringBuilder incomingText = new StringBuilder();
     private volatile WebSocket webSocket;
+    private volatile long activeConnectionGeneration;
     private volatile String lastLoggedConnectFailure;
 
     public FabricChatClefBridgeClient(
@@ -69,29 +73,37 @@ public final class FabricChatClefBridgeClient implements WebSocket.Listener, Fab
             socket.sendClose(WebSocket.NORMAL_CLOSURE, "LAVI Fabric ChatClef bridge stopping");
         }
         reconnectScheduler.stop();
-        commandQueue.clear();
+        commandQueue.clear("bridge_stopping");
         state.markStopped();
         diagnostics.info("stopped");
     }
 
     @Override
     public void onOpen(WebSocket webSocket) {
+        long generation = connectionGenerations.incrementAndGet();
         this.webSocket = webSocket;
+        activeConnectionGeneration = generation;
+        incomingText.setLength(0);
         connecting.set(false);
         lastLoggedConnectFailure = null;
         state.markConnected();
-        diagnostics.info("connected; sending handshake");
+        diagnostics.info("connected generation=" + generation + "; sending handshake");
         sendHandshake(webSocket);
         webSocket.request(1);
     }
 
     @Override
     public CompletionStage<?> onText(WebSocket webSocket, CharSequence data, boolean last) {
+        if (!isCurrentSocket(webSocket)) {
+            diagnostics.warn("ignored text from stale WebSocket generation=" + activeConnectionGeneration);
+            webSocket.request(1);
+            return null;
+        }
         incomingText.append(data);
         if (last) {
             String message = incomingText.toString();
             incomingText.setLength(0);
-            handleMessage(message);
+            handleMessage(webSocket, activeConnectionGeneration, message);
         }
         webSocket.request(1);
         return null;
@@ -99,23 +111,42 @@ public final class FabricChatClefBridgeClient implements WebSocket.Listener, Fab
 
     @Override
     public CompletionStage<?> onClose(WebSocket webSocket, int statusCode, String reason) {
+        long generation = activeConnectionGeneration;
+        if (!isCurrentSocket(webSocket)) {
+            diagnostics.warn("ignored close from stale WebSocket status=" + statusCode + " reason=" + reason);
+            return null;
+        }
         this.webSocket = null;
+        activeConnectionGeneration = 0;
         connecting.set(false);
-        commandQueue.clear();
+        commandQueue.detachConnection(generation, "websocket_closed");
         state.markDisconnected("closed status=" + statusCode + " reason=" + reason);
-        diagnostics.warn("closed status=" + statusCode + " reason=" + reason);
+        diagnostics.warn(
+                "closed generation="
+                        + generation
+                        + " status="
+                        + statusCode
+                        + " reason="
+                        + reason
+        );
         scheduleReconnect();
         return null;
     }
 
     @Override
     public void onError(WebSocket webSocket, Throwable error) {
+        long generation = activeConnectionGeneration;
+        if (!isCurrentSocket(webSocket)) {
+            diagnostics.warn("ignored error from stale WebSocket " + error.getClass().getSimpleName() + ": " + error.getMessage());
+            return;
+        }
         this.webSocket = null;
+        activeConnectionGeneration = 0;
         connecting.set(false);
-        commandQueue.clear();
+        commandQueue.detachConnection(generation, "websocket_error");
         String message = error.getClass().getSimpleName() + ": " + error.getMessage();
         state.markFailed(message);
-        diagnostics.warn("connection error " + message);
+        diagnostics.warn("connection error generation=" + generation + " " + message);
         scheduleReconnect();
     }
 
@@ -150,7 +181,11 @@ public final class FabricChatClefBridgeClient implements WebSocket.Listener, Fab
         }
     }
 
-    private void handleMessage(String message) {
+    private void handleMessage(WebSocket socket, long generation, String message) {
+        if (!isCurrentSocket(socket) || generation != activeConnectionGeneration) {
+            diagnostics.warn("ignored message from stale WebSocket generation=" + generation);
+            return;
+        }
         try {
             FabricChatClefBridgeEnvelope envelope = json.decode(message);
             if (envelope.protocolVersion != 1) {
@@ -166,7 +201,7 @@ public final class FabricChatClefBridgeClient implements WebSocket.Listener, Fab
                 return;
             }
             if ("command_request".equals(envelope.messageType)) {
-                handleCommandRequest(envelope);
+                handleCommandRequest(envelope, generation);
                 return;
             }
             if ("error".equals(envelope.messageType)) {
@@ -193,11 +228,46 @@ public final class FabricChatClefBridgeClient implements WebSocket.Listener, Fab
         diagnostics.info("handshake accepted session=" + state.sessionId().orElse("<none>"));
     }
 
-    private void handleCommandRequest(FabricChatClefBridgeEnvelope envelope) {
+    private void handleCommandRequest(FabricChatClefBridgeEnvelope envelope, long generation) {
+        if (!state.handshakeAccepted()) {
+            sendCommandResult(
+                    envelope.messageId,
+                    envelope.sessionId,
+                    generation,
+                    FabricChatClefCommandResult.rejected(
+                            "",
+                            "not_connected",
+                            "Fabric ChatClef bridge handshake has not been accepted."
+                    )
+            );
+            return;
+        }
+        String currentSessionId = state.sessionId().orElse("");
+        if (envelope.sessionId == null || !currentSessionId.equals(envelope.sessionId)) {
+            sendCommandResult(
+                    envelope.messageId,
+                    envelope.sessionId,
+                    generation,
+                    FabricChatClefCommandResult.rejected(
+                            "",
+                            "invalid_request",
+                            "Fabric ChatClef command_request session does not match active handshake."
+                    )
+            );
+            return;
+        }
         FabricChatClefCommandRequest request = json.commandRequest(envelope.payload);
+        FabricChatClefCommandContext context = new FabricChatClefCommandContext(
+                request,
+                envelope.messageId,
+                envelope.sessionId,
+                generation
+        );
         if (!request.isValid()) {
             sendCommandResult(
                     envelope.messageId,
+                    envelope.sessionId,
+                    generation,
                     FabricChatClefCommandResult.rejected(
                             request.requestId,
                             "invalid_request",
@@ -206,9 +276,11 @@ public final class FabricChatClefBridgeClient implements WebSocket.Listener, Fab
             );
             return;
         }
-        if (!commandQueue.offer(request)) {
+        if (!commandQueue.offer(context)) {
             sendCommandResult(
                     envelope.messageId,
+                    envelope.sessionId,
+                    generation,
                     FabricChatClefCommandResult.rejected(
                             request.requestId,
                             "invalid_request",
@@ -218,14 +290,33 @@ public final class FabricChatClefBridgeClient implements WebSocket.Listener, Fab
             );
             return;
         }
-        diagnostics.info("queued command request=" + request.requestId);
+        diagnostics.info("queued command request=" + request.requestId + " generation=" + generation);
     }
 
     @Override
-    public void sendCommandResult(String correlationId, Map<String, Object> payload) {
+    public void sendCommandResult(FabricChatClefCommandContext context, Map<String, Object> payload) {
+        sendCommandResult(
+                context.correlationId(),
+                context.sessionId(),
+                context.connectionGeneration(),
+                payload
+        );
+    }
+
+    private void sendCommandResult(
+            String correlationId,
+            String sessionId,
+            long generation,
+            Map<String, Object> payload
+    ) {
         WebSocket socket = webSocket;
-        if (socket == null) {
-            diagnostics.warn("cannot send command_result because WebSocket is disconnected");
+        if (socket == null || generation != activeConnectionGeneration) {
+            diagnostics.warn(
+                    "ignored command_result for inactive generation="
+                            + generation
+                            + " active_generation="
+                            + activeConnectionGeneration
+            );
             return;
         }
         FabricChatClefBridgeEnvelope envelope = new FabricChatClefBridgeEnvelope();
@@ -233,7 +324,7 @@ public final class FabricChatClefBridgeClient implements WebSocket.Listener, Fab
         envelope.messageType = "command_result";
         envelope.messageId = "fabric-chatclef-result-" + java.util.UUID.randomUUID();
         envelope.correlationId = correlationId;
-        envelope.sessionId = state.sessionId().orElse(null);
+        envelope.sessionId = sessionId;
         envelope.timestampMs = System.currentTimeMillis();
         envelope.payload = payload;
         try {
@@ -250,6 +341,10 @@ public final class FabricChatClefBridgeClient implements WebSocket.Listener, Fab
         }
         String text = value.toString();
         return text.isBlank() ? null : text;
+    }
+
+    private boolean isCurrentSocket(WebSocket socket) {
+        return socket != null && socket == webSocket;
     }
 
     private void scheduleReconnect() {

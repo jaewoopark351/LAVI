@@ -4,5 +4,5 @@ import java.util.Map;
 
 //20260801_kpopmodder: Let command dispatch report results without owning WebSocket transport.
 public interface FabricChatClefCommandResultSender {
-    void sendCommandResult(String correlationId, Map<String, Object> payload);
+    void sendCommandResult(FabricChatClefCommandContext context, Map<String, Object> payload);
 }

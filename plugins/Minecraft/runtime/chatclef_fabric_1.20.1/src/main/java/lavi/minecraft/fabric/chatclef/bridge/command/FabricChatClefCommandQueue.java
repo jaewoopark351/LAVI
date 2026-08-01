@@ -6,58 +6,78 @@ import java.util.concurrent.atomic.AtomicReference;
 
 //20260801_kpopmodder: Enforce one Fabric ChatClef command pending or active at a time.
 public final class FabricChatClefCommandQueue {
-    private final ConcurrentLinkedQueue<FabricChatClefCommandRequest> pending = new ConcurrentLinkedQueue<>();
-    private final AtomicReference<FabricChatClefCommandRequest> active = new AtomicReference<>();
+    private final ConcurrentLinkedQueue<FabricChatClefCommandContext> pending = new ConcurrentLinkedQueue<>();
+    private final AtomicReference<FabricChatClefCommandContext> active = new AtomicReference<>();
 
-    public synchronized boolean offer(FabricChatClefCommandRequest request) {
-        if (request == null || active.get() != null || !pending.isEmpty()) {
+    public synchronized boolean offer(FabricChatClefCommandContext context) {
+        if (context == null || active.get() != null || !pending.isEmpty()) {
             return false;
         }
-        pending.offer(request);
+        pending.offer(context);
         return true;
     }
 
-    public synchronized Optional<FabricChatClefCommandRequest> peekPending() {
+    public synchronized Optional<FabricChatClefCommandContext> peekPending() {
         return Optional.ofNullable(pending.peek());
     }
 
-    public synchronized Optional<FabricChatClefCommandRequest> pollForDispatch() {
+    public synchronized Optional<FabricChatClefCommandContext> pollForDispatch() {
         if (active.get() != null) {
             return Optional.empty();
         }
-        FabricChatClefCommandRequest request = pending.poll();
-        if (request == null) {
+        FabricChatClefCommandContext context = pending.poll();
+        if (context == null) {
             return Optional.empty();
         }
-        if (!active.compareAndSet(null, request)) {
-            pending.offer(request);
+        if (!active.compareAndSet(null, context)) {
+            pending.offer(context);
             return Optional.empty();
         }
-        return Optional.of(request);
+        return Optional.of(context);
     }
 
     public synchronized boolean hasActive() {
         return active.get() != null;
     }
 
-    public synchronized Optional<String> activeRequestId() {
-        FabricChatClefCommandRequest request = active.get();
-        return Optional.ofNullable(request == null ? null : request.requestId);
+    public synchronized Optional<FabricChatClefCommandContext> activeContext() {
+        return Optional.ofNullable(active.get());
     }
 
-    public synchronized void complete(String requestId) {
-        FabricChatClefCommandRequest request = active.get();
-        if (request != null && request.requestId.equals(requestId)) {
-            active.compareAndSet(request, null);
+    public synchronized Optional<String> activeRequestId() {
+        FabricChatClefCommandContext context = active.get();
+        return Optional.ofNullable(context == null ? null : context.requestId());
+    }
+
+    public synchronized boolean complete(FabricChatClefCommandContext context) {
+        return context != null && active.compareAndSet(context, null);
+    }
+
+    public synchronized boolean removePending(FabricChatClefCommandContext context) {
+        return pending.remove(context);
+    }
+
+    public synchronized void detachConnection(long connectionGeneration, String reason) {
+        pending.removeIf(context -> {
+            boolean matches = context.connectionGeneration() == connectionGeneration;
+            if (matches) {
+                context.markDetached(reason);
+            }
+            return matches;
+        });
+        FabricChatClefCommandContext activeContext = active.get();
+        if (activeContext != null && activeContext.connectionGeneration() == connectionGeneration) {
+            activeContext.markDetached(reason);
+            active.compareAndSet(activeContext, null);
         }
     }
 
-    public synchronized void removePending(String requestId) {
-        pending.removeIf(request -> request.requestId.equals(requestId));
-    }
-
-    public synchronized void clear() {
+    public synchronized void clear(String reason) {
+        pending.forEach(context -> context.markDetached(reason));
         pending.clear();
-        active.set(null);
+        FabricChatClefCommandContext activeContext = active.getAndSet(null);
+        if (activeContext != null) {
+            activeContext.markDetached(reason);
+        }
     }
 }

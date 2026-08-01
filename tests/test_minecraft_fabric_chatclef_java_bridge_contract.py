@@ -132,6 +132,69 @@ class MinecraftFabricChatClefJavaBridgeContractTests(unittest.TestCase):
         self.assertIn('"running"', result_text)
         self.assertIn('"unknown"', result_text)
 
+    def test_java_bridge_binds_results_to_connection_generation_and_context(self):
+        client_text = (
+            BRIDGE_ROOT
+            / "transport"
+            / "FabricChatClefBridgeClient.java"
+        ).read_text(encoding="utf-8")
+        queue_text = (
+            BRIDGE_ROOT
+            / "command"
+            / "FabricChatClefCommandQueue.java"
+        ).read_text(encoding="utf-8")
+        sender_text = (
+            BRIDGE_ROOT
+            / "command"
+            / "FabricChatClefCommandResultSender.java"
+        ).read_text(encoding="utf-8")
+        context_text = (
+            BRIDGE_ROOT
+            / "command"
+            / "FabricChatClefCommandContext.java"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("AtomicLong connectionGenerations", client_text)
+        self.assertIn("activeConnectionGeneration", client_text)
+        self.assertIn("isCurrentSocket", client_text)
+        self.assertIn("detachConnection(generation", client_text)
+        self.assertIn("generation != activeConnectionGeneration", client_text)
+        self.assertIn("FabricChatClefCommandContext context", client_text)
+
+        self.assertIn("FabricChatClefCommandContext", sender_text)
+        self.assertIn("AtomicReference<FabricChatClefCommandContext>", queue_text)
+        self.assertIn("compareAndSet(context, null)", queue_text)
+        self.assertIn("connectionGeneration", context_text)
+        self.assertIn("correlationId", context_text)
+        self.assertIn("sessionId", context_text)
+        self.assertIn("AtomicBoolean terminalSent", context_text)
+
+    def test_java_dispatcher_checks_active_deadline_before_busy_return(self):
+        dispatcher_text = (
+            BRIDGE_ROOT
+            / "command"
+            / "FabricChatClefCommandDispatcher.java"
+        ).read_text(encoding="utf-8")
+        active_context_index = dispatcher_text.index("commandQueue.activeContext()")
+        deadline_index = dispatcher_text.index("completeActiveDeadline(context)")
+        engine_ready_index = dispatcher_text.index("if (!isEngineReady())")
+
+        self.assertLess(active_context_index, engine_ready_index)
+        self.assertLess(deadline_index, engine_ready_index)
+        self.assertNotIn("if (commandQueue.hasActive()) {\n            return;", dispatcher_text)
+
+    def test_java_bridge_rejects_session_mismatch_before_queueing_command(self):
+        client_text = (
+            BRIDGE_ROOT
+            / "transport"
+            / "FabricChatClefBridgeClient.java"
+        ).read_text(encoding="utf-8")
+
+        session_check_index = client_text.index("command_request session does not match")
+        offer_index = client_text.index("commandQueue.offer(context)")
+
+        self.assertLess(session_check_index, offer_index)
+
 
 if __name__ == "__main__":
     unittest.main()

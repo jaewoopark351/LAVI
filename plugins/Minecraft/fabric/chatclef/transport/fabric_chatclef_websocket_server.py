@@ -25,6 +25,9 @@ from plugins.Minecraft.fabric.chatclef.config.fabric_chatclef_config import (
 )
 from plugins.Minecraft.fabric.chatclef.diagnostics import FabricChatClefDiagnostics
 from plugins.Minecraft.fabric.chatclef.session import FabricChatClefSessionRegistry
+from plugins.Minecraft.fabric.chatclef.transport.fabric_chatclef_connection_ownership import (
+    FabricChatClefConnectionOwnership,
+)
 from plugins.Minecraft.fabric.chatclef.transport.fabric_chatclef_websocket_server_factory import (
     serve_fabric_chatclef_websocket,
 )
@@ -50,10 +53,7 @@ class FabricChatClefWebSocketServer:
         self._bound_port = config.port
         self._stopping = False
         self._command_lock = threading.RLock()
-        self._active_websocket: Any = None
-        self._active_session_id: str | None = None
-        self._active_request_id: str | None = None
-        self._last_command_result: dict[str, Any] | None = None
+        self._connection_ownership = FabricChatClefConnectionOwnership()
 
     @property
     def endpoint(self) -> str:
@@ -100,13 +100,16 @@ class FabricChatClefWebSocketServer:
         if self._thread is not None:
             self._thread.join(timeout=self._config.startup_timeout_sec)
         self._session_registry.clear()
+        with self._command_lock:
+            self._connection_ownership.clear()
         self._thread = None
         self._loop = None
         self._server = None
         self._stopping = False
 
     def status_snapshot(self, *, enabled: bool) -> StatusSnapshotDTO:
-        connected = self._session_registry.active_session() is not None
+        with self._command_lock:
+            connected = self._connection_ownership.is_connected()
         if not enabled:
             state = BridgeLifecycleState.DISABLED
             detail = "Fabric ChatClef bridge is disabled."
@@ -150,27 +153,42 @@ class FabricChatClefWebSocketServer:
                 metadata=command_request.metadata,
             )
         with self._command_lock:
-            websocket = self._active_websocket
-            if websocket is None or self._loop is None or not self._loop.is_running():
+            if (
+                not self._connection_ownership.is_connected()
+                or self._loop is None
+                or not self._loop.is_running()
+            ):
                 return self._command_rejection(
                     command_request,
                     BridgeErrorCode.NOT_CONNECTED,
                     "Fabric ChatClef bridge client is not connected.",
                 )
-            if self._active_request_id is not None:
+            active_request_id = self._connection_ownership.active_request_id
+            if active_request_id is not None:
                 return self._command_rejection(
                     command_request,
                     BridgeErrorCode.INVALID_REQUEST,
-                    f"Fabric ChatClef command already active: {self._active_request_id}",
+                    f"Fabric ChatClef command already active: {active_request_id}",
                 )
-            self._active_request_id = command_request.request_id
+            message_id = self._new_message_id()
+            command_context = self._connection_ownership.begin_command(
+                request_id=command_request.request_id,
+                command_message_id=message_id,
+            )
+            if command_context is None:
+                return self._command_rejection(
+                    command_request,
+                    BridgeErrorCode.NOT_CONNECTED,
+                    "Fabric ChatClef bridge client is not connected.",
+                )
+            websocket = command_context.websocket
 
         envelope = BridgeEnvelopeDTO(
             protocol_version=1,
             message_type=BridgeMessageType.COMMAND_REQUEST,
-            message_id=self._new_message_id(),
+            message_id=message_id,
             correlation_id=command_request.request_id,
-            session_id=self._active_session_id,
+            session_id=command_context.session_id,
             timestamp_ms=self._now_ms(),
             payload=command_request.to_dict(),
         )
@@ -182,8 +200,7 @@ class FabricChatClefWebSocketServer:
             future.result(timeout=self._config.startup_timeout_sec)
         except Exception as error:
             with self._command_lock:
-                if self._active_request_id == command_request.request_id:
-                    self._active_request_id = None
+                self._connection_ownership.clear_command_if_current(command_context)
             return self._command_rejection(
                 command_request,
                 BridgeErrorCode.INTERNAL_ERROR,
@@ -195,7 +212,11 @@ class FabricChatClefWebSocketServer:
             status=CommandResultStatus.ACCEPTED,
             error_code=None,
             message="Fabric ChatClef command sent to Java bridge.",
-            data={"session_id": self._active_session_id},
+            data={
+                "session_id": command_context.session_id,
+                "connection_generation": command_context.generation,
+                "command_message_id": command_context.command_message_id,
+            },
         )
 
     def _run_loop(self) -> None:
@@ -240,6 +261,8 @@ class FabricChatClefWebSocketServer:
         server.close()
         await server.wait_closed()
         self._session_registry.clear()
+        with self._command_lock:
+            self._connection_ownership.clear()
         if not self._stopping:
             self._diagnostics.info("server closed")
 
@@ -248,6 +271,8 @@ class FabricChatClefWebSocketServer:
 
     async def _handle_client(self, websocket: Any) -> None:
         session_id: str | None = None
+        accepted_session_id: str | None = None
+        connection_generation = 0
         try:
             async for raw_message in websocket:
                 envelope = self._parse_envelope(raw_message)
@@ -270,6 +295,28 @@ class FabricChatClefWebSocketServer:
 
                 if envelope.message_type == BridgeMessageType.HANDSHAKE:
                     session_id = self._session_id_for(envelope)
+                    with self._command_lock:
+                        admission = self._connection_ownership.try_activate(
+                            websocket=websocket,
+                            session_id=session_id,
+                        )
+                    if not admission.accepted:
+                        await self._send_handshake_ack(
+                            websocket,
+                            envelope,
+                            session_id,
+                            accepted=False,
+                            message=admission.reason,
+                            connection_generation=admission.generation,
+                        )
+                        self._diagnostics.warning(
+                            "rejected duplicate client handshake "
+                            f"session={session_id} reason={admission.reason}"
+                        )
+                        continue
+
+                    accepted_session_id = session_id
+                    connection_generation = admission.generation
                     self._session_registry.upsert(
                         session_id=session_id,
                         timestamp_ms=self._now_ms(),
@@ -279,9 +326,38 @@ class FabricChatClefWebSocketServer:
                         ),
                         metadata=self._payload_dict(envelope.payload.get("metadata")),
                     )
-                    self._mark_active_websocket(websocket, session_id)
-                    await self._send_handshake_ack(websocket, envelope, session_id)
-                    self._diagnostics.info(f"client connected session={session_id}")
+                    await self._send_handshake_ack(
+                        websocket,
+                        envelope,
+                        session_id,
+                        accepted=True,
+                        connection_generation=connection_generation,
+                    )
+                    self._diagnostics.info(
+                        "client connected "
+                        f"session={session_id} generation={connection_generation}"
+                    )
+                    continue
+
+                with self._command_lock:
+                    is_active_websocket = (
+                        self._connection_ownership.is_active_websocket(websocket)
+                    )
+                if not is_active_websocket:
+                    await self._send_error(
+                        websocket,
+                        request=envelope,
+                        error_code=BridgeErrorCode.NOT_CONNECTED,
+                        message=(
+                            "Fabric ChatClef bridge messages require an active "
+                            "handshake on this websocket."
+                        ),
+                    )
+                    self._diagnostics.warning(
+                        "ignored message from inactive websocket "
+                        f"type={envelope.message_type.value} "
+                        f"session={envelope.session_id}"
+                    )
                     continue
 
                 if envelope.message_type == BridgeMessageType.STATUS_REQUEST:
@@ -289,7 +365,7 @@ class FabricChatClefWebSocketServer:
                     continue
 
                 if envelope.message_type == BridgeMessageType.COMMAND_RESULT:
-                    self._handle_command_result(envelope)
+                    self._handle_command_result(websocket, envelope)
                     continue
 
                 await self._send_error(
@@ -305,10 +381,19 @@ class FabricChatClefWebSocketServer:
                     f"client handler ended with {self._last_error}"
                 )
         finally:
-            if session_id is not None:
-                self._session_registry.remove(session_id)
-                self._clear_active_websocket(session_id)
-                self._diagnostics.info(f"client disconnected session={session_id}")
+            if accepted_session_id is not None:
+                with self._command_lock:
+                    cleared = self._connection_ownership.clear_if_active(
+                        websocket=websocket,
+                        session_id=accepted_session_id,
+                    )
+                if cleared:
+                    self._session_registry.remove(accepted_session_id)
+                    self._diagnostics.info(
+                        "client disconnected "
+                        f"session={accepted_session_id} "
+                        f"generation={connection_generation}"
+                    )
 
     def _parse_envelope(self, raw_message: Any) -> BridgeEnvelopeDTO | None:
         try:
@@ -322,6 +407,10 @@ class FabricChatClefWebSocketServer:
         websocket: Any,
         request: BridgeEnvelopeDTO,
         session_id: str,
+        *,
+        accepted: bool = True,
+        message: str = "",
+        connection_generation: int = 0,
     ) -> None:
         await self._send_envelope(
             websocket,
@@ -333,8 +422,10 @@ class FabricChatClefWebSocketServer:
                 session_id=session_id,
                 timestamp_ms=self._now_ms(),
                 payload={
-                    "accepted": True,
+                    "accepted": accepted,
                     "session_id": session_id,
+                    "connection_generation": connection_generation,
+                    "message": message,
                     "status": self.status_snapshot(enabled=True).to_dict(),
                 },
             ),
@@ -403,30 +494,31 @@ class FabricChatClefWebSocketServer:
     def _payload_dict(self, value: Any) -> dict[str, Any]:
         return dict(value) if isinstance(value, dict) else {}
 
-    def _mark_active_websocket(self, websocket: Any, session_id: str) -> None:
+    def _handle_command_result(self, websocket: Any, envelope: BridgeEnvelopeDTO) -> None:
+        try:
+            result = CommandResultDTO.from_mapping(envelope.payload)
+        except Exception as error:
+            self._diagnostics.warning(
+                "ignored malformed command result "
+                f"error={type(error).__name__}: {error}"
+            )
+            return
         with self._command_lock:
-            self._active_websocket = websocket
-            self._active_session_id = session_id
-            self._active_request_id = None
-
-    def _clear_active_websocket(self, session_id: str) -> None:
-        with self._command_lock:
-            if self._active_session_id != session_id:
-                return
-            self._active_websocket = None
-            self._active_session_id = None
-            self._active_request_id = None
-
-    def _handle_command_result(self, envelope: BridgeEnvelopeDTO) -> None:
-        result = CommandResultDTO.from_mapping(envelope.payload)
-        with self._command_lock:
-            self._last_command_result = result.to_dict()
-            if (
-                self._active_request_id == result.request_id
-                and result.status
-                not in {CommandResultStatus.ACCEPTED, CommandResultStatus.RUNNING}
-            ):
-                self._active_request_id = None
+            accepted, reason = self._connection_ownership.accept_result(
+                websocket=websocket,
+                envelope=envelope,
+                result=result,
+            )
+        if not accepted:
+            self._diagnostics.warning(
+                "ignored command result "
+                f"request={result.request_id} "
+                f"status={result.status.value} "
+                f"reason={reason} "
+                f"session={envelope.session_id} "
+                f"correlation={envelope.correlation_id}"
+            )
+            return
         self._diagnostics.info(
             "command result "
             f"request={result.request_id} status={result.status.value} ok={result.ok}"
@@ -434,11 +526,7 @@ class FabricChatClefWebSocketServer:
 
     def _command_status(self) -> dict[str, Any]:
         with self._command_lock:
-            return {
-                "active_session_id": self._active_session_id,
-                "active_request_id": self._active_request_id,
-                "last_result": self._last_command_result,
-            }
+            return self._connection_ownership.snapshot()
 
     def _command_rejection(
         self,

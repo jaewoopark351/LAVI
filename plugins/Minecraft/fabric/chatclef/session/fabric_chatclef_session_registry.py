@@ -45,7 +45,7 @@ class FabricChatClefSessionRegistry:
         with self._lock:
             self._sessions.pop(session_id, None)
             if self._active_session_id == session_id:
-                self._active_session_id = next(iter(self._sessions), None)
+                self._active_session_id = None
 
     def clear(self) -> None:
         with self._lock:
