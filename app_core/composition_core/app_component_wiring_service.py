@@ -1,5 +1,7 @@
 #20260717_kpopmodder: Keeps AppComposer focused on assembly order while this service owns component wiring rules.
 
+from core.logger import log_print
+
 from .managed_component_wiring_result import ManagedComponentWiringResult
 
 
@@ -26,7 +28,12 @@ class AppComponentWiringService:
         starcraft_plugin=None,
         screen_vision=None,
         screen_vision_input_callback=None,
+        minecraft_fabric_chatclef_extension=None,
     ):
+        self._wire_minecraft_chatclef_input_router(
+            llm=llm,
+            minecraft_fabric_chatclef_extension=minecraft_fabric_chatclef_extension,
+        )
         input_component.add_output_event_listener(llm.receive_input)
         llm.add_output_event_listener(translate.receive_input)
         translate.add_output_event_listener(tts.receive_input)
@@ -45,6 +52,31 @@ class AppComponentWiringService:
 
         if screen_vision is not None and screen_vision_input_callback is not None:
             screen_vision.add_output_event_listener(screen_vision_input_callback)
+
+    def _wire_minecraft_chatclef_input_router(
+        self,
+        *,
+        llm,
+        minecraft_fabric_chatclef_extension=None,
+    ):
+        setter = getattr(llm, "set_input_router", None)
+        if not callable(setter):
+            return
+        if minecraft_fabric_chatclef_extension is None:
+            setter(None)
+            return
+        try:
+            from plugins.Minecraft.fabric.chatclef.input import (
+                MinecraftChatClefInputRouter,
+            )
+        except Exception as e:
+            log_print(f"[MinecraftChatClefInputRouter] import failed: {e}")
+            return
+        setter(
+            MinecraftChatClefInputRouter(
+                extension=minecraft_fabric_chatclef_extension,
+            )
+        )
 
     def build_managed_components(
         self,

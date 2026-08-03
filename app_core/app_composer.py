@@ -328,6 +328,9 @@ class AppComposer:
             starcraft_plugin=self.starcraft_plugin,
             screen_vision=self.screen_vision,
             screen_vision_input_callback=self.receive_screen_vision_input,
+            minecraft_fabric_chatclef_extension=(
+                self.minecraft_fabric_chatclef_extension
+            ),
         )
 
     def receive_screen_vision_input(self, text):#20260628_kpopmodder

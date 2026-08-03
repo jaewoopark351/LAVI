@@ -124,6 +124,7 @@ class LLM(PluginSelectionBase):
             memory_command_handler=self.memory_command_handler,#20260621_kpopmodder
             screen_question_router=self.screen_question_router,#20260628_kpopmodder
         )
+        self.input_router = None  #20260803_kpopmodder: Optional external command router is injected by app wiring.
         self.text_only_generation_helper = self._get_text_only_generation_helper()#20260705_kpopmodder
         self.input_queue_worker = LLMInputQueueWorker(
             response_callback=self.predict_wrapper,
@@ -324,6 +325,10 @@ class LLM(PluginSelectionBase):
         # return inspect.isgeneratorfunction(self.current_plugin.predict)
 
     def predict_wrapper(self, message, history, system_prompt):
+        routed_response = self._try_route_external_input(message)
+        if routed_response is not None:
+            yield routed_response
+            return
         yield from self.response_pipeline.predict(
             message,
             history,
@@ -518,6 +523,30 @@ class LLM(PluginSelectionBase):
             function,
             full_response=full_response,
         )
+
+    def set_input_router(self, router):#20260803_kpopmodder: Let app-owned routers intercept chat/mic commands before LLM generation.
+        self.input_router = router
+
+    def _try_route_external_input(self, message):#20260803_kpopmodder
+        router = getattr(self, "input_router", None)
+        route = getattr(router, "route", None)
+        if not callable(route):
+            return None
+        try:
+            decision = route(message)
+        except Exception as e:
+            log_print(f"[LLM] input router failed: {type(e).__name__}: {e}")
+            return None
+        if not getattr(decision, "handled", False):
+            return None
+        response_text = str(getattr(decision, "response_text", "") or "").strip()
+        if not response_text:
+            response_text = "[Input routed]"
+        log_print(
+            "[LLM] external input routed: "
+            f"reason={getattr(decision, 'reason', '')}"
+        )
+        return response_text
 
     def is_sentence_end(self, word):#20260617_kpopmodder
         return self.streaming_chunker.is_sentence_end(word)
