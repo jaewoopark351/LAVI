@@ -1,20 +1,15 @@
 package lavi.minecraft.integration.carryon;
 
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.integration.carryon.logging.CarryOnDiagnosticSessionContext;
+import lavi.minecraft.integration.carryon.logging.CarryOnDiagnosticSessionLogger;
 import net.minecraft.client.MinecraftClient;
 
 //20260730_kpopmodder: Model a bounded Carry On diagnostic session owned by a LAVI wrapper or parent Task.
 public final class CarryOnDiagnosticSession {
-    private final long taskInstanceId;
-    private final long operationId;
-    private final CarryOnOperationType operationType;
-    private final CarryOnTransition expectedTransition;
-    private final String childTask;
-    private final String targetType;
-    private final String targetId;
-    private final String targetPosition;
     private final CarryOnStateReader stateReader;
-    private final CarryOnDiagnosticSampler sampler = new CarryOnDiagnosticSampler();
+    private final CarryOnDiagnosticSessionContext context;
+    private final CarryOnDiagnosticSessionLogger logger;
     private int attemptCount;
     private int elapsedTicks;
 
@@ -27,15 +22,18 @@ public final class CarryOnDiagnosticSession {
                                      String targetId,
                                      String targetPosition,
                                      CarryOnStateReader stateReader) {
-        this.taskInstanceId = taskInstanceId;
-        this.operationId = operationId;
-        this.operationType = operationType;
-        this.expectedTransition = expectedTransition;
-        this.childTask = childTask;
-        this.targetType = targetType;
-        this.targetId = targetId;
-        this.targetPosition = targetPosition;
         this.stateReader = stateReader;
+        this.context = new CarryOnDiagnosticSessionContext(
+                taskInstanceId,
+                operationId,
+                operationType,
+                expectedTransition,
+                childTask,
+                targetType,
+                targetId,
+                targetPosition
+        );
+        this.logger = new CarryOnDiagnosticSessionLogger(context);
     }
 
     public static CarryOnDiagnosticSession start(long taskInstanceId,
@@ -63,7 +61,7 @@ public final class CarryOnDiagnosticSession {
     }
 
     public long operationId() {
-        return operationId;
+        return context.operationId();
     }
 
     public int attemptCount() {
@@ -137,26 +135,16 @@ public final class CarryOnDiagnosticSession {
                      String clickResult,
                      boolean clickAttempt,
                      CarryOnTerminalReason terminalReason) {
-        CarryOnSnapshot snapshot = CarryOnSnapshotCollector.collect(
-                taskInstanceId,
-                operationId,
+        logger.log(
                 eventName,
-                operationType,
-                expectedTransition,
-                childTask,
-                targetType,
-                targetId,
-                targetPosition,
                 stateBefore,
                 stateAfter,
                 clickResult,
+                clickAttempt,
                 attemptCount,
                 elapsedTicks,
                 terminalReason
         );
-        if (sampler.shouldLog(snapshot, clickAttempt)) {
-            CarryOnDiagnosticLogger.log(snapshot);
-        }
     }
 
 }
