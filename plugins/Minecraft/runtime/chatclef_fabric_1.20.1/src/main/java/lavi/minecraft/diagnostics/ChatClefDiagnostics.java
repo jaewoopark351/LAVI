@@ -6,7 +6,6 @@ import adris.altoclef.tasksystem.TaskChain;
 import adris.altoclef.util.ItemTarget;
 import adris.altoclef.util.slots.Slot;
 import baritone.api.utils.input.Input;
-import lavi.minecraft.diagnostics.postplace.PostPlaceContainerDiagnosticState;
 import lavi.minecraft.diagnostics.postplace.PostPlaceContainerInteractionObserver;
 import lavi.minecraft.diagnostics.postplace.PostPlaceContainerOpenIntent;
 import net.minecraft.client.MinecraftClient;
@@ -26,7 +25,11 @@ public final class ChatClefDiagnostics {
     private static final DiagnosticTaskRegistry TASKS = new DiagnosticTaskRegistry();
     private static final DiagnosticModeController MODE = new DiagnosticModeController(DiagnosticOutputMode.fromEnvironment());
     private static final DiagnosticEventEmitter EVENTS = new DiagnosticEventEmitter(TRACE_STATE, TASKS);
-    private static final PostPlaceContainerDiagnosticState POST_PLACE_CONTAINERS = new PostPlaceContainerDiagnosticState();
+    private static final PostPlaceContainerDiagnostics POST_PLACE_CONTAINERS = new PostPlaceContainerDiagnostics(
+            MODE,
+            EVENTS,
+            ChatClefDiagnostics::currentClientTickId
+    );
 
     private ChatClefDiagnostics() {
     }
@@ -243,78 +246,42 @@ public final class ChatClefDiagnostics {
                                                          Object containerType,
                                                          BlockPos targetPosition,
                                                          Object targetBlockState) {
-        if (MODE.isOff()) {
-            return;
-        }
-        POST_PLACE_CONTAINERS.begin(
-                operationId,
-                value(containerType),
-                targetPosition,
-                value(targetBlockState),
-                currentClientTickId()
-        );
+        POST_PLACE_CONTAINERS.begin(operationId, containerType, targetPosition, targetBlockState);
     }
 
     public static PostPlaceContainerOpenIntent activePostPlaceContainerOpenIntent(BlockPos targetPosition) {
-        if (MODE.isOff()) {
-            return null;
-        }
         return POST_PLACE_CONTAINERS.active(targetPosition);
     }
 
     public static int postPlaceContainerAttemptCount(long operationId) {
-        if (MODE.isOff()) {
-            return 0;
-        }
         return POST_PLACE_CONTAINERS.attemptCount(operationId);
     }
 
     public static String postPlaceContainerLastInteractResult(long operationId) {
-        if (MODE.isOff()) {
-            return "unavailable";
-        }
         return POST_PLACE_CONTAINERS.lastInteractResult(operationId);
     }
 
     public static long postPlaceContainerElapsedTicks(long operationId) {
-        if (MODE.isOff()) {
-            return -1;
-        }
-        return POST_PLACE_CONTAINERS.elapsedTicks(operationId, currentClientTickId());
+        return POST_PLACE_CONTAINERS.elapsedTicks(operationId);
     }
 
     public static boolean markPostPlaceContainerGuiOpened(long operationId) {
-        if (MODE.isOff()) {
-            return false;
-        }
         return POST_PLACE_CONTAINERS.markGuiOpened(operationId);
     }
 
     public static boolean markPostPlaceContainerGuiTimeout(long operationId) {
-        if (MODE.isOff()) {
-            return false;
-        }
         return POST_PLACE_CONTAINERS.markGuiTimeout(operationId);
     }
 
     public static boolean markPostPlaceContainerWarningLogged(long operationId) {
-        if (MODE.isOff()) {
-            return false;
-        }
         return POST_PLACE_CONTAINERS.markWarningLogged(operationId);
     }
 
     public static boolean isPostPlaceContainerGuiOpened(long operationId) {
-        if (MODE.isOff()) {
-            return false;
-        }
         return POST_PLACE_CONTAINERS.isGuiOpened(operationId);
     }
 
     public static void clearPostPlaceContainerOpenIntent(long operationId) {
-        if (MODE.isOff()) {
-            return;
-        }
         POST_PLACE_CONTAINERS.clear(operationId);
     }
 
@@ -441,42 +408,7 @@ public final class ChatClefDiagnostics {
                                                                 Object hand,
                                                                 BlockHitResult hitResult,
                                                                 Object result) {
-        if (hitResult == null) {
-            return;
-        }
-        PostPlaceContainerOpenIntent intent = activePostPlaceContainerOpenIntent(hitResult.getBlockPos());
-        if (intent == null) {
-            return;
-        }
-
-        int attempt = POST_PLACE_CONTAINERS.recordInteraction(intent, phase, value(result));
-        if (attempt < 0) {
-            return;
-        }
-
-        if ("HEAD".equals(phase)) {
-            POST_PLACE_CONTAINERS.notifyBeforeInteract(intent);
-            logBoundary("CONTAINER_INTERACT_ATTEMPT", "post_place_container_interact_attempt", null,
-                    "operationId", intent.operationId(),
-                    "attempt", attempt,
-                    "targetPosition", blockPos(intent.targetPosition()),
-                    "targetBlockState", intent.targetBlockState(),
-                    "hand", value(hand),
-                    "shiftClick", false,
-                    "playerSneaking", safeValue(() -> player == null ? null : player.isSneaking()),
-                    "rawSneakKeyPressed", DiagnosticInputState.rawKeyHeld(Input.SNEAK));
-            return;
-        }
-
-        if ("RETURN".equals(phase)) {
-            logBoundary("CONTAINER_INTERACT_RESULT", "post_place_container_interact_result", null,
-                    "operationId", intent.operationId(),
-                    "attempt", attempt,
-                    "targetPosition", blockPos(intent.targetPosition()),
-                    "targetBlockState", intent.targetBlockState(),
-                    "result", value(result));
-            POST_PLACE_CONTAINERS.notifyAfterInteract(intent, player, result);
-        }
+        POST_PLACE_CONTAINERS.logInteractIfMatching(phase, player, hand, hitResult, result);
     }
 
     private static String callerStack() {
