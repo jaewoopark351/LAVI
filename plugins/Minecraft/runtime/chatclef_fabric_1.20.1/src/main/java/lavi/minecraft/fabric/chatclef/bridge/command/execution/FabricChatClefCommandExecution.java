@@ -2,7 +2,6 @@ package lavi.minecraft.fabric.chatclef.bridge.command.execution;
 
 import adris.altoclef.tasksystem.Task;
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandRequest;
-import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandResult;
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandContext;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandTerminationObservation;
 
@@ -13,6 +12,7 @@ import java.util.Map;
 public final class FabricChatClefCommandExecution {
     private final FabricChatClefCommandContext context;
     private final FabricChatClefCommandRequest request;
+    private final FabricChatClefCommandResultFactory resultFactory;
     private final String normalizedCommand;
     private final long dispatchStartedMs;
     private final String dispatchThreadName;
@@ -39,14 +39,11 @@ public final class FabricChatClefCommandExecution {
         this.dispatchThreadName = Thread.currentThread().getName();
         this.taskAfterDispatch = FabricChatClefTaskSnapshot.capture(null);
         this.terminalTask = FabricChatClefTaskSnapshot.capture(null);
+        this.resultFactory = new FabricChatClefCommandResultFactory(this);
     }
 
     public Map<String, Object> runningResult() {
-        return FabricChatClefCommandResult.running(
-                request.requestId,
-                "Fabric ChatClef command dispatch started.",
-                data("dispatch_started")
-        );
+        return resultFactory.runningResult();
     }
 
     public void markFinishCallbackReceived(FabricChatClefTaskSnapshot taskAtFinish) {
@@ -61,33 +58,21 @@ public final class FabricChatClefCommandExecution {
 
     public Map<String, Object> unknownAfterFinish(FabricChatClefTaskSnapshot taskAtFinish) {
         markFinishCallbackReceived(taskAtFinish);
-        return FabricChatClefCommandResult.unknown(
-                request.requestId,
-                "Fabric ChatClef command callback finished, but Minecraft goal success was not verified.",
-                data("finish_callback_without_verified_success")
-        );
+        return resultFactory.unknownAfterFinish();
     }
 
     public Map<String, Object> failedFromCommandException(Throwable exception, FabricChatClefTaskSnapshot taskAtFailure) {
         failureType = exception.getClass().getSimpleName();
         failureMessage = nullSafeMessage(exception);
         terminalTask = taskAtFailure;
-        return FabricChatClefCommandResult.failed(
-                request.requestId,
-                failureType + ": " + failureMessage,
-                data("command_exception")
-        );
+        return resultFactory.failedFromCommandException();
     }
 
     public Map<String, Object> failedFromDispatchException(Throwable exception, FabricChatClefTaskSnapshot taskAtFailure) {
         failureType = exception.getClass().getSimpleName();
         failureMessage = nullSafeMessage(exception);
         terminalTask = taskAtFailure;
-        return FabricChatClefCommandResult.failed(
-                request.requestId,
-                failureType + ": " + failureMessage,
-                data("dispatch_exception")
-        );
+        return resultFactory.failedFromDispatchException();
     }
 
     public void markDispatchReturned(Task boundRootTask, FabricChatClefTaskSnapshot taskAfterDispatch) {
@@ -158,55 +143,27 @@ public final class FabricChatClefCommandExecution {
     }
 
     public Map<String, Object> completedFromTaskFinished(FabricChatClefCommandTerminationObservation observation) {
-        return FabricChatClefCommandResult.completed(
-                request.requestId,
-                "ChatClef user task reached natural completion.",
-                data("matching_task_finished", observation)
-        );
+        return resultFactory.completedFromTaskFinished(observation);
     }
 
     public Map<String, Object> completedWithoutUserTask() {
-        return FabricChatClefCommandResult.completed(
-                request.requestId,
-                "ChatClef command completed without starting a user task.",
-                data("callback_completed_without_user_task")
-        );
+        return resultFactory.completedWithoutUserTask();
     }
 
     public Map<String, Object> failedFromStoppedTask(FabricChatClefCommandTerminationObservation observation) {
-        return FabricChatClefCommandResult.failed(
-                request.requestId,
-                "ChatClef user task stopped before natural completion.",
-                data("matching_task_stopped", observation)
-        );
+        return resultFactory.failedFromStoppedTask(observation);
     }
 
     public Map<String, Object> unknownFromTaskObservation(FabricChatClefCommandTerminationObservation observation) {
-        return FabricChatClefCommandResult.unknown(
-                request.requestId,
-                "ChatClef user task completion could not be safely classified.",
-                data("task_observation_unclassified", observation)
-        );
+        return resultFactory.unknownFromTaskObservation(observation);
     }
 
     public Map<String, Object> unknownFromTaskIdentityMismatch(FabricChatClefCommandTerminationObservation observation) {
-        return FabricChatClefCommandResult.unknown(
-                request.requestId,
-                "ChatClef user task finished, but it did not match the command root task.",
-                data("task_identity_mismatch", observation)
-        );
+        return resultFactory.unknownFromTaskIdentityMismatch(observation);
     }
 
     public Map<String, Object> deadlineExceededResult(String message) {
-        Map<String, Object> payload = data("deadline_exceeded");
-        payload.put("automation_cancelled", false);
-        payload.put("task_may_still_be_running", true);
-        payload.put("late_terminal_event_will_be_ignored", true);
-        return FabricChatClefCommandResult.deadlineExceeded(
-                request.requestId,
-                message,
-                payload
-        );
+        return resultFactory.deadlineExceededResult(message);
     }
 
     public boolean markTerminalSent() {
@@ -222,43 +179,71 @@ public final class FabricChatClefCommandExecution {
     }
 
     public Map<String, Object> duplicateTerminalData(String reason) {
-        return data(reason);
+        return resultFactory.duplicateTerminalData(reason);
     }
 
     public Map<String, Object> diagnosticData(String diagnosticReason) {
-        return FabricChatClefCommandDiagnosticPayload.diagnosticData(
-                diagnosticReason,
-                request,
-                normalizedCommand,
-                System.currentTimeMillis() - dispatchStartedMs,
-                data(diagnosticReason)
-        );
+        return resultFactory.diagnosticData(diagnosticReason);
     }
 
-    private Map<String, Object> data(String resultReason) {
-        return data(resultReason, taskFinishedObservation);
+    FabricChatClefCommandRequest requestForResult() {
+        return request;
     }
 
-    private Map<String, Object> data(
-            String resultReason,
-            FabricChatClefCommandTerminationObservation observation
-    ) {
-        return FabricChatClefCommandDiagnosticPayload.commandData(
-                resultReason,
-                dispatchStartedMs,
-                dispatchReturned,
-                dispatchThreadName,
-                normalizedCommand,
-                finishCallbackReceived,
-                failureType,
-                failureMessage,
-                context,
-                taskBeforeDispatch,
-                taskAfterDispatch,
-                terminalTask,
-                FabricChatClefTaskSnapshot.capture(boundRootTask),
-                observation
-        );
+    String normalizedCommandForResult() {
+        return normalizedCommand;
+    }
+
+    long dispatchStartedMsForResult() {
+        return dispatchStartedMs;
+    }
+
+    boolean dispatchReturnedForResult() {
+        return dispatchReturned;
+    }
+
+    String dispatchThreadNameForResult() {
+        return dispatchThreadName;
+    }
+
+    boolean finishCallbackReceivedForResult() {
+        return finishCallbackReceived;
+    }
+
+    String failureTypeForResult() {
+        return failureType;
+    }
+
+    String failureMessageForResult() {
+        return failureMessage;
+    }
+
+    FabricChatClefCommandContext contextForResult() {
+        return context;
+    }
+
+    FabricChatClefTaskSnapshot taskBeforeDispatchForResult() {
+        return taskBeforeDispatch;
+    }
+
+    FabricChatClefTaskSnapshot taskAfterDispatchForResult() {
+        return taskAfterDispatch;
+    }
+
+    FabricChatClefTaskSnapshot terminalTaskForResult() {
+        return terminalTask;
+    }
+
+    FabricChatClefTaskSnapshot boundRootTaskForResult() {
+        return FabricChatClefTaskSnapshot.capture(boundRootTask);
+    }
+
+    FabricChatClefCommandTerminationObservation taskFinishedObservationForResult() {
+        return taskFinishedObservation;
+    }
+
+    long elapsedMsForResult() {
+        return System.currentTimeMillis() - dispatchStartedMs;
     }
 
     private static String nullSafeMessage(Throwable error) {
