@@ -55,7 +55,7 @@ public final class PostPlaceContainerDiagnosticState {
         intents.clear(operationId);
     }
 
-    public int recordInteraction(PostPlaceContainerOpenIntent intent, String phase, String result) {
+    public int recordInteraction(PostPlaceContainerOpenIntent intent, PostPlaceContainerInteractionPhase phase, String result) {
         return intents.recordInteraction(intent, phase, result);
     }
 

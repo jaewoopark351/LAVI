@@ -6,6 +6,7 @@ import lavi.minecraft.diagnostics.formatting.DiagnosticValueFormatter;
 import lavi.minecraft.diagnostics.mode.DiagnosticModeController;
 import lavi.minecraft.diagnostics.postplace.PostPlaceContainerDiagnosticState;
 import lavi.minecraft.diagnostics.postplace.PostPlaceContainerInteractionObserver;
+import lavi.minecraft.diagnostics.postplace.PostPlaceContainerInteractionPhase;
 import lavi.minecraft.diagnostics.postplace.PostPlaceContainerOpenIntent;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.util.hit.BlockHitResult;
@@ -16,9 +17,6 @@ import java.util.function.Supplier;
 
 //20260803_kpopmodder: Keep post-place container diagnostic ownership out of the public ChatClef facade.
 final class PostPlaceContainerDiagnostics {
-    private static final String PHASE_HEAD = "HEAD";
-    private static final String PHASE_RETURN = "RETURN";
-
     private final DiagnosticModeController mode;
     private final DiagnosticEventEmitter events;
     private final LongSupplier currentClientTickId;
@@ -128,12 +126,13 @@ final class PostPlaceContainerDiagnostics {
             return;
         }
 
-        int attempt = state.recordInteraction(intent, phase, value(result));
+        PostPlaceContainerInteractionPhase interactionPhase = PostPlaceContainerInteractionPhase.fromWireValue(phase);
+        int attempt = state.recordInteraction(intent, interactionPhase, value(result));
         if (attempt < 0) {
             return;
         }
 
-        if (PHASE_HEAD.equals(phase)) {
+        if (interactionPhase.isHead()) {
             state.notifyBeforeInteract(intent);
             emitBoundary("CONTAINER_INTERACT_ATTEMPT", "post_place_container_interact_attempt",
                     "operationId", intent.operationId(),
@@ -147,7 +146,7 @@ final class PostPlaceContainerDiagnostics {
             return;
         }
 
-        if (PHASE_RETURN.equals(phase)) {
+        if (interactionPhase.isReturn()) {
             emitBoundary("CONTAINER_INTERACT_RESULT", "post_place_container_interact_result",
                     "operationId", intent.operationId(),
                     "attempt", attempt,

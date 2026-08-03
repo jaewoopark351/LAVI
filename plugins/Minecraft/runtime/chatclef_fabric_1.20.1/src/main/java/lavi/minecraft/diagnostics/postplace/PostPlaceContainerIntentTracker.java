@@ -109,15 +109,15 @@ final class PostPlaceContainerIntentTracker {
         }
     }
 
-    int recordInteraction(PostPlaceContainerOpenIntent intent, String phase, String result) {
+    int recordInteraction(PostPlaceContainerOpenIntent intent, PostPlaceContainerInteractionPhase phase, String result) {
         synchronized (lock) {
             if (intent == null || !matching(intent.operationId())) {
                 return -1;
             }
-            if ("HEAD".equals(phase)) {
+            if (phase.isHead()) {
                 activeIntent.incrementAttemptCount();
             }
-            if ("RETURN".equals(phase)) {
+            if (phase.isReturn()) {
                 activeIntent.setLastInteractResult(result);
             }
             return activeIntent.attemptCount();
