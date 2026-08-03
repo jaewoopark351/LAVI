@@ -1,5 +1,8 @@
 package lavi.minecraft.fabric.chatclef.bridge.command;
 
+import lavi.minecraft.fabric.chatclef.bridge.command.result.FabricChatClefCommandResultPayload;
+import lavi.minecraft.fabric.chatclef.bridge.command.result.FabricChatClefCommandResultStatus;
+
 import java.util.HashMap;
 import java.util.Map;
 
@@ -9,66 +12,57 @@ public final class FabricChatClefCommandResult {
     }
 
     public static Map<String, Object> completed(String requestId, String message) {
-        return result(requestId, true, "completed", null, message);
+        return result(requestId, FabricChatClefCommandResultStatus.COMPLETED, null, message);
     }
 
     public static Map<String, Object> completed(String requestId, String message, Map<String, Object> data) {
-        return result(requestId, true, "completed", null, message, data);
+        return result(requestId, FabricChatClefCommandResultStatus.COMPLETED, null, message, data);
     }
 
     public static Map<String, Object> running(String requestId, String message, Map<String, Object> data) {
-        return result(requestId, true, "running", null, message, data);
+        return result(requestId, FabricChatClefCommandResultStatus.RUNNING, null, message, data);
     }
 
     public static Map<String, Object> unknown(String requestId, String message, Map<String, Object> data) {
-        return result(requestId, false, "unknown", null, message, data);
+        return result(requestId, FabricChatClefCommandResultStatus.UNKNOWN, null, message, data);
     }
 
     public static Map<String, Object> failed(String requestId, String message) {
-        return result(requestId, false, "failed", "internal_error", message);
+        return result(requestId, FabricChatClefCommandResultStatus.FAILED, "internal_error", message);
     }
 
     public static Map<String, Object> failed(String requestId, String message, Map<String, Object> data) {
-        return result(requestId, false, "failed", "internal_error", message, data);
+        return result(requestId, FabricChatClefCommandResultStatus.FAILED, "internal_error", message, data);
     }
 
     public static Map<String, Object> rejected(String requestId, String errorCode, String message) {
-        return result(requestId, false, "rejected", errorCode, message);
+        return result(requestId, FabricChatClefCommandResultStatus.REJECTED, errorCode, message);
     }
 
     public static Map<String, Object> deadlineExceeded(String requestId, String message) {
-        return result(requestId, false, "deadline_exceeded", "deadline_exceeded", message);
+        return result(requestId, FabricChatClefCommandResultStatus.DEADLINE_EXCEEDED, "deadline_exceeded", message);
     }
 
     public static Map<String, Object> deadlineExceeded(String requestId, String message, Map<String, Object> data) {
-        return result(requestId, false, "deadline_exceeded", "deadline_exceeded", message, data);
+        return result(requestId, FabricChatClefCommandResultStatus.DEADLINE_EXCEEDED, "deadline_exceeded", message, data);
     }
 
     private static Map<String, Object> result(
             String requestId,
-            boolean ok,
-            String status,
+            FabricChatClefCommandResultStatus status,
             String errorCode,
             String message
     ) {
-        return result(requestId, ok, status, errorCode, message, new HashMap<String, Object>());
+        return result(requestId, status, errorCode, message, new HashMap<String, Object>());
     }
 
     private static Map<String, Object> result(
             String requestId,
-            boolean ok,
-            String status,
+            FabricChatClefCommandResultStatus status,
             String errorCode,
             String message,
             Map<String, Object> data
     ) {
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("request_id", requestId == null ? "" : requestId);
-        payload.put("ok", ok);
-        payload.put("status", status);
-        payload.put("error_code", errorCode);
-        payload.put("message", message == null ? "" : message);
-        payload.put("data", data == null ? new HashMap<String, Object>() : data);
-        return payload;
+        return FabricChatClefCommandResultPayload.of(requestId, status, errorCode, message, data).toMap();
     }
 }
