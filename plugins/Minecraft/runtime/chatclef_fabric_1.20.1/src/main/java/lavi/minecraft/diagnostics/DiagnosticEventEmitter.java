@@ -2,6 +2,7 @@ package lavi.minecraft.diagnostics;
 
 import adris.altoclef.Debug;
 import adris.altoclef.tasksystem.Task;
+import lavi.minecraft.diagnostics.formatting.DiagnosticValueFormatter;
 
 import java.util.StringJoiner;
 

@@ -3,6 +3,8 @@ package lavi.minecraft.diagnostics;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.slots.Slot;
 import baritone.api.utils.input.Input;
+import lavi.minecraft.diagnostics.formatting.DiagnosticGameStateFormatter;
+import lavi.minecraft.diagnostics.formatting.DiagnosticValueFormatter;
 import net.minecraft.client.MinecraftClient;
 
 //20260803_kpopmodder: Keep diagnostic field construction out of the public ChatClef diagnostics facade.

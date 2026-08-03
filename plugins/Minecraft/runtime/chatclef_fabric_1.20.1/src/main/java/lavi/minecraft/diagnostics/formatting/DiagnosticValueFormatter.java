@@ -1,4 +1,4 @@
-package lavi.minecraft.diagnostics;
+package lavi.minecraft.diagnostics.formatting;
 
 import java.util.function.Supplier;
 

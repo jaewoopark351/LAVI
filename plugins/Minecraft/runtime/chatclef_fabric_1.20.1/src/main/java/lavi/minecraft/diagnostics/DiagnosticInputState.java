@@ -2,6 +2,7 @@ package lavi.minecraft.diagnostics;
 
 import adris.altoclef.AltoClef;
 import baritone.api.utils.input.Input;
+import lavi.minecraft.diagnostics.formatting.DiagnosticValueFormatter;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.option.GameOptions;
 import net.minecraft.client.option.KeyBinding;

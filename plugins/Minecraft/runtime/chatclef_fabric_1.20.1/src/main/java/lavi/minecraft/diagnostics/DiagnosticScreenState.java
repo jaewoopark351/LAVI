@@ -1,5 +1,6 @@
 package lavi.minecraft.diagnostics;
 
+import lavi.minecraft.diagnostics.formatting.DiagnosticValueFormatter;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.screen.ScreenHandler;

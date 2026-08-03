@@ -6,6 +6,7 @@ import adris.altoclef.tasksystem.TaskChain;
 import adris.altoclef.util.ItemTarget;
 import adris.altoclef.util.slots.Slot;
 import baritone.api.utils.input.Input;
+import lavi.minecraft.diagnostics.formatting.DiagnosticFormatterFacade;
 import lavi.minecraft.diagnostics.postplace.PostPlaceContainerInteractionObserver;
 import lavi.minecraft.diagnostics.postplace.PostPlaceContainerOpenIntent;
 import net.minecraft.client.MinecraftClient;
@@ -26,6 +27,11 @@ public final class ChatClefDiagnostics {
     private static final DiagnosticModeController MODE = new DiagnosticModeController(DiagnosticOutputMode.fromEnvironment());
     private static final DiagnosticEventEmitter EVENTS = new DiagnosticEventEmitter(TRACE_STATE, TASKS);
     private static final DiagnosticContextBuilder CONTEXT = new DiagnosticContextBuilder(MODE, TASKS);
+    private static final DiagnosticFormatterFacade FORMATTERS = new DiagnosticFormatterFacade(
+            MODE::isOff,
+            TASKS::taskInstanceIdLabel,
+            TASKS::taskRunIdLabel
+    );
     private static final PostPlaceContainerDiagnostics POST_PLACE_CONTAINERS = new PostPlaceContainerDiagnostics(
             MODE,
             EVENTS,
@@ -279,96 +285,63 @@ public final class ChatClefDiagnostics {
     }
 
     public static String className(Object value) {
-        return DiagnosticValueFormatter.className(value);
+        return FORMATTERS.className(value);
     }
 
     public static String safeValue(Supplier<?> supplier) {
-        return DiagnosticValueFormatter.safeValue(
-                () -> supplier == null ? null : supplier.get(),
-                !MODE.isOff()
-        );
+        return FORMATTERS.safeValue(supplier);
     }
 
     public static String safeValueForDiagnosticLog(Supplier<?> supplier) {
-        return DiagnosticValueFormatter.safeValue(
-                () -> supplier == null ? null : supplier.get(),
-                true
-        );
+        return FORMATTERS.safeValueForDiagnosticLog(supplier);
     }
 
     public static String taskSummary(Task task) {
-        if (MODE.isOff()) {
-            return "unavailable";
-        }
-        return DiagnosticGameStateFormatter.taskSummary(task, TASKS);
+        return FORMATTERS.taskSummary(task);
     }
 
     public static String taskSummaryForDiagnosticLog(Task task) {
-        return DiagnosticGameStateFormatter.taskSummary(task, TASKS);
+        return FORMATTERS.taskSummaryForDiagnosticLog(task);
     }
 
     public static String entitySummary(Entity entity) {
-        if (MODE.isOff()) {
-            return "unavailable";
-        }
-        return DiagnosticGameStateFormatter.entitySummary(entity);
+        return FORMATTERS.entitySummary(entity);
     }
 
     public static String entityDistanceSqrToPlayer(AltoClef mod, Entity entity) {
-        if (MODE.isOff()) {
-            return "unavailable";
-        }
-        return DiagnosticGameStateFormatter.entityDistanceSqrToPlayer(mod, entity);
+        return FORMATTERS.entityDistanceSqrToPlayer(mod, entity);
     }
 
     public static String playerPosition(AltoClef mod) {
-        if (MODE.isOff()) {
-            return "unavailable";
-        }
-        return DiagnosticGameStateFormatter.playerPosition(mod);
+        return FORMATTERS.playerPosition(mod);
     }
 
     public static String vec3d(Vec3d pos) {
-        return DiagnosticGameStateFormatter.vec3d(pos);
+        return FORMATTERS.vec3d(pos);
     }
 
     public static String blockPos(BlockPos pos) {
-        return DiagnosticGameStateFormatter.blockPos(pos);
+        return FORMATTERS.blockPos(pos);
     }
 
     public static String itemStackSummary(ItemStack stack) {
-        if (MODE.isOff()) {
-            return "unavailable";
-        }
-        return DiagnosticGameStateFormatter.itemStackSummary(stack);
+        return FORMATTERS.itemStackSummary(stack);
     }
 
     public static String slotSummary(Slot slot) {
-        if (MODE.isOff()) {
-            return "unavailable";
-        }
-        return DiagnosticGameStateFormatter.slotSummary(slot);
+        return FORMATTERS.slotSummary(slot);
     }
 
     public static String slotStackSummary(Slot slot) {
-        if (MODE.isOff()) {
-            return "unavailable";
-        }
-        return DiagnosticGameStateFormatter.slotStackSummary(slot);
+        return FORMATTERS.slotStackSummary(slot);
     }
 
     public static String itemTargets(ItemTarget[] targets) {
-        if (MODE.isOff()) {
-            return "unavailable";
-        }
-        return DiagnosticGameStateFormatter.itemTargets(targets);
+        return FORMATTERS.itemTargets(targets);
     }
 
     public static String classList(Class<?>[] classes) {
-        if (MODE.isOff()) {
-            return "unavailable";
-        }
-        return DiagnosticGameStateFormatter.classList(classes);
+        return FORMATTERS.classList(classes);
     }
 
     private static void safeLog(String eventType, String phase, String reason, Task task, Object[] fields, boolean startNewTrace) {
@@ -413,24 +386,14 @@ public final class ChatClefDiagnostics {
     }
 
     public static String chainName(TaskChain chain) {
-        if (MODE.isOff()) {
-            return "unavailable";
-        }
-        return chainNameForDiagnosticLog(chain);
+        return FORMATTERS.chainName(chain);
     }
 
     public static String chainNameForDiagnosticLog(TaskChain chain) {
-        if (chain == null) {
-            return "unavailable";
-        }
-        try {
-            return chain.getName();
-        } catch (RuntimeException | LinkageError ignored) {
-            return "unavailable";
-        }
+        return FORMATTERS.chainNameForDiagnosticLog(chain);
     }
 
     private static String value(Object rawValue) {
-        return DiagnosticValueFormatter.value(rawValue);
+        return FORMATTERS.value(rawValue);
     }
 }

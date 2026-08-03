@@ -1,4 +1,4 @@
-package lavi.minecraft.diagnostics;
+package lavi.minecraft.diagnostics.formatting;
 
 import adris.altoclef.AltoClef;
 import adris.altoclef.tasksystem.Task;
@@ -11,23 +11,26 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 
+import java.util.function.Function;
 import java.util.StringJoiner;
 
 //20260731_kpopmodder: Keep Minecraft object formatting separate from diagnostic event ownership.
-final class DiagnosticGameStateFormatter {
+public final class DiagnosticGameStateFormatter {
     private DiagnosticGameStateFormatter() {
     }
 
-    static String taskSummary(Task task, DiagnosticTaskRegistry tasks) {
+    public static String taskSummary(Task task,
+                                     Function<Task, String> taskInstanceIdLabel,
+                                     Function<Task, String> taskRunIdLabel) {
         if (task == null) {
             return "none";
         }
         return taskName(task)
-                + "#instance=" + tasks.taskInstanceIdLabel(task)
-                + "#run=" + tasks.taskRunIdLabel(task);
+                + "#instance=" + taskInstanceIdLabel.apply(task)
+                + "#run=" + taskRunIdLabel.apply(task);
     }
 
-    static String entitySummary(Entity entity) {
+    public static String entitySummary(Entity entity) {
         if (entity == null) {
             return "none";
         }
@@ -46,7 +49,7 @@ final class DiagnosticGameStateFormatter {
         }
     }
 
-    static String entityDistanceSqrToPlayer(AltoClef mod, Entity entity) {
+    public static String entityDistanceSqrToPlayer(AltoClef mod, Entity entity) {
         try {
             if (mod == null || mod.getPlayer() == null || entity == null) {
                 return "unavailable";
@@ -57,7 +60,7 @@ final class DiagnosticGameStateFormatter {
         }
     }
 
-    static String playerPosition(AltoClef mod) {
+    public static String playerPosition(AltoClef mod) {
         try {
             if (mod == null || mod.getPlayer() == null) {
                 return "unavailable";
@@ -68,7 +71,7 @@ final class DiagnosticGameStateFormatter {
         }
     }
 
-    static String vec3d(Vec3d pos) {
+    public static String vec3d(Vec3d pos) {
         if (pos == null) {
             return "unavailable";
         }
@@ -79,7 +82,7 @@ final class DiagnosticGameStateFormatter {
         }
     }
 
-    static String blockPos(BlockPos pos) {
+    public static String blockPos(BlockPos pos) {
         if (pos == null) {
             return "unavailable";
         }
@@ -90,7 +93,7 @@ final class DiagnosticGameStateFormatter {
         }
     }
 
-    static String itemStackSummary(ItemStack stack) {
+    public static String itemStackSummary(ItemStack stack) {
         if (stack == null) {
             return "none";
         }
@@ -101,7 +104,7 @@ final class DiagnosticGameStateFormatter {
         }
     }
 
-    static String slotSummary(Slot slot) {
+    public static String slotSummary(Slot slot) {
         if (slot == null) {
             return "none";
         }
@@ -115,7 +118,7 @@ final class DiagnosticGameStateFormatter {
         }
     }
 
-    static String slotStackSummary(Slot slot) {
+    public static String slotStackSummary(Slot slot) {
         if (slot == null) {
             return "none";
         }
@@ -141,7 +144,7 @@ final class DiagnosticGameStateFormatter {
         }
     }
 
-    static String itemTargets(ItemTarget[] targets) {
+    public static String itemTargets(ItemTarget[] targets) {
         if (targets == null) {
             return "null";
         }
@@ -156,7 +159,7 @@ final class DiagnosticGameStateFormatter {
         }
     }
 
-    static String classList(Class<?>[] classes) {
+    public static String classList(Class<?>[] classes) {
         if (classes == null) {
             return "all_tracked_entity_types";
         }
