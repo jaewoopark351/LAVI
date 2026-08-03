@@ -28,6 +28,7 @@ public final class FabricChatClefBridgeClient implements WebSocket.Listener, Fab
     private final FabricChatClefBridgeJson json;
     private final FabricChatClefBridgeMessageFactory messageFactory;
     private final FabricChatClefReconnectScheduler reconnectScheduler;
+    private final FabricChatClefResultEnvelopeSender resultEnvelopeSender;
     private final HttpClient httpClient = HttpClient.newHttpClient();
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final AtomicBoolean connecting = new AtomicBoolean(false);
@@ -53,6 +54,12 @@ public final class FabricChatClefBridgeClient implements WebSocket.Listener, Fab
         this.json = json;
         this.messageFactory = messageFactory;
         this.reconnectScheduler = reconnectScheduler;
+        this.resultEnvelopeSender = new FabricChatClefResultEnvelopeSender(
+                diagnostics,
+                json,
+                () -> this.webSocket,
+                () -> this.activeConnectionGeneration
+        );
     }
 
     public void start() {
@@ -314,12 +321,7 @@ public final class FabricChatClefBridgeClient implements WebSocket.Listener, Fab
 
     @Override
     public void sendCommandResult(FabricChatClefCommandContext context, Map<String, Object> payload) {
-        sendCommandResult(
-                context.correlationId(),
-                context.sessionId(),
-                context.connectionGeneration(),
-                payload
-        );
+        resultEnvelopeSender.sendCommandResult(context, payload);
     }
 
     private void sendCommandResult(
@@ -328,29 +330,7 @@ public final class FabricChatClefBridgeClient implements WebSocket.Listener, Fab
             long generation,
             Map<String, Object> payload
     ) {
-        WebSocket socket = webSocket;
-        if (socket == null || generation != activeConnectionGeneration) {
-            diagnostics.warn(
-                    "ignored command_result for inactive generation="
-                            + generation
-                            + " active_generation="
-                            + activeConnectionGeneration
-            );
-            return;
-        }
-        FabricChatClefBridgeEnvelope envelope = new FabricChatClefBridgeEnvelope();
-        envelope.protocolVersion = 1;
-        envelope.messageType = "command_result";
-        envelope.messageId = "fabric-chatclef-result-" + java.util.UUID.randomUUID();
-        envelope.correlationId = correlationId;
-        envelope.sessionId = sessionId;
-        envelope.timestampMs = System.currentTimeMillis();
-        envelope.payload = payload;
-        try {
-            socket.sendText(json.encode(envelope), true);
-        } catch (Exception error) {
-            diagnostics.warn("command_result send failed " + error.getClass().getSimpleName() + ": " + error.getMessage());
-        }
+        resultEnvelopeSender.sendCommandResult(correlationId, sessionId, generation, payload);
     }
 
     private String stringPayload(Map<String, Object> payload, String key) {
