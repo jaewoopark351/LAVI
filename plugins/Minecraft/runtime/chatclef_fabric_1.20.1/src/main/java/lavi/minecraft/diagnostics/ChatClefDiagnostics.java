@@ -7,8 +7,11 @@ import adris.altoclef.util.ItemTarget;
 import adris.altoclef.util.slots.Slot;
 import baritone.api.utils.input.Input;
 import lavi.minecraft.diagnostics.formatting.DiagnosticFormatterFacade;
+import lavi.minecraft.diagnostics.mode.DiagnosticModeController;
+import lavi.minecraft.diagnostics.mode.DiagnosticOutputMode;
 import lavi.minecraft.diagnostics.postplace.PostPlaceContainerInteractionObserver;
 import lavi.minecraft.diagnostics.postplace.PostPlaceContainerOpenIntent;
+import lavi.minecraft.diagnostics.runtime.RuntimeIdentityDiagnostics;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.entity.Entity;
@@ -381,7 +384,7 @@ public final class ChatClefDiagnostics {
                 "DIAGNOSTICS_RUNTIME_IDENTITY",
                 "diagnostics_runtime_identity",
                 null,
-                RuntimeIdentityDiagnostics.fields(MODE.current(), ChatClefDiagnostics.class)
+                RuntimeIdentityDiagnostics.fields(MODE.current().name(), ChatClefDiagnostics.class)
         );
     }
 

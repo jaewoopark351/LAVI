@@ -1,30 +1,30 @@
-package lavi.minecraft.diagnostics;
+package lavi.minecraft.diagnostics.mode;
 
 //20260803_kpopmodder: Split diagnostic output mode ownership out of the ChatClef diagnostics facade.
-final class DiagnosticModeController {
+public final class DiagnosticModeController {
     private volatile DiagnosticOutputMode outputMode;
 
-    DiagnosticModeController(DiagnosticOutputMode outputMode) {
+    public DiagnosticModeController(DiagnosticOutputMode outputMode) {
         this.outputMode = outputMode;
     }
 
-    DiagnosticOutputMode current() {
+    public DiagnosticOutputMode current() {
         return outputMode;
     }
 
-    boolean isOff() {
+    public boolean isOff() {
         return outputMode == DiagnosticOutputMode.OFF;
     }
 
-    boolean isVerboseEnabled() {
+    public boolean isVerboseEnabled() {
         return outputMode == DiagnosticOutputMode.VERBOSE;
     }
 
-    boolean isBoundaryEnabled() {
+    public boolean isBoundaryEnabled() {
         return outputMode != DiagnosticOutputMode.OFF;
     }
 
-    void setBoundaryEnabled(boolean enabled) {
+    public void setBoundaryEnabled(boolean enabled) {
         outputMode = enabled ? DiagnosticOutputMode.BOUNDARY : DiagnosticOutputMode.OFF;
     }
 }

@@ -1,12 +1,12 @@
-package lavi.minecraft.diagnostics;
+package lavi.minecraft.diagnostics.mode;
 
 //20260731_kpopmodder: Keep diagnostic output mode parsing outside the main ChatClef diagnostic facade.
-enum DiagnosticOutputMode {
+public enum DiagnosticOutputMode {
     OFF,
     BOUNDARY,
     VERBOSE;
 
-    static DiagnosticOutputMode fromEnvironment() {
+    public static DiagnosticOutputMode fromEnvironment() {
         String configured = System.getProperty("lavi.chatclef.diagnostics");
         if (configured == null || configured.isBlank()) {
             configured = System.getenv("LAVI_CHATCLEF_DIAGNOSTICS");

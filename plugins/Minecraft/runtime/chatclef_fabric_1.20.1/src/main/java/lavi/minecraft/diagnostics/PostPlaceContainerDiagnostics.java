@@ -3,6 +3,7 @@ package lavi.minecraft.diagnostics;
 import baritone.api.utils.input.Input;
 import lavi.minecraft.diagnostics.formatting.DiagnosticGameStateFormatter;
 import lavi.minecraft.diagnostics.formatting.DiagnosticValueFormatter;
+import lavi.minecraft.diagnostics.mode.DiagnosticModeController;
 import lavi.minecraft.diagnostics.postplace.PostPlaceContainerDiagnosticState;
 import lavi.minecraft.diagnostics.postplace.PostPlaceContainerInteractionObserver;
 import lavi.minecraft.diagnostics.postplace.PostPlaceContainerOpenIntent;

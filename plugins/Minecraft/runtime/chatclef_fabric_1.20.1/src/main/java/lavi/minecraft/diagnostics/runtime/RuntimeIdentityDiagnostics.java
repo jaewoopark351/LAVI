@@ -1,13 +1,13 @@
-package lavi.minecraft.diagnostics;
+package lavi.minecraft.diagnostics.runtime;
 
 //20260803_kpopmodder: Keep diagnostics runtime identity fields out of the public diagnostics facade.
-final class RuntimeIdentityDiagnostics {
+public final class RuntimeIdentityDiagnostics {
     private RuntimeIdentityDiagnostics() {
     }
 
-    static Object[] fields(DiagnosticOutputMode outputMode, Class<?> sourceClass) {
+    public static Object[] fields(String outputModeName, Class<?> sourceClass) {
         return new Object[]{
-                "outputMode", outputMode.name(),
+                "outputMode", outputModeName,
                 "diagnosticsSourceMarker", "20260731_post_place_handoff_p2",
                 "diagnosticsClassCodeSource", codeSourceLocation(sourceClass),
                 "diagnosticsCodeSourceLastModified", codeSourceLastModified(sourceClass),
