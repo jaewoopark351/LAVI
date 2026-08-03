@@ -25,6 +25,7 @@ public final class ChatClefDiagnostics {
     private static final DiagnosticTaskRegistry TASKS = new DiagnosticTaskRegistry();
     private static final DiagnosticModeController MODE = new DiagnosticModeController(DiagnosticOutputMode.fromEnvironment());
     private static final DiagnosticEventEmitter EVENTS = new DiagnosticEventEmitter(TRACE_STATE, TASKS);
+    private static final DiagnosticContextBuilder CONTEXT = new DiagnosticContextBuilder(MODE, TASKS);
     private static final PostPlaceContainerDiagnostics POST_PLACE_CONTAINERS = new PostPlaceContainerDiagnostics(
             MODE,
             EVENTS,
@@ -138,13 +139,7 @@ public final class ChatClefDiagnostics {
         if (!MODE.isVerboseEnabled()) {
             return;
         }
-        Object[] merged = mergeFields(fields,
-                "previousTask", taskName(previousTask),
-                "previousTaskInstanceId", TASKS.taskInstanceIdLabel(previousTask),
-                "previousTaskRunId", TASKS.taskRunIdLabel(previousTask),
-                "nextTask", taskName(nextTask),
-                "nextTaskInstanceId", TASKS.taskInstanceIdLabel(nextTask),
-                "nextTaskRunId", TASKS.taskRunIdLabel(nextTask));
+        Object[] merged = CONTEXT.taskTransitionFields(fields, previousTask, nextTask);
         safeLog("TASK_CHILD", "TRANSITION", reason, parent, merged, false);
     }
 
@@ -152,9 +147,7 @@ public final class ChatClefDiagnostics {
         if (!MODE.isVerboseEnabled()) {
             return;
         }
-        Object[] merged = mergeFields(fields,
-                "input", DiagnosticInputState.inputName(input),
-                "inputCallerStack", callerStack());
+        Object[] merged = CONTEXT.inputFields(fields, input);
         safeLog("INPUT", phase, reason, TASKS.currentTask(), merged, false);
     }
 
@@ -162,7 +155,7 @@ public final class ChatClefDiagnostics {
         if (!MODE.isVerboseEnabled()) {
             return;
         }
-        Object[] merged = mergeFields(DiagnosticInputState.snapshotFields(), fields);
+        Object[] merged = CONTEXT.inputSnapshotFields(fields);
         safeLog("INPUT_SNAPSHOT", phase, reason, TASKS.currentTask(), merged, false);
     }
 
@@ -170,11 +163,7 @@ public final class ChatClefDiagnostics {
         if (!MODE.isVerboseEnabled()) {
             return;
         }
-        Object[] merged = mergeFields(fields,
-                "slot", slotSummary(slot),
-                "mouseButton", Integer.toString(mouseButton),
-                "slotActionType", value(type),
-                "cursorStack", safeValue(() -> MinecraftClient.getInstance().player.currentScreenHandler.getCursorStack()));
+        Object[] merged = CONTEXT.slotClickFields(fields, slot, mouseButton, type);
         safeLog("SLOT", phase, reason, TASKS.currentTask(), merged, false);
     }
 
@@ -411,14 +400,6 @@ public final class ChatClefDiagnostics {
         POST_PLACE_CONTAINERS.logInteractIfMatching(phase, player, hand, hitResult, result);
     }
 
-    private static String callerStack() {
-        return DiagnosticCallerStack.captureExcluding(ChatClefDiagnostics.class);
-    }
-
-    private static Object[] mergeFields(Object[] fields, Object... extra) {
-        return DiagnosticEventEmitter.mergeFields(fields, extra);
-    }
-
     private static void logRuntimeIdentityOnce() {
         if (!TRACE_STATE.markRuntimeIdentityLogged()) {
             return;
@@ -447,10 +428,6 @@ public final class ChatClefDiagnostics {
         } catch (RuntimeException | LinkageError ignored) {
             return "unavailable";
         }
-    }
-
-    private static String taskName(Task task) {
-        return DiagnosticEventEmitter.taskName(task);
     }
 
     private static String value(Object rawValue) {
