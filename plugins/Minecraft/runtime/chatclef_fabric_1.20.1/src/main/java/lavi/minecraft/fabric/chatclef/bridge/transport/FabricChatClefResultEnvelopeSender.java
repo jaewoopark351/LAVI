@@ -41,7 +41,7 @@ public final class FabricChatClefResultEnvelopeSender implements FabricChatClefC
         );
     }
 
-    void sendCommandResult(
+    public void sendCommandResult(
             String correlationId,
             String sessionId,
             long generation,

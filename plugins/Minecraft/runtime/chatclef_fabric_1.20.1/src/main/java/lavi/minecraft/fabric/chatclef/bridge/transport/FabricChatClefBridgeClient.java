@@ -3,14 +3,14 @@ package lavi.minecraft.fabric.chatclef.bridge.transport;
 import lavi.minecraft.fabric.chatclef.bridge.config.FabricChatClefBridgeConfig;
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandContext;
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandQueue;
-import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandRequest;
-import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandResult;
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandResultSender;
 import lavi.minecraft.fabric.chatclef.bridge.diagnostics.FabricChatClefBridgeDiagnostics;
-import lavi.minecraft.fabric.chatclef.bridge.protocol.FabricChatClefBridgeEnvelope;
 import lavi.minecraft.fabric.chatclef.bridge.protocol.FabricChatClefBridgeJson;
 import lavi.minecraft.fabric.chatclef.bridge.protocol.FabricChatClefBridgeMessageFactory;
 import lavi.minecraft.fabric.chatclef.bridge.state.FabricChatClefBridgeState;
+import lavi.minecraft.fabric.chatclef.bridge.transport.inbound.FabricChatClefCommandRequestHandler;
+import lavi.minecraft.fabric.chatclef.bridge.transport.inbound.FabricChatClefInboundMessageHandler;
+import lavi.minecraft.fabric.chatclef.bridge.transport.session.FabricChatClefSessionGuard;
 
 import java.net.http.HttpClient;
 import java.net.http.WebSocket;
@@ -29,6 +29,7 @@ public final class FabricChatClefBridgeClient implements WebSocket.Listener, Fab
     private final FabricChatClefBridgeMessageFactory messageFactory;
     private final FabricChatClefReconnectScheduler reconnectScheduler;
     private final FabricChatClefResultEnvelopeSender resultEnvelopeSender;
+    private final FabricChatClefInboundMessageHandler inboundMessageHandler;
     private final HttpClient httpClient = HttpClient.newHttpClient();
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final AtomicBoolean connecting = new AtomicBoolean(false);
@@ -59,6 +60,19 @@ public final class FabricChatClefBridgeClient implements WebSocket.Listener, Fab
                 json,
                 () -> this.webSocket,
                 () -> this.activeConnectionGeneration
+        );
+        FabricChatClefSessionGuard sessionGuard = new FabricChatClefSessionGuard(state, diagnostics);
+        this.inboundMessageHandler = new FabricChatClefInboundMessageHandler(
+                diagnostics,
+                json,
+                sessionGuard,
+                new FabricChatClefCommandRequestHandler(
+                        commandQueue,
+                        diagnostics,
+                        json,
+                        resultEnvelopeSender,
+                        sessionGuard
+                )
         );
     }
 
@@ -106,11 +120,16 @@ public final class FabricChatClefBridgeClient implements WebSocket.Listener, Fab
             webSocket.request(1);
             return null;
         }
+        long generation = activeConnectionGeneration;
         incomingText.append(data);
         if (last) {
             String message = incomingText.toString();
             incomingText.setLength(0);
-            handleMessage(webSocket, activeConnectionGeneration, message);
+            if (!isCurrentSocket(webSocket) || generation != activeConnectionGeneration) {
+                diagnostics.warn("ignored message from stale WebSocket generation=" + generation);
+            } else {
+                inboundMessageHandler.handle(generation, message);
+            }
         }
         webSocket.request(1);
         return null;
@@ -188,158 +207,9 @@ public final class FabricChatClefBridgeClient implements WebSocket.Listener, Fab
         }
     }
 
-    private void handleMessage(WebSocket socket, long generation, String message) {
-        if (!isCurrentSocket(socket) || generation != activeConnectionGeneration) {
-            diagnostics.warn("ignored message from stale WebSocket generation=" + generation);
-            return;
-        }
-        try {
-            FabricChatClefBridgeEnvelope envelope = json.decode(message);
-            if (envelope.protocolVersion != 1) {
-                diagnostics.warn("ignored unsupported protocol_version=" + envelope.protocolVersion);
-                return;
-            }
-            if ("handshake_ack".equals(envelope.messageType)) {
-                handleHandshakeAck(envelope);
-                return;
-            }
-            if ("status_snapshot".equals(envelope.messageType)) {
-                diagnostics.info("received status_snapshot");
-                return;
-            }
-            if ("command_request".equals(envelope.messageType)) {
-                handleCommandRequest(envelope, generation);
-                return;
-            }
-            if ("error".equals(envelope.messageType)) {
-                diagnostics.warn("received error envelope payload=" + envelope.payload);
-                return;
-            }
-            diagnostics.warn("ignored unsupported message_type=" + envelope.messageType);
-        } catch (Exception error) {
-            diagnostics.warn("message decode failed " + error.getClass().getSimpleName() + ": " + error.getMessage());
-        }
-    }
-
-    private void handleHandshakeAck(FabricChatClefBridgeEnvelope envelope) {
-        Object accepted = envelope.payload.get("accepted");
-        if (!Boolean.TRUE.equals(accepted)) {
-            diagnostics.warn("handshake rejected payload=" + envelope.payload);
-            return;
-        }
-        String sessionId = stringPayload(envelope.payload, "session_id");
-        if (sessionId == null) {
-            sessionId = envelope.sessionId;
-        }
-        state.markHandshakeAccepted(sessionId);
-        diagnostics.info("handshake accepted session=" + state.sessionId().orElse("<none>"));
-    }
-
-    private void handleCommandRequest(FabricChatClefBridgeEnvelope envelope, long generation) {
-        if (!state.handshakeAccepted()) {
-            sendCommandResult(
-                    envelope.messageId,
-                    envelope.sessionId,
-                    generation,
-                    FabricChatClefCommandResult.rejected(
-                            "",
-                            "not_connected",
-                            "Fabric ChatClef bridge handshake has not been accepted."
-                    )
-            );
-            return;
-        }
-        String currentSessionId = state.sessionId().orElse("");
-        if (envelope.sessionId == null || !currentSessionId.equals(envelope.sessionId)) {
-            sendCommandResult(
-                    envelope.messageId,
-                    envelope.sessionId,
-                    generation,
-                    FabricChatClefCommandResult.rejected(
-                            "",
-                            "invalid_request",
-                            "Fabric ChatClef command_request session does not match active handshake."
-                    )
-            );
-            return;
-        }
-        FabricChatClefCommandRequest request = json.commandRequest(envelope.payload);
-        FabricChatClefCommandContext context = new FabricChatClefCommandContext(
-                request,
-                envelope.messageId,
-                envelope.sessionId,
-                generation
-        );
-        if (!request.isValid()) {
-            sendCommandResult(
-                    envelope.messageId,
-                    envelope.sessionId,
-                    generation,
-                    FabricChatClefCommandResult.rejected(
-                            request.requestId,
-                            "invalid_request",
-                            "Fabric ChatClef command_request requires request_id and command."
-                    )
-            );
-            return;
-        }
-        if (!commandQueue.offer(context)) {
-            diagnostics.warn(
-                    "rejected command_request rejected_by=java_command_queue request="
-                            + request.requestId
-                            + " source="
-                            + request.source
-                            + " active_request="
-                            + commandQueue.activeRequestId().orElse("<pending>")
-                            + " generation="
-                            + generation
-            );
-            sendCommandResult(
-                    envelope.messageId,
-                    envelope.sessionId,
-                    generation,
-                    FabricChatClefCommandResult.rejected(
-                            request.requestId,
-                            "invalid_request",
-                            "Fabric ChatClef command already pending or active: "
-                                    + commandQueue.activeRequestId().orElse("<pending>")
-                    )
-            );
-            return;
-        }
-        diagnostics.info(
-                "queued command request="
-                        + request.requestId
-                        + " source="
-                        + request.source
-                        + " command="
-                        + request.command
-                        + " generation="
-                        + generation
-        );
-    }
-
     @Override
     public void sendCommandResult(FabricChatClefCommandContext context, Map<String, Object> payload) {
         resultEnvelopeSender.sendCommandResult(context, payload);
-    }
-
-    private void sendCommandResult(
-            String correlationId,
-            String sessionId,
-            long generation,
-            Map<String, Object> payload
-    ) {
-        resultEnvelopeSender.sendCommandResult(correlationId, sessionId, generation, payload);
-    }
-
-    private String stringPayload(Map<String, Object> payload, String key) {
-        Object value = payload.get(key);
-        if (value == null) {
-            return null;
-        }
-        String text = value.toString();
-        return text.isBlank() ? null : text;
     }
 
     private boolean isCurrentSocket(WebSocket socket) {
