@@ -1,16 +1,17 @@
 package lavi.minecraft.fabric.chatclef.bridge.command;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.atomic.AtomicReference;
 
 //20260801_kpopmodder: Enforce one Fabric ChatClef command pending or active at a time.
 public final class FabricChatClefCommandQueue {
-    private final ConcurrentLinkedQueue<FabricChatClefCommandContext> pending = new ConcurrentLinkedQueue<>();
-    private final AtomicReference<FabricChatClefCommandContext> active = new AtomicReference<>();
+    //20260804_kpopmodder: Keep queue ownership under this object's monitor instead of mixing synchronized and atomics.
+    private final Deque<FabricChatClefCommandContext> pending = new ArrayDeque<>();
+    private FabricChatClefCommandContext active;
 
     public synchronized boolean offer(FabricChatClefCommandContext context) {
-        if (context == null || active.get() != null || !pending.isEmpty()) {
+        if (context == null || active != null || !pending.isEmpty()) {
             return false;
         }
         pending.offer(context);
@@ -22,35 +23,36 @@ public final class FabricChatClefCommandQueue {
     }
 
     public synchronized Optional<FabricChatClefCommandContext> pollForDispatch() {
-        if (active.get() != null) {
+        if (active != null) {
             return Optional.empty();
         }
         FabricChatClefCommandContext context = pending.poll();
         if (context == null) {
             return Optional.empty();
         }
-        if (!active.compareAndSet(null, context)) {
-            pending.offer(context);
-            return Optional.empty();
-        }
+        active = context;
         return Optional.of(context);
     }
 
     public synchronized boolean hasActive() {
-        return active.get() != null;
+        return active != null;
     }
 
     public synchronized Optional<FabricChatClefCommandContext> activeContext() {
-        return Optional.ofNullable(active.get());
+        return Optional.ofNullable(active);
     }
 
     public synchronized Optional<String> activeRequestId() {
-        FabricChatClefCommandContext context = active.get();
+        FabricChatClefCommandContext context = active;
         return Optional.ofNullable(context == null ? null : context.requestId());
     }
 
     public synchronized boolean complete(FabricChatClefCommandContext context) {
-        return context != null && active.compareAndSet(context, null);
+        if (context == null || active != context) {
+            return false;
+        }
+        active = null;
+        return true;
     }
 
     public synchronized boolean removePending(FabricChatClefCommandContext context) {
@@ -65,17 +67,18 @@ public final class FabricChatClefCommandQueue {
             }
             return matches;
         });
-        FabricChatClefCommandContext activeContext = active.get();
+        FabricChatClefCommandContext activeContext = active;
         if (activeContext != null && activeContext.connectionGeneration() == connectionGeneration) {
             activeContext.markDetached(reason);
-            active.compareAndSet(activeContext, null);
+            active = null;
         }
     }
 
     public synchronized void clear(String reason) {
         pending.forEach(context -> context.markDetached(reason));
         pending.clear();
-        FabricChatClefCommandContext activeContext = active.getAndSet(null);
+        FabricChatClefCommandContext activeContext = active;
+        active = null;
         if (activeContext != null) {
             activeContext.markDetached(reason);
         }
