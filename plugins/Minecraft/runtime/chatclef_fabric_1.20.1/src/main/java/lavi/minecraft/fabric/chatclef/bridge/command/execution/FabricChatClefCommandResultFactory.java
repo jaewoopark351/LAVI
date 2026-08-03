@@ -8,10 +8,10 @@ import java.util.Map;
 
 //20260804_kpopmodder: Separate command result map construction from mutable command execution state.
 final class FabricChatClefCommandResultFactory {
-    private final FabricChatClefCommandExecution execution;
+    private final FabricChatClefCommandExecutionState state;
 
-    FabricChatClefCommandResultFactory(FabricChatClefCommandExecution execution) {
-        this.execution = execution;
+    FabricChatClefCommandResultFactory(FabricChatClefCommandExecutionState state) {
+        this.state = state;
     }
 
     Map<String, Object> runningResult() {
@@ -33,7 +33,7 @@ final class FabricChatClefCommandResultFactory {
     Map<String, Object> failedFromCommandException() {
         return FabricChatClefCommandResult.failed(
                 request().requestId,
-                execution.failureTypeForResult() + ": " + execution.failureMessageForResult(),
+                state.failureType() + ": " + state.failureMessage(),
                 data("command_exception")
         );
     }
@@ -41,7 +41,7 @@ final class FabricChatClefCommandResultFactory {
     Map<String, Object> failedFromDispatchException() {
         return FabricChatClefCommandResult.failed(
                 request().requestId,
-                execution.failureTypeForResult() + ": " + execution.failureMessageForResult(),
+                state.failureType() + ": " + state.failureMessage(),
                 data("dispatch_exception")
         );
     }
@@ -106,14 +106,14 @@ final class FabricChatClefCommandResultFactory {
         return FabricChatClefCommandDiagnosticPayload.diagnosticData(
                 diagnosticReason,
                 request(),
-                execution.normalizedCommandForResult(),
-                execution.elapsedMsForResult(),
+                state.normalizedCommand(),
+                state.elapsedMs(),
                 data(diagnosticReason)
         );
     }
 
     private Map<String, Object> data(String resultReason) {
-        return data(resultReason, execution.taskFinishedObservationForResult());
+        return data(resultReason, state.taskFinishedObservation());
     }
 
     private Map<String, Object> data(
@@ -122,23 +122,23 @@ final class FabricChatClefCommandResultFactory {
     ) {
         return FabricChatClefCommandDiagnosticPayload.commandData(
                 resultReason,
-                execution.dispatchStartedMsForResult(),
-                execution.dispatchReturnedForResult(),
-                execution.dispatchThreadNameForResult(),
-                execution.normalizedCommandForResult(),
-                execution.finishCallbackReceivedForResult(),
-                execution.failureTypeForResult(),
-                execution.failureMessageForResult(),
-                execution.contextForResult(),
-                execution.taskBeforeDispatchForResult(),
-                execution.taskAfterDispatchForResult(),
-                execution.terminalTaskForResult(),
-                execution.boundRootTaskForResult(),
+                state.dispatchStartedMs(),
+                state.dispatchReturned(),
+                state.dispatchThreadName(),
+                state.normalizedCommand(),
+                state.finishCallbackReceived(),
+                state.failureType(),
+                state.failureMessage(),
+                state.context(),
+                state.taskBeforeDispatch(),
+                state.taskAfterDispatch(),
+                state.terminalTask(),
+                state.boundRootTask(),
                 observation
         );
     }
 
     private FabricChatClefCommandRequest request() {
-        return execution.requestForResult();
+        return state.request();
     }
 }
