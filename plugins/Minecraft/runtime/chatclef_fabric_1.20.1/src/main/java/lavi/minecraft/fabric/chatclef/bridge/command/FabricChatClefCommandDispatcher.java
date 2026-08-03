@@ -2,32 +2,39 @@ package lavi.minecraft.fabric.chatclef.bridge.command;
 
 import adris.altoclef.AltoClef;
 import adris.altoclef.commandsystem.CommandExecutor;
+import lavi.minecraft.fabric.chatclef.bridge.command.diagnostics.FabricChatClefTaskStateReader;
 import lavi.minecraft.fabric.chatclef.bridge.command.execution.FabricChatClefCommandExecution;
-import lavi.minecraft.fabric.chatclef.bridge.command.execution.FabricChatClefTaskSnapshot;
+import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandLifecycleCoordinator;
 import lavi.minecraft.fabric.chatclef.bridge.diagnostics.FabricChatClefBridgeDiagnostics;
 import net.minecraft.client.MinecraftClient;
 
 import java.util.Optional;
-import java.util.function.Supplier;
 
 //20260801_kpopmodder: Dispatch LAVI Fabric ChatClef commands only from the client tick.
 public final class FabricChatClefCommandDispatcher {
     private final FabricChatClefCommandQueue commandQueue;
     private final FabricChatClefCommandResultSender resultSender;
+    private final FabricChatClefCommandLifecycleCoordinator lifecycleCoordinator;
     private final FabricChatClefBridgeDiagnostics diagnostics;
+    private final FabricChatClefTaskStateReader taskStateReader;
 
     public FabricChatClefCommandDispatcher(
             FabricChatClefCommandQueue commandQueue,
             FabricChatClefCommandResultSender resultSender,
-            FabricChatClefBridgeDiagnostics diagnostics
+            FabricChatClefCommandLifecycleCoordinator lifecycleCoordinator,
+            FabricChatClefBridgeDiagnostics diagnostics,
+            FabricChatClefTaskStateReader taskStateReader
     ) {
         this.commandQueue = commandQueue;
         this.resultSender = resultSender;
+        this.lifecycleCoordinator = lifecycleCoordinator;
         this.diagnostics = diagnostics;
+        this.taskStateReader = taskStateReader;
     }
 
     public void onEndClientTick(MinecraftClient client) {
         long nowMs = System.currentTimeMillis();
+        lifecycleCoordinator.onEndClientTick(commandQueue.activeContext());
         Optional<FabricChatClefCommandContext> active = commandQueue.activeContext();
         if (active.isPresent()) {
             FabricChatClefCommandContext context = active.get();
@@ -72,11 +79,16 @@ public final class FabricChatClefCommandDispatcher {
         FabricChatClefCommandExecution execution = new FabricChatClefCommandExecution(
                 context,
                 command,
-                captureCurrentTask()
+                taskStateReader.captureCurrentTaskSnapshot()
         );
+        lifecycleCoordinator.beginExecution(execution);
         diagnostics.info(
                 "dispatch command request="
                         + context.requestId()
+                        + " source="
+                        + request.source
+                        + " normalized_command="
+                        + command
                         + " generation="
                         + context.connectionGeneration()
         );
@@ -84,20 +96,22 @@ public final class FabricChatClefCommandDispatcher {
         try {
             executor.execute(
                     command,
-                    () -> completeOnce(
+                    () -> lifecycleCoordinator.markCommandFinish(
                             execution,
-                            () -> execution.unknownAfterFinish(captureCurrentTask())
+                            taskStateReader.currentTaskOrNull()
                     ),
-                    exception -> completeOnce(
+                    exception -> lifecycleCoordinator.completeCommandException(
                             execution,
-                            () -> execution.failedFromCommandException(exception, captureCurrentTask())
+                            exception,
+                            taskStateReader.captureCurrentTaskSnapshot()
                     )
             );
-            execution.markDispatchReturned(captureCurrentTask());
+            lifecycleCoordinator.markDispatchReturned(execution, taskStateReader.currentTaskOrNull());
         } catch (Throwable error) {
-            completeOnce(
+            lifecycleCoordinator.completeDispatchException(
                     execution,
-                    () -> execution.failedFromDispatchException(error, captureCurrentTask())
+                    error,
+                    taskStateReader.captureCurrentTaskSnapshot()
             );
         }
     }
@@ -110,69 +124,7 @@ public final class FabricChatClefCommandDispatcher {
         return executor.getCommandPrefix() + normalized;
     }
 
-    private void completeOnce(
-            FabricChatClefCommandExecution execution,
-            Supplier<java.util.Map<String, Object>> resultFactory
-    ) {
-        if (!execution.markTerminalSent()) {
-            diagnostics.warn(
-                    "ignored duplicate terminal result request="
-                            + execution.requestId()
-                            + " data="
-                            + execution.duplicateTerminalData("duplicate_terminal_result")
-            );
-            return;
-        }
-        java.util.Map<String, Object> result = resultFactory.get();
-        if (!commandQueue.complete(execution.context())) {
-            diagnostics.warn(
-                    "ignored stale terminal result request="
-                            + execution.requestId()
-                            + " data="
-                            + execution.duplicateTerminalData("stale_terminal_result")
-            );
-            return;
-        }
-        resultSender.sendCommandResult(execution.context(), result);
-    }
-
     private void completeActiveDeadline(FabricChatClefCommandContext context) {
-        if (!context.markTerminalSent()) {
-            diagnostics.warn(
-                    "ignored duplicate deadline result request="
-                            + context.requestId()
-                            + " data="
-                            + context.ownershipData()
-            );
-            return;
-        }
-        if (!commandQueue.complete(context)) {
-            diagnostics.warn(
-                    "ignored stale deadline result request="
-                            + context.requestId()
-                            + " data="
-                            + context.ownershipData()
-            );
-            return;
-        }
-        resultSender.sendCommandResult(
-                context,
-                FabricChatClefCommandResult.deadlineExceeded(
-                        context.requestId(),
-                        "Fabric ChatClef command deadline expired while active."
-                )
-        );
-    }
-
-    private FabricChatClefTaskSnapshot captureCurrentTask() {
-        try {
-            AltoClef mod = AltoClef.getInstance();
-            if (mod == null || mod.getUserTaskChain() == null) {
-                return FabricChatClefTaskSnapshot.capture(null);
-            }
-            return FabricChatClefTaskSnapshot.capture(mod.getUserTaskChain().getCurrentTask());
-        } catch (Throwable error) {
-            return FabricChatClefTaskSnapshot.unavailable(error);
-        }
+        lifecycleCoordinator.completeActiveDeadline(context);
     }
 }

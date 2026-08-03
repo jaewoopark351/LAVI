@@ -7,6 +7,7 @@ import adris.altoclef.eventbus.events.TaskFinishedEvent;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.tasksystem.TaskRunner;
 import adris.altoclef.util.time.Stopwatch;
+import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 
 // A task chain that runs a user defined task at the same priority.
 // This basically replaces our old Task Runner.
@@ -54,6 +55,12 @@ public class UserTaskChain extends SingleTaskChain {
     }
 
     public void cancel(AltoClef mod) {
+        ChatClefDiagnostics.logLifecycleBoundary("USER_TASK_CHAIN_CANCEL_REQUESTED", "user_task_chain_cancel_requested", mainTask,
+                "chain", ChatClefDiagnostics.chainNameForDiagnosticLog(this),
+                "mainTaskPresent", mainTask != null,
+                "mainTaskActive", ChatClefDiagnostics.safeValueForDiagnosticLog(() -> mainTask != null && mainTask.isActive()),
+                "runningIdleTask", runningIdleTask,
+                "nextTaskIdleFlag", nextTaskIdleFlag);
         if (mainTask != null && mainTask.isActive()) {
             stop();
             onTaskFinish(mod);
@@ -71,6 +78,15 @@ public class UserTaskChain extends SingleTaskChain {
     }
 
     public void runTask(AltoClef mod, Task task, Runnable onFinish) {
+        //20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
+        // Diagnostics-only: observe task assignment and idle classification without changing lifecycle behavior.
+        ChatClefDiagnostics.logLifecycleBoundary("USER_TASK_CHAIN_RUN_TASK_ENTER", "user_task_chain_run_task_enter", task,
+                "chain", ChatClefDiagnostics.chainNameForDiagnosticLog(this),
+                "previousMainTask", ChatClefDiagnostics.taskSummaryForDiagnosticLog(mainTask),
+                "incomingTask", ChatClefDiagnostics.taskSummaryForDiagnosticLog(task),
+                "previousRunningIdleTask", runningIdleTask,
+                "previousNextTaskIdleFlag", nextTaskIdleFlag,
+                "incomingOnFinishPresent", onFinish != null);
         runningIdleTask = nextTaskIdleFlag;
         nextTaskIdleFlag = false;
 
@@ -82,6 +98,12 @@ public class UserTaskChain extends SingleTaskChain {
         mod.getTaskRunner().enable();
         taskStopwatch.begin();
         setTask(task);
+        ChatClefDiagnostics.logLifecycleBoundary("USER_TASK_CHAIN_RUN_TASK_ASSIGNED", "user_task_chain_run_task_assigned", task,
+                "chain", ChatClefDiagnostics.chainNameForDiagnosticLog(this),
+                "mainTaskAfterSetTask", ChatClefDiagnostics.taskSummaryForDiagnosticLog(mainTask),
+                "runningIdleTask", runningIdleTask,
+                "nextTaskIdleFlag", nextTaskIdleFlag,
+                "currentOnFinishPresent", currentOnFinish != null);
 
         if (mod.getModSettings().failedToLoad()) {
             Debug.logWarning("Settings file failed to load at some point. Check logs for more info, or delete the" +
@@ -94,29 +116,94 @@ public class UserTaskChain extends SingleTaskChain {
         boolean shouldIdle = mod.getModSettings().shouldRunIdleCommandWhenNotActive();
         double seconds = taskStopwatch.time();
         Task oldTask = mainTask;
+        //20260730_kpopmodder: Added diagnostic logging to prove the Carry On interaction failure boundary.
+        // Diagnostics-only: observe callback and TaskFinishedEvent publish decisions without changing completion logic.
+        ChatClefDiagnostics.logLifecycleBoundary("USER_TASK_CHAIN_ON_TASK_FINISH_ENTER", "user_task_chain_on_task_finish_enter", oldTask,
+                "chain", ChatClefDiagnostics.chainNameForDiagnosticLog(this),
+                "oldTask", ChatClefDiagnostics.taskSummaryForDiagnosticLog(oldTask),
+                "shouldIdle", shouldIdle,
+                "runningIdleTask", runningIdleTask,
+                "nextTaskIdleFlag", nextTaskIdleFlag,
+                "currentOnFinishPresent", currentOnFinish != null,
+                "elapsedSeconds", seconds);
         mainTask = null;
+        ChatClefDiagnostics.logLifecycleBoundary("USER_TASK_CHAIN_MAIN_TASK_CLEARED", "user_task_chain_main_task_cleared", oldTask,
+                "chain", ChatClefDiagnostics.chainNameForDiagnosticLog(this),
+                "oldTask", ChatClefDiagnostics.taskSummaryForDiagnosticLog(oldTask),
+                "mainTaskAfterClear", ChatClefDiagnostics.taskSummaryForDiagnosticLog(mainTask),
+                "shouldIdle", shouldIdle);
         if (!shouldIdle) {
             // Stop.
+            ChatClefDiagnostics.logLifecycleBoundary("USER_TASK_CHAIN_STOP_MOD_BEGIN", "user_task_chain_stop_mod_begin", oldTask,
+                    "chain", ChatClefDiagnostics.chainNameForDiagnosticLog(this),
+                    "oldTask", ChatClefDiagnostics.taskSummaryForDiagnosticLog(oldTask));
             mod.stop();
+            ChatClefDiagnostics.logLifecycleBoundary("USER_TASK_CHAIN_STOP_MOD_END", "user_task_chain_stop_mod_end", oldTask,
+                    "chain", ChatClefDiagnostics.chainNameForDiagnosticLog(this),
+                    "oldTask", ChatClefDiagnostics.taskSummaryForDiagnosticLog(oldTask));
         } else {
             // disable baritone at least
+            ChatClefDiagnostics.logLifecycleBoundary("USER_TASK_CHAIN_IDLE_CLEANUP_BEGIN", "user_task_chain_idle_cleanup_begin", oldTask,
+                    "chain", ChatClefDiagnostics.chainNameForDiagnosticLog(this),
+                    "oldTask", ChatClefDiagnostics.taskSummaryForDiagnosticLog(oldTask));
             mod.getClientBaritone().getPathingBehavior().forceCancel();
             mod.getClientBaritone().getInputOverrideHandler().clearAllKeys();    
+            ChatClefDiagnostics.logLifecycleBoundary("USER_TASK_CHAIN_IDLE_CLEANUP_END", "user_task_chain_idle_cleanup_end", oldTask,
+                    "chain", ChatClefDiagnostics.chainNameForDiagnosticLog(this),
+                    "oldTask", ChatClefDiagnostics.taskSummaryForDiagnosticLog(oldTask));
         }
         if (currentOnFinish != null) {
+            ChatClefDiagnostics.logLifecycleBoundary("USER_TASK_CHAIN_ON_FINISH_CALLBACK_BEGIN", "user_task_chain_on_finish_callback_begin", oldTask,
+                    "chain", ChatClefDiagnostics.chainNameForDiagnosticLog(this),
+                    "oldTask", ChatClefDiagnostics.taskSummaryForDiagnosticLog(oldTask),
+                    "mainTaskBeforeCallback", ChatClefDiagnostics.taskSummaryForDiagnosticLog(mainTask));
             currentOnFinish.run();
+            ChatClefDiagnostics.logLifecycleBoundary("USER_TASK_CHAIN_ON_FINISH_CALLBACK_END", "user_task_chain_on_finish_callback_end", oldTask,
+                    "chain", ChatClefDiagnostics.chainNameForDiagnosticLog(this),
+                    "oldTask", ChatClefDiagnostics.taskSummaryForDiagnosticLog(oldTask),
+                    "mainTaskAfterCallback", ChatClefDiagnostics.taskSummaryForDiagnosticLog(mainTask));
         }
         // our `onFinish` might have triggered more tasks.
         boolean actuallyDone = mainTask == null;
+        ChatClefDiagnostics.logLifecycleBoundary("USER_TASK_CHAIN_ACTUALLY_DONE_DECISION", "user_task_chain_actually_done_decision", oldTask,
+                "chain", ChatClefDiagnostics.chainNameForDiagnosticLog(this),
+                "oldTask", ChatClefDiagnostics.taskSummaryForDiagnosticLog(oldTask),
+                "mainTaskAfterCallback", ChatClefDiagnostics.taskSummaryForDiagnosticLog(mainTask),
+                "actuallyDone", actuallyDone,
+                "runningIdleTask", runningIdleTask,
+                "willPublishTaskFinishedEvent", actuallyDone && !runningIdleTask,
+                "willStartIdleCommand", actuallyDone && shouldIdle);
         if (actuallyDone) {
             if (!runningIdleTask) {
                 Debug.logMessage("User task FINISHED. Took %s seconds.", prettyPrintTimeDuration(seconds));
+                ChatClefDiagnostics.logLifecycleBoundary("USER_TASK_CHAIN_TASK_FINISHED_EVENT_PUBLISH_BEGIN", "user_task_chain_task_finished_event_publish_begin", oldTask,
+                        "chain", ChatClefDiagnostics.chainNameForDiagnosticLog(this),
+                        "oldTask", ChatClefDiagnostics.taskSummaryForDiagnosticLog(oldTask),
+                        "elapsedSeconds", seconds,
+                        "runningIdleTask", runningIdleTask);
                 EventBus.publish(new TaskFinishedEvent(seconds, oldTask));
+                ChatClefDiagnostics.logLifecycleBoundary("USER_TASK_CHAIN_TASK_FINISHED_EVENT_PUBLISH_END", "user_task_chain_task_finished_event_publish_end", oldTask,
+                        "chain", ChatClefDiagnostics.chainNameForDiagnosticLog(this),
+                        "oldTask", ChatClefDiagnostics.taskSummaryForDiagnosticLog(oldTask),
+                        "elapsedSeconds", seconds,
+                        "runningIdleTask", runningIdleTask);
             }
             if (shouldIdle) {
-                AltoClef.getCommandExecutor().executeWithPrefix(mod.getModSettings().getIdleCommand());
+                ChatClefDiagnostics.logLifecycleBoundary("USER_TASK_CHAIN_IDLE_COMMAND_BEGIN", "user_task_chain_idle_command_begin", oldTask,
+                        "chain", ChatClefDiagnostics.chainNameForDiagnosticLog(this),
+                        "oldTask", ChatClefDiagnostics.taskSummaryForDiagnosticLog(oldTask),
+                        "idleCommand", mod.getModSettings().getIdleCommand());
+                //20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
+                // Mark the synchronous idle command before it creates its IdleTask so the flag is consumed by the idle task itself.
                 signalNextTaskToBeIdleTask();
+                AltoClef.getCommandExecutor().executeWithPrefix(mod.getModSettings().getIdleCommand());
                 runningIdleTask = true;
+                ChatClefDiagnostics.logLifecycleBoundary("USER_TASK_CHAIN_IDLE_COMMAND_END", "user_task_chain_idle_command_end", oldTask,
+                        "chain", ChatClefDiagnostics.chainNameForDiagnosticLog(this),
+                        "oldTask", ChatClefDiagnostics.taskSummaryForDiagnosticLog(oldTask),
+                        "mainTaskAfterIdleCommand", ChatClefDiagnostics.taskSummaryForDiagnosticLog(mainTask),
+                        "runningIdleTask", runningIdleTask,
+                        "nextTaskIdleFlag", nextTaskIdleFlag);
             }
         }
     }
@@ -127,6 +214,11 @@ public class UserTaskChain extends SingleTaskChain {
 
     // The next task will be an idle task.
     public void signalNextTaskToBeIdleTask() {
+        ChatClefDiagnostics.logLifecycleBoundary("USER_TASK_CHAIN_SIGNAL_NEXT_IDLE", "user_task_chain_signal_next_idle", mainTask,
+                "chain", ChatClefDiagnostics.chainNameForDiagnosticLog(this),
+                "mainTask", ChatClefDiagnostics.taskSummaryForDiagnosticLog(mainTask),
+                "previousNextTaskIdleFlag", nextTaskIdleFlag,
+                "runningIdleTask", runningIdleTask);
         nextTaskIdleFlag = true;
     }
 }

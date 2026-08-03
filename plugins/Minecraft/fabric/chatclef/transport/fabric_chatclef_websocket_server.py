@@ -158,6 +158,17 @@ class FabricChatClefWebSocketServer:
                 or self._loop is None
                 or not self._loop.is_running()
             ):
+                self._log_command_gate(
+                    "command_rejected_not_connected",
+                    command_request,
+                    {
+                        "loop_present": self._loop is not None,
+                        "loop_running": (
+                            self._loop is not None and self._loop.is_running()
+                        ),
+                        "commands": self._connection_ownership.snapshot(),
+                    },
+                )
                 return self._command_rejection(
                     command_request,
                     BridgeErrorCode.NOT_CONNECTED,
@@ -165,6 +176,15 @@ class FabricChatClefWebSocketServer:
                 )
             active_request_id = self._connection_ownership.active_request_id
             if active_request_id is not None:
+                self._log_command_gate(
+                    "command_rejected_already_active",
+                    command_request,
+                    {
+                        "active_request_id": active_request_id,
+                        "rejected_at_ms": self._now_ms(),
+                        "commands": self._connection_ownership.snapshot(),
+                    },
+                )
                 return self._command_rejection(
                     command_request,
                     BridgeErrorCode.INVALID_REQUEST,
@@ -174,14 +194,32 @@ class FabricChatClefWebSocketServer:
             command_context = self._connection_ownership.begin_command(
                 request_id=command_request.request_id,
                 command_message_id=message_id,
+                command=command_request.command,
+                source=command_request.source,
             )
             if command_context is None:
+                self._log_command_gate(
+                    "command_rejected_begin_command_failed",
+                    command_request,
+                    {"commands": self._connection_ownership.snapshot()},
+                )
                 return self._command_rejection(
                     command_request,
                     BridgeErrorCode.NOT_CONNECTED,
                     "Fabric ChatClef bridge client is not connected.",
                 )
             websocket = command_context.websocket
+            self._log_command_gate(
+                "command_accepted",
+                command_request,
+                {
+                    "session_id": command_context.session_id,
+                    "connection_generation": command_context.generation,
+                    "command_message_id": command_context.command_message_id,
+                    "accepted_at_ms": self._now_ms(),
+                    "commands": self._connection_ownership.snapshot(),
+                },
+            )
 
         envelope = BridgeEnvelopeDTO(
             protocol_version=1,
@@ -201,11 +239,33 @@ class FabricChatClefWebSocketServer:
         except Exception as error:
             with self._command_lock:
                 self._connection_ownership.clear_command_if_current(command_context)
+            self._log_command_gate(
+                "command_send_failed",
+                command_request,
+                {
+                    "error_type": type(error).__name__,
+                    "error_message": str(error),
+                    "commands": self._connection_ownership.snapshot(),
+                },
+            )
             return self._command_rejection(
                 command_request,
                 BridgeErrorCode.INTERNAL_ERROR,
                 f"Fabric ChatClef command send failed: {type(error).__name__}: {error}",
             )
+        with self._command_lock:
+            after_send_status = self._connection_ownership.snapshot()
+        self._log_command_gate(
+            "command_send_succeeded",
+            command_request,
+            {
+                "session_id": command_context.session_id,
+                "connection_generation": command_context.generation,
+                "command_message_id": command_context.command_message_id,
+                "sent_at_ms": self._now_ms(),
+                "commands": after_send_status,
+            },
+        )
         return CommandResultDTO(
             request_id=command_request.request_id,
             ok=True,
@@ -383,16 +443,20 @@ class FabricChatClefWebSocketServer:
         finally:
             if accepted_session_id is not None:
                 with self._command_lock:
+                    before_status = self._connection_ownership.snapshot()
                     cleared = self._connection_ownership.clear_if_active(
                         websocket=websocket,
                         session_id=accepted_session_id,
                     )
+                    after_status = self._connection_ownership.snapshot()
                 if cleared:
                     self._session_registry.remove(accepted_session_id)
                     self._diagnostics.info(
                         "client disconnected "
                         f"session={accepted_session_id} "
-                        f"generation={connection_generation}"
+                        f"generation={connection_generation} "
+                        f"before={self._compact_json(before_status)} "
+                        f"after={self._compact_json(after_status)}"
                     )
 
     def _parse_envelope(self, raw_message: Any) -> BridgeEnvelopeDTO | None:
@@ -504,11 +568,26 @@ class FabricChatClefWebSocketServer:
             )
             return
         with self._command_lock:
+            before_status = self._connection_ownership.snapshot()
+        self._diagnostics.info(
+            "command result received "
+            f"request={result.request_id} "
+            f"status={result.status.value} "
+            f"ok={result.ok} "
+            f"error_code={result.error_code} "
+            f"message={result.message} "
+            f"session={envelope.session_id} "
+            f"correlation={envelope.correlation_id} "
+            f"before={self._compact_json(before_status)} "
+            f"data={self._compact_json(result.data)}"
+        )
+        with self._command_lock:
             accepted, reason = self._connection_ownership.accept_result(
                 websocket=websocket,
                 envelope=envelope,
                 result=result,
             )
+            after_status = self._connection_ownership.snapshot()
         if not accepted:
             self._diagnostics.warning(
                 "ignored command result "
@@ -516,12 +595,20 @@ class FabricChatClefWebSocketServer:
                 f"status={result.status.value} "
                 f"reason={reason} "
                 f"session={envelope.session_id} "
-                f"correlation={envelope.correlation_id}"
+                f"correlation={envelope.correlation_id} "
+                f"before={self._compact_json(before_status)} "
+                f"after={self._compact_json(after_status)} "
+                f"data={self._compact_json(result.data)}"
             )
             return
         self._diagnostics.info(
             "command result "
-            f"request={result.request_id} status={result.status.value} ok={result.ok}"
+            f"request={result.request_id} status={result.status.value} ok={result.ok} "
+            f"error_code={result.error_code} "
+            f"message={result.message} "
+            f"before={self._compact_json(before_status)} "
+            f"after={self._compact_json(after_status)} "
+            f"data={self._compact_json(result.data)}"
         )
 
     def _command_status(self) -> dict[str, Any]:
@@ -542,6 +629,34 @@ class FabricChatClefWebSocketServer:
             message=message,
             data={},
         )
+
+    def _log_command_gate(
+        self,
+        event: str,
+        request: CommandRequestDTO,
+        details: dict[str, Any],
+    ) -> None:
+        payload = {
+            "event": event,
+            "request_id": request.request_id,
+            "source": request.source,
+            "command": request.command,
+            "deadline_ms": request.deadline_ms,
+            "metadata": request.metadata,
+            "details": details,
+        }
+        self._diagnostics.info("command gate " + self._compact_json(payload))
+
+    def _compact_json(self, payload: Any) -> str:
+        try:
+            return json.dumps(
+                payload,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+        except Exception as error:
+            return f"<json failed {type(error).__name__}: {error}>"
 
     def _new_message_id(self) -> str:
         return f"lavi-{uuid.uuid4().hex}"

@@ -54,7 +54,7 @@ class MinecraftFabricChatClefJavaBridgeContractTests(unittest.TestCase):
     def test_phase_4_bridge_keeps_command_execution_in_tick_dispatcher(self):
         banned_fragments = (
             "TaskRunner",
-            "adris.altoclef.tasks",
+            "adris.altoclef.tasks.",
             "baritone",
             "PlayerInteractionFixChain",
             "InteractWithBlockTask",
@@ -109,7 +109,7 @@ class MinecraftFabricChatClefJavaBridgeContractTests(unittest.TestCase):
         self.assertIn("ClientTickEvents.END_CLIENT_TICK.register", entrypoint_text)
         self.assertIn("commandDispatcher::onEndClientTick", entrypoint_text)
 
-    def test_bridge_result_fidelity_does_not_treat_callback_as_completed(self):
+    def test_bridge_result_fidelity_combines_callback_with_task_finished_event(self):
         dispatcher_text = (
             BRIDGE_ROOT
             / "command"
@@ -125,12 +125,57 @@ class MinecraftFabricChatClefJavaBridgeContractTests(unittest.TestCase):
         self.assertTrue(execution_root.exists())
         self.assertIn("FabricChatClefCommandExecution", dispatcher_text)
         self.assertIn("execution.runningResult()", dispatcher_text)
-        self.assertIn("unknownAfterFinish", dispatcher_text)
-        self.assertIn("failedFromCommandException", dispatcher_text)
-        self.assertIn("failedFromDispatchException", dispatcher_text)
+        self.assertNotIn("unknownAfterFinish", dispatcher_text)
+        self.assertIn("completeCommandException", dispatcher_text)
+        self.assertIn("completeDispatchException", dispatcher_text)
         self.assertNotIn("FabricChatClefCommandResult.completed(", dispatcher_text)
         self.assertIn('"running"', result_text)
         self.assertIn('"unknown"', result_text)
+
+        lifecycle_root = BRIDGE_ROOT / "command" / "lifecycle"
+        observer_text = (
+            lifecycle_root / "FabricChatClefUserTaskFinishedObserver.java"
+        ).read_text(encoding="utf-8")
+        observation_text = (
+            lifecycle_root / "FabricChatClefCommandTerminationObservation.java"
+        ).read_text(encoding="utf-8")
+        classifier_text = (
+            lifecycle_root / "FabricChatClefCommandOutcomeClassifier.java"
+        ).read_text(encoding="utf-8")
+        execution_text = (
+            execution_root / "FabricChatClefCommandExecution.java"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("failedFromCommandException", execution_text)
+        self.assertIn("failedFromDispatchException", execution_text)
+        self.assertIn("EventBus.subscribe(TaskFinishedEvent.class", observer_text)
+        self.assertIn("ConcurrentLinkedQueue", observer_text)
+        self.assertIn("catch (Throwable error)", observer_text)
+        self.assertIn("task.stopped()", observation_text)
+        self.assertNotIn(".isFinished()", observation_text)
+        self.assertIn("finishCallbackReceived()", classifier_text)
+        self.assertIn("matchesBoundRootTask", classifier_text)
+        self.assertIn("completedFromTaskFinished", classifier_text)
+        self.assertIn("observation.task() == boundRootTask", execution_text)
+
+    def test_entrypoint_registers_lifecycle_observer_without_engine_modification(self):
+        entrypoint_text = (
+            BRIDGE_ROOT / "FabricChatClefBridgeEntrypoint.java"
+        ).read_text(encoding="utf-8")
+        lifecycle_root = BRIDGE_ROOT / "command" / "lifecycle"
+        coordinator_text = (
+            lifecycle_root / "FabricChatClefCommandLifecycleCoordinator.java"
+        ).read_text(encoding="utf-8")
+        outbox_text = (
+            lifecycle_root / "FabricChatClefCommandResultOutbox.java"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("taskFinishedObserver.register()", entrypoint_text)
+        self.assertIn("FabricChatClefCommandLifecycleCoordinator", entrypoint_text)
+        self.assertIn("onEndClientTick", coordinator_text)
+        self.assertIn("resultOutbox.sendTerminal", coordinator_text)
+        self.assertIn("markTerminalSent()", outbox_text)
+        self.assertIn("commandQueue.complete", outbox_text)
 
     def test_java_bridge_binds_results_to_connection_generation_and_context(self):
         client_text = (

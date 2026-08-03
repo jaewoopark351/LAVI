@@ -10,6 +10,10 @@ from plugins.Minecraft.common.dto.command_result_dto import CommandResultDTO
 from plugins.Minecraft.fabric.chatclef.adapter.fabric_chatclef_adapter import (
     FabricChatClefAdapter,
 )
+from plugins.Minecraft.fabric.chatclef.intent import (
+    ChatClefNaturalLanguageService,
+    ChatClefTranslationResultDTO,
+)
 
 
 class MinecraftFabricChatClefExtension(GameExtensionInterface):
@@ -19,9 +23,13 @@ class MinecraftFabricChatClefExtension(GameExtensionInterface):
         self,
         plugin: Any = None,
         adapter: FabricChatClefAdapter | None = None,
+        natural_language_service: ChatClefNaturalLanguageService | None = None,
     ):
         self.plugin = plugin
         self.adapter = adapter or self._adapter_from_plugin(plugin)
+        self.natural_language_service = (
+            natural_language_service or ChatClefNaturalLanguageService()
+        )
         self.context = None
         self.runtime_context = None
         self.event_bus = None
@@ -51,6 +59,21 @@ class MinecraftFabricChatClefExtension(GameExtensionInterface):
         payload = self._extension_result_payload(result)
         self.record_result(payload, action="submit_command")
         return payload
+
+    def translate_natural_language_command(self, command: Any) -> dict[str, Any]:
+        text = self._natural_language_text(command)
+        return self.natural_language_service.translate(text).to_dict()
+
+    def handle_natural_language_command(self, command: Any) -> dict[str, Any]:
+        text = self._natural_language_text(command)
+        translation = self.natural_language_service.translate(text)
+        if not translation.executable:
+            payload = self._translation_rejection_payload(translation)
+            self.record_result(payload, action="translate_natural_language_command")
+            return payload
+        return self.handle_command(
+            self._translated_command_request(command, translation, text)
+        )
 
     def get_status(self) -> dict[str, Any]:
         status = self.adapter.get_status().to_dict()
@@ -95,6 +118,35 @@ class MinecraftFabricChatClefExtension(GameExtensionInterface):
             metadata={"raw_type": command.__class__.__name__},
         )
 
+    def _natural_language_text(self, command: Any) -> str:
+        if isinstance(command, str):
+            return command.strip()
+        if isinstance(command, Mapping):
+            payload = dict(command)
+            return str(payload.get("text") or payload.get("command") or "").strip()
+        return str(command or "").strip()
+
+    def _translated_command_request(
+        self,
+        command: Any,
+        translation: ChatClefTranslationResultDTO,
+        original_text: str,
+    ) -> CommandRequestDTO:
+        payload = dict(command) if isinstance(command, Mapping) else {}
+        metadata = dict(payload.get("metadata") or {})
+        metadata["natural_language"] = {
+            "language": "ko",
+            "original_text": original_text,
+            "translation": translation.to_dict(),
+        }
+        return CommandRequestDTO(
+            request_id=payload.get("request_id", f"lavi-ko-{uuid.uuid4().hex}"),
+            command=str(translation.command or ""),
+            source=payload.get("source", "lavi_korean_intent"),
+            deadline_ms=payload.get("deadline_ms"),
+            metadata=metadata,
+        )
+
     def _extension_result_payload(self, result: CommandResultDTO) -> dict[str, Any]:
         return {
             "ok": result.ok,
@@ -102,6 +154,18 @@ class MinecraftFabricChatClefExtension(GameExtensionInterface):
             "error": None if result.error_code is None else result.error_code.value,
             "message": result.message,
             "details": result.data,
+        }
+
+    def _translation_rejection_payload(
+        self,
+        translation: ChatClefTranslationResultDTO,
+    ) -> dict[str, Any]:
+        return {
+            "ok": False,
+            "status": translation.to_dict(),
+            "error": translation.reason_code,
+            "message": translation.message,
+            "details": translation.data,
         }
 
     def _plugin_status(self) -> dict[str, Any]:

@@ -12,6 +12,10 @@ public final class FabricChatClefCommandResult {
         return result(requestId, true, "completed", null, message);
     }
 
+    public static Map<String, Object> completed(String requestId, String message, Map<String, Object> data) {
+        return result(requestId, true, "completed", null, message, data);
+    }
+
     public static Map<String, Object> running(String requestId, String message, Map<String, Object> data) {
         return result(requestId, true, "running", null, message, data);
     }
@@ -34,6 +38,10 @@ public final class FabricChatClefCommandResult {
 
     public static Map<String, Object> deadlineExceeded(String requestId, String message) {
         return result(requestId, false, "deadline_exceeded", "deadline_exceeded", message);
+    }
+
+    public static Map<String, Object> deadlineExceeded(String requestId, String message, Map<String, Object> data) {
+        return result(requestId, false, "deadline_exceeded", "deadline_exceeded", message, data);
     }
 
     private static Map<String, Object> result(

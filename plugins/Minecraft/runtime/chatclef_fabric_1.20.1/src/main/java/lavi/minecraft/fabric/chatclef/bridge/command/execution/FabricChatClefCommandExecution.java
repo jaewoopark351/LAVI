@@ -1,8 +1,10 @@
 package lavi.minecraft.fabric.chatclef.bridge.command.execution;
 
+import adris.altoclef.tasksystem.Task;
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandRequest;
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandResult;
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandContext;
+import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandTerminationObservation;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -19,8 +21,10 @@ public final class FabricChatClefCommandExecution {
     private volatile boolean finishCallbackReceived;
     private volatile String failureType = "";
     private volatile String failureMessage = "";
+    private volatile Task boundRootTask;
     private volatile FabricChatClefTaskSnapshot taskAfterDispatch;
     private volatile FabricChatClefTaskSnapshot terminalTask;
+    private volatile FabricChatClefCommandTerminationObservation taskFinishedObservation;
 
     public FabricChatClefCommandExecution(
             FabricChatClefCommandContext context,
@@ -45,9 +49,18 @@ public final class FabricChatClefCommandExecution {
         );
     }
 
-    public Map<String, Object> unknownAfterFinish(FabricChatClefTaskSnapshot taskAtFinish) {
+    public void markFinishCallbackReceived(FabricChatClefTaskSnapshot taskAtFinish) {
         finishCallbackReceived = true;
         terminalTask = taskAtFinish;
+    }
+
+    public void markFinishCallbackReceived(Task taskAtFinish) {
+        finishCallbackReceived = true;
+        terminalTask = FabricChatClefTaskSnapshot.capture(taskAtFinish);
+    }
+
+    public Map<String, Object> unknownAfterFinish(FabricChatClefTaskSnapshot taskAtFinish) {
+        markFinishCallbackReceived(taskAtFinish);
         return FabricChatClefCommandResult.unknown(
                 request.requestId,
                 "Fabric ChatClef command callback finished, but Minecraft goal success was not verified.",
@@ -77,9 +90,123 @@ public final class FabricChatClefCommandExecution {
         );
     }
 
-    public void markDispatchReturned(FabricChatClefTaskSnapshot taskAfterDispatch) {
+    public void markDispatchReturned(Task boundRootTask, FabricChatClefTaskSnapshot taskAfterDispatch) {
         dispatchReturned = true;
+        this.boundRootTask = boundRootTask;
         this.taskAfterDispatch = taskAfterDispatch;
+    }
+
+    public void markTaskFinishedObservation(FabricChatClefCommandTerminationObservation observation) {
+        taskFinishedObservation = observation;
+        if (observation != null) {
+            terminalTask = FabricChatClefTaskSnapshot.capture(observation.task());
+        }
+    }
+
+    public boolean dispatchReturned() {
+        return dispatchReturned;
+    }
+
+    public boolean finishCallbackReceived() {
+        return finishCallbackReceived;
+    }
+
+    public boolean hasBoundRootTask() {
+        return boundRootTask != null;
+    }
+
+    public boolean matchesBoundRootTask(FabricChatClefCommandTerminationObservation observation) {
+        return observation != null
+                && observation.taskPresent()
+                && boundRootTask != null
+                && observation.task() == boundRootTask;
+    }
+
+    public boolean matchesBoundRootTask(Task candidateTask) {
+        return candidateTask != null
+                && boundRootTask != null
+                && candidateTask == boundRootTask;
+    }
+
+    public String boundRootMatchReason(Task candidateTask) {
+        if (boundRootTask == null) {
+            return "no_bound_root_task";
+        }
+        if (candidateTask == null) {
+            return "candidate_task_absent";
+        }
+        if (candidateTask == boundRootTask) {
+            return "same_task_instance";
+        }
+        if (candidateTask.getClass() == boundRootTask.getClass()) {
+            return "same_task_class_different_instance";
+        }
+        return "different_task_class";
+    }
+
+    public Map<String, Object> boundRootRelationshipData(String candidateName, Task candidateTask) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put(candidateName, FabricChatClefTaskSnapshot.capture(candidateTask).toMap());
+        payload.put(candidateName + "_matches_bound_root_task", matchesBoundRootTask(candidateTask));
+        payload.put(candidateName + "_bound_root_match_reason", boundRootMatchReason(candidateTask));
+        payload.put("bound_root_task", FabricChatClefTaskSnapshot.capture(boundRootTask).toMap());
+        return payload;
+    }
+
+    public FabricChatClefCommandTerminationObservation taskFinishedObservation() {
+        return taskFinishedObservation;
+    }
+
+    public Map<String, Object> completedFromTaskFinished(FabricChatClefCommandTerminationObservation observation) {
+        return FabricChatClefCommandResult.completed(
+                request.requestId,
+                "ChatClef user task reached natural completion.",
+                data("matching_task_finished", observation)
+        );
+    }
+
+    public Map<String, Object> completedWithoutUserTask() {
+        return FabricChatClefCommandResult.completed(
+                request.requestId,
+                "ChatClef command completed without starting a user task.",
+                data("callback_completed_without_user_task")
+        );
+    }
+
+    public Map<String, Object> failedFromStoppedTask(FabricChatClefCommandTerminationObservation observation) {
+        return FabricChatClefCommandResult.failed(
+                request.requestId,
+                "ChatClef user task stopped before natural completion.",
+                data("matching_task_stopped", observation)
+        );
+    }
+
+    public Map<String, Object> unknownFromTaskObservation(FabricChatClefCommandTerminationObservation observation) {
+        return FabricChatClefCommandResult.unknown(
+                request.requestId,
+                "ChatClef user task completion could not be safely classified.",
+                data("task_observation_unclassified", observation)
+        );
+    }
+
+    public Map<String, Object> unknownFromTaskIdentityMismatch(FabricChatClefCommandTerminationObservation observation) {
+        return FabricChatClefCommandResult.unknown(
+                request.requestId,
+                "ChatClef user task finished, but it did not match the command root task.",
+                data("task_identity_mismatch", observation)
+        );
+    }
+
+    public Map<String, Object> deadlineExceededResult(String message) {
+        Map<String, Object> payload = data("deadline_exceeded");
+        payload.put("automation_cancelled", false);
+        payload.put("task_may_still_be_running", true);
+        payload.put("late_terminal_event_will_be_ignored", true);
+        return FabricChatClefCommandResult.deadlineExceeded(
+                request.requestId,
+                message,
+                payload
+        );
     }
 
     public boolean markTerminalSent() {
@@ -98,9 +225,25 @@ public final class FabricChatClefCommandExecution {
         return data(reason);
     }
 
+    public Map<String, Object> diagnosticData(String diagnosticReason) {
+        Map<String, Object> payload = data(diagnosticReason);
+        payload.put("request_command", request.command == null ? "" : request.command);
+        payload.put("request_source", request.source == null ? "" : request.source);
+        payload.put("normalized_command", normalizedCommand);
+        payload.put("elapsed_ms", System.currentTimeMillis() - dispatchStartedMs);
+        return payload;
+    }
+
     private Map<String, Object> data(String resultReason) {
+        return data(resultReason, taskFinishedObservation);
+    }
+
+    private Map<String, Object> data(
+            String resultReason,
+            FabricChatClefCommandTerminationObservation observation
+    ) {
         Map<String, Object> payload = new HashMap<>();
-        payload.put("result_fidelity", "bridge_callback_is_not_goal_success");
+        payload.put("result_fidelity", "callback_plus_matching_user_task_event");
         payload.put("result_reason", resultReason);
         payload.put("dispatch_started_ms", dispatchStartedMs);
         payload.put("dispatch_returned", dispatchReturned);
@@ -113,6 +256,9 @@ public final class FabricChatClefCommandExecution {
         payload.put("task_before_dispatch", taskBeforeDispatch.toMap());
         payload.put("task_after_dispatch", taskAfterDispatch.toMap());
         payload.put("terminal_task", terminalTask.toMap());
+        payload.put("bound_root_task", FabricChatClefTaskSnapshot.capture(boundRootTask).toMap());
+        payload.put("task_finished_event_received", observation != null);
+        payload.put("task_finished_observation", observation == null ? new HashMap<String, Object>() : observation.toMap());
         return payload;
     }
 

@@ -1,6 +1,7 @@
 #20260801_kpopmodder: Keep Fabric ChatClef websocket/request ownership out of the server I/O loop.
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -24,6 +25,9 @@ class FabricChatClefActiveCommand:
     generation: int
     request_id: str
     command_message_id: str
+    command: str = field(default="", compare=False)
+    source: str = field(default="", compare=False)
+    started_at_ms: int = field(default=0, compare=False)
 
 
 class FabricChatClefConnectionOwnership:
@@ -119,6 +123,8 @@ class FabricChatClefConnectionOwnership:
         *,
         request_id: str,
         command_message_id: str,
+        command: str = "",
+        source: str = "",
     ) -> FabricChatClefActiveCommand | None:
         if self._active_websocket is None or self._active_session_id is None:
             return None
@@ -130,6 +136,9 @@ class FabricChatClefConnectionOwnership:
             generation=self._generation,
             request_id=request_id,
             command_message_id=command_message_id,
+            command=str(command or ""),
+            source=str(source or ""),
+            started_at_ms=self._now_ms(),
         )
         self._active_command = command
         return command
@@ -168,6 +177,11 @@ class FabricChatClefConnectionOwnership:
 
     def snapshot(self) -> dict[str, Any]:
         command = self._active_command
+        active_age_ms = (
+            None
+            if command is None or command.started_at_ms <= 0
+            else max(0, self._now_ms() - command.started_at_ms)
+        )
         return {
             "active_session_id": self._active_session_id,
             "active_generation": self.active_generation,
@@ -175,5 +189,12 @@ class FabricChatClefConnectionOwnership:
             "active_command_message_id": (
                 None if command is None else command.command_message_id
             ),
+            "active_command": None if command is None else command.command,
+            "active_command_source": None if command is None else command.source,
+            "active_started_at_ms": None if command is None else command.started_at_ms,
+            "active_age_ms": active_age_ms,
             "last_result": self._last_command_result,
         }
+
+    def _now_ms(self) -> int:
+        return int(time.time() * 1000)

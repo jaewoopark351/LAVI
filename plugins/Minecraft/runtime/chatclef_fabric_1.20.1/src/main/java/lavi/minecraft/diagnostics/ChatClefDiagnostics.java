@@ -221,6 +221,11 @@ public final class ChatClefDiagnostics {
         emitEvent("BOUNDARY", "[LAVI ChatClefBoundary]", eventName, reason, task, fields, false);
     }
 
+    //20260803_kpopmodder: Keep command lifecycle diagnostics visible even when broad diagnostics are disabled.
+    public static void logLifecycleBoundary(String eventName, String reason, Task task, Object... fields) {
+        emitEvent("BOUNDARY", "[LAVI ChatClefLifecycle]", eventName, reason, task, fields, false);
+    }
+
     public static void logWarningEvent(String eventName, String reason, Task task, Object... fields) {
         if (OUTPUT_MODE == DiagnosticOutputMode.OFF) {
             return;
@@ -329,10 +334,21 @@ public final class ChatClefDiagnostics {
         );
     }
 
+    public static String safeValueForDiagnosticLog(Supplier<?> supplier) {
+        return DiagnosticValueFormatter.safeValue(
+                () -> supplier == null ? null : supplier.get(),
+                true
+        );
+    }
+
     public static String taskSummary(Task task) {
         if (OUTPUT_MODE == DiagnosticOutputMode.OFF) {
             return "unavailable";
         }
+        return DiagnosticGameStateFormatter.taskSummary(task, TASKS);
+    }
+
+    public static String taskSummaryForDiagnosticLog(Task task) {
         return DiagnosticGameStateFormatter.taskSummary(task, TASKS);
     }
 
@@ -606,6 +622,10 @@ public final class ChatClefDiagnostics {
         if (OUTPUT_MODE == DiagnosticOutputMode.OFF) {
             return "unavailable";
         }
+        return chainNameForDiagnosticLog(chain);
+    }
+
+    public static String chainNameForDiagnosticLog(TaskChain chain) {
         if (chain == null) {
             return "unavailable";
         }

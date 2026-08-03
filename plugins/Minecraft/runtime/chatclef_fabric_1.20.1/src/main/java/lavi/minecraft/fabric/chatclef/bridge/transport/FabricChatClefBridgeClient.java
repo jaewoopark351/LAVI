@@ -277,6 +277,16 @@ public final class FabricChatClefBridgeClient implements WebSocket.Listener, Fab
             return;
         }
         if (!commandQueue.offer(context)) {
+            diagnostics.warn(
+                    "rejected command_request rejected_by=java_command_queue request="
+                            + request.requestId
+                            + " source="
+                            + request.source
+                            + " active_request="
+                            + commandQueue.activeRequestId().orElse("<pending>")
+                            + " generation="
+                            + generation
+            );
             sendCommandResult(
                     envelope.messageId,
                     envelope.sessionId,
@@ -290,7 +300,16 @@ public final class FabricChatClefBridgeClient implements WebSocket.Listener, Fab
             );
             return;
         }
-        diagnostics.info("queued command request=" + request.requestId + " generation=" + generation);
+        diagnostics.info(
+                "queued command request="
+                        + request.requestId
+                        + " source="
+                        + request.source
+                        + " command="
+                        + request.command
+                        + " generation="
+                        + generation
+        );
     }
 
     @Override
