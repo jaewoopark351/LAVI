@@ -8,9 +8,10 @@ import adris.altoclef.util.slots.CursorSlot;
 import adris.altoclef.util.slots.Slot;
 import baritone.utils.ToolSet;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.diagnostics.toolselect.support.DiagnosticDeduplicator;
+import lavi.minecraft.diagnostics.toolselect.support.ToolDiagnosticFormatter;
+import lavi.minecraft.diagnostics.toolselect.support.ToolSavePolicyDiagnostics;
 import net.minecraft.block.BlockState;
-import net.minecraft.block.Block;
-import net.minecraft.block.Blocks;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
@@ -22,11 +23,7 @@ import java.util.StringJoiner;
 
 //20260801_kpopmodder: Added tool equip boundary diagnostics without changing ChatClef engine behavior.
 public final class ToolEquipDiagnostics {
-    private static final int MAX_CANDIDATES = 12;
-    private static String lastSelectionFingerprint = "";
-    private static String lastEquipRequestFingerprint = "";
-    private static String lastEquipResultFingerprint = "";
-    private static String lastPostconditionWarningFingerprint = "";
+    private static final DiagnosticDeduplicator DEDUPLICATOR = new DiagnosticDeduplicator();
 
     private ToolEquipDiagnostics() {
     }
@@ -45,8 +42,7 @@ public final class ToolEquipDiagnostics {
 
         long equipAttemptId = ChatClefDiagnostics.nextOperationId();
         String fingerprint = selectionFingerprint(targetPosition, targetState, currentSlot, currentStack, chosenSlot, chosenStack, decisionReason);
-        if (!fingerprint.equals(lastSelectionFingerprint)) {
-            lastSelectionFingerprint = fingerprint;
+        if (DEDUPLICATOR.shouldEmit("selection", fingerprint)) {
             ChatClefDiagnostics.logBoundary("TOOL_SELECTION_DECISION", "destroy_block_tool_selection", null,
                     "equipAttemptId", equipAttemptId,
                     "decisionReason", decisionReason,
@@ -56,16 +52,16 @@ public final class ToolEquipDiagnostics {
                     "targetRequiresTool", ChatClefDiagnostics.safeValue(() -> targetState == null ? null : targetState.isToolRequired()),
                     "minimumMiningRequirement", ChatClefDiagnostics.safeValue(() -> targetState == null ? null : MiningRequirement.getMinimumRequirementForBlock(targetState.getBlock())),
                     "currentSlot", ChatClefDiagnostics.slotSummary(currentSlot),
-                    "currentStack", stackDetails(currentStack),
+                    "currentStack", ToolDiagnosticFormatter.basicStackDetails(currentStack),
                     "currentSuitable", suitable(currentStack, targetState),
                     "currentSpeed", speed(currentStack, targetState),
                     "chosenSlot", ChatClefDiagnostics.slotSummary(chosenSlot),
-                    "chosenStack", stackDetails(chosenStack),
+                    "chosenStack", ToolDiagnosticFormatter.basicStackDetails(chosenStack),
                     "chosenSuitable", suitable(chosenStack, targetState),
                     "chosenSpeed", speed(chosenStack, targetState),
                     "baritonePathing", ChatClefDiagnostics.safeValue(() -> mod.getClientBaritone().getPathingBehavior().isPathing()),
                     "foodChainEating", ChatClefDiagnostics.safeValue(() -> mod.getFoodChain().isTryingToEat()),
-                    "cursorStack", ChatClefDiagnostics.safeValue(() -> stackDetails(StorageHelper.getItemStackInSlot(CursorSlot.SLOT))),
+                    "cursorStack", ChatClefDiagnostics.safeValue(() -> ToolDiagnosticFormatter.basicStackDetails(StorageHelper.getItemStackInSlot(CursorSlot.SLOT))),
                     "candidateSummary", candidateSummary(mod, targetState));
         }
 
@@ -99,41 +95,39 @@ public final class ToolEquipDiagnostics {
         String resultFingerprint = equipResultFingerprint(requestedItem, expectedSourceSlot, actualMatchingSlots,
                 selectedSlotBefore, selectedSlotAfter, mainHandBefore, mainHandAfter, forceEquipReportedSuccess,
                 postconditionItemMatched, postconditionExactStackMatched, resultReason);
-        if (resultFingerprint.equals(lastEquipResultFingerprint)) {
+        if (!DEDUPLICATOR.shouldEmit("equip_result", resultFingerprint)) {
             return;
         }
-        lastEquipResultFingerprint = resultFingerprint;
 
         ChatClefDiagnostics.logBoundary("TOOL_EQUIP_RESULT", "force_equip_item_result", null,
                 "equipAttemptId", equipAttemptId,
                 "resultReason", resultReason,
                 "requestedItem", requestedItem,
                 "expectedSourceSlot", ChatClefDiagnostics.slotSummary(expectedSourceSlot),
-                "expectedSourceStack", stackDetails(expectedSourceStack),
+                "expectedSourceStack", ToolDiagnosticFormatter.basicStackDetails(expectedSourceStack),
                 "actualMatchingSlotCount", actualMatchingSlots == null ? 0 : actualMatchingSlots.size(),
-                "actualMatchingSlots", slotListSummary(actualMatchingSlots),
+                "actualMatchingSlots", ToolDiagnosticFormatter.slotListSummary(actualMatchingSlots),
                 "sourceSlotMatchedExpected", sourceSlotMatchedExpected(expectedSourceSlot, actualMatchingSlots),
                 "destinationHotbarSlot", 1,
                 "inCursor", inCursor,
                 "selectedSlotBefore", selectedSlotBefore,
                 "selectedSlotAfter", selectedSlotAfter,
-                "hotbarSlot1Before", stackDetails(hotbarSlot1Before),
-                "hotbarSlot1After", stackDetails(hotbarSlot1After),
-                "mainHandBefore", stackDetails(mainHandBefore),
-                "mainHandAfter", stackDetails(mainHandAfter),
+                "hotbarSlot1Before", ToolDiagnosticFormatter.basicStackDetails(hotbarSlot1Before),
+                "hotbarSlot1After", ToolDiagnosticFormatter.basicStackDetails(hotbarSlot1After),
+                "mainHandBefore", ToolDiagnosticFormatter.basicStackDetails(mainHandBefore),
+                "mainHandAfter", ToolDiagnosticFormatter.basicStackDetails(mainHandAfter),
                 "forceEquipReportedSuccess", forceEquipReportedSuccess,
                 "postconditionItemMatched", postconditionItemMatched,
                 "postconditionExactStackMatched", postconditionExactStackMatched,
                 "baritonePathing", ChatClefDiagnostics.safeValue(() -> mod.getClientBaritone().getPathingBehavior().isPathing()));
 
-        if (forceEquipReportedSuccess && !postconditionItemMatched && !resultFingerprint.equals(lastPostconditionWarningFingerprint)) {
-            lastPostconditionWarningFingerprint = resultFingerprint;
+        if (forceEquipReportedSuccess && !postconditionItemMatched && DEDUPLICATOR.shouldEmit("postcondition_warning", resultFingerprint)) {
             ChatClefDiagnostics.logWarningEvent("TOOL_EQUIP_POSTCONDITION_MISMATCH", "force_equip_reported_success_without_main_hand_match", null,
                     "equipAttemptId", equipAttemptId,
                     "requestedItem", requestedItem,
-                    "mainHandAfter", stackDetails(mainHandAfter),
+                    "mainHandAfter", ToolDiagnosticFormatter.basicStackDetails(mainHandAfter),
                     "expectedSourceSlot", ChatClefDiagnostics.slotSummary(expectedSourceSlot),
-                    "actualMatchingSlots", slotListSummary(actualMatchingSlots));
+                    "actualMatchingSlots", ToolDiagnosticFormatter.slotListSummary(actualMatchingSlots));
         }
     }
 
@@ -145,20 +139,19 @@ public final class ToolEquipDiagnostics {
                                         Slot chosenSlot,
                                         ItemStack chosenStack) {
         String fingerprint = selectionFingerprint(targetPosition, targetState, currentSlot, currentStack, chosenSlot, chosenStack, "EQUIP_REQUEST");
-        if (fingerprint.equals(lastEquipRequestFingerprint)) {
+        if (!DEDUPLICATOR.shouldEmit("equip_request", fingerprint)) {
             return;
         }
-        lastEquipRequestFingerprint = fingerprint;
         ChatClefDiagnostics.logBoundary("TOOL_EQUIP_REQUEST", "better_tool_selected", null,
                 "equipAttemptId", equipAttemptId,
                 "targetPosition", ChatClefDiagnostics.blockPos(targetPosition),
                 "targetBlockState", ChatClefDiagnostics.safeValue(() -> targetState),
                 "currentSlot", ChatClefDiagnostics.slotSummary(currentSlot),
-                "currentStack", stackDetails(currentStack),
+                "currentStack", ToolDiagnosticFormatter.basicStackDetails(currentStack),
                 "currentSuitable", suitable(currentStack, targetState),
                 "currentSpeed", speed(currentStack, targetState),
                 "chosenSlot", ChatClefDiagnostics.slotSummary(chosenSlot),
-                "chosenStack", stackDetails(chosenStack),
+                "chosenStack", ToolDiagnosticFormatter.basicStackDetails(chosenStack),
                 "chosenSuitable", suitable(chosenStack, targetState),
                 "chosenSpeed", speed(chosenStack, targetState));
     }
@@ -181,13 +174,13 @@ public final class ToolEquipDiagnostics {
                     continue;
                 }
                 candidateCount++;
-                if (emitted < MAX_CANDIDATES) {
-                    String saveDecision = saveDecision(mod, stack, targetState);
+                if (emitted < ToolDiagnosticFormatter.MAX_CANDIDATES) {
+                    String saveDecision = ToolSavePolicyDiagnostics.computedDecision(mod, stack, targetState);
                     candidates.add(ChatClefDiagnostics.slotSummary(slot)
-                            + "#stack=" + stackDetails(stack)
+                            + "#stack=" + ToolDiagnosticFormatter.basicStackDetails(stack)
                             + "#suitable=" + suitable(stack, targetState)
                             + "#defaultStackSuitable=" + defaultStackSuitable(stack, targetState)
-                            + "#shouldSave=" + shouldSaveFromDecision(saveDecision)
+                            + "#shouldSave=" + ToolSavePolicyDiagnostics.shouldSaveFromDecision(saveDecision)
                             + "#selectionOutcome=" + selectionOutcome(stack, targetState, saveDecision)
                             + "#saveDecision=" + saveDecision
                             + "#speed=" + speed(stack, targetState));
@@ -202,16 +195,6 @@ public final class ToolEquipDiagnostics {
         }
     }
 
-    private static String stackDetails(ItemStack stack) {
-        if (stack == null) {
-            return "none";
-        }
-        return ChatClefDiagnostics.itemStackSummary(stack)
-                + "#damage=" + ChatClefDiagnostics.safeValue(stack::getDamage)
-                + "#maxDamage=" + ChatClefDiagnostics.safeValue(stack::getMaxDamage)
-                + "#stackString=" + ChatClefDiagnostics.safeValue(stack::toString);
-    }
-
     private static String suitable(ItemStack stack, BlockState targetState) {
         return ChatClefDiagnostics.safeValue(() -> stack != null && targetState != null && stack.isSuitableFor(targetState));
     }
@@ -222,14 +205,6 @@ public final class ToolEquipDiagnostics {
 
     private static String speed(ItemStack stack, BlockState targetState) {
         return ChatClefDiagnostics.safeValue(() -> stack == null || targetState == null ? "unavailable" : ToolSet.calculateSpeedVsBlock(stack, targetState));
-    }
-
-    private static String shouldSaveFromDecision(String saveDecision) {
-        if (saveDecision == null || !saveDecision.startsWith("result=")) {
-            return "unavailable";
-        }
-        int delimiter = saveDecision.indexOf('#');
-        return delimiter < 0 ? saveDecision.substring("result=".length()) : saveDecision.substring("result=".length(), delimiter);
     }
 
     private static String selectionOutcome(ItemStack stack, BlockState targetState, String saveDecision) {
@@ -257,76 +232,6 @@ public final class ToolEquipDiagnostics {
         });
     }
 
-    private static String saveDecision(AltoClef mod, ItemStack stack, BlockState targetState) {
-        return ChatClefDiagnostics.safeValue(() -> {
-            if (stack == null) {
-                return "result=unavailable#reason=NO_STACK";
-            }
-            if (targetState == null) {
-                return "result=unavailable#reason=NO_TARGET_STATE";
-            }
-
-            Item item = stack.getItem();
-            if (item != Items.IRON_PICKAXE) {
-                return "result=false#reason=NOT_IRON_PICKAXE";
-            }
-
-            boolean hasDiamondPickaxe = mod.getItemStorage().hasItem(Items.DIAMOND_PICKAXE);
-            if (hasDiamondPickaxe) {
-                return "result=false#reason=HAS_DIAMOND_PICKAXE";
-            }
-
-            Block block = targetState.getBlock();
-            boolean diamondRelatedBlock = block.equals(Blocks.DIAMOND_BLOCK)
-                    || block.equals(Blocks.DIAMOND_ORE)
-                    || block.equals(Blocks.DEEPSLATE_DIAMOND_ORE);
-            int damage = stack.getDamage();
-            int maxDamage = stack.getMaxDamage();
-            boolean criticalDurability = damage + 8 > maxDamage;
-            boolean lowDurability = damage + 30 > maxDamage;
-            MiningRequirement minimumRequirement = MiningRequirement.getMinimumRequirementForBlock(block);
-            boolean shouldSave = StorageHelper.shouldSaveStack(mod, block, stack);
-
-            String reason = "NOT_LOW_DURABILITY";
-            if (criticalDurability) {
-                reason = diamondRelatedBlock ? "CRITICAL_DURABILITY_DIAMOND_RELATED" : "CRITICAL_DURABILITY_NON_DIAMOND";
-            } else if (lowDurability) {
-                reason = minimumRequirement.equals(MiningRequirement.IRON)
-                        ? "LOW_DURABILITY_IRON_REQUIRED"
-                        : "LOW_DURABILITY_BLOCK_NOT_IRON_REQUIRED";
-            }
-
-            return "result=" + shouldSave
-                    + "#reason=" + reason
-                    + "#hasDiamondPickaxe=" + hasDiamondPickaxe
-                    + "#damage=" + damage
-                    + "#maxDamage=" + maxDamage
-                    + "#damagePlus8=" + (damage + 8)
-                    + "#damagePlus30=" + (damage + 30)
-                    + "#diamondRelatedBlock=" + diamondRelatedBlock
-                    + "#minimumMiningRequirement=" + minimumRequirement;
-        });
-    }
-
-    private static String slotListSummary(List<Slot> slots) {
-        if (slots == null) {
-            return "none";
-        }
-        StringJoiner joiner = new StringJoiner(",", "[", "]");
-        int emitted = 0;
-        for (Slot slot : slots) {
-            if (emitted >= MAX_CANDIDATES) {
-                break;
-            }
-            joiner.add(ChatClefDiagnostics.slotSummary(slot));
-            emitted++;
-        }
-        if (slots.size() > emitted) {
-            joiner.add("truncated=" + (slots.size() - emitted));
-        }
-        return joiner.toString();
-    }
-
     private static boolean sourceSlotMatchedExpected(Slot expectedSourceSlot, List<Slot> actualMatchingSlots) {
         return expectedSourceSlot != null && actualMatchingSlots != null && actualMatchingSlots.stream().anyMatch(expectedSourceSlot::equals);
     }
@@ -341,9 +246,9 @@ public final class ToolEquipDiagnostics {
         return ChatClefDiagnostics.blockPos(targetPosition)
                 + "|" + ChatClefDiagnostics.safeValue(() -> targetState == null ? null : targetState.getBlock())
                 + "|" + ChatClefDiagnostics.slotSummary(currentSlot)
-                + "|" + itemFingerprint(currentStack)
+                + "|" + ToolDiagnosticFormatter.equipItemFingerprint(currentStack)
                 + "|" + ChatClefDiagnostics.slotSummary(chosenSlot)
-                + "|" + itemFingerprint(chosenStack)
+                + "|" + ToolDiagnosticFormatter.equipItemFingerprint(chosenStack)
                 + "|" + decisionReason;
     }
 
@@ -360,26 +265,14 @@ public final class ToolEquipDiagnostics {
                                                  String resultReason) {
         return requestedItem
                 + "|" + ChatClefDiagnostics.slotSummary(expectedSourceSlot)
-                + "|" + slotListSummary(actualMatchingSlots)
+                + "|" + ToolDiagnosticFormatter.slotListSummary(actualMatchingSlots)
                 + "|" + selectedSlotBefore
                 + "|" + selectedSlotAfter
-                + "|" + itemFingerprint(mainHandBefore)
-                + "|" + itemFingerprint(mainHandAfter)
+                + "|" + ToolDiagnosticFormatter.equipItemFingerprint(mainHandBefore)
+                + "|" + ToolDiagnosticFormatter.equipItemFingerprint(mainHandAfter)
                 + "|" + reportedSuccess
                 + "|" + postconditionItemMatched
                 + "|" + postconditionExactStackMatched
                 + "|" + resultReason;
-    }
-
-    private static String itemFingerprint(ItemStack stack) {
-        if (stack == null) {
-            return "none";
-        }
-        return ChatClefDiagnostics.safeValue(() -> stack.getItem())
-                + "#count=" + ChatClefDiagnostics.safeValue(stack::getCount)
-                + "#damage=" + ChatClefDiagnostics.safeValue(stack::getDamage)
-                + "#maxDamage=" + ChatClefDiagnostics.safeValue(stack::getMaxDamage)
-                + "#stackString=" + ChatClefDiagnostics.safeValue(stack::toString)
-                + "#empty=" + ChatClefDiagnostics.safeValue(stack::isEmpty);
     }
 }
