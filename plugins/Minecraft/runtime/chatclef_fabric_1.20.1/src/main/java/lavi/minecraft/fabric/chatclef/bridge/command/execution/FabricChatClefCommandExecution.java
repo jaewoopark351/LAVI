@@ -226,12 +226,13 @@ public final class FabricChatClefCommandExecution {
     }
 
     public Map<String, Object> diagnosticData(String diagnosticReason) {
-        Map<String, Object> payload = data(diagnosticReason);
-        payload.put("request_command", request.command == null ? "" : request.command);
-        payload.put("request_source", request.source == null ? "" : request.source);
-        payload.put("normalized_command", normalizedCommand);
-        payload.put("elapsed_ms", System.currentTimeMillis() - dispatchStartedMs);
-        return payload;
+        return FabricChatClefCommandDiagnosticPayload.diagnosticData(
+                diagnosticReason,
+                request,
+                normalizedCommand,
+                System.currentTimeMillis() - dispatchStartedMs,
+                data(diagnosticReason)
+        );
     }
 
     private Map<String, Object> data(String resultReason) {
@@ -242,24 +243,22 @@ public final class FabricChatClefCommandExecution {
             String resultReason,
             FabricChatClefCommandTerminationObservation observation
     ) {
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("result_fidelity", "callback_plus_matching_user_task_event");
-        payload.put("result_reason", resultReason);
-        payload.put("dispatch_started_ms", dispatchStartedMs);
-        payload.put("dispatch_returned", dispatchReturned);
-        payload.put("dispatch_thread", dispatchThreadName);
-        payload.put("normalized_command_length", normalizedCommand.length());
-        payload.put("finish_callback_received", finishCallbackReceived);
-        payload.put("failure_type", failureType);
-        payload.put("failure_message", failureMessage);
-        payload.put("ownership", context.ownershipData());
-        payload.put("task_before_dispatch", taskBeforeDispatch.toMap());
-        payload.put("task_after_dispatch", taskAfterDispatch.toMap());
-        payload.put("terminal_task", terminalTask.toMap());
-        payload.put("bound_root_task", FabricChatClefTaskSnapshot.capture(boundRootTask).toMap());
-        payload.put("task_finished_event_received", observation != null);
-        payload.put("task_finished_observation", observation == null ? new HashMap<String, Object>() : observation.toMap());
-        return payload;
+        return FabricChatClefCommandDiagnosticPayload.commandData(
+                resultReason,
+                dispatchStartedMs,
+                dispatchReturned,
+                dispatchThreadName,
+                normalizedCommand,
+                finishCallbackReceived,
+                failureType,
+                failureMessage,
+                context,
+                taskBeforeDispatch,
+                taskAfterDispatch,
+                terminalTask,
+                FabricChatClefTaskSnapshot.capture(boundRootTask),
+                observation
+        );
     }
 
     private static String nullSafeMessage(Throwable error) {
