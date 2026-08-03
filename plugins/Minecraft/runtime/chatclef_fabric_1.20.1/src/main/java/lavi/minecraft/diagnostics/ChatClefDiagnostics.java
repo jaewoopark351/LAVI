@@ -1,7 +1,6 @@
 package lavi.minecraft.diagnostics;
 
 import adris.altoclef.AltoClef;
-import adris.altoclef.Debug;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.tasksystem.TaskChain;
 import adris.altoclef.util.ItemTarget;
@@ -18,7 +17,6 @@ import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 
-import java.util.StringJoiner;
 import java.util.function.Supplier;
 
 //20260730_kpopmodder: Added diagnostic logging to prove the Carry On interaction failure boundary.
@@ -26,14 +24,15 @@ import java.util.function.Supplier;
 public final class ChatClefDiagnostics {
     private static final DiagnosticTraceState TRACE_STATE = new DiagnosticTraceState();
     private static final DiagnosticTaskRegistry TASKS = new DiagnosticTaskRegistry();
+    private static final DiagnosticModeController MODE = new DiagnosticModeController(DiagnosticOutputMode.fromEnvironment());
+    private static final DiagnosticEventEmitter EVENTS = new DiagnosticEventEmitter(TRACE_STATE, TASKS);
     private static final PostPlaceContainerDiagnosticState POST_PLACE_CONTAINERS = new PostPlaceContainerDiagnosticState();
-    private static volatile DiagnosticOutputMode OUTPUT_MODE = DiagnosticOutputMode.fromEnvironment();
 
     private ChatClefDiagnostics() {
     }
 
     public static void onClientTickHead() {
-        if (OUTPUT_MODE == DiagnosticOutputMode.OFF) {
+        if (MODE.isOff()) {
             return;
         }
         try {
@@ -60,56 +59,56 @@ public final class ChatClefDiagnostics {
     }
 
     public static boolean isVerboseEnabled() {
-        return OUTPUT_MODE == DiagnosticOutputMode.VERBOSE;
+        return MODE.isVerboseEnabled();
     }
 
     public static boolean isBoundaryEnabled() {
-        return OUTPUT_MODE != DiagnosticOutputMode.OFF;
+        return MODE.isBoundaryEnabled();
     }
 
     //20260731_kpopmodder: Allow the LAVI command layer to switch diagnostics between BOUNDARY and OFF without changing engine behavior.
     public static void setBoundaryEnabled(boolean enabled) {
-        OUTPUT_MODE = enabled ? DiagnosticOutputMode.BOUNDARY : DiagnosticOutputMode.OFF;
+        MODE.setBoundaryEnabled(enabled);
         TRACE_STATE.resetRuntimeIdentityLogged();
     }
 
     public static String inputHeldState(Input input) {
-        if (OUTPUT_MODE == DiagnosticOutputMode.OFF) {
+        if (MODE.isOff()) {
             return "unavailable";
         }
         return DiagnosticInputState.inputHeld(input);
     }
 
     public static String rawInputHeldState(Input input) {
-        if (OUTPUT_MODE == DiagnosticOutputMode.OFF) {
+        if (MODE.isOff()) {
             return "unavailable";
         }
         return DiagnosticInputState.rawKeyHeld(input);
     }
 
     public static void startTrace(String reason, Task task, Object... fields) {
-        if (OUTPUT_MODE != DiagnosticOutputMode.VERBOSE) {
+        if (!MODE.isVerboseEnabled()) {
             return;
         }
         safeLog("TRACE", "START", reason, task, fields, true);
     }
 
     public static void enterTask(Task task) {
-        if (OUTPUT_MODE != DiagnosticOutputMode.VERBOSE) {
+        if (!MODE.isVerboseEnabled()) {
             return;
         }
         TASKS.enterTask(task);
     }
 
     public static void exitTask(Task task) {
-        if (OUTPUT_MODE != DiagnosticOutputMode.VERBOSE) {
+        if (!MODE.isVerboseEnabled()) {
             return;
         }
         TASKS.exitTask(task);
     }
 
     public static void beginTaskRun(Task task, TaskChain parentChain) {
-        if (OUTPUT_MODE != DiagnosticOutputMode.VERBOSE) {
+        if (!MODE.isVerboseEnabled()) {
             return;
         }
         safeLog("TASK", "START", "first_tick", task,
@@ -119,21 +118,21 @@ public final class ChatClefDiagnostics {
     }
 
     public static void setParent(Task child, Task parent) {
-        if (OUTPUT_MODE != DiagnosticOutputMode.VERBOSE) {
+        if (!MODE.isVerboseEnabled()) {
             return;
         }
         TASKS.setParent(child, parent);
     }
 
     public static void logEvent(String eventType, String phase, String reason, Task task, Object... fields) {
-        if (OUTPUT_MODE != DiagnosticOutputMode.VERBOSE) {
+        if (!MODE.isVerboseEnabled()) {
             return;
         }
         safeLog(eventType, phase, reason, task, fields, false);
     }
 
     public static void logTaskTransition(Task parent, Task previousTask, Task nextTask, String reason, Object... fields) {
-        if (OUTPUT_MODE != DiagnosticOutputMode.VERBOSE) {
+        if (!MODE.isVerboseEnabled()) {
             return;
         }
         Object[] merged = mergeFields(fields,
@@ -147,7 +146,7 @@ public final class ChatClefDiagnostics {
     }
 
     public static void logInput(String phase, String reason, Input input, Object... fields) {
-        if (OUTPUT_MODE != DiagnosticOutputMode.VERBOSE) {
+        if (!MODE.isVerboseEnabled()) {
             return;
         }
         Object[] merged = mergeFields(fields,
@@ -157,7 +156,7 @@ public final class ChatClefDiagnostics {
     }
 
     public static void logInputSnapshot(String phase, String reason, Object... fields) {
-        if (OUTPUT_MODE != DiagnosticOutputMode.VERBOSE) {
+        if (!MODE.isVerboseEnabled()) {
             return;
         }
         Object[] merged = mergeFields(DiagnosticInputState.snapshotFields(), fields);
@@ -165,7 +164,7 @@ public final class ChatClefDiagnostics {
     }
 
     public static void logSlotClick(String phase, String reason, Slot slot, int mouseButton, Object type, Object... fields) {
-        if (OUTPUT_MODE != DiagnosticOutputMode.VERBOSE) {
+        if (!MODE.isVerboseEnabled()) {
             return;
         }
         Object[] merged = mergeFields(fields,
@@ -177,17 +176,17 @@ public final class ChatClefDiagnostics {
     }
 
     public static void logInteractBlock(String phase, String reason, Object hand, BlockHitResult hitResult, Object result) {
-        if (OUTPUT_MODE == DiagnosticOutputMode.OFF) {
+        if (MODE.isOff()) {
             return;
         }
         logInteractBlock(phase, reason, MinecraftClient.getInstance().player, hand, hitResult, result);
     }
 
     public static void logInteractBlock(String phase, String reason, ClientPlayerEntity player, Object hand, BlockHitResult hitResult, Object result) {
-        if (OUTPUT_MODE != DiagnosticOutputMode.OFF) {
+        if (!MODE.isOff()) {
             logPostPlaceContainerInteractIfMatching(phase, player, hand, hitResult, result);
         }
-        if (OUTPUT_MODE != DiagnosticOutputMode.VERBOSE) {
+        if (!MODE.isVerboseEnabled()) {
             return;
         }
         BlockPos blockPos = hitResult == null ? null : hitResult.getBlockPos();
@@ -215,7 +214,7 @@ public final class ChatClefDiagnostics {
     }
 
     public static void logBoundary(String eventName, String reason, Task task, Object... fields) {
-        if (OUTPUT_MODE == DiagnosticOutputMode.OFF) {
+        if (MODE.isOff()) {
             return;
         }
         emitEvent("BOUNDARY", "[LAVI ChatClefBoundary]", eventName, reason, task, fields, false);
@@ -227,14 +226,14 @@ public final class ChatClefDiagnostics {
     }
 
     public static void logWarningEvent(String eventName, String reason, Task task, Object... fields) {
-        if (OUTPUT_MODE == DiagnosticOutputMode.OFF) {
+        if (MODE.isOff()) {
             return;
         }
         emitEvent("WARN", "[LAVI ChatClefDiag]", eventName, reason, task, fields, true);
     }
 
     public static void logVerboseLine(String message) {
-        if (OUTPUT_MODE != DiagnosticOutputMode.VERBOSE) {
+        if (!MODE.isVerboseEnabled()) {
             return;
         }
         System.out.println("ALTO CLEF: " + value(message));
@@ -244,7 +243,7 @@ public final class ChatClefDiagnostics {
                                                          Object containerType,
                                                          BlockPos targetPosition,
                                                          Object targetBlockState) {
-        if (OUTPUT_MODE == DiagnosticOutputMode.OFF) {
+        if (MODE.isOff()) {
             return;
         }
         POST_PLACE_CONTAINERS.begin(
@@ -257,63 +256,63 @@ public final class ChatClefDiagnostics {
     }
 
     public static PostPlaceContainerOpenIntent activePostPlaceContainerOpenIntent(BlockPos targetPosition) {
-        if (OUTPUT_MODE == DiagnosticOutputMode.OFF) {
+        if (MODE.isOff()) {
             return null;
         }
         return POST_PLACE_CONTAINERS.active(targetPosition);
     }
 
     public static int postPlaceContainerAttemptCount(long operationId) {
-        if (OUTPUT_MODE == DiagnosticOutputMode.OFF) {
+        if (MODE.isOff()) {
             return 0;
         }
         return POST_PLACE_CONTAINERS.attemptCount(operationId);
     }
 
     public static String postPlaceContainerLastInteractResult(long operationId) {
-        if (OUTPUT_MODE == DiagnosticOutputMode.OFF) {
+        if (MODE.isOff()) {
             return "unavailable";
         }
         return POST_PLACE_CONTAINERS.lastInteractResult(operationId);
     }
 
     public static long postPlaceContainerElapsedTicks(long operationId) {
-        if (OUTPUT_MODE == DiagnosticOutputMode.OFF) {
+        if (MODE.isOff()) {
             return -1;
         }
         return POST_PLACE_CONTAINERS.elapsedTicks(operationId, currentClientTickId());
     }
 
     public static boolean markPostPlaceContainerGuiOpened(long operationId) {
-        if (OUTPUT_MODE == DiagnosticOutputMode.OFF) {
+        if (MODE.isOff()) {
             return false;
         }
         return POST_PLACE_CONTAINERS.markGuiOpened(operationId);
     }
 
     public static boolean markPostPlaceContainerGuiTimeout(long operationId) {
-        if (OUTPUT_MODE == DiagnosticOutputMode.OFF) {
+        if (MODE.isOff()) {
             return false;
         }
         return POST_PLACE_CONTAINERS.markGuiTimeout(operationId);
     }
 
     public static boolean markPostPlaceContainerWarningLogged(long operationId) {
-        if (OUTPUT_MODE == DiagnosticOutputMode.OFF) {
+        if (MODE.isOff()) {
             return false;
         }
         return POST_PLACE_CONTAINERS.markWarningLogged(operationId);
     }
 
     public static boolean isPostPlaceContainerGuiOpened(long operationId) {
-        if (OUTPUT_MODE == DiagnosticOutputMode.OFF) {
+        if (MODE.isOff()) {
             return false;
         }
         return POST_PLACE_CONTAINERS.isGuiOpened(operationId);
     }
 
     public static void clearPostPlaceContainerOpenIntent(long operationId) {
-        if (OUTPUT_MODE == DiagnosticOutputMode.OFF) {
+        if (MODE.isOff()) {
             return;
         }
         POST_PLACE_CONTAINERS.clear(operationId);
@@ -330,7 +329,7 @@ public final class ChatClefDiagnostics {
     public static String safeValue(Supplier<?> supplier) {
         return DiagnosticValueFormatter.safeValue(
                 () -> supplier == null ? null : supplier.get(),
-                OUTPUT_MODE != DiagnosticOutputMode.OFF
+                !MODE.isOff()
         );
     }
 
@@ -342,7 +341,7 @@ public final class ChatClefDiagnostics {
     }
 
     public static String taskSummary(Task task) {
-        if (OUTPUT_MODE == DiagnosticOutputMode.OFF) {
+        if (MODE.isOff()) {
             return "unavailable";
         }
         return DiagnosticGameStateFormatter.taskSummary(task, TASKS);
@@ -353,21 +352,21 @@ public final class ChatClefDiagnostics {
     }
 
     public static String entitySummary(Entity entity) {
-        if (OUTPUT_MODE == DiagnosticOutputMode.OFF) {
+        if (MODE.isOff()) {
             return "unavailable";
         }
         return DiagnosticGameStateFormatter.entitySummary(entity);
     }
 
     public static String entityDistanceSqrToPlayer(AltoClef mod, Entity entity) {
-        if (OUTPUT_MODE == DiagnosticOutputMode.OFF) {
+        if (MODE.isOff()) {
             return "unavailable";
         }
         return DiagnosticGameStateFormatter.entityDistanceSqrToPlayer(mod, entity);
     }
 
     public static String playerPosition(AltoClef mod) {
-        if (OUTPUT_MODE == DiagnosticOutputMode.OFF) {
+        if (MODE.isOff()) {
             return "unavailable";
         }
         return DiagnosticGameStateFormatter.playerPosition(mod);
@@ -382,35 +381,35 @@ public final class ChatClefDiagnostics {
     }
 
     public static String itemStackSummary(ItemStack stack) {
-        if (OUTPUT_MODE == DiagnosticOutputMode.OFF) {
+        if (MODE.isOff()) {
             return "unavailable";
         }
         return DiagnosticGameStateFormatter.itemStackSummary(stack);
     }
 
     public static String slotSummary(Slot slot) {
-        if (OUTPUT_MODE == DiagnosticOutputMode.OFF) {
+        if (MODE.isOff()) {
             return "unavailable";
         }
         return DiagnosticGameStateFormatter.slotSummary(slot);
     }
 
     public static String slotStackSummary(Slot slot) {
-        if (OUTPUT_MODE == DiagnosticOutputMode.OFF) {
+        if (MODE.isOff()) {
             return "unavailable";
         }
         return DiagnosticGameStateFormatter.slotStackSummary(slot);
     }
 
     public static String itemTargets(ItemTarget[] targets) {
-        if (OUTPUT_MODE == DiagnosticOutputMode.OFF) {
+        if (MODE.isOff()) {
             return "unavailable";
         }
         return DiagnosticGameStateFormatter.itemTargets(targets);
     }
 
     public static String classList(Class<?>[] classes) {
-        if (OUTPUT_MODE == DiagnosticOutputMode.OFF) {
+        if (MODE.isOff()) {
             return "unavailable";
         }
         return DiagnosticGameStateFormatter.classList(classes);
@@ -424,39 +423,7 @@ public final class ChatClefDiagnostics {
         if (!isVerboseEnabled()) {
             return;
         }
-        try {
-            StringJoiner log = new StringJoiner(" ");
-            DiagnosticEventIdentity eventIdentity;
-            long taskInstanceId;
-            long taskRunId;
-            long parentTaskRunId;
-            eventIdentity = TRACE_STATE.nextEventIdentity(startNewTrace);
-            taskInstanceId = task == null ? -1 : TASKS.instanceId(task);
-            if (startTaskRun && task != null) {
-                taskRunId = TASKS.createRunId(task);
-            } else {
-                taskRunId = task == null ? -1 : TASKS.existingRunId(task);
-            }
-            parentTaskRunId = task == null ? -1 : TASKS.parentRunId(task);
-
-            append(log, "traceId", eventIdentity.traceId());
-            append(log, "clientTickId", eventIdentity.clientTickId());
-            append(log, "eventSequence", eventIdentity.eventSequence());
-            append(log, "taskInstanceId", DiagnosticTaskRegistry.idLabel(taskInstanceId));
-            append(log, "taskRunId", DiagnosticTaskRegistry.idLabel(taskRunId));
-            append(log, "parentTaskRunId", DiagnosticTaskRegistry.idLabel(parentTaskRunId));
-            append(log, "threadName", Thread.currentThread().getName());
-            append(log, "eventType", eventType);
-            append(log, "phase", phase);
-            append(log, "reason", reason);
-            append(log, "taskClass", taskName(task));
-            appendPairs(log, DiagnosticScreenState.currentFields());
-            appendPairs(log, DiagnosticInputState.currentStateFields());
-            appendPairs(log, fields);
-
-            System.out.println("ALTO CLEF: [LAVI ChatClefDiag] " + log);
-        } catch (RuntimeException | LinkageError ignored) {
-        }
+        EVENTS.logVerboseEvent(eventType, phase, reason, task, fields, startNewTrace, startTaskRun);
     }
 
     private static void emitEvent(String level,
@@ -466,37 +433,7 @@ public final class ChatClefDiagnostics {
                                   Task task,
                                   Object[] fields,
                                   boolean warning) {
-        try {
-            StringJoiner log = new StringJoiner(" ");
-            DiagnosticEventIdentity eventIdentity;
-            long taskInstanceId;
-            long taskRunId;
-            long parentTaskRunId;
-            eventIdentity = TRACE_STATE.nextEventIdentity(false);
-            taskInstanceId = task == null ? -1 : TASKS.instanceId(task);
-            taskRunId = task == null ? -1 : TASKS.existingRunId(task);
-            parentTaskRunId = task == null ? -1 : TASKS.parentRunId(task);
-
-            append(log, "traceId", eventIdentity.traceId());
-            append(log, "clientTickId", eventIdentity.clientTickId());
-            append(log, "eventSequence", eventIdentity.eventSequence());
-            append(log, "taskInstanceId", DiagnosticTaskRegistry.idLabel(taskInstanceId));
-            append(log, "taskRunId", DiagnosticTaskRegistry.idLabel(taskRunId));
-            append(log, "parentTaskRunId", DiagnosticTaskRegistry.idLabel(parentTaskRunId));
-            append(log, "threadName", Thread.currentThread().getName());
-            append(log, "level", level);
-            append(log, "event", eventName);
-            append(log, "reason", reason);
-            append(log, "taskClass", taskName(task));
-            appendPairs(log, fields);
-
-            if (warning) {
-                Debug.logWarning(prefix + " " + log);
-            } else {
-                System.out.println("ALTO CLEF: " + prefix + " " + log);
-            }
-        } catch (RuntimeException | LinkageError ignored) {
-        }
+        EVENTS.emitEvent(level, prefix, eventName, reason, task, fields, warning);
     }
 
     private static void logPostPlaceContainerInteractIfMatching(String phase,
@@ -546,80 +483,24 @@ public final class ChatClefDiagnostics {
         return DiagnosticCallerStack.captureExcluding(ChatClefDiagnostics.class);
     }
 
-    private static void appendPairs(StringJoiner log, Object... fields) {
-        if (fields == null) {
-            return;
-        }
-        for (int i = 0; i < fields.length; i += 2) {
-            Object key = fields[i];
-            Object fieldValue = i + 1 < fields.length ? fields[i + 1] : "missing";
-            append(log, String.valueOf(key), value(fieldValue));
-        }
-    }
-
-    private static void append(StringJoiner log, String key, Object fieldValue) {
-        log.add(key + "=" + value(fieldValue));
-    }
-
     private static Object[] mergeFields(Object[] fields, Object... extra) {
-        if (fields == null || fields.length == 0) {
-            return extra;
-        }
-        Object[] merged = new Object[fields.length + extra.length];
-        System.arraycopy(fields, 0, merged, 0, fields.length);
-        System.arraycopy(extra, 0, merged, fields.length, extra.length);
-        return merged;
+        return DiagnosticEventEmitter.mergeFields(fields, extra);
     }
 
     private static void logRuntimeIdentityOnce() {
         if (!TRACE_STATE.markRuntimeIdentityLogged()) {
             return;
         }
-        logBoundary("DIAGNOSTICS_RUNTIME_IDENTITY", "diagnostics_runtime_identity", null,
-                "outputMode", OUTPUT_MODE.name(),
-                "diagnosticsSourceMarker", "20260731_post_place_handoff_p2",
-                "diagnosticsClassCodeSource", diagnosticsCodeSourceLocation(),
-                "diagnosticsCodeSourceLastModified", diagnosticsCodeSourceLastModified(),
-                "diagnosticsImplementationVersion", diagnosticsImplementationVersion());
-    }
-
-    private static String diagnosticsCodeSourceLocation() {
-        try {
-            java.security.CodeSource source = ChatClefDiagnostics.class.getProtectionDomain().getCodeSource();
-            return source == null || source.getLocation() == null ? "unavailable" : source.getLocation().toString();
-        } catch (RuntimeException | LinkageError ignored) {
-            return "unavailable";
-        }
-    }
-
-    private static String diagnosticsCodeSourceLastModified() {
-        try {
-            java.security.CodeSource source = ChatClefDiagnostics.class.getProtectionDomain().getCodeSource();
-            if (source == null || source.getLocation() == null) {
-                return "unavailable";
-            }
-            java.nio.file.Path path = java.nio.file.Paths.get(source.getLocation().toURI());
-            if (!java.nio.file.Files.exists(path)) {
-                return "unavailable";
-            }
-            return java.nio.file.Files.getLastModifiedTime(path).toString();
-        } catch (Exception | LinkageError ignored) {
-            return "unavailable";
-        }
-    }
-
-    private static String diagnosticsImplementationVersion() {
-        try {
-            Package packageInfo = ChatClefDiagnostics.class.getPackage();
-            String implementationVersion = packageInfo == null ? null : packageInfo.getImplementationVersion();
-            return implementationVersion == null || implementationVersion.isBlank() ? "unavailable" : implementationVersion;
-        } catch (RuntimeException | LinkageError ignored) {
-            return "unavailable";
-        }
+        logBoundary(
+                "DIAGNOSTICS_RUNTIME_IDENTITY",
+                "diagnostics_runtime_identity",
+                null,
+                RuntimeIdentityDiagnostics.fields(MODE.current(), ChatClefDiagnostics.class)
+        );
     }
 
     public static String chainName(TaskChain chain) {
-        if (OUTPUT_MODE == DiagnosticOutputMode.OFF) {
+        if (MODE.isOff()) {
             return "unavailable";
         }
         return chainNameForDiagnosticLog(chain);
@@ -637,14 +518,7 @@ public final class ChatClefDiagnostics {
     }
 
     private static String taskName(Task task) {
-        if (task == null) {
-            return "none";
-        }
-        try {
-            return task.getClass().getName();
-        } catch (RuntimeException | LinkageError ignored) {
-            return "unavailable";
-        }
+        return DiagnosticEventEmitter.taskName(task);
     }
 
     private static String value(Object rawValue) {
