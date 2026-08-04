@@ -1,6 +1,5 @@
 package lavi.minecraft.fabric.chatclef.bridge.command;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -62,15 +61,15 @@ public final class FabricChatClefCommandContext {
     }
 
     public Map<String, Object> ownershipData() {
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("request_id", requestId());
-        payload.put("correlation_id", correlationId);
-        payload.put("session_id", sessionId);
-        payload.put("connection_generation", connectionGeneration);
-        payload.put("accepted_at_ms", acceptedAtMs);
-        payload.put("detached", detached);
-        payload.put("detached_reason", detachedReason);
-        return payload;
+        return new FabricChatClefCommandOwnershipPayload(
+                requestId(),
+                correlationId,
+                sessionId,
+                connectionGeneration,
+                acceptedAtMs,
+                detached,
+                detachedReason
+        ).toMap();
     }
 
     private static String nullToEmpty(String value) {

@@ -4,6 +4,7 @@ import adris.altoclef.AltoClef;
 import adris.altoclef.util.slots.Slot;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 import lavi.minecraft.diagnostics.toolselect.support.DiagnosticDeduplicator;
+import lavi.minecraft.diagnostics.toolselect.support.ToolCandidateDiagnosticFormatter;
 import lavi.minecraft.diagnostics.toolselect.support.ToolDiagnosticFormatter;
 import lavi.minecraft.diagnostics.toolselect.support.ToolSavePolicyDiagnostics;
 import lavi.minecraft.diagnostics.toolselect.support.ToolTargetDiagnosticFields;
@@ -81,13 +82,14 @@ public final class BestToolSlotDiagnostics {
             String saveDecision = defaultSuitable
                     ? ToolSavePolicyDiagnostics.observedDecision(mod, stack, targetState, shouldSave)
                     : "not_evaluated#reason=NOT_DEFAULT_SUITABLE";
-            candidates.add(ChatClefDiagnostics.slotSummary(slot)
-                    + "#stack=" + ToolDiagnosticFormatter.toolStackDetails(stack)
-                    + "#defaultStackSuitable=" + defaultSuitable
-                    + "#shouldSave=" + (defaultSuitable ? Boolean.toString(shouldSave) : "not_evaluated")
-                    + "#selectionOutcome=" + outcome
-                    + "#saveDecision=" + saveDecision
-                    + "#speed=" + ToolDiagnosticFormatter.speedValue(speed));
+            candidates.add(ToolCandidateDiagnosticFormatter.bestToolCandidate(
+                    slot,
+                    ToolDiagnosticFormatter.toolStackDetails(stack),
+                    defaultSuitable,
+                    defaultSuitable ? Boolean.toString(shouldSave) : "not_evaluated",
+                    outcome,
+                    saveDecision,
+                    ToolDiagnosticFormatter.speedValue(speed)));
             emittedCandidates++;
         }
 
@@ -103,11 +105,11 @@ public final class BestToolSlotDiagnostics {
             if (emittedCandidates >= ToolDiagnosticFormatter.MAX_CANDIDATES) {
                 return;
             }
-            candidates.add(ChatClefDiagnostics.slotSummary(slot)
-                    + "#stack=" + ToolDiagnosticFormatter.toolStackDetails(stack)
-                    + "#selectionOutcome=" + (effective ? (selected ? "SHEARS_SELECTED" : "SHEARS_EFFECTIVE") : "SHEARS_NOT_EFFECTIVE")
-                    + "#saveDecision=not_applicable#reason=SHEARS"
-                    + "#speed=not_evaluated");
+            candidates.add(ToolCandidateDiagnosticFormatter.shearsCandidate(
+                    slot,
+                    ToolDiagnosticFormatter.toolStackDetails(stack),
+                    effective,
+                    selected));
             emittedCandidates++;
         }
 

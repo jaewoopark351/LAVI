@@ -8,6 +8,7 @@ import adris.altoclef.util.slots.Slot;
 import baritone.utils.ToolSet;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 import lavi.minecraft.diagnostics.toolselect.support.DiagnosticDeduplicator;
+import lavi.minecraft.diagnostics.toolselect.support.ToolCandidateDiagnosticFormatter;
 import lavi.minecraft.diagnostics.toolselect.support.ToolDiagnosticFormatter;
 import lavi.minecraft.diagnostics.toolselect.support.ToolSavePolicyDiagnostics;
 import lavi.minecraft.diagnostics.toolselect.support.ToolTargetDiagnosticFields;
@@ -176,14 +177,15 @@ public final class ToolEquipDiagnostics {
                 candidateCount++;
                 if (emitted < ToolDiagnosticFormatter.MAX_CANDIDATES) {
                     String saveDecision = ToolSavePolicyDiagnostics.computedDecision(mod, stack, targetState);
-                    candidates.add(ChatClefDiagnostics.slotSummary(slot)
-                            + "#stack=" + ToolDiagnosticFormatter.basicStackDetails(stack)
-                            + "#suitable=" + suitable(stack, targetState)
-                            + "#defaultStackSuitable=" + defaultStackSuitable(stack, targetState)
-                            + "#shouldSave=" + ToolSavePolicyDiagnostics.shouldSaveFromDecision(saveDecision)
-                            + "#selectionOutcome=" + selectionOutcome(stack, targetState, saveDecision)
-                            + "#saveDecision=" + saveDecision
-                            + "#speed=" + speed(stack, targetState));
+                    candidates.add(ToolCandidateDiagnosticFormatter.equipCandidate(
+                            slot,
+                            ToolDiagnosticFormatter.basicStackDetails(stack),
+                            suitable(stack, targetState),
+                            defaultStackSuitable(stack, targetState),
+                            ToolSavePolicyDiagnostics.shouldSaveFromDecision(saveDecision),
+                            selectionOutcome(stack, targetState, saveDecision),
+                            saveDecision,
+                            speed(stack, targetState)));
                     emitted++;
                 }
             }

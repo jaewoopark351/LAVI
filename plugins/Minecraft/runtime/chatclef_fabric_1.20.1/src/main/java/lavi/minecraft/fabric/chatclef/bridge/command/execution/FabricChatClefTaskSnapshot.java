@@ -2,7 +2,6 @@ package lavi.minecraft.fabric.chatclef.bridge.command.execution;
 
 import adris.altoclef.tasksystem.Task;
 
-import java.util.HashMap;
 import java.util.Map;
 
 //20260801_kpopmodder: Observe ChatClef task identity without owning or mutating engine state.
@@ -77,18 +76,18 @@ public final class FabricChatClefTaskSnapshot {
     }
 
     public Map<String, Object> toMap() {
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("available", available);
-        payload.put("class_name", className);
-        payload.put("description", description);
-        payload.put("identity", identity);
-        payload.put("error", error);
-        payload.put("task_state_available", taskStateAvailable);
-        payload.put("task_active", taskActive);
-        payload.put("task_stopped", taskStopped);
-        payload.put("this_or_child_timed_out", thisOrChildTimedOut);
-        payload.put("task_state_error", taskStateError);
-        return payload;
+        return new FabricChatClefTaskSnapshotPayload(
+                available,
+                className,
+                description,
+                identity,
+                error,
+                taskStateAvailable,
+                taskActive,
+                taskStopped,
+                thisOrChildTimedOut,
+                taskStateError
+        ).toMap();
     }
 
     private static TaskState captureTaskState(Object task) {

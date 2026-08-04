@@ -4,7 +4,6 @@ import adris.altoclef.eventbus.events.TaskFinishedEvent;
 import adris.altoclef.tasksystem.Task;
 import lavi.minecraft.fabric.chatclef.bridge.command.execution.FabricChatClefTaskSnapshot;
 
-import java.util.HashMap;
 import java.util.Map;
 
 //20260803_kpopmodder: Observe user task termination without changing ChatClef engine behavior.
@@ -96,18 +95,17 @@ public final class FabricChatClefCommandTerminationObservation {
     }
 
     public Map<String, Object> toMap() {
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("completion_source", "altoclef_task_finished_event");
-        payload.put("termination_kind", terminationKind());
-        payload.put("task_present", taskPresent);
-        payload.put("task_stopped", taskStopped);
-        payload.put("stop_state_available", stopStateAvailable);
-        payload.put("stop_state_error", stopStateError);
-        payload.put("duration_seconds", durationSeconds);
-        payload.put("observed_at_ms", observedAtMs);
-        payload.put("observation_thread", observationThread);
-        payload.put("task", taskSnapshot.toMap());
-        return payload;
+        return new FabricChatClefCommandTerminationObservationPayload(
+                terminationKind(),
+                taskPresent,
+                taskStopped,
+                stopStateAvailable,
+                stopStateError,
+                durationSeconds,
+                observedAtMs,
+                observationThread,
+                taskSnapshot
+        ).toMap();
     }
 
     private static String nullSafeMessage(Throwable error) {
