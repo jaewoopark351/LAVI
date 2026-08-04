@@ -80,8 +80,11 @@ Codex must read and apply this document before proposing or modifying
 ChatClef, AltoClef, Baritone interaction, Carry On integration, or related
 diagnostic behavior.
 
-This link does not authorize a later phase, Java modification, diagnostics
-patch, behavioral fix, build, commit, or push.
+Reading the companion document alone does not authorize a later phase, Java
+modification, diagnostics patch, behavioral fix, build, commit, or push.
+The standing authorization in `ChatClef Fabric 1.20.1 Diagnostics-Only and
+Bounded Logging Policy` below separately authorizes the smallest bounded
+diagnostics-only source edit when all of that policy's conditions are met.
 
 This subsection has higher priority for that tree than:
 
@@ -405,7 +408,7 @@ Remaining risk:
 
 Any edit to upstream-derived ChatClef or AltoClef source is an engine divergence.
 
-A diagnostics-only engine divergence may be proposed only when the required failure boundary cannot be observed from a LAVI-owned layer. It must not change return values, task selection, completion, retry, timeout, input state, Baritone goal or path state, fallback behavior, exception handling, cleanup, or lifecycle ordering.
+A diagnostics-only engine divergence may be applied under the standing diagnostics-only authorization when the required failure boundary cannot be observed from a LAVI-owned layer. It must remain the smallest method-level or diff-hunk-level observation change and must not change return values, task selection, completion, retry, timeout, input state, Baritone goal or path state, fallback behavior, exception handling, cleanup, or lifecycle ordering. If the observation requires a broad engine change, more than the minimum upstream hunks, or any behavior change, stop and report instead of applying it.
 
 A behavior-changing engine divergence is a last-resort operation.
 
@@ -512,9 +515,527 @@ stopReason
 exceptionType
 ```
 
-Use state-change logging, attempt counters, correlation identifiers, bounded debug sessions, rate limiting, or sampling for high-frequency game-tick paths. Logging volume must not be used as a reason to leave a material transition unobservable.
+Use boundary and state-change logging rather than unchanged-state polling logs. For every high-frequency game-tick or slot path, the bounded logging controls defined below are mandatory. Logging volume must not be used as a reason to leave a material transition unobservable, and material observability must not be implemented through unbounded output.
 
 Do not add timeout, retry, blacklist, cancellation, input release, path cancellation, or fallback behavior until logs or direct evidence prove the exact failing boundary and the ownership of the state being changed.
+
+#### ChatClef Fabric 1.20.1 Diagnostics-Only and Bounded Logging Policy
+
+<!-- 20260804_kpopmodder: Added a standing diagnostics-only policy that preserves ChatClef behavior while preventing tick-by-slot log explosions. -->
+
+This policy applies to the Fabric ChatClef 1.20.1 runtime tree and to LAVI-owned Fabric ChatClef bridge or diagnostics code that observes commands executed by that runtime. It applies to ChatClef, AltoClef, Baritone interaction boundaries, inventory tracking, container transfer, command lifecycle, and optional Carry On observation. It is not limited to Carry On bugs.
+
+When this policy conflicts with the generic logging guidance in Sections 21 or 21.1, this scoped policy has higher priority for the Fabric ChatClef 1.20.1 investigation.
+
+##### Standing diagnostics-only authorization
+
+When the user asks Codex to investigate, diagnose, trace, or debug a failure, hang, loop, missing terminal event, crash, or unexplained result in this scope, and the exact root cause is not already proven, Codex must classify the next source change as diagnostics-only.
+
+Codex may apply the smallest bounded diagnostics-only logging edit without asking a separate question such as whether logs should be added first. This is standing permission to choose diagnostics-only work over a speculative behavior fix.
+
+This standing authorization:
+
+* applies only to source edits whose sole runtime purpose is observation
+* applies to the smallest necessary LAVI-owned diagnostic helper or upstream-derived diagnostic hunk
+* does not authorize a behavior-changing fix
+* does not authorize a dependency or version change
+* does not authorize a wire-protocol change
+* does not authorize a build, Minecraft launch, runtime reproduction, commit, or push unless the user's current instruction separately authorizes that action
+* does not override an explicit read-only, audit-only, no-edit, or proposal-only instruction
+* does not override the strict read-only restoration and salvage protocol
+* does not authorize edits outside the active repository boundary
+
+When the required observation boundary exists only inside upstream-derived ChatClef or AltoClef code, Codex may add one minimal method-level or diff-hunk-level diagnostic block without separate behavior-fix approval. If the required observation would span multiple upstream lifecycle owners, restructure an upstream class, or modify behavior, stop and report the wider scope instead.
+
+##### Unknown-cause behavior gate
+
+If the exact last successful boundary, first failing boundary, and triggering state are not proven, behavior changes are prohibited.
+
+A diagnostics-only change may:
+
+* read already available state without mutating it
+* calculate a bounded summary for logging
+* emit structured logs through the existing logger
+* keep diagnostic-only counters, fingerprints, suppression counts, and session budgets that influence only whether a diagnostic event is emitted
+* expire or clear diagnostic-only bookkeeping without calling engine cleanup or changing task results
+
+A diagnostics-only change must not change or influence:
+
+```text
+return values
+Task selection, scheduling, ordering, completion, or ownership
+retry count, retry policy, retry timing, or retry reason
+timeout creation, timeout duration, timeout result, cooldown, delay, or sleep
+input state, input ownership, input acquisition, or input release
+Baritone pathing state, goal creation, goal replacement, goal cancellation, or goal ownership
+fallback selection, fallback result, or recovery policy
+exception catching, suppression, conversion, propagation, or terminal classification
+cleanup entry, cleanup ordering, cleanup ownership, or resources released
+wire-protocol schema, message fields, ordering, status values, or acknowledgements
+container clicks, cursor state, slot transfer, sync-id handling, screen opening, or screen closing
+TaskRunner, Task chain, UserTaskChain, SingleTaskChain, or command lifecycle behavior
+thread scheduling, synchronization, object lifecycle, or game-tick ordering
+```
+
+Do not add a new `try/catch` around observed engine behavior merely to collect a log. Do not catch and suppress a new exception. A diagnostic formatter may protect only its own formatting from malformed optional values; it must not consume an exception thrown by the observed ChatClef, AltoClef, Baritone, input, transport, or container operation.
+
+Do not call a state-changing ChatClef, AltoClef, Baritone, Minecraft, Fabric, Carry On, input, or container API merely to populate a log field.
+
+##### Diagnostics defaults and overlay separation
+
+Use these defaults unless an existing project configuration defines a stricter, quieter policy:
+
+```text
+Normal runtime startup: diagnostics OFF
+Explicitly enabled investigation: diagnostics BOUNDARY
+VERBOSE or equivalent detail mode: explicit user selection only
+Overlay or HUD rendering: independent from diagnostics mode
+```
+
+`OFF` disables investigation-only detail but does not suppress existing lifecycle, warning, error, crash, or terminal-failure logs that are part of normal operation.
+
+`BOUNDARY` is the default investigation mode. It emits operation boundaries, meaningful state changes, decisions, refusals, sampled progress, exceptions, and terminal reasons. It must not emit unchanged state every tick.
+
+`VERBOSE` may be used only for a bounded reproduction when the user explicitly selects it or the current task explicitly authorizes that detail level. `VERBOSE` is still subject to rate limiting, deduplication, sampling, payload bounds, and the session hard cap.
+
+Overlay and diagnostics are separate controls:
+
+* turning an overlay or HUD on or off must not enable, disable, or change diagnostics
+* enabling or disabling diagnostics must not change HUD visibility, Baritone path rendering, goal rendering, or any other visual overlay
+* diagnostics state must not be inferred from overlay state
+* overlay configuration must not be used as the diagnostics storage location merely because both are developer-facing controls
+
+If the current implementation couples overlay and diagnostics, decoupling them is a separate configuration or behavior task. Do not hide that behavior change inside a diagnostics-only logging hunk. A diagnostics-only patch must not silently change the current startup default or command semantics.
+
+##### Boundary, state-change, and terminal event model
+
+Prefer a small set of reconstructable structured events over many low-value loop messages.
+
+Log the following when applicable:
+
+```text
+operation or command accepted
+correlation established
+root Task started
+child Task selected or changed
+important decision made
+existing retry attempt or retry reason changed
+existing fallback activated
+relevant inventory, tool, container, input, or pathing state changed
+an action was refused and the exact refusal reason is known
+interruption or cancellation entered
+cleanup entered and completed when already owned by the observed code
+terminal success, rejection, cancellation, interruption, existing timeout, or failure
+exception type and exact observation boundary
+```
+
+A repeated unchanged state is not a state-change event.
+
+Terminal, exception, and diagnostic-cap events must have reserved emission budget so repetitive progress logs cannot consume the entire session budget before the final reason is recorded.
+
+##### Forbidden high-frequency logging patterns
+
+Do not add or retain investigation logging that emits any of the following without a boundary or state change:
+
+```text
+game tick x inventory slot
+game tick x container slot
+game tick x candidate tool
+every-tick full inventory snapshot
+every-tick full container snapshot
+per-slot InventorySubTracker.registerItem logging
+per-call StorageHelper slot-read logging
+per-node or per-movement Baritone planning logging
+per-tick TaskRunner or child-Task dump when the Task identity is unchanged
+raw Object.toString output for every observed object
+repeated full stack traces for the same exception boundary
+```
+
+Do not instrument a low-level slot accessor merely because it is called by the failing path. Prefer the caller boundary that owns the count, decision, transfer request, refusal, or terminal result.
+
+##### Mandatory hot-path controls
+
+A path is hot when it may execute every game tick, once per slot, once per inventory registration, once per path node, once per movement candidate, once per render frame, or repeatedly while a Task remains unchanged.
+
+Every diagnostic event emitted from a hot path must use all of the following controls:
+
+1. **Rate limit**: bound the maximum emission frequency per correlation and event family.
+2. **Deduplication**: suppress identical meaningful fingerprints and count suppressed repeats.
+3. **Sampling**: emit periodic unchanged-state progress only at a coarse documented interval; state changes and terminal events are not sampled away.
+4. **Session hard cap**: cap total diagnostic events for the bounded diagnostic session, with reserved capacity for terminal, exception, suppression-summary, and cap-reached events.
+
+Use an existing stricter project limit when one exists. If no limit exists, use these conservative defaults:
+
+```text
+first unique event: emit immediately
+unchanged repeat summary: no more than once per 200 game ticks or 10 seconds
+per-correlation detailed-event cap: 256 events
+total diagnostic-session hard cap: 5000 events
+reserved terminal/exception/cap budget: at least 32 events inside the total cap
+```
+
+These values are log budgets only. They must never become a Task retry limit, gameplay timeout, cancellation trigger, pathing timeout, container timeout, or command terminal condition.
+
+When events are suppressed, emit a bounded summary containing the event family, meaningful fingerprint, suppressed count, first-observed time or tick, and last-observed time or tick. Do not emit one suppression message per suppressed event.
+
+When the session cap is reached, emit one `DIAGNOSTIC_SESSION_CAP_REACHED` event, continue reserving the terminal budget, and suppress only non-terminal diagnostic detail. Do not stop, cancel, retry, time out, or otherwise alter the observed operation.
+
+##### Fingerprint stability and payload bounds
+
+A deduplication fingerprint must use stable semantic values that explain why two events are meaningfully the same or different.
+
+Preferred fingerprint fields include only applicable values such as:
+
+```text
+event family
+correlationId or local operation id
+root Task class
+child Task class
+normalized item or block identifier
+requested count
+current count
+target count
+delta needed
+normalized screen handler type
+container sync id
+normalized source and target slot identities
+normalized pathing phase or goal summary
+move result
+refusal reason
+terminal reason
+exception type
+exception boundary
+```
+
+Do not put these values in the default fingerprint:
+
+```text
+game tick or wall-clock timestamp
+System.identityHashCode or another identity hash
+default or opaque Object.toString output
+unordered HashMap.toString, HashSet.toString, or another unordered collection rendering
+full NBT
+full inventory or full container dump
+stack trace
+random UUID generated per log attempt
+mutable object address or implementation-specific identity
+```
+
+`gameTick` and timestamps may be emitted as ordinary fields for ordering and elapsed-time analysis, but they must not make every fingerprint unique.
+
+Normalize and sort maps, sets, item collections, candidate lists, and slot summaries before logging or fingerprinting. Slot summaries must be ordered by stable slot identity or slot index. Include an `omittedCount` when a bounded summary truncates additional entries.
+
+A full stack trace may be emitted for the first occurrence of a unique exception type and boundary in a correlation. Repeated occurrences must use deduplication and a repeat count rather than repeating the full trace. The stack trace is evidence payload, not fingerprint material.
+
+Full NBT is disabled by default. Log only the specific semantic fields required to explain the decision, such as item id, count, damage, max damage, custom-name presence, or another explicitly relevant property. Any temporary full-NBT investigation requires explicit user approval and its own strict payload and session cap.
+
+##### Inventory, item-count, and free-slot suspicion
+
+When inventory count, item availability, or free-slot state may explain a hang or refusal, log at the count/decision boundary rather than inside every slot read.
+
+Capture the smallest applicable state:
+
+```text
+requestId
+correlationId
+rootTask
+childTask
+requestedItem
+requestedCount
+currentItemCount
+targetItemCount
+deltaNeeded
+inventoryFreeSlots
+sourceItem
+sourceItemCount
+sourceSlotsSummary
+counting boundary or helper
+selected branch
+refusalReason
+terminalReason
+```
+
+`sourceSlotsSummary` must contain only relevant matching or decision-driving slots, sorted by slot index and bounded in length. Do not dump every inventory slot every tick. Emit a new snapshot only on operation start, relevant count change, free-slot change, refusal, terminal result, or exception.
+
+When command semantics distinguish requested quantity from final target quantity, log both. Do not assume `requestedCount`, `targetItemCount`, and `deltaNeeded` are interchangeable.
+
+##### Tool selection and block-breakability suspicion
+
+When tool selection or block breakability may explain stalled `DestroyBlockTask` or mining behavior, log one bounded decision event when the target, candidate set, selected tool, or refusal reason changes.
+
+Capture applicable fields:
+
+```text
+requestId
+correlationId
+rootTask
+childTask
+targetBlockId
+targetBlockPosition
+targetBlockStateSummary
+requiredToolCategory or mining level when already available
+breakability decision
+candidateToolsSummary
+selectedToolSlot
+selectedToolItem
+selectedToolDamage
+selectedToolMaxDamage
+selectionOutcome
+selectionReason
+save-tool decision and reason when already evaluated
+fallback considered by existing code
+terminalReason
+exceptionType
+exceptionBoundary
+```
+
+`candidateToolsSummary` must be sorted and bounded. It should contain only decision-driving values such as item id, slot, suitability, durability, and skip reason. Do not call an additional mining, pathing, or tool-selection operation solely to fill the log.
+
+##### Furnace and container slot-transfer suspicion
+
+When `SmeltInFurnaceTask`, `MoveItemToSlotTask`, or another container transfer may be stalled, log at screen-entry, transfer-decision, observed relevant-slot state change, refusal, and terminal boundaries.
+
+Capture applicable fields:
+
+```text
+requestId
+correlationId
+rootTask
+childTask
+requestedItem
+requestedCount
+currentItemCount
+targetItemCount
+deltaNeeded
+inventoryFreeSlots
+sourceItem
+sourceItemCount
+sourceSlotsSummary
+targetSlot
+cursorStackSummary
+screenHandlerType
+containerSyncId
+furnaceInputSlot
+furnaceFuelSlot
+furnaceOutputSlot
+moveAction already selected by existing code
+moveResult
+refusalReason
+terminalReason
+exceptionType
+exceptionBoundary
+```
+
+Represent the furnace input, fuel, and output slots as bounded semantic summaries such as item id and count. Do not log full NBT or every unrelated container slot.
+
+A diagnostics-only patch must not click a slot, change the target slot, move the cursor stack, alter `syncId`, reopen or close a screen, retry a transfer, or reinterpret a refusal as success.
+
+##### Pathfinding and long Baritone planning suspicion
+
+When Baritone planning appears long-running, log planning boundaries and sampled progress instead of nodes or movements individually.
+
+Capture applicable fields:
+
+```text
+requestId
+correlationId
+rootTask
+childTask
+pathing process or phase
+baritonePathing state
+goal type and bounded semantic summary
+goal owner when observable
+path or custom-goal owner when observable
+planning start tick or time
+elapsed ticks or time
+movements considered when already exposed
+open-set size when already exposed
+path-node map size when already exposed
+best-path or progress summary when already exposed
+state-change reason
+existing cancellation or terminal reason
+exceptionType
+exceptionBoundary
+```
+
+Emit immediately on planning start, goal or owner change, pathing-state change, completion, existing cancellation, or exception. Emit unchanged progress only at the coarse sampling interval and under the hard cap.
+
+Do not create, replace, cancel, pause, resume, or restart a Baritone goal or path to obtain diagnostics. Do not add a pathing timeout as part of diagnostics-only work.
+
+##### Command lifecycle terminal-event suspicion
+
+When a command appears complete in Minecraft but LAVI remains active, trace the existing lifecycle boundaries without changing the wire protocol or command state machine.
+
+Capture applicable fields:
+
+```text
+requestId
+correlationId
+command accepted or queued boundary
+render-thread or command-dispatch boundary
+root Task start
+root Task change
+child Task change
+existing actually-done or completion decision
+TaskFinishedEvent publication boundary
+user Task chain idle transition
+result normalization boundary
+result publication boundary
+active-command clear boundary
+terminal status and terminal reason
+exceptionType
+exceptionBoundary
+```
+
+Reuse the existing `requestId` and `correlationId` when available. If the engine boundary has no protocol identifier, use a local diagnostics-only correlation value without adding or changing a wire field.
+
+Do not change acknowledgement ordering, completion semantics, active-command clearing, terminal classification, TaskRunner state, event publication, or response payload as part of a diagnostics-only patch.
+
+##### Crash and exception suspicion
+
+For a crash or exception, record the first unique exception occurrence with enough operation context to identify the exact boundary.
+
+Capture applicable fields:
+
+```text
+requestId
+correlationId
+rootTask
+childTask
+lastSuccessfulBoundary
+exceptionBoundary
+exceptionType
+exceptionMessage
+relevant inventory, container, input, or pathing summary
+whether existing code propagates, retries, falls back, or terminates
+terminalReason when reached
+```
+
+Emit the full stack trace once per unique exception type and boundary per correlation when the existing logger supports it. Deduplicate repeats and emit a bounded repeat summary.
+
+Do not add a broad catch, suppress propagation, return success, select a fallback, or change cleanup merely to keep the process running. Exception diagnostics must observe the existing behavior.
+
+##### Hot-path log-explosion review
+
+Before adding a log inside a tick loop, slot loop, inventory registration method, Baritone planning loop, Task runner loop, render loop, or polling callback, Codex must document:
+
+```text
+Why this exact low-level boundary is required:
+Why a higher-level owner boundary is insufficient:
+Event fingerprint fields:
+Rate limit:
+Deduplication rule:
+Sampling interval:
+Per-correlation cap:
+Session hard cap:
+Reserved terminal budget:
+Suppression summary event:
+Payload truncation rule:
+```
+
+If any field is missing, the hot-path logging change is incomplete and must not be applied.
+
+Prefer moving the diagnostic event to a higher-level owner boundary rather than logging inside `registerItem`, a generic slot accessor, every `Task.onTick`, or each Baritone node expansion.
+
+##### Gold smelting minimum diagnostic contract
+
+For a long-running command such as `@get gold_ingot 100`, the trace must make the item requirement and furnace transfer decision reconstructable without a full inventory dump.
+
+Use the same `requestId` and `correlationId` across the command, root Task, child Task, transfer decision, exception, and terminal event.
+
+At minimum, log these fields at the applicable start, Task-transition, item-requirement, transfer-decision, refusal, exception, and terminal boundaries:
+
+```text
+commandRequestId
+correlationId
+rootTask
+childTask
+requestedItem
+requestedCount
+currentItemCount
+targetItemCount
+deltaNeeded
+inventoryFreeSlots
+sourceItem
+sourceItemCount
+sourceSlotsSummary
+targetSlot
+screenHandlerType
+containerSyncId
+furnaceInputSlot
+furnaceFuelSlot
+furnaceOutputSlot
+moveResult
+refusalReason
+terminalReason
+exceptionType
+exceptionBoundary
+```
+
+For the gold-smelting case, keep requested output and source input explicit, for example `requestedItem=minecraft:gold_ingot` and `sourceItem=minecraft:raw_gold`, when those are the actual values selected by existing code.
+
+A useful bounded decision record should be capable of answering all of these questions without another per-slot trace:
+
+```text
+Which command and Task chain owns the operation?
+How many gold ingots were requested?
+How many currently exist?
+What final target did the Task compute?
+How many are still needed?
+How many free inventory slots exist?
+How much raw gold exists and in which relevant slots?
+Which furnace or container slot was targeted?
+Which screen handler and sync id were active?
+What occupied the furnace input, fuel, and output slots?
+Did the move occur, or why was it refused?
+What terminal reason or exception boundary ended the observed path?
+```
+
+Do not emit the complete field set every tick. Emit it on operation start, meaningful count or slot-state change, transfer decision or refusal, terminal result, and exception, subject to deduplication and the hard cap.
+
+##### Upstream minimal-hunk and LAVI-owned helper rule
+
+Upstream-derived ChatClef and AltoClef files must remain in their existing files, packages, inheritance structure, and folder structure. A diagnostics-only edit to an upstream-derived file must be the smallest local hunk required to expose the boundary. Do not rename, move, split, merge, repackage, broadly format, or refactor the file while adding diagnostics.
+
+Do not force an upstream-derived class to satisfy the LAVI-owned two-responsibility, one-class-per-file, folderization, or inheritance rules merely because a diagnostic line is added.
+
+New LAVI-owned diagnostics code remains subject to Sections 29, 29.1, and 29.2:
+
+* a narrow helper with one responsibility may remain a single focused file
+* when a new LAVI-owned diagnostics helper owns two or more independent responsibilities, split those responsibilities into focused files and evaluate a meaningful diagnostics package or folder
+* keep fingerprinting, rate limiting, snapshot collection, formatting, and emission separate when they have independent state or reasons to change
+* do not create a folder for one trivial helper when an existing LAVI-owned diagnostics package already represents the responsibility
+* do not use the new LAVI-owned structure as a reason to move or reorganize upstream-derived files
+* do not add a broad diagnostics manager or utility dumping ground
+
+Prefer a LAVI-owned observer or helper when it can expose the same boundary without changing upstream code. Prefer a local upstream diagnostic hunk when extracting a helper would require broader method signatures, lifecycle changes, or upstream restructuring.
+
+##### Required diagnostics-only completion report
+
+After applying a diagnostics-only change in this scope, report:
+
+```text
+Root-cause status: verified or still unknown
+Diagnostics-only classification:
+Exact files and methods changed:
+Observed boundaries added:
+Behavior explicitly preserved:
+Hot-path classification:
+Rate limit:
+Deduplication fingerprint:
+Sampling interval:
+Per-correlation cap:
+Session hard cap:
+Reserved terminal budget:
+Overlay/diagnostics independence preserved:
+Wire protocol unchanged:
+TaskRunner, Baritone, input, and container behavior unchanged:
+Upstream minimal-hunk confirmation:
+LAVI-owned helper responsibilities and folder decision:
+Runtime reproduction still required:
+```
+
+Do not claim the bug is fixed merely because the diagnostic patch compiles or the log volume remains small.
 
 #### Carry On compatibility guard
 
@@ -2175,10 +2696,12 @@ When adding logs:
 * Use existing logger utilities if available.
 * Avoid printing secrets.
 * Prefer clear, structured messages that identify the exact operation, component, branch, state, and result.
-* During active troubleshooting, diagnostic completeness has priority over quiet console output.
-* Temporary high-volume `DEBUG` logging is explicitly allowed when the cause is unknown.
-* Do not omit necessary diagnostics merely because the logs may be noisy.
-* For real-time audio, video, model-token, game-tick, polling, event, and queue loops, keep the investigation bounded or configurable, but log every state transition, rejection reason, retry, timeout, cancellation, and terminal result needed to reconstruct the failure.
+* Diagnostic completeness and runtime safety have equal priority during troubleshooting.
+* Temporarily expanded `DEBUG` coverage is allowed only when it is bounded by boundary or state-change emission and, for hot paths, rate limiting, deduplication, sampling, payload bounds, and a session hard cap.
+* Do not omit a material transition merely because raw per-loop logging would be noisy; aggregate, summarize, or move the event to the owning boundary instead.
+* For real-time audio, video, model-token, game-tick, polling, event, and queue loops, log every material state transition, rejection reason, existing retry, existing timeout, cancellation, and terminal result needed to reconstruct the failure without emitting unchanged state continuously.
+
+Unbounded per-tick, per-item, per-slot, per-token, per-node, per-frame, or per-poll logging is prohibited.
 
 Do not remove useful debug logs during active troubleshooting unless the user asks.
 Do not reduce or silence investigation logs until the root cause has been verified and permanent observability remains.
@@ -2206,15 +2729,17 @@ When the root cause is unknown, Codex must:
 One small logging patch is not automatically sufficient.
 If uncertainty remains after the first reproduction, Codex must add more logs and reproduce again instead of choosing the most likely explanation.
 
-During active investigation, verbose and repetitive `DEBUG` logs are preferable to speculation.
-It is acceptable for the console or log file to become noisy while tracing an unknown failure, provided that:
+During active investigation, structured and bounded `DEBUG` coverage is preferable to speculation. Repetitive unbounded logs are not acceptable evidence collection.
+
+Expanded diagnostic detail is acceptable only when:
 
 * secrets, credentials, raw microphone audio, private conversations, and sensitive payloads are not logged
 * each message identifies its component, operation, branch, state, attempt, or correlation identifier
-* high-frequency logging is bounded to the affected test session, controlled by an existing debug setting when practical, or removed/downgraded only after verification
-* logging volume does not cause a new resource-exhaustion failure
+* unchanged high-frequency events are rate-limited, deduplicated, sampled, and covered by a session hard cap
+* material state changes, terminal reasons, and first exceptions retain reserved emission budget
+* logging volume and formatting overhead do not create a new resource-exhaustion or timing failure
 
-Do not optimize for clean output while the failing path is still invisible.
+Do not optimize for artificially clean output while the failing path is still invisible. Make the path observable with bounded boundary events and summaries rather than raw loop dumps.
 Do not treat "probably", "likely", "appears to be", or "seems related" as proof.
 
 ### Core Rule
@@ -2397,10 +2922,10 @@ Do not use `ERROR` for a normal optional absence.
 
 Do not use `INFO` for high-frequency loop details.
 
-During active troubleshooting, high-volume `DEBUG` output is allowed and preferred over guessing when it is required to expose the failing path.
-Real-time audio, video, model-token, game-tick, polling, event, and queue loops must not emit permanently unbounded logs, but this restriction must not be used as a reason to leave a failure unobservable.
-Use a bounded reproduction session, state-change logging, attempt counters, correlation identifiers, sampling, rate limiting, aggregation, or a configurable debug switch as appropriate.
-For the affected test run, log enough detail to reconstruct every relevant transition and terminal result.
+During active troubleshooting, expanded `DEBUG` coverage is allowed only when it is bounded and is required to expose the failing path.
+Real-time audio, video, model-token, game-tick, polling, event, render, slot, and queue loops must not emit unbounded logs. This restriction must not be used as a reason to leave a failure unobservable; use ownership-boundary events and bounded summaries instead.
+Use state-change logging, attempt counters, correlation identifiers, rate limiting, deduplication, sampling, aggregation, payload truncation, and a documented session hard cap as appropriate. Hot paths require all applicable controls, not merely one of them.
+For the affected test run, log enough detail to reconstruct every relevant transition and terminal result without logging unchanged state continuously.
 
 ### Correlation and Traceability
 
@@ -2466,7 +2991,7 @@ Keep permanent logs that provide continuing operational value, especially for:
 * reload failure and retained previous state
 * cleanup failure
 
-Temporary high-volume investigation logs may be removed or downgraded only after the root cause is verified and sufficient permanent observability remains for the same failure class.
+Temporary investigation-only diagnostics may be removed or downgraded only after the root cause is verified and sufficient permanent observability remains for the same failure class. Unbounded high-volume logging is never an acceptable temporary mode.
 
 ### Required Investigation Report
 
@@ -2523,14 +3048,14 @@ Do not:
 * print secrets or complete sensitive payloads
 * rely on console `print` when an existing logger is available
 * use vague, unlabeled, or uncorrelated log messages that make a high-volume trace impossible to follow
-* refuse to add required diagnostic logs merely because the output may be noisy
+* leave a material boundary unobservable merely because raw hot-path output would be large; use bounded events, aggregation, and summaries instead
 * remove useful diagnostic logs immediately after the first successful run
 * claim that the problem is fixed without reproducing and observing the affected path
 * stop investigating while the report still contains material unobserved boundaries
 
 The purpose of logging is to make the exact failing boundary observable before code behavior is changed.
-Output volume is secondary during an active investigation.
-Structured verbose logging is acceptable; unsupported guessing is not.
+Complete boundary observability and runtime safety are both mandatory during an active investigation.
+Bounded structured diagnostics are acceptable; unbounded output and unsupported guessing are not.
 
 ---
 
@@ -4736,7 +5261,7 @@ When in doubt:
 * preserve existing behavior
 * do not guess the root cause
 * add more structured diagnostic logs until the failing boundary is proven
-* accept noisy investigation logs rather than an unsupported behavioral change
+* accept bounded, information-dense investigation logs rather than an unsupported behavioral change
 * make smaller changes
 * document fragile assumptions
 * ask before changing versions
