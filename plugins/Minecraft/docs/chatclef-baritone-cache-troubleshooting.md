@@ -75,6 +75,273 @@ When a test world is copied, restored, replaced, or renamed, its Baritone cache
 may no longer match the actual world state.
 ```
 
+<!-- 20260805_kpopmodder: Documented BlockOptionalMeta JVM cache poisoning as a separate Baritone failure mode. -->
+
+## Separate Failure Mode: BlockOptionalMeta NPE
+
+Do not confuse Baritone disk world cache staleness with the `BlockOptionalMeta`
+failure mode below.
+
+Observed local evidence from `LAVI_TEST_Fabric01\logs\latest.log`:
+
+```text
+[02:12:04] RuntimeException: ExecutionException: NullPointerException
+BlockOptionalMeta.getManager()
+BlockOptionalMeta.drops()
+BlockOptionalMeta.getStackHashes()
+BlockOptionalMeta.<init>()
+BuilderProcess$2.partOfMask()
+BuilderProcess.fullRecalc()
+BuilderProcess.onTick()
+```
+
+In this pattern, ChatClef / LAVI command lifecycle may still report success:
+
+```text
+command result status=completed ok=True
+terminal command decision reason=matching_task_finished
+```
+
+That only proves the command lifecycle reached a terminal result. It does not
+prove Baritone's block or item matching state remained correct.
+
+### Current Local Interpretation
+
+Treat this as a Baritone `BlockOptionalMeta` failure-containment issue, not as
+a LAVI WebSocket bridge, ChatClef command dispatcher, TaskRunner, or general
+pathfinding lifecycle bug.
+
+The likely risk is JVM-internal cache poisoning:
+
+```text
+LootDataManager candidate is created
+server-data reload starts
+reload fails inside the async reload path
+drops() catches or prints the exception
+empty or incomplete drop result is returned
+failed empty result may be cached as if it were authoritative
+later BlockOptionalMeta.matches(ItemStack) checks can silently change meaning
+```
+
+This is separate from Baritone disk cache:
+
+```text
+Baritone disk world cache:
+    persisted chunk/pathing/search data under the save directory
+
+BlockOptionalMeta JVM cache:
+    static LootDataManager and block drop cache inside the running Minecraft JVM
+```
+
+Closing Minecraft resets the JVM static state. Deleting the Baritone disk cache
+does not directly fix `BlockOptionalMeta` static state in a running process.
+
+### Stage Decision
+
+If the stack above is present, the next source change is no longer
+diagnostics-only. It should be a narrow crash guard / failure-containment patch
+with structured, rate-limited diagnostics.
+
+This does not authorize a broad root-cause rewrite of Minecraft resource
+initialization. First preserve the actual inner cause and prevent poisoned
+state from being published or cached.
+
+The intended contract is:
+
+```text
+publish LootDataManager only after reload completed successfully
+do not cache failed drop-resolution output as authoritative block drops
+replace unbounded printStackTrace output with rate-limited structured logging
+preserve the deepest root cause from ExecutionException or related wrappers
+```
+
+### Required Diagnostic Event
+
+Use a bounded event like:
+
+```text
+BLOCK_OPTIONAL_META_MANAGER_FAILURE
+stage=WAIT_FOR_RELOAD
+block=minecraft:...
+lootTable=minecraft:blocks/...
+thread=Render thread
+vanillaPackPresent=true|false
+candidateManagerCreated=true|false
+reloadCompleted=true|false
+managerPublished=true|false
+outerException=...
+rootException=...
+rootMessage=...
+rootTopFrame=...
+caller=baritone.process.BuilderProcess$2.partOfMask
+fallback=BLOCK_ITEM|EMPTY|NONE
+dropCacheWrite=true|false
+```
+
+Suggested stages:
+
+```text
+LOOKUP_VANILLA_PACK_METHOD
+INVOKE_VANILLA_PACK_METHOD
+CREATE_SERVER_DATA_RESOURCES
+CREATE_LOOT_MANAGER
+START_RELOAD
+WAIT_FOR_RELOAD
+LOOKUP_LOOT_TABLE
+EVALUATE_LOOT_DROPS
+```
+
+Logging rules:
+
+```text
+no per-tick output
+no per-block stack trace spam
+first full stack trace per unique stage + root exception + root top frame
+BOUNDARY mode must show the first failure boundary
+normal successful paths should stay quiet
+```
+
+### Guard Rules
+
+Do not fix this with only:
+
+```java
+if (manager == null) {
+    return Collections.emptyList();
+}
+```
+
+That hides the crash while preserving the worst semantic failure: a failed drop
+resolution can become indistinguishable from a legitimate empty drop result.
+
+A safe minimal direction is:
+
+```text
+use a local LootDataManager candidate
+perform server-data reload
+publish the candidate only after successful reload
+separate normal empty drops from failed drop resolution
+cache only successful authoritative drop results
+on failure, return a clearly degraded fallback without writing the authoritative cache
+```
+
+Block-item fallback may be used only as degraded containment:
+
+```text
+use only when manager initialization or drop resolution failed
+do not use Items.AIR as a fallback
+do not write fallback output to authoritative drops cache
+log fallbackApplied=BLOCK_ITEM
+document that ore, stone, leaves, gravel, silk-touch, and fortune-sensitive
+blocks may not preserve full drop semantics
+```
+
+### Files To Inspect First
+
+Primary local file:
+
+```text
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/api/java/baritone/api/utils/BlockOptionalMeta.java
+```
+
+Primary methods and state:
+
+```text
+getVanillaServerPack()
+getManager()
+drops(Block)
+getStackHashes(...)
+static lootTables
+static drops cache
+small root-cause unwrap and diagnostic helper, if needed
+```
+
+Inspect, but do not change in the first containment patch unless local diff
+evidence proves it is required:
+
+```text
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/api/java/baritone/process/BuilderProcess.java
+BuilderProcess$2.partOfMask()
+```
+
+Only consider `BlockOptionalMeta$ServerLevelStub` when the deepest `Caused by`
+frame directly points at that stub, `LootContext`, registry access, or enabled
+features.
+
+### Areas Not To Change For This Bug
+
+Do not use this failure as a reason to modify:
+
+```text
+LAVI WebSocket bridge
+FabricChatClefCommandDispatcher
+ChatClef command lifecycle
+TaskRunner
+CommandExecutor
+UserTaskChain
+SingleTaskChain
+AltoClef Task common lifecycle
+Baritone pathfinding algorithm
+BuilderProcess fullRecalc algorithm
+Baritone world or disk cache management
+Fabric API global mixins
+Minecraft global resource reload behavior
+```
+
+Do not add broad `catch (Throwable)`, reset all Baritone caches per command,
+or delete Baritone disk cache as a root-cause fix for this JVM-local failure.
+
+### Minimum Verification Before Committing A Fix
+
+Before committing a source fix for this failure, verify:
+
+```text
+new BlockOptionalMeta(Blocks.COBBLESTONE) does not throw
+new BlockOptionalMeta(Blocks.DIRT) does not throw
+new BlockOptionalMeta(Blocks.FURNACE) does not throw
+self-drop ItemStack matching still works
+unrelated ItemStack matching stays false
+reload failure does not publish a partial manager
+failed drop resolution does not write the authoritative drops cache
+identical failure logging is rate-limited
+same JVM can run multiple commands without static-state poisoning
+```
+
+Runtime smoke flow:
+
+```text
+get cooked_beef 10
+get gold_ingot 10
+get iron_ingot 10
+```
+
+Expected result:
+
+```text
+no BlockOptionalMeta manager failure stack trace
+ChatClef bridge connection remains normal
+Baritone pathing and BuilderProcess continue normally
+command lifecycle can still complete with matching_task_finished
+no new log explosion
+```
+
+## Commit Split For A Future Source Fix
+
+Keep any future source work small and reviewable:
+
+```text
+test/diag(baritone): capture BlockOptionalMeta loot reload failures
+fix(baritone): publish LootDataManager only after successful reload
+fix(baritone): avoid caching failed block drop resolution
+```
+
+Only add a separate BuilderProcess commit if a local-vs-upstream diff proves an
+unintended local `partOfMask()` regression:
+
+```text
+fix(baritone-builder): remove unintended BlockOptionalMeta construction from mask scan
+```
+
 ## Recovery Procedure
 
 Use this when the goal is a clean operational reset of Baritone's world cache.
