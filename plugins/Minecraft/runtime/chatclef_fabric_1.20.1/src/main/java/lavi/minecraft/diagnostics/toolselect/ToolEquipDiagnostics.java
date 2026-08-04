@@ -1,7 +1,6 @@
 package lavi.minecraft.diagnostics.toolselect;
 
 import adris.altoclef.AltoClef;
-import adris.altoclef.util.MiningRequirement;
 import adris.altoclef.util.helpers.ItemHelper;
 import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.slots.CursorSlot;
@@ -11,6 +10,7 @@ import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 import lavi.minecraft.diagnostics.toolselect.support.DiagnosticDeduplicator;
 import lavi.minecraft.diagnostics.toolselect.support.ToolDiagnosticFormatter;
 import lavi.minecraft.diagnostics.toolselect.support.ToolSavePolicyDiagnostics;
+import lavi.minecraft.diagnostics.toolselect.support.ToolTargetDiagnosticFields;
 import net.minecraft.block.BlockState;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
@@ -47,10 +47,10 @@ public final class ToolEquipDiagnostics {
                     "equipAttemptId", equipAttemptId,
                     "decisionReason", decisionReason,
                     "targetPosition", ChatClefDiagnostics.blockPos(targetPosition),
-                    "targetBlockState", ChatClefDiagnostics.safeValue(() -> targetState),
-                    "targetBlockId", ChatClefDiagnostics.safeValue(() -> targetState == null ? null : targetState.getBlock()),
-                    "targetRequiresTool", ChatClefDiagnostics.safeValue(() -> targetState == null ? null : targetState.isToolRequired()),
-                    "minimumMiningRequirement", ChatClefDiagnostics.safeValue(() -> targetState == null ? null : MiningRequirement.getMinimumRequirementForBlock(targetState.getBlock())),
+                    "targetBlockState", ToolTargetDiagnosticFields.blockState(targetState),
+                    "targetBlockId", ToolTargetDiagnosticFields.blockId(targetState),
+                    "targetRequiresTool", ToolTargetDiagnosticFields.requiresTool(targetState),
+                    "minimumMiningRequirement", ToolTargetDiagnosticFields.minimumMiningRequirement(targetState),
                     "currentSlot", ChatClefDiagnostics.slotSummary(currentSlot),
                     "currentStack", ToolDiagnosticFormatter.basicStackDetails(currentStack),
                     "currentSuitable", suitable(currentStack, targetState),
@@ -145,7 +145,7 @@ public final class ToolEquipDiagnostics {
         ChatClefDiagnostics.logBoundary("TOOL_EQUIP_REQUEST", "better_tool_selected", null,
                 "equipAttemptId", equipAttemptId,
                 "targetPosition", ChatClefDiagnostics.blockPos(targetPosition),
-                "targetBlockState", ChatClefDiagnostics.safeValue(() -> targetState),
+                "targetBlockState", ToolTargetDiagnosticFields.blockState(targetState),
                 "currentSlot", ChatClefDiagnostics.slotSummary(currentSlot),
                 "currentStack", ToolDiagnosticFormatter.basicStackDetails(currentStack),
                 "currentSuitable", suitable(currentStack, targetState),

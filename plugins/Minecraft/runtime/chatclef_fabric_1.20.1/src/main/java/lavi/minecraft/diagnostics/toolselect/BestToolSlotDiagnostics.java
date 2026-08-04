@@ -1,12 +1,12 @@
 package lavi.minecraft.diagnostics.toolselect;
 
 import adris.altoclef.AltoClef;
-import adris.altoclef.util.MiningRequirement;
 import adris.altoclef.util.slots.Slot;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 import lavi.minecraft.diagnostics.toolselect.support.DiagnosticDeduplicator;
 import lavi.minecraft.diagnostics.toolselect.support.ToolDiagnosticFormatter;
 import lavi.minecraft.diagnostics.toolselect.support.ToolSavePolicyDiagnostics;
+import lavi.minecraft.diagnostics.toolselect.support.ToolTargetDiagnosticFields;
 import net.minecraft.block.BlockState;
 import net.minecraft.item.ItemStack;
 
@@ -122,10 +122,10 @@ public final class BestToolSlotDiagnostics {
 
             ChatClefDiagnostics.logBoundary("BEST_TOOL_SLOT_DECISION", "storage_helper_get_best_tool_slot", null,
                     "decisionReason", decisionReason,
-                    "targetBlockState", ChatClefDiagnostics.safeValue(() -> targetState),
-                    "targetBlockId", ChatClefDiagnostics.safeValue(() -> targetState == null ? null : targetState.getBlock()),
-                    "targetRequiresTool", ChatClefDiagnostics.safeValue(() -> targetState == null ? null : targetState.isToolRequired()),
-                    "minimumMiningRequirement", ChatClefDiagnostics.safeValue(() -> targetState == null ? null : MiningRequirement.getMinimumRequirementForBlock(targetState.getBlock())),
+                    "targetBlockState", ToolTargetDiagnosticFields.blockState(targetState),
+                    "targetBlockId", ToolTargetDiagnosticFields.blockId(targetState),
+                    "targetRequiresTool", ToolTargetDiagnosticFields.requiresTool(targetState),
+                    "minimumMiningRequirement", ToolTargetDiagnosticFields.minimumMiningRequirement(targetState),
                     "selectedSlot", ChatClefDiagnostics.slotSummary(bestToolSlot),
                     "selectedStack", ToolDiagnosticFormatter.toolStackDetails(ToolDiagnosticFormatter.slotStack(bestToolSlot)),
                     "selectedSpeed", ToolDiagnosticFormatter.speedValue(highestSpeed),
