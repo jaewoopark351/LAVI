@@ -39,13 +39,26 @@ public final class FabricChatClefCommandResultPayload {
     }
 
     public Map<String, Object> toMap() {
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("request_id", requestId);
-        payload.put("ok", status.ok());
-        payload.put("status", status.wireValue());
-        payload.put("error_code", errorCode);
-        payload.put("message", message);
-        payload.put("data", data);
-        return payload;
+        return FabricChatClefCommandResultPayloadMap.toMap(this);
+    }
+
+    String requestId() {
+        return requestId;
+    }
+
+    FabricChatClefCommandResultStatus status() {
+        return status;
+    }
+
+    String errorCode() {
+        return errorCode;
+    }
+
+    String message() {
+        return message;
+    }
+
+    Map<String, Object> data() {
+        return data;
     }
 }
