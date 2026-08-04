@@ -80,6 +80,15 @@ Codex must read and apply this document before proposing or modifying
 ChatClef, AltoClef, Baritone interaction, Carry On integration, or related
 diagnostic behavior.
 
+Required operational troubleshooting note:
+
+[ChatClef / Baritone Cache Troubleshooting](plugins/Minecraft/docs/chatclef-baritone-cache-troubleshooting.md)
+
+Codex must read and apply this note before treating pathfinding loops, impossible
+routes, wrong-target movement, mining stalls, or world-replacement regressions
+as a LAVI behavior bug. This is especially important after a Minecraft test
+world is copied, restored, replaced, or renamed.
+
 Reading the companion document alone does not authorize a later phase, Java
 modification, diagnostics patch, behavioral fix, build, commit, or push.
 The standing authorization in `ChatClef Fabric 1.20.1 Diagnostics-Only and

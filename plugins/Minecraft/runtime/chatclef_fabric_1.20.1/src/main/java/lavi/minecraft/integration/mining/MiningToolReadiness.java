@@ -58,13 +58,7 @@ public final class MiningToolReadiness {
         return false;
     }
 
-    public static final class Readiness {
-        private final MiningRequirement requirement;
-        private final boolean broadRequirementMet;
-        private final boolean selectableToolPresent;
-        private final boolean rejectedBySavePolicy;
-        private final boolean requiresAcquisition;
-
+    public static final class Readiness extends MiningToolReadinessResult {
         private Readiness(
                 MiningRequirement requirement,
                 boolean broadRequirementMet,
@@ -72,31 +66,7 @@ public final class MiningToolReadiness {
                 boolean rejectedBySavePolicy,
                 boolean requiresAcquisition
         ) {
-            this.requirement = requirement;
-            this.broadRequirementMet = broadRequirementMet;
-            this.selectableToolPresent = selectableToolPresent;
-            this.rejectedBySavePolicy = rejectedBySavePolicy;
-            this.requiresAcquisition = requiresAcquisition;
-        }
-
-        public MiningRequirement requirement() {
-            return requirement;
-        }
-
-        public boolean broadRequirementMet() {
-            return broadRequirementMet;
-        }
-
-        public boolean selectableToolPresent() {
-            return selectableToolPresent;
-        }
-
-        public boolean rejectedBySavePolicy() {
-            return rejectedBySavePolicy;
-        }
-
-        public boolean requiresAcquisition() {
-            return requiresAcquisition;
+            super(requirement, broadRequirementMet, selectableToolPresent, rejectedBySavePolicy, requiresAcquisition);
         }
     }
 }

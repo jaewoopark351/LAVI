@@ -5,6 +5,7 @@ import lavi.minecraft.integration.carryon.snapshot.CarryOnInputSnapshot;
 import lavi.minecraft.integration.carryon.snapshot.CarryOnOperationSnapshot;
 import lavi.minecraft.integration.carryon.snapshot.CarryOnPlayerSnapshot;
 import lavi.minecraft.integration.carryon.snapshot.CarryOnScreenSnapshot;
+import lavi.minecraft.integration.carryon.snapshot.CarryOnSnapshotStateKey;
 import lavi.minecraft.integration.carryon.snapshot.CarryOnTargetSnapshot;
 import lavi.minecraft.integration.carryon.snapshot.CarryOnTaskSnapshot;
 
@@ -227,52 +228,6 @@ public final class CarryOnSnapshot {
     }
 
     public String stateKey() {
-        return value(eventName())
-                + "|" + value(targetId())
-                + "|" + value(targetPosition())
-                + "|" + value(currentChain())
-                + "|" + value(taskChain())
-                + "|" + value(taskRunnerActive())
-                + "|" + value(userTaskChainActive())
-                + "|" + value(paused())
-                + "|" + value(chatClefEnabled())
-                + "|" + value(playerMode())
-                + "|" + value(playerPosition())
-                + "|" + value(playerVelocity())
-                + "|" + value(lookRotation())
-                + "|" + value(playerPoseState())
-                + "|" + value(rightClickState())
-                + "|" + value(sneakState())
-                + "|" + value(leftClickState())
-                + "|" + value(movementInputState())
-                + "|" + value(baritonePathing())
-                + "|" + value(customGoalOwner())
-                + "|" + value(breakingBlockState())
-                + "|" + value(crosshairType())
-                + "|" + value(crosshairTarget())
-                + "|" + value(crosshairBlockId())
-                + "|" + stateName(stateBefore())
-                + "|" + stateName(stateAfter())
-                + "|" + exceptionName(stateBefore())
-                + "|" + exceptionName(stateAfter())
-                + "|" + value(clickResult())
-                + "|" + value(screenName())
-                + "|" + value(screenHandlerName())
-                + "|" + value(screenHandlerSyncId())
-                + "|" + value(cursorStack())
-                + "|" + value(selectedHotbarSlot())
-                + "|" + terminalReason();
-    }
-
-    private static String stateName(CarryOnObservation observation) {
-        return observation == null ? "unavailable" : String.valueOf(observation.state());
-    }
-
-    private static String exceptionName(CarryOnObservation observation) {
-        return observation == null ? "unavailable" : observation.exceptionType();
-    }
-
-    private static String value(Object value) {
-        return value == null ? "unavailable" : String.valueOf(value);
+        return CarryOnSnapshotStateKey.from(this);
     }
 }
