@@ -1,6 +1,5 @@
 package lavi.minecraft.fabric.chatclef.bridge.command.result;
 
-import java.util.HashMap;
 import java.util.Map;
 
 //20260804_kpopmodder: Keep command result payload fields typed until the v1 Map serialization edge.
@@ -9,14 +8,14 @@ public final class FabricChatClefCommandResultPayload {
     private final FabricChatClefCommandResultStatus status;
     private final String errorCode;
     private final String message;
-    private final Map<String, Object> data;
+    private final FabricChatClefCommandResultDataPayload data;
 
     private FabricChatClefCommandResultPayload(
             String requestId,
             FabricChatClefCommandResultStatus status,
             String errorCode,
             String message,
-            Map<String, Object> data
+            FabricChatClefCommandResultDataPayload data
     ) {
         if (status == null) {
             throw new IllegalArgumentException("status must not be null");
@@ -25,7 +24,7 @@ public final class FabricChatClefCommandResultPayload {
         this.status = status;
         this.errorCode = errorCode;
         this.message = message == null ? "" : message;
-        this.data = data == null ? new HashMap<>() : data;
+        this.data = data == null ? FabricChatClefCommandResultDataPayload.empty() : data;
     }
 
     public static FabricChatClefCommandResultPayload of(
@@ -34,6 +33,16 @@ public final class FabricChatClefCommandResultPayload {
             String errorCode,
             String message,
             Map<String, Object> data
+    ) {
+        return of(requestId, status, errorCode, message, FabricChatClefCommandResultDataPayload.fromMap(data));
+    }
+
+    public static FabricChatClefCommandResultPayload of(
+            String requestId,
+            FabricChatClefCommandResultStatus status,
+            String errorCode,
+            String message,
+            FabricChatClefCommandResultDataPayload data
     ) {
         return new FabricChatClefCommandResultPayload(requestId, status, errorCode, message, data);
     }
@@ -59,6 +68,6 @@ public final class FabricChatClefCommandResultPayload {
     }
 
     Map<String, Object> data() {
-        return data;
+        return data.toMap();
     }
 }

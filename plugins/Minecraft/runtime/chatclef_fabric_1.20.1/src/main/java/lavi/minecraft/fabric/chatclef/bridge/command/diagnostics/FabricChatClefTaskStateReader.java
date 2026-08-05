@@ -6,8 +6,6 @@ import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskRuntimeObservationPayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskSnapshot;
 
-import java.util.Map;
-
 //20260803_kpopmodder: Observe current ChatClef user task state without changing engine behavior.
 public final class FabricChatClefTaskStateReader {
     public Task currentTaskOrNull() {
@@ -24,10 +22,6 @@ public final class FabricChatClefTaskStateReader {
         } catch (Throwable error) {
             return FabricChatClefTaskSnapshot.unavailable(error);
         }
-    }
-
-    public Map<String, Object> runtimeData() {
-        return runtimePayload().toMap();
     }
 
     public FabricChatClefTaskRuntimeObservationPayload runtimePayload() {

@@ -2,12 +2,13 @@ package lavi.minecraft.fabric.chatclef.bridge.command.lifecycle;
 
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandContext;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskSnapshot;
+import lavi.minecraft.fabric.chatclef.bridge.command.result.FabricChatClefCommandResultDataPayload;
 
 import java.util.HashMap;
 import java.util.Map;
 
 //20260805_kpopmodder: Keep command lifecycle diagnostic fields typed until the existing Map edge.
-public final class FabricChatClefCommandLifecyclePayload {
+public final class FabricChatClefCommandLifecyclePayload implements FabricChatClefCommandResultDataPayload {
     private static final String RESULT_FIDELITY = "result_fidelity";
     private static final String RESULT_FIDELITY_VALUE = "callback_plus_matching_user_task_event";
     private static final String RESULT_REASON = "result_reason";
@@ -107,6 +108,7 @@ public final class FabricChatClefCommandLifecyclePayload {
         );
     }
 
+    @Override
     public Map<String, Object> toMap() {
         Map<String, Object> payload = new HashMap<>();
         payload.put(RESULT_FIDELITY, RESULT_FIDELITY_VALUE);

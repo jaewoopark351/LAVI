@@ -94,7 +94,7 @@ public final class FabricChatClefCommandDiagnostics {
     ) {
         Map<String, Object> payload = execution == null
                 ? new HashMap<>()
-                : execution.diagnosticData(event);
+                : execution.diagnosticPayload(event).toMap();
         payload.put("event", event);
         payload.put("details", details == null ? new HashMap<String, Object>() : details);
         return payload;

@@ -34,7 +34,7 @@ public final class FabricChatClefCommandResultOutbox {
                     "ignored duplicate terminal result request="
                             + execution.requestId()
                             + " data="
-                            + execution.duplicateTerminalData("duplicate_terminal_result")
+                            + execution.duplicateTerminalPayload("duplicate_terminal_result").toMap()
             );
             return false;
         }
@@ -44,7 +44,7 @@ public final class FabricChatClefCommandResultOutbox {
                     "ignored stale terminal result request="
                             + execution.requestId()
                             + " data="
-                            + execution.duplicateTerminalData("stale_terminal_result")
+                            + execution.duplicateTerminalPayload("stale_terminal_result").toMap()
             );
             return true;
         }

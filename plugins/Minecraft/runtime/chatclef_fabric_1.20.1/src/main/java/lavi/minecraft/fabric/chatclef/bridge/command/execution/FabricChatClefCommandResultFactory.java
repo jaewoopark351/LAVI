@@ -4,9 +4,8 @@ import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandReques
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandResult;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandDeadlinePayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandTerminationObservation;
+import lavi.minecraft.fabric.chatclef.bridge.command.result.FabricChatClefCommandResultDataPayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.result.FabricChatClefCommandResultPayload;
-
-import java.util.Map;
 
 //20260804_kpopmodder: Separate command result map construction from mutable command execution state.
 final class FabricChatClefCommandResultFactory {
@@ -89,20 +88,18 @@ final class FabricChatClefCommandResultFactory {
     }
 
     FabricChatClefCommandResultPayload deadlineExceededResult(String message) {
-        Map<String, Object> payload = data("deadline_exceeded");
-        FabricChatClefCommandDeadlinePayload.markTaskMayStillBeRunning(payload);
         return FabricChatClefCommandResult.deadlineExceeded(
                 request().requestId,
                 message,
-                payload
+                FabricChatClefCommandDeadlinePayload.markTaskMayStillBeRunning(data("deadline_exceeded"))
         );
     }
 
-    Map<String, Object> duplicateTerminalData(String reason) {
+    FabricChatClefCommandResultDataPayload duplicateTerminalPayload(String reason) {
         return data(reason);
     }
 
-    Map<String, Object> diagnosticData(String diagnosticReason) {
+    FabricChatClefCommandResultDataPayload diagnosticPayload(String diagnosticReason) {
         return FabricChatClefCommandDiagnosticPayload.diagnosticData(
                 diagnosticReason,
                 request(),
@@ -112,11 +109,11 @@ final class FabricChatClefCommandResultFactory {
         );
     }
 
-    private Map<String, Object> data(String resultReason) {
+    private FabricChatClefCommandResultDataPayload data(String resultReason) {
         return data(resultReason, state.taskFinishedObservation());
     }
 
-    private Map<String, Object> data(
+    private FabricChatClefCommandResultDataPayload data(
             String resultReason,
             FabricChatClefCommandTerminationObservation observation
     ) {

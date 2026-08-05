@@ -306,6 +306,8 @@ Current LAVI-owned helper placement:
 
 ```text
 command/ownership/FabricChatClefCommandOwnershipPayload
+command/result/FabricChatClefCommandResultDataPayload
+command/result/FabricChatClefCommandResultDataMapPayload
 command/result/FabricChatClefCommandResultPayload
 command/result/FabricChatClefCommandResultPayloadMap
 command/result/FabricChatClefCommandResultStatus
@@ -314,6 +316,7 @@ command/observation/FabricChatClefTaskSnapshot
 command/observation/FabricChatClefTaskSnapshotPayload
 command/observation/FabricChatClefBoundRootTaskRelationshipPayload
 command/observation/FabricChatClefTaskRuntimeObservationPayload
+command/execution/FabricChatClefCommandDiagnosticResultPayload
 command/lifecycle/FabricChatClefCommandDeadlinePayload
 command/lifecycle/FabricChatClefCommandLifecyclePayload
 command/lifecycle/FabricChatClefLifecycleDetailsPayload
@@ -321,8 +324,11 @@ command/lifecycle/FabricChatClefTaskFinishedEventDetailsPayload
 ```
 
 These helpers centralize field names and keep typed values local until the
-existing `Map<String, Object>` serialization edge. Command lifecycle detail
-objects now pass through `FabricChatClefCommandDiagnosticDetailsPayload` before
+existing `Map<String, Object>` serialization edge. Command result `data` now
+travels through `FabricChatClefCommandResultDataPayload` for lifecycle,
+ownership, deadline, and diagnostic-result payloads before the final map
+expansion. Command lifecycle detail objects pass through
+`FabricChatClefCommandDiagnosticDetailsPayload` before
 `FabricChatClefCommandDiagnostics` expands them for logging. They do not rename
 emitted keys, change status values, or alter lifecycle, timeout, retry, task
 observation, or ownership behavior.

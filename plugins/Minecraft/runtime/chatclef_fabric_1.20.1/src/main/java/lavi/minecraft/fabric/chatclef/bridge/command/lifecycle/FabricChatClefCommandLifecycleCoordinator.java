@@ -7,11 +7,11 @@ import lavi.minecraft.fabric.chatclef.bridge.command.diagnostics.FabricChatClefC
 import lavi.minecraft.fabric.chatclef.bridge.command.diagnostics.FabricChatClefTaskStateReader;
 import lavi.minecraft.fabric.chatclef.bridge.command.execution.FabricChatClefCommandExecution;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskSnapshot;
+import lavi.minecraft.fabric.chatclef.bridge.command.result.FabricChatClefCommandResultDataPayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.result.FabricChatClefCommandResultPayload;
 import lavi.minecraft.fabric.chatclef.bridge.diagnostics.FabricChatClefBridgeDiagnostics;
 
 import java.util.HashMap;
-import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
@@ -269,7 +269,7 @@ public final class FabricChatClefCommandLifecycleCoordinator {
         return FabricChatClefLifecycleDetailsPayload.exception(exception);
     }
 
-    private Map<String, Object> deadlineData(FabricChatClefCommandContext context) {
-        return FabricChatClefCommandDeadlinePayload.markTaskMayStillBeRunning(context.ownershipPayload().toMap());
+    private FabricChatClefCommandResultDataPayload deadlineData(FabricChatClefCommandContext context) {
+        return FabricChatClefCommandDeadlinePayload.markTaskMayStillBeRunning(context.ownershipPayload());
     }
 }

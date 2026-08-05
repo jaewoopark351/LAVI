@@ -5,9 +5,8 @@ import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandContex
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandTerminationObservation;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefBoundRootTaskRelationshipPayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskSnapshot;
+import lavi.minecraft.fabric.chatclef.bridge.command.result.FabricChatClefCommandResultDataPayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.result.FabricChatClefCommandResultPayload;
-
-import java.util.Map;
 
 //20260801_kpopmodder: Keep bridge result fidelity separate from ChatClef command callbacks.
 public final class FabricChatClefCommandExecution {
@@ -82,10 +81,6 @@ public final class FabricChatClefCommandExecution {
         return state.boundRootMatchReason(candidateTask);
     }
 
-    public Map<String, Object> boundRootRelationshipData(String candidateName, Task candidateTask) {
-        return state.boundRootRelationshipData(candidateName, candidateTask);
-    }
-
     public FabricChatClefBoundRootTaskRelationshipPayload boundRootRelationshipPayload(
             String candidateName,
             Task candidateTask
@@ -133,11 +128,11 @@ public final class FabricChatClefCommandExecution {
         return state.context();
     }
 
-    public Map<String, Object> duplicateTerminalData(String reason) {
-        return resultFactory.duplicateTerminalData(reason);
+    public FabricChatClefCommandResultDataPayload duplicateTerminalPayload(String reason) {
+        return resultFactory.duplicateTerminalPayload(reason);
     }
 
-    public Map<String, Object> diagnosticData(String diagnosticReason) {
-        return resultFactory.diagnosticData(diagnosticReason);
+    public FabricChatClefCommandResultDataPayload diagnosticPayload(String diagnosticReason) {
+        return resultFactory.diagnosticPayload(diagnosticReason);
     }
 }

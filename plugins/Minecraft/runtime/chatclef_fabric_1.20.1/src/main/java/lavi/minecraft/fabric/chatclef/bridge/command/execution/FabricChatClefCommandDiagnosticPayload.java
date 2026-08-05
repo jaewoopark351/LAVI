@@ -5,15 +5,14 @@ import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandReques
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandLifecyclePayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandTerminationObservation;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskSnapshot;
-
-import java.util.Map;
+import lavi.minecraft.fabric.chatclef.bridge.command.result.FabricChatClefCommandResultDataPayload;
 
 //20260803_kpopmodder: Keep command lifecycle state separate from diagnostic payload map assembly.
 public final class FabricChatClefCommandDiagnosticPayload {
     private FabricChatClefCommandDiagnosticPayload() {
     }
 
-    public static Map<String, Object> commandData(
+    public static FabricChatClefCommandResultDataPayload commandData(
             String resultReason,
             long dispatchStartedMs,
             boolean dispatchReturned,
@@ -44,15 +43,15 @@ public final class FabricChatClefCommandDiagnosticPayload {
                 terminalTask,
                 boundRootTask,
                 observation
-        ).toMap();
+        );
     }
 
-    public static Map<String, Object> diagnosticData(
+    public static FabricChatClefCommandResultDataPayload diagnosticData(
             String diagnosticReason,
             FabricChatClefCommandRequest request,
             String normalizedCommand,
             long elapsedMs,
-            Map<String, Object> commandData
+            FabricChatClefCommandResultDataPayload commandData
     ) {
         return new FabricChatClefCommandDiagnosticResultPayload(
                 diagnosticReason,
@@ -60,6 +59,6 @@ public final class FabricChatClefCommandDiagnosticPayload {
                 normalizedCommand,
                 elapsedMs,
                 commandData
-        ).toMap();
+        );
     }
 }

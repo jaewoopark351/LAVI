@@ -7,8 +7,6 @@ import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCom
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefBoundRootTaskRelationshipPayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskSnapshot;
 
-import java.util.Map;
-
 //20260804_kpopmodder: Keep mutable ChatClef command execution state out of result orchestration.
 final class FabricChatClefCommandExecutionState {
     private final FabricChatClefCommandContext context;
@@ -109,10 +107,6 @@ final class FabricChatClefCommandExecutionState {
             return "same_task_class_different_instance";
         }
         return "different_task_class";
-    }
-
-    Map<String, Object> boundRootRelationshipData(String candidateName, Task candidateTask) {
-        return boundRootRelationshipPayload(candidateName, candidateTask).toMap();
     }
 
     FabricChatClefBoundRootTaskRelationshipPayload boundRootRelationshipPayload(String candidateName, Task candidateTask) {
