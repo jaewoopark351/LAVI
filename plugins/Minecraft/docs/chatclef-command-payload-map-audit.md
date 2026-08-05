@@ -244,6 +244,27 @@ finish_callback_received
 runtime
 ```
 
+Other command lifecycle detail keys now centralized in the Java helper layer:
+
+```text
+replaced_active_request_id
+callback_current_task
+callback_current_task_matches_bound_root_task
+callback_current_task_bound_root_match_reason
+runtime
+decision_reason
+terminal_sent
+lifecycle_cleared
+queue_active_present
+queue_active_request_id
+waiting_reason
+current_task
+current_task_matches_bound_root_task
+current_task_bound_root_match_reason
+exception_type
+exception_message
+```
+
 Termination observation keys:
 
 ```text
@@ -288,6 +309,7 @@ command/observation/FabricChatClefBoundRootTaskRelationshipPayload
 command/observation/FabricChatClefTaskRuntimeObservationPayload
 command/lifecycle/FabricChatClefCommandDeadlinePayload
 command/lifecycle/FabricChatClefCommandLifecyclePayload
+command/lifecycle/FabricChatClefLifecycleDetailsPayload
 command/lifecycle/FabricChatClefTaskFinishedEventDetailsPayload
 ```
 

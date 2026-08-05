@@ -53,9 +53,11 @@ public final class FabricChatClefCommandLifecycleCoordinator {
                             + " next="
                             + execution.requestId()
             );
-            Map<String, Object> details = new HashMap<>();
-            details.put("replaced_active_request_id", active == null ? "" : active.requestId());
-            commandDiagnostics.warn("begin_execution_replaced_stale_active", execution, details);
+            commandDiagnostics.warn(
+                    "begin_execution_replaced_stale_active",
+                    execution,
+                    FabricChatClefLifecycleDetailsPayload.replacedActive(active == null ? "" : active.requestId())
+            );
             activeExecution.set(execution);
         }
         lastWaitingDecisionKey = "";
@@ -73,9 +75,14 @@ public final class FabricChatClefCommandLifecycleCoordinator {
             Task taskAtFinish
     ) {
         execution.markFinishCallbackReceived(taskAtFinish);
-        Map<String, Object> details = execution.boundRootRelationshipData("callback_current_task", taskAtFinish);
-        details.put("runtime", taskStateReader.runtimeData());
-        commandDiagnostics.info("finish_callback_received", execution, details);
+        commandDiagnostics.info(
+                "finish_callback_received",
+                execution,
+                FabricChatClefLifecycleDetailsPayload.finishCallback(
+                        execution.boundRootRelationshipPayload("callback_current_task", taskAtFinish),
+                        taskStateReader.runtimePayload()
+                )
+        );
         tryComplete(execution);
     }
 
@@ -185,9 +192,11 @@ public final class FabricChatClefCommandLifecycleCoordinator {
             logWaitingDecision(execution, decision.reason());
             return;
         }
-        Map<String, Object> details = new HashMap<>();
-        details.put("decision_reason", decision.reason());
-        commandDiagnostics.info("terminal_decision", execution, details);
+        commandDiagnostics.info(
+                "terminal_decision",
+                execution,
+                FabricChatClefLifecycleDetailsPayload.terminalDecision(decision.reason())
+        );
         completeTerminal(execution, decision::result);
         diagnostics.info(
                 "terminal command decision request="
@@ -203,10 +212,11 @@ public final class FabricChatClefCommandLifecycleCoordinator {
     ) {
         boolean terminalSent = resultOutbox.sendTerminal(execution, resultFactory);
         boolean lifecycleCleared = activeExecution.compareAndSet(execution, null);
-        Map<String, Object> details = new HashMap<>();
-        details.put("terminal_sent", terminalSent);
-        details.put("lifecycle_cleared", lifecycleCleared);
-        commandDiagnostics.info("terminal_result_sent", execution, details);
+        commandDiagnostics.info(
+                "terminal_result_sent",
+                execution,
+                FabricChatClefLifecycleDetailsPayload.terminalResult(terminalSent, lifecycleCleared)
+        );
         lastWaitingDecisionKey = "";
     }
 
@@ -222,13 +232,14 @@ public final class FabricChatClefCommandLifecycleCoordinator {
                 "cleared lifecycle execution without active queue context request="
                         + execution.requestId()
         );
-        Map<String, Object> details = new HashMap<>();
-        details.put("queue_active_present", activeContext.isPresent());
-        details.put(
-                "queue_active_request_id",
-                activeContext.isPresent() ? activeContext.get().requestId() : ""
+        commandDiagnostics.warn(
+                "lifecycle_execution_without_active_queue_context",
+                execution,
+                FabricChatClefLifecycleDetailsPayload.queueContextMismatch(
+                        activeContext.isPresent(),
+                        activeContext.isPresent() ? activeContext.get().requestId() : ""
+                )
         );
-        commandDiagnostics.warn("lifecycle_execution_without_active_queue_context", execution, details);
         activeExecution.compareAndSet(execution, null);
     }
 
@@ -241,26 +252,23 @@ public final class FabricChatClefCommandLifecycleCoordinator {
         lastWaitingDecisionKey = key;
         lastWaitingDecisionLoggedAtMs = nowMs;
         Task currentTask = taskStateReader.currentTaskOrNull();
-        Map<String, Object> details = new HashMap<>();
-        details.put("waiting_reason", reason);
-        details.putAll(execution.boundRootRelationshipData("current_task", currentTask));
-        details.put("current_task_bound_root_match_reason", execution.boundRootMatchReason(currentTask));
-        details.put("runtime", taskStateReader.runtimeData());
-        commandDiagnostics.info("waiting_for_terminal_condition", execution, details);
+        commandDiagnostics.info(
+                "waiting_for_terminal_condition",
+                execution,
+                FabricChatClefLifecycleDetailsPayload.waitingForTerminalCondition(
+                        reason,
+                        execution.boundRootRelationshipPayload("current_task", currentTask),
+                        execution.boundRootMatchReason(currentTask),
+                        taskStateReader.runtimePayload()
+                )
+        );
     }
 
     private Map<String, Object> exceptionDetails(Throwable exception) {
-        Map<String, Object> details = new HashMap<>();
-        details.put("exception_type", exception == null ? "" : exception.getClass().getName());
-        details.put("exception_message", exception == null ? "" : nullSafeMessage(exception));
-        return details;
+        return FabricChatClefLifecycleDetailsPayload.exception(exception);
     }
 
     private Map<String, Object> deadlineData(FabricChatClefCommandContext context) {
         return FabricChatClefCommandDeadlinePayload.markTaskMayStillBeRunning(context.ownershipData());
-    }
-
-    private String nullSafeMessage(Throwable error) {
-        return error.getMessage() == null ? "" : error.getMessage();
     }
 }

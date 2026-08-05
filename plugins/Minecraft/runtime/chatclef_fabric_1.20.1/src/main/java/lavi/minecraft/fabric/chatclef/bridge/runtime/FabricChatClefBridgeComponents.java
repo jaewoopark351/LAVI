@@ -1,7 +1,9 @@
 package lavi.minecraft.fabric.chatclef.bridge.runtime;
 
+import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandDispatcher;
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandQueue;
+import lavi.minecraft.fabric.chatclef.bridge.command.diagnostics.FabricChatClefDiagnosticCommandContextProvider;
 import lavi.minecraft.fabric.chatclef.bridge.command.diagnostics.FabricChatClefTaskStateReader;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandLifecycleCoordinator;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandOutcomeClassifier;
@@ -38,6 +40,7 @@ public final class FabricChatClefBridgeComponents {
     public static FabricChatClefBridgeComponents create() {
         FabricChatClefBridgeDiagnostics diagnostics = new FabricChatClefBridgeDiagnostics();
         FabricChatClefCommandQueue commandQueue = new FabricChatClefCommandQueue();
+        ChatClefDiagnostics.registerCommandContextProvider(new FabricChatClefDiagnosticCommandContextProvider(commandQueue));
         FabricChatClefTaskStateReader taskStateReader = new FabricChatClefTaskStateReader();
         FabricChatClefBridgeConfig config = new FabricChatClefBridgeConfigLoader().load();
         FabricChatClefBridgeClient bridgeClient = new FabricChatClefBridgeClient(
