@@ -202,6 +202,9 @@ request_command
 request_source
 normalized_command
 elapsed_ms
+automation_cancelled
+task_may_still_be_running
+late_terminal_event_will_be_ignored
 ```
 
 Task snapshot keys:
@@ -252,6 +255,20 @@ Typing direction: additive typing is allowed later, but avoid deleting or
 renaming keys while these logs are actively used to diagnose command lifecycle
 issues. A future typed diagnostic object should still provide `toMap()` at the
 command result boundary.
+
+Current LAVI-owned helper placement:
+
+```text
+command/ownership/FabricChatClefCommandOwnershipPayload
+command/observation/FabricChatClefTaskSnapshot
+command/observation/FabricChatClefTaskSnapshotPayload
+command/lifecycle/FabricChatClefCommandDeadlinePayload
+```
+
+These helpers centralize field names and keep typed values local until the
+existing `Map<String, Object>` serialization edge. They do not rename emitted
+keys, change status values, or alter lifecycle, timeout, retry, task
+observation, or ownership behavior.
 
 ### Lifecycle And Gate Logs
 
@@ -357,10 +374,12 @@ plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fa
 plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/request/FabricChatClefCommandRequestFields.java
 plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/FabricChatClefCommandResult.java
 plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/FabricChatClefCommandContext.java
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/ownership/FabricChatClefCommandOwnershipPayload.java
 plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/FabricChatClefCommandResultSender.java
 plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/transport/FabricChatClefResultEnvelopeSender.java
 plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/execution/FabricChatClefCommandDiagnosticPayload.java
-plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/execution/FabricChatClefTaskSnapshot.java
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/observation/FabricChatClefTaskSnapshot.java
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/lifecycle/FabricChatClefCommandDeadlinePayload.java
 plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/lifecycle/FabricChatClefCommandTerminationObservation.java
 plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/diagnostics/FabricChatClefCommandDiagnostics.java
 ```

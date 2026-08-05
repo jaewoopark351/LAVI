@@ -2,6 +2,7 @@ package lavi.minecraft.fabric.chatclef.bridge.command.execution;
 
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandRequest;
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandResult;
+import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandDeadlinePayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandTerminationObservation;
 
 import java.util.Map;
@@ -88,9 +89,7 @@ final class FabricChatClefCommandResultFactory {
 
     Map<String, Object> deadlineExceededResult(String message) {
         Map<String, Object> payload = data("deadline_exceeded");
-        payload.put("automation_cancelled", false);
-        payload.put("task_may_still_be_running", true);
-        payload.put("late_terminal_event_will_be_ignored", true);
+        FabricChatClefCommandDeadlinePayload.markTaskMayStillBeRunning(payload);
         return FabricChatClefCommandResult.deadlineExceeded(
                 request().requestId,
                 message,

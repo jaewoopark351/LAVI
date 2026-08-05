@@ -1,5 +1,7 @@
 package lavi.minecraft.fabric.chatclef.bridge.command;
 
+import lavi.minecraft.fabric.chatclef.bridge.command.ownership.FabricChatClefCommandOwnershipPayload;
+
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -61,7 +63,7 @@ public final class FabricChatClefCommandContext {
     }
 
     public Map<String, Object> ownershipData() {
-        return new FabricChatClefCommandOwnershipPayload(
+        return FabricChatClefCommandOwnershipPayload.of(
                 requestId(),
                 correlationId,
                 sessionId,

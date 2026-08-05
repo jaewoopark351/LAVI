@@ -4,6 +4,7 @@ import adris.altoclef.tasksystem.Task;
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandContext;
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandRequest;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandTerminationObservation;
+import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskSnapshot;
 
 import java.util.HashMap;
 import java.util.Map;

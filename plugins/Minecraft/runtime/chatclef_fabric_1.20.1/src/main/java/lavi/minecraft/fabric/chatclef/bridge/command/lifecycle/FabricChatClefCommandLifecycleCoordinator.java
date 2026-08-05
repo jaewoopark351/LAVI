@@ -6,7 +6,7 @@ import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandResult
 import lavi.minecraft.fabric.chatclef.bridge.command.diagnostics.FabricChatClefCommandDiagnostics;
 import lavi.minecraft.fabric.chatclef.bridge.command.diagnostics.FabricChatClefTaskStateReader;
 import lavi.minecraft.fabric.chatclef.bridge.command.execution.FabricChatClefCommandExecution;
-import lavi.minecraft.fabric.chatclef.bridge.command.execution.FabricChatClefTaskSnapshot;
+import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskSnapshot;
 import lavi.minecraft.fabric.chatclef.bridge.diagnostics.FabricChatClefBridgeDiagnostics;
 
 import java.util.HashMap;
@@ -256,11 +256,7 @@ public final class FabricChatClefCommandLifecycleCoordinator {
     }
 
     private Map<String, Object> deadlineData(FabricChatClefCommandContext context) {
-        Map<String, Object> payload = context.ownershipData();
-        payload.put("automation_cancelled", false);
-        payload.put("task_may_still_be_running", true);
-        payload.put("late_terminal_event_will_be_ignored", true);
-        return payload;
+        return FabricChatClefCommandDeadlinePayload.markTaskMayStillBeRunning(context.ownershipData());
     }
 
     private String nullSafeMessage(Throwable error) {

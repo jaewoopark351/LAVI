@@ -1,6 +1,6 @@
 package lavi.minecraft.fabric.chatclef.bridge.command.lifecycle;
 
-import lavi.minecraft.fabric.chatclef.bridge.command.execution.FabricChatClefTaskSnapshot;
+import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskSnapshot;
 
 import java.util.HashMap;
 import java.util.Map;

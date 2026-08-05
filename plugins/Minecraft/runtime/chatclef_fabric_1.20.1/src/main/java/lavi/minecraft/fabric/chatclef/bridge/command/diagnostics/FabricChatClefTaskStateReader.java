@@ -3,7 +3,7 @@ package lavi.minecraft.fabric.chatclef.bridge.command.diagnostics;
 import adris.altoclef.AltoClef;
 import adris.altoclef.tasksystem.Task;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
-import lavi.minecraft.fabric.chatclef.bridge.command.execution.FabricChatClefTaskSnapshot;
+import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskSnapshot;
 
 import java.util.HashMap;
 import java.util.Map;

@@ -1,4 +1,4 @@
-package lavi.minecraft.fabric.chatclef.bridge.command.execution;
+package lavi.minecraft.fabric.chatclef.bridge.command.observation;
 
 import java.util.HashMap;
 import java.util.Map;

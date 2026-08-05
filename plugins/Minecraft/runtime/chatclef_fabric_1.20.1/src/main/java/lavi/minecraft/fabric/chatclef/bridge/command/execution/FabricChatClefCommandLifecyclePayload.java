@@ -2,6 +2,7 @@ package lavi.minecraft.fabric.chatclef.bridge.command.execution;
 
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandContext;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandTerminationObservation;
+import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskSnapshot;
 
 import java.util.HashMap;
 import java.util.Map;

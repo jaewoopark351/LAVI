@@ -1,10 +1,10 @@
-package lavi.minecraft.fabric.chatclef.bridge.command;
+package lavi.minecraft.fabric.chatclef.bridge.command.ownership;
 
 import java.util.HashMap;
 import java.util.Map;
 
 //20260805_kpopmodder: Isolate command ownership diagnostic payload keys without changing their map shape.
-final class FabricChatClefCommandOwnershipPayload {
+public final class FabricChatClefCommandOwnershipPayload {
     private static final String REQUEST_ID = "request_id";
     private static final String CORRELATION_ID = "correlation_id";
     private static final String SESSION_ID = "session_id";
@@ -21,7 +21,7 @@ final class FabricChatClefCommandOwnershipPayload {
     private final boolean detached;
     private final String detachedReason;
 
-    FabricChatClefCommandOwnershipPayload(
+    private FabricChatClefCommandOwnershipPayload(
             String requestId,
             String correlationId,
             String sessionId,
@@ -39,7 +39,27 @@ final class FabricChatClefCommandOwnershipPayload {
         this.detachedReason = detachedReason;
     }
 
-    Map<String, Object> toMap() {
+    public static FabricChatClefCommandOwnershipPayload of(
+            String requestId,
+            String correlationId,
+            String sessionId,
+            long connectionGeneration,
+            long acceptedAtMs,
+            boolean detached,
+            String detachedReason
+    ) {
+        return new FabricChatClefCommandOwnershipPayload(
+                requestId,
+                correlationId,
+                sessionId,
+                connectionGeneration,
+                acceptedAtMs,
+                detached,
+                detachedReason
+        );
+    }
+
+    public Map<String, Object> toMap() {
         Map<String, Object> payload = new HashMap<>();
         payload.put(REQUEST_ID, requestId);
         payload.put(CORRELATION_ID, correlationId);
