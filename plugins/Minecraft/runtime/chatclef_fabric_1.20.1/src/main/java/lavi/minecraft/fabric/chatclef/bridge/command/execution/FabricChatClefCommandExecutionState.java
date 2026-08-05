@@ -4,9 +4,9 @@ import adris.altoclef.tasksystem.Task;
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandContext;
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandRequest;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandTerminationObservation;
+import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefBoundRootTaskRelationshipPayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskSnapshot;
 
-import java.util.HashMap;
 import java.util.Map;
 
 //20260804_kpopmodder: Keep mutable ChatClef command execution state out of result orchestration.
@@ -112,12 +112,13 @@ final class FabricChatClefCommandExecutionState {
     }
 
     Map<String, Object> boundRootRelationshipData(String candidateName, Task candidateTask) {
-        Map<String, Object> payload = new HashMap<>();
-        payload.put(candidateName, FabricChatClefTaskSnapshot.capture(candidateTask).toMap());
-        payload.put(candidateName + "_matches_bound_root_task", matchesBoundRootTask(candidateTask));
-        payload.put(candidateName + "_bound_root_match_reason", boundRootMatchReason(candidateTask));
-        payload.put("bound_root_task", FabricChatClefTaskSnapshot.capture(boundRootTask).toMap());
-        return payload;
+        return FabricChatClefBoundRootTaskRelationshipPayload.of(
+                candidateName,
+                FabricChatClefTaskSnapshot.capture(candidateTask),
+                matchesBoundRootTask(candidateTask),
+                boundRootMatchReason(candidateTask),
+                FabricChatClefTaskSnapshot.capture(boundRootTask)
+        ).toMap();
     }
 
     FabricChatClefCommandTerminationObservation taskFinishedObservation() {
