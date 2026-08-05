@@ -15,7 +15,11 @@ public final class CarryOnObservationClassifier {
         return previous.loaded() == current.loaded()
                 && previous.state() == current.state()
                 && previous.version().equals(current.version())
-                && previous.exceptionType().equals(current.exceptionType());
+                && previous.exceptionType().equals(current.exceptionType())
+                && previous.carriedBlockId().equals(current.carriedBlockId())
+                && previous.carriedBlockDescription().equals(current.carriedBlockDescription())
+                && previous.carriedBlockState().equals(current.carriedBlockState())
+                && previous.carriedBlockExceptionType().equals(current.carriedBlockExceptionType());
     }
 
     public static boolean isCarrying(CarryOnObservation observation) {

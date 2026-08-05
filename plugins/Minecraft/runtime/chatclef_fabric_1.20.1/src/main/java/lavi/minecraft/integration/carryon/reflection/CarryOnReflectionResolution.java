@@ -9,12 +9,26 @@ public record CarryOnReflectionResolution(CarryOnResolutionStatus status,
                                           String version,
                                           Throwable cause,
                                           Method getCarryDataMethod,
-                                          Method isCarryingMethod) {
-    static CarryOnReflectionResolution resolved(String version, Method getCarryDataMethod, Method isCarryingMethod) {
-        return new CarryOnReflectionResolution(CarryOnResolutionStatus.RESOLVED, version, null, getCarryDataMethod, isCarryingMethod);
+                                          Method isCarryingMethod,
+                                          Method carriedBlockMethod,
+                                          Method carriedBlockStateMethod) {
+    static CarryOnReflectionResolution resolved(String version,
+                                                Method getCarryDataMethod,
+                                                Method isCarryingMethod,
+                                                Method carriedBlockMethod,
+                                                Method carriedBlockStateMethod) {
+        return new CarryOnReflectionResolution(
+                CarryOnResolutionStatus.RESOLVED,
+                version,
+                null,
+                getCarryDataMethod,
+                isCarryingMethod,
+                carriedBlockMethod,
+                carriedBlockStateMethod
+        );
     }
 
     static CarryOnReflectionResolution incompatible(String version, Throwable cause) {
-        return new CarryOnReflectionResolution(CarryOnResolutionStatus.INCOMPATIBLE, version, cause, null, null);
+        return new CarryOnReflectionResolution(CarryOnResolutionStatus.INCOMPATIBLE, version, cause, null, null, null, null);
     }
 }

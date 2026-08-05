@@ -16,6 +16,7 @@ import adris.altoclef.util.slots.Slot;
 import adris.altoclef.util.time.TimerGame;
 import baritone.api.utils.input.Input;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.diagnostics.container.ContainerTaskDiagnostics;
 import net.minecraft.block.Block;
 import net.minecraft.screen.slot.SlotActionType;
 import net.minecraft.util.math.BlockPos;
@@ -124,6 +125,23 @@ public abstract class DoStuffInContainerTask extends Task {
         // If we're placing, keep on placing.
         if (hasContainerItem && placeTaskActive && !placeTaskFinished) {
             setDebugState("Placing container");
+            if (diagnosticsBoundary) {
+                //20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
+                // trace-20260805-container-loop: diagnostics-only branch attribution; behavior intentionally preserved.
+                ContainerTaskDiagnostics.logBoundary("CONTAINER_TASK_BRANCH",
+                        "return_active_place_task",
+                        "ACTIVE_PLACE_TASK|" + containerTarget + "|placed=" + ChatClefDiagnostics.blockPos(placeTask.getPlaced()),
+                        mod,
+                        this,
+                        containerTarget,
+                        containerBlocks,
+                        "decision", "RETURN_ACTIVE_PLACE_TASK",
+                        "hasContainerBlockItem", hasContainerItem,
+                        "placeTaskActive", true,
+                        "placeTaskFinished", false,
+                        "placeTaskPlaced", placeTask.getPlaced(),
+                        "placeTaskPlacedBlockState", placeTask.getPlaced() == null ? "unavailable" : ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(placeTask.getPlaced())));
+            }
             if (diagnosticsVerbose) {
                 ChatClefDiagnostics.logTaskTransition(this, null, placeTask, "return_active_place_task",
                         "containerTarget", containerTarget,
@@ -225,6 +243,19 @@ public abstract class DoStuffInContainerTask extends Task {
         if (containerOpen) {
             logPostPlaceGuiOpened(mod);
             Task containerTask = containerSubTask(mod);
+            if (diagnosticsBoundary) {
+                ContainerTaskDiagnostics.logBoundary("CONTAINER_TASK_BRANCH",
+                        "return_container_sub_task",
+                        "CONTAINER_OPEN|" + containerTarget + "|" + cachedContainerPosition,
+                        mod,
+                        this,
+                        containerTarget,
+                        containerBlocks,
+                        "decision", "RETURN_CONTAINER_SUB_TASK",
+                        "containerOpen", true,
+                        "cachedContainerPosition", cachedContainerPosition,
+                        "containerTask", ChatClefDiagnostics.taskSummary(containerTask));
+            }
             if (diagnosticsVerbose) {
                 ChatClefDiagnostics.logTaskTransition(this, null, containerTask, "return_container_sub_task",
                         "containerTarget", containerTarget,
@@ -277,6 +308,33 @@ public abstract class DoStuffInContainerTask extends Task {
                     "justPlacedElapsed", justPlacedElapsed,
                     "hasContainerItem", hasContainerItem);
         }
+        if (diagnosticsBoundary) {
+            ContainerTaskDiagnostics.logBoundary("CONTAINER_TASK_TARGET_DECISION",
+                    "container_target_decision",
+                    "nearest=" + nearest.map(BlockPos::toShortString).orElse("none")
+                            + "|hasBlockItem=" + hasContainerItem
+                            + "|placeTaskActive=" + placeTaskActive
+                            + "|placeTaskFinished=" + placeTaskFinished
+                            + "|placed=" + ChatClefDiagnostics.blockPos(placeTask.getPlaced()),
+                    mod,
+                    this,
+                    containerTarget,
+                    containerBlocks,
+                    "overrideContainerPosition", override,
+                    "nearestPresent", nearest.isPresent(),
+                    "nearestPosition", nearest.map(BlockPos::toShortString).orElse("none"),
+                    "nearestBlockState", nearest.map(blockPos -> ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(blockPos))).orElse("unavailable"),
+                    "cachedContainerPosition", cachedContainerPosition,
+                    "placeTaskActive", placeTaskActive,
+                    "placeTaskFinished", placeTaskFinished,
+                    "placeTaskPlaced", placeTask.getPlaced(),
+                    "placeTaskPlacedBlockState", placeTask.getPlaced() == null ? "unavailable" : ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(placeTask.getPlaced())),
+                    "costToWalk", costToWalk,
+                    "costToMakeNew", costToMakeNew,
+                    "placeForceElapsed", placeForceElapsed,
+                    "justPlacedElapsed", justPlacedElapsed,
+                    "hasContainerBlockItem", hasContainerItem);
+        }
 
         // Make a new container if going to the container is a pretty bad cost.
         // Also keep on making the container if we're stuck in some
@@ -308,8 +366,30 @@ public abstract class DoStuffInContainerTask extends Task {
             }
 
             // Get if we don't have...
-            if (!mod.getItemStorage().hasItem(containerTarget)) {
+            boolean hasContainerTarget = mod.getItemStorage().hasItem(containerTarget);
+            if (!hasContainerTarget) {
                 setDebugState("Getting container item");
+                if (diagnosticsBoundary) {
+                    ContainerTaskDiagnostics.logBoundary("CONTAINER_TASK_BRANCH",
+                            "return_get_container_item_task",
+                            "GET_CONTAINER_ITEM|" + containerTarget
+                                    + "|nearest=" + nearest.map(BlockPos::toShortString).orElse("none")
+                                    + "|placed=" + ChatClefDiagnostics.blockPos(placeTask.getPlaced()),
+                            mod,
+                            this,
+                            containerTarget,
+                            containerBlocks,
+                            "decision", "RETURN_GET_CONTAINER_ITEM_TASK",
+                            "hasContainerBlockItem", hasContainerItem,
+                            "hasContainerTarget", false,
+                            "nearestPresent", nearest.isPresent(),
+                            "nearestPosition", nearest.map(BlockPos::toShortString).orElse("none"),
+                            "placeTaskPlaced", placeTask.getPlaced(),
+                            "costToWalk", costToWalk,
+                            "costToMakeNew", costToMakeNew,
+                            "placeForceElapsed", placeForceElapsed,
+                            "justPlacedElapsed", justPlacedElapsed);
+                }
                 if (diagnosticsVerbose) {
                     ChatClefDiagnostics.logEvent("CONTAINER_TASK", "RETURN", "return_get_container_item_task", this,
                             "containerTarget", containerTarget,
@@ -323,6 +403,27 @@ public abstract class DoStuffInContainerTask extends Task {
 
             justPlacedTimer.reset();
             // Now place!
+            if (diagnosticsBoundary) {
+                ContainerTaskDiagnostics.logBoundary("CONTAINER_TASK_BRANCH",
+                        "return_place_task",
+                        "PLACE_CONTAINER|" + containerTarget
+                                + "|nearest=" + nearest.map(BlockPos::toShortString).orElse("none")
+                                + "|placed=" + ChatClefDiagnostics.blockPos(placeTask.getPlaced()),
+                        mod,
+                        this,
+                        containerTarget,
+                        containerBlocks,
+                        "decision", "RETURN_PLACE_TASK",
+                        "hasContainerBlockItem", hasContainerItem,
+                        "hasContainerTarget", true,
+                        "nearestPresent", nearest.isPresent(),
+                        "nearestPosition", nearest.map(BlockPos::toShortString).orElse("none"),
+                        "placeTaskPlaced", placeTask.getPlaced(),
+                        "costToWalk", costToWalk,
+                        "costToMakeNew", costToMakeNew,
+                        "placeForceElapsed", placeForceElapsed,
+                        "justPlacedElapsed", justPlacedElapsed);
+            }
             if (diagnosticsVerbose) {
                 ChatClefDiagnostics.logTaskTransition(this, null, placeTask, "return_place_task",
                         "containerTarget", containerTarget,
@@ -341,6 +442,18 @@ public abstract class DoStuffInContainerTask extends Task {
         // Wait for food
         if (mod.getFoodChain().needsToEat()) {
             setDebugState("Waiting for eating...");
+            if (diagnosticsBoundary) {
+                ContainerTaskDiagnostics.logBoundary("CONTAINER_TASK_BRANCH",
+                        "return_wait_for_food",
+                        "WAIT_FOR_FOOD|" + containerTarget + "|" + cachedContainerPosition,
+                        mod,
+                        this,
+                        containerTarget,
+                        containerBlocks,
+                        "decision", "RETURN_NULL_WAIT_FOR_FOOD",
+                        "cachedContainerPosition", cachedContainerPosition,
+                        "nearestPosition", nearest.get().toShortString());
+            }
             if (diagnosticsVerbose) {
                 ChatClefDiagnostics.logEvent("CONTAINER_TASK", "RETURN", "return_wait_for_food", this,
                         "containerTarget", containerTarget,
@@ -354,6 +467,19 @@ public abstract class DoStuffInContainerTask extends Task {
         if (!cursorStack.isEmpty()) {
             Optional<Slot> toMoveTo = mod.getItemStorage().getSlotThatCanFitInPlayerInventory(cursorStack, false);
             if (toMoveTo.isEmpty()) {
+                if (diagnosticsBoundary) {
+                    ContainerTaskDiagnostics.logBoundary("CONTAINER_TASK_BRANCH",
+                            "return_ensure_free_inventory_slot",
+                            "ENSURE_FREE_SLOT|" + containerTarget + "|" + cachedContainerPosition,
+                            mod,
+                            this,
+                            containerTarget,
+                            containerBlocks,
+                            "decision", "RETURN_ENSURE_FREE_INVENTORY_SLOT",
+                            "cachedContainerPosition", cachedContainerPosition,
+                            "nearestPosition", nearest.get().toShortString(),
+                            "cursorStack", cursorStack);
+                }
                 if (diagnosticsVerbose) {
                     ChatClefDiagnostics.logEvent("CONTAINER_TASK", "RETURN", "return_ensure_free_inventory_slot", this,
                             "containerTarget", containerTarget,
@@ -387,6 +513,20 @@ public abstract class DoStuffInContainerTask extends Task {
                     "openTableTaskClass", ChatClefDiagnostics.className(openTableTask));
         }
         beginPostPlaceOpenIntentIfNeeded(mod);
+        if (diagnosticsBoundary) {
+            ContainerTaskDiagnostics.logBoundary("CONTAINER_TASK_BRANCH",
+                    "return_open_table_task",
+                    "OPEN_CONTAINER|" + containerTarget + "|" + cachedContainerPosition,
+                    mod,
+                    this,
+                    containerTarget,
+                    containerBlocks,
+                    "decision", "RETURN_OPEN_TABLE_TASK",
+                    "cachedContainerPosition", cachedContainerPosition,
+                    "cachedContainerBlockState", cachedContainerPosition == null ? "unavailable" : ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(cachedContainerPosition)),
+                    "nearestPosition", nearest.get().toShortString(),
+                    "openTableTask", ChatClefDiagnostics.taskSummary(openTableTask));
+        }
         if (diagnosticsVerbose) {
             ChatClefDiagnostics.logTaskTransition(this, null, openTableTask, "return_open_table_task",
                     "containerTarget", containerTarget,

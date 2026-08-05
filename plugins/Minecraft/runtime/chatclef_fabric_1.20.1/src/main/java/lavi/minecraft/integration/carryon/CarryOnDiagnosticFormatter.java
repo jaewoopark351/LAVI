@@ -11,7 +11,7 @@ public final class CarryOnDiagnosticFormatter {
         CarryOnObservation before = snapshot.stateBefore();
         CarryOnObservation after = snapshot.stateAfter();
         return String.format(
-                "[LAVI CarryOnDiag] traceId=%s clientTickId=%d eventSequence=%d event=%s taskInstanceId=%d operationId=%d operationType=%s expectedTransition=%s transitionObserved=%s gameTick=%s threadName=%s currentChain=%s topLevelTask=%s childTask=%s taskChain=%s taskRunnerActive=%s userTaskChainActive=%s paused=%s chatClefEnabled=%s playerMode=%s targetType=%s targetId=%s targetPosition=%s playerPosition=%s playerVelocity=%s lookRotation=%s playerPoseState=%s dimension=%s carryOnLoadedBefore=%s carryOnLoadedAfter=%s carryOnVersionBefore=%s carryOnVersionAfter=%s carryStateBefore=%s carryStateAfter=%s rightClickState=%s sneakState=%s leftClickState=%s movementInputState=%s baritonePathing=%s customGoalOwner=%s breakingBlockState=%s crosshairType=%s crosshairTarget=%s crosshairBlockId=%s clickResult=%s attemptCount=%d elapsedTicks=%d screenName=%s screenHandlerName=%s screenHandlerSyncId=%s cursorStack=%s selectedHotbarSlot=%s mainHandItem=%s offHandItem=%s terminalReason=%s exceptionTypeBefore=%s exceptionTypeAfter=%s",
+                "[LAVI CarryOnDiag] traceId=%s clientTickId=%d eventSequence=%d event=%s taskInstanceId=%d operationId=%d operationType=%s expectedTransition=%s transitionObserved=%s gameTick=%s threadName=%s currentChain=%s topLevelTask=%s childTask=%s taskChain=%s taskRunnerActive=%s userTaskChainActive=%s paused=%s chatClefEnabled=%s playerMode=%s targetType=%s targetId=%s targetPosition=%s playerPosition=%s playerVelocity=%s lookRotation=%s playerPoseState=%s dimension=%s carryOnLoadedBefore=%s carryOnLoadedAfter=%s carryOnVersionBefore=%s carryOnVersionAfter=%s carryStateBefore=%s carryStateAfter=%s carriedBlockIdBefore=%s carriedBlockIdAfter=%s carriedBlockDescriptionBefore=%s carriedBlockDescriptionAfter=%s carriedBlockStateBefore=%s carriedBlockStateAfter=%s carriedBlockExceptionTypeBefore=%s carriedBlockExceptionTypeAfter=%s rightClickState=%s sneakState=%s leftClickState=%s movementInputState=%s baritonePathing=%s customGoalOwner=%s breakingBlockState=%s crosshairType=%s crosshairTarget=%s crosshairBlockId=%s clickResult=%s attemptCount=%d elapsedTicks=%d screenName=%s screenHandlerName=%s screenHandlerSyncId=%s cursorStack=%s selectedHotbarSlot=%s mainHandItem=%s offHandItem=%s terminalReason=%s exceptionTypeBefore=%s exceptionTypeAfter=%s",
                 ChatClefDiagnostics.currentTraceId(),
                 ChatClefDiagnostics.currentClientTickId(),
                 ChatClefDiagnostics.nextEventSequence(),
@@ -46,6 +46,14 @@ public final class CarryOnDiagnosticFormatter {
                 version(after),
                 state(before),
                 state(after),
+                carriedBlockId(before),
+                carriedBlockId(after),
+                carriedBlockDescription(before),
+                carriedBlockDescription(after),
+                carriedBlockState(before),
+                carriedBlockState(after),
+                carriedBlockExceptionType(before),
+                carriedBlockExceptionType(after),
                 snapshot.rightClickState(),
                 snapshot.sneakState(),
                 snapshot.leftClickState(),
@@ -90,5 +98,21 @@ public final class CarryOnDiagnosticFormatter {
 
     private static String exceptionType(CarryOnObservation observation) {
         return observation == null ? "unavailable" : observation.exceptionType();
+    }
+
+    private static String carriedBlockId(CarryOnObservation observation) {
+        return observation == null ? "unavailable" : observation.carriedBlockId();
+    }
+
+    private static String carriedBlockDescription(CarryOnObservation observation) {
+        return observation == null ? "unavailable" : observation.carriedBlockDescription();
+    }
+
+    private static String carriedBlockState(CarryOnObservation observation) {
+        return observation == null ? "unavailable" : observation.carriedBlockState();
+    }
+
+    private static String carriedBlockExceptionType(CarryOnObservation observation) {
+        return observation == null ? "unavailable" : observation.carriedBlockExceptionType();
     }
 }

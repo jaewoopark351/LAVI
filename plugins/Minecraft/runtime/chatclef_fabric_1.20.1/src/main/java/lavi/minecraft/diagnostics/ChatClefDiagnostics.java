@@ -6,7 +6,10 @@ import adris.altoclef.tasksystem.TaskChain;
 import adris.altoclef.util.ItemTarget;
 import adris.altoclef.util.slots.Slot;
 import baritone.api.utils.input.Input;
+import lavi.minecraft.diagnostics.command.DiagnosticCommandContextProvider;
+import lavi.minecraft.diagnostics.command.DiagnosticCommandContextRegistry;
 import lavi.minecraft.diagnostics.formatting.DiagnosticFormatterFacade;
+import lavi.minecraft.diagnostics.interaction.BlockInteractionObserver;
 import lavi.minecraft.diagnostics.mode.DiagnosticModeController;
 import lavi.minecraft.diagnostics.mode.DiagnosticOutputMode;
 import lavi.minecraft.diagnostics.postplace.PostPlaceContainerInteractionObserver;
@@ -29,6 +32,7 @@ public final class ChatClefDiagnostics {
     private static final DiagnosticTaskRegistry TASKS = new DiagnosticTaskRegistry();
     private static final DiagnosticModeController MODE = new DiagnosticModeController(DiagnosticOutputMode.fromEnvironment());
     private static final DiagnosticEventEmitter EVENTS = new DiagnosticEventEmitter(TRACE_STATE, TASKS);
+    private static final DiagnosticCommandContextRegistry COMMAND_CONTEXTS = new DiagnosticCommandContextRegistry();
     private static final DiagnosticContextBuilder CONTEXT = new DiagnosticContextBuilder(MODE, TASKS);
     private static final DiagnosticFormatterFacade FORMATTERS = new DiagnosticFormatterFacade(
             MODE::isOff,
@@ -39,6 +43,13 @@ public final class ChatClefDiagnostics {
             MODE,
             EVENTS,
             ChatClefDiagnostics::currentClientTickId
+    );
+    private static final BlockInteractionDiagnostics BLOCK_INTERACTIONS = new BlockInteractionDiagnostics(
+            MODE,
+            EVENTS,
+            ChatClefDiagnostics::currentClientTickId,
+            ChatClefDiagnostics::nextOperationId,
+            COMMAND_CONTEXTS
     );
 
     private ChatClefDiagnostics() {
@@ -186,6 +197,7 @@ public final class ChatClefDiagnostics {
     public static void logInteractBlock(String phase, String reason, ClientPlayerEntity player, Object hand, BlockHitResult hitResult, Object result) {
         if (!MODE.isOff()) {
             logPostPlaceContainerInteractIfMatching(phase, player, hand, hitResult, result);
+            BLOCK_INTERACTIONS.logInteract(phase, player, hand, hitResult, result);
         }
         if (!MODE.isVerboseEnabled()) {
             return;
@@ -285,6 +297,18 @@ public final class ChatClefDiagnostics {
 
     public static void registerPostPlaceContainerInteractionObserver(PostPlaceContainerInteractionObserver observer) {
         POST_PLACE_CONTAINERS.registerObserver(observer);
+    }
+
+    public static void registerBlockInteractionObserver(BlockInteractionObserver observer) {
+        BLOCK_INTERACTIONS.registerObserver(observer);
+    }
+
+    public static void registerCommandContextProvider(DiagnosticCommandContextProvider provider) {
+        COMMAND_CONTEXTS.register(provider);
+    }
+
+    public static Object[] withCommandContextFields(Object... fields) {
+        return COMMAND_CONTEXTS.appendFields(fields);
     }
 
     public static String className(Object value) {

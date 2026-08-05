@@ -2,6 +2,7 @@ package lavi.minecraft.integration.carryon;
 
 import lavi.minecraft.integration.carryon.reflection.CarryOnModProbe;
 import lavi.minecraft.integration.carryon.reflection.CarryOnModStatus;
+import lavi.minecraft.integration.carryon.reflection.CarryOnCarriedBlockIdentityReader;
 import lavi.minecraft.integration.carryon.reflection.CarryOnReflectionResolution;
 import lavi.minecraft.integration.carryon.reflection.CarryOnReflectionResolver;
 import net.minecraft.client.network.ClientPlayerEntity;
@@ -41,7 +42,10 @@ public final class ReflectiveCarryOnStateReader implements CarryOnStateReader {
             if (!(carrying instanceof Boolean)) {
                 return CarryOnObservation.unreadable(probe.version(), null);
             }
-            return CarryOnObservation.observed(probe.version(), (Boolean) carrying);
+            CarryOnCarriedBlockIdentity carriedBlockIdentity = (Boolean) carrying
+                    ? CarryOnCarriedBlockIdentityReader.read(data, resolution)
+                    : CarryOnCarriedBlockIdentity.notCarrying();
+            return CarryOnObservation.observed(probe.version(), (Boolean) carrying, carriedBlockIdentity);
         } catch (IllegalAccessException e) {
             return CarryOnObservation.unreadable(probe.version(), e);
         } catch (InvocationTargetException e) {
