@@ -320,6 +320,7 @@ command/execution/FabricChatClefCommandDiagnosticResultPayload
 command/lifecycle/FabricChatClefCommandDeadlinePayload
 command/lifecycle/FabricChatClefCommandLifecyclePayload
 command/lifecycle/FabricChatClefLifecycleDetailsPayload
+command/lifecycle/details/*
 command/lifecycle/FabricChatClefTaskFinishedEventDetailsPayload
 ```
 
@@ -332,6 +333,10 @@ expansion. Command lifecycle detail objects pass through
 `FabricChatClefCommandDiagnostics` expands them for logging. They do not rename
 emitted keys, change status values, or alter lifecycle, timeout, retry, task
 observation, or ownership behavior.
+
+The command lifecycle detail facade now delegates event-specific detail
+payloads to `command/lifecycle/details/*` so each lifecycle event owns its own
+field serialization before the final diagnostic map edge.
 
 ### Lifecycle And Gate Logs
 
