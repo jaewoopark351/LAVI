@@ -8,6 +8,7 @@ import adris.altoclef.util.slots.CraftingTableSlot;
 import adris.altoclef.util.slots.CursorSlot;
 import adris.altoclef.util.slots.PlayerSlot;
 import adris.altoclef.util.slots.Slot;
+import lavi.minecraft.diagnostics.inventory.InventorySubTrackerScanProbe;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.entity.player.PlayerInventory;
@@ -172,17 +173,31 @@ public class InventorySubTracker extends Tracker {
             count = 0;
         }
 
-        if (isSlotPlayerInventory) {
-            itemCountsPlayer.put(item, itemCountsPlayer.getOrDefault(item, 0) + count);
-        } else {
-            itemCountsContainer.put(item, itemCountsContainer.getOrDefault(item, 0) + count);
-        }
+        HashMap<Item, Integer> countMap = isSlotPlayerInventory ? itemCountsPlayer : itemCountsContainer;
+        int itemCountMapValueBefore = countMap.getOrDefault(item, 0);
+        countMap.put(item, itemCountMapValueBefore + count);
+        int itemCountMapValueAfterCountUpdate = countMap.getOrDefault(item, 0);
 
         if (slot != null) {
             HashMap<Item, List<Slot>> toAdd = isSlotPlayerInventory ? itemToSlotPlayer : itemToSlotContainer;
-            if (!toAdd.containsKey(item))
+            boolean itemKeyPresentBefore = toAdd.containsKey(item);
+            if (!itemKeyPresentBefore)
                 toAdd.put(item, new ArrayList<>());
+            InventorySubTrackerScanProbe.beforeRegisterAdd(
+                    this,
+                    stack,
+                    item,
+                    slot,
+                    isSlotPlayerInventory,
+                    itemKeyPresentBefore,
+                    toAdd,
+                    itemCountMapValueBefore,
+                    itemCountMapValueAfterCountUpdate,
+                    itemToSlotPlayer.size(),
+                    itemToSlotContainer.size()
+            );
             toAdd.get(item).add(slot);
+            InventorySubTrackerScanProbe.afterRegisterAdd(this);
         }
     }
 
@@ -190,26 +205,68 @@ public class InventorySubTracker extends Tracker {
     protected void updateState() {
         _prevScreenHandler = MinecraftClient.getInstance().player != null ? MinecraftClient.getInstance().player.currentScreenHandler : null;
 
+        InventorySubTrackerScanProbe.beginScan(this);
+        InventorySubTrackerScanProbe.beforeSharedReset(
+                this,
+                itemToSlotPlayer.size(),
+                itemToSlotContainer.size(),
+                itemCountsPlayer.size(),
+                itemCountsContainer.size()
+        );
         itemToSlotPlayer.clear();
         itemToSlotContainer.clear();
         itemCountsPlayer.clear();
         itemCountsContainer.clear();
-        if (MinecraftClient.getInstance().player == null)
+        InventorySubTrackerScanProbe.afterSharedReset(
+                this,
+                itemToSlotPlayer.size(),
+                itemToSlotContainer.size(),
+                itemCountsPlayer.size(),
+                itemCountsContainer.size()
+        );
+        if (MinecraftClient.getInstance().player == null) {
+            InventorySubTrackerScanProbe.endScan(
+                    this,
+                    itemToSlotPlayer.size(),
+                    itemToSlotContainer.size(),
+                    itemCountsPlayer.size(),
+                    itemCountsContainer.size()
+            );
             return;
+        }
         ScreenHandler handler = MinecraftClient.getInstance().player.currentScreenHandler;
-        if (handler == null)
+        if (handler == null) {
+            InventorySubTrackerScanProbe.endScan(
+                    this,
+                    itemToSlotPlayer.size(),
+                    itemToSlotContainer.size(),
+                    itemCountsPlayer.size(),
+                    itemCountsContainer.size()
+            );
             return;
+        }
         for (Slot slot : Slot.getCurrentScreenSlots()) {
             // Ignore cursor slot, that's handled separately.
-            if (slot.equals(CursorSlot.SLOT))
+            if (slot.equals(CursorSlot.SLOT)) {
+                InventorySubTrackerScanProbe.observeSlot(this, slot, true, false);
                 continue;
+            }
             ItemStack stack = StorageHelper.getItemStackInSlot(slot);
             // Add separately if we're in a container vs player inventory.
 
-            if (!shouldIgnoreSlotForContainer(slot)) {
+            boolean ignored = shouldIgnoreSlotForContainer(slot);
+            InventorySubTrackerScanProbe.observeSlot(this, slot, false, ignored);
+            if (!ignored) {
                 registerItem(stack, slot, slot.isSlotInPlayerInventory());
             }
         }
+        InventorySubTrackerScanProbe.endScan(
+                this,
+                itemToSlotPlayer.size(),
+                itemToSlotContainer.size(),
+                itemCountsPlayer.size(),
+                itemCountsContainer.size()
+        );
     }
 
     @Override

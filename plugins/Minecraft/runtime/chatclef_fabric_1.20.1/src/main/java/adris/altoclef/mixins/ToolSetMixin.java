@@ -6,6 +6,7 @@ import baritone.Baritone;
 import baritone.api.Settings;
 import baritone.utils.ToolSet;
 import com.llamalad7.mixinextras.sugar.Local;
+import lavi.minecraft.diagnostics.inventory.ToolSetStorageQueryDiagnostics;
 import net.minecraft.block.Block;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.item.ItemStack;
@@ -51,6 +52,7 @@ public class ToolSetMixin {
 
     @Redirect(method = "getBestSlot(Lnet/minecraft/block/Block;ZZ)I",at = @At(value = "INVOKE", target = "Lnet/minecraft/item/ItemStack;getDamage()I"))
     public int redirected(ItemStack stack,Block block) {
+        ToolSetStorageQueryDiagnostics.observe(block, stack, "item_stack_get_damage_redirect");
         if (StorageHelper.shouldSaveStack(AltoClef.getInstance(),block,stack)) {
             return 100_000;
         }
@@ -60,6 +62,7 @@ public class ToolSetMixin {
 
     @Redirect(method = "getBestSlot(Lnet/minecraft/block/Block;ZZ)I",at = @At(value = "FIELD", target = "Lbaritone/api/Settings;itemSaver:Lbaritone/api/Settings$Setting;"), remap = false)
     public Settings.Setting<Boolean> redirected(Settings instance,Block block ,@Local ItemStack stack) {
+        ToolSetStorageQueryDiagnostics.observe(block, stack, "item_saver_setting_redirect");
         if (StorageHelper.shouldSaveStack(AltoClef.getInstance(),block,stack)) {
             return trueSetting;
         }
