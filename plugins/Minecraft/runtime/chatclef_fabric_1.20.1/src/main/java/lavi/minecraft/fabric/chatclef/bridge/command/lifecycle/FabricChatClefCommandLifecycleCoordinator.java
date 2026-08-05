@@ -164,13 +164,14 @@ public final class FabricChatClefCommandLifecycleCoordinator {
             return;
         }
         execution.markTaskFinishedObservation(observation);
-        Map<String, Object> details = new HashMap<>();
-        details.put("task_finished_event", observation.toMap());
-        details.put("matched_bound_root_task", execution.matchesBoundRootTask(observation));
-        details.putAll(execution.boundRootRelationshipData("event_task", observation.task()));
-        details.put("event_task_bound_root_match_reason", execution.boundRootMatchReason(observation.task()));
-        details.put("finish_callback_received", execution.finishCallbackReceived());
-        details.put("runtime", taskStateReader.runtimeData());
+        Map<String, Object> details = FabricChatClefTaskFinishedEventDetailsPayload.of(
+                observation,
+                execution.matchesBoundRootTask(observation),
+                execution.boundRootRelationshipPayload("event_task", observation.task()),
+                execution.boundRootMatchReason(observation.task()),
+                execution.finishCallbackReceived(),
+                taskStateReader.runtimePayload()
+        ).toMap();
         commandDiagnostics.info("task_finished_event_received", execution, details);
         tryComplete(execution);
     }

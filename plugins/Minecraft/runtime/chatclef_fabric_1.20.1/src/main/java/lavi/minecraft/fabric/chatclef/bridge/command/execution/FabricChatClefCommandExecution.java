@@ -3,6 +3,7 @@ package lavi.minecraft.fabric.chatclef.bridge.command.execution;
 import adris.altoclef.tasksystem.Task;
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandContext;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandTerminationObservation;
+import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefBoundRootTaskRelationshipPayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskSnapshot;
 
 import java.util.Map;
@@ -82,6 +83,13 @@ public final class FabricChatClefCommandExecution {
 
     public Map<String, Object> boundRootRelationshipData(String candidateName, Task candidateTask) {
         return state.boundRootRelationshipData(candidateName, candidateTask);
+    }
+
+    public FabricChatClefBoundRootTaskRelationshipPayload boundRootRelationshipPayload(
+            String candidateName,
+            Task candidateTask
+    ) {
+        return state.boundRootRelationshipPayload(candidateName, candidateTask);
     }
 
     public FabricChatClefCommandTerminationObservation taskFinishedObservation() {

@@ -112,13 +112,17 @@ final class FabricChatClefCommandExecutionState {
     }
 
     Map<String, Object> boundRootRelationshipData(String candidateName, Task candidateTask) {
+        return boundRootRelationshipPayload(candidateName, candidateTask).toMap();
+    }
+
+    FabricChatClefBoundRootTaskRelationshipPayload boundRootRelationshipPayload(String candidateName, Task candidateTask) {
         return FabricChatClefBoundRootTaskRelationshipPayload.of(
                 candidateName,
                 FabricChatClefTaskSnapshot.capture(candidateTask),
                 matchesBoundRootTask(candidateTask),
                 boundRootMatchReason(candidateTask),
                 FabricChatClefTaskSnapshot.capture(boundRootTask)
-        ).toMap();
+        );
     }
 
     FabricChatClefCommandTerminationObservation taskFinishedObservation() {

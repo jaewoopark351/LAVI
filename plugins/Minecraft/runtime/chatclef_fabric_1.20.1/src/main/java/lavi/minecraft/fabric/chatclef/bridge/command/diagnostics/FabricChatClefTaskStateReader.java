@@ -27,12 +27,16 @@ public final class FabricChatClefTaskStateReader {
     }
 
     public Map<String, Object> runtimeData() {
+        return runtimePayload().toMap();
+    }
+
+    public FabricChatClefTaskRuntimeObservationPayload runtimePayload() {
         return FabricChatClefTaskRuntimeObservationPayload.of(
                 Thread.currentThread().getName(),
                 System.currentTimeMillis(),
                 ChatClefDiagnostics.currentClientTickId(),
                 captureCurrentTaskSnapshot()
-        ).toMap();
+        );
     }
 
     private Task currentTaskOrThrow() {

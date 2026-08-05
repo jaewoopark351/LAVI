@@ -231,6 +231,19 @@ client_tick_id
 current_task
 ```
 
+Task finished event lifecycle detail keys:
+
+```text
+task_finished_event
+matched_bound_root_task
+event_task
+event_task_matches_bound_root_task
+event_task_bound_root_match_reason
+bound_root_task
+finish_callback_received
+runtime
+```
+
 Termination observation keys:
 
 ```text
@@ -275,6 +288,7 @@ command/observation/FabricChatClefBoundRootTaskRelationshipPayload
 command/observation/FabricChatClefTaskRuntimeObservationPayload
 command/lifecycle/FabricChatClefCommandDeadlinePayload
 command/lifecycle/FabricChatClefCommandLifecyclePayload
+command/lifecycle/FabricChatClefTaskFinishedEventDetailsPayload
 ```
 
 These helpers centralize field names and keep typed values local until the
@@ -391,6 +405,7 @@ plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fa
 plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/transport/FabricChatClefResultEnvelopeSender.java
 plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/execution/FabricChatClefCommandDiagnosticPayload.java
 plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/lifecycle/FabricChatClefCommandLifecyclePayload.java
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/lifecycle/FabricChatClefTaskFinishedEventDetailsPayload.java
 plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/observation/FabricChatClefBoundRootTaskRelationshipPayload.java
 plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/observation/FabricChatClefTaskRuntimeObservationPayload.java
 plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/observation/FabricChatClefTaskSnapshot.java
