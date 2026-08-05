@@ -19,6 +19,9 @@ import adris.altoclef.util.slots.PlayerSlot;
 import adris.altoclef.util.slots.Slot;
 import baritone.utils.ToolSet;
 import lavi.minecraft.diagnostics.toolselect.BestToolSlotDiagnostics;
+import lavi.minecraft.diagnostics.toolselect.ToolSavePolicySnapshotDiagnostics;
+import lavi.minecraft.integration.toolselect.snapshot.ToolSavePolicySnapshot;
+import lavi.minecraft.integration.toolselect.snapshot.ToolSavePolicySnapshotProvider;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
@@ -195,23 +198,60 @@ public class StorageHelper {
     }
 
     // if the iron pickaxes durability is low, we do not have diamond pickaxe and are not mining diamonds, do not use it
+    //20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
+    // 2026-08-05 evidence: Baritone worker ToolSetMixin entered live InventorySubTracker rebuild off-thread.
     public static boolean shouldSaveStack(AltoClef mod,Block block, ItemStack stack) {
-        if (!stack.getItem().equals(Items.IRON_PICKAXE) || mod.getItemStorage().hasItem(Items.DIAMOND_PICKAXE)) return false;
+        if (!stack.getItem().equals(Items.IRON_PICKAXE)) return false;
+
+        ToolSavePolicySnapshot snapshot = null;
+        boolean snapshotBacked = !isMinecraftClientThread();
+        boolean hasDiamondPickaxe;
+        if (snapshotBacked) {
+            snapshot = ToolSavePolicySnapshotProvider.current();
+            if (!snapshot.ready()) {
+                ToolSavePolicySnapshotDiagnostics.logConsumed(snapshot, block, stack, "SNAPSHOT_NOT_READY_FAIL_SAVE", true);
+                return true;
+            }
+            hasDiamondPickaxe = snapshot.hasDiamondPickaxe();
+        } else {
+            hasDiamondPickaxe = mod.getItemStorage().hasItem(Items.DIAMOND_PICKAXE);
+        }
+
+        if (hasDiamondPickaxe) {
+            if (snapshotBacked) {
+                ToolSavePolicySnapshotDiagnostics.logConsumed(snapshot, block, stack, "HAS_DIAMOND_PICKAXE", false);
+            }
+            return false;
+        }
 
         boolean diamondRelatedBlock = block.equals(Blocks.DIAMOND_BLOCK) || block.equals(Blocks.DIAMOND_ORE) || block.equals(Blocks.DEEPSLATE_DIAMOND_ORE);
+        boolean shouldSave = false;
+        boolean decisionMade = false;
+        String decisionReason = "NOT_LOW_DURABILITY";
 
         // if the durability is really low, mine only diamond related stuff
         if (stack.getDamage()+8 > stack.getMaxDamage()) {
-            return diamondRelatedBlock;
+            shouldSave = diamondRelatedBlock;
+            decisionMade = true;
+            decisionReason = diamondRelatedBlock ? "CRITICAL_DURABILITY_DIAMOND_RELATED" : "CRITICAL_DURABILITY_NON_DIAMOND";
         }
 
         // if the durability gets low, mine only things we have to
-        if (stack.getDamage()+30 > stack.getMaxDamage()) {
-            return !MiningRequirement.getMinimumRequirementForBlock(block).equals(MiningRequirement.IRON);
+        if (!decisionMade && stack.getDamage()+30 > stack.getMaxDamage()) {
+            shouldSave = !MiningRequirement.getMinimumRequirementForBlock(block).equals(MiningRequirement.IRON);
+            decisionReason = shouldSave ? "LOW_DURABILITY_BLOCK_NOT_IRON_REQUIRED" : "LOW_DURABILITY_IRON_REQUIRED";
         }
 
+        if (snapshotBacked) {
+            ToolSavePolicySnapshotDiagnostics.logConsumed(snapshot, block, stack, decisionReason, shouldSave);
+        }
 
-        return false;
+        return shouldSave;
+    }
+
+    private static boolean isMinecraftClientThread() {
+        String threadName = Thread.currentThread().getName();
+        return "Render thread".equals(threadName) || "Client thread".equals(threadName);
     }
 
     // Gets a slot with an item we can throw away

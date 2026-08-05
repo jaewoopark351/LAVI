@@ -14,9 +14,12 @@ The previous diagnostics commit placed Carry On-specific imports, fields, observ
 `adris.altoclef.tasks.InteractWithBlockTask`. The cleanup removed that Carry On-specific engine coupling
 and returned Carry On diagnostics to the LAVI-owned optional integration namespace.
 
-The current active behavior-changing divergence is the bounded post-place container handoff in
-`adris.altoclef.tasks.container.DoStuffInContainerTask`. It is an engine divergence because the class is a
-generic upstream-derived container workflow base class.
+The current active behavior-changing divergences are:
+
+- The bounded post-place container handoff in `adris.altoclef.tasks.container.DoStuffInContainerTask`.
+- The Baritone worker tool-save policy snapshot boundary in `adris.altoclef.util.helpers.StorageHelper`.
+
+Both are engine divergences because the classes are generic upstream-derived ChatClef / AltoClef workflow helpers.
 
 ## Upstream Baseline Provenance
 
@@ -105,6 +108,97 @@ Affected generic subclasses and workflows:
 Rollback unit:
 
 - Revert the exact bounded post-place handoff hunk in `DoStuffInContainerTask.java`.
+- Do not use `git reset`, broad checkout, broad restore, or cleanup commands as rollback.
+
+Build result:
+
+- NOT_RUN for the current working-tree hunk at the time this record was updated.
+
+Runtime reproduction result:
+
+- NOT_RUN for the current working-tree hunk at the time this record was updated.
+
+Verification status:
+
+- APPLIED_NOT_BUILT
+
+## Active Behavior-Changing Divergence Record: Tool Save Policy Snapshot Boundary
+
+Review baseline SHA: `3794684fdf22c2d28b7796d17d00e25f2f651525`
+
+Modified engine file:
+
+- `plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/adris/altoclef/util/helpers/StorageHelper.java`
+
+Modified class: `adris.altoclef.util.helpers.StorageHelper`
+
+Modified method:
+
+- `shouldSaveStack`
+
+Baseline file hash before this hunk: `1fe86541debf14bb896e861013252b1ae792cddf`
+
+Companion LAVI-owned files:
+
+- `plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/integration/toolselect/ToolSavePolicyEntrypoint.java`
+- `plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/integration/toolselect/snapshot/ToolSavePolicySnapshot.java`
+- `plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/integration/toolselect/snapshot/ToolSavePolicySnapshotProvider.java`
+- `plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/integration/toolselect/snapshot/ToolSavePolicySnapshotPublisher.java`
+- `plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/diagnostics/toolselect/ToolSavePolicySnapshotDiagnostics.java`
+
+Verified reason:
+
+- Runtime logs from `LAVI_TEST_Fabric01` on `2026-08-05 21:40:27` showed
+  `pool-8-thread-4` entering `StorageHelper.shouldSaveStack -> ItemStorageTracker.hasItem ->
+  InventorySubTracker.updateState` from Baritone `ToolSet.getBestSlot`.
+- The same tracker identity was being rebuilt by the Render thread, with `INVENTORY_SUBTRACKER_SCAN_OVERLAP_DETECTED`,
+  worker `SHARED_RESET_BEGIN/END`, and a following `InventorySubTracker.registerItem` NPE.
+
+First failing boundary:
+
+- Baritone worker path-calculation code crossed into AltoClef live client inventory tracker rebuild through
+  `StorageHelper.shouldSaveStack`.
+
+Behavior change:
+
+- Client-thread callers keep the existing live `mod.getItemStorage().hasItem(Items.DIAMOND_PICKAXE)` behavior.
+- Non-client-thread callers no longer call live `ItemStorageTracker` from `shouldSaveStack`.
+- Non-client-thread callers read the latest immutable client-published `ToolSavePolicySnapshot` instead.
+- If the snapshot is not ready, the worker fails closed by preserving the iron pickaxe instead of silently treating
+  `hasDiamondPickaxe` as false.
+- Existing low-durability `+8`, `+30`, diamond-related block, and mining-requirement predicates are preserved.
+
+Input ownership:
+
+- Unchanged.
+- No input is acquired, released, or force-cleared.
+
+Retry ownership:
+
+- Unchanged.
+- No retry loop, timeout, blacklist, cooldown, or fallback policy is added.
+
+Baritone ownership:
+
+- Pathing algorithm, worker lifecycle, path cancellation, goal ownership, and thread count are unchanged.
+- The hunk only changes the tool-save policy data source used by Baritone worker callers.
+
+Carry On-specific engine coupling:
+
+- None.
+- The hunk contains no Carry On imports, version policy, capability state, retry policy, or cleanup behavior.
+
+Generic behavior preserved:
+
+- `TaskRunner`, `AltoClef`, `PlayerInteractionFixChain`, `InteractWithBlockTask`, and `InventorySubTracker` lifecycle
+  behavior are unchanged.
+- Existing client-thread tool selection behavior is intentionally retained.
+
+Rollback unit:
+
+- Revert only the `StorageHelper.shouldSaveStack` snapshot-read hunk.
+- Remove the LAVI-owned tool-save snapshot entrypoint/provider/publisher/diagnostic files and the matching
+  `fabric.mod.json` entrypoint line if this divergence is rolled back.
 - Do not use `git reset`, broad checkout, broad restore, or cleanup commands as rollback.
 
 Build result:
