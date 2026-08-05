@@ -18,6 +18,15 @@ plugins {
 apply plugin: 'fabric-loom'
 apply plugin: 'com.replaymod.preprocess'
 
+//20260806_kpopmodder: Ensure remapJar rewrites the ChatClef mixin refmap for runtime names.
+loom {
+    mixin {
+        defaultRefmapName = "chatclef-refmap.json"
+        refmapTargetNamespace = "intermediary"
+        add sourceSets.main, "chatclef-refmap.json"
+    }
+}
+
 preprocess {
     patternAnnotation.set("adris.altoclef.multiversion.Pattern")
 }
