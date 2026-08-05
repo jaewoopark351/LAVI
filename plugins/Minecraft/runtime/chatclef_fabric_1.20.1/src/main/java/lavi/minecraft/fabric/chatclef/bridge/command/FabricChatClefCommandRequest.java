@@ -1,25 +1,26 @@
 package lavi.minecraft.fabric.chatclef.bridge.command;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import lavi.minecraft.fabric.chatclef.bridge.command.request.FabricChatClefCommandRequestFields;
 
 import java.util.HashMap;
 import java.util.Map;
 
 //20260801_kpopmodder: Represent one LAVI Fabric ChatClef command request.
 public final class FabricChatClefCommandRequest {
-    @JsonProperty("request_id")
+    @JsonProperty(FabricChatClefCommandRequestFields.REQUEST_ID)
     public String requestId = "";
 
-    @JsonProperty("command")
+    @JsonProperty(FabricChatClefCommandRequestFields.COMMAND)
     public String command = "";
 
-    @JsonProperty("source")
+    @JsonProperty(FabricChatClefCommandRequestFields.SOURCE)
     public String source = "";
 
-    @JsonProperty("deadline_ms")
+    @JsonProperty(FabricChatClefCommandRequestFields.DEADLINE_MS)
     public Long deadlineMs;
 
-    @JsonProperty("metadata")
+    @JsonProperty(FabricChatClefCommandRequestFields.METADATA)
     public Map<String, Object> metadata = new HashMap<>();
 
     public boolean isValid() {

@@ -94,6 +94,7 @@ Java receives:
 ```text
 FabricChatClefBridgeJson.commandRequest(Map<String, Object>)
 FabricChatClefCommandRequest
+FabricChatClefCommandRequestFields
 ```
 
 Stable keys:
@@ -110,6 +111,8 @@ Classification: hard protocol boundary.
 
 Typing direction: Java already has `FabricChatClefCommandRequest`. Keep
 `metadata` flexible unless a specific metadata schema is approved.
+The request wire keys are centralized in `FabricChatClefCommandRequestFields`
+to support gradual folderization without changing serialized field names.
 
 ### Command Result
 
@@ -351,6 +354,7 @@ plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fa
 plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/protocol/FabricChatClefBridgeJson.java
 plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/protocol/FabricChatClefBridgeMessageFactory.java
 plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/FabricChatClefCommandRequest.java
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/request/FabricChatClefCommandRequestFields.java
 plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/FabricChatClefCommandResult.java
 plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/FabricChatClefCommandContext.java
 plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/FabricChatClefCommandResultSender.java
