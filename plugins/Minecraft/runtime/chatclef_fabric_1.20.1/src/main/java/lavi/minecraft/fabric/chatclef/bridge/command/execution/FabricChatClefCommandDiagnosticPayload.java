@@ -2,6 +2,7 @@ package lavi.minecraft.fabric.chatclef.bridge.command.execution;
 
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandContext;
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandRequest;
+import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandLifecyclePayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandTerminationObservation;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskSnapshot;
 
@@ -28,7 +29,7 @@ public final class FabricChatClefCommandDiagnosticPayload {
             FabricChatClefTaskSnapshot boundRootTask,
             FabricChatClefCommandTerminationObservation observation
     ) {
-        return new FabricChatClefCommandLifecyclePayload(
+        return FabricChatClefCommandLifecyclePayload.of(
                 resultReason,
                 dispatchStartedMs,
                 dispatchReturned,

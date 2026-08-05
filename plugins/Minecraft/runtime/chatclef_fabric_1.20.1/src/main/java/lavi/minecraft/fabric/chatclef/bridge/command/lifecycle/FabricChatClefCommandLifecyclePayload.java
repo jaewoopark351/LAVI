@@ -1,14 +1,13 @@
-package lavi.minecraft.fabric.chatclef.bridge.command.execution;
+package lavi.minecraft.fabric.chatclef.bridge.command.lifecycle;
 
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandContext;
-import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandTerminationObservation;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskSnapshot;
 
 import java.util.HashMap;
 import java.util.Map;
 
 //20260805_kpopmodder: Keep command lifecycle diagnostic fields typed until the existing Map edge.
-final class FabricChatClefCommandLifecyclePayload {
+public final class FabricChatClefCommandLifecyclePayload {
     private static final String RESULT_FIDELITY = "result_fidelity";
     private static final String RESULT_FIDELITY_VALUE = "callback_plus_matching_user_task_event";
     private static final String RESULT_REASON = "result_reason";
@@ -42,7 +41,7 @@ final class FabricChatClefCommandLifecyclePayload {
     private final FabricChatClefTaskSnapshot boundRootTask;
     private final FabricChatClefCommandTerminationObservation observation;
 
-    FabricChatClefCommandLifecyclePayload(
+    private FabricChatClefCommandLifecyclePayload(
             String resultReason,
             long dispatchStartedMs,
             boolean dispatchReturned,
@@ -74,7 +73,41 @@ final class FabricChatClefCommandLifecyclePayload {
         this.observation = observation;
     }
 
-    Map<String, Object> toMap() {
+    public static FabricChatClefCommandLifecyclePayload of(
+            String resultReason,
+            long dispatchStartedMs,
+            boolean dispatchReturned,
+            String dispatchThreadName,
+            String normalizedCommand,
+            boolean finishCallbackReceived,
+            String failureType,
+            String failureMessage,
+            FabricChatClefCommandContext context,
+            FabricChatClefTaskSnapshot taskBeforeDispatch,
+            FabricChatClefTaskSnapshot taskAfterDispatch,
+            FabricChatClefTaskSnapshot terminalTask,
+            FabricChatClefTaskSnapshot boundRootTask,
+            FabricChatClefCommandTerminationObservation observation
+    ) {
+        return new FabricChatClefCommandLifecyclePayload(
+                resultReason,
+                dispatchStartedMs,
+                dispatchReturned,
+                dispatchThreadName,
+                normalizedCommand,
+                finishCallbackReceived,
+                failureType,
+                failureMessage,
+                context,
+                taskBeforeDispatch,
+                taskAfterDispatch,
+                terminalTask,
+                boundRootTask,
+                observation
+        );
+    }
+
+    public Map<String, Object> toMap() {
         Map<String, Object> payload = new HashMap<>();
         payload.put(RESULT_FIDELITY, RESULT_FIDELITY_VALUE);
         payload.put(RESULT_REASON, resultReason);

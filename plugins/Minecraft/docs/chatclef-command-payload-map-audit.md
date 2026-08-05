@@ -263,6 +263,7 @@ command/ownership/FabricChatClefCommandOwnershipPayload
 command/observation/FabricChatClefTaskSnapshot
 command/observation/FabricChatClefTaskSnapshotPayload
 command/lifecycle/FabricChatClefCommandDeadlinePayload
+command/lifecycle/FabricChatClefCommandLifecyclePayload
 ```
 
 These helpers centralize field names and keep typed values local until the
@@ -378,6 +379,7 @@ plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fa
 plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/FabricChatClefCommandResultSender.java
 plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/transport/FabricChatClefResultEnvelopeSender.java
 plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/execution/FabricChatClefCommandDiagnosticPayload.java
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/lifecycle/FabricChatClefCommandLifecyclePayload.java
 plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/observation/FabricChatClefTaskSnapshot.java
 plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/lifecycle/FabricChatClefCommandDeadlinePayload.java
 plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/lifecycle/FabricChatClefCommandTerminationObservation.java
