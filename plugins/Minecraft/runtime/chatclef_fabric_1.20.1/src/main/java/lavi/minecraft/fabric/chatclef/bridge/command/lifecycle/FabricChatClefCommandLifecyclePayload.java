@@ -118,7 +118,7 @@ public final class FabricChatClefCommandLifecyclePayload {
         payload.put(FINISH_CALLBACK_RECEIVED, finishCallbackReceived);
         payload.put(FAILURE_TYPE, failureType);
         payload.put(FAILURE_MESSAGE, failureMessage);
-        payload.put(OWNERSHIP, context.ownershipData());
+        payload.put(OWNERSHIP, context.ownershipPayload().toMap());
         payload.put(TASK_BEFORE_DISPATCH, taskBeforeDispatch.toMap());
         payload.put(TASK_AFTER_DISPATCH, taskAfterDispatch.toMap());
         payload.put(TERMINAL_TASK, terminalTask.toMap());

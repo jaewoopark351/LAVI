@@ -2,7 +2,6 @@ package lavi.minecraft.fabric.chatclef.bridge.command;
 
 import lavi.minecraft.fabric.chatclef.bridge.command.ownership.FabricChatClefCommandOwnershipPayload;
 
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 //20260801_kpopmodder: Bind one command to its Fabric websocket session, envelope, and connection generation.
@@ -62,7 +61,7 @@ public final class FabricChatClefCommandContext {
         detachedReason = nullToEmpty(reason);
     }
 
-    public Map<String, Object> ownershipData() {
+    public FabricChatClefCommandOwnershipPayload ownershipPayload() {
         return FabricChatClefCommandOwnershipPayload.of(
                 requestId(),
                 correlationId,
@@ -71,7 +70,7 @@ public final class FabricChatClefCommandContext {
                 acceptedAtMs,
                 detached,
                 detachedReason
-        ).toMap();
+        );
     }
 
     private static String nullToEmpty(String value) {

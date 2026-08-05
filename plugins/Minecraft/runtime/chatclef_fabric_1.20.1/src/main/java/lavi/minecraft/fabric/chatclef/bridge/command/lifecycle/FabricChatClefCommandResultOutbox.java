@@ -4,9 +4,9 @@ import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandContex
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandQueue;
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandResultSender;
 import lavi.minecraft.fabric.chatclef.bridge.command.execution.FabricChatClefCommandExecution;
+import lavi.minecraft.fabric.chatclef.bridge.command.result.FabricChatClefCommandResultPayload;
 import lavi.minecraft.fabric.chatclef.bridge.diagnostics.FabricChatClefBridgeDiagnostics;
 
-import java.util.Map;
 import java.util.function.Supplier;
 
 //20260803_kpopmodder: Send terminal command results exactly once after lifecycle classification.
@@ -27,7 +27,7 @@ public final class FabricChatClefCommandResultOutbox {
 
     public boolean sendTerminal(
             FabricChatClefCommandExecution execution,
-            Supplier<Map<String, Object>> resultFactory
+            Supplier<FabricChatClefCommandResultPayload> resultFactory
     ) {
         if (!execution.markTerminalSent()) {
             diagnostics.warn(
@@ -38,7 +38,7 @@ public final class FabricChatClefCommandResultOutbox {
             );
             return false;
         }
-        Map<String, Object> result = resultFactory.get();
+        FabricChatClefCommandResultPayload result = resultFactory.get();
         if (!commandQueue.complete(execution.context())) {
             diagnostics.warn(
                     "ignored stale terminal result request="
@@ -54,24 +54,24 @@ public final class FabricChatClefCommandResultOutbox {
 
     public boolean sendTerminal(
             FabricChatClefCommandContext context,
-            Supplier<Map<String, Object>> resultFactory
+            Supplier<FabricChatClefCommandResultPayload> resultFactory
     ) {
         if (!context.markTerminalSent()) {
             diagnostics.warn(
                     "ignored duplicate terminal result request="
                             + context.requestId()
                             + " data="
-                            + context.ownershipData()
+                            + context.ownershipPayload().toMap()
             );
             return false;
         }
-        Map<String, Object> result = resultFactory.get();
+        FabricChatClefCommandResultPayload result = resultFactory.get();
         if (!commandQueue.complete(context)) {
             diagnostics.warn(
                     "ignored stale terminal result request="
                             + context.requestId()
                             + " data="
-                            + context.ownershipData()
+                            + context.ownershipPayload().toMap()
             );
             return true;
         }
@@ -81,18 +81,18 @@ public final class FabricChatClefCommandResultOutbox {
 
     public boolean sendPendingTerminal(
             FabricChatClefCommandContext context,
-            Supplier<Map<String, Object>> resultFactory
+            Supplier<FabricChatClefCommandResultPayload> resultFactory
     ) {
         if (!context.markTerminalSent()) {
             diagnostics.warn(
                     "ignored duplicate pending result request="
                             + context.requestId()
                             + " data="
-                            + context.ownershipData()
+                            + context.ownershipPayload().toMap()
             );
             return false;
         }
-        Map<String, Object> result = resultFactory.get();
+        FabricChatClefCommandResultPayload result = resultFactory.get();
         resultSender.sendCommandResult(context, result);
         return true;
     }

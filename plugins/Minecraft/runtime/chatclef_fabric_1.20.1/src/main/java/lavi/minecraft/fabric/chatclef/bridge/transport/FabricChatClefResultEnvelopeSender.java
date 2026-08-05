@@ -2,6 +2,7 @@ package lavi.minecraft.fabric.chatclef.bridge.transport;
 
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandContext;
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandResultSender;
+import lavi.minecraft.fabric.chatclef.bridge.command.result.FabricChatClefCommandResultPayload;
 import lavi.minecraft.fabric.chatclef.bridge.diagnostics.FabricChatClefBridgeDiagnostics;
 import lavi.minecraft.fabric.chatclef.bridge.protocol.FabricChatClefBridgeEnvelope;
 import lavi.minecraft.fabric.chatclef.bridge.protocol.FabricChatClefBridgeJson;
@@ -32,7 +33,7 @@ public final class FabricChatClefResultEnvelopeSender implements FabricChatClefC
     }
 
     @Override
-    public void sendCommandResult(FabricChatClefCommandContext context, Map<String, Object> payload) {
+    public void sendCommandResult(FabricChatClefCommandContext context, FabricChatClefCommandResultPayload payload) {
         sendCommandResult(
                 context.correlationId(),
                 context.sessionId(),
@@ -45,7 +46,7 @@ public final class FabricChatClefResultEnvelopeSender implements FabricChatClefC
             String correlationId,
             String sessionId,
             long generation,
-            Map<String, Object> payload
+            FabricChatClefCommandResultPayload payload
     ) {
         WebSocket socket = socketSupplier.get();
         long activeGeneration = activeGenerationSupplier.getAsLong();
@@ -59,7 +60,7 @@ public final class FabricChatClefResultEnvelopeSender implements FabricChatClefC
             return;
         }
         try {
-            socket.sendText(json.encode(envelope(correlationId, sessionId, payload)), true);
+            socket.sendText(json.encode(envelope(correlationId, sessionId, payload.toMap())), true);
         } catch (Exception error) {
             diagnostics.warn("command_result send failed " + error.getClass().getSimpleName() + ": " + error.getMessage());
         }

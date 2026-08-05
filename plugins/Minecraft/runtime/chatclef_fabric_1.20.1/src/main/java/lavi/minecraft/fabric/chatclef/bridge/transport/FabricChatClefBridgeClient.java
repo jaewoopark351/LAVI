@@ -4,6 +4,7 @@ import lavi.minecraft.fabric.chatclef.bridge.config.FabricChatClefBridgeConfig;
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandContext;
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandQueue;
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandResultSender;
+import lavi.minecraft.fabric.chatclef.bridge.command.result.FabricChatClefCommandResultPayload;
 import lavi.minecraft.fabric.chatclef.bridge.diagnostics.FabricChatClefBridgeDiagnostics;
 import lavi.minecraft.fabric.chatclef.bridge.protocol.FabricChatClefBridgeJson;
 import lavi.minecraft.fabric.chatclef.bridge.protocol.FabricChatClefBridgeMessageFactory;
@@ -14,7 +15,6 @@ import lavi.minecraft.fabric.chatclef.bridge.transport.session.FabricChatClefSes
 
 import java.net.http.HttpClient;
 import java.net.http.WebSocket;
-import java.util.Map;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -208,7 +208,7 @@ public final class FabricChatClefBridgeClient implements WebSocket.Listener, Fab
     }
 
     @Override
-    public void sendCommandResult(FabricChatClefCommandContext context, Map<String, Object> payload) {
+    public void sendCommandResult(FabricChatClefCommandContext context, FabricChatClefCommandResultPayload payload) {
         resultEnvelopeSender.sendCommandResult(context, payload);
     }
 

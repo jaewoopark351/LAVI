@@ -26,9 +26,25 @@ public final class FabricChatClefCommandDiagnostics {
     public void info(
             String event,
             FabricChatClefCommandExecution execution,
+            FabricChatClefCommandDiagnosticDetailsPayload details
+    ) {
+        info(event, execution, details == null ? new HashMap<>() : details.toMap());
+    }
+
+    public void info(
+            String event,
+            FabricChatClefCommandExecution execution,
             Map<String, Object> details
     ) {
         diagnostics.info("command lifecycle " + executionPayload(event, execution, details));
+    }
+
+    public void warn(
+            String event,
+            FabricChatClefCommandExecution execution,
+            FabricChatClefCommandDiagnosticDetailsPayload details
+    ) {
+        warn(event, execution, details == null ? new HashMap<>() : details.toMap());
     }
 
     public void warn(
@@ -42,9 +58,25 @@ public final class FabricChatClefCommandDiagnostics {
     public void contextInfo(
             String event,
             FabricChatClefCommandContext context,
+            FabricChatClefCommandDiagnosticDetailsPayload details
+    ) {
+        contextInfo(event, context, details == null ? new HashMap<>() : details.toMap());
+    }
+
+    public void contextInfo(
+            String event,
+            FabricChatClefCommandContext context,
             Map<String, Object> details
     ) {
         diagnostics.info("command lifecycle " + contextPayload(event, context, details));
+    }
+
+    public void contextWarn(
+            String event,
+            FabricChatClefCommandContext context,
+            FabricChatClefCommandDiagnosticDetailsPayload details
+    ) {
+        contextWarn(event, context, details == null ? new HashMap<>() : details.toMap());
     }
 
     public void contextWarn(
@@ -75,7 +107,7 @@ public final class FabricChatClefCommandDiagnostics {
     ) {
         Map<String, Object> payload = context == null
                 ? new HashMap<>()
-                : context.ownershipData();
+                : context.ownershipPayload().toMap();
         payload.put("event", event);
         payload.put("details", details == null ? new HashMap<String, Object>() : details);
         return payload;

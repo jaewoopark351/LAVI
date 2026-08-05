@@ -1,5 +1,6 @@
 package lavi.minecraft.fabric.chatclef.bridge.command.lifecycle;
 
+import lavi.minecraft.fabric.chatclef.bridge.command.diagnostics.FabricChatClefCommandDiagnosticDetailsPayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefBoundRootTaskRelationshipPayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskRuntimeObservationPayload;
 
@@ -7,7 +8,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 //20260805_kpopmodder: Keep TaskFinishedEvent lifecycle detail fields typed until the Map edge.
-public final class FabricChatClefTaskFinishedEventDetailsPayload {
+public final class FabricChatClefTaskFinishedEventDetailsPayload implements FabricChatClefCommandDiagnosticDetailsPayload {
     private static final String TASK_FINISHED_EVENT = "task_finished_event";
     private static final String MATCHED_BOUND_ROOT_TASK = "matched_bound_root_task";
     private static final String EVENT_TASK_BOUND_ROOT_MATCH_REASON = "event_task_bound_root_match_reason";
@@ -55,6 +56,7 @@ public final class FabricChatClefTaskFinishedEventDetailsPayload {
         );
     }
 
+    @Override
     public Map<String, Object> toMap() {
         Map<String, Object> payload = new HashMap<>();
         payload.put(TASK_FINISHED_EVENT, observation.toMap());

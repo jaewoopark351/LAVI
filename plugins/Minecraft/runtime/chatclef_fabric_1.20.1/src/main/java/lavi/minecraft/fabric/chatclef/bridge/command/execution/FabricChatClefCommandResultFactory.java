@@ -4,6 +4,7 @@ import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandReques
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandResult;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandDeadlinePayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandTerminationObservation;
+import lavi.minecraft.fabric.chatclef.bridge.command.result.FabricChatClefCommandResultPayload;
 
 import java.util.Map;
 
@@ -15,7 +16,7 @@ final class FabricChatClefCommandResultFactory {
         this.state = state;
     }
 
-    Map<String, Object> runningResult() {
+    FabricChatClefCommandResultPayload runningResult() {
         return FabricChatClefCommandResult.running(
                 request().requestId,
                 "Fabric ChatClef command dispatch started.",
@@ -23,7 +24,7 @@ final class FabricChatClefCommandResultFactory {
         );
     }
 
-    Map<String, Object> unknownAfterFinish() {
+    FabricChatClefCommandResultPayload unknownAfterFinish() {
         return FabricChatClefCommandResult.unknown(
                 request().requestId,
                 "Fabric ChatClef command callback finished, but Minecraft goal success was not verified.",
@@ -31,7 +32,7 @@ final class FabricChatClefCommandResultFactory {
         );
     }
 
-    Map<String, Object> failedFromCommandException() {
+    FabricChatClefCommandResultPayload failedFromCommandException() {
         return FabricChatClefCommandResult.failed(
                 request().requestId,
                 state.failureType() + ": " + state.failureMessage(),
@@ -39,7 +40,7 @@ final class FabricChatClefCommandResultFactory {
         );
     }
 
-    Map<String, Object> failedFromDispatchException() {
+    FabricChatClefCommandResultPayload failedFromDispatchException() {
         return FabricChatClefCommandResult.failed(
                 request().requestId,
                 state.failureType() + ": " + state.failureMessage(),
@@ -47,7 +48,7 @@ final class FabricChatClefCommandResultFactory {
         );
     }
 
-    Map<String, Object> completedFromTaskFinished(FabricChatClefCommandTerminationObservation observation) {
+    FabricChatClefCommandResultPayload completedFromTaskFinished(FabricChatClefCommandTerminationObservation observation) {
         return FabricChatClefCommandResult.completed(
                 request().requestId,
                 "ChatClef user task reached natural completion.",
@@ -55,7 +56,7 @@ final class FabricChatClefCommandResultFactory {
         );
     }
 
-    Map<String, Object> completedWithoutUserTask() {
+    FabricChatClefCommandResultPayload completedWithoutUserTask() {
         return FabricChatClefCommandResult.completed(
                 request().requestId,
                 "ChatClef command completed without starting a user task.",
@@ -63,7 +64,7 @@ final class FabricChatClefCommandResultFactory {
         );
     }
 
-    Map<String, Object> failedFromStoppedTask(FabricChatClefCommandTerminationObservation observation) {
+    FabricChatClefCommandResultPayload failedFromStoppedTask(FabricChatClefCommandTerminationObservation observation) {
         return FabricChatClefCommandResult.failed(
                 request().requestId,
                 "ChatClef user task stopped before natural completion.",
@@ -71,7 +72,7 @@ final class FabricChatClefCommandResultFactory {
         );
     }
 
-    Map<String, Object> unknownFromTaskObservation(FabricChatClefCommandTerminationObservation observation) {
+    FabricChatClefCommandResultPayload unknownFromTaskObservation(FabricChatClefCommandTerminationObservation observation) {
         return FabricChatClefCommandResult.unknown(
                 request().requestId,
                 "ChatClef user task completion could not be safely classified.",
@@ -79,7 +80,7 @@ final class FabricChatClefCommandResultFactory {
         );
     }
 
-    Map<String, Object> unknownFromTaskIdentityMismatch(FabricChatClefCommandTerminationObservation observation) {
+    FabricChatClefCommandResultPayload unknownFromTaskIdentityMismatch(FabricChatClefCommandTerminationObservation observation) {
         return FabricChatClefCommandResult.unknown(
                 request().requestId,
                 "ChatClef user task finished, but it did not match the command root task.",
@@ -87,7 +88,7 @@ final class FabricChatClefCommandResultFactory {
         );
     }
 
-    Map<String, Object> deadlineExceededResult(String message) {
+    FabricChatClefCommandResultPayload deadlineExceededResult(String message) {
         Map<String, Object> payload = data("deadline_exceeded");
         FabricChatClefCommandDeadlinePayload.markTaskMayStillBeRunning(payload);
         return FabricChatClefCommandResult.deadlineExceeded(

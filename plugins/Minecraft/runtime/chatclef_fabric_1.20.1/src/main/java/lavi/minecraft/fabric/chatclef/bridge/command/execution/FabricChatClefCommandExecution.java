@@ -5,6 +5,7 @@ import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandContex
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandTerminationObservation;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefBoundRootTaskRelationshipPayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskSnapshot;
+import lavi.minecraft.fabric.chatclef.bridge.command.result.FabricChatClefCommandResultPayload;
 
 import java.util.Map;
 
@@ -22,7 +23,7 @@ public final class FabricChatClefCommandExecution {
         this.resultFactory = new FabricChatClefCommandResultFactory(state);
     }
 
-    public Map<String, Object> runningResult() {
+    public FabricChatClefCommandResultPayload runningResult() {
         return resultFactory.runningResult();
     }
 
@@ -34,17 +35,17 @@ public final class FabricChatClefCommandExecution {
         state.markFinishCallbackReceived(taskAtFinish);
     }
 
-    public Map<String, Object> unknownAfterFinish(FabricChatClefTaskSnapshot taskAtFinish) {
+    public FabricChatClefCommandResultPayload unknownAfterFinish(FabricChatClefTaskSnapshot taskAtFinish) {
         markFinishCallbackReceived(taskAtFinish);
         return resultFactory.unknownAfterFinish();
     }
 
-    public Map<String, Object> failedFromCommandException(Throwable exception, FabricChatClefTaskSnapshot taskAtFailure) {
+    public FabricChatClefCommandResultPayload failedFromCommandException(Throwable exception, FabricChatClefTaskSnapshot taskAtFailure) {
         state.markFailure(exception, taskAtFailure);
         return resultFactory.failedFromCommandException();
     }
 
-    public Map<String, Object> failedFromDispatchException(Throwable exception, FabricChatClefTaskSnapshot taskAtFailure) {
+    public FabricChatClefCommandResultPayload failedFromDispatchException(Throwable exception, FabricChatClefTaskSnapshot taskAtFailure) {
         state.markFailure(exception, taskAtFailure);
         return resultFactory.failedFromDispatchException();
     }
@@ -96,27 +97,27 @@ public final class FabricChatClefCommandExecution {
         return state.taskFinishedObservation();
     }
 
-    public Map<String, Object> completedFromTaskFinished(FabricChatClefCommandTerminationObservation observation) {
+    public FabricChatClefCommandResultPayload completedFromTaskFinished(FabricChatClefCommandTerminationObservation observation) {
         return resultFactory.completedFromTaskFinished(observation);
     }
 
-    public Map<String, Object> completedWithoutUserTask() {
+    public FabricChatClefCommandResultPayload completedWithoutUserTask() {
         return resultFactory.completedWithoutUserTask();
     }
 
-    public Map<String, Object> failedFromStoppedTask(FabricChatClefCommandTerminationObservation observation) {
+    public FabricChatClefCommandResultPayload failedFromStoppedTask(FabricChatClefCommandTerminationObservation observation) {
         return resultFactory.failedFromStoppedTask(observation);
     }
 
-    public Map<String, Object> unknownFromTaskObservation(FabricChatClefCommandTerminationObservation observation) {
+    public FabricChatClefCommandResultPayload unknownFromTaskObservation(FabricChatClefCommandTerminationObservation observation) {
         return resultFactory.unknownFromTaskObservation(observation);
     }
 
-    public Map<String, Object> unknownFromTaskIdentityMismatch(FabricChatClefCommandTerminationObservation observation) {
+    public FabricChatClefCommandResultPayload unknownFromTaskIdentityMismatch(FabricChatClefCommandTerminationObservation observation) {
         return resultFactory.unknownFromTaskIdentityMismatch(observation);
     }
 
-    public Map<String, Object> deadlineExceededResult(String message) {
+    public FabricChatClefCommandResultPayload deadlineExceededResult(String message) {
         return resultFactory.deadlineExceededResult(message);
     }
 

@@ -120,6 +120,8 @@ Java sends:
 
 ```text
 FabricChatClefCommandResult
+FabricChatClefCommandResultPayload
+FabricChatClefCommandResultStatus
 FabricChatClefCommandResultFactory
 FabricChatClefCommandResultOutbox
 FabricChatClefResultEnvelopeSender
@@ -159,10 +161,11 @@ unknown
 
 Classification: hard protocol boundary.
 
-Typing direction: this is the best first Java typing target. Add a small
-Java-side status enum or value type only if it preserves the existing wire
-values. The public map shape must continue to satisfy Python
-`CommandResultDTO`.
+Typing direction: Java command result payloads now stay typed as
+`FabricChatClefCommandResultPayload` through result construction, lifecycle
+classification, outbox delivery, and the result sender interface. The transport
+edge still serializes the same map shape in `FabricChatClefResultEnvelopeSender`
+so the public payload continues to satisfy Python `CommandResultDTO`.
 
 ## Diagnostic Payloads
 
@@ -176,7 +179,7 @@ FabricChatClefCommandDiagnosticPayload.diagnosticData()
 FabricChatClefTaskSnapshot.toMap()
 FabricChatClefCommandTerminationObservation.toMap()
 FabricChatClefCommandExecution.duplicateTerminalData()
-FabricChatClefCommandContext.ownershipData()
+FabricChatClefCommandContext.ownershipPayload().toMap()
 ```
 
 Important nested keys currently emitted include:
@@ -303,6 +306,10 @@ Current LAVI-owned helper placement:
 
 ```text
 command/ownership/FabricChatClefCommandOwnershipPayload
+command/result/FabricChatClefCommandResultPayload
+command/result/FabricChatClefCommandResultPayloadMap
+command/result/FabricChatClefCommandResultStatus
+command/diagnostics/FabricChatClefCommandDiagnosticDetailsPayload
 command/observation/FabricChatClefTaskSnapshot
 command/observation/FabricChatClefTaskSnapshotPayload
 command/observation/FabricChatClefBoundRootTaskRelationshipPayload
@@ -314,8 +321,10 @@ command/lifecycle/FabricChatClefTaskFinishedEventDetailsPayload
 ```
 
 These helpers centralize field names and keep typed values local until the
-existing `Map<String, Object>` serialization edge. They do not rename emitted
-keys, change status values, or alter lifecycle, timeout, retry, task
+existing `Map<String, Object>` serialization edge. Command lifecycle detail
+objects now pass through `FabricChatClefCommandDiagnosticDetailsPayload` before
+`FabricChatClefCommandDiagnostics` expands them for logging. They do not rename
+emitted keys, change status values, or alter lifecycle, timeout, retry, task
 observation, or ownership behavior.
 
 ### Lifecycle And Gate Logs
@@ -393,11 +402,13 @@ separate UI model refactor is approved.
 FabricChatClefCommandResult typed object -> toMap() -> command_result payload
 ```
 
-4. Leave diagnostic `data` as `Map<String, Object>` until the command result
-   payload itself is stable.
-5. Type diagnostic payloads only after deciding which diagnostic fields are
+4. Leave command result diagnostic `data` as `Map<String, Object>` until the
+   command result payload itself is stable.
+5. Use typed diagnostic detail wrappers at lifecycle log call sites, then
+   expand to the existing map shape only in `FabricChatClefCommandDiagnostics`.
+6. Type diagnostic payloads only after deciding which diagnostic fields are
    long-term contract fields and which were temporary investigation fields.
-6. Keep `metadata`, `details`, and log-only dictionaries flexible unless a
+7. Keep `metadata`, `details`, and log-only dictionaries flexible unless a
    consumer contract requires a schema.
 
 ## Do Not Include In This Refactor

@@ -7,6 +7,7 @@ import lavi.minecraft.fabric.chatclef.bridge.command.diagnostics.FabricChatClefC
 import lavi.minecraft.fabric.chatclef.bridge.command.diagnostics.FabricChatClefTaskStateReader;
 import lavi.minecraft.fabric.chatclef.bridge.command.execution.FabricChatClefCommandExecution;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskSnapshot;
+import lavi.minecraft.fabric.chatclef.bridge.command.result.FabricChatClefCommandResultPayload;
 import lavi.minecraft.fabric.chatclef.bridge.diagnostics.FabricChatClefBridgeDiagnostics;
 
 import java.util.HashMap;
@@ -171,14 +172,14 @@ public final class FabricChatClefCommandLifecycleCoordinator {
             return;
         }
         execution.markTaskFinishedObservation(observation);
-        Map<String, Object> details = FabricChatClefTaskFinishedEventDetailsPayload.of(
+        FabricChatClefTaskFinishedEventDetailsPayload details = FabricChatClefTaskFinishedEventDetailsPayload.of(
                 observation,
                 execution.matchesBoundRootTask(observation),
                 execution.boundRootRelationshipPayload("event_task", observation.task()),
                 execution.boundRootMatchReason(observation.task()),
                 execution.finishCallbackReceived(),
                 taskStateReader.runtimePayload()
-        ).toMap();
+        );
         commandDiagnostics.info("task_finished_event_received", execution, details);
         tryComplete(execution);
     }
@@ -208,7 +209,7 @@ public final class FabricChatClefCommandLifecycleCoordinator {
 
     private void completeTerminal(
             FabricChatClefCommandExecution execution,
-            Supplier<Map<String, Object>> resultFactory
+            Supplier<FabricChatClefCommandResultPayload> resultFactory
     ) {
         boolean terminalSent = resultOutbox.sendTerminal(execution, resultFactory);
         boolean lifecycleCleared = activeExecution.compareAndSet(execution, null);
@@ -264,11 +265,11 @@ public final class FabricChatClefCommandLifecycleCoordinator {
         );
     }
 
-    private Map<String, Object> exceptionDetails(Throwable exception) {
+    private FabricChatClefLifecycleDetailsPayload exceptionDetails(Throwable exception) {
         return FabricChatClefLifecycleDetailsPayload.exception(exception);
     }
 
     private Map<String, Object> deadlineData(FabricChatClefCommandContext context) {
-        return FabricChatClefCommandDeadlinePayload.markTaskMayStillBeRunning(context.ownershipData());
+        return FabricChatClefCommandDeadlinePayload.markTaskMayStillBeRunning(context.ownershipPayload().toMap());
     }
 }

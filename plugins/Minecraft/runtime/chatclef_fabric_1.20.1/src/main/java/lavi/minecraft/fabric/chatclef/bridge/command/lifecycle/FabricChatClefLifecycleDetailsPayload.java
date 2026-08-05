@@ -1,5 +1,6 @@
 package lavi.minecraft.fabric.chatclef.bridge.command.lifecycle;
 
+import lavi.minecraft.fabric.chatclef.bridge.command.diagnostics.FabricChatClefCommandDiagnosticDetailsPayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefBoundRootTaskRelationshipPayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskRuntimeObservationPayload;
 
@@ -7,7 +8,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 //20260805_kpopmodder: Keep command lifecycle detail fields typed until the Map edge.
-public final class FabricChatClefLifecycleDetailsPayload {
+public final class FabricChatClefLifecycleDetailsPayload implements FabricChatClefCommandDiagnosticDetailsPayload {
     private static final String REPLACED_ACTIVE_REQUEST_ID = "replaced_active_request_id";
     private static final String RUNTIME = "runtime";
     private static final String DECISION_REASON = "decision_reason";
@@ -20,48 +21,51 @@ public final class FabricChatClefLifecycleDetailsPayload {
     private static final String EXCEPTION_TYPE = "exception_type";
     private static final String EXCEPTION_MESSAGE = "exception_message";
 
-    private FabricChatClefLifecycleDetailsPayload() {
+    private final Map<String, Object> details;
+
+    private FabricChatClefLifecycleDetailsPayload(Map<String, Object> details) {
+        this.details = details == null ? new HashMap<>() : new HashMap<>(details);
     }
 
-    public static Map<String, Object> replacedActive(String replacedActiveRequestId) {
+    public static FabricChatClefLifecycleDetailsPayload replacedActive(String replacedActiveRequestId) {
         Map<String, Object> details = new HashMap<>();
         details.put(REPLACED_ACTIVE_REQUEST_ID, nullToEmpty(replacedActiveRequestId));
-        return details;
+        return new FabricChatClefLifecycleDetailsPayload(details);
     }
 
-    public static Map<String, Object> finishCallback(
+    public static FabricChatClefLifecycleDetailsPayload finishCallback(
             FabricChatClefBoundRootTaskRelationshipPayload callbackCurrentTask,
             FabricChatClefTaskRuntimeObservationPayload runtime
     ) {
         Map<String, Object> details = callbackCurrentTask.toMap();
         details.put(RUNTIME, runtime.toMap());
-        return details;
+        return new FabricChatClefLifecycleDetailsPayload(details);
     }
 
-    public static Map<String, Object> terminalDecision(String decisionReason) {
+    public static FabricChatClefLifecycleDetailsPayload terminalDecision(String decisionReason) {
         Map<String, Object> details = new HashMap<>();
         details.put(DECISION_REASON, nullToEmpty(decisionReason));
-        return details;
+        return new FabricChatClefLifecycleDetailsPayload(details);
     }
 
-    public static Map<String, Object> terminalResult(boolean terminalSent, boolean lifecycleCleared) {
+    public static FabricChatClefLifecycleDetailsPayload terminalResult(boolean terminalSent, boolean lifecycleCleared) {
         Map<String, Object> details = new HashMap<>();
         details.put(TERMINAL_SENT, terminalSent);
         details.put(LIFECYCLE_CLEARED, lifecycleCleared);
-        return details;
+        return new FabricChatClefLifecycleDetailsPayload(details);
     }
 
-    public static Map<String, Object> queueContextMismatch(
+    public static FabricChatClefLifecycleDetailsPayload queueContextMismatch(
             boolean queueActivePresent,
             String queueActiveRequestId
     ) {
         Map<String, Object> details = new HashMap<>();
         details.put(QUEUE_ACTIVE_PRESENT, queueActivePresent);
         details.put(QUEUE_ACTIVE_REQUEST_ID, nullToEmpty(queueActiveRequestId));
-        return details;
+        return new FabricChatClefLifecycleDetailsPayload(details);
     }
 
-    public static Map<String, Object> waitingForTerminalCondition(
+    public static FabricChatClefLifecycleDetailsPayload waitingForTerminalCondition(
             String waitingReason,
             FabricChatClefBoundRootTaskRelationshipPayload currentTask,
             String currentTaskBoundRootMatchReason,
@@ -72,14 +76,19 @@ public final class FabricChatClefLifecycleDetailsPayload {
         details.putAll(currentTask.toMap());
         details.put(CURRENT_TASK_BOUND_ROOT_MATCH_REASON, nullToEmpty(currentTaskBoundRootMatchReason));
         details.put(RUNTIME, runtime.toMap());
-        return details;
+        return new FabricChatClefLifecycleDetailsPayload(details);
     }
 
-    public static Map<String, Object> exception(Throwable exception) {
+    public static FabricChatClefLifecycleDetailsPayload exception(Throwable exception) {
         Map<String, Object> details = new HashMap<>();
         details.put(EXCEPTION_TYPE, exception == null ? "" : exception.getClass().getName());
         details.put(EXCEPTION_MESSAGE, exception == null ? "" : nullSafeMessage(exception));
-        return details;
+        return new FabricChatClefLifecycleDetailsPayload(details);
+    }
+
+    @Override
+    public Map<String, Object> toMap() {
+        return new HashMap<>(details);
     }
 
     private static String nullSafeMessage(Throwable error) {
