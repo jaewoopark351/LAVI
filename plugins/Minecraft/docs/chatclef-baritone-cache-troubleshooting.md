@@ -454,6 +454,20 @@ Do not make a LAVI behavior fix merely because pathfinding looks wrong after a
 world replacement. First determine whether a stale Baritone cache explains the
 behavior.
 
+If the cache has already been reset and the same command still shows repeated
+task selection, repeated `DestroyBlockTask`, `task_identity_mismatch`,
+`cancelled_without_task`, or a command lifecycle that remains
+`waiting_for_terminal_condition`, use the lifecycle diagnostic runbook before
+proposing a behavior fix:
+
+```text
+plugins/Minecraft/docs/chatclef-task-lifecycle-diagnostics.md
+```
+
+That runbook separates Baritone cache suspicion from command root ownership,
+TaskFinishedEvent correlation, parent-child target handoff, child replacement,
+Interact lifecycle, and Baritone path ownership.
+
 ## References
 
 Primary upstream references:

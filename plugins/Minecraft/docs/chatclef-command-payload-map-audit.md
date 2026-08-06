@@ -432,6 +432,113 @@ FabricChatClefCommandResult typed object -> toMap() -> command_result payload
 - no Forge/MineMind common implementation or shared transport/session layer
 - no package moves in upstream-derived ChatClef code
 
+## Related Lifecycle Diagnostic Runbook
+
+When `task_identity_mismatch`, `cancelled_without_task`,
+`waiting_for_terminal_condition`, repeated child Task selection, or Baritone
+pathing loops are under investigation, keep this audit's payload-shape
+guardrails and use:
+
+```text
+plugins/Minecraft/docs/chatclef-task-lifecycle-diagnostics.md
+```
+
+That runbook defines additive diagnostics for command root assignment,
+TaskFinishedEvent correlation, parent-child target comparison, Interact
+lifecycle, Baritone path ownership, container open attempts, and
+DestroyBlockTask target state. It does not authorize changing existing payload
+field names or command lifecycle behavior.
+
+For the command lifecycle, ownership, terminal ordering, and thread-affinity
+overview, also read:
+
+```text
+plugins/Minecraft/docs/chatclef-command-lifecycle-and-threading.md
+```
+
+## Diagnostic Event Emission Contract
+
+Diagnostic events are log-only or command-result `data` observations. They are
+not a new v1 wire message contract unless a later protocol document explicitly
+promotes them.
+
+Every new diagnostic event added for command lifecycle, task observation,
+container behavior, Baritone pathing, tool readiness, or optional Carry On
+observation must document these fields:
+
+```text
+event
+owner
+mode
+trigger
+dedupe_key
+max_emission
+correlation
+payload
+terminal
+behavior_effect
+```
+
+Field meanings:
+
+```text
+event: stable diagnostic event name
+owner: component that owns the observation
+mode: boundary, verbose, or another existing diagnostics mode
+trigger: state change or boundary that caused emission
+dedupe_key: fingerprint used to suppress repeated unchanged events
+max_emission: per-command or per-session emission budget
+correlation: request/session/task identity values used to join logs
+payload: additive event-specific detail object
+terminal: true only when the event represents a terminal observation
+behavior_effect: must be none for diagnostics-only events
+```
+
+Allowed `owner` examples:
+
+```text
+python_connection_ownership
+python_transport
+java_bridge_client
+java_command_queue
+java_client_tick_dispatcher
+java_command_lifecycle
+chatclef_task_observer
+baritone_path_observer
+container_observer
+carryon_optional_observer
+```
+
+Correlation should include the strongest available stable identifiers:
+
+```text
+request_id
+correlation_id
+session_id
+connection_generation
+client_tick_id
+task_identity
+bound_root_task_identity
+child_task_identity
+target_position
+dimension
+```
+
+Rules:
+
+- Additive fields are allowed when investigation needs them.
+- Renaming an event or existing field is not allowed while the current logs are
+  being used as evidence.
+- Deduplication and emission budgets may affect only logging volume.
+- Diagnostic budgets are not timeouts and must not change command lifecycle.
+- `behavior_effect` must remain `none` for diagnostics-only changes.
+- Do not turn an observation failure into success.
+- Do not add a `try/catch` around observed engine behavior solely to protect a
+  diagnostic event.
+- Formatter-local protection is allowed only for malformed optional diagnostic
+  values and must not suppress ChatClef, AltoClef, Baritone, input, transport,
+  or container exceptions.
+
 ## Evidence File List
 
 Java protocol and command files:

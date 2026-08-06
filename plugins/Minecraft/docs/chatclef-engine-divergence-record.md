@@ -37,6 +37,51 @@ Verification method: runtime log observation only; no upstream repository compar
 
 Known LAVI-specific divergences: PARTIALLY_VERIFIED
 
+## Upstream Provenance Completion Checklist
+
+This record must not claim exact upstream provenance until each item below has
+direct evidence:
+
+```text
+upstream repository URL
+upstream branch, release, or tag
+exact upstream commit
+import date or baseline creation date
+Minecraft version
+Yarn mappings version
+Fabric Loader version used for build
+Fabric API version used for build
+Loom or build plugin version
+Java toolchain version
+ChatClef / AltoClef version label
+Baritone artifact identity
+Baritone version label observed at runtime
+LAVI-owned Java package roots
+modified upstream-derived files
+purpose of each divergence
+build verification command and result
+runtime verification instance and result
+rollback unit for each divergence
+```
+
+Current local evidence is limited to:
+
+```text
+fabric.mod.json contact homepage/sources = https://github.com/MiranCZ/altoclef
+gradle.properties mod_version = 0.18.23
+gradle.properties archives_base_name = chatclef
+runtime log label = altoclef 1.20.1-0.18.23
+runtime log label = baritone 1.10.1-9-geace2ad1-dirty
+```
+
+These values are useful identifiers, but they are not proof of the exact
+upstream commit. Until upstream comparison is completed, keep the upstream
+repository, release/tag, and exact commit fields marked `UNVERIFIED`.
+
+When provenance is completed, record the comparison method and the local command
+or artifact used to prove it. Do not use a successful build or runtime launch as
+upstream provenance proof.
+
 ## Active Behavior-Changing Divergence Record
 
 Review baseline SHA: `a15037399aef1619dc8430b478c42443a47049bf`
