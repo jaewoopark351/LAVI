@@ -409,6 +409,41 @@ If the same target causes continuous `REPLACE_CHILD`, inspect task equality and
 target construction. If the same child is retained but pathing restarts,
 inspect Baritone ownership.
 
+For the current gold-ingot mining loop, distinguish candidate allocation from
+actual active-child replacement:
+
+```text
+MineOrCollectTask may create a new DestroyBlockTask candidate every tick.
+Task.tick() may still retain the active child when isEqual() reports true.
+Repeated return-task logs are not proof of real child churn.
+```
+
+Use a more specific event name for this investigation:
+
+```text
+TASK_CHILD_RECONCILIATION
+```
+
+Additional fields:
+
+```text
+activeChildBeforeInstanceId
+candidateChildInstanceId
+isEqualResult
+replacementApplied
+activeChildAfterInstanceId
+previousChildStopCalled
+candidateDiscardedBecauseEqual
+activeChildBeforeTargetPosition
+candidateTargetPosition
+activeChildAfterTargetPosition
+```
+
+Do not include candidate instance ID, tick, timestamp, or opaque `toString()`
+values in the dedupe fingerprint. Candidate instance IDs may be emitted as
+fields, but they should not make unchanged semantic state look like a new
+state every tick.
+
 ### 8. Log Interact Lifecycle Boundaries
 
 For `InteractWithBlockTask` and tasks that compose it, log lifecycle changes
@@ -511,6 +546,198 @@ FORCE_CANCEL immediately follows child replacement
 large path calculation repeatedly targets the same endpoint
     -> terrain, cache, or target-selection boundary is suspect
 ```
+
+### 9.1 DestroyBlockTask To Baritone Path Boundary
+
+For the current gold-ingot loop, the highest-priority boundary is not command
+lifecycle, `TaskFinishedEvent`, or `DestroyBlockTask.isFinished()`.
+
+The highest-priority boundary is:
+
+```text
+DestroyBlockTask owns or observes an active Baritone custom goal
+  -> Baritone has an actually present/adopted path
+  -> Baritone pathing starts or the no-path/failure state is observable
+```
+
+The suspicious state is:
+
+```text
+customGoalActive=true
+baritonePathing=false
+pathPresent unknown
+goalMatchesCurrentTarget unknown
+calculation state unknown
+active process owner unknown
+```
+
+Do not assume `DestroyBlockTask.isFinished()` is wrong when the target block is
+still present. For a target block state such as `minecraft:deepslate_gold_ore`,
+`isFinished()` returning false is expected. The failure boundary is navigation
+to the target, path adoption, or progress observation before block completion.
+
+Suggested event:
+
+```text
+DESTROY_NAVIGATION_STATE_TRANSITION
+```
+
+Required fields:
+
+```text
+targetPosition
+targetBlockId
+targetBlockState
+blockStillExists
+chunkLoaded
+worldCanBreak
+playerPosition
+distanceSq
+horizontalDistanceSq
+verticalDelta
+reachPresent
+playerOnGround
+playerTouchingWater
+foodChainNeedsToEat
+inNetherPortal
+safeToCancel
+navigationState
+customGoalActive
+baritonePathing
+pathPresent
+currentMovementPresent
+ticksRemainingInSegment
+goalType
+goalSummary
+goalMatchesTarget
+stateEnteredTick
+stateElapsedTicks
+```
+
+Suggested `navigationState` values:
+
+```text
+PATHING_ACTIVE
+IN_RANGE_BREAK_GATE
+WAIT_CUSTOM_GOAL_ACTIVE_NO_PATHING
+SET_GOAL_AND_PATH_OBSERVED
+NO_GOAL_PATH_ABSENT
+UNSTUCK_TASK_ACTIVE
+PORTAL_ESCAPE
+```
+
+Emit immediately when this state first appears:
+
+```text
+customGoalActive=true
+baritonePathing=false
+pathPresent=false
+reachPresent=false
+```
+
+If the state is unchanged, emit only a bounded summary at most once per 200
+game ticks or 10 seconds per correlation.
+
+Suggested Baritone path-state event:
+
+```text
+BARITONE_GOAL_PATH_TRANSITION
+```
+
+Required fields:
+
+```text
+transition
+goalType
+goalSummary
+goalMatchesTarget
+customGoalActive
+baritonePathing
+pathPresent
+currentMovementPresent
+ticksRemainingInSegment
+planningStartTick
+planningElapsedTicks
+existingCancellationReason
+existingFailureReason
+activeProcessOwner
+```
+
+Suggested `transition` values:
+
+```text
+GOAL_SUBMITTED
+GOAL_BECAME_ACTIVE
+CALCULATION_STARTED
+CALCULATION_SUCCEEDED
+CALCULATION_FAILED
+PATH_BECAME_PRESENT
+PATHING_STARTED
+PATHING_STOPPED
+PATH_DISAPPEARED
+GOAL_CLEARED
+```
+
+Use only public read-only Baritone state in the first pass. Do not touch
+Baritone source only to expose internal calculation state. If public snapshots
+cannot distinguish calculating, failed, and active-idle states, report the
+first-pass result before proposing one minimal Baritone process transition
+logging hunk.
+
+### 9.2 Existing Force-Cancel Boundaries
+
+Observe existing `forceCancel()` calls before and after. Do not add, move,
+remove, or reorder cancellation calls for diagnostics.
+
+Suggested event:
+
+```text
+BARITONE_EXISTING_CANCEL_BOUNDARY
+```
+
+Known sources to distinguish:
+
+```text
+DESTROY_ON_START
+DESTROY_ON_STOP
+MINE_OR_COLLECT_PROGRESS_FAILURE
+```
+
+Required fields:
+
+```text
+cancelSource
+targetPosition
+baritonePathingBefore
+customGoalActiveBefore
+pathPresentBefore
+currentMovementPresentBefore
+ticksRemainingInSegmentBefore
+goalTypeBefore
+goalSummaryBefore
+goalMatchesTargetBefore
+baritonePathingAfter
+customGoalActiveAfter
+pathPresentAfter
+currentMovementPresentAfter
+ticksRemainingInSegmentAfter
+goalTypeAfter
+goalSummaryAfter
+goalMatchesTargetAfter
+```
+
+Important evidence pattern:
+
+```text
+before: pathing=true, customGoalActive=true
+forceCancel
+after:  pathing=false, customGoalActive=true
+same target immediately reselected
+```
+
+That pattern points to the boundary between existing cancellation,
+reselection, and Baritone active-idle/path adoption. It does not by itself
+authorize a new cancellation, retry, timeout, or blacklist change.
 
 ### 10. Container Open And Click Boundary
 
@@ -628,6 +855,224 @@ low durability tool is selected for required ore
     -> tool saver and mining requirement boundary is suspect
 ```
 
+### 12. Mining Target, Progress, And Blacklist Events
+
+For the gold-ingot mining loop, add separate events for target selection,
+movement progress, unreachable requests, and actual blacklist state. Do not
+combine these with command lifecycle payloads.
+
+Suggested event:
+
+```text
+MINE_TARGET_SELECTION_TRANSITION
+```
+
+Required fields:
+
+```text
+previousPursuitType
+previousPursuitPosition
+closestBlockPosition
+closestBlockDistanceSq
+closestDropEntityId
+closestDropPosition
+closestDropDistanceSq
+selectedPursuitType
+selectedPursuitPosition
+targetChanged
+selectionReason
+targetBlockId
+targetBlockState
+blockStillMatchesRequestedType
+chunkLoaded
+worldCanBreak
+scannerUnreachable
+localBlacklistContains
+heuristicCachePresent
+cachedHeuristic
+cachedBestDistanceSq
+```
+
+Suggested `selectionReason` values:
+
+```text
+INITIAL_SELECTION
+CURRENT_PURSUIT_UNCHANGED
+CURRENT_PURSUIT_INVALIDATED
+NEW_CLOSEST_NOT_IN_HEURISTIC_CACHE
+CACHED_HEURISTIC_BETTER
+CONSIDERABLY_CLOSER
+DROP_CLOSER
+INTERACTION_PAUSED_DROP_ONLY
+NO_CANDIDATE
+```
+
+Suggested event:
+
+```text
+MOVEMENT_PROGRESS_CHECK_RESULT
+```
+
+Required fields:
+
+```text
+checkerOwner
+checkerCallIndex
+checkEvaluated
+checkResult
+failureTransition
+mode
+lastResetTick
+elapsedTicksSinceReset
+resetReason
+playerPosition
+startPlayerPosition
+playerDisplacementSinceReset
+controllerBreakingBlock
+breakingBlockPosition
+breakingProgress
+lastBreakingBlockPosition
+lastBreakingBlockNowAir
+distanceTimeoutSeconds
+minimumDistance
+mineTimeoutSeconds
+minimumMineProgress
+allowedAttempts
+moveCheckFirstEvaluated
+moveCheckFirstResult
+stuckCheckEvaluated
+stuckCheckResult
+moveCheckSecondEvaluated
+moveCheckSecondResult
+```
+
+Required `checkerOwner` values:
+
+```text
+DESTROY_MOVE
+DESTROY_STUCK
+MINE_OR_COLLECT
+```
+
+For `DestroyBlockTask`, preserve the existing two `_moveChecker.check()` calls
+and short-circuit ordering. Label their observed results with
+`checkerCallIndex`. Do not call `check()` an extra time only to fill a log
+field.
+
+Suggested event:
+
+```text
+BLOCK_UNREACHABLE_REQUEST
+```
+
+Required fields:
+
+```text
+requestSource
+targetPosition
+targetBlockId
+requestedAllowedFailures
+scannerUnreachableBefore
+playerPosition
+distanceSq
+currentMiningRequirement
+activeDestroyTaskInstanceId
+candidateDestroyTaskInstanceId
+customGoalActive
+baritonePathing
+pathPresent
+```
+
+Suggested `requestSource` values:
+
+```text
+MINE_OR_COLLECT_PROGRESS_FAILURE
+DESTROY_MOVE_CHECK_FAILURE
+DESTROY_WATER_FAILURE
+PILLAGER_WOOL
+```
+
+Suggested event:
+
+```text
+BLOCK_BLACKLIST_STATE_CHANGED
+```
+
+Required fields:
+
+```text
+entryCreated
+failureCountBefore
+failureCountAfter
+allowedFailuresBefore
+requestedAllowedFailures
+allowedFailuresAfter
+unreachableBefore
+unreachableAfter
+currentDistanceSq
+bestDistanceSqBefore
+bestDistanceSqAfter
+currentMiningRequirement
+bestToolBefore
+bestToolAfter
+resetApplied
+resetReason
+```
+
+Suggested `resetReason` values:
+
+```text
+NEW_ENTRY
+DISTANCE_IMPROVED
+TOOL_IMPROVED
+DISTANCE_AND_TOOL_IMPROVED
+NONE
+```
+
+Important blacklist interpretation:
+
+```text
+requestBlockUnreachable(pos, 2)
+    -> not unreachable until failureCount > 2, unless reset logic changes state
+
+requestBlockUnreachable(pos)
+    -> not unreachable until failureCount > 4, unless reset logic changes state
+```
+
+The local `MineOrCollectTask` blacklist set is not sufficient proof that target
+selection excludes a block. Log the actual scanner or blacklist before/after
+state before considering a blacklist behavior change.
+
+### 13. Tool Boundary Is Secondary Until Reach
+
+For the observed deepslate-gold case, tool saver is not the first suspected
+boundary while the target remains far below the player and `reachPresent=false`.
+
+Treat tool selection as the primary boundary only after:
+
+```text
+target is stable
+Baritone goal matches target
+pathing or path adoption reaches the target
+reachPresent=true
+breaking does not start or progress remains zero
+```
+
+Then reuse existing tool diagnostics where possible and add only missing fields
+such as:
+
+```text
+requiredMiningRequirement
+selectedToolSlot
+selectedToolItem
+selectedToolDamage
+selectedToolMaxDamage
+selectedToolSuitable
+saveToolDecision
+saveToolReason
+selectionOutcome
+```
+
 ## Current Gold-Ingot Loop Checklist
 
 For the local `get gold_ingot 10` symptom, current logs already prove:
@@ -644,13 +1089,27 @@ targetBlockState can be minecraft:deepslate_gold_ore
 baritonePathing can be false while customGoalActive is true
 ```
 
+This is currently expected task-chain behavior:
+
+```text
+CollectGoldIngotTask chooses SmeltInFurnaceTask in the overworld.
+SmeltInFurnaceTask requests material collection when raw gold is insufficient.
+raw_gold=5 and materialsNeeded=10 means MineAndCollectTask -> DestroyBlockTask
+is a normal child path, not a command lifecycle failure by itself.
+```
+
 Current logs do not yet prove:
 
 ```text
-whether DestroyBlockTask child is retained or replaced
+whether per-tick DestroyBlockTask candidates become real active-child replacement
 whether InteractWithBlockTask START/STOP repeats
 whether Baritone goal target equals the DestroyBlockTask target
+whether a Baritone path is present or adopted after the custom goal is active
+whether the Baritone state is calculating, failed, active-idle, or controlled by another process
+whether existing forceCancel calls leave customGoalActive=true but pathing=false
 whether setGoalAndPath is cancelled by child replacement, lost control, or another owner
+whether blacklist requests become real target exclusion
+whether progress checker failure is distance progress, mine progress, or stuck logic
 whether the target block still exists every time it is selected
 whether reach/look/click/break progress ever advances
 whether tool-save policy changes the mining decision
@@ -702,6 +1161,7 @@ log terminal, cancellation, exception, and refusal reasons
 log bounded summaries for repeated unchanged state
 do not emit every tick unchanged
 do not emit every Baritone node or movement expansion
+do not include candidate instance IDs, ticks, timestamps, or random operation IDs in dedupe fingerprints
 do not add a retry, timeout, blacklist, fallback, cleanup, or cancellation
 do not change Task selection, isFinished, isEqual, return values, or ordering
 do not call side-effecting Minecraft, Baritone, Carry On, input, or container APIs
@@ -755,9 +1215,34 @@ Suspected boundary:
     scanner, cached block state, or Baritone/world cache
 
 Observed result:
-    repeated long path calculations after world replacement
+repeated long path calculations after world replacement
 Suspected boundary:
     Baritone disk cache or map-specific terrain/pathing
+
+Observed result:
+    customGoalActive=true, baritonePathing=false, pathPresent=false, reachPresent=false
+Suspected boundary:
+    DestroyBlockTask custom goal to Baritone path adoption
+
+Observed result:
+    candidate ID changes every tick, active child ID is stable, isEqual=true, replacement=false
+Suspected boundary:
+    diagnostic fingerprint or candidate allocation noise, not real Task churn
+
+Observed result:
+    active child ID changes repeatedly for the same or alternating target
+Suspected boundary:
+    real child replacement, target reselection, or equality mismatch
+
+Observed result:
+    unreachable request repeats but unreachableAfter=false
+Suspected boundary:
+    blacklist threshold not reached or distance/tool reset is clearing failure count
+
+Observed result:
+    goal matches target, custom goal active, path absent, calculation state unavailable
+Suspected boundary:
+    Baritone calculation, no-path, or active-idle state needs read-only observation
 ```
 
 ## Behavior Fix Gate
@@ -790,6 +1275,11 @@ globally cancel Baritone pathing
 globally release input
 change InteractWithBlockTask.isFinished()
 change TaskRunner or chain scheduling
+change DestroyBlockTask.isFinished()
+change DestroyBlockTask._moveChecker.check() order
+change blacklist thresholds
+add, remove, move, or reorder existing forceCancel calls
+touch Baritone source in the first diagnostic pass
 change payload field names or status values
 delete Baritone cache while Minecraft is running
 catch and suppress Throwable around observed engine behavior

@@ -468,6 +468,31 @@ That runbook separates Baritone cache suspicion from command root ownership,
 TaskFinishedEvent correlation, parent-child target handoff, child replacement,
 Interact lifecycle, and Baritone path ownership.
 
+If cache reset has already been performed and the same world still reproduces
+the symptom after waiting, do not keep treating cache as the only owner. The
+next diagnostic boundary is:
+
+```text
+DestroyBlockTask custom goal active
+  -> Baritone path present/adopted
+  -> Baritone pathing started or no-path/failure state observed
+```
+
+In that case, collect bounded lifecycle diagnostics for:
+
+```text
+TASK_CHILD_RECONCILIATION
+BARITONE_EXISTING_CANCEL_BOUNDARY
+DESTROY_NAVIGATION_STATE_TRANSITION
+BARITONE_GOAL_PATH_TRANSITION
+MOVEMENT_PROGRESS_CHECK_RESULT
+BLOCK_UNREACHABLE_REQUEST
+BLOCK_BLACKLIST_STATE_CHANGED
+```
+
+Do not add a timeout, retry, blacklist threshold change, global path
+cancellation, or Baritone source change until this boundary is proven.
+
 ## References
 
 Primary upstream references:

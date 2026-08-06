@@ -529,6 +529,14 @@ Rules:
 - Additive fields are allowed when investigation needs them.
 - Renaming an event or existing field is not allowed while the current logs are
   being used as evidence.
+- Do not modify the existing command lifecycle, ownership, or task observation
+  payload classes or their `toMap()` shapes merely to attach a new
+  investigation field.
+- Use separate bounded diagnostic events for new DestroyBlockTask, Baritone
+  path, blacklist, and movement-progress observations.
+- Use existing `DiagnosticCommandContextSnapshot` / command-context helper
+  fields on those new events instead of appending command context fields to
+  lifecycle payloads.
 - Deduplication and emission budgets may affect only logging volume.
 - Diagnostic budgets are not timeouts and must not change command lifecycle.
 - `behavior_effect` must remain `none` for diagnostics-only changes.
@@ -538,6 +546,53 @@ Rules:
 - Formatter-local protection is allowed only for malformed optional diagnostic
   values and must not suppress ChatClef, AltoClef, Baritone, input, transport,
   or container exceptions.
+
+First-pass event names for the current DestroyBlockTask / Baritone path
+investigation:
+
+```text
+TASK_CHILD_RECONCILIATION
+MINE_TARGET_SELECTION_TRANSITION
+BARITONE_EXISTING_CANCEL_BOUNDARY
+DESTROY_NAVIGATION_STATE_TRANSITION
+BARITONE_GOAL_PATH_TRANSITION
+MOVEMENT_PROGRESS_CHECK_RESULT
+BLOCK_UNREACHABLE_REQUEST
+BLOCK_BLACKLIST_STATE_CHANGED
+```
+
+These names are diagnostic event contracts only. They do not change
+`command_request`, `command_result`, `StatusSnapshotDTO`, lifecycle payload,
+ownership payload, or task runtime observation payload shapes.
+
+For these events, exclude the following from dedupe fingerprints:
+
+```text
+clientTickId
+timestamp
+candidate task instance ID
+System.identityHashCode
+opaque toString
+exact per-tick player position
+random operation ID
+```
+
+Preferred fingerprint dimensions include:
+
+```text
+commandCorrelationId
+event
+ownerTaskClass
+activeChildClass
+targetPosition
+navigationState
+customGoalActive
+baritonePathing
+pathPresent
+isEqualResult
+replacementApplied
+scannerUnreachable
+```
 
 ## Evidence File List
 
