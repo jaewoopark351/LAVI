@@ -29,7 +29,8 @@ Fabric ChatClef command bridge
 UserTaskChain / SingleTaskChain
 TaskFinishedEvent publication and observation
 Task parent-child selection and replacement
-DoCraftInTableTask / DoToClosestBlockTask / InteractWithBlockTask
+DoCraftInTableTask / DoStuffInContainerTask / DoToClosestBlockTask / InteractWithBlockTask
+SmeltInFurnaceTask furnace arbitration and make-new cost decisions
 MineAndCollectTask / DestroyBlockTask
 Baritone custom goal and path ownership
 container open and click observation
@@ -1149,6 +1150,652 @@ whether child replacement repeatedly force-cancelled pathing
 Do not assume Carry On is the primary cause when carry state is
 `AVAILABLE_NOT_CARRYING` and no click attempt or Carry On state transition
 evidence is present.
+
+## Current Furnace Arbitration And Destroy Churn Checklist
+
+Use this section for symptoms where a furnace-backed task such as
+`get cooked_beef 10` keeps running inside `SmeltInFurnaceTask`, while logs show
+both existing-furnace open attempts and make-new-container material collection.
+
+Documentation status:
+
+```text
+documentation only
+does not approve Java behavior changes
+does not approve cost, timer, retry, path, blacklist, input, or payload changes
+```
+
+### Leading Hypothesis
+
+Do not treat repeated `stone` or `cobblestone` mining logs as the primary root
+cause until the container arbitration boundary is proven stable.
+
+The current leading boundary is:
+
+```text
+DoStuffInContainerTask furnace arbitration
+  -> actual child replacement
+  -> DestroyBlockTask stop/start
+  -> existing forceCancel
+  -> repeated stone target restart
+```
+
+The suspected flow is:
+
+```text
+costToWalk < costToMakeNew
+  -> OPEN_EXISTING_CONTAINER
+
+player position or route cost changes near the threshold
+  -> costToWalk > costToMakeNew
+  -> placeForceTimer reset
+  -> GET_CONTAINER_ITEM
+  -> furnace material collection starts
+  -> MineAndCollectTask returns DestroyBlockTask for stone/cobblestone
+  -> Baritone path calculation can still report SUCCESS_TO_GOAL
+
+cost or timer state changes again
+  -> OPEN_EXISTING_CONTAINER
+  -> furnace acquisition subtree is interrupted
+  -> DestroyBlockTask.onStop()
+  -> existing Baritone path forceCancel
+
+GET_CONTAINER_ITEM is selected again
+  -> same nearby stone can be selected again
+  -> a new DestroyBlockTask can start
+```
+
+In this pattern, the problem may not be that stone cannot be mined. The problem
+may be that the stone-mining child does not live long enough to reach break
+progress.
+
+### Current Evidence Limits
+
+Existing `CONTAINER_TASK_TARGET_DECISION` and `CONTAINER_TASK_BRANCH` events are
+not enough to prove per-tick branch oscillation.
+
+The current container diagnostics limiter can emit a first detail event and
+then a 200-tick summary for repeated equivalent states. Seeing both
+`OPEN_CONTAINER` and `GET_CONTAINER_ITEM` in the same command window proves both
+paths were observed, but it does not prove the exact transition count, exact
+transition tick, or actual active-child replacement by itself.
+
+Before a behavior fix, prove this chain:
+
+```text
+FURNACE branch changes GET -> OPEN
+  -> furnace acquisition child is stopped
+  -> DestroyBlockTask STOP is observed
+  -> forceCancelSource=DESTROY_ON_STOP
+  -> blockStillExists=true
+  -> breakEverStarted=false
+  -> same stone target starts in a later DestroyBlockTask
+```
+
+If that chain is present, the first failing boundary is likely container
+arbitration or child replacement, not stone breakability.
+
+### First-Pass Diagnostic Events
+
+Add these only as diagnostics. They must not change return values, selected
+tasks, timer calls, retry behavior, blacklist behavior, Baritone goals, input
+state, command lifecycle payload shapes, or existing cleanup.
+
+#### FURNACE_CONTAINER_ROUTE_TRANSITION
+
+Preferred location:
+
+```text
+DoStuffInContainerTask.onTick()
+after costToWalk / costToMakeNew are calculated
+after placeForceTimer reset intent is known
+before returning OPEN, GET, PLACE, or handoff child
+```
+
+If the existing `ContainerTaskDiagnostics` already receives enough fields from
+`DoStuffInContainerTask`, prefer a LAVI-owned stateful observer inside that
+diagnostics helper. The observer may run before the existing emission limiter so
+suppressed details still update transition counters.
+
+Required fields:
+
+```text
+decisionSequence
+previousEffectiveBranch
+effectiveBranch
+branchChanged
+branchAgeTicks
+branchTransitionCount
+rawCostRelation
+costToWalk
+costToMakeNew
+costDelta
+costDeltaBand
+placeForceElapsedBeforeReset
+placeForceDurationBeforeReset
+placeForceResetThisTick
+placeForceElapsedAfterReset
+placeForceDurationAfterReset
+placeForceHoldRemainingSeconds
+justPlacedElapsed
+justPlacedDurationSeconds
+nearestSource
+nearestPresent
+nearestPosition
+nearestBlockState
+nearestChunkLoaded
+nearestCanReach
+nearestScannerUnreachable
+cachedContainerPositionBefore
+cachedContainerPositionAfter
+overrideContainerPosition
+placeTaskPlaced
+playerPosition
+playerDistanceSqToNearest
+horizontalDistanceSqToNearest
+verticalDeltaToNearest
+hasContainerBlockItem
+containerBlockItemCount
+candidateChildClass
+candidateChildSemanticKey
+```
+
+Suggested `rawCostRelation` values:
+
+```text
+NO_NEAREST
+WALK_COST_LOWER
+WALK_COST_EQUAL
+WALK_COST_HIGHER
+```
+
+Suggested `effectiveBranch` values:
+
+```text
+OPEN_EXISTING_CONTAINER
+GET_CONTAINER_ITEM
+PLACE_CONTAINER
+CONTINUE_ACTIVE_PLACE
+CONTAINER_ALREADY_OPEN
+WAIT_POST_PLACE_HANDOFF
+```
+
+Suggested `costDeltaBand` values:
+
+```text
+LE_MINUS_1
+MINUS_1_TO_0
+ZERO_TO_PLUS_1
+GT_PLUS_1
+INFINITE
+```
+
+Do not include these values in the dedupe fingerprint:
+
+```text
+exact costToWalk double
+exact playerPosition double
+gameTick
+eventSequence
+timestamp
+Task instance ID
+calculation worker ID
+```
+
+Use only semantic values in the fingerprint, for example:
+
+```text
+previousEffectiveBranch
+effectiveBranch
+costDeltaBand
+nearestPosition
+placeForceResetThisTick
+hasContainerBlockItem
+```
+
+#### FURNACE_MAKE_COST_SNAPSHOT
+
+Preferred location:
+
+```text
+SmeltInFurnaceTask.DoSmeltInFurnaceTask.getCostToMakeNew()
+each existing return boundary
+```
+
+Emit source transitions only. Do not call `getCostToMakeNew()` again for
+diagnostics.
+
+Required fields:
+
+```text
+costToMakeNew
+costSource
+furnaceCacheHasContents
+cachedMaterialSlot
+cachedFuelSlot
+cachedOutputSlot
+burningFuelCount
+burnPercentage
+cacheUpdatedThisTick
+cacheLastUpdatedTick
+cacheAgeTicks
+cacheSourceFurnacePosition
+cobblestoneCount
+woodRequirementMetInventory
+furnaceBlockItemCount
+```
+
+Suggested `costSource` values:
+
+```text
+FURNACE_CACHE_NON_EMPTY
+COBBLESTONE_INVENTORY_COST
+WOOD_TOOL_FALLBACK_50
+NO_WOOD_TOOL_FALLBACK_100
+```
+
+A suspicious local signature is:
+
+```text
+costSource=WOOD_TOOL_FALLBACK_50
+furnaceCacheHasContents=false
+cobblestoneCount<=8
+woodRequirementMetInventory=true
+costToMakeNew=50.0
+```
+
+This can keep the make-new cost near the threshold while cobblestone is still
+being collected.
+
+#### FURNACE_OPERATION_GATE_TRANSITION
+
+Preferred location:
+
+```text
+SmeltInFurnaceTask.DoSmeltInFurnaceTask.onTick()
+only when the high-level operation gate changes
+```
+
+Do not emit the full gate snapshot every tick.
+
+Required fields:
+
+```text
+previousGate
+currentGate
+inventoryMaterialCount
+materialsNeeded
+materialGateSatisfied
+inventoryFuelCount
+fuelNeeded
+fuelGateSatisfied
+materialsAccessible
+containerFlowEligible
+inventoryOutputCount
+```
+
+Suggested `currentGate` values:
+
+```text
+GET_MATERIAL
+GET_FUEL
+MOVE_ACCESSIBLE_MATERIAL
+ENTER_CONTAINER_FLOW
+```
+
+This event distinguishes a true container arbitration loop from a later
+material, fuel, or output movement loop.
+
+#### DESTROY_BLOCK_LIFETIME
+
+Preferred locations:
+
+```text
+DestroyBlockTask.onStart()
+DestroyBlockTask.onStop()
+```
+
+Required fields:
+
+```text
+destroyTaskRunId
+destroyTaskInstanceId
+phase=START|STOP
+targetPosition
+targetBlockState
+blockStillExists
+startedAtTick
+stoppedAtTick
+lifetimeTicks
+parentContainerDecisionSequence
+parentEffectiveBranch
+interruptTaskClass
+interruptTaskSemanticKey
+customGoalActiveBefore
+baritonePathingBefore
+pathPresentBefore
+calculationGenerationBefore
+forceCancelSource
+customGoalActiveAfter
+baritonePathingAfter
+pathPresentAfter
+pathSuccessObserved
+pathingStartedObserved
+reachEverPresent
+breakEverStarted
+maximumBreakingProgress
+blockBecameAir
+inventoryCobblestoneAtStart
+inventoryCobblestoneAtStop
+```
+
+Suggested `forceCancelSource` values:
+
+```text
+DESTROY_ON_START
+DESTROY_ON_STOP
+MINE_OR_COLLECT_PROGRESS_FAILURE
+```
+
+The decisive fields are:
+
+```text
+interruptTaskClass
+parentEffectiveBranch
+lifetimeTicks
+breakEverStarted
+blockStillExists
+```
+
+Example container-arbitration signature:
+
+```text
+effectiveBranch changes GET_CONTAINER_ITEM -> OPEN_EXISTING_CONTAINER
+DestroyBlockTask STOP
+interruptTaskClass=DoToClosestBlockTask
+blockStillExists=true
+breakEverStarted=false
+lifetimeTicks is small
+forceCancelSource=DESTROY_ON_STOP
+```
+
+#### DESTROY_BLOCK_PHASE_TRANSITION
+
+Preferred location:
+
+```text
+DestroyBlockTask.onTick()
+after the existing reach calculation
+```
+
+Emit only when the phase changes.
+
+Suggested phases:
+
+```text
+TARGET_SELECTED
+GOAL_SUBMITTED
+PATH_CALCULATION_SUCCEEDED
+PATHING_STARTED
+PATHING_STOPPED
+GOAL_REACHED_NO_REACH
+REACH_ACQUIRED
+BREAK_REQUESTED
+BREAK_PROGRESS_STARTED
+BLOCK_BECAME_AIR
+UNREACHABLE_REQUESTED
+TASK_INTERRUPTED
+```
+
+Required fields:
+
+```text
+previousPhase
+currentPhase
+phaseAgeTicks
+targetPosition
+targetBlockState
+blockStillExists
+playerPosition
+distanceSqToTarget
+horizontalDistanceSq
+verticalDelta
+reachPresent
+isCloseToMoveBack
+customGoalActive
+baritonePathing
+pathPresent
+currentMovementPresent
+goalMatchesTarget
+calculationGeneration
+lastPathCalculationResult
+playerOnGround
+playerTouchingWater
+foodChainNeedsToEat
+safeToCancel
+controllerBreakingBlock
+breakingBlockPosition
+breakingProgress
+leftClickForced
+leftClickHeld
+mainHandStack
+bestToolStack
+bestToolSuitable
+savePolicyDecision
+```
+
+This event must distinguish:
+
+```text
+SUCCESS_TO_GOAL -> TASK_INTERRUPTED
+SUCCESS_TO_GOAL -> GOAL_REACHED_NO_REACH
+SUCCESS_TO_GOAL -> REACH_ACQUIRED -> BREAK_REQUESTED -> breakingProgress stays 0
+SUCCESS_TO_GOAL -> REACH_ACQUIRED -> BREAK_PROGRESS_STARTED -> BLOCK_BECAME_AIR
+```
+
+Those timelines have different owners and must not be collapsed into one
+"mining failed" explanation.
+
+#### MINE_PROGRESS_FAILURE_CONTEXT
+
+Preferred location:
+
+```text
+MineAndCollectTask.MineOrCollectTask.onTick()
+the existing branch where progressChecker.check() returned false
+```
+
+Do not call `progressChecker.check()` a second time for diagnostics. Capture the
+existing return value and already-computed state.
+
+Required fields:
+
+```text
+targetPosition
+targetBlockState
+blockStillExists
+progressCheckResult
+progressCheckerMode
+elapsedTicksSinceReset
+progressCheckerResetReason
+playerStartPosition
+playerCurrentPosition
+playerDisplacement
+baritonePathing
+customGoalActive
+pathPresent
+lastPathCalculationResult
+calculationGeneration
+activeDestroyTaskRunId
+destroyPhase
+destroyLifetimeTicks
+scannerUnreachableBefore
+blacklistFailureCountBefore
+blacklistFailureCountAfter
+inventoryCobblestoneCount
+```
+
+Use this only after the container branch is stable enough to rule out
+interruption-driven Destroy restarts.
+
+### Task.tick Is A Second-Pass Option
+
+Do not add a generic `Task.tick()` observer first.
+
+Use it only if `DestroyBlockTask.onStop()` cannot prove which parent branch or
+candidate child caused interruption, for example:
+
+```text
+interruptTask=null
+interruptTask is only a high-level wrapper
+the relationship between branch transition and child stop is still ambiguous
+```
+
+If needed, the observer must be gated to container acquisition/open subtrees and
+must not emit generic hot-path logs.
+
+Required fields:
+
+```text
+parentTaskRunId
+activeChildBeforeClass
+activeChildBeforeRunId
+candidateChildClass
+candidateChildSemanticKey
+isEqualResult
+canInterruptPreviousChild
+replacementApplied
+previousChildStopCalled
+activeChildAfterClass
+activeChildAfterRunId
+containerDecisionSequence
+```
+
+### Furnace Arbitration Decision Table
+
+```text
+Observed result:
+    GET -> OPEN followed by Destroy STOP, open-table interrupt, block still exists,
+    breakEverStarted=false
+Suspected boundary:
+    furnace route arbitration is cancelling the material collection child
+
+Observed result:
+    GET_CONTAINER_ITEM remains stable for 100-200 ticks and the same Destroy run
+    remains active
+Suspected boundary:
+    container arbitration is probably not the first boundary
+
+Observed result:
+    same Destroy run, SUCCESS_TO_GOAL, then GOAL_REACHED_NO_REACH
+Suspected boundary:
+    GoalNear arrival and actual block reach boundary
+
+Observed result:
+    same Destroy run, reachPresent=true, breakingProgress remains 0
+Suspected boundary:
+    input, selected tool, look, or block interaction boundary
+
+Observed result:
+    same Destroy run, break starts, block becomes air, cobblestone count increases
+Suspected boundary:
+    stone mining is healthy; inspect crafting, inventory, or furnace flow above it
+
+Observed result:
+    branch is stable GET, then progress failure and blacklist changes
+Suspected boundary:
+    MineAndCollect progress or reachability ownership
+
+Observed result:
+    branch does not change but Destroy start/stop repeats
+Suspected boundary:
+    target reselection or intermediate task churn
+
+Observed result:
+    candidate Destroy objects are new but the active Destroy run is stable
+Suspected boundary:
+    allocation/logging noise, not real child restart
+```
+
+Expected healthy timeline:
+
+```text
+FURNACE_CONTAINER_ROUTE_TRANSITION
+  -> DESTROY_BLOCK_LIFETIME START
+  -> GOAL_SUBMITTED
+  -> PATH_CALCULATION_SUCCEEDED
+  -> PATHING_STARTED
+  -> REACH_ACQUIRED
+  -> BREAK_PROGRESS_STARTED
+  -> BLOCK_BECAME_AIR
+  -> inventoryCobblestoneCount increases
+```
+
+Suspicious container-boundary timeline:
+
+```text
+FURNACE_CONTAINER_ROUTE_TRANSITION GET -> OPEN
+  -> DESTROY_BLOCK_LIFETIME STOP
+  -> forceCancelSource=DESTROY_ON_STOP
+  -> blockStillExists=true
+  -> breakEverStarted=false
+  -> FURNACE_CONTAINER_ROUTE_TRANSITION OPEN -> GET
+  -> same stone target starts again
+```
+
+### Furnace Arbitration Bounded Logging
+
+Use the existing diagnostics mode and caps where possible:
+
+```text
+mode=BOUNDARY only unless the user explicitly requests verbose diagnostics
+first 4 new transitions emit detail immediately
+repeated equivalent transitions are summarized
+summary every 200 ticks or about 10 seconds
+per-correlation detail cap=256
+session hard cap=5000
+reserve at least 32 terminal, exception, and cap events
+```
+
+Recommended summary fields:
+
+```text
+windowStartTick
+windowEndTick
+openBranchTicks
+getContainerBranchTicks
+openToGetTransitionCount
+getToOpenTransitionCount
+placeForceResetCount
+minimumCostDelta
+maximumCostDelta
+costThresholdCrossCount
+childReplacementCount
+destroyStartCount
+destroyStopCount
+destroyInterruptedBeforeReachCount
+destroyInterruptedBeforeBreakCount
+pathSuccessCount
+reachAcquiredCount
+breakStartedCount
+blockBecameAirCount
+suppressedDetailCount
+```
+
+Diagnostics must not add extra calls to:
+
+```text
+progressChecker.check()
+Task.isEqual()
+DestroyBlockTask.isFinished()
+forceCancel()
+setGoalAndPath()
+getCostToMakeNew()
+getNearestBlock()
+```
+
+Capture existing call results in local variables or pass already-computed state
+to observers.
 
 ## Bounded Logging Rules
 

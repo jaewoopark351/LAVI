@@ -183,6 +183,14 @@ regressions, read:
 plugins/Minecraft/docs/chatclef-baritone-cache-troubleshooting.md
 ```
 
+For furnace/container arbitration, repeated `OPEN_CONTAINER` /
+`GET_CONTAINER_ITEM` decisions, or `DestroyBlockTask` restart symptoms while a
+smelting command is active, read:
+
+```text
+plugins/Minecraft/docs/chatclef-task-lifecycle-diagnostics.md
+```
+
 For payload typing and map-shape stability, read:
 
 ```text
