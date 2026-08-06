@@ -1,6 +1,7 @@
 package lavi.minecraft.diagnostics.toolselect;
 
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.diagnostics.toolselect.support.ToolMiningDiagnosticFieldValues;
 import lavi.minecraft.integration.toolselect.snapshot.ToolSavePolicySnapshot;
 import net.minecraft.block.Block;
 import net.minecraft.item.ItemStack;
@@ -73,9 +74,17 @@ public final class ToolSavePolicySnapshotDiagnostics {
                                 "decisionReason", decisionReason,
                                 "shouldSave", shouldSave,
                                 "targetBlockId", blockId(block),
+                                "targetMinimumMiningRequirement", ToolMiningDiagnosticFieldValues.minimumMiningRequirement(block),
                                 "toolItemId", itemId(stack),
                                 "toolItemDamage", stack == null ? "unavailable" : stack.getDamage(),
                                 "toolItemMaxDamage", stack == null ? "unavailable" : stack.getMaxDamage(),
+                                "toolItemRemainingDurability", ToolMiningDiagnosticFieldValues.remainingDurability(stack),
+                                "toolItemDamagePlus8", ToolMiningDiagnosticFieldValues.damagePlus(stack, 8),
+                                "toolItemDamagePlus30", ToolMiningDiagnosticFieldValues.damagePlus(stack, 30),
+                                "toolCriticalDurabilityThresholdReached", ToolMiningDiagnosticFieldValues.durabilityThresholdReached(stack, 8),
+                                "toolLowDurabilityThresholdReached", ToolMiningDiagnosticFieldValues.durabilityThresholdReached(stack, 30),
+                                "toolIsIronPickaxe", ToolMiningDiagnosticFieldValues.isIronPickaxe(stack),
+                                "lowDurabilityNonIronBlockProtected", shouldSave && "LOW_DURABILITY_BLOCK_NOT_IRON_REQUIRED".equals(decisionReason),
                                 "toolStackEmpty", stack == null ? "unavailable" : stack.isEmpty()
                         })
                 )

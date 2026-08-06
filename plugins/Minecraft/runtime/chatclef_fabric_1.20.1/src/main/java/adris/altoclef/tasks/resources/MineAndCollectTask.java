@@ -18,6 +18,8 @@ import adris.altoclef.util.slots.CursorSlot;
 import adris.altoclef.util.slots.PlayerSlot;
 import adris.altoclef.util.time.TimerGame;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.diagnostics.mining.BaritonePathDiagnosticSnapshot;
+import lavi.minecraft.diagnostics.mining.MiningPathDiagnostics;
 import lavi.minecraft.diagnostics.tasktrace.VisibleTaskDiagnostics;
 import lavi.minecraft.integration.mining.MiningToolReadiness;
 import net.minecraft.block.Block;
@@ -237,6 +239,9 @@ public class MineAndCollectTask extends ResourceTask {
             // We can't mine right now.
             if (mod.getExtraBaritoneSettings().isInteractionPaused()) {
                 Optional<Object> result = closestDrop.getRight().map(Object.class::cast);
+                MiningPathDiagnostics.logMineTargetSelection(mod, this, closestBlock, closestDrop, result,
+                        "INTERACTION_PAUSED_DROP_ONLY", selectedTargetChanged(result), localBlacklistContains(result),
+                        _blocks, blacklist.size(), miningPos);
                 VisibleTaskDiagnostics.logDecision(mod, this, "mine_or_collect_closest_choice",
                         "choice=drop_interaction_paused|drop=" + result.map(Object::toString).orElse("none"),
                         "choice", "drop_interaction_paused",
@@ -250,6 +255,9 @@ public class MineAndCollectTask extends ResourceTask {
 
             if (dropSq <= blockSq) {
                 Optional<Object> result = closestDrop.getRight().map(Object.class::cast);
+                MiningPathDiagnostics.logMineTargetSelection(mod, this, closestBlock, closestDrop, result,
+                        result.isPresent() ? "DROP_CLOSER" : "NO_CANDIDATE", selectedTargetChanged(result), localBlacklistContains(result),
+                        _blocks, blacklist.size(), miningPos);
                 VisibleTaskDiagnostics.logDecision(mod, this, "mine_or_collect_closest_choice",
                         "choice=drop|drop=" + result.map(Object::toString).orElse("none"),
                         "choice", "drop",
@@ -261,6 +269,9 @@ public class MineAndCollectTask extends ResourceTask {
                 return result;
             } else {
                 Optional<Object> result = closestBlock.getRight().map(Object.class::cast);
+                MiningPathDiagnostics.logMineTargetSelection(mod, this, closestBlock, closestDrop, result,
+                        result.isPresent() ? "NEW_CLOSEST_NOT_IN_HEURISTIC_CACHE" : "NO_CANDIDATE", selectedTargetChanged(result), localBlacklistContains(result),
+                        _blocks, blacklist.size(), miningPos);
                 VisibleTaskDiagnostics.logDecision(mod, this, "mine_or_collect_closest_choice",
                         "choice=block|block=" + result.map(Object::toString).orElse("none"),
                         "choice", "block",
@@ -311,13 +322,35 @@ public class MineAndCollectTask extends ResourceTask {
             if (mod.getClientBaritone().getPathingBehavior().isPathing()) {
                 progressChecker.reset();
             }
-            if (miningPos != null && !progressChecker.check(mod)) {
+            boolean progressCheckEvaluated = miningPos != null;
+            boolean progressCheckResult = !progressCheckEvaluated || progressChecker.check(mod);
+            if (progressCheckEvaluated) {
+                MiningPathDiagnostics.logMovementProgressCheckResult(
+                        mod,
+                        this,
+                        miningPos,
+                        "MINE_OR_COLLECT",
+                        1,
+                        true,
+                        progressCheckResult,
+                        progressCheckResult ? "PASS" : "PROGRESS_FAILURE",
+                        false,
+                        "not_destroy_move_checker",
+                        false,
+                        "not_destroy_stuck_checker",
+                        false,
+                        "not_destroy_second_move_checker");
+            }
+            if (miningPos != null && !progressCheckResult) {
                 VisibleTaskDiagnostics.logProgress(mod, this, "mine_or_collect_progress_failed_blacklist",
                         "miningPos=" + ChatClefDiagnostics.blockPos(miningPos),
                         "miningPos", ChatClefDiagnostics.blockPos(miningPos),
                         "blacklistSizeBefore", blacklist.size());
+                BaritonePathDiagnosticSnapshot cancelBefore = MiningPathDiagnostics.captureBaritoneSnapshot(mod, miningPos, null, "unavailable");
                 mod.getClientBaritone().getPathingBehavior().forceCancel();
+                MiningPathDiagnostics.logExistingCancelBoundary(mod, this, miningPos, "MINE_OR_COLLECT_PROGRESS_FAILURE", cancelBefore);
                 Debug.logMessage("Failed to mine block. Suggesting it may be unreachable.");
+                MiningPathDiagnostics.logBlockUnreachableRequest(mod, this, miningPos, 2, "MINE_OR_COLLECT_PROGRESS_FAILURE", null, null);
                 mod.getBlockScanner().requestBlockUnreachable(miningPos, 2);
                 blacklist.add(miningPos);
                 miningPos = null;
@@ -429,6 +462,25 @@ public class MineAndCollectTask extends ResourceTask {
 
         public BlockPos miningPos() {
             return miningPos;
+        }
+
+        private boolean selectedTargetChanged(Optional<Object> selected) {
+            if (selected.isEmpty()) {
+                return miningPos != null;
+            }
+            Object value = selected.get();
+            if (value instanceof BlockPos blockPos) {
+                return miningPos == null || !miningPos.equals(blockPos);
+            }
+            return miningPos != null;
+        }
+
+        private boolean localBlacklistContains(Optional<Object> selected) {
+            return selected
+                    .filter(BlockPos.class::isInstance)
+                    .map(BlockPos.class::cast)
+                    .map(blacklist::contains)
+                    .orElse(false);
         }
     }
 

@@ -6,6 +6,10 @@
   "mixins": [
     "AbstractFurnaceScreenHandlerAccessor",
     "AxeItemAccessor",
+    "diagnostics.AbstractNodeCostSearchDiagnosticMixin",
+    "diagnostics.CustomGoalProcessDiagnosticMixin",
+    "diagnostics.PathingBehaviorDiagnosticMixin",
+    "diagnostics.PathingControlManagerDiagnosticMixin",
     "BlockModifiedByPlayerMixin",
     "ClientBlockBreakAccessor",
     "ClientConnectionAccessor",

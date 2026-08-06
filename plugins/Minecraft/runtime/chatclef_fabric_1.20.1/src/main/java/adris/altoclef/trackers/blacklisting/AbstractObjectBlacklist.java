@@ -4,6 +4,7 @@ import adris.altoclef.AltoClef;
 import adris.altoclef.Debug;
 import adris.altoclef.util.MiningRequirement;
 import adris.altoclef.util.helpers.StorageHelper;
+import lavi.minecraft.diagnostics.mining.MiningPathDiagnostics;
 import net.minecraft.util.math.Vec3d;
 
 import java.util.HashMap;
@@ -18,7 +19,8 @@ public abstract class AbstractObjectBlacklist<T> {
     private final HashMap<T, BlacklistEntry> entries = new HashMap<>();
 
     public void blackListItem(AltoClef mod, T item, int numberOfFailuresAllowed) {
-        if (!entries.containsKey(item)) {
+        boolean entryCreated = !entries.containsKey(item);
+        if (entryCreated) {
             BlacklistEntry entry = new BlacklistEntry();
             entry.numberOfFailuresAllowed = numberOfFailuresAllowed;
             entry.numberOfFailures = 0;
@@ -27,10 +29,18 @@ public abstract class AbstractObjectBlacklist<T> {
             entries.put(item, entry);
         }
         BlacklistEntry entry = entries.get(item);
+        int failureCountBefore = entry.numberOfFailures;
+        int allowedFailuresBefore = entry.numberOfFailuresAllowed;
+        boolean unreachableBefore = entry.numberOfFailures > entry.numberOfFailuresAllowed;
+        double bestDistanceSqBefore = entry.bestDistanceSq;
+        MiningRequirement bestToolBefore = entry.bestTool;
         double newDistance = getPos(item).squaredDistanceTo(mod.getPlayer().getPos());
         MiningRequirement newTool = StorageHelper.getCurrentMiningRequirement();
         // For distance, add a slight threshold so it doesn't reset EVERY time we move a tiny bit closer.
-        if (newTool.ordinal() > entry.bestTool.ordinal() || (newDistance < entry.bestDistanceSq - 1)) {
+        boolean toolImproved = newTool.ordinal() > entry.bestTool.ordinal();
+        boolean distanceImproved = newDistance < entry.bestDistanceSq - 1;
+        boolean resetApplied = toolImproved || distanceImproved;
+        if (resetApplied) {
             if (newTool.ordinal() > entry.bestTool.ordinal()) entry.bestTool = newTool;
             if (newDistance < entry.bestDistanceSq) entry.bestDistanceSq = newDistance;
             entry.numberOfFailures = 0;
@@ -39,6 +49,41 @@ public abstract class AbstractObjectBlacklist<T> {
         entry.numberOfFailures++;
         entry.numberOfFailuresAllowed = numberOfFailuresAllowed;
         Debug.logMessage("Blacklist: " + item.toString() + ": Try " + entry.numberOfFailures + " / " + entry.numberOfFailuresAllowed);
+        MiningPathDiagnostics.logBlacklistStateChanged(
+                mod,
+                item,
+                entryCreated,
+                failureCountBefore,
+                entry.numberOfFailures,
+                allowedFailuresBefore,
+                numberOfFailuresAllowed,
+                entry.numberOfFailuresAllowed,
+                unreachableBefore,
+                entry.numberOfFailures > entry.numberOfFailuresAllowed,
+                newDistance,
+                bestDistanceSqBefore,
+                entry.bestDistanceSq,
+                newTool,
+                bestToolBefore,
+                entry.bestTool,
+                resetApplied,
+                resetReason(entryCreated, distanceImproved, toolImproved));
+    }
+
+    private String resetReason(boolean entryCreated, boolean distanceImproved, boolean toolImproved) {
+        if (entryCreated) {
+            return "NEW_ENTRY";
+        }
+        if (distanceImproved && toolImproved) {
+            return "DISTANCE_AND_TOOL_IMPROVED";
+        }
+        if (distanceImproved) {
+            return "DISTANCE_IMPROVED";
+        }
+        if (toolImproved) {
+            return "TOOL_IMPROVED";
+        }
+        return "NONE";
     }
 
     protected abstract Vec3d getPos(T item);

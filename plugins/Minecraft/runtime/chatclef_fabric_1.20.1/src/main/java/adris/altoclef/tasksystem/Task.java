@@ -3,6 +3,7 @@ package adris.altoclef.tasksystem;
 import adris.altoclef.Debug;
 import adris.altoclef.tasks.movement.TimeoutWanderTask;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.diagnostics.mining.MiningPathDiagnostics;
 
 import java.util.function.Predicate;
 
@@ -64,13 +65,19 @@ public abstract class Task {
             }
             // We have a sub task
             if (newSub != null) {
+                Task activeChildBefore = sub;
                 boolean subTasksEqual = newSub.isEqual(sub);
                 if (diagnosticsVerbose) {
                     ChatClefDiagnostics.logTaskTransition(this, sub, newSub, "child_isEqual_result",
                             "isEqualResult", subTasksEqual);
                 }
+                boolean canInterruptEvaluated = false;
+                boolean canInterrupt = false;
+                boolean previousChildStopCalled = false;
+                boolean replacementApplied = false;
                 if (!subTasksEqual) {
-                    boolean canInterrupt = canBeInterrupted(sub, newSub);
+                    canInterruptEvaluated = true;
+                    canInterrupt = canBeInterrupted(sub, newSub);
                     if (diagnosticsVerbose) {
                         ChatClefDiagnostics.logTaskTransition(this, sub, newSub, "child_interruptibility_result",
                                 "canInterruptPreviousChild", canInterrupt);
@@ -79,6 +86,7 @@ public abstract class Task {
                         // Our sub task is new
                         if (sub != null) {
                             // Our previous sub must be interrupted.
+                            previousChildStopCalled = true;
                             if (diagnosticsVerbose) {
                                 ChatClefDiagnostics.logTaskTransition(this, sub, newSub, "previous_child_stop_begin");
                             }
@@ -89,12 +97,24 @@ public abstract class Task {
                         }
 
                         sub = newSub;
+                        replacementApplied = true;
                         ChatClefDiagnostics.setParent(sub, this);
                         if (diagnosticsVerbose) {
                             ChatClefDiagnostics.logTaskTransition(this, null, sub, "child_replaced");
                         }
                     }
                 }
+                MiningPathDiagnostics.logTaskChildReconciliation(
+                        this,
+                        activeChildBefore,
+                        newSub,
+                        subTasksEqual,
+                        canInterruptEvaluated,
+                        canInterrupt,
+                        replacementApplied,
+                        previousChildStopCalled,
+                        sub,
+                        subTasksEqual);
 
                 // Run our child
                 if (diagnosticsVerbose) {

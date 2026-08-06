@@ -13,6 +13,7 @@ import adris.altoclef.tasks.resources.wood.*;
 import adris.altoclef.tasks.squashed.CataloguedResourceTask;
 import adris.altoclef.util.*;
 import adris.altoclef.util.helpers.ItemHelper;
+import lavi.minecraft.integration.mining.operation.PrepareThenMineRawGoldTask;
 import net.minecraft.block.Block;
 import net.minecraft.block.MapColor;
 import net.minecraft.entity.mob.*;
@@ -67,7 +68,9 @@ public class TaskCatalogue {
             mine("glowstone_dust", Blocks.GLOWSTONE, Items.GLOWSTONE_DUST).forceDimension(Dimension.NETHER);
             mine("coal", MiningRequirement.WOOD, new Block[]{Blocks.COAL_ORE, Blocks.DEEPSLATE_COAL_ORE}, Items.COAL);
             mine("raw_iron", MiningRequirement.STONE, new Block[]{Blocks.IRON_ORE, Blocks.DEEPSLATE_IRON_ORE}, Items.RAW_IRON);
-            mine("raw_gold", MiningRequirement.IRON, new Block[]{Blocks.GOLD_ORE, Blocks.DEEPSLATE_GOLD_ORE}, Items.RAW_GOLD);
+            //20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
+            // Keep raw gold's access-tool preparation operation-local without changing global tool saving or Baritone policy.
+            put("raw_gold", new Item[]{Items.RAW_GOLD}, count -> new PrepareThenMineRawGoldTask(count, new Block[]{Blocks.GOLD_ORE, Blocks.DEEPSLATE_GOLD_ORE})).dontMineIfPresent();
             mine("raw_copper", MiningRequirement.STONE, new Block[]{Blocks.COPPER_ORE, Blocks.DEEPSLATE_COPPER_ORE}, Items.RAW_COPPER);
             mine("diamond", MiningRequirement.IRON, new Block[]{Blocks.DIAMOND_ORE, Blocks.DEEPSLATE_DIAMOND_ORE}, Items.DIAMOND);
             mine("emerald", MiningRequirement.IRON, new Block[]{Blocks.EMERALD_ORE, Blocks.DEEPSLATE_EMERALD_ORE}, Items.EMERALD);

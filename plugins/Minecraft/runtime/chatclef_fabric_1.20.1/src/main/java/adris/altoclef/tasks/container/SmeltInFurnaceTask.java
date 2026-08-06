@@ -17,6 +17,7 @@ import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.slots.FurnaceSlot;
 import adris.altoclef.util.slots.Slot;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.diagnostics.container.furnace.FurnaceContainerDiagnostics;
 import lavi.minecraft.diagnostics.tasktrace.VisibleTaskDiagnostics;
 import net.minecraft.block.Blocks;
 import net.minecraft.item.Item;
@@ -240,6 +241,13 @@ public class SmeltInFurnaceTask extends ResourceTask {
                     - mod.getItemStorage().getItemCountInventoryOnly(outputTarget.getMatches())
                     - (outputTarget.matches(furnaceCache.outputSlot.getItem()) ? furnaceCache.outputSlot.getCount() : 0)
                     - totalFuelInFurnace;
+            int inventoryMaterialCount = mod.getItemStorage().getItemCount(materialTarget.getMatches());
+            int inventoryOutputCount = ChatClefDiagnostics.isBoundaryEnabled()
+                    ? mod.getItemStorage().getItemCountInventoryOnly(outputTarget.getMatches())
+                    : -1;
+            double inventoryFuelCount = StorageHelper.calculateInventoryFuelCount(mod);
+            boolean materialGateSatisfied = inventoryMaterialCount >= materialsNeeded;
+            boolean fuelGateSatisfied = furnaceCache.burningFuelCount > 0 || inventoryFuelCount >= fuelNeeded;
             ChatClefDiagnostics.logEvent("SMELT_FURNACE", "DO_TICK_STATE", "do_smelt_in_furnace_material_fuel_state", this,
                     "target", target,
                     "materialTarget", materialTarget,
@@ -252,18 +260,30 @@ public class SmeltInFurnaceTask extends ResourceTask {
                     "cachedOutputSlot", ChatClefDiagnostics.itemStackSummary(furnaceCache.outputSlot),
                     "burningFuelCount", furnaceCache.burningFuelCount,
                     "burnPercentage", furnaceCache.burnPercentage,
-                    "inventoryMaterialCount", ChatClefDiagnostics.safeValue(() -> mod.getItemStorage().getItemCount(materialTarget.getMatches())),
-                    "inventoryFuelCount", ChatClefDiagnostics.safeValue(() -> StorageHelper.calculateInventoryFuelCount(mod)));
+                    "inventoryMaterialCount", inventoryMaterialCount,
+                    "inventoryFuelCount", inventoryFuelCount);
 
             // We don't have enough materials...
-            if (mod.getItemStorage().getItemCount(materialTarget.getMatches()) < materialsNeeded) {
+            if (inventoryMaterialCount < materialsNeeded) {
                 setDebugState("Getting Materials");
                 Task materialTask = getMaterialTask(target.getMaterial());
+                FurnaceContainerDiagnostics.logOperationGate(mod,
+                        this,
+                        "GET_MATERIAL",
+                        inventoryMaterialCount,
+                        materialsNeeded,
+                        false,
+                        inventoryFuelCount,
+                        fuelNeeded,
+                        fuelGateSatisfied,
+                        "not_evaluated_material_missing",
+                        false,
+                        inventoryOutputCount);
                 VisibleTaskDiagnostics.logReturnTask(mod, this, materialTask, "do_smelt_in_furnace_return_material_task",
                         "materialsNeeded=" + materialsNeeded + "|target=" + materialTarget,
                         "materialsNeeded", materialsNeeded,
                         "materialTarget", materialTarget,
-                        "inventoryMaterialCount", ChatClefDiagnostics.safeValue(() -> mod.getItemStorage().getItemCount(materialTarget.getMatches())));
+                        "inventoryMaterialCount", inventoryMaterialCount);
                 ChatClefDiagnostics.logTaskTransition(this, null, materialTask, "do_smelt_in_furnace_return_material_task",
                         "materialsNeeded", materialsNeeded,
                         "materialTarget", materialTarget);
@@ -271,22 +291,47 @@ public class SmeltInFurnaceTask extends ResourceTask {
             }
 
             // We don't have enough fuel...
-            if (furnaceCache.burningFuelCount <= 0 && StorageHelper.calculateInventoryFuelCount(mod) < fuelNeeded) {
+            if (furnaceCache.burningFuelCount <= 0 && inventoryFuelCount < fuelNeeded) {
                 setDebugState("Getting Fuel");
                 Task fuelTask = new CollectFuelTask(fuelNeeded + 1);
+                FurnaceContainerDiagnostics.logOperationGate(mod,
+                        this,
+                        "GET_FUEL",
+                        inventoryMaterialCount,
+                        materialsNeeded,
+                        materialGateSatisfied,
+                        inventoryFuelCount,
+                        fuelNeeded,
+                        false,
+                        "not_evaluated_fuel_missing",
+                        false,
+                        inventoryOutputCount);
                 VisibleTaskDiagnostics.logReturnTask(mod, this, fuelTask, "do_smelt_in_furnace_return_fuel_task",
                         "fuelNeeded=" + fuelNeeded,
                         "fuelNeeded", fuelNeeded,
-                        "inventoryFuelCount", StorageHelper.calculateInventoryFuelCount(mod));
+                        "inventoryFuelCount", inventoryFuelCount);
                 ChatClefDiagnostics.logTaskTransition(this, null, fuelTask, "do_smelt_in_furnace_return_fuel_task",
                         "fuelNeeded", fuelNeeded,
-                        "inventoryFuelCount", StorageHelper.calculateInventoryFuelCount(mod));
+                        "inventoryFuelCount", inventoryFuelCount);
                 return fuelTask;
             }
 
             // Make sure our materials are accessible in our inventory
-            if (StorageHelper.isItemInaccessibleToContainer(mod, allMaterials)) {
+            boolean materialsInaccessible = StorageHelper.isItemInaccessibleToContainer(mod, allMaterials);
+            if (materialsInaccessible) {
                 Task moveTask = new MoveInaccessibleItemToInventoryTask(allMaterials);
+                FurnaceContainerDiagnostics.logOperationGate(mod,
+                        this,
+                        "MOVE_ACCESSIBLE_MATERIAL",
+                        inventoryMaterialCount,
+                        materialsNeeded,
+                        materialGateSatisfied,
+                        inventoryFuelCount,
+                        fuelNeeded,
+                        fuelGateSatisfied,
+                        false,
+                        false,
+                        inventoryOutputCount);
                 VisibleTaskDiagnostics.logReturnTask(mod, this, moveTask, "do_smelt_in_furnace_return_accessible_material_task",
                         "allMaterials=" + allMaterials,
                         "allMaterials", allMaterials);
@@ -299,6 +344,18 @@ public class SmeltInFurnaceTask extends ResourceTask {
             ChatClefDiagnostics.logEvent("SMELT_FURNACE", "DO_TICK_DECISION", "do_smelt_in_furnace_enter_container_flow", this,
                     "materialsNeeded", materialsNeeded,
                     "fuelNeeded", fuelNeeded);
+            FurnaceContainerDiagnostics.logOperationGate(mod,
+                    this,
+                    "ENTER_CONTAINER_FLOW",
+                    inventoryMaterialCount,
+                    materialsNeeded,
+                    materialGateSatisfied,
+                    inventoryFuelCount,
+                    fuelNeeded,
+                    fuelGateSatisfied,
+                    true,
+                    true,
+                    inventoryOutputCount);
             VisibleTaskDiagnostics.logDecision(mod, this, "do_smelt_in_furnace_enter_container_flow",
                     "materialsNeeded=" + materialsNeeded + "|fuelNeeded=" + fuelNeeded,
                     "materialsNeeded", materialsNeeded,
@@ -492,28 +549,79 @@ public class SmeltInFurnaceTask extends ResourceTask {
 
         @Override
         protected double getCostToMakeNew(AltoClef mod) {
-            if (furnaceCache.burnPercentage > 0 || furnaceCache.burningFuelCount > 0 ||
+            boolean furnaceCacheHasContents = furnaceCache.burnPercentage > 0 || furnaceCache.burningFuelCount > 0 ||
                     !furnaceCache.fuelSlot.isEmpty() || !furnaceCache.materialSlot.isEmpty() ||
-                    !furnaceCache.outputSlot.isEmpty()) {
+                    !furnaceCache.outputSlot.isEmpty();
+            boolean diagnosticsBoundary = ChatClefDiagnostics.isBoundaryEnabled();
+            int cobblestoneCount = mod.getItemStorage().getItemCount(Items.COBBLESTONE);
+            int furnaceBlockItemCount = diagnosticsBoundary ? mod.getItemStorage().getItemCount(Items.FURNACE) : -1;
+            if (furnaceCacheHasContents) {
+                double cost = 9999999.0;
+                if (diagnosticsBoundary) {
+                    FurnaceContainerDiagnostics.logMakeCostSnapshot(mod,
+                            this,
+                            "FURNACE_CACHE_NON_EMPTY",
+                            cost,
+                            true,
+                            furnaceCache.materialSlot,
+                            furnaceCache.fuelSlot,
+                            furnaceCache.outputSlot,
+                            furnaceCache.burningFuelCount,
+                            furnaceCache.burnPercentage,
+                            cobblestoneCount,
+                            StorageHelper.miningRequirementMetInventory(MiningRequirement.WOOD),
+                            furnaceBlockItemCount);
+                }
                 ChatClefDiagnostics.logEvent("SMELT_FURNACE", "COST_TO_MAKE_NEW", "furnace_cache_non_empty_cost", this,
-                        "cost", 9999999.0,
+                        "cost", cost,
                         "cachedMaterialSlot", ChatClefDiagnostics.itemStackSummary(furnaceCache.materialSlot),
                         "cachedFuelSlot", ChatClefDiagnostics.itemStackSummary(furnaceCache.fuelSlot),
                         "cachedOutputSlot", ChatClefDiagnostics.itemStackSummary(furnaceCache.outputSlot));
-                return 9999999.0;
+                return cost;
             }
-            if (mod.getItemStorage().getItemCount(Items.COBBLESTONE) > 8) {
+            if (cobblestoneCount > 8) {
                 double cost = 100.0 - 90.0 * (double) mod.getItemStorage().getItemCount(new Item[]{Items.COBBLESTONE}) / 8.0;
                 double boundedCost = Math.max(cost, 10.0);
+                if (diagnosticsBoundary) {
+                    FurnaceContainerDiagnostics.logMakeCostSnapshot(mod,
+                            this,
+                            "COBBLESTONE_INVENTORY_COST",
+                            boundedCost,
+                            false,
+                            furnaceCache.materialSlot,
+                            furnaceCache.fuelSlot,
+                            furnaceCache.outputSlot,
+                            furnaceCache.burningFuelCount,
+                            furnaceCache.burnPercentage,
+                            cobblestoneCount,
+                            StorageHelper.miningRequirementMetInventory(MiningRequirement.WOOD),
+                            furnaceBlockItemCount);
+                }
                 ChatClefDiagnostics.logEvent("SMELT_FURNACE", "COST_TO_MAKE_NEW", "furnace_inventory_cost", this,
                         "cost", boundedCost,
-                        "cobblestoneCount", mod.getItemStorage().getItemCount(Items.COBBLESTONE));
+                        "cobblestoneCount", cobblestoneCount);
                 return boundedCost;
             }
-            double fallbackCost = StorageHelper.miningRequirementMetInventory(MiningRequirement.WOOD) ? 50.0 : 100.0;
+            boolean woodRequirementMetInventory = StorageHelper.miningRequirementMetInventory(MiningRequirement.WOOD);
+            double fallbackCost = woodRequirementMetInventory ? 50.0 : 100.0;
+            if (diagnosticsBoundary) {
+                FurnaceContainerDiagnostics.logMakeCostSnapshot(mod,
+                        this,
+                        woodRequirementMetInventory ? "WOOD_TOOL_FALLBACK_50" : "NO_WOOD_TOOL_FALLBACK_100",
+                        fallbackCost,
+                        false,
+                        furnaceCache.materialSlot,
+                        furnaceCache.fuelSlot,
+                        furnaceCache.outputSlot,
+                        furnaceCache.burningFuelCount,
+                        furnaceCache.burnPercentage,
+                        cobblestoneCount,
+                        woodRequirementMetInventory,
+                        furnaceBlockItemCount);
+            }
             ChatClefDiagnostics.logEvent("SMELT_FURNACE", "COST_TO_MAKE_NEW", "furnace_fallback_cost", this,
                     "cost", fallbackCost,
-                    "woodRequirementMet", StorageHelper.miningRequirementMetInventory(MiningRequirement.WOOD));
+                    "woodRequirementMet", woodRequirementMetInventory);
             return fallbackCost;
         }
 
@@ -531,6 +639,7 @@ public class SmeltInFurnaceTask extends ResourceTask {
                 furnaceCache.fuelSlot = StorageHelper.getItemStackInSlot(FurnaceSlot.INPUT_SLOT_FUEL);
                 furnaceCache.materialSlot = StorageHelper.getItemStackInSlot(FurnaceSlot.INPUT_SLOT_MATERIALS);
                 furnaceCache.outputSlot = StorageHelper.getItemStackInSlot(FurnaceSlot.OUTPUT_SLOT);
+                FurnaceContainerDiagnostics.markCacheUpdated(this, getTargetContainerPosition());
                 ChatClefDiagnostics.logEvent("SMELT_FURNACE", "CACHE_UPDATE", "furnace_cache_updated_from_open_screen", this,
                         "materialSlot", ChatClefDiagnostics.itemStackSummary(furnaceCache.materialSlot),
                         "fuelSlot", ChatClefDiagnostics.itemStackSummary(furnaceCache.fuelSlot),

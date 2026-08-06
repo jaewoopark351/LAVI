@@ -1,6 +1,7 @@
 package lavi.minecraft.diagnostics.inventory;
 
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.diagnostics.toolselect.support.ToolMiningDiagnosticFieldValues;
 import net.minecraft.block.Block;
 import net.minecraft.item.ItemStack;
 import net.minecraft.registry.Registries;
@@ -77,10 +78,17 @@ public final class ToolSetStorageQueryDiagnostics {
                 "callerBoundary", caller.callerBoundary(),
                 "callerTopFrames", caller.callerTopFrames(),
                 "targetBlockId", blockId(block),
+                "targetMinimumMiningRequirement", ToolMiningDiagnosticFieldValues.minimumMiningRequirement(block),
                 "toolItemId", itemId(stack),
                 "toolItemCount", stack == null ? "unavailable" : stack.getCount(),
                 "toolItemDamage", stack == null ? "unavailable" : stack.getDamage(),
                 "toolItemMaxDamage", stack == null ? "unavailable" : stack.getMaxDamage(),
+                "toolItemRemainingDurability", ToolMiningDiagnosticFieldValues.remainingDurability(stack),
+                "toolItemDamagePlus8", ToolMiningDiagnosticFieldValues.damagePlus(stack, 8),
+                "toolItemDamagePlus30", ToolMiningDiagnosticFieldValues.damagePlus(stack, 30),
+                "toolCriticalDurabilityThresholdReached", ToolMiningDiagnosticFieldValues.durabilityThresholdReached(stack, 8),
+                "toolLowDurabilityThresholdReached", ToolMiningDiagnosticFieldValues.durabilityThresholdReached(stack, 30),
+                "toolIsIronPickaxe", ToolMiningDiagnosticFieldValues.isIronPickaxe(stack),
                 "toolStackEmpty", stack == null ? "unavailable" : stack.isEmpty(),
                 "activeInventoryScanCount", InventorySubTrackerScanProbe.activeScanCount()
         };

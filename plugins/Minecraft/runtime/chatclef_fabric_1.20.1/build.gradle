@@ -18,11 +18,10 @@ plugins {
 apply plugin: 'fabric-loom'
 apply plugin: 'com.replaymod.preprocess'
 
-//20260806_kpopmodder: Ensure remapJar rewrites the ChatClef mixin refmap for runtime names.
+//20260806_kpopmodder: Keep the ChatClef refmap name stable while letting remapJar rewrite runtime names.
 loom {
     mixin {
         defaultRefmapName = "chatclef-refmap.json"
-        refmapTargetNamespace = "intermediary"
         add sourceSets.main, "chatclef-refmap.json"
     }
 }
@@ -144,10 +143,20 @@ remapJar {
 processResources {
     inputs.property("version", project.version)
     inputs.property("mcVersion", project.name)
+    inputs.property("omitLegacyLocalPlayerMixin", mcVersion >= 12001)
 
     filesMatching("fabric.mod.json") {
         expand "version": project.version,
                 "mcVersion": project.name
+    }
+
+    if (mcVersion >= 12001) {
+        //20260806_kpopmodder: Exclude the legacy LocalPlayer pitch mixin from 1.20.1+ runtime jars.
+        filesMatching("altoclef.mixins.json") {
+            filter { String line ->
+                line.contains('"MixinLocalPlayer"') ? null : line
+            }
+        }
     }
 
     from(sourceSets.main.resources.srcDirs) {

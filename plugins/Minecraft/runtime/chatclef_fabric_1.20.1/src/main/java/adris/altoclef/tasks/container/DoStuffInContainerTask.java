@@ -17,6 +17,7 @@ import adris.altoclef.util.time.TimerGame;
 import baritone.api.utils.input.Input;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 import lavi.minecraft.diagnostics.container.ContainerTaskDiagnostics;
+import lavi.minecraft.diagnostics.container.furnace.FurnaceContainerDiagnostics;
 import net.minecraft.block.Block;
 import net.minecraft.screen.slot.SlotActionType;
 import net.minecraft.util.math.BlockPos;
@@ -272,10 +273,12 @@ public abstract class DoStuffInContainerTask extends Task {
 
         Vec3d currentPos = mod.getPlayer().getPos();
         BlockPos override = overrideContainerPosition(mod);
+        String nearestSource = "BLOCK_SCANNER";
 
         if (override != null && mod.getBlockScanner().isBlockAtPosition(override, containerBlocks)) {
             // We have an override so go there instead.
             nearest = Optional.of(override);
+            nearestSource = "OVERRIDE_CONTAINER_POSITION";
         } else {
             // Track nearest container
             nearest = mod.getBlockScanner().getNearestBlock(currentPos, blockPos -> WorldHelper.canReach(blockPos), containerBlocks);
@@ -283,8 +286,10 @@ public abstract class DoStuffInContainerTask extends Task {
         if (nearest.isEmpty()) {
             // If all else fails, try using our placed task
             nearest = Optional.ofNullable(placeTask.getPlaced());
+            nearestSource = nearest.isPresent() ? "PLACE_TASK_PLACED" : "NONE";
             if (nearest.isPresent() && !mod.getBlockScanner().isBlockAtPosition(nearest.get(), containerBlocks)) {
                 nearest = Optional.empty();
+                nearestSource = "NONE";
             }
         }
         if (nearest.isPresent()) {
@@ -293,6 +298,12 @@ public abstract class DoStuffInContainerTask extends Task {
         double costToMakeNew = getCostToMakeNew(mod);
         boolean placeForceElapsed = placeForceTimer.elapsed();
         boolean justPlacedElapsed = justPlacedTimer.elapsed();
+        boolean placeForceElapsedBeforeReset = placeForceElapsed;
+        double placeForceDurationBeforeReset = diagnosticsBoundary ? placeForceTimer.getDuration() : -1.0;
+        double justPlacedTimerAgeSeconds = diagnosticsBoundary ? justPlacedTimer.getDuration() : -1.0;
+        boolean placeForceResetThisTick = false;
+        BlockPos cachedContainerPositionBeforeRoute = cachedContainerPosition;
+        int containerBlockItemCount = diagnosticsBoundary ? mod.getItemStorage().getItemCount(ItemHelper.blocksToItems(containerBlocks)) : -1;
         if (diagnosticsVerbose) {
             ChatClefDiagnostics.logEvent("CONTAINER_TASK", "NEAREST_DECISION", "container_nearest_decision", this,
                     "containerTarget", containerTarget,
@@ -347,9 +358,12 @@ public abstract class DoStuffInContainerTask extends Task {
                         "nearestPresent", nearest.isPresent());
             }
             placeForceTimer.reset();
+            placeForceResetThisTick = true;
         }
         placeForceElapsed = placeForceTimer.elapsed();
+        double placeForceDurationAfterReset = diagnosticsBoundary ? placeForceTimer.getDuration() : -1.0;
         justPlacedElapsed = justPlacedTimer.elapsed();
+        justPlacedTimerAgeSeconds = diagnosticsBoundary ? justPlacedTimer.getDuration() : justPlacedTimerAgeSeconds;
         if (nearest.isEmpty() || (!placeForceElapsed && justPlacedElapsed)) {
             // It's cheaper to make a new one, or our only option.
 
@@ -369,6 +383,32 @@ public abstract class DoStuffInContainerTask extends Task {
             boolean hasContainerTarget = mod.getItemStorage().hasItem(containerTarget);
             if (!hasContainerTarget) {
                 setDebugState("Getting container item");
+                Task getContainerItemTask = TaskCatalogue.getItemTask(containerTarget);
+                FurnaceContainerDiagnostics.logRouteTransition(mod,
+                        this,
+                        containerTarget,
+                        containerBlocks,
+                        "GET_CONTAINER_ITEM",
+                        getContainerItemTask,
+                        "get_container_item|" + containerTarget,
+                        nearest.orElse(null),
+                        nearestSource,
+                        override,
+                        cachedContainerPositionBeforeRoute,
+                        cachedContainerPosition,
+                        placeTask.getPlaced(),
+                        costToWalk,
+                        costToMakeNew,
+                        placeForceElapsedBeforeReset,
+                        placeForceDurationBeforeReset,
+                        placeForceResetThisTick,
+                        placeForceElapsed,
+                        placeForceDurationAfterReset,
+                        justPlacedElapsed,
+                        justPlacedTimerAgeSeconds,
+                        hasContainerItem,
+                        containerBlockItemCount,
+                        "return_get_container_item_task");
                 if (diagnosticsBoundary) {
                     ContainerTaskDiagnostics.logBoundary("CONTAINER_TASK_BRANCH",
                             "return_get_container_item_task",
@@ -396,13 +436,38 @@ public abstract class DoStuffInContainerTask extends Task {
                             "hasContainerItem", hasContainerItem,
                             "placeTaskPlaced", placeTask.getPlaced());
                 }
-                return TaskCatalogue.getItemTask(containerTarget);
+                return getContainerItemTask;
             }
 
             setDebugState("Placing container...");
 
             justPlacedTimer.reset();
             // Now place!
+            FurnaceContainerDiagnostics.logRouteTransition(mod,
+                    this,
+                    containerTarget,
+                    containerBlocks,
+                    "PLACE_CONTAINER",
+                    placeTask,
+                    "place_container|" + ChatClefDiagnostics.blockPos(placeTask.getPlaced()),
+                    nearest.orElse(null),
+                    nearestSource,
+                    override,
+                    cachedContainerPositionBeforeRoute,
+                    cachedContainerPosition,
+                    placeTask.getPlaced(),
+                    costToWalk,
+                    costToMakeNew,
+                    placeForceElapsedBeforeReset,
+                    placeForceDurationBeforeReset,
+                    placeForceResetThisTick,
+                    placeForceElapsed,
+                    placeForceDurationAfterReset,
+                    justPlacedElapsed,
+                    justPlacedTimerAgeSeconds,
+                    hasContainerItem,
+                    containerBlockItemCount,
+                    "return_place_task");
             if (diagnosticsBoundary) {
                 ContainerTaskDiagnostics.logBoundary("CONTAINER_TASK_BRANCH",
                         "return_place_task",
@@ -513,6 +578,31 @@ public abstract class DoStuffInContainerTask extends Task {
                     "openTableTaskClass", ChatClefDiagnostics.className(openTableTask));
         }
         beginPostPlaceOpenIntentIfNeeded(mod);
+        FurnaceContainerDiagnostics.logRouteTransition(mod,
+                this,
+                containerTarget,
+                containerBlocks,
+                "OPEN_EXISTING_CONTAINER",
+                openTableTask,
+                "open_existing_container|" + ChatClefDiagnostics.blockPos(cachedContainerPosition),
+                nearest.orElse(null),
+                nearestSource,
+                override,
+                cachedContainerPositionBeforeRoute,
+                cachedContainerPosition,
+                placeTask.getPlaced(),
+                costToWalk,
+                costToMakeNew,
+                placeForceElapsedBeforeReset,
+                placeForceDurationBeforeReset,
+                placeForceResetThisTick,
+                placeForceElapsed,
+                placeForceDurationAfterReset,
+                justPlacedElapsed,
+                justPlacedTimerAgeSeconds,
+                hasContainerItem,
+                containerBlockItemCount,
+                "return_open_table_task");
         if (diagnosticsBoundary) {
             ContainerTaskDiagnostics.logBoundary("CONTAINER_TASK_BRANCH",
                     "return_open_table_task",

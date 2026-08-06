@@ -15,11 +15,14 @@ import adris.altoclef.util.helpers.WorldHelper;
 import adris.altoclef.util.progresscheck.MovementProgressChecker;
 import adris.altoclef.util.slots.PlayerSlot;
 import adris.altoclef.util.slots.Slot;
+import baritone.api.pathing.goals.Goal;
 import baritone.api.pathing.goals.GoalBlock;
 import baritone.api.pathing.goals.GoalNear;
 import baritone.api.utils.Rotation;
 import baritone.api.utils.input.Input;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.diagnostics.mining.BaritonePathDiagnosticSnapshot;
+import lavi.minecraft.diagnostics.mining.MiningPathDiagnostics;
 import lavi.minecraft.diagnostics.tasktrace.VisibleTaskDiagnostics;
 import net.minecraft.block.*;
 import adris.altoclef.multiversion.versionedfields.Blocks;
@@ -61,6 +64,35 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
 
     public DestroyBlockTask(BlockPos pos) {
         this.pos = pos;
+    }
+
+    public BlockPos diagnosticTargetPosition() {
+        return pos;
+    }
+
+    private String navigationState(AltoClef mod, Optional<Rotation> reach) {
+        if (WorldHelper.isInNetherPortal()) {
+            return "PORTAL_ESCAPE";
+        }
+        if (reach.isPresent()
+                && (mod.getPlayer().isTouchingWater() || mod.getPlayer().isOnGround())
+                && !mod.getFoodChain().needsToEat()
+                && mod.getClientBaritone().getPathingBehavior().isSafeToCancel()) {
+            return "IN_RANGE_BREAK_GATE";
+        }
+        boolean pathing = mod.getClientBaritone().getPathingBehavior().isPathing();
+        boolean customGoalActive = mod.getClientBaritone().getCustomGoalProcess().isActive();
+        boolean pathPresent = mod.getClientBaritone().getPathingBehavior().getPath().isPresent();
+        if (pathing) {
+            return "PATHING_ACTIVE";
+        }
+        if (customGoalActive && !pathPresent && reach.isEmpty()) {
+            return "WAIT_CUSTOM_GOAL_ACTIVE_NO_PATHING";
+        }
+        if (!customGoalActive && !pathPresent) {
+            return "NO_GOAL_PATH_ABSENT";
+        }
+        return "PATH_OR_GOAL_STATE_OBSERVED";
     }
 
     /**
@@ -204,7 +236,11 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
                 "cursorStack", ChatClefDiagnostics.safeValue(StorageHelper::getItemStackInCursorSlot));
 
         // Cancel any ongoing pathing behavior.
+        BaritonePathDiagnosticSnapshot cancelBefore = MiningPathDiagnostics.captureBaritoneSnapshot(mod, pos, null, "unavailable");
         mod.getClientBaritone().getPathingBehavior().forceCancel();
+        MiningPathDiagnostics.logExistingCancelBoundary(mod, this, pos, "DESTROY_ON_START", cancelBefore);
+        MiningPathDiagnostics.logDestroyLifetimeStart(mod, this, pos, "DESTROY_ON_START", cancelBefore);
+        MiningPathDiagnostics.logDestroyPhaseTransition(mod, this, pos, "TARGET_SELECTED", false, false);
 
         // Reset move checker and stuck check.
         _moveChecker.reset();
@@ -272,6 +308,7 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
                             "targetPosition", ChatClefDiagnostics.blockPos(pos),
                             "entity", ChatClefDiagnostics.entitySummary(entity));
                     // Request the block at the position to be marked as unreachable
+                    MiningPathDiagnostics.logBlockUnreachableRequest(mod, this, pos, 0, "PILLAGER_WOOL", this, null);
                     mod.getBlockScanner().requestBlockUnreachable(pos, 0);
                 }
             }
@@ -289,6 +326,7 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
         if (WorldHelper.isInNetherPortal()) {
             if (!mod.getClientBaritone().getPathingBehavior().isPathing()) {
                 setDebugState("Getting out from nether portal");
+                MiningPathDiagnostics.logDestroyPhaseTransition(mod, this, pos, "PORTAL_ESCAPE", false, false);
                 VisibleTaskDiagnostics.logDecision(mod, this, "destroy_block_nether_portal_hold_escape_inputs",
                         "targetPosition=" + ChatClefDiagnostics.blockPos(pos),
                         "targetPosition", ChatClefDiagnostics.blockPos(pos));
@@ -322,6 +360,7 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
                 // Release control of Baritone's custom goal process and explore process
                 mod.getClientBaritone().getCustomGoalProcess().onLostControl();
                 mod.getClientBaritone().getExploreProcess().onLostControl();
+                MiningPathDiagnostics.logDestroyPhaseTransition(mod, this, pos, "UNSTUCK_TASK_ACTIVE", false, false);
                 VisibleTaskDiagnostics.logReturnTask(mod, this, unstuckTask, "destroy_block_return_active_unstuck_task",
                         "targetPosition=" + ChatClefDiagnostics.blockPos(pos),
                         "targetPosition", ChatClefDiagnostics.blockPos(pos),
@@ -331,7 +370,42 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
         }
 
         // Check if the move checker or the stuck check failed
-        if (!_moveChecker.check(mod) || !stuckCheck.check(mod)) {
+        boolean moveCheckFirstResult = _moveChecker.check(mod);
+        boolean stuckCheckEvaluated = moveCheckFirstResult;
+        boolean stuckCheckResult = !stuckCheckEvaluated || stuckCheck.check(mod);
+        MiningPathDiagnostics.logMovementProgressCheckResult(
+                mod,
+                this,
+                pos,
+                "DESTROY_MOVE",
+                1,
+                true,
+                moveCheckFirstResult,
+                moveCheckFirstResult ? "PASS" : "MOVE_CHECK_FAILED",
+                true,
+                moveCheckFirstResult,
+                stuckCheckEvaluated,
+                stuckCheckEvaluated ? stuckCheckResult : "not_evaluated_short_circuit",
+                false,
+                "not_evaluated_yet");
+        if (stuckCheckEvaluated) {
+            MiningPathDiagnostics.logMovementProgressCheckResult(
+                    mod,
+                    this,
+                    pos,
+                    "DESTROY_STUCK",
+                    1,
+                    true,
+                    stuckCheckResult,
+                    stuckCheckResult ? "PASS" : "STUCK_CHECK_FAILED",
+                    true,
+                    moveCheckFirstResult,
+                    true,
+                    stuckCheckResult,
+                    false,
+                    "not_evaluated_yet");
+        }
+        if (!moveCheckFirstResult || !stuckCheckResult) {
             BlockPos blockStuck = stuckInBlock(mod);
             VisibleTaskDiagnostics.logProgress(mod, this, "destroy_block_progress_check_failed",
                     "targetPosition=" + ChatClefDiagnostics.blockPos(pos) + "|stuckBlock=" + ChatClefDiagnostics.blockPos(blockStuck),
@@ -349,13 +423,30 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
         }
 
         // Check if the move checker failed
-        if (!_moveChecker.check(mod)) {
+        boolean moveCheckSecondResult = _moveChecker.check(mod);
+        MiningPathDiagnostics.logMovementProgressCheckResult(
+                mod,
+                this,
+                pos,
+                "DESTROY_MOVE",
+                2,
+                true,
+                moveCheckSecondResult,
+                moveCheckSecondResult ? "PASS" : "MOVE_CHECK_FAILED",
+                true,
+                moveCheckFirstResult,
+                stuckCheckEvaluated,
+                stuckCheckEvaluated ? stuckCheckResult : "not_evaluated_short_circuit",
+                true,
+                moveCheckSecondResult);
+        if (!moveCheckSecondResult) {
             _moveChecker.reset();
             VisibleTaskDiagnostics.logProgress(mod, this, "destroy_block_move_checker_failed_request_unreachable",
                     "targetPosition=" + ChatClefDiagnostics.blockPos(pos),
                     "targetPosition", ChatClefDiagnostics.blockPos(pos),
                     "targetBlockState", ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(pos)));
             // Request the block at the position to be marked as unreachable
+            MiningPathDiagnostics.logBlockUnreachableRequest(mod, this, pos, 4, "DESTROY_MOVE_CHECK_FAILURE", this, null);
             mod.getBlockScanner().requestBlockUnreachable(pos);
         }
 
@@ -374,6 +465,9 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
         }
 
         Optional<Rotation> reach = LookHelper.getReach(pos);
+        String currentNavigationState = navigationState(mod, reach);
+        MiningPathDiagnostics.logDestroyNavigationState(mod, this, pos, currentNavigationState, reach.isPresent());
+        MiningPathDiagnostics.logDestroyPhaseTransition(mod, this, pos, diagnosticDestroyPhase(mod, reach, false), reach.isPresent(), false);
         if (reach.isPresent() && (mod.getPlayer().isTouchingWater() || mod.getPlayer().isOnGround()) && !mod.getFoodChain().needsToEat() && !WorldHelper.isInNetherPortal() && mod.getClientBaritone().getPathingBehavior().isSafeToCancel()) {
             setDebugState("Block in range, mining...");
             VisibleTaskDiagnostics.logDecision(mod, this, "destroy_block_in_range_mining",
@@ -428,6 +522,7 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
                     "baritonePathing", ChatClefDiagnostics.safeValue(() -> mod.getClientBaritone().getPathingBehavior().isPathing()),
                     "customGoalActive", ChatClefDiagnostics.safeValue(() -> mod.getClientBaritone().getCustomGoalProcess().isActive()),
                     "willRequestClickLeft", true);
+            MiningPathDiagnostics.logDestroyPhaseTransition(mod, this, pos, "BREAK_REQUESTED", true, false);
             mod.getClientBaritone().getInputOverrideHandler().setInputForceState(Input.CLICK_LEFT, true);
         } else {
             setDebugState("Getting to block...");
@@ -448,12 +543,14 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
                 VisibleTaskDiagnostics.logProgress(mod, this, "destroy_block_water_mining_request_unreachable",
                         "targetPosition=" + ChatClefDiagnostics.blockPos(pos),
                         "targetPosition", ChatClefDiagnostics.blockPos(pos));
+                MiningPathDiagnostics.logBlockUnreachableRequest(mod, this, pos, 4, "DESTROY_WATER_FAILURE", this, null);
                 mod.getBlockScanner().requestBlockUnreachable(pos);
                 mod.getInputControls().hold(Input.CLICK_LEFT);
             } else {
                 isMining = false;
             }
             boolean isCloseToMoveBack = pos.isWithinDistance(mod.getPlayer().getPos(), 2);
+            MiningPathDiagnostics.logDestroyPhaseTransition(mod, this, pos, diagnosticDestroyPhase(mod, reach, isCloseToMoveBack), reach.isPresent(), isCloseToMoveBack);
             if (isCloseToMoveBack) {
                 if (!mod.getClientBaritone().getPathingBehavior().isPathing() && !mod.getPlayer().isTouchingWater() &&
                         !mod.getFoodChain().needsToEat()) {
@@ -479,8 +576,13 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
                         "targetPosition", ChatClefDiagnostics.blockPos(pos),
                         "targetBlockState", ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(pos)),
                         "aboveBlockState", ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(pos.up())));
-                mod.getClientBaritone().getCustomGoalProcess().setGoalAndPath(mod.getWorld().getBlockState(pos.up()).getBlock() ==
-                        Blocks.SNOW ? new GoalBlock(pos) : new GoalNear(pos, 1));
+                Goal goal = mod.getWorld().getBlockState(pos.up()).getBlock() == Blocks.SNOW
+                        ? new GoalBlock(pos)
+                        : new GoalNear(pos, 1);
+                MiningPathDiagnostics.logGoalPathTransition(mod, this, pos, "GOAL_SUBMITTED", goal, "destroy_set_goal_and_path_before");
+                mod.getClientBaritone().getCustomGoalProcess().setGoalAndPath(goal);
+                MiningPathDiagnostics.logGoalPathTransition(mod, this, pos, "GOAL_BECAME_ACTIVE", goal, "destroy_set_goal_and_path_after");
+                MiningPathDiagnostics.logDestroyPhaseTransition(mod, this, pos, "GOAL_SUBMITTED", false, isCloseToMoveBack);
             }
         }
         return null;
@@ -501,7 +603,11 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
                 "interruptTask", ChatClefDiagnostics.taskSummary(interruptTask));
 
         // Cancel Baritone pathing
+        BaritonePathDiagnosticSnapshot cancelBefore = MiningPathDiagnostics.captureBaritoneSnapshot(mod, pos, null, "unavailable");
         mod.getClientBaritone().getPathingBehavior().forceCancel();
+        MiningPathDiagnostics.logExistingCancelBoundary(mod, this, pos, "DESTROY_ON_STOP", cancelBefore);
+        MiningPathDiagnostics.logDestroyPhaseTransition(mod, this, pos, "TASK_INTERRUPTED", false, false);
+        MiningPathDiagnostics.logDestroyLifetimeStop(mod, this, pos, interruptTask, "DESTROY_ON_STOP", cancelBefore);
 
         // If not in game, return
         if (!AltoClef.inGame()) {
@@ -582,5 +688,32 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
     @Override
     protected String toDebugString() {
         return "Destroy block at " + pos.toShortString();
+    }
+
+    private String diagnosticDestroyPhase(AltoClef mod, Optional<Rotation> reach, boolean isCloseToMoveBack) {
+        if (mod.getWorld().getBlockState(pos).isAir()) {
+            return "BLOCK_BECAME_AIR";
+        }
+        if (mod.getControllerExtras().isBreakingBlock()
+                && pos.equals(mod.getControllerExtras().getBreakingBlockPos())
+                && mod.getControllerExtras().getBreakingBlockProgress() > 0) {
+            return "BREAK_PROGRESS_STARTED";
+        }
+        if (reach.isPresent()) {
+            return "REACH_ACQUIRED";
+        }
+        if (mod.getClientBaritone().getPathingBehavior().isPathing()) {
+            return "PATHING_STARTED";
+        }
+        if (mod.getClientBaritone().getPathingBehavior().getPath().isPresent()) {
+            return "PATH_CALCULATION_SUCCEEDED";
+        }
+        if (mod.getClientBaritone().getCustomGoalProcess().isActive()) {
+            return "GOAL_SUBMITTED";
+        }
+        if (isCloseToMoveBack) {
+            return "GOAL_REACHED_NO_REACH";
+        }
+        return "TARGET_SELECTED";
     }
 }
