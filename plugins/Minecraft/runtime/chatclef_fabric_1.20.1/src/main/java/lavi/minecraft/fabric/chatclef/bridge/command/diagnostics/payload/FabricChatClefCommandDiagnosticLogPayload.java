@@ -19,7 +19,7 @@ public final class FabricChatClefCommandDiagnosticLogPayload {
             String event,
             FabricChatClefCommandExecution execution
     ) {
-        return execution(event, execution, emptyDetails());
+        return execution(event, execution, FabricChatClefCommandDiagnosticDetailsMapPayload.empty());
     }
 
     public static Map<String, Object> execution(
@@ -30,7 +30,7 @@ public final class FabricChatClefCommandDiagnosticLogPayload {
         return execution(event, execution, detailsMap(details));
     }
 
-    public static Map<String, Object> execution(
+    private static Map<String, Object> execution(
             String event,
             FabricChatClefCommandExecution execution,
             Map<String, Object> details
@@ -46,7 +46,7 @@ public final class FabricChatClefCommandDiagnosticLogPayload {
             String event,
             FabricChatClefCommandContext context
     ) {
-        return context(event, context, emptyDetails());
+        return context(event, context, FabricChatClefCommandDiagnosticDetailsMapPayload.empty());
     }
 
     public static Map<String, Object> context(
@@ -57,7 +57,7 @@ public final class FabricChatClefCommandDiagnosticLogPayload {
         return context(event, context, detailsMap(details));
     }
 
-    public static Map<String, Object> context(
+    private static Map<String, Object> context(
             String event,
             FabricChatClefCommandContext context,
             Map<String, Object> details

@@ -1,6 +1,7 @@
 package lavi.minecraft.fabric.chatclef.bridge.command.diagnostics;
 
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandContext;
+import lavi.minecraft.fabric.chatclef.bridge.command.diagnostics.payload.FabricChatClefCommandDiagnosticDetailsMapPayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.diagnostics.payload.FabricChatClefCommandDiagnosticLogPayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.execution.FabricChatClefCommandExecution;
 import lavi.minecraft.fabric.chatclef.bridge.diagnostics.FabricChatClefBridgeDiagnostics;
@@ -45,10 +46,7 @@ public final class FabricChatClefCommandDiagnostics {
             FabricChatClefCommandExecution execution,
             Map<String, Object> details
     ) {
-        diagnostics.info(
-                "command lifecycle "
-                        + FabricChatClefCommandDiagnosticLogPayload.execution(event, execution, details)
-        );
+        info(event, execution, FabricChatClefCommandDiagnosticDetailsMapPayload.from(details));
     }
 
     public void warn(
@@ -67,10 +65,7 @@ public final class FabricChatClefCommandDiagnostics {
             FabricChatClefCommandExecution execution,
             Map<String, Object> details
     ) {
-        diagnostics.warn(
-                "command lifecycle "
-                        + FabricChatClefCommandDiagnosticLogPayload.execution(event, execution, details)
-        );
+        warn(event, execution, FabricChatClefCommandDiagnosticDetailsMapPayload.from(details));
     }
 
     public void contextInfo(
@@ -89,10 +84,7 @@ public final class FabricChatClefCommandDiagnostics {
             FabricChatClefCommandContext context,
             Map<String, Object> details
     ) {
-        diagnostics.info(
-                "command lifecycle "
-                        + FabricChatClefCommandDiagnosticLogPayload.context(event, context, details)
-        );
+        contextInfo(event, context, FabricChatClefCommandDiagnosticDetailsMapPayload.from(details));
     }
 
     public void contextWarn(
@@ -111,9 +103,6 @@ public final class FabricChatClefCommandDiagnostics {
             FabricChatClefCommandContext context,
             Map<String, Object> details
     ) {
-        diagnostics.warn(
-                "command lifecycle "
-                        + FabricChatClefCommandDiagnosticLogPayload.context(event, context, details)
-        );
+        contextWarn(event, context, FabricChatClefCommandDiagnosticDetailsMapPayload.from(details));
     }
 }

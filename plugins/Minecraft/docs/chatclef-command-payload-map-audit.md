@@ -39,8 +39,17 @@ additive typing can be done later without changing the wire contract.
   work.
 - Do not move or repackage upstream-derived ChatClef, AltoClef, TaskRunner, or
   Baritone code as part of payload typing.
-- Prefer Java value objects or records internally, then serialize to the
-  existing map shape at the transport edge.
+- For newly added LAVI-owned command lifecycle, ownership, task observation, or
+  diagnostic payload classes, prefer typed Java payload objects or records from
+  the start, then serialize to the existing map shape only at the log,
+  diagnostic-data, or transport edge.
+- Do not use new raw `Map<String, Object>` payload assembly as the primary
+  implementation for those new classes unless the class is explicitly a
+  compatibility adapter, request metadata boundary, protocol parser, or final
+  serialization edge.
+- Do not use this new-class typing rule as permission to mass-type existing
+  command lifecycle, ownership, or task observation payloads while their log
+  field names and nested shapes are active debugging evidence.
 - Keep Python DTOs as the receiving authority for the current v1 protocol.
 
 ## Current Wire Contracts
@@ -323,6 +332,7 @@ command/lifecycle/FabricChatClefLifecycleDetailsPayload
 command/lifecycle/details/*
 command/lifecycle/details/FabricChatClefTaskFinishedEventDetailsPayload
 command/diagnostics/payload/FabricChatClefCommandDiagnosticLogPayload
+command/diagnostics/payload/FabricChatClefCommandDiagnosticDetailsMapPayload
 ```
 
 These helpers centralize field names and keep typed values local until the
@@ -335,6 +345,11 @@ expansion. Command lifecycle detail objects pass through
 `FabricChatClefCommandDiagnostics` emits the log line. They do not rename
 emitted keys, change status values, or alter lifecycle, timeout, retry, task
 observation, or ownership behavior.
+
+Legacy raw diagnostic detail maps are isolated behind
+`FabricChatClefCommandDiagnosticDetailsMapPayload` at the diagnostics facade
+compatibility edge. This preserves the existing `details` object shape while
+keeping new lifecycle call sites on typed detail payloads.
 
 The command lifecycle detail facade now delegates event-specific detail
 payloads to `command/lifecycle/details/*` so each lifecycle event owns its own
