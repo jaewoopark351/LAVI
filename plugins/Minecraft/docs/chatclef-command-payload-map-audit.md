@@ -341,6 +341,7 @@ command/lifecycle/FabricChatClefCommandDeadlinePayload
 command/lifecycle/FabricChatClefCommandLifecyclePayload
 command/lifecycle/FabricChatClefLifecycleDetailsPayload
 command/lifecycle/details/*
+command/lifecycle/payload/FabricChatClefCommandDeadlinePayloadMap
 command/lifecycle/payload/FabricChatClefCommandLifecyclePayloadMap
 command/lifecycle/payload/FabricChatClefCommandTerminationObservationPayload
 command/lifecycle/details/FabricChatClefTaskFinishedEventDetailsPayload
@@ -395,6 +396,12 @@ map field ownership to `command/lifecycle/payload/*`. This folderization keeps
 the existing `result_fidelity`, ownership, task snapshot, and
 `task_finished_observation` shapes unchanged while separating lifecycle state
 from the serialization edge.
+
+Deadline exceeded result data follows the same lifecycle payload pattern:
+`FabricChatClefCommandDeadlinePayload` preserves the value wrapper while
+`command/lifecycle/payload/FabricChatClefCommandDeadlinePayloadMap` owns the
+existing `automation_cancelled`, `task_may_still_be_running`, and
+`late_terminal_event_will_be_ignored` map keys.
 
 Command ownership and task observation value objects follow the same pattern:
 the public value object remains in its existing package, while final map key
