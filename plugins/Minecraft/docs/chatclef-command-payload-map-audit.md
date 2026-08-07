@@ -344,6 +344,7 @@ command/lifecycle/details/*
 command/lifecycle/payload/FabricChatClefCommandDeadlinePayloadMap
 command/lifecycle/payload/FabricChatClefCommandLifecyclePayloadMap
 command/lifecycle/payload/FabricChatClefCommandTerminationObservationPayload
+command/lifecycle/payload/FabricChatClefCommandTerminationObservationPayloadMap
 command/lifecycle/details/FabricChatClefTaskFinishedEventDetailsPayload
 command/lifecycle/details/payload/*
 command/lifecycle/observation/FabricChatClefTaskFinishedObservationPayload
@@ -402,6 +403,12 @@ Deadline exceeded result data follows the same lifecycle payload pattern:
 `command/lifecycle/payload/FabricChatClefCommandDeadlinePayloadMap` owns the
 existing `automation_cancelled`, `task_may_still_be_running`, and
 `late_terminal_event_will_be_ignored` map keys.
+
+Termination observations now keep their value wrapper in
+`FabricChatClefCommandTerminationObservationPayload` and delegate final field
+ownership to `command/lifecycle/payload/FabricChatClefCommandTerminationObservationPayloadMap`.
+The emitted `completion_source`, `termination_kind`, stop-state, duration, and
+`task` fields remain unchanged.
 
 Command ownership and task observation value objects follow the same pattern:
 the public value object remains in its existing package, while final map key

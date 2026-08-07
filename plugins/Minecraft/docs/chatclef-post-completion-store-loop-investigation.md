@@ -417,6 +417,134 @@ Do not add more detailed ToolSet, InventorySubTracker, or tool-save-policy
 fields before reducing their emission volume. Those diagnostics already show
 that the hot path is being exercised.
 
+## Added Diagnostic Events
+
+The follow-up diagnostics added for this investigation are log-only events.
+They do not change `command_request`, `command_result`, status values, task
+selection, retry, timeout, Baritone goal/path ownership, input state, container
+clicks, or cleanup behavior.
+
+```text
+USER_TASK_CHAIN_TASK_ORIGIN_DECISION
+    owner=user_task_chain
+    mode=BOUNDARY
+    trigger=runTask_before_assignment
+    dedupe_key=user_task_chain_origin|...
+    max_emission=one_per_runTask_call
+    correlation=incomingTaskIdentity=<identity>
+    payload=flat_fields
+    terminal=false
+    behavior_effect=none
+```
+
+Required comparison fields:
+
+```text
+previousTask
+incomingTask
+previousTaskWasRunningIdle
+incomingMarkedIdleByNextFlag
+incomingWillConsumeNextIdleFlag
+incomingTaskOriginHint
+incomingCommandHint
+originIdleCommand
+incomingOnFinishPresent
+callerSummary
+commandContextAvailable
+commandRequestId
+commandCorrelationId
+commandText
+commandContextError
+```
+
+This event is emitted before `UserTaskChain.runTask()` consumes
+`nextTaskIdleFlag`, so it separates "previous task was idle" from "incoming
+task was actually created by the idle command".
+
+```text
+STORE_IN_ANY_CONTAINER_START
+STORE_IN_ANY_CONTAINER_BRANCH
+STORE_IN_ANY_CONTAINER_PROGRESS_STATE
+STORE_IN_ANY_CONTAINER_REPEAT_SUMMARY
+STORE_IN_ANY_CONTAINER_STOP
+STORE_IN_ANY_CONTAINER_DIAGNOSTIC_CAP_REACHED
+    owner=store_in_any_container_observer
+    mode=BOUNDARY
+    trigger=<start|branch|progress_state|repeat_summary|stop|session_cap>
+    dedupe_key=STORE_IN_ANY_CONTAINER_BRANCH|...
+    max_emission=detail_per_bucket=1,session=512,summary_ticks=200
+    correlation=storeTaskIdentity=<identity>
+    payload=flat_fields
+    terminal=true only for STOP
+    behavior_effect=none
+```
+
+Required branch comparison fields:
+
+```text
+getIfNotPresent
+toStore
+notStored
+notStoredCount
+storedCountByTarget
+closestContainerPresent
+closestContainerPosition
+closestWithinRange
+currentTryWithinExtraRange
+currentChestTry
+dungeonChestCacheSize
+nonDungeonChestCacheSize
+playerPosition
+progressCheckOk
+progressFailureWillRequestUnreachable
+childTaskClass
+requestedItem
+requestedCount
+containerBlockItem
+missingTarget
+inventoryNeed
+inventoryCount
+```
+
+These events are intentionally separate from command lifecycle payloads. They
+must remain additive and bounded while the current logs are active evidence.
+
+```text
+DEPOSIT_COMMAND_INVOCATION_DECISION
+    owner=deposit_command_observer
+    mode=BOUNDARY
+    trigger=before_runUserTask
+    dedupe_key=deposit_command_invocation|<task identity>
+    max_emission=one_per_deposit_command_invocation
+    correlation=taskToRunIdentity=<identity>
+    payload=flat_fields
+    terminal=false
+    behavior_effect=none
+```
+
+This event proves whether `DepositCommand` explicitly created the
+`StoreInAnyContainerTask` later seen in `UserTaskChain.runTask()`. It is emitted
+before `runUserTask()` and does not change command parsing, task selection, or
+completion callback behavior.
+
+```text
+CRAFTING_TABLE_ROUTE_RETRY_SUMMARY
+    owner=crafting_table_route_observer
+    mode=BOUNDARY
+    trigger=<first_route_observation|route_retry_summary>
+    dedupe_key=crafting_table_route_retry|...
+    max_emission=first_and_summary_ticks=200,session=256
+    correlation=containerTaskIdentity=<identity>
+    payload=flat_fields
+    terminal=false
+    behavior_effect=none
+```
+
+This event summarizes stable `DoCraftInTableTask` crafting-table routing
+choices from the already computed `DoStuffInContainerTask` branch fields. It
+does not recalculate routes, change `costToMakeNew`, change Baritone goals, or
+modify container interaction.
+
 ## Behavior Fix Priority, If Later Approved
 
 The current evidence supports this investigation order:

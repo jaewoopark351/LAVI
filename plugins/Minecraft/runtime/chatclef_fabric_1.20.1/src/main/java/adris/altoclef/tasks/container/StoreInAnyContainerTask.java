@@ -11,6 +11,7 @@ import adris.altoclef.util.ItemTarget;
 import adris.altoclef.util.helpers.ItemHelper;
 import adris.altoclef.util.helpers.WorldHelper;
 import adris.altoclef.util.progresscheck.MovementProgressChecker;
+import lavi.minecraft.diagnostics.container.store.StoreInAnyContainerDiagnostics;
 import net.minecraft.block.Block;
 import net.minecraft.block.Blocks;
 import net.minecraft.item.Items;
@@ -45,6 +46,7 @@ public class StoreInAnyContainerTask extends Task {
 
     @Override
     protected void onStart() {
+        StoreInAnyContainerDiagnostics.logStart(this, _getIfNotPresent, _toStore);
         _storedItems.startTracking();
         _dungeonChests.clear();
         _nonDungeonChests.clear();
@@ -58,7 +60,25 @@ public class StoreInAnyContainerTask extends Task {
         if (_getIfNotPresent) {
             for (ItemTarget target : _toStore) {
                 int inventoryNeed = target.getTargetCount() - _storedItems.getStoredCount(target.getMatches());
-                if (inventoryNeed > mod.getItemStorage().getItemCount(target)) {
+                int inventoryCount = mod.getItemStorage().getItemCount(target);
+                if (inventoryNeed > inventoryCount) {
+                    StoreInAnyContainerDiagnostics.logBranch("return_get_missing_item",
+                            mod,
+                            this,
+                            _getIfNotPresent,
+                            _toStore,
+                            null,
+                            _storedItems,
+                            null,
+                            false,
+                            false,
+                            _currentChestTry,
+                            _dungeonChests.size(),
+                            _nonDungeonChests.size(),
+                            "missingTarget", target,
+                            "inventoryNeed", inventoryNeed,
+                            "inventoryCount", inventoryCount,
+                            "childTaskClass", "TaskCatalogue.getItemTask");
                     return TaskCatalogue.getItemTask(new ItemTarget(target, inventoryNeed));
                 }
             }
@@ -103,11 +123,31 @@ public class StoreInAnyContainerTask extends Task {
         };
 
         Optional<BlockPos> closest = mod.getBlockScanner().getNearestBlock(StoreInContainerTask.CONTAINER_BLOCKS);
-        if (closest.isPresent() && (closest.get().isWithinDistance(mod.getPlayer().getPos(), TOO_FAR_RANGE) || (_currentChestTry != null && _currentChestTry.isWithinDistance(mod.getPlayer().getPos(), TOO_FAR_RANGE_EXTRA)))) {
+        boolean closestWithinRange = closest.isPresent() && closest.get().isWithinDistance(mod.getPlayer().getPos(), TOO_FAR_RANGE);
+        boolean currentTryWithinExtraRange = _currentChestTry != null && _currentChestTry.isWithinDistance(mod.getPlayer().getPos(), TOO_FAR_RANGE_EXTRA);
+        if (closest.isPresent() && (closestWithinRange || currentTryWithinExtraRange)) {
 
             setDebugState("Going to container and depositing items");
 
-            if (!_progressChecker.check(mod) && _currentChestTry != null) {
+            boolean progressCheckOk = _progressChecker.check(mod);
+            StoreInAnyContainerDiagnostics.logBranch("return_open_existing_container",
+                    mod,
+                    this,
+                    _getIfNotPresent,
+                    _toStore,
+                    notStored,
+                    _storedItems,
+                    closest.get(),
+                    closestWithinRange,
+                    currentTryWithinExtraRange,
+                    _currentChestTry,
+                    _dungeonChests.size(),
+                    _nonDungeonChests.size(),
+                    "progressCheckOk", progressCheckOk,
+                    "progressFailureWillRequestUnreachable", !progressCheckOk && _currentChestTry != null,
+                    "childTaskClass", DoToClosestBlockTask.class.getName());
+
+            if (!progressCheckOk && _currentChestTry != null) {
                 Debug.logMessage("Failed to open container. Suggesting it may be unreachable.");
                 mod.getBlockScanner().requestBlockUnreachable(_currentChestTry, 2);
                 _currentChestTry = null;
@@ -129,7 +169,23 @@ public class StoreInAnyContainerTask extends Task {
         _progressChecker.reset();
         // Craft + place chest nearby
         for (Block couldPlace : StoreInContainerTask.CONTAINER_BLOCKS) {
-            if (mod.getItemStorage().hasItem(couldPlace.asItem())) {
+            boolean hasContainerBlockItem = mod.getItemStorage().hasItem(couldPlace.asItem());
+            if (hasContainerBlockItem) {
+                StoreInAnyContainerDiagnostics.logBranch("return_place_container_nearby",
+                        mod,
+                        this,
+                        _getIfNotPresent,
+                        _toStore,
+                        notStored,
+                        _storedItems,
+                        null,
+                        false,
+                        false,
+                        _currentChestTry,
+                        _dungeonChests.size(),
+                        _nonDungeonChests.size(),
+                        "containerBlockItem", couldPlace.asItem(),
+                        "childTaskClass", PlaceBlockNearbyTask.class.getName());
                 setDebugState("Placing container nearby");
                 return new PlaceBlockNearbyTask(canPlace -> {
                     // For chests, above must be air OR breakable.
@@ -141,6 +197,22 @@ public class StoreInAnyContainerTask extends Task {
             }
         }
         setDebugState("Obtaining a chest item (by default)");
+        StoreInAnyContainerDiagnostics.logBranch("return_obtain_chest_item",
+                mod,
+                this,
+                _getIfNotPresent,
+                _toStore,
+                notStored,
+                _storedItems,
+                null,
+                false,
+                false,
+                _currentChestTry,
+                _dungeonChests.size(),
+                _nonDungeonChests.size(),
+                "requestedItem", Items.CHEST,
+                "requestedCount", 1,
+                "childTaskClass", "TaskCatalogue.getItemTask");
         return TaskCatalogue.getItemTask(Items.CHEST, 1);
     }
 
@@ -152,6 +224,7 @@ public class StoreInAnyContainerTask extends Task {
 
     @Override
     protected void onStop(Task interruptTask) {
+        StoreInAnyContainerDiagnostics.logStop(this, interruptTask, _getIfNotPresent, _toStore);
         _storedItems.stopTracking();
     }
 

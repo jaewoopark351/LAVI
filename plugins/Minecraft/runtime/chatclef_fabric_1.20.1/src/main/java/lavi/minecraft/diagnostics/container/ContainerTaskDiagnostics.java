@@ -4,6 +4,7 @@ import adris.altoclef.AltoClef;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.ItemTarget;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.diagnostics.container.crafting.CraftingTableRouteRetryDiagnostics;
 import lavi.minecraft.integration.carryon.CarryOnDiagnostics;
 import lavi.minecraft.integration.carryon.CarryOnObservation;
 import net.minecraft.block.Block;
@@ -31,6 +32,8 @@ public final class ContainerTaskDiagnostics {
         }
 
         CarryOnObservation carryOn = observeCarryOn();
+        CraftingTableRouteRetryDiagnostics.observe(eventName, reason, stateKey, mod, task, containerTarget,
+                containerBlocks, branchFields);
         String repeatKey = ContainerTaskDiagnosticFields.repeatKey(
                 eventName,
                 reason,

@@ -8,6 +8,7 @@ import adris.altoclef.util.ItemTarget;
 import adris.altoclef.util.helpers.ItemHelper;
 import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.slots.PlayerSlot;
+import lavi.minecraft.diagnostics.command.deposit.DepositCommandDiagnostics;
 import net.minecraft.block.Block;
 import net.minecraft.block.Blocks;
 import net.minecraft.item.Item;
@@ -109,6 +110,10 @@ public class DepositCommand extends Command {
         // // Store in the nearby container
         // mod.runUserTask(new StoreInContainerTask(container.get(), false, items), this::finish);
 
-        mod.runUserTask(new StoreInAnyContainerTask(false, items), this::finish);
+        StoreInAnyContainerTask storeTask = new StoreInAnyContainerTask(false, items);
+        //20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
+        // trace-20260807-deposit-origin: diagnostics-only attribution for post-completion store loops.
+        DepositCommandDiagnostics.logInvocation(mod, itemList != null, items, storeTask);
+        mod.runUserTask(storeTask, this::finish);
     }
 }

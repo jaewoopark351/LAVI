@@ -7,11 +7,14 @@ import net.minecraft.block.Block;
 import net.minecraft.item.ItemStack;
 import net.minecraft.registry.Registries;
 
+import java.util.Locale;
+
 //20260805_kpopmodder: Bound tool-save snapshot diagnostics without reading live inventory from worker threads.
 public final class ToolSavePolicySnapshotDiagnostics {
     private static final Object LOCK = new Object();
+    private static final ToolSavePolicySnapshotEmissionLimiter CONSUMED_LIMITER =
+            new ToolSavePolicySnapshotEmissionLimiter();
     private static String lastPublishedFingerprint = "";
-    private static String lastConsumedFingerprint = "";
 
     private ToolSavePolicySnapshotDiagnostics() {
     }
@@ -49,19 +52,41 @@ public final class ToolSavePolicySnapshotDiagnostics {
         if (!ChatClefDiagnostics.isBoundaryEnabled() || snapshot == null) {
             return;
         }
-        String fingerprint = "consume|"
-                + snapshot.generation()
-                + "|" + snapshot.ready()
-                + "|" + snapshot.hasDiamondPickaxe()
-                + "|" + snapshot.status()
-                + "|" + Thread.currentThread().getName()
-                + "|" + decisionReason
-                + "|" + shouldSave;
-        synchronized (LOCK) {
-            if (fingerprint.equals(lastConsumedFingerprint)) {
-                return;
-            }
-            lastConsumedFingerprint = fingerprint;
+        String repeatKey = consumedRepeatKey(snapshot, block, stack, decisionReason, shouldSave);
+        ToolSavePolicySnapshotEmissionLimiter.Decision decision = CONSUMED_LIMITER.evaluate(repeatKey);
+        if (decision.emitCap) {
+            ChatClefDiagnostics.logBoundary(
+                    "TOOL_SAVE_POLICY_SNAPSHOT_DIAGNOSTIC_CAP_REACHED",
+                    "tool_save_policy_snapshot_diagnostic_cap_reached",
+                    null,
+                    ChatClefDiagnostics.withCommandContextFields(new Object[]{
+                            "capScope", "tool_save_policy_snapshot_consumed",
+                            "cap", ToolSavePolicySnapshotEmissionLimiter.SESSION_HARD_CAP,
+                            "maxEmission", maxEmissionDescription(),
+                            "behavior_effect", "none"
+                    })
+            );
+            return;
+        }
+        if (decision.emitSummary) {
+            ChatClefDiagnostics.logBoundary(
+                    "TOOL_SAVE_POLICY_SNAPSHOT_CONSUMED_REPEAT_SUMMARY",
+                    "tool_save_policy_snapshot_consumed_repeat_summary",
+                    null,
+                    ChatClefDiagnostics.withCommandContextFields(new Object[]{
+                            "capScope", "tool_save_policy_snapshot_consumed",
+                            "repeatKey", repeatKey,
+                            "suppressedRepeatCount", decision.suppressedRepeatCount,
+                            "firstObservedTick", decision.firstObservedTick,
+                            "lastObservedTick", decision.lastObservedTick,
+                            "maxEmission", maxEmissionDescription(),
+                            "behavior_effect", "none"
+                    })
+            );
+            return;
+        }
+        if (!decision.emitEvent) {
+            return;
         }
         ChatClefDiagnostics.logBoundary(
                 "TOOL_SAVE_POLICY_SNAPSHOT_CONSUMED",
@@ -69,6 +94,13 @@ public final class ToolSavePolicySnapshotDiagnostics {
                 null,
                 ChatClefDiagnostics.withCommandContextFields(
                         merge(snapshotFields(snapshot), new Object[]{
+                                "dedupeKey", repeatKey,
+                                "maxEmission", maxEmissionDescription(),
+                                "summary", false,
+                                "suppressedRepeatCount", decision.suppressedRepeatCount,
+                                "firstObservedTick", decision.firstObservedTick,
+                                "lastObservedTick", decision.lastObservedTick,
+                                "behavior_effect", "none",
                                 "consumerThreadName", Thread.currentThread().getName(),
                                 "consumerThreadId", Thread.currentThread().getId(),
                                 "decisionReason", decisionReason,
@@ -89,6 +121,47 @@ public final class ToolSavePolicySnapshotDiagnostics {
                         })
                 )
         );
+    }
+
+    private static String consumedRepeatKey(ToolSavePolicySnapshot snapshot,
+                                            Block block,
+                                            ItemStack stack,
+                                            String decisionReason,
+                                            boolean shouldSave) {
+        return "consume|"
+                + snapshot.generation()
+                + "|" + snapshot.ready()
+                + "|" + snapshot.hasDiamondPickaxe()
+                + "|" + snapshot.status()
+                + "|thread=" + threadCategory()
+                + "|decision=" + decisionReason
+                + "|shouldSave=" + shouldSave
+                + "|block=" + blockId(block)
+                + "|requirement=" + ToolMiningDiagnosticFieldValues.minimumMiningRequirement(block)
+                + "|tool=" + itemId(stack)
+                + "|critical=" + ToolMiningDiagnosticFieldValues.durabilityThresholdReached(stack, 8)
+                + "|low=" + ToolMiningDiagnosticFieldValues.durabilityThresholdReached(stack, 30)
+                + "|iron=" + ToolMiningDiagnosticFieldValues.isIronPickaxe(stack)
+                + "|empty=" + (stack == null ? "unavailable" : stack.isEmpty());
+    }
+
+    private static String threadCategory() {
+        String threadName = Thread.currentThread().getName();
+        if ("Render thread".equals(threadName) || "Client thread".equals(threadName)) {
+            return "minecraft_client";
+        }
+        String normalized = threadName == null ? "" : threadName.toLowerCase(Locale.ROOT);
+        if (normalized.contains("baritone")) {
+            return "baritone_worker";
+        }
+        if (normalized.contains("worker")) {
+            return "worker";
+        }
+        return normalized.isEmpty() ? "unknown" : "other";
+    }
+
+    private static String maxEmissionDescription() {
+        return "detail_per_bucket=256,session=5000,summary_ticks=200";
     }
 
     private static Object[] snapshotFields(ToolSavePolicySnapshot snapshot) {
