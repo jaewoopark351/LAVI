@@ -80,6 +80,27 @@ Codex must read and apply this document before proposing or modifying
 ChatClef, AltoClef, Baritone interaction, Carry On integration, or related
 diagnostic behavior.
 
+<!-- 20260807_kpopmodder: Added clean forced build verification requirements for Fabric ChatClef 1.20.1. -->
+
+Required build verification runbook:
+
+[Fabric ChatClef 1.20.1 Build Verification](plugins/Minecraft/docs/chatclef-fabric-build-verification.md)
+
+Codex must read and apply this runbook before running or evaluating a Fabric
+ChatClef 1.20.1 runtime build. Build execution still requires separate
+authorization. When an authorized build is used as compatibility evidence, run
+from the runtime root:
+
+```bat
+.\gradlew.bat clean build --rerun-tasks
+```
+
+Do not treat incremental Gradle success as sufficient proof. Preprocess/remap
+outputs and Mixin targets can be stale, and Gradle success does not prove
+runtime Mixin injection. Verify the fresh 1.20.1 jar copied into the active
+CurseForge instance, then inspect Minecraft logs and any crash report after
+launch.
+
 Required operational troubleshooting note:
 
 [ChatClef / Baritone Cache Troubleshooting](plugins/Minecraft/docs/chatclef-baritone-cache-troubleshooting.md)
