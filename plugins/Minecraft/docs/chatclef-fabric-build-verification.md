@@ -41,6 +41,37 @@ Incremental, compile-only, or targeted Gradle tasks may be used only as quick
 local sanity checks when separately authorized. They must not be reported as
 runtime verification, deployment verification, or compatibility evidence.
 
+## PowerShell Execution Baseline
+
+For local verification on the Windows development PC, prefer a normal external
+Windows PowerShell session from the runtime root. Treat VSCode integrated
+terminals, Codex sandboxed shells, and other embedded shells as secondary
+execution environments that may have different file access, Gradle cache,
+network, Java, or environment state.
+
+The preferred PowerShell verification command is:
+
+```powershell
+cd C:\Vtuber_Souorce_Code\LAVI\plugins\Minecraft\runtime\chatclef_fabric_1.20.1
+.\gradlew.bat clean build --rerun-tasks --no-build-cache --no-daemon --stacktrace
+```
+
+If an embedded shell fails before Java compilation, first classify the failure
+by boundary before treating it as a source or Mixin problem. Examples of
+environment-boundary failures include:
+
+```text
+access denied for C:\Users\<user>\.gradle\wrapper\dists\...\*.lck
+plugin resolution failure for fabric-loom or another Gradle plugin
+network, Maven, or Gradle cache metadata lookup failure
+Java or PATH differences between shells
+```
+
+When an external PowerShell run completes with `BUILD SUCCESSFUL` after an
+embedded-shell failure, report the embedded-shell result as an environment or
+dependency-resolution failure unless the same source, compile, remap, or Mixin
+failure reproduces in the PowerShell baseline.
+
 ## Why Incremental Success Is Not Sufficient
 
 This runtime preprocesses source across multiple Minecraft versions and then
