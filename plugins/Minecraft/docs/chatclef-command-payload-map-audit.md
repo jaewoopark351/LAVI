@@ -344,6 +344,7 @@ command/lifecycle/details/*
 command/lifecycle/payload/FabricChatClefCommandLifecyclePayloadMap
 command/lifecycle/payload/FabricChatClefCommandTerminationObservationPayload
 command/lifecycle/details/FabricChatClefTaskFinishedEventDetailsPayload
+command/lifecycle/details/payload/*
 command/lifecycle/observation/FabricChatClefTaskFinishedObservationPayload
 command/diagnostics/payload/FabricChatClefCommandDiagnosticLogPayload
 command/diagnostics/payload/FabricChatClefCommandDiagnosticDetailsMapPayload
@@ -368,6 +369,13 @@ keeping new lifecycle call sites on typed detail payloads.
 The command lifecycle detail facade now delegates event-specific detail
 payloads to `command/lifecycle/details/*` so each lifecycle event owns its own
 field serialization before the final diagnostic map edge.
+
+The lifecycle detail value objects now keep event-specific values in
+`command/lifecycle/details/*` and delegate final map key ownership to
+`command/lifecycle/details/payload/*`. This keeps active detail fields such as
+`exception_type`, `queue_active_request_id`, `decision_reason`, `terminal_sent`,
+and `task_finished_event` unchanged while separating event value ownership from
+map serialization.
 
 Empty lifecycle detail payloads also use
 `FabricChatClefLifecycleDetailsPayload.empty()` before expanding to the same
