@@ -1,6 +1,7 @@
 package lavi.minecraft.fabric.chatclef.bridge.command.lifecycle;
 
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandContext;
+import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.observation.FabricChatClefTaskFinishedObservationPayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskSnapshot;
 import lavi.minecraft.fabric.chatclef.bridge.command.result.FabricChatClefCommandResultDataPayload;
 
@@ -110,6 +111,8 @@ public final class FabricChatClefCommandLifecyclePayload implements FabricChatCl
 
     @Override
     public Map<String, Object> toMap() {
+        FabricChatClefTaskFinishedObservationPayload taskFinishedObservation =
+                FabricChatClefTaskFinishedObservationPayload.from(observation);
         Map<String, Object> payload = new HashMap<>();
         payload.put(RESULT_FIDELITY, RESULT_FIDELITY_VALUE);
         payload.put(RESULT_REASON, resultReason);
@@ -125,11 +128,8 @@ public final class FabricChatClefCommandLifecyclePayload implements FabricChatCl
         payload.put(TASK_AFTER_DISPATCH, taskAfterDispatch.toMap());
         payload.put(TERMINAL_TASK, terminalTask.toMap());
         payload.put(BOUND_ROOT_TASK, boundRootTask.toMap());
-        payload.put(TASK_FINISHED_EVENT_RECEIVED, observation != null);
-        payload.put(
-                TASK_FINISHED_OBSERVATION,
-                observation == null ? new HashMap<String, Object>() : observation.toMap()
-        );
+        payload.put(TASK_FINISHED_EVENT_RECEIVED, taskFinishedObservation.received());
+        payload.put(TASK_FINISHED_OBSERVATION, taskFinishedObservation.toMap());
         return payload;
     }
 }

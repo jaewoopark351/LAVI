@@ -18,10 +18,24 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(ClientPlayerEntity.class)
 public class PlayerDamageMixin {
     
+    //#if MC>12002
     @Inject(
         method = "damage",
         at = @At("HEAD")
     )
+    //#elseif MC >= 12001
+    //$$ //20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
+    //$$ @Inject(
+    //$$     method = "method_5643(Lnet/minecraft/class_1282;F)Z",
+    //$$     at = @At("HEAD"),
+    //$$     remap = false
+    //$$ )
+    //#else
+    //$$ @Inject(
+    //$$     method = "damage",
+    //$$     at = @At("HEAD")
+    //$$ )
+    //#endif
     public void applyDamage(DamageSource source, float amount, CallbackInfoReturnable<Boolean> ci) {
         // System.out.println("DAMAGED: " + source.getAttacker() + " " + source.getName());
         // PlayerEntity p = (PlayerEntity) ((Object)this);

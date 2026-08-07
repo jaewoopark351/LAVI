@@ -18,7 +18,14 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(ClientPlayNetworkHandler.class)
 public abstract class EntityAnimationSwungMixin {
 
+    //#if MC>12002
     @Inject(method = "onEntityAnimation", at = @At("HEAD"))
+    //#elseif MC >= 12001
+    //$$ //20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
+    //$$ @Inject(method = "method_11160(Lnet/minecraft/class_2616;)V", at = @At("HEAD"), remap = false)
+    //#else
+    //$$ @Inject(method = "onEntityAnimation", at = @At("HEAD"))
+    //#endif
     private void onEntityAnimation(EntityAnimationS2CPacket packet, CallbackInfo ci) {
         MinecraftClient client = MinecraftClient.getInstance();
         Entity entity = client.world.getEntityById(packet.getEntityId());

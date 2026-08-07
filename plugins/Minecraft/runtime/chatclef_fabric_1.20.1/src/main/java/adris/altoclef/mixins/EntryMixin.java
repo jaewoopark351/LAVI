@@ -16,7 +16,14 @@ public class EntryMixin {
     @Unique
     private static boolean _initialized = false;
 
+    //#if MC>12002
     @Inject(at = @At("HEAD"), method = "init()V")
+    //#elseif MC >= 12001
+    //$$ //20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
+    //$$ @Inject(at = @At("HEAD"), method = "method_25426()V", remap = false)
+    //#else
+    //$$ @Inject(at = @At("HEAD"), method = "init()V")
+    //#endif
     private void init(CallbackInfo info) {
         if (!_initialized) {
             _initialized = true;

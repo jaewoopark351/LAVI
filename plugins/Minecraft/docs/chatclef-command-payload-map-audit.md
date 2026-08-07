@@ -339,6 +339,7 @@ command/lifecycle/FabricChatClefCommandLifecyclePayload
 command/lifecycle/FabricChatClefLifecycleDetailsPayload
 command/lifecycle/details/*
 command/lifecycle/details/FabricChatClefTaskFinishedEventDetailsPayload
+command/lifecycle/observation/FabricChatClefTaskFinishedObservationPayload
 command/diagnostics/payload/FabricChatClefCommandDiagnosticLogPayload
 command/diagnostics/payload/FabricChatClefCommandDiagnosticDetailsMapPayload
 ```
@@ -368,6 +369,12 @@ Empty lifecycle detail payloads also use
 `{}` details map at the log edge. This prevents new lifecycle call sites from
 assembling raw empty `Map<String, Object>` details directly while preserving the
 current emitted shape.
+
+Optional task-finished observations in command lifecycle result data use
+`command/lifecycle/observation/FabricChatClefTaskFinishedObservationPayload`
+before expanding to the existing `task_finished_event_received` boolean and
+`task_finished_observation` object. Missing observations still serialize as
+`task_finished_observation={}`.
 
 ### Lifecycle And Gate Logs
 

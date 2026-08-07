@@ -19,13 +19,19 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(Block.class)
 public class BlockModifiedByPlayerMixin {
 
+    //#if MC>12002
     @Inject(
             method = "onBreak",
             at = @At("HEAD")
     )
-    //#if MC>12002
     public void onBlockBroken(World world, BlockPos pos, BlockState state, PlayerEntity player, CallbackInfoReturnable<BlockState> cir) {
     //#else
+    //$$ //20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
+    //$$ @Inject(
+    //$$         method = "method_9576",
+    //$$         at = @At("HEAD"),
+    //$$         remap = false
+    //$$ )
     //$$ public void onBlockBroken(World world, BlockPos pos, BlockState state, PlayerEntity player, CallbackInfo ci) {
     //#endif
         if (player.getWorld() == world) {

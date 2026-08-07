@@ -4,7 +4,7 @@
 
 ## Current Status
 
-Verification status: APPLIED_NOT_BUILT
+Verification status: BUILT_NOT_RUNTIME_REPRODUCED
 
 Active behavior-changing engine divergence: PRESENT
 
@@ -16,10 +16,16 @@ and returned Carry On diagnostics to the LAVI-owned optional integration namespa
 
 The current active behavior-changing divergences are:
 
+- The Block break mixin runtime target fallback in `adris.altoclef.mixins.BlockModifiedByPlayerMixin`.
+- The title screen entry mixin runtime target fallback in `adris.altoclef.mixins.EntryMixin`.
+- The player damage mixin runtime target fallback in `adris.altoclef.mixins.PlayerDamageMixin`.
+- The entity animation swing mixin runtime target fallback in `adris.altoclef.mixins.EntityAnimationSwungMixin`.
+- The Baritone movement helper infested-block redirect runtime target fallback in
+  `adris.altoclef.mixins.MovementHelperMixin`.
 - The bounded post-place container handoff in `adris.altoclef.tasks.container.DoStuffInContainerTask`.
 - The Baritone worker tool-save policy snapshot boundary in `adris.altoclef.util.helpers.StorageHelper`.
 
-Both are engine divergences because the classes are generic upstream-derived ChatClef / AltoClef workflow helpers.
+These are engine divergences because the classes are generic upstream-derived ChatClef / AltoClef workflow helpers.
 
 ## Upstream Baseline Provenance
 
@@ -257,6 +263,411 @@ Runtime reproduction result:
 Verification status:
 
 - APPLIED_NOT_BUILT
+
+## Active Behavior-Changing Divergence Record: Block Break Mixin Runtime Target Fallback
+
+Review baseline SHA: `aa1484188d8f76266f081850ed19c6beb320fe61`
+
+Modified engine file:
+
+- `plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/adris/altoclef/mixins/BlockModifiedByPlayerMixin.java`
+
+Modified class: `adris.altoclef.mixins.BlockModifiedByPlayerMixin`
+
+Modified method:
+
+- `onBlockBroken`
+
+Verified reason:
+
+- `C:\Users\jaewo\curseforge\minecraft\Instances\LAVI_TEST_Fabric01\logs\latest.log` from
+  `2026-08-07 15:02:05 KST` showed Minecraft aborting during mixin apply.
+- The failing boundary was `altoclef.mixins.json:BlockModifiedByPlayerMixin`, where
+  `@Inject` on `onBlockBroken` could not find target method `onBreak` in `net.minecraft.class_2248`.
+- The built 1.20.1 jar's `chatclef-refmap.json` did not contain `BlockModifiedByPlayerMixin` or `onBreak`,
+  so the runtime attempted to resolve the named method directly against the intermediary runtime class.
+
+First failing boundary:
+
+- Mixin target resolution for `BlockModifiedByPlayerMixin` before Minecraft reached the ChatClef entrypoints.
+
+Behavior change:
+
+- For the `MC <= 12002` preprocessed branch, the injection annotation now targets the intermediary runtime method
+  `method_9576` directly with `remap = false`.
+- The `MC > 12002` branch continues to target named `onBreak` through the existing remap path.
+- The injected method body, `BlockBrokenEvent` publication, command lifecycle payloads, and diagnostics payloads are
+  unchanged.
+
+Input ownership:
+
+- Unchanged.
+- No input is acquired, released, or force-cleared.
+
+Retry ownership:
+
+- Unchanged.
+- No retry loop, timeout, blacklist, cooldown, or fallback policy is added.
+
+Baritone ownership:
+
+- Unchanged.
+- No Baritone goal, path, process, or cancellation behavior is added.
+
+Carry On-specific engine coupling:
+
+- None.
+- The hunk contains no Carry On imports, version policy, state observation, retry policy, or cleanup behavior.
+
+Generic behavior preserved:
+
+- The same block break event hook is still injected at `HEAD`.
+- The hunk only changes target-name resolution for the affected preprocessed runtime branch.
+
+Rollback unit:
+
+- Revert only the annotation branch hunk in `BlockModifiedByPlayerMixin.java`.
+- Do not use `git reset`, broad checkout, broad restore, or cleanup commands as rollback.
+
+Build result:
+
+- `.\gradlew.bat clean build --rerun-tasks` completed successfully on `2026-08-07`.
+- Result: `BUILD SUCCESSFUL in 2m 29s`, `139 actionable tasks: 139 executed`.
+- Verified final `1.20.1` jar class annotation with `javap`: `method=["method_9576"]`, `remap=false`.
+
+Runtime reproduction result:
+
+- NOT_RUN after this hunk at the time this record was updated.
+
+Verification status:
+
+- BUILT_NOT_RUNTIME_REPRODUCED
+
+## Active Behavior-Changing Divergence Record: Title Screen Entry Mixin Runtime Target Fallback
+
+Review baseline SHA: `aa1484188d8f76266f081850ed19c6beb320fe61`
+
+Modified engine file:
+
+- `plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/adris/altoclef/mixins/EntryMixin.java`
+
+Modified class: `adris.altoclef.mixins.EntryMixin`
+
+Modified method:
+
+- `init`
+
+Verified reason:
+
+- `C:\Users\jaewo\curseforge\minecraft\Instances\LAVI_TEST_Fabric01\logs\latest.log` from
+  `2026-08-07 15:15:46 KST` showed Minecraft aborting during mixin apply after the block break mixin target fallback
+  allowed startup to proceed further.
+- The failing boundary was `altoclef.mixins.json:EntryMixin`, where `@Inject` on `init` could not find target method
+  `Lnet/minecraft/class_442;init()V` in `net.minecraft.class_442`.
+- The built 1.20.1 jar's refmap mapped `EntryMixin` `init()V` to the unresolved runtime target
+  `Lnet/minecraft/class_442;init()V`, while adjacent generated refmaps and runtime evidence point to the intermediary
+  target `method_25426()V` for this title screen initialization hook.
+
+First failing boundary:
+
+- Mixin target resolution for `EntryMixin` before Minecraft reached the ChatClef entrypoints or LAVI bridge handshake.
+
+Behavior change:
+
+- For the `MC >= 12001 && MC <= 12002` preprocessed branch, the injection annotation now targets the intermediary
+  runtime method `method_25426()V` directly with `remap = false`.
+- The `MC > 12002` and `MC < 12001` branches continue to target named `init()V` through the existing remap path.
+- The injected method body, one-time `_initialized` guard, `Debug.logMessage("Global Init")`, and
+  `TitleScreenEntryEvent` publication are unchanged.
+
+Input ownership:
+
+- Unchanged.
+- No input is acquired, released, or force-cleared.
+
+Retry ownership:
+
+- Unchanged.
+- No retry loop, timeout, blacklist, cooldown, or fallback policy is added.
+
+Baritone ownership:
+
+- Unchanged.
+- No Baritone goal, path, process, or cancellation behavior is added.
+
+Carry On-specific engine coupling:
+
+- None.
+- The hunk contains no Carry On imports, version policy, state observation, retry policy, or cleanup behavior.
+
+Generic behavior preserved:
+
+- The same title screen initialization event hook is still injected at `HEAD`.
+- The hunk only changes target-name resolution for the affected preprocessed runtime branch.
+
+Rollback unit:
+
+- Revert only the annotation branch hunk in `EntryMixin.java`.
+- Do not use `git reset`, broad checkout, broad restore, or cleanup commands as rollback.
+
+Build result:
+
+- `.\gradlew.bat clean build --rerun-tasks` completed successfully on `2026-08-07`.
+- Result: `BUILD SUCCESSFUL in 1m 42s`, `139 actionable tasks: 139 executed`.
+- Verified final `1.20.1` jar class annotation with `javap`: `method=["method_25426()V"]`, `remap=false`.
+
+Runtime reproduction result:
+
+- NOT_RUN after this hunk at the time this record was updated.
+
+Verification status:
+
+- BUILT_NOT_RUNTIME_REPRODUCED
+
+## Active Behavior-Changing Divergence Record: Player Damage Mixin Runtime Target Fallback
+
+Review baseline SHA: `aa1484188d8f76266f081850ed19c6beb320fe61`
+
+Modified engine file:
+
+- `plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/adris/altoclef/mixins/PlayerDamageMixin.java`
+
+Modified class: `adris.altoclef.mixins.PlayerDamageMixin`
+
+Modified method:
+
+- `applyDamage`
+
+Verified reason:
+
+- The `LAVI_TEST_Fabric01` latest launch log from `2026-08-07 15:27:31 KST` failed while applying
+  `altoclef.mixins.json:PlayerDamageMixin`.
+- Mixin could not find `Lnet/minecraft/class_746;damage(Lnet/minecraft/class_1282;F)Z` in
+  `net.minecraft.class_746`.
+- The previous block-break and title-screen mixin target fallbacks allowed startup to advance to this next mixin
+  target failure.
+
+First failing boundary:
+
+- Mixin target resolution before the Minecraft client reaches the ChatClef bridge handshake.
+
+Behavior change:
+
+- For the `MC >= 12001 && MC <= 12002` preprocessor branch, the injection target now uses
+  `method_5643(Lnet/minecraft/class_1282;F)Z` with `remap=false`.
+- Other preprocessor branches keep the existing `damage` remap path.
+- The injected body still only publishes `PlayerDamageEvent` with the original `DamageSource` and amount.
+
+Input ownership:
+
+- Unchanged.
+- The hunk does not acquire or release any input.
+
+Retry ownership:
+
+- Unchanged.
+- No retry loop, blacklist, cooldown, or fallback policy is added.
+
+Baritone ownership:
+
+- Unchanged.
+- No Baritone goal, path, process, or cancellation behavior is added.
+
+Generic behavior preserved:
+
+- The same client-player damage event hook is still injected at `HEAD`.
+- The hunk only changes target-name resolution for the affected preprocessed runtime branch.
+
+Rollback unit:
+
+- Revert only the annotation branch hunk in `PlayerDamageMixin.java`.
+- Do not use `git reset`, broad checkout, broad restore, or cleanup commands as rollback.
+
+Build result:
+
+- `.\gradlew.bat clean build --rerun-tasks` completed successfully on `2026-08-07`.
+- Result: `BUILD SUCCESSFUL in 2m 16s`, `139 actionable tasks: 139 executed`.
+- Verified final `1.20.1` jar class annotation with `javap`:
+  `method=["method_5643(Lnet/minecraft/class_1282;F)Z"]`, `remap=false`.
+
+Runtime reproduction result:
+
+- NOT_RUN after this hunk at the time this record was updated.
+
+Verification status:
+
+- BUILT_NOT_RUNTIME_REPRODUCED
+
+## Active Behavior-Changing Divergence Record: Entity Animation Swing Mixin Runtime Target Fallback
+
+Review baseline SHA: `aa1484188d8f76266f081850ed19c6beb320fe61`
+
+Modified engine file:
+
+- `plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/adris/altoclef/mixins/EntityAnimationSwungMixin.java`
+
+Modified class: `adris.altoclef.mixins.EntityAnimationSwungMixin`
+
+Modified method:
+
+- `onEntityAnimation`
+
+Verified reason:
+
+- The `LAVI_TEST_Fabric01` latest launch log from `2026-08-07 15:34:58 KST` failed while applying
+  `altoclef.mixins.json:EntityAnimationSwungMixin`.
+- Mixin could not find `Lnet/minecraft/class_634;onEntityAnimation(Lnet/minecraft/class_2616;)V` in
+  `net.minecraft.class_634`.
+- The local `1.20.1` Yarn mappings identify this hook as
+  `method_11160(Lnet/minecraft/class_2616;)V`, and adjacent generated refmaps such as `1.20.2` and `1.21.1` already
+  map `onEntityAnimation` to that intermediary target.
+
+First failing boundary:
+
+- Mixin target resolution after the Fabric ChatClef bridge entrypoint registers but before Minecraft finishes client
+  initialization and before the bridge can reach a stable runtime session.
+
+Behavior change:
+
+- For the `MC >= 12001 && MC <= 12002` preprocessor branch, the injection target now uses
+  `method_11160(Lnet/minecraft/class_2616;)V` with `remap=false`.
+- Other preprocessor branches keep the existing `onEntityAnimation` remap path.
+- The injected body still only reads the entity id and animation id, then publishes `EntitySwungEvent` for main-hand or
+  off-hand swing animations.
+
+Input ownership:
+
+- Unchanged.
+- The hunk does not acquire or release any input.
+
+Retry ownership:
+
+- Unchanged.
+- No retry loop, blacklist, cooldown, or fallback policy is added.
+
+Baritone ownership:
+
+- Unchanged.
+- No Baritone goal, path, process, or cancellation behavior is added.
+
+Generic behavior preserved:
+
+- The same entity animation packet hook is still injected at `HEAD`.
+- The hunk only changes target-name resolution for the affected preprocessed runtime branch.
+
+Rollback unit:
+
+- Revert only the annotation branch hunk in `EntityAnimationSwungMixin.java`.
+- Do not use `git reset`, broad checkout, broad restore, or cleanup commands as rollback.
+
+Build result:
+
+- `.\gradlew.bat clean build --rerun-tasks` completed successfully on `2026-08-07`.
+- Result: `BUILD SUCCESSFUL in 2m 13s`, `139 actionable tasks: 139 executed`.
+- Verified final `1.20.1` jar class annotation with `javap`:
+  `method=["method_11160(Lnet/minecraft/class_2616;)V"]`, `remap=false`.
+
+Runtime reproduction result:
+
+- NOT_RUN after this hunk at the time this record was updated.
+
+Verification status:
+
+- BUILT_NOT_RUNTIME_REPRODUCED
+
+## Active Behavior-Changing Divergence Record: Movement Helper Infested-Block Redirect Runtime Target Fallback
+
+Review baseline SHA: `e46552b`
+
+Modified engine file:
+
+- `plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/adris/altoclef/mixins/MovementHelperMixin.java`
+
+Modified class: `adris.altoclef.mixins.MovementHelperMixin`
+
+Modified method:
+
+- `allowInfested`
+
+Baseline file hash:
+
+- SHA-256 `5579322A5E71DE3220FDE1FC51726ED2018A2D807BCA4B8BEDEE2E189C933BC3`
+
+Verified reason:
+
+- The `LAVI_TEST_Fabric01` crash report from `2026-08-07 15:44:52 KST` failed after Minecraft startup,
+  LAVI bridge registration, and WebSocket handshake succeeded.
+- The failing boundary was `altoclef.mixins.json:MovementHelperMixin`, where the redirector
+  `allowInfested(Lnet/minecraft/class_2680;)Lnet/minecraft/class_2248;` failed injection with
+  `(0/1) succeeded. Scanned 0 target(s).`
+- The previous generated `1.20.1` jar annotation kept the redirect target as
+  `Lnet/minecraft/block/BlockState;getBlock()Lnet/minecraft/block/Block;`, while the included 1.20.1 Baritone jar's
+  runtime bytecode calls `Lnet/minecraft/class_2680;method_26204()Lnet/minecraft/class_2248;` at both candidate
+  `avoidBreaking` call sites.
+
+First failing boundary:
+
+- Runtime Mixin target resolution for `MovementHelperMixin` when Baritone `MovementHelper` is loaded from the
+  pathing/cache execution path.
+
+Behavior change:
+
+- For the `MC >= 12001` preprocessor branch, the redirect now targets the runtime intermediary method
+  `Lnet/minecraft/class_2680;method_26204()Lnet/minecraft/class_2248;` directly with `remap=false`.
+- The target method selector remains `avoidBreaking`; this Baritone helper has no competing `avoidBreaking` overload in
+  the included 1.20.1 jar.
+- The existing `ordinal = 1` choice is preserved for the 1.20.1+ branch.
+- The `MC < 12001` branch keeps the previous named `BlockState.getBlock()` redirect target and `ordinal = 0`.
+- The handler body still only maps `InfestedBlock` to its regular block before returning the original block otherwise.
+
+Input ownership:
+
+- Unchanged.
+- No input is acquired, released, or force-cleared.
+
+Retry ownership:
+
+- Unchanged.
+- No retry loop, blacklist, cooldown, timeout, or fallback policy is added.
+
+Baritone ownership:
+
+- Unchanged.
+- No Baritone goal, path, process, cancellation, path selection, or cache behavior is added.
+
+Carry On-specific engine coupling:
+
+- None.
+- The hunk contains no Carry On imports, version policy, state observation, retry policy, or cleanup behavior.
+
+Generic behavior preserved:
+
+- The same `avoidBreaking` infested-block redirect remains in place.
+- The hunk changes only runtime namespace resolution for the existing redirect target.
+- The redirect handler body and ordinal semantics are unchanged for the affected branch.
+
+Rollback unit:
+
+- Revert only the annotation branch hunk in `MovementHelperMixin.java`.
+- Do not use `git reset`, broad checkout, broad restore, or cleanup commands as rollback.
+
+Build result:
+
+- `.\gradlew.bat clean build --rerun-tasks` completed successfully on `2026-08-07`.
+- Result: `BUILD SUCCESSFUL in 1m 47s`, `139 actionable tasks: 139 executed`.
+- Verified final `1.20.1` jar class annotation with `javap`:
+  `method=["avoidBreaking"]`, `target="Lnet/minecraft/class_2680;method_26204()Lnet/minecraft/class_2248;"`,
+  `ordinal=1`, `remap=false`.
+- Verified included 1.20.1 Baritone jar `MovementHelper.avoidBreaking` bytecode contains the matching
+  `class_2680.method_26204()` invocation at the preserved ordinal.
+
+Runtime reproduction result:
+
+- NOT_RUN after this hunk at the time this record was updated.
+
+Verification status:
+
+- BUILT_NOT_RUNTIME_REPRODUCED
 
 ## Active Diagnostics Divergence Record
 
