@@ -363,6 +363,12 @@ The command lifecycle detail facade now delegates event-specific detail
 payloads to `command/lifecycle/details/*` so each lifecycle event owns its own
 field serialization before the final diagnostic map edge.
 
+Empty lifecycle detail payloads also use
+`FabricChatClefLifecycleDetailsPayload.empty()` before expanding to the same
+`{}` details map at the log edge. This prevents new lifecycle call sites from
+assembling raw empty `Map<String, Object>` details directly while preserving the
+current emitted shape.
+
 ### Lifecycle And Gate Logs
 
 Java:

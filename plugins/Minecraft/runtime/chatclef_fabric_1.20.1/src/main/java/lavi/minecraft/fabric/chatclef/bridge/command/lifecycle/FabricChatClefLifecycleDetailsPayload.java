@@ -1,6 +1,7 @@
 package lavi.minecraft.fabric.chatclef.bridge.command.lifecycle;
 
 import lavi.minecraft.fabric.chatclef.bridge.command.diagnostics.FabricChatClefCommandDiagnosticDetailsPayload;
+import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.details.FabricChatClefEmptyDetailsPayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.details.FabricChatClefExceptionDetailsPayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.details.FabricChatClefFinishCallbackDetailsPayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.details.FabricChatClefQueueContextMismatchDetailsPayload;
@@ -13,6 +14,10 @@ import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefT
 
 //20260805_kpopmodder: Keep command lifecycle detail fields typed until the Map edge.
 public interface FabricChatClefLifecycleDetailsPayload extends FabricChatClefCommandDiagnosticDetailsPayload {
+    static FabricChatClefLifecycleDetailsPayload empty() {
+        return new FabricChatClefEmptyDetailsPayload();
+    }
+
     static FabricChatClefLifecycleDetailsPayload replacedActive(String replacedActiveRequestId) {
         return new FabricChatClefReplacedActiveDetailsPayload(replacedActiveRequestId);
     }

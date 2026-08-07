@@ -12,7 +12,6 @@ import lavi.minecraft.fabric.chatclef.bridge.command.result.FabricChatClefComman
 import lavi.minecraft.fabric.chatclef.bridge.command.result.FabricChatClefCommandResultPayload;
 import lavi.minecraft.fabric.chatclef.bridge.diagnostics.FabricChatClefBridgeDiagnostics;
 
-import java.util.HashMap;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
@@ -136,7 +135,7 @@ public final class FabricChatClefCommandLifecycleCoordinator {
         commandDiagnostics.contextWarn(
                 "active_deadline_exceeded_without_lifecycle_execution",
                 context,
-                new HashMap<>()
+                FabricChatClefLifecycleDetailsPayload.empty()
         );
         resultOutbox.sendTerminal(
                 context,
