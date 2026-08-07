@@ -2,6 +2,7 @@ package lavi.minecraft.fabric.chatclef.bridge.command.lifecycle;
 
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandContext;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.payload.FabricChatClefCommandLifecyclePayloadMap;
+import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.observation.FabricChatClefTaskFinishedObservationPayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskSnapshot;
 import lavi.minecraft.fabric.chatclef.bridge.command.result.FabricChatClefCommandResultDataPayload;
 
@@ -22,7 +23,7 @@ public final class FabricChatClefCommandLifecyclePayload implements FabricChatCl
     private final FabricChatClefTaskSnapshot taskAfterDispatch;
     private final FabricChatClefTaskSnapshot terminalTask;
     private final FabricChatClefTaskSnapshot boundRootTask;
-    private final FabricChatClefCommandTerminationObservation observation;
+    private final FabricChatClefTaskFinishedObservationPayload taskFinishedObservation;
 
     private FabricChatClefCommandLifecyclePayload(
             String resultReason,
@@ -53,7 +54,7 @@ public final class FabricChatClefCommandLifecyclePayload implements FabricChatCl
         this.taskAfterDispatch = taskAfterDispatch;
         this.terminalTask = terminalTask;
         this.boundRootTask = boundRootTask;
-        this.observation = observation;
+        this.taskFinishedObservation = FabricChatClefTaskFinishedObservationPayload.from(observation);
     }
 
     public static FabricChatClefCommandLifecyclePayload of(
@@ -106,7 +107,7 @@ public final class FabricChatClefCommandLifecyclePayload implements FabricChatCl
                 taskAfterDispatch,
                 terminalTask,
                 boundRootTask,
-                observation
+                taskFinishedObservation
         );
     }
 }

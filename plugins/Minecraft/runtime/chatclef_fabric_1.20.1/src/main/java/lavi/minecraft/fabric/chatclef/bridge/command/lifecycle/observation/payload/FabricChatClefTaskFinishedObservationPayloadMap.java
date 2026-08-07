@@ -1,6 +1,6 @@
 package lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.observation.payload;
 
-import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandTerminationObservation;
+import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.payload.FabricChatClefCommandTerminationObservationPayload;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -10,7 +10,7 @@ public final class FabricChatClefTaskFinishedObservationPayloadMap {
     private FabricChatClefTaskFinishedObservationPayloadMap() {
     }
 
-    public static Map<String, Object> toMap(FabricChatClefCommandTerminationObservation observation) {
+    public static Map<String, Object> toMap(FabricChatClefCommandTerminationObservationPayload observation) {
         return observation == null ? new HashMap<>() : observation.toMap();
     }
 }

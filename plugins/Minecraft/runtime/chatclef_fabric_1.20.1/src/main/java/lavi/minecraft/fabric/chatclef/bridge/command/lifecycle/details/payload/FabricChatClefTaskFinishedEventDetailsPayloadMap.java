@@ -1,6 +1,6 @@
 package lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.details.payload;
 
-import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandTerminationObservation;
+import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.observation.FabricChatClefTaskFinishedObservationPayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefBoundRootTaskRelationshipPayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskRuntimeObservationPayload;
 
@@ -18,7 +18,7 @@ public final class FabricChatClefTaskFinishedEventDetailsPayloadMap {
     }
 
     public static Map<String, Object> toMap(
-            FabricChatClefCommandTerminationObservation observation,
+            FabricChatClefTaskFinishedObservationPayload taskFinishedEvent,
             boolean matchedBoundRootTask,
             FabricChatClefBoundRootTaskRelationshipPayload eventTaskRelationship,
             String eventTaskBoundRootMatchReason,
@@ -26,7 +26,7 @@ public final class FabricChatClefTaskFinishedEventDetailsPayloadMap {
             FabricChatClefTaskRuntimeObservationPayload runtime
     ) {
         Map<String, Object> payload = new HashMap<>();
-        payload.put(TASK_FINISHED_EVENT, observation.toMap());
+        payload.put(TASK_FINISHED_EVENT, taskFinishedEvent.toMap());
         payload.put(MATCHED_BOUND_ROOT_TASK, matchedBoundRootTask);
         payload.putAll(eventTaskRelationship.toMap());
         payload.put(EVENT_TASK_BOUND_ROOT_MATCH_REASON, eventTaskBoundRootMatchReason);

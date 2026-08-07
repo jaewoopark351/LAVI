@@ -10,30 +10,35 @@ public final class FabricChatClefTaskRuntimeObservationPayload {
     private final long observedAtMs;
     private final long clientTickId;
     private final FabricChatClefTaskSnapshot currentTask;
+    private final FabricChatClefTaskOwnershipSnapshot ownership;
 
     private FabricChatClefTaskRuntimeObservationPayload(
             String threadName,
             long observedAtMs,
             long clientTickId,
-            FabricChatClefTaskSnapshot currentTask
+            FabricChatClefTaskSnapshot currentTask,
+            FabricChatClefTaskOwnershipSnapshot ownership
     ) {
         this.threadName = threadName;
         this.observedAtMs = observedAtMs;
         this.clientTickId = clientTickId;
         this.currentTask = currentTask;
+        this.ownership = ownership;
     }
 
     public static FabricChatClefTaskRuntimeObservationPayload of(
             String threadName,
             long observedAtMs,
             long clientTickId,
-            FabricChatClefTaskSnapshot currentTask
+            FabricChatClefTaskSnapshot currentTask,
+            FabricChatClefTaskOwnershipSnapshot ownership
     ) {
         return new FabricChatClefTaskRuntimeObservationPayload(
                 threadName,
                 observedAtMs,
                 clientTickId,
-                currentTask
+                currentTask,
+                ownership
         );
     }
 
@@ -42,7 +47,8 @@ public final class FabricChatClefTaskRuntimeObservationPayload {
                 threadName,
                 observedAtMs,
                 clientTickId,
-                currentTask
+                currentTask,
+                ownership
         );
     }
 }

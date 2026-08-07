@@ -1,5 +1,8 @@
 package lavi.minecraft.fabric.chatclef.bridge.command;
 
+import lavi.minecraft.fabric.chatclef.bridge.command.diagnostics.FabricChatClefCommandContextUnbindDiagnostics;
+import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskOwnershipSnapshot;
+
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Optional;
@@ -48,10 +51,31 @@ public final class FabricChatClefCommandQueue {
     }
 
     public synchronized boolean complete(FabricChatClefCommandContext context) {
+        FabricChatClefCommandContext activeBefore = active;
+        FabricChatClefTaskOwnershipSnapshot ownershipBefore =
+                FabricChatClefCommandContextUnbindDiagnostics.captureOwnershipSnapshot();
         if (context == null || active != context) {
+            FabricChatClefCommandContextUnbindDiagnostics.logBoundary(
+                    "stale_terminal_attempt",
+                    context,
+                    activeBefore,
+                    active,
+                    false,
+                    ownershipBefore,
+                    FabricChatClefCommandContextUnbindDiagnostics.captureOwnershipSnapshot()
+            );
             return false;
         }
         active = null;
+        FabricChatClefCommandContextUnbindDiagnostics.logBoundary(
+                "terminal_result",
+                context,
+                activeBefore,
+                active,
+                true,
+                ownershipBefore,
+                FabricChatClefCommandContextUnbindDiagnostics.captureOwnershipSnapshot()
+        );
         return true;
     }
 
@@ -60,6 +84,9 @@ public final class FabricChatClefCommandQueue {
     }
 
     public synchronized void detachConnection(long connectionGeneration, String reason) {
+        FabricChatClefCommandContext activeBefore = active;
+        FabricChatClefTaskOwnershipSnapshot ownershipBefore =
+                FabricChatClefCommandContextUnbindDiagnostics.captureOwnershipSnapshot();
         pending.removeIf(context -> {
             boolean matches = context.connectionGeneration() == connectionGeneration;
             if (matches) {
@@ -72,9 +99,21 @@ public final class FabricChatClefCommandQueue {
             activeContext.markDetached(reason);
             active = null;
         }
+        FabricChatClefCommandContextUnbindDiagnostics.logBoundary(
+                "connection_detached",
+                activeContext,
+                activeBefore,
+                active,
+                activeBefore != active,
+                ownershipBefore,
+                FabricChatClefCommandContextUnbindDiagnostics.captureOwnershipSnapshot()
+        );
     }
 
     public synchronized void clear(String reason) {
+        FabricChatClefCommandContext activeBefore = active;
+        FabricChatClefTaskOwnershipSnapshot ownershipBefore =
+                FabricChatClefCommandContextUnbindDiagnostics.captureOwnershipSnapshot();
         pending.forEach(context -> context.markDetached(reason));
         pending.clear();
         FabricChatClefCommandContext activeContext = active;
@@ -82,5 +121,14 @@ public final class FabricChatClefCommandQueue {
         if (activeContext != null) {
             activeContext.markDetached(reason);
         }
+        FabricChatClefCommandContextUnbindDiagnostics.logBoundary(
+                "queue_cleared",
+                activeContext,
+                activeBefore,
+                active,
+                activeBefore != active,
+                ownershipBefore,
+                FabricChatClefCommandContextUnbindDiagnostics.captureOwnershipSnapshot()
+        );
     }
 }

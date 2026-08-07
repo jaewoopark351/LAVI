@@ -18,13 +18,15 @@ public final class UserTaskChainDiagnostics {
                                              Task incomingTask,
                                              boolean runningIdleTask,
                                              boolean nextTaskIdleFlag,
-                                             boolean incomingOnFinishPresent) {
+                                             boolean incomingOnFinishPresent,
+                                             Object... additionalFields) {
         String idleCommand = idleCommand(mod);
         boolean incomingMarkedIdle = nextTaskIdleFlag;
         ChatClefDiagnostics.logLifecycleBoundary("USER_TASK_CHAIN_TASK_ORIGIN_DECISION",
                 "user_task_chain_task_origin_decision",
                 incomingTask,
-                ChatClefDiagnostics.withCommandContextFields(
+                ChatClefDiagnostics.withCommandContextFields(merge(
+                        new Object[]{
                         "diagnosticScope", "user_task_chain_origin",
                         "owner", "user_task_chain",
                         "mode", "BOUNDARY",
@@ -45,7 +47,9 @@ public final class UserTaskChainDiagnostics {
                         "originIdleCommand", idleCommand,
                         "incomingOnFinishPresent", incomingOnFinishPresent,
                         "callerSummary", callerSummary()
-                ));
+                        },
+                        additionalFields
+                )));
     }
 
     public static Object[] withOriginAndCommandContext(AltoClef mod,
@@ -122,6 +126,8 @@ public final class UserTaskChainDiagnostics {
     }
 
     private static Object[] merge(Object[] first, Object[] second) {
+        first = flatten(first);
+        second = flatten(second);
         if (first == null || first.length == 0) {
             return second == null ? new Object[0] : second;
         }
@@ -132,6 +138,31 @@ public final class UserTaskChainDiagnostics {
         System.arraycopy(first, 0, merged, 0, first.length);
         System.arraycopy(second, 0, merged, first.length, second.length);
         return merged;
+    }
+
+    private static Object[] flatten(Object[] fields) {
+        if (fields == null || fields.length == 0) {
+            return fields;
+        }
+        int flattenedLength = 0;
+        for (Object field : fields) {
+            flattenedLength += field instanceof Object[] nested ? nested.length : 1;
+        }
+        if (flattenedLength == fields.length) {
+            return fields;
+        }
+        Object[] flattened = new Object[flattenedLength];
+        int index = 0;
+        for (Object field : fields) {
+            if (field instanceof Object[] nested) {
+                System.arraycopy(nested, 0, flattened, index, nested.length);
+                index += nested.length;
+            } else {
+                flattened[index] = field;
+                index++;
+            }
+        }
+        return flattened;
     }
 
     private static String idleCommand(AltoClef mod) {

@@ -1,7 +1,6 @@
 package lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.payload;
 
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandContext;
-import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandTerminationObservation;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.observation.FabricChatClefTaskFinishedObservationPayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskSnapshot;
 
@@ -45,10 +44,10 @@ public final class FabricChatClefCommandLifecyclePayloadMap {
             FabricChatClefTaskSnapshot taskAfterDispatch,
             FabricChatClefTaskSnapshot terminalTask,
             FabricChatClefTaskSnapshot boundRootTask,
-            FabricChatClefCommandTerminationObservation observation
+            FabricChatClefTaskFinishedObservationPayload taskFinishedObservation
     ) {
-        FabricChatClefTaskFinishedObservationPayload taskFinishedObservation =
-                FabricChatClefTaskFinishedObservationPayload.from(observation);
+        FabricChatClefTaskFinishedObservationPayload normalizedTaskFinishedObservation =
+                FabricChatClefTaskFinishedObservationPayload.orEmpty(taskFinishedObservation);
         Map<String, Object> payload = new HashMap<>();
         payload.put(RESULT_FIDELITY, RESULT_FIDELITY_VALUE);
         payload.put(RESULT_REASON, resultReason);
@@ -64,8 +63,8 @@ public final class FabricChatClefCommandLifecyclePayloadMap {
         payload.put(TASK_AFTER_DISPATCH, taskAfterDispatch.toMap());
         payload.put(TERMINAL_TASK, terminalTask.toMap());
         payload.put(BOUND_ROOT_TASK, boundRootTask.toMap());
-        payload.put(TASK_FINISHED_EVENT_RECEIVED, taskFinishedObservation.received());
-        payload.put(TASK_FINISHED_OBSERVATION, taskFinishedObservation.toMap());
+        payload.put(TASK_FINISHED_EVENT_RECEIVED, normalizedTaskFinishedObservation.received());
+        payload.put(TASK_FINISHED_OBSERVATION, normalizedTaskFinishedObservation.toMap());
         return payload;
     }
 }

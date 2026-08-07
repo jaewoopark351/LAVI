@@ -4,10 +4,14 @@ import adris.altoclef.AltoClef;
 import adris.altoclef.tasksystem.Task;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskRuntimeObservationPayload;
+import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskOwnershipSnapshot;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskSnapshot;
 
 //20260803_kpopmodder: Observe current ChatClef user task state without changing engine behavior.
 public final class FabricChatClefTaskStateReader {
+    private final FabricChatClefTaskOwnershipSnapshotReader ownershipSnapshotReader =
+            new FabricChatClefTaskOwnershipSnapshotReader();
+
     public Task currentTaskOrNull() {
         try {
             return currentTaskOrThrow();
@@ -29,8 +33,13 @@ public final class FabricChatClefTaskStateReader {
                 Thread.currentThread().getName(),
                 System.currentTimeMillis(),
                 ChatClefDiagnostics.currentClientTickId(),
-                captureCurrentTaskSnapshot()
+                captureCurrentTaskSnapshot(),
+                ownershipSnapshot()
         );
+    }
+
+    public FabricChatClefTaskOwnershipSnapshot ownershipSnapshot() {
+        return ownershipSnapshotReader.ownershipSnapshot();
     }
 
     private Task currentTaskOrThrow() {
@@ -40,4 +49,5 @@ public final class FabricChatClefTaskStateReader {
         }
         return mod.getUserTaskChain().getCurrentTask();
     }
+
 }

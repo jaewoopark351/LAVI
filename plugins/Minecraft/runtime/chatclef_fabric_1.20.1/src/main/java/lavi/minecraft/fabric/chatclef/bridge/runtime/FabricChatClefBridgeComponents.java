@@ -53,7 +53,8 @@ public final class FabricChatClefBridgeComponents {
                 new FabricChatClefReconnectScheduler()
         );
         FabricChatClefUserTaskFinishedObserver taskFinishedObserver = new FabricChatClefUserTaskFinishedObserver(
-                diagnostics
+                diagnostics,
+                taskStateReader
         );
         FabricChatClefCommandResultOutbox commandResultOutbox = new FabricChatClefCommandResultOutbox(
                 commandQueue,

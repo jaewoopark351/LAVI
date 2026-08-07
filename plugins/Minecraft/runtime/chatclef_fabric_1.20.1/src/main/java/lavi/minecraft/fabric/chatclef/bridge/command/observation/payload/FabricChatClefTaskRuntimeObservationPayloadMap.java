@@ -1,6 +1,7 @@
 package lavi.minecraft.fabric.chatclef.bridge.command.observation.payload;
 
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskSnapshot;
+import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskOwnershipSnapshot;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -11,6 +12,7 @@ public final class FabricChatClefTaskRuntimeObservationPayloadMap {
     private static final String OBSERVED_AT_MS = "observed_at_ms";
     private static final String CLIENT_TICK_ID = "client_tick_id";
     private static final String CURRENT_TASK = "current_task";
+    private static final String OWNERSHIP = "ownership";
 
     private FabricChatClefTaskRuntimeObservationPayloadMap() {
     }
@@ -19,13 +21,15 @@ public final class FabricChatClefTaskRuntimeObservationPayloadMap {
             String threadName,
             long observedAtMs,
             long clientTickId,
-            FabricChatClefTaskSnapshot currentTask
+            FabricChatClefTaskSnapshot currentTask,
+            FabricChatClefTaskOwnershipSnapshot ownership
     ) {
         Map<String, Object> payload = new HashMap<>();
         payload.put(THREAD_NAME, threadName);
         payload.put(OBSERVED_AT_MS, observedAtMs);
         payload.put(CLIENT_TICK_ID, clientTickId);
         payload.put(CURRENT_TASK, currentTask.toMap());
+        payload.put(OWNERSHIP, ownership.toMap());
         return payload;
     }
 }

@@ -9,12 +9,17 @@ import adris.altoclef.tasksystem.TaskRunner;
 import adris.altoclef.util.time.Stopwatch;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 import lavi.minecraft.diagnostics.tasktrace.UserTaskChainDiagnostics;
+import lavi.minecraft.diagnostics.tasktrace.userchain.UserTaskChainDiagnosticLedger;
+import lavi.minecraft.diagnostics.tasktrace.userchain.UserTaskChainDiagnosticLedger.CancelInvocation;
+import lavi.minecraft.diagnostics.tasktrace.userchain.UserTaskChainDiagnosticLedger.FinishTrigger;
+import lavi.minecraft.diagnostics.tasktrace.userchain.UserTaskChainDiagnosticLedger.RootAssignment;
 
 // A task chain that runs a user defined task at the same priority.
 // This basically replaces our old Task Runner.
 public class UserTaskChain extends SingleTaskChain {
 
     private final Stopwatch taskStopwatch = new Stopwatch();
+    private final UserTaskChainDiagnosticLedger diagnosticLedger = new UserTaskChainDiagnosticLedger();
     private Runnable currentOnFinish = null;
 
     private boolean runningIdleTask;
@@ -56,15 +61,31 @@ public class UserTaskChain extends SingleTaskChain {
     }
 
     public void cancel(AltoClef mod) {
+        boolean willCallOnTaskFinish = mainTask != null && mainTask.isActive();
+        CancelInvocation cancelInvocation = diagnosticLedger.beginCancel(
+                mainTask,
+                ChatClefDiagnostics.safeValueForDiagnosticLog(() -> getTasks())
+        );
         ChatClefDiagnostics.logLifecycleBoundary("USER_TASK_CHAIN_CANCEL_REQUESTED", "user_task_chain_cancel_requested", mainTask,
                 UserTaskChainDiagnostics.withOriginAndCommandContext(mod, mainTask, null, runningIdleTask, nextTaskIdleFlag,
                         "chain", ChatClefDiagnostics.chainNameForDiagnosticLog(this),
                         "mainTaskPresent", mainTask != null,
                         "mainTaskActive", ChatClefDiagnostics.safeValueForDiagnosticLog(() -> mainTask != null && mainTask.isActive()),
+                        "willCallOnTaskFinish", willCallOnTaskFinish,
                         "runningIdleTask", runningIdleTask,
-                        "nextTaskIdleFlag", nextTaskIdleFlag));
+                        "nextTaskIdleFlag", nextTaskIdleFlag,
+                        cancelInvocation.beforeStopFields()));
         if (mainTask != null && mainTask.isActive()) {
+            diagnosticLedger.markCancelWillCallOnTaskFinish(cancelInvocation);
+            ChatClefDiagnostics.logLifecycleBoundary("USER_TASK_CHAIN_CANCEL_STOP_BEGIN", "user_task_chain_cancel_stop_begin", mainTask,
+                    UserTaskChainDiagnostics.withOriginAndCommandContext(mod, mainTask, null, runningIdleTask, nextTaskIdleFlag,
+                            "chain", ChatClefDiagnostics.chainNameForDiagnosticLog(this),
+                            cancelInvocation.beforeStopFields()));
             stop();
+            ChatClefDiagnostics.logLifecycleBoundary("USER_TASK_CHAIN_CANCEL_STOP_END", "user_task_chain_cancel_stop_end", cancelInvocation.rootBeforeStop(),
+                    UserTaskChainDiagnostics.withOriginAndCommandContext(mod, cancelInvocation.rootBeforeStop(), mainTask, runningIdleTask, nextTaskIdleFlag,
+                            "chain", ChatClefDiagnostics.chainNameForDiagnosticLog(this),
+                            cancelInvocation.afterStopFields(mainTask)));
             onTaskFinish(mod);
         }
     }
@@ -82,7 +103,9 @@ public class UserTaskChain extends SingleTaskChain {
     public void runTask(AltoClef mod, Task task, Runnable onFinish) {
         //20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
         // Diagnostics-only: observe task assignment and idle classification without changing lifecycle behavior.
-        UserTaskChainDiagnostics.logTaskOriginDecision(mod, mainTask, task, runningIdleTask, nextTaskIdleFlag, onFinish != null);
+        RootAssignment rootAssignment = diagnosticLedger.beginRootAssignment(mainTask, task);
+        UserTaskChainDiagnostics.logTaskOriginDecision(mod, mainTask, task, runningIdleTask, nextTaskIdleFlag, onFinish != null,
+                rootAssignment.beforeFields());
         ChatClefDiagnostics.logLifecycleBoundary("USER_TASK_CHAIN_RUN_TASK_ENTER", "user_task_chain_run_task_enter", task,
                 UserTaskChainDiagnostics.withOriginAndCommandContext(mod, mainTask, task, runningIdleTask, nextTaskIdleFlag,
                         "chain", ChatClefDiagnostics.chainNameForDiagnosticLog(this),
@@ -90,7 +113,8 @@ public class UserTaskChain extends SingleTaskChain {
                         "incomingTask", ChatClefDiagnostics.taskSummaryForDiagnosticLog(task),
                         "previousRunningIdleTask", runningIdleTask,
                         "previousNextTaskIdleFlag", nextTaskIdleFlag,
-                        "incomingOnFinishPresent", onFinish != null));
+                        "incomingOnFinishPresent", onFinish != null,
+                        rootAssignment.beforeFields()));
         runningIdleTask = nextTaskIdleFlag;
         nextTaskIdleFlag = false;
 
@@ -108,7 +132,8 @@ public class UserTaskChain extends SingleTaskChain {
                         "mainTaskAfterSetTask", ChatClefDiagnostics.taskSummaryForDiagnosticLog(mainTask),
                         "runningIdleTask", runningIdleTask,
                         "nextTaskIdleFlag", nextTaskIdleFlag,
-                        "currentOnFinishPresent", currentOnFinish != null));
+                        "currentOnFinishPresent", currentOnFinish != null,
+                        diagnosticLedger.commitRootAssignment(rootAssignment, mainTask)));
 
         if (mod.getModSettings().failedToLoad()) {
             Debug.logWarning("Settings file failed to load at some point. Check logs for more info, or delete the" +
@@ -121,6 +146,7 @@ public class UserTaskChain extends SingleTaskChain {
         boolean shouldIdle = mod.getModSettings().shouldRunIdleCommandWhenNotActive();
         double seconds = taskStopwatch.time();
         Task oldTask = mainTask;
+        FinishTrigger finishTrigger = diagnosticLedger.consumeFinishTrigger(oldTask);
         //20260730_kpopmodder: Added diagnostic logging to prove the Carry On interaction failure boundary.
         // Diagnostics-only: observe callback and TaskFinishedEvent publish decisions without changing completion logic.
         ChatClefDiagnostics.logLifecycleBoundary("USER_TASK_CHAIN_ON_TASK_FINISH_ENTER", "user_task_chain_on_task_finish_enter", oldTask,
@@ -131,7 +157,8 @@ public class UserTaskChain extends SingleTaskChain {
                         "runningIdleTask", runningIdleTask,
                         "nextTaskIdleFlag", nextTaskIdleFlag,
                         "currentOnFinishPresent", currentOnFinish != null,
-                        "elapsedSeconds", seconds));
+                        "elapsedSeconds", seconds,
+                        finishTrigger.fields(oldTask)));
         mainTask = null;
         ChatClefDiagnostics.logLifecycleBoundary("USER_TASK_CHAIN_MAIN_TASK_CLEARED", "user_task_chain_main_task_cleared", oldTask,
                 UserTaskChainDiagnostics.withOriginAndCommandContext(mod, oldTask, null, runningIdleTask, nextTaskIdleFlag,
@@ -195,14 +222,31 @@ public class UserTaskChain extends SingleTaskChain {
                                 "chain", ChatClefDiagnostics.chainNameForDiagnosticLog(this),
                                 "oldTask", ChatClefDiagnostics.taskSummaryForDiagnosticLog(oldTask),
                                 "elapsedSeconds", seconds,
-                                "runningIdleTask", runningIdleTask));
-                EventBus.publish(new TaskFinishedEvent(seconds, oldTask));
+                                "runningIdleTask", runningIdleTask,
+                                finishTrigger.fields(oldTask)));
+                TaskFinishedEvent finishedEvent = new TaskFinishedEvent(seconds, oldTask);
+                ChatClefDiagnostics.logLifecycleBoundary("USER_TASK_CHAIN_TASK_FINISHED_EVENT_READY", "user_task_chain_task_finished_event_ready", oldTask,
+                        UserTaskChainDiagnostics.withOriginAndCommandContext(mod, oldTask, null, runningIdleTask, nextTaskIdleFlag,
+                                "chain", ChatClefDiagnostics.chainNameForDiagnosticLog(this),
+                                "event_present", true,
+                                "event_identity", Integer.toHexString(System.identityHashCode(finishedEvent)),
+                                "event_task_present", oldTask != null,
+                                "event_task_identity", UserTaskChainDiagnosticLedger.taskIdentity(oldTask),
+                                "task_absence_reason", oldTask == null ? "event_last_task_null" : "task_present",
+                                finishTrigger.fields(oldTask)));
+                EventBus.publish(finishedEvent);
                 ChatClefDiagnostics.logLifecycleBoundary("USER_TASK_CHAIN_TASK_FINISHED_EVENT_PUBLISH_END", "user_task_chain_task_finished_event_publish_end", oldTask,
                         UserTaskChainDiagnostics.withOriginAndCommandContext(mod, oldTask, null, runningIdleTask, nextTaskIdleFlag,
                                 "chain", ChatClefDiagnostics.chainNameForDiagnosticLog(this),
                                 "oldTask", ChatClefDiagnostics.taskSummaryForDiagnosticLog(oldTask),
                                 "elapsedSeconds", seconds,
-                                "runningIdleTask", runningIdleTask));
+                                "runningIdleTask", runningIdleTask,
+                                "event_present", true,
+                                "event_identity", Integer.toHexString(System.identityHashCode(finishedEvent)),
+                                "event_task_present", oldTask != null,
+                                "event_task_identity", UserTaskChainDiagnosticLedger.taskIdentity(oldTask),
+                                "task_absence_reason", oldTask == null ? "event_last_task_null" : "task_present",
+                                finishTrigger.fields(oldTask)));
             }
             if (shouldIdle) {
                 ChatClefDiagnostics.logLifecycleBoundary("USER_TASK_CHAIN_IDLE_COMMAND_BEGIN", "user_task_chain_idle_command_begin", oldTask,
@@ -228,6 +272,22 @@ public class UserTaskChain extends SingleTaskChain {
 
     public boolean isRunningIdleTask() {
         return isActive() && runningIdleTask;
+    }
+
+    public String diagnosticRootAssignmentId() {
+        return diagnosticLedger.currentRootAssignmentId();
+    }
+
+    public long diagnosticRootGeneration() {
+        return diagnosticLedger.currentRootGeneration();
+    }
+
+    public boolean diagnosticRunningIdleTaskFlag() {
+        return runningIdleTask;
+    }
+
+    public boolean diagnosticNextTaskIdleFlag() {
+        return nextTaskIdleFlag;
     }
 
     // The next task will be an idle task.
