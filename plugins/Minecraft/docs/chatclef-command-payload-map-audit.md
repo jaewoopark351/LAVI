@@ -336,6 +336,7 @@ command/observation/FabricChatClefTaskRuntimeObservationPayload
 command/observation/payload/FabricChatClefBoundRootTaskRelationshipPayloadMap
 command/observation/payload/FabricChatClefTaskRuntimeObservationPayloadMap
 command/observation/payload/FabricChatClefTaskSnapshotPayload
+command/observation/payload/FabricChatClefTaskSnapshotPayloadMap
 command/execution/FabricChatClefCommandDiagnosticResultPayload
 command/lifecycle/FabricChatClefCommandDeadlinePayload
 command/lifecycle/FabricChatClefCommandLifecyclePayload
@@ -348,8 +349,11 @@ command/lifecycle/payload/FabricChatClefCommandTerminationObservationPayloadMap
 command/lifecycle/details/FabricChatClefTaskFinishedEventDetailsPayload
 command/lifecycle/details/payload/*
 command/lifecycle/observation/FabricChatClefTaskFinishedObservationPayload
+command/lifecycle/observation/payload/FabricChatClefTaskFinishedObservationPayloadMap
+command/diagnostics/details/FabricChatClefEmptyCommandDiagnosticDetailsPayload
+command/diagnostics/details/payload/FabricChatClefEmptyCommandDiagnosticDetailsPayloadMap
 command/diagnostics/payload/FabricChatClefCommandDiagnosticLogPayload
-command/diagnostics/payload/FabricChatClefCommandDiagnosticDetailsMapPayload
+command/diagnostics/payload/log/*
 ```
 
 These helpers centralize field names and keep typed values local until the
@@ -363,10 +367,12 @@ expansion. Command lifecycle detail objects pass through
 emitted keys, change status values, or alter lifecycle, timeout, retry, task
 observation, or ownership behavior.
 
-Legacy raw diagnostic detail maps are isolated behind
-`FabricChatClefCommandDiagnosticDetailsMapPayload` at the diagnostics facade
-compatibility edge. This preserves the existing `details` object shape while
-keeping new lifecycle call sites on typed detail payloads.
+Empty diagnostic detail maps are represented by
+`FabricChatClefEmptyCommandDiagnosticDetailsPayload` before final log
+serialization. The diagnostics facade no longer keeps a raw
+`Map<String, Object>` detail adapter or accepts raw-map detail overloads, so new
+lifecycle call sites must provide typed detail payloads while preserving the
+existing `details` object shape.
 
 The command lifecycle detail facade now delegates event-specific detail
 payloads to `command/lifecycle/details/*` so each lifecycle event owns its own
@@ -388,8 +394,16 @@ current emitted shape.
 Optional task-finished observations in command lifecycle result data use
 `command/lifecycle/observation/FabricChatClefTaskFinishedObservationPayload`
 before expanding to the existing `task_finished_event_received` boolean and
-`task_finished_observation` object. Missing observations still serialize as
-`task_finished_observation={}`.
+`task_finished_observation` object. The final map expansion is isolated under
+`command/lifecycle/observation/payload/*`. Missing observations still serialize
+as `task_finished_observation={}`.
+
+Command diagnostic log payloads keep `FabricChatClefCommandDiagnosticLogPayload`
+as the facade used by the diagnostics emitter. Execution, context, and shared
+`event` / `details` field assembly now live under
+`command/diagnostics/payload/log/*`, and the diagnostics facade no longer
+accepts new raw `Map<String, Object>` detail overloads. Existing emitted log
+keys and detail object shapes remain unchanged.
 
 Command lifecycle result data now keeps the lifecycle value object in
 `command/lifecycle/FabricChatClefCommandLifecyclePayload` and delegates final
@@ -413,9 +427,10 @@ The emitted `completion_source`, `termination_kind`, stop-state, duration, and
 Command ownership and task observation value objects follow the same pattern:
 the public value object remains in its existing package, while final map key
 ownership lives under `command/ownership/payload/*` and
-`command/observation/payload/*`. This keeps active diagnostic fields such as
-`request_id`, `connection_generation`, `current_task`, and `bound_root_task`
-unchanged.
+`command/observation/payload/*`. Task snapshot field ownership is split between
+the typed snapshot payload and `FabricChatClefTaskSnapshotPayloadMap` so
+`available`, `class_name`, `identity`, task-state, `current_task`, and
+`bound_root_task` fields stay unchanged while the Map edge remains isolated.
 
 ### Lifecycle And Gate Logs
 
@@ -433,9 +448,10 @@ FabricChatClefWebSocketServer._log_command_gate()
 
 Classification: log-only diagnostic payloads.
 
-Typing direction: keep flexible for now. These maps are useful precisely
-because they can carry temporary diagnostic fields while command ownership is
-being investigated.
+Typing direction: keep event-specific detail payloads flexible, but do not add
+raw `Map<String, Object>` overloads to the diagnostics facade. Temporary
+diagnostic fields should be represented by a typed detail payload and expanded
+only at the existing log serialization edge.
 
 ## Python UI And Extension Payloads
 
@@ -497,9 +513,9 @@ FabricChatClefCommandResult typed object -> toMap() -> command_result payload
 5. Use typed diagnostic detail wrappers at lifecycle log call sites, then
    expand to the existing map shape only in
    `FabricChatClefCommandDiagnosticLogPayload`.
-6. Type diagnostic payloads only after deciding which diagnostic fields are
-   long-term contract fields and which were temporary investigation fields.
-7. Keep `metadata`, `details`, and log-only dictionaries flexible unless a
+6. Keep diagnostic log field names stable while routing temporary detail fields
+   through typed detail payloads.
+7. Keep request `metadata` and Python UI dictionaries flexible unless a
    consumer contract requires a schema.
 
 ## Do Not Include In This Refactor
