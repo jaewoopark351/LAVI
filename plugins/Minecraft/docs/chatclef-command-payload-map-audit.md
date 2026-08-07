@@ -321,7 +321,8 @@ command/lifecycle/FabricChatClefCommandDeadlinePayload
 command/lifecycle/FabricChatClefCommandLifecyclePayload
 command/lifecycle/FabricChatClefLifecycleDetailsPayload
 command/lifecycle/details/*
-command/lifecycle/FabricChatClefTaskFinishedEventDetailsPayload
+command/lifecycle/details/FabricChatClefTaskFinishedEventDetailsPayload
+command/diagnostics/payload/FabricChatClefCommandDiagnosticLogPayload
 ```
 
 These helpers centralize field names and keep typed values local until the
@@ -330,7 +331,8 @@ travels through `FabricChatClefCommandResultDataPayload` for lifecycle,
 ownership, deadline, and diagnostic-result payloads before the final map
 expansion. Command lifecycle detail objects pass through
 `FabricChatClefCommandDiagnosticDetailsPayload` before
-`FabricChatClefCommandDiagnostics` expands them for logging. They do not rename
+`FabricChatClefCommandDiagnosticLogPayload` expands them for logging and
+`FabricChatClefCommandDiagnostics` emits the log line. They do not rename
 emitted keys, change status values, or alter lifecycle, timeout, retry, task
 observation, or ownership behavior.
 
@@ -416,7 +418,8 @@ FabricChatClefCommandResult typed object -> toMap() -> command_result payload
 4. Leave command result diagnostic `data` as `Map<String, Object>` until the
    command result payload itself is stable.
 5. Use typed diagnostic detail wrappers at lifecycle log call sites, then
-   expand to the existing map shape only in `FabricChatClefCommandDiagnostics`.
+   expand to the existing map shape only in
+   `FabricChatClefCommandDiagnosticLogPayload`.
 6. Type diagnostic payloads only after deciding which diagnostic fields are
    long-term contract fields and which were temporary investigation fields.
 7. Keep `metadata`, `details`, and log-only dictionaries flexible unless a
@@ -611,13 +614,14 @@ plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fa
 plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/transport/FabricChatClefResultEnvelopeSender.java
 plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/execution/FabricChatClefCommandDiagnosticPayload.java
 plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/lifecycle/FabricChatClefCommandLifecyclePayload.java
-plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/lifecycle/FabricChatClefTaskFinishedEventDetailsPayload.java
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/lifecycle/details/FabricChatClefTaskFinishedEventDetailsPayload.java
 plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/observation/FabricChatClefBoundRootTaskRelationshipPayload.java
 plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/observation/FabricChatClefTaskRuntimeObservationPayload.java
 plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/observation/FabricChatClefTaskSnapshot.java
 plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/lifecycle/FabricChatClefCommandDeadlinePayload.java
 plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/lifecycle/FabricChatClefCommandTerminationObservation.java
 plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/diagnostics/FabricChatClefCommandDiagnostics.java
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/diagnostics/payload/FabricChatClefCommandDiagnosticLogPayload.java
 ```
 
 Python DTO, transport, and UI files:
