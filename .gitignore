@@ -9,6 +9,7 @@ plugins/StarCraft116/bwapi_observer_client/bin/Release/*.pdb
 # Local dotfiles and tool caches
 .env
 .env.*
+/.gradle/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
