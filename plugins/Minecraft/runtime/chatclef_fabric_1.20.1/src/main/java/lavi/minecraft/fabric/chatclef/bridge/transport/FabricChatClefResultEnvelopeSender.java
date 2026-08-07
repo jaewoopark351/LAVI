@@ -4,12 +4,10 @@ import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandContex
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandResultSender;
 import lavi.minecraft.fabric.chatclef.bridge.command.result.FabricChatClefCommandResultPayload;
 import lavi.minecraft.fabric.chatclef.bridge.diagnostics.FabricChatClefBridgeDiagnostics;
-import lavi.minecraft.fabric.chatclef.bridge.protocol.FabricChatClefBridgeEnvelope;
 import lavi.minecraft.fabric.chatclef.bridge.protocol.FabricChatClefBridgeJson;
+import lavi.minecraft.fabric.chatclef.bridge.protocol.result.FabricChatClefCommandResultEnvelopeFactory;
 
 import java.net.http.WebSocket;
-import java.util.Map;
-import java.util.UUID;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 
@@ -17,6 +15,7 @@ import java.util.function.Supplier;
 public final class FabricChatClefResultEnvelopeSender implements FabricChatClefCommandResultSender {
     private final FabricChatClefBridgeDiagnostics diagnostics;
     private final FabricChatClefBridgeJson json;
+    private final FabricChatClefCommandResultEnvelopeFactory envelopeFactory = new FabricChatClefCommandResultEnvelopeFactory();
     private final Supplier<WebSocket> socketSupplier;
     private final LongSupplier activeGenerationSupplier;
 
@@ -60,21 +59,9 @@ public final class FabricChatClefResultEnvelopeSender implements FabricChatClefC
             return;
         }
         try {
-            socket.sendText(json.encode(envelope(correlationId, sessionId, payload.toMap())), true);
+            socket.sendText(json.encode(envelopeFactory.commandResult(correlationId, sessionId, payload)), true);
         } catch (Exception error) {
             diagnostics.warn("command_result send failed " + error.getClass().getSimpleName() + ": " + error.getMessage());
         }
-    }
-
-    private FabricChatClefBridgeEnvelope envelope(String correlationId, String sessionId, Map<String, Object> payload) {
-        FabricChatClefBridgeEnvelope envelope = new FabricChatClefBridgeEnvelope();
-        envelope.protocolVersion = 1;
-        envelope.messageType = "command_result";
-        envelope.messageId = "fabric-chatclef-result-" + UUID.randomUUID();
-        envelope.correlationId = correlationId;
-        envelope.sessionId = sessionId;
-        envelope.timestampMs = System.currentTimeMillis();
-        envelope.payload = payload;
-        return envelope;
     }
 }

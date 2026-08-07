@@ -140,6 +140,7 @@ FabricChatClefCommandResultStatus
 FabricChatClefCommandResultFactory
 FabricChatClefCommandResultOutbox
 FabricChatClefResultEnvelopeSender
+protocol/result/FabricChatClefCommandResultEnvelopeFactory
 ```
 
 Python receives:
@@ -178,9 +179,10 @@ Classification: hard protocol boundary.
 
 Typing direction: Java command result payloads now stay typed as
 `FabricChatClefCommandResultPayload` through result construction, lifecycle
-classification, outbox delivery, and the result sender interface. The transport
-edge still serializes the same map shape in `FabricChatClefResultEnvelopeSender`
-so the public payload continues to satisfy Python `CommandResultDTO`.
+classification, outbox delivery, the result sender interface, and command result
+envelope construction. The protocol edge still serializes the same map shape in
+`protocol/result/FabricChatClefCommandResultEnvelopeFactory` so the public
+payload continues to satisfy Python `CommandResultDTO`.
 
 ## Diagnostic Payloads
 
@@ -636,6 +638,7 @@ plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fa
 plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/ownership/FabricChatClefCommandOwnershipPayload.java
 plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/FabricChatClefCommandResultSender.java
 plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/transport/FabricChatClefResultEnvelopeSender.java
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/protocol/result/FabricChatClefCommandResultEnvelopeFactory.java
 plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/execution/FabricChatClefCommandDiagnosticPayload.java
 plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/lifecycle/FabricChatClefCommandLifecyclePayload.java
 plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/lifecycle/details/FabricChatClefTaskFinishedEventDetailsPayload.java
