@@ -62,6 +62,9 @@ Java:
 FabricChatClefBridgeEnvelope
 FabricChatClefBridgeJson
 FabricChatClefResultEnvelopeSender
+protocol/handshake/FabricChatClefHandshakePayload
+protocol/handshake/FabricChatClefHandshakeCapabilitiesPayload
+protocol/handshake/FabricChatClefHandshakeMetadataPayload
 ```
 
 Python:
@@ -87,7 +90,10 @@ Classification: hard protocol boundary.
 
 Typing direction: keep the JSON key names and message type values unchanged.
 Internal Java construction may be typed, but the serialized envelope must stay
-compatible with `BridgeEnvelopeDTO.from_mapping()`.
+compatible with `BridgeEnvelopeDTO.from_mapping()`. The Fabric ChatClef
+handshake payload is typed in `protocol/handshake/*` and expands to the same
+`payload.capabilities` and `payload.metadata` map shape only at the envelope
+serialization edge.
 
 ### Command Request
 
@@ -620,6 +626,9 @@ Java protocol and command files:
 plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/protocol/FabricChatClefBridgeEnvelope.java
 plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/protocol/FabricChatClefBridgeJson.java
 plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/protocol/FabricChatClefBridgeMessageFactory.java
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/protocol/handshake/FabricChatClefHandshakePayload.java
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/protocol/handshake/FabricChatClefHandshakeCapabilitiesPayload.java
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/protocol/handshake/FabricChatClefHandshakeMetadataPayload.java
 plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/FabricChatClefCommandRequest.java
 plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/request/FabricChatClefCommandRequestFields.java
 plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/FabricChatClefCommandResult.java
