@@ -1,0 +1,92 @@
+#20260807_kpopmodder: Added manual, non-blocking ChatClef Mixin advisory reporting.
+name: ChatClef Mixin Advisory
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_build:
+        description: "Run the clean 1.20.1 Gradle build before reporting"
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+      fail_on_findings:
+        description: "Fail the workflow when the advisory report finds ERROR entries"
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+permissions:
+  contents: read
+
+jobs:
+  advisory:
+    name: Report final ChatClef Mixin evidence
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Record repository boundary
+        shell: pwsh
+        run: |
+          Get-Location
+          git rev-parse --show-toplevel
+
+      - name: Build Fabric ChatClef 1.20.1 jar (advisory)
+        if: ${{ inputs.run_build == 'true' }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Continue"
+          Push-Location "plugins\Minecraft\runtime\chatclef_fabric_1.20.1"
+          .\gradlew.bat clean :1.20.1:build --rerun-tasks --no-build-cache --no-daemon --stacktrace
+          $buildExitCode = $LASTEXITCODE
+          Pop-Location
+          "CHATCLEF_BUILD_EXIT_CODE=$buildExitCode" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "Gradle advisory build exit code: $buildExitCode" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          exit 0
+
+      - name: Mark skipped build
+        if: ${{ inputs.run_build != 'true' }}
+        shell: pwsh
+        run: |
+          "CHATCLEF_BUILD_EXIT_CODE=SKIPPED" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "Gradle advisory build was skipped." | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+
+      - name: Generate Mixin advisory report
+        shell: pwsh
+        run: |
+          $args = @(
+            "-ExecutionPolicy", "Bypass",
+            "-File", ".\plugins\Minecraft\tools\chatclef_mixin_advisory_report.ps1",
+            "-OutputDirectory", ".\artifacts\chatclef-mixin-advisory"
+          )
+          if ("${{ inputs.fail_on_findings }}" -eq "true") {
+            $args += "-FailOnFindings"
+          }
+          powershell @args
+          $reportExitCode = $LASTEXITCODE
+          "Advisory report exit code: $reportExitCode" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          if ("${{ inputs.fail_on_findings }}" -eq "true") {
+            exit $reportExitCode
+          }
+          exit 0
+
+      - name: Upload advisory artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chatclef-mixin-advisory
+          path: artifacts/chatclef-mixin-advisory
+          if-no-files-found: warn
