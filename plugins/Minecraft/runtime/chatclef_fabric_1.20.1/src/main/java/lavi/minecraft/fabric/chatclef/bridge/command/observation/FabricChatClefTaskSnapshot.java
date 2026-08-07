@@ -1,6 +1,7 @@
 package lavi.minecraft.fabric.chatclef.bridge.command.observation;
 
 import adris.altoclef.tasksystem.Task;
+import lavi.minecraft.fabric.chatclef.bridge.command.observation.payload.FabricChatClefTaskSnapshotPayload;
 
 import java.util.Map;
 

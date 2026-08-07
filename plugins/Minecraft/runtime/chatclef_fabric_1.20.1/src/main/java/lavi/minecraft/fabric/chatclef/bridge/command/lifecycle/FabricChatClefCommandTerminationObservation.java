@@ -2,6 +2,7 @@ package lavi.minecraft.fabric.chatclef.bridge.command.lifecycle;
 
 import adris.altoclef.eventbus.events.TaskFinishedEvent;
 import adris.altoclef.tasksystem.Task;
+import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.payload.FabricChatClefCommandTerminationObservationPayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskSnapshot;
 
 import java.util.Map;

@@ -1,4 +1,4 @@
-package lavi.minecraft.fabric.chatclef.bridge.command.lifecycle;
+package lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.payload;
 
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskSnapshot;
 
@@ -6,7 +6,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 //20260805_kpopmodder: Isolate termination observation diagnostic payload keys without changing emitted fields.
-final class FabricChatClefCommandTerminationObservationPayload {
+public final class FabricChatClefCommandTerminationObservationPayload {
     private static final String COMPLETION_SOURCE = "completion_source";
     private static final String COMPLETION_SOURCE_VALUE = "altoclef_task_finished_event";
     private static final String TERMINATION_KIND = "termination_kind";
@@ -29,7 +29,7 @@ final class FabricChatClefCommandTerminationObservationPayload {
     private final String observationThread;
     private final FabricChatClefTaskSnapshot taskSnapshot;
 
-    FabricChatClefCommandTerminationObservationPayload(
+    public FabricChatClefCommandTerminationObservationPayload(
             String terminationKind,
             boolean taskPresent,
             boolean taskStopped,
@@ -51,7 +51,7 @@ final class FabricChatClefCommandTerminationObservationPayload {
         this.taskSnapshot = taskSnapshot;
     }
 
-    Map<String, Object> toMap() {
+    public Map<String, Object> toMap() {
         Map<String, Object> payload = new HashMap<>();
         payload.put(COMPLETION_SOURCE, COMPLETION_SOURCE_VALUE);
         payload.put(TERMINATION_KIND, terminationKind);

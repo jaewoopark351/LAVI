@@ -323,6 +323,7 @@ Current LAVI-owned helper placement:
 
 ```text
 command/ownership/FabricChatClefCommandOwnershipPayload
+command/ownership/payload/FabricChatClefCommandOwnershipPayloadMap
 command/result/FabricChatClefCommandResultDataPayload
 command/result/FabricChatClefCommandResultDataMapPayload
 command/result/FabricChatClefCommandResultPayload
@@ -330,14 +331,18 @@ command/result/FabricChatClefCommandResultPayloadMap
 command/result/FabricChatClefCommandResultStatus
 command/diagnostics/FabricChatClefCommandDiagnosticDetailsPayload
 command/observation/FabricChatClefTaskSnapshot
-command/observation/FabricChatClefTaskSnapshotPayload
 command/observation/FabricChatClefBoundRootTaskRelationshipPayload
 command/observation/FabricChatClefTaskRuntimeObservationPayload
+command/observation/payload/FabricChatClefBoundRootTaskRelationshipPayloadMap
+command/observation/payload/FabricChatClefTaskRuntimeObservationPayloadMap
+command/observation/payload/FabricChatClefTaskSnapshotPayload
 command/execution/FabricChatClefCommandDiagnosticResultPayload
 command/lifecycle/FabricChatClefCommandDeadlinePayload
 command/lifecycle/FabricChatClefCommandLifecyclePayload
 command/lifecycle/FabricChatClefLifecycleDetailsPayload
 command/lifecycle/details/*
+command/lifecycle/payload/FabricChatClefCommandLifecyclePayloadMap
+command/lifecycle/payload/FabricChatClefCommandTerminationObservationPayload
 command/lifecycle/details/FabricChatClefTaskFinishedEventDetailsPayload
 command/lifecycle/observation/FabricChatClefTaskFinishedObservationPayload
 command/diagnostics/payload/FabricChatClefCommandDiagnosticLogPayload
@@ -375,6 +380,20 @@ Optional task-finished observations in command lifecycle result data use
 before expanding to the existing `task_finished_event_received` boolean and
 `task_finished_observation` object. Missing observations still serialize as
 `task_finished_observation={}`.
+
+Command lifecycle result data now keeps the lifecycle value object in
+`command/lifecycle/FabricChatClefCommandLifecyclePayload` and delegates final
+map field ownership to `command/lifecycle/payload/*`. This folderization keeps
+the existing `result_fidelity`, ownership, task snapshot, and
+`task_finished_observation` shapes unchanged while separating lifecycle state
+from the serialization edge.
+
+Command ownership and task observation value objects follow the same pattern:
+the public value object remains in its existing package, while final map key
+ownership lives under `command/ownership/payload/*` and
+`command/observation/payload/*`. This keeps active diagnostic fields such as
+`request_id`, `connection_generation`, `current_task`, and `bound_root_task`
+unchanged.
 
 ### Lifecycle And Gate Logs
 

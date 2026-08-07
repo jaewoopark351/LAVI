@@ -1,10 +1,10 @@
-package lavi.minecraft.fabric.chatclef.bridge.command.observation;
+package lavi.minecraft.fabric.chatclef.bridge.command.observation.payload;
 
 import java.util.HashMap;
 import java.util.Map;
 
 //20260805_kpopmodder: Isolate task snapshot diagnostic payload keys without changing emitted fields.
-final class FabricChatClefTaskSnapshotPayload {
+public final class FabricChatClefTaskSnapshotPayload {
     private static final String AVAILABLE = "available";
     private static final String CLASS_NAME = "class_name";
     private static final String DESCRIPTION = "description";
@@ -27,7 +27,7 @@ final class FabricChatClefTaskSnapshotPayload {
     private final boolean thisOrChildTimedOut;
     private final String taskStateError;
 
-    FabricChatClefTaskSnapshotPayload(
+    public FabricChatClefTaskSnapshotPayload(
             boolean available,
             String className,
             String description,
@@ -51,7 +51,7 @@ final class FabricChatClefTaskSnapshotPayload {
         this.taskStateError = taskStateError;
     }
 
-    Map<String, Object> toMap() {
+    public Map<String, Object> toMap() {
         Map<String, Object> payload = new HashMap<>();
         payload.put(AVAILABLE, available);
         payload.put(CLASS_NAME, className);
