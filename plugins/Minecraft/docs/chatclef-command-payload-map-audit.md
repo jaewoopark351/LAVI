@@ -356,6 +356,7 @@ command/lifecycle/details/FabricChatClefTaskFinishedEventDetailsPayload
 command/lifecycle/details/payload/*
 command/lifecycle/details/payload/finish/*
 command/lifecycle/details/payload/taskfinished/*
+command/lifecycle/details/payload/terminal/*
 command/lifecycle/details/payload/waiting/*
 command/lifecycle/observation/FabricChatClefTaskFinishedObservationPayload
 command/lifecycle/observation/payload/FabricChatClefTaskFinishedObservationPayloadMap
@@ -473,6 +474,10 @@ Waiting and finish-callback lifecycle detail writers are split under
 `command/lifecycle/details/payload/finish/*` so waiting reason, current-task
 relationship fields, callback current-task fields, and runtime fields remain
 separate while preserving the existing diagnostic detail keys.
+Terminal-result lifecycle detail writers are split under
+`command/lifecycle/details/payload/terminal/*` so the `terminal_sent` and
+`lifecycle_cleared` ordering fields stay separate while preserving the existing
+diagnostic detail keys.
 
 ### Lifecycle And Gate Logs
 
