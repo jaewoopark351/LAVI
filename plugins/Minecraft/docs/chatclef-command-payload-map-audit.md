@@ -342,6 +342,7 @@ command/observation/payload/FabricChatClefTaskSnapshotPayloadMap
 command/observation/payload/runtime/*
 command/observation/payload/ownership/*
 command/observation/payload/relationship/*
+command/observation/payload/snapshot/*
 command/execution/FabricChatClefCommandDiagnosticResultPayload
 command/lifecycle/FabricChatClefCommandDeadlinePayload
 command/lifecycle/FabricChatClefCommandLifecyclePayload
@@ -453,6 +454,12 @@ Bound-root relationship fields are split under
 `command/observation/payload/relationship/*` so candidate task snapshots,
 `bound_root_task`, and the suffix-derived match/reason fields remain separately
 owned while preserving the current emitted keys and nesting.
+Task snapshot field writers are split under
+`command/observation/payload/snapshot/*` so summary fields such as `available`,
+`class_name`, `description`, `identity`, and `error` stay separate from
+runtime state fields such as `task_state_available`, `task_active`,
+`task_stopped`, `this_or_child_timed_out`, and `task_state_error` without
+changing the emitted snapshot shape.
 
 ### Lifecycle And Gate Logs
 
