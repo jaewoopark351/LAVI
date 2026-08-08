@@ -340,6 +340,7 @@ command/observation/payload/FabricChatClefTaskSnapshotPayload
 command/observation/payload/FabricChatClefTaskSnapshotPayloadMap
 command/observation/payload/runtime/*
 command/observation/payload/ownership/*
+command/observation/payload/relationship/*
 command/execution/FabricChatClefCommandDiagnosticResultPayload
 command/lifecycle/FabricChatClefCommandDeadlinePayload
 command/lifecycle/FabricChatClefCommandLifecyclePayload
@@ -442,6 +443,10 @@ Runtime task observation fields are split under
 `command/observation/payload/runtime/*` so capture timing/thread fields and
 the `current_task` / `ownership` nested payload fields remain separately owned
 while the existing emitted shape stays unchanged.
+Bound-root relationship fields are split under
+`command/observation/payload/relationship/*` so candidate task snapshots,
+`bound_root_task`, and the suffix-derived match/reason fields remain separately
+owned while preserving the current emitted keys and nesting.
 
 ### Lifecycle And Gate Logs
 
