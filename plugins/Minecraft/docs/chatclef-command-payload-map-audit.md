@@ -338,6 +338,7 @@ command/observation/payload/FabricChatClefTaskRuntimeObservationPayloadMap
 command/observation/payload/FabricChatClefTaskOwnershipSnapshotPayloadMap
 command/observation/payload/FabricChatClefTaskSnapshotPayload
 command/observation/payload/FabricChatClefTaskSnapshotPayloadMap
+command/observation/payload/runtime/*
 command/observation/payload/ownership/*
 command/execution/FabricChatClefCommandDiagnosticResultPayload
 command/lifecycle/FabricChatClefCommandDeadlinePayload
@@ -437,6 +438,10 @@ Task ownership snapshot field groups are further split under
 `command/observation/payload/ownership/*` so capture metadata, UserTask root
 fields, and selected-chain fields can change internally without renaming the
 existing emitted keys.
+Runtime task observation fields are split under
+`command/observation/payload/runtime/*` so capture timing/thread fields and
+the `current_task` / `ownership` nested payload fields remain separately owned
+while the existing emitted shape stays unchanged.
 
 ### Lifecycle And Gate Logs
 
