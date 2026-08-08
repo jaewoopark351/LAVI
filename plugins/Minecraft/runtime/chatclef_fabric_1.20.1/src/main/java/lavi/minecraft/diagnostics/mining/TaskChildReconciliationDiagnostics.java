@@ -1,9 +1,11 @@
 package lavi.minecraft.diagnostics.mining;
 
+import adris.altoclef.AltoClef;
 import adris.altoclef.tasks.construction.DestroyBlockTask;
 import adris.altoclef.tasks.resources.MineAndCollectTask;
 import adris.altoclef.tasksystem.Task;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import net.minecraft.util.math.BlockPos;
 
 //20260806_kpopmodder: Observe child candidate reconciliation without altering Task scheduling.
 final class TaskChildReconciliationDiagnostics {
@@ -28,9 +30,18 @@ final class TaskChildReconciliationDiagnostics {
                 && !(activeChildAfter instanceof DestroyBlockTask)) {
             return;
         }
+        AltoClef mod = AltoClef.getInstance();
+        MineAndCollectTask.MineOrCollectTask mineParent = (MineAndCollectTask.MineOrCollectTask) parent;
+        BlockPos activeBeforeTargetPos = destroyTargetPosition(activeChildBefore);
+        BlockPos candidateTargetPos = destroyTargetPosition(candidateChild);
+        BlockPos activeAfterTargetPos = destroyTargetPosition(activeChildAfter);
         String activeBeforeTarget = MiningDiagnosticEmitter.destroyTarget(activeChildBefore);
         String candidateTarget = MiningDiagnosticEmitter.destroyTarget(candidateChild);
         String activeAfterTarget = MiningDiagnosticEmitter.destroyTarget(activeChildAfter);
+        String activeToCandidateRelation = MineTargetPositionRelation.classify(activeBeforeTargetPos, candidateTargetPos);
+        String activeBeforeScannerUnreachable = scannerUnreachable(mod, activeBeforeTargetPos);
+        String candidateScannerUnreachable = scannerUnreachable(mod, candidateTargetPos);
+        String activeAfterScannerUnreachable = scannerUnreachable(mod, activeAfterTargetPos);
         boolean candidateBecameActive = candidateChild != null && candidateChild == activeChildAfter;
         boolean activeChildRetained = activeChildBefore != null && activeChildBefore == activeChildAfter;
         boolean activeChildChanged = activeChildBefore != activeChildAfter;
@@ -66,11 +77,19 @@ final class TaskChildReconciliationDiagnostics {
                         "activeChildBeforeClass", MiningDiagnosticEmitter.taskClass(activeChildBefore),
                         "activeChildBeforeInstanceId", MiningDiagnosticEmitter.instanceId(activeChildBefore),
                         "activeChildBeforeTargetPosition", activeBeforeTarget,
+                        "activeChildBeforeScannerUnreachable", activeBeforeScannerUnreachable,
+                        "activeChildBeforeLocalBlacklistContains", localBlacklistContains(mineParent, activeBeforeTargetPos),
                         "activeChildBeforeActive", MiningDiagnosticEmitter.safeTaskActive(activeChildBefore),
                         "activeChildBeforeStopped", MiningDiagnosticEmitter.safeTaskStopped(activeChildBefore),
                         "candidateChildClass", MiningDiagnosticEmitter.taskClass(candidateChild),
                         "candidateChildInstanceId", MiningDiagnosticEmitter.instanceId(candidateChild),
                         "candidateTargetPosition", candidateTarget,
+                        "candidateScannerUnreachable", candidateScannerUnreachable,
+                        "candidateLocalBlacklistContains", localBlacklistContains(mineParent, candidateTargetPos),
+                        "activeToCandidateTargetRelation", activeToCandidateRelation,
+                        "activeToCandidateManhattanDistance", MineTargetPositionRelation.manhattanDistance(activeBeforeTargetPos, candidateTargetPos),
+                        "activeToCandidateChebyshevDistance", MineTargetPositionRelation.chebyshevDistance(activeBeforeTargetPos, candidateTargetPos),
+                        "activeToCandidateSquaredDistance", MineTargetPositionRelation.squaredDistance(activeBeforeTargetPos, candidateTargetPos),
                         "candidateOutcome", candidateOutcome,
                         "candidateBecameActive", candidateBecameActive,
                         "activeChildRetained", activeChildRetained,
@@ -85,8 +104,32 @@ final class TaskChildReconciliationDiagnostics {
                         "previousChildStopCalled", previousChildStopCalled,
                         "activeChildAfterClass", MiningDiagnosticEmitter.taskClass(activeChildAfter),
                         "activeChildAfterInstanceId", MiningDiagnosticEmitter.instanceId(activeChildAfter),
-                        "activeChildAfterTargetPosition", activeAfterTarget
+                        "activeChildAfterTargetPosition", activeAfterTarget,
+                        "activeChildAfterScannerUnreachable", activeAfterScannerUnreachable,
+                        "activeChildAfterLocalBlacklistContains", localBlacklistContains(mineParent, activeAfterTargetPos),
+                        "parentLocalBlacklistSize", mineParent.diagnosticLocalBlacklistSize()
                 });
+    }
+
+    private static BlockPos destroyTargetPosition(Task task) {
+        if (task instanceof DestroyBlockTask destroyBlockTask) {
+            return destroyBlockTask.diagnosticTargetPosition();
+        }
+        return null;
+    }
+
+    private static String scannerUnreachable(AltoClef mod, BlockPos target) {
+        if (target == null) {
+            return "not_destroy_target";
+        }
+        return ChatClefDiagnostics.safeValue(() -> mod != null && mod.getBlockScanner().isUnreachable(target));
+    }
+
+    private static String localBlacklistContains(MineAndCollectTask.MineOrCollectTask parent, BlockPos target) {
+        if (target == null) {
+            return "not_destroy_target";
+        }
+        return ChatClefDiagnostics.safeValue(() -> parent.diagnosticLocalBlacklistContains(target));
     }
 
     private static String candidateOutcome(Task candidateChild,

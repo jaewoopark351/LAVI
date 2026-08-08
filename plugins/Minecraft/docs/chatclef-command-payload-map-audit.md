@@ -354,6 +354,7 @@ command/lifecycle/payload/FabricChatClefCommandTerminationObservationPayload
 command/lifecycle/payload/FabricChatClefCommandTerminationObservationPayloadMap
 command/lifecycle/details/FabricChatClefTaskFinishedEventDetailsPayload
 command/lifecycle/details/payload/*
+command/lifecycle/details/payload/exceptiondetail/*
 command/lifecycle/details/payload/finish/*
 command/lifecycle/details/payload/taskfinished/*
 command/lifecycle/details/payload/terminal/*
@@ -478,6 +479,10 @@ Terminal-result lifecycle detail writers are split under
 `command/lifecycle/details/payload/terminal/*` so the `terminal_sent` and
 `lifecycle_cleared` ordering fields stay separate while preserving the existing
 diagnostic detail keys.
+Exception lifecycle detail writers are split under
+`command/lifecycle/details/payload/exceptiondetail/*` so `exception_type` and
+`exception_message` keep their existing diagnostic detail keys while separating
+exception classification from exception text serialization.
 
 ### Lifecycle And Gate Logs
 

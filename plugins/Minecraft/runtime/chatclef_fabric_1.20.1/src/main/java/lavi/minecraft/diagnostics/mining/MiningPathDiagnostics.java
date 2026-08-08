@@ -5,6 +5,7 @@ import adris.altoclef.tasks.construction.DestroyBlockTask;
 import adris.altoclef.tasks.resources.MineAndCollectTask;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.MiningRequirement;
+import lavi.minecraft.integration.mining.MiningToolReadiness;
 import net.minecraft.block.Block;
 import net.minecraft.entity.ItemEntity;
 import net.minecraft.util.Pair;
@@ -52,6 +53,23 @@ public final class MiningPathDiagnostics {
                                               BlockPos currentMiningPos) {
         MineTargetSelectionDiagnostics.log(mod, task, closestBlock, closestDrop, selected, selectionReason,
                 targetChanged, localBlacklistContains, requestedBlocks, localBlacklistSize, currentMiningPos);
+    }
+
+    public static void logMineTargetGoalRequest(AltoClef mod,
+                                                MineAndCollectTask.MineOrCollectTask task,
+                                                BlockPos target,
+                                                BlockPos previousMiningPos,
+                                                BlockPos miningPosAfterDecision,
+                                                boolean localBlacklistContainsBefore,
+                                                int localBlacklistSize,
+                                                Block[] requestedBlocks,
+                                                MiningRequirement requestedRequirement,
+                                                MiningToolReadiness.Readiness readiness,
+                                                String decisionOutcome,
+                                                Task returnedTask) {
+        MineTargetGoalRequestDiagnostics.log(mod, task, target, previousMiningPos, miningPosAfterDecision,
+                localBlacklistContainsBefore, localBlacklistSize, requestedBlocks, requestedRequirement, readiness,
+                decisionOutcome, returnedTask);
     }
 
     public static void logDestroyNavigationState(AltoClef mod,

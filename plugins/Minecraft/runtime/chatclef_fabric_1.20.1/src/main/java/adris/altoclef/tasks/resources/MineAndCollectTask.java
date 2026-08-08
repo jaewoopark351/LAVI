@@ -363,6 +363,8 @@ public class MineAndCollectTask extends ResourceTask {
         protected Task getGoalTask(Object obj) {
             if (obj instanceof BlockPos newPos) {
                 AltoClef mod = AltoClef.getInstance();
+                BlockPos previousMiningPos = miningPos;
+                boolean localBlacklistedBefore = blacklist.contains(newPos);
                 BlockState targetState = mod.getWorld().getBlockState(newPos);
                 MiningToolReadiness.Readiness readiness = MiningToolReadiness.evaluate(mod, targetState, _requirement);
                 //20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
@@ -371,6 +373,9 @@ public class MineAndCollectTask extends ResourceTask {
                     miningPos = null;
                     progressChecker.reset();
                     Task requirementTask = new SatisfyMiningRequirementTask(_requirement, targetState);
+                    MiningPathDiagnostics.logMineTargetGoalRequest(mod, this, newPos, previousMiningPos, miningPos,
+                            localBlacklistedBefore, blacklist.size(), _blocks, _requirement, readiness,
+                            "RETURN_TARGET_TOOL_REQUIREMENT_TASK", requirementTask);
                     VisibleTaskDiagnostics.logReturnTask(mod, this, requirementTask, "mine_or_collect_return_target_tool_requirement_task",
                             "targetPosition=" + ChatClefDiagnostics.blockPos(newPos) + "|requirement=" + _requirement,
                             "targetPosition", ChatClefDiagnostics.blockPos(newPos),
@@ -387,6 +392,9 @@ public class MineAndCollectTask extends ResourceTask {
                 }
                 miningPos = newPos;
                 Task destroyTask = new DestroyBlockTask(miningPos);
+                MiningPathDiagnostics.logMineTargetGoalRequest(mod, this, newPos, previousMiningPos, miningPos,
+                        localBlacklistedBefore, blacklist.size(), _blocks, _requirement, readiness,
+                        "RETURN_DESTROY_BLOCK_TASK", destroyTask);
                 VisibleTaskDiagnostics.logReturnTask(mod, this, destroyTask, "mine_or_collect_return_destroy_block_task",
                         "miningPos=" + ChatClefDiagnostics.blockPos(miningPos),
                         "miningPos", ChatClefDiagnostics.blockPos(miningPos),
@@ -462,6 +470,14 @@ public class MineAndCollectTask extends ResourceTask {
 
         public BlockPos miningPos() {
             return miningPos;
+        }
+
+        public boolean diagnosticLocalBlacklistContains(BlockPos pos) {
+            return pos != null && blacklist.contains(pos);
+        }
+
+        public int diagnosticLocalBlacklistSize() {
+            return blacklist.size();
         }
 
         private boolean selectedTargetChanged(Optional<Object> selected) {
