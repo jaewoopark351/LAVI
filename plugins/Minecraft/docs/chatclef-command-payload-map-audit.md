@@ -335,8 +335,10 @@ command/observation/FabricChatClefBoundRootTaskRelationshipPayload
 command/observation/FabricChatClefTaskRuntimeObservationPayload
 command/observation/payload/FabricChatClefBoundRootTaskRelationshipPayloadMap
 command/observation/payload/FabricChatClefTaskRuntimeObservationPayloadMap
+command/observation/payload/FabricChatClefTaskOwnershipSnapshotPayloadMap
 command/observation/payload/FabricChatClefTaskSnapshotPayload
 command/observation/payload/FabricChatClefTaskSnapshotPayloadMap
+command/observation/payload/ownership/*
 command/execution/FabricChatClefCommandDiagnosticResultPayload
 command/lifecycle/FabricChatClefCommandDeadlinePayload
 command/lifecycle/FabricChatClefCommandLifecyclePayload
@@ -431,6 +433,10 @@ ownership lives under `command/ownership/payload/*` and
 the typed snapshot payload and `FabricChatClefTaskSnapshotPayloadMap` so
 `available`, `class_name`, `identity`, task-state, `current_task`, and
 `bound_root_task` fields stay unchanged while the Map edge remains isolated.
+Task ownership snapshot field groups are further split under
+`command/observation/payload/ownership/*` so capture metadata, UserTask root
+fields, and selected-chain fields can change internally without renaming the
+existing emitted keys.
 
 ### Lifecycle And Gate Logs
 
