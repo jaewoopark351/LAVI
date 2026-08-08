@@ -1942,6 +1942,11 @@ chatclef-baritone-cache-troubleshooting.md
     Operational checks for world replacement, Baritone disk cache, and
     long-running pathing or mining symptoms.
 
+chatclef-resource-target-retry-thrashing-analysis.md
+    Corrected gold-ingot diagnosis and target-level timeline plan for
+    path/target retry thrashing after command lifecycle and path adoption are
+    ruled out.
+
 chatclef-carryon-integration-direction.md
     Engine boundary, ownership, diagnostics-only, and root-cause patch gates.
 
