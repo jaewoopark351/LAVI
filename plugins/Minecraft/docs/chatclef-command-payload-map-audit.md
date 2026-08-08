@@ -356,9 +356,13 @@ command/lifecycle/details/FabricChatClefTaskFinishedEventDetailsPayload
 command/lifecycle/details/payload/*
 command/lifecycle/details/payload/exceptiondetail/*
 command/lifecycle/details/payload/finish/*
+command/lifecycle/details/payload/queue/*
 command/lifecycle/details/payload/taskfinished/*
+command/lifecycle/details/payload/taskfinished/match/*
+command/lifecycle/details/payload/taskfinished/runtime/*
 command/lifecycle/details/payload/terminal/*
 command/lifecycle/details/payload/waiting/*
+command/lifecycle/details/payload/waiting/current/*
 command/lifecycle/observation/FabricChatClefTaskFinishedObservationPayload
 command/lifecycle/observation/payload/FabricChatClefTaskFinishedObservationPayloadMap
 command/diagnostics/details/FabricChatClefEmptyCommandDiagnosticDetailsPayload
@@ -470,14 +474,26 @@ Task-finished lifecycle detail field writers are split under
 `task_finished_event`, bound-root match fields, `finish_callback_received`, and
 `runtime` fields keep their existing log shape while each detail group owns its
 own final Map writes.
+Task-finished bound-root matching and runtime fields are further split under
+`command/lifecycle/details/payload/taskfinished/match/*` and
+`command/lifecycle/details/payload/taskfinished/runtime/*` so match flags,
+relationship fields, match reasons, callback state, and runtime snapshots stay
+separate without changing emitted keys.
 Waiting and finish-callback lifecycle detail writers are split under
 `command/lifecycle/details/payload/waiting/*` and
 `command/lifecycle/details/payload/finish/*` so waiting reason, current-task
 relationship fields, callback current-task fields, and runtime fields remain
 separate while preserving the existing diagnostic detail keys.
+Waiting current-task relationship and match-reason fields are further split
+under `command/lifecycle/details/payload/waiting/current/*` while preserving
+the existing diagnostic detail keys.
 Terminal-result lifecycle detail writers are split under
 `command/lifecycle/details/payload/terminal/*` so the `terminal_sent` and
 `lifecycle_cleared` ordering fields stay separate while preserving the existing
+diagnostic detail keys.
+Queue context mismatch lifecycle detail writers are split under
+`command/lifecycle/details/payload/queue/*` so `queue_active_present` and
+`queue_active_request_id` stay separately owned while preserving the existing
 diagnostic detail keys.
 Exception lifecycle detail writers are split under
 `command/lifecycle/details/payload/exceptiondetail/*` so `exception_type` and
