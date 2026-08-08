@@ -12,6 +12,7 @@ final class MiningDiagnosticEventGate {
     private static final int SESSION_HARD_CAP = 5000;
     private static final Map<String, State> STATES = new HashMap<>();
     private static int sessionEmissions;
+    private static boolean limitReportClaimed;
 
     private MiningDiagnosticEventGate() {
     }
@@ -26,7 +27,7 @@ final class MiningDiagnosticEventGate {
             if (!canEmitDetail(state)) {
                 state.suppressedCount++;
                 state.lastObservedTick = tick;
-                return Decision.suppressed(state);
+                return Decision.suppressed(state, limitDecision(state));
             }
             int suppressed = state.suppressedCount;
             long firstObserved = state.firstObservedTick;
@@ -41,7 +42,10 @@ final class MiningDiagnosticEventGate {
 
         state.suppressedCount++;
         state.lastObservedTick = tick;
-        if (tick - state.lastSummaryTick >= SUMMARY_INTERVAL_TICKS && canEmitDetail(state)) {
+        if (!canEmitDetail(state)) {
+            return Decision.suppressed(state, limitDecision(state));
+        }
+        if (tick - state.lastSummaryTick >= SUMMARY_INTERVAL_TICKS) {
             int suppressed = state.suppressedCount;
             long firstObserved = state.firstObservedTick;
             state.suppressedCount = 0;
@@ -51,11 +55,30 @@ final class MiningDiagnosticEventGate {
             sessionEmissions++;
             return Decision.emit(true, suppressed, firstObserved, tick);
         }
-        return Decision.suppressed(state);
+        return Decision.suppressed(state, LimitDecision.none());
     }
 
     private static boolean canEmitDetail(State state) {
         return sessionEmissions < SESSION_HARD_CAP && state.detailEmissions < DETAIL_LIMIT_PER_BUCKET;
+    }
+
+    private static LimitDecision limitDecision(State state) {
+        String reason = sessionEmissions >= SESSION_HARD_CAP
+                ? "SESSION_HARD_CAP"
+                : "DETAIL_LIMIT_PER_BUCKET";
+        boolean report = !limitReportClaimed;
+        if (report) {
+            limitReportClaimed = true;
+        }
+        return new LimitDecision(
+                true,
+                report,
+                reason,
+                sessionEmissions,
+                SESSION_HARD_CAP,
+                state.detailEmissions,
+                DETAIL_LIMIT_PER_BUCKET
+        );
     }
 
     private static String normalize(String value) {
@@ -71,21 +94,53 @@ final class MiningDiagnosticEventGate {
         final int suppressedCount;
         final long firstObservedTick;
         final long lastObservedTick;
+        final boolean gateLimitReached;
+        final boolean reportGateLimit;
+        final String gateLimitReason;
+        final int sessionEmissions;
+        final int sessionHardCap;
+        final int bucketDetailEmissions;
+        final int bucketDetailLimit;
 
-        private Decision(boolean emit, boolean summary, int suppressedCount, long firstObservedTick, long lastObservedTick) {
+        private Decision(boolean emit,
+                         boolean summary,
+                         int suppressedCount,
+                         long firstObservedTick,
+                         long lastObservedTick,
+                         LimitDecision limit) {
             this.emit = emit;
             this.summary = summary;
             this.suppressedCount = suppressedCount;
             this.firstObservedTick = firstObservedTick;
             this.lastObservedTick = lastObservedTick;
+            this.gateLimitReached = limit.reached;
+            this.reportGateLimit = limit.report;
+            this.gateLimitReason = limit.reason;
+            this.sessionEmissions = limit.sessionEmissions;
+            this.sessionHardCap = limit.sessionHardCap;
+            this.bucketDetailEmissions = limit.bucketDetailEmissions;
+            this.bucketDetailLimit = limit.bucketDetailLimit;
         }
 
         static Decision emit(boolean summary, int suppressedCount, long firstObservedTick, long lastObservedTick) {
-            return new Decision(true, summary, suppressedCount, firstObservedTick, lastObservedTick);
+            return new Decision(true, summary, suppressedCount, firstObservedTick, lastObservedTick, LimitDecision.none());
         }
 
-        static Decision suppressed(State state) {
-            return new Decision(false, false, state.suppressedCount, state.firstObservedTick, state.lastObservedTick);
+        static Decision suppressed(State state, LimitDecision limit) {
+            return new Decision(false, false, state.suppressedCount, state.firstObservedTick, state.lastObservedTick, limit);
+        }
+    }
+
+    private record LimitDecision(boolean reached,
+                                 boolean report,
+                                 String reason,
+                                 int sessionEmissions,
+                                 int sessionHardCap,
+                                 int bucketDetailEmissions,
+                                 int bucketDetailLimit) {
+        static LimitDecision none() {
+            return new LimitDecision(false, false, "none", MiningDiagnosticEventGate.sessionEmissions, SESSION_HARD_CAP, 0,
+                    DETAIL_LIMIT_PER_BUCKET);
         }
     }
 

@@ -17,6 +17,9 @@ public final class MiningDiagnosticEmitter {
                             Object[] eventFields) {
         MiningDiagnosticEventGate.Decision decision = MiningDiagnosticEventGate.evaluate(bucket, fingerprint);
         if (!decision.emit) {
+            if (decision.reportGateLimit) {
+                emitGateLimitReached(eventName, reason, bucket, fingerprint, decision);
+            }
             return;
         }
         Object[] contractFields = new Object[]{
@@ -32,6 +35,34 @@ public final class MiningDiagnosticEmitter {
         };
         ChatClefDiagnostics.logBoundary(eventName, reason, task,
                 ChatClefDiagnostics.withCommandContextFields(merge(contractFields, eventFields)));
+    }
+
+    private static void emitGateLimitReached(String suppressedEventName,
+                                             String suppressedReason,
+                                             String suppressedBucket,
+                                             String suppressedFingerprint,
+                                             MiningDiagnosticEventGate.Decision decision) {
+        ChatClefDiagnostics.logBoundary("MINING_DIAGNOSTIC_GATE_EXHAUSTED",
+                "mining_diagnostic_event_gate_exhausted",
+                null,
+                ChatClefDiagnostics.withCommandContextFields(new Object[]{
+                        "mode", "BOUNDARY",
+                        "terminal", false,
+                        "behavior_effect", "none",
+                        "suppressedEventName", suppressedEventName,
+                        "suppressedReason", suppressedReason,
+                        "suppressedBucket", suppressedBucket,
+                        "suppressedFingerprint", suppressedFingerprint,
+                        "gateLimitReached", decision.gateLimitReached,
+                        "gateLimitReason", decision.gateLimitReason,
+                        "sessionEmissions", decision.sessionEmissions,
+                        "sessionHardCap", decision.sessionHardCap,
+                        "bucketDetailEmissions", decision.bucketDetailEmissions,
+                        "bucketDetailLimit", decision.bucketDetailLimit,
+                        "suppressedCount", decision.suppressedCount,
+                        "firstObservedTick", decision.firstObservedTick,
+                        "lastObservedTick", decision.lastObservedTick
+                }));
     }
 
     static String destroyTarget(Task task) {

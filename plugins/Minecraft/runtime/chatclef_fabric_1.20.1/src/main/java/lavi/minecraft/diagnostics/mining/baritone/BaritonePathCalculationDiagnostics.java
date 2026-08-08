@@ -1,5 +1,6 @@
 package lavi.minecraft.diagnostics.mining.baritone;
 
+import baritone.Baritone;
 import baritone.api.pathing.calc.IPath;
 import baritone.api.pathing.goals.Goal;
 import baritone.api.process.PathingCommand;
@@ -7,20 +8,25 @@ import baritone.api.utils.BetterBlockPos;
 import baritone.api.utils.PathCalculationResult;
 import baritone.behavior.PathingBehavior;
 import baritone.pathing.calc.AbstractNodeCostSearch;
+import baritone.pathing.calc.PathNode;
 import baritone.pathing.movement.CalculationContext;
 import baritone.pathing.path.PathExecutor;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 import lavi.minecraft.diagnostics.mining.MiningDiagnosticEmitter;
 import net.minecraft.util.math.BlockPos;
 
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Supplier;
 
 //20260806_kpopmodder: Correlate Baritone path calculation results with adoption without changing pathing behavior.
 public final class BaritonePathCalculationDiagnostics {
     private static final AtomicLong NEXT_GENERATION = new AtomicLong(1);
     private static final ConcurrentMap<Integer, CalculationRecord> RECORDS = new ConcurrentHashMap<>();
+    private static final ConcurrentMap<Integer, CalculationRecord> PATH_RECORDS = new ConcurrentHashMap<>();
+    private static final ThreadLocal<CalculationRecord> ACTIVE_CALCULATION = new ThreadLocal<>();
     private static final int RECORD_HARD_CAP = 1024;
 
     private BaritonePathCalculationDiagnostics() {
@@ -196,6 +202,12 @@ public final class BaritonePathCalculationDiagnostics {
             record.failureTimeoutMs = failureTimeout;
             record.calculateStartNanos = System.nanoTime();
         }
+        ACTIVE_CALCULATION.set(record);
+        emitCalculationPhase(record, pathfinder, "CALCULATE_ENTER",
+                "abstract_node_cost_search_calculate_head", "calculate",
+                -1, cancelRequested, new Object[]{
+                        "pathfinderFinishedBeforeCalculate", ChatClefDiagnostics.safeValueForDiagnosticLog(pathfinder::isFinished)
+                });
         String fingerprint = MiningDiagnosticEmitter.joinFingerprint(
                 "BARITONE_PATHFINDER_CALCULATE_STARTED",
                 Long.toString(record.generationId),
@@ -242,6 +254,15 @@ public final class BaritonePathCalculationDiagnostics {
             record.elapsedMillis = elapsedNanos / 1_000_000L;
             record.cancelRequestedAfterCalculate = cancelRequested;
         }
+        emitCalculationPhase(record, pathfinder, "CALCULATE_RETURN",
+                "abstract_node_cost_search_calculate_return", "calculate",
+                record.elapsedMillis, cancelRequested, new Object[]{
+                        "resultType", record.resultType,
+                        "resultPathPresent", record.resultPathPresent,
+                        "resultPathIdentity", record.resultPathId,
+                        "resultPathSummary", record.resultPathSummary,
+                        "pathfinderFinishedAfterCalculate", ChatClefDiagnostics.safeValueForDiagnosticLog(pathfinder::isFinished)
+                });
         String fingerprint = MiningDiagnosticEmitter.joinFingerprint(
                 "BARITONE_PATHFINDER_CALCULATE_COMPLETED",
                 Long.toString(record.generationId),
@@ -269,6 +290,164 @@ public final class BaritonePathCalculationDiagnostics {
                         "workerThreadName", Thread.currentThread().getName(),
                         "workerThreadId", Thread.currentThread().getId()
                 }, searchStateFields));
+        ACTIVE_CALCULATION.remove();
+    }
+
+    public static void logCalculate0Enter(AbstractNodeCostSearch pathfinder,
+                                          long primaryTimeout,
+                                          long failureTimeout) {
+        if (!ChatClefDiagnostics.isBoundaryEnabled() || pathfinder == null) {
+            return;
+        }
+        CalculationRecord record = recordFor(pathfinder);
+        synchronized (record) {
+            record.primaryTimeoutMs = primaryTimeout;
+            record.failureTimeoutMs = failureTimeout;
+            record.calculate0StartNanos = System.nanoTime();
+        }
+        ACTIVE_CALCULATION.set(record);
+        emitCalculationPhase(record, pathfinder, "CALCULATE0_ENTER",
+                "astar_path_finder_calculate0_head", "calculate0",
+                -1, "unavailable_from_astar_phase_mixin", new Object[]{
+                        "rawResultPathPresent", "unavailable"
+                });
+    }
+
+    public static void logCalculate0Return(AbstractNodeCostSearch pathfinder,
+                                           Optional<IPath> result) {
+        if (!ChatClefDiagnostics.isBoundaryEnabled() || pathfinder == null) {
+            return;
+        }
+        CalculationRecord record = recordFor(pathfinder);
+        IPath rawPath = optionalPath(result);
+        long elapsedMillis;
+        synchronized (record) {
+            record.rawPathPresent = rawPath != null;
+            record.rawPath = rawPath;
+            record.rawPathId = BaritonePathObjectFormatters.identity(rawPath);
+            record.rawPathSummary = BaritonePathObjectFormatters.summarizePath(rawPath);
+            elapsedMillis = elapsedMillisSince(record.calculate0StartNanos);
+        }
+        emitCalculationPhase(record, pathfinder, "CALCULATE0_RETURN",
+                "astar_path_finder_calculate0_return", "calculate0|" + record.rawPathId,
+                elapsedMillis, "unavailable_from_astar_phase_mixin", new Object[]{
+                        "rawResultPathPresent", record.rawPathPresent,
+                        "rawResultPathIdentity", record.rawPathId,
+                        "rawResultPathSummary", record.rawPathSummary
+                });
+    }
+
+    public static void logPathBuildEnter(Object path,
+                                         BetterBlockPos realStart,
+                                         PathNode startNode,
+                                         PathNode endNode,
+                                         int numNodes,
+                                         Goal goal,
+                                         CalculationContext context) {
+        if (!ChatClefDiagnostics.isBoundaryEnabled()) {
+            return;
+        }
+        CalculationRecord record = activeRecordForPath(path);
+        if (record == null || path == null) {
+            return;
+        }
+        synchronized (record) {
+            record.pathBuildStartNanos = System.nanoTime();
+            record.rawPathId = BaritonePathObjectFormatters.identity(path);
+        }
+        putPathRecord(path, record);
+        emitCalculationPhase(record, record.pathfinder, "PATH_BUILD_ENTER",
+                "baritone_path_constructor_head", "path_build|" + BaritonePathObjectFormatters.identity(path),
+                -1, "unavailable_from_path_phase_mixin",
+                pathBuildFields(path, realStart, startNode, endNode, numNodes, goal, context, false));
+    }
+
+    public static void logPathBuildReturn(Object path,
+                                          BetterBlockPos realStart,
+                                          PathNode startNode,
+                                          PathNode endNode,
+                                          int numNodes,
+                                          Goal goal,
+                                          CalculationContext context) {
+        if (!ChatClefDiagnostics.isBoundaryEnabled()) {
+            return;
+        }
+        CalculationRecord record = activeRecordForPath(path);
+        if (record == null || path == null) {
+            return;
+        }
+        putPathRecord(path, record);
+        IPath rawPath = path instanceof IPath ? (IPath) path : null;
+        long elapsedMillis;
+        synchronized (record) {
+            record.rawPathPresent = rawPath != null;
+            record.rawPath = rawPath;
+            record.rawPathId = BaritonePathObjectFormatters.identity(path);
+            record.rawPathSummary = BaritonePathObjectFormatters.summarizePath(rawPath);
+            elapsedMillis = elapsedMillisSince(record.pathBuildStartNanos);
+        }
+        emitCalculationPhase(record, record.pathfinder, "PATH_BUILD_RETURN",
+                "baritone_path_constructor_return", "path_build|" + BaritonePathObjectFormatters.identity(path),
+                elapsedMillis, "unavailable_from_path_phase_mixin",
+                MiningDiagnosticEmitter.merge(
+                        pathBuildFields(path, realStart, startNode, endNode, numNodes, goal, context, true),
+                        new Object[]{
+                                "rawResultPathPresent", record.rawPathPresent,
+                                "rawResultPathIdentity", record.rawPathId,
+                                "rawResultPathSummary", record.rawPathSummary
+                        }));
+    }
+
+    public static void logPathPostProcessEnter(IPath path) {
+        if (!ChatClefDiagnostics.isBoundaryEnabled() || path == null) {
+            return;
+        }
+        CalculationRecord record = activeRecordForPath(path);
+        if (record == null) {
+            return;
+        }
+        synchronized (record) {
+            record.postProcessStartNanos = System.nanoTime();
+        }
+        emitCalculationPhase(record, record.pathfinder, "POST_PROCESS_ENTER",
+                "baritone_path_post_process_head", "post_process|" + BaritonePathObjectFormatters.identity(path),
+                -1, "unavailable_from_path_phase_mixin", new Object[]{
+                        "rawResultPathPresent", true,
+                        "rawResultPathIdentity", BaritonePathObjectFormatters.identity(path),
+                        "rawResultPathSummary", BaritonePathObjectFormatters.summarizePath(path)
+                });
+    }
+
+    public static void logPathPostProcessReturn(IPath path,
+                                                IPath result) {
+        if (!ChatClefDiagnostics.isBoundaryEnabled() || path == null) {
+            return;
+        }
+        CalculationRecord record = activeRecordForPath(path);
+        if (record == null) {
+            return;
+        }
+        long elapsedMillis;
+        synchronized (record) {
+            record.postProcessedPathPresent = result != null;
+            record.postProcessedPath = result;
+            record.postProcessedPathId = BaritonePathObjectFormatters.identity(result);
+            record.postProcessedPathSummary = BaritonePathObjectFormatters.summarizePath(result);
+            elapsedMillis = elapsedMillisSince(record.postProcessStartNanos);
+        }
+        emitCalculationPhase(record, record.pathfinder, "POST_PROCESS_RETURN",
+                "baritone_path_post_process_return", "post_process|"
+                        + BaritonePathObjectFormatters.identity(path)
+                        + "|"
+                        + record.postProcessedPathId,
+                elapsedMillis, "unavailable_from_path_phase_mixin", new Object[]{
+                        "rawResultPathPresent", true,
+                        "rawResultPathIdentity", BaritonePathObjectFormatters.identity(path),
+                        "rawResultPathSummary", BaritonePathObjectFormatters.summarizePath(path),
+                        "postProcessedPathPresent", record.postProcessedPathPresent,
+                        "postProcessedPathIdentity", record.postProcessedPathId,
+                        "postProcessedPathSummary", record.postProcessedPathSummary
+                });
     }
 
     public static void logAdoptionDecisionBeforeClear(PathingBehavior behavior,
@@ -329,6 +508,9 @@ public final class BaritonePathCalculationDiagnostics {
                 },
                 BaritoneExecutorDiagnosticSnapshot.fields("current", current),
                 BaritoneExecutorDiagnosticSnapshot.fields("next", next)));
+        removePathRecord(record.rawPath);
+        removePathRecord(record.postProcessedPath);
+        removePathRecord(record.resultPath);
         RECORDS.remove(System.identityHashCode(pathfinder), record);
     }
 
@@ -370,12 +552,179 @@ public final class BaritonePathCalculationDiagnostics {
                 });
     }
 
+    private static void emitCalculationPhase(CalculationRecord record,
+                                             AbstractNodeCostSearch pathfinder,
+                                             String phase,
+                                             String trigger,
+                                             String phaseKey,
+                                             long elapsedMillis,
+                                             Object cancelRequested,
+                                             Object[] phaseFields) {
+        TimeoutSnapshot timeout = timeoutSnapshot(record.primaryTimeoutMs, record.failureTimeoutMs);
+        String pathfinderIdentity = pathfinder == null
+                ? Integer.toHexString(record.pathfinderIdentity)
+                : BaritonePathObjectFormatters.identity(pathfinder);
+        String fingerprint = MiningDiagnosticEmitter.joinFingerprint(
+                "BARITONE_CALCULATION_PHASE_BOUNDARY",
+                Long.toString(record.generationId),
+                pathfinderIdentity,
+                phase,
+                phaseKey
+        );
+        BaritoneDiagnosticEmitter.emit("BARITONE_CALCULATION_PHASE_BOUNDARY", "baritone_calculation_phase_boundary",
+                "baritone_pathfinder_phase_observer", trigger,
+                "baritone_calculation|" + record.generationId,
+                fingerprint,
+                MiningDiagnosticEmitter.merge(new Object[]{
+                        "calculationGeneration", record.generationId,
+                        "phase", phase,
+                        "pathfinderIdentity", pathfinderIdentity,
+                        "pathfinderType", BaritonePathObjectFormatters.className(pathfinder),
+                        "pathingBehaviorIdentity", record.pathingBehaviorId,
+                        "firstSegment", record.firstSegment,
+                        "pathStart", record.pathStartSummary,
+                        "pathfinderStart", record.pathfinderStartSummary,
+                        "requestedGoalType", record.requestedGoalType,
+                        "requestedGoalSummary", record.requestedGoalSummary,
+                        "pathfinderGoalType", record.pathfinderGoalType,
+                        "pathfinderGoalSummary", record.pathfinderGoalSummary,
+                        "primaryTimeoutMs", record.primaryTimeoutMs,
+                        "failureTimeoutMs", record.failureTimeoutMs,
+                        "slowPath", timeout.slowPath(),
+                        "slowPathTimeoutMs", timeout.slowPathTimeoutMs(),
+                        "effectivePrimaryTimeoutMs", timeout.effectivePrimaryTimeoutMs(),
+                        "effectiveFailureTimeoutMs", timeout.effectiveFailureTimeoutMs(),
+                        "elapsedMillis", elapsedMillis,
+                        "cancelRequested", cancelRequested,
+                        "workerThreadName", Thread.currentThread().getName(),
+                        "workerThreadId", Thread.currentThread().getId()
+                }, phaseFields));
+    }
+
+    private static Object[] pathBuildFields(Object path,
+                                            BetterBlockPos realStart,
+                                            PathNode startNode,
+                                            PathNode endNode,
+                                            int numNodes,
+                                            Goal goal,
+                                            CalculationContext context,
+                                            boolean includePathSummary) {
+        IPath rawPath = includePathSummary && path instanceof IPath ? (IPath) path : null;
+        return new Object[]{
+                "pathIdentity", BaritonePathObjectFormatters.identity(path),
+                "pathType", BaritonePathObjectFormatters.className(path),
+                "pathSummary", includePathSummary ? BaritonePathObjectFormatters.summarizePath(rawPath) : "unavailable_before_constructor_return",
+                "pathRealStart", BaritonePathObjectFormatters.safeValue(realStart),
+                "pathStartNodePresent", startNode != null,
+                "pathStartNodeSummary", summarizeNode(startNode),
+                "pathEndNodePresent", endNode != null,
+                "pathEndNodeSummary", summarizeNode(endNode),
+                "pathEndNodePreviousPresent", endNode != null && endNode.previous != null,
+                "pathNumNodesConsidered", numNodes,
+                "pathGoalType", BaritonePathObjectFormatters.className(goal),
+                "pathGoalSummary", BaritonePathObjectFormatters.summarizeGoal(goal),
+                "calculationContextType", BaritonePathObjectFormatters.className(context)
+        };
+    }
+
+    private static CalculationRecord activeRecordForPath(Object path) {
+        CalculationRecord active = ACTIVE_CALCULATION.get();
+        if (active != null) {
+            return active;
+        }
+        if (path == null) {
+            return null;
+        }
+        return PATH_RECORDS.get(System.identityHashCode(path));
+    }
+
+    private static void putPathRecord(Object path, CalculationRecord record) {
+        if (path == null || record == null) {
+            return;
+        }
+        if (PATH_RECORDS.size() > RECORD_HARD_CAP) {
+            PATH_RECORDS.clear();
+        }
+        PATH_RECORDS.put(System.identityHashCode(path), record);
+    }
+
+    private static IPath optionalPath(Optional<IPath> result) {
+        if (result == null) {
+            return null;
+        }
+        try {
+            return result.orElse(null);
+        } catch (RuntimeException | LinkageError error) {
+            return null;
+        }
+    }
+
+    private static long elapsedMillisSince(long startedAtNanos) {
+        if (startedAtNanos <= 0) {
+            return -1;
+        }
+        return (System.nanoTime() - startedAtNanos) / 1_000_000L;
+    }
+
+    private static String summarizeNode(PathNode node) {
+        if (node == null) {
+            return "none";
+        }
+        return "PathNode{x="
+                + node.x
+                + ",y="
+                + node.y
+                + ",z="
+                + node.z
+                + ",cost="
+                + ChatClefDiagnostics.safeValueForDiagnosticLog(() -> node.cost)
+                + ",estimatedCostToGoal="
+                + ChatClefDiagnostics.safeValueForDiagnosticLog(() -> node.estimatedCostToGoal)
+                + ",combinedCost="
+                + ChatClefDiagnostics.safeValueForDiagnosticLog(() -> node.combinedCost)
+                + ",open="
+                + ChatClefDiagnostics.safeValueForDiagnosticLog(node::isOpen)
+                + "}";
+    }
+
+    private static TimeoutSnapshot timeoutSnapshot(long primaryTimeoutMs, long failureTimeoutMs) {
+        String slowPath = ChatClefDiagnostics.safeValueForDiagnosticLog(() -> Baritone.settings().slowPath.value);
+        long slowPathTimeoutMs = safeLongSetting(() -> Baritone.settings().slowPathTimeoutMS.value);
+        boolean slowPathEnabled = "true".equals(slowPath);
+        long effectivePrimaryTimeoutMs = slowPathEnabled && slowPathTimeoutMs >= 0
+                ? slowPathTimeoutMs
+                : primaryTimeoutMs;
+        long effectiveFailureTimeoutMs = slowPathEnabled && slowPathTimeoutMs >= 0
+                ? slowPathTimeoutMs
+                : failureTimeoutMs;
+        return new TimeoutSnapshot(slowPath, slowPathTimeoutMs, effectivePrimaryTimeoutMs, effectiveFailureTimeoutMs);
+    }
+
+    private static long safeLongSetting(Supplier<?> supplier) {
+        try {
+            Object value = supplier.get();
+            if (value instanceof Number number) {
+                return number.longValue();
+            }
+            return -1;
+        } catch (RuntimeException | LinkageError error) {
+            return -1;
+        }
+    }
+
     private static CalculationRecord recordFor(AbstractNodeCostSearch pathfinder) {
         if (RECORDS.size() > RECORD_HARD_CAP) {
             RECORDS.clear();
+            PATH_RECORDS.clear();
         }
         return RECORDS.computeIfAbsent(System.identityHashCode(pathfinder),
                 ignored -> new CalculationRecord(NEXT_GENERATION.getAndIncrement(), pathfinder));
+    }
+
+    private static void removePathRecord(IPath path) {
+        if (path != null) {
+            PATH_RECORDS.remove(System.identityHashCode(path));
+        }
     }
 
     private static String deriveRejectReason(boolean accepted,
@@ -435,6 +784,12 @@ public final class BaritonePathCalculationDiagnostics {
         return "PATH_PRESENT_NOT_ADOPTED_OR_DISCARDED";
     }
 
+    private record TimeoutSnapshot(String slowPath,
+                                   long slowPathTimeoutMs,
+                                   long effectivePrimaryTimeoutMs,
+                                   long effectiveFailureTimeoutMs) {
+    }
+
     private static final class CalculationRecord {
         final long generationId;
         final int pathfinderIdentity;
@@ -450,11 +805,22 @@ public final class BaritonePathCalculationDiagnostics {
         long primaryTimeoutMs = -1;
         long failureTimeoutMs = -1;
         long calculateStartNanos = -1;
+        long calculate0StartNanos = -1;
+        long pathBuildStartNanos = -1;
+        long postProcessStartNanos = -1;
         String resultType = "unobserved";
         boolean resultPathPresent;
         String resultPathId = "none";
         String resultPathSummary = "none";
         IPath resultPath;
+        boolean rawPathPresent;
+        String rawPathId = "none";
+        String rawPathSummary = "none";
+        IPath rawPath;
+        boolean postProcessedPathPresent;
+        String postProcessedPathId = "none";
+        String postProcessedPathSummary = "none";
+        IPath postProcessedPath;
         long elapsedMillis = -1;
         boolean cancelRequestedAfterCalculate;
 

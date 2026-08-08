@@ -5,9 +5,11 @@
   "compatibilityLevel": "JAVA_8",
   "mixins": [
     "AbstractFurnaceScreenHandlerAccessor",
+    "diagnostics.AStarPathFinderDiagnosticMixin",
     "AxeItemAccessor",
     "diagnostics.AbstractNodeCostSearchDiagnosticMixin",
     "diagnostics.CustomGoalProcessDiagnosticMixin",
+    "diagnostics.PathDiagnosticMixin",
     "diagnostics.PathingBehaviorDiagnosticMixin",
     "diagnostics.PathingControlManagerDiagnosticMixin",
     "BlockModifiedByPlayerMixin",

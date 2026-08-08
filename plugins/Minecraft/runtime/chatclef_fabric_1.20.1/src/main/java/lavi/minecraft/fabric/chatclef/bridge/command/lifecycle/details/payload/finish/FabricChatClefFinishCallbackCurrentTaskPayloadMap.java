@@ -1,5 +1,6 @@
 package lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.details.payload.finish;
 
+import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.details.payload.finish.current.FabricChatClefFinishCallbackCurrentTaskRelationshipPayloadMap;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefBoundRootTaskRelationshipPayload;
 
 import java.util.Map;
@@ -13,6 +14,6 @@ public final class FabricChatClefFinishCallbackCurrentTaskPayloadMap {
             Map<String, Object> details,
             FabricChatClefBoundRootTaskRelationshipPayload callbackCurrentTask
     ) {
-        details.putAll(callbackCurrentTask.toMap());
+        FabricChatClefFinishCallbackCurrentTaskRelationshipPayloadMap.writeTo(details, callbackCurrentTask);
     }
 }
