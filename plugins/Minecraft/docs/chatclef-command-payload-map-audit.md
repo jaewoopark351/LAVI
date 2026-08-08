@@ -324,6 +324,7 @@ Current LAVI-owned helper placement:
 ```text
 command/ownership/FabricChatClefCommandOwnershipPayload
 command/ownership/payload/FabricChatClefCommandOwnershipPayloadMap
+command/ownership/payload/session/*
 command/result/FabricChatClefCommandResultDataPayload
 command/result/FabricChatClefCommandResultDataMapPayload
 command/result/FabricChatClefCommandResultPayload
@@ -435,6 +436,11 @@ ownership lives under `command/ownership/payload/*` and
 the typed snapshot payload and `FabricChatClefTaskSnapshotPayloadMap` so
 `available`, `class_name`, `identity`, task-state, `current_task`, and
 `bound_root_task` fields stay unchanged while the Map edge remains isolated.
+Command ownership session fields are split under
+`command/ownership/payload/session/*` so `request_id`, `correlation_id`,
+`session_id`, `connection_generation`, `accepted_at_ms`, `detached`, and
+`detached_reason` stay unchanged while request/session metadata and detach
+state are written by separate helpers.
 Task ownership snapshot field groups are further split under
 `command/observation/payload/ownership/*` so capture metadata, UserTask root
 fields, and selected-chain fields can change internally without renaming the
