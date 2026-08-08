@@ -354,6 +354,9 @@ command/lifecycle/payload/FabricChatClefCommandTerminationObservationPayload
 command/lifecycle/payload/FabricChatClefCommandTerminationObservationPayloadMap
 command/lifecycle/details/FabricChatClefTaskFinishedEventDetailsPayload
 command/lifecycle/details/payload/*
+command/lifecycle/details/payload/finish/*
+command/lifecycle/details/payload/taskfinished/*
+command/lifecycle/details/payload/waiting/*
 command/lifecycle/observation/FabricChatClefTaskFinishedObservationPayload
 command/lifecycle/observation/payload/FabricChatClefTaskFinishedObservationPayloadMap
 command/diagnostics/details/FabricChatClefEmptyCommandDiagnosticDetailsPayload
@@ -460,6 +463,16 @@ Task snapshot field writers are split under
 runtime state fields such as `task_state_available`, `task_active`,
 `task_stopped`, `this_or_child_timed_out`, and `task_state_error` without
 changing the emitted snapshot shape.
+Task-finished lifecycle detail field writers are split under
+`command/lifecycle/details/payload/taskfinished/*` so the
+`task_finished_event`, bound-root match fields, `finish_callback_received`, and
+`runtime` fields keep their existing log shape while each detail group owns its
+own final Map writes.
+Waiting and finish-callback lifecycle detail writers are split under
+`command/lifecycle/details/payload/waiting/*` and
+`command/lifecycle/details/payload/finish/*` so waiting reason, current-task
+relationship fields, callback current-task fields, and runtime fields remain
+separate while preserving the existing diagnostic detail keys.
 
 ### Lifecycle And Gate Logs
 
