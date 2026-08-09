@@ -1,13 +1,13 @@
 package lavi.minecraft.fabric.chatclef.bridge.command.observation.payload.relationship;
 
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskSnapshot;
+import lavi.minecraft.fabric.chatclef.bridge.command.observation.payload.relationship.task.FabricChatClefBoundRootTaskRelationshipBoundRootTaskPayloadMap;
+import lavi.minecraft.fabric.chatclef.bridge.command.observation.payload.relationship.task.FabricChatClefBoundRootTaskRelationshipCandidateTaskPayloadMap;
 
 import java.util.Map;
 
 //20260808_kpopmodder: Split bound-root relationship task snapshots without changing emitted keys.
 public final class FabricChatClefBoundRootTaskRelationshipTaskPayloadMap {
-    private static final String BOUND_ROOT_TASK = "bound_root_task";
-
     private FabricChatClefBoundRootTaskRelationshipTaskPayloadMap() {
     }
 
@@ -17,7 +17,14 @@ public final class FabricChatClefBoundRootTaskRelationshipTaskPayloadMap {
             FabricChatClefTaskSnapshot candidateTask,
             FabricChatClefTaskSnapshot boundRootTask
     ) {
-        payload.put(candidateName, candidateTask.toMap());
-        payload.put(BOUND_ROOT_TASK, boundRootTask.toMap());
+        FabricChatClefBoundRootTaskRelationshipCandidateTaskPayloadMap.writeTo(
+                payload,
+                candidateName,
+                candidateTask
+        );
+        FabricChatClefBoundRootTaskRelationshipBoundRootTaskPayloadMap.writeTo(
+                payload,
+                boundRootTask
+        );
     }
 }

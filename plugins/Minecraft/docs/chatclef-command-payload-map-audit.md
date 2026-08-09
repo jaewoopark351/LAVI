@@ -475,6 +475,11 @@ Bound-root relationship fields are split under
 `command/observation/payload/relationship/*` so candidate task snapshots,
 `bound_root_task`, and the suffix-derived match/reason fields remain separately
 owned while preserving the current emitted keys and nesting.
+Bound-root relationship task and match fields are further split under
+`command/observation/payload/relationship/task/*` and
+`command/observation/payload/relationship/match/*` so the candidate task,
+bound-root task, match flag, and match reason each own their final Map write
+without changing emitted key names.
 Task snapshot field writers are split under
 `command/observation/payload/snapshot/*` so summary fields such as `available`,
 `class_name`, `description`, `identity`, and `error` stay separate from
