@@ -325,6 +325,7 @@ Current LAVI-owned helper placement:
 command/ownership/FabricChatClefCommandOwnershipPayload
 command/ownership/payload/FabricChatClefCommandOwnershipPayloadMap
 command/ownership/payload/session/*
+command/ownership/payload/session/detach/*
 command/result/FabricChatClefCommandResultDataPayload
 command/result/FabricChatClefCommandResultDataMapPayload
 command/result/FabricChatClefCommandResultPayload
@@ -458,6 +459,9 @@ connection/acceptance ownership fields are further split under
 `command/ownership/payload/session/request/*` and
 `command/ownership/payload/session/connection/*` without changing emitted
 keys.
+Detach ownership fields are further split under
+`command/ownership/payload/session/detach/*` so `detached` and
+`detached_reason` remain separately owned without changing emitted keys.
 Task ownership snapshot field groups are further split under
 `command/observation/payload/ownership/*` so capture metadata, UserTask root
 fields, and selected-chain fields can change internally without renaming the

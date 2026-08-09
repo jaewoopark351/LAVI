@@ -1,12 +1,12 @@
 package lavi.minecraft.fabric.chatclef.bridge.command.ownership.payload.session;
 
+import lavi.minecraft.fabric.chatclef.bridge.command.ownership.payload.session.detach.FabricChatClefCommandOwnershipDetachedFlagPayloadMap;
+import lavi.minecraft.fabric.chatclef.bridge.command.ownership.payload.session.detach.FabricChatClefCommandOwnershipDetachedReasonPayloadMap;
+
 import java.util.Map;
 
 //20260808_kpopmodder: Keep command ownership detach fields separate at the same Map edge.
 public final class FabricChatClefCommandOwnershipDetachPayloadMap {
-    private static final String DETACHED = "detached";
-    private static final String DETACHED_REASON = "detached_reason";
-
     private FabricChatClefCommandOwnershipDetachPayloadMap() {
     }
 
@@ -15,7 +15,7 @@ public final class FabricChatClefCommandOwnershipDetachPayloadMap {
             boolean detached,
             String detachedReason
     ) {
-        payload.put(DETACHED, detached);
-        payload.put(DETACHED_REASON, detachedReason);
+        FabricChatClefCommandOwnershipDetachedFlagPayloadMap.writeTo(payload, detached);
+        FabricChatClefCommandOwnershipDetachedReasonPayloadMap.writeTo(payload, detachedReason);
     }
 }
