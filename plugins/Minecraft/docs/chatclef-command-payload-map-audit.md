@@ -452,7 +452,11 @@ Command ownership session fields are split under
 `command/ownership/payload/session/*` so `request_id`, `correlation_id`,
 `session_id`, `connection_generation`, `accepted_at_ms`, `detached`, and
 `detached_reason` stay unchanged while request/session metadata and detach
-state are written by separate helpers.
+state are written by separate helpers. Request/correlation and
+connection/acceptance ownership fields are further split under
+`command/ownership/payload/session/request/*` and
+`command/ownership/payload/session/connection/*` without changing emitted
+keys.
 Task ownership snapshot field groups are further split under
 `command/observation/payload/ownership/*` so capture metadata, UserTask root
 fields, and selected-chain fields can change internally without renaming the
@@ -470,7 +474,10 @@ Task snapshot field writers are split under
 `class_name`, `description`, `identity`, and `error` stay separate from
 runtime state fields such as `task_state_available`, `task_active`,
 `task_stopped`, `this_or_child_timed_out`, and `task_state_error` without
-changing the emitted snapshot shape.
+changing the emitted snapshot shape. Snapshot summary fields now split
+availability/error and identity writers under
+`command/observation/payload/snapshot/summary/*` while preserving the same
+summary keys.
 Task-finished lifecycle detail field writers are split under
 `command/lifecycle/details/payload/taskfinished/*` so the
 `task_finished_event`, bound-root match fields, `finish_callback_received`, and
