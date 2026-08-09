@@ -343,6 +343,7 @@ command/observation/payload/runtime/*
 command/observation/payload/ownership/*
 command/observation/payload/relationship/*
 command/observation/payload/snapshot/*
+command/observation/payload/snapshot/state/*
 command/execution/FabricChatClefCommandDiagnosticResultPayload
 command/lifecycle/FabricChatClefCommandDeadlinePayload
 command/lifecycle/FabricChatClefCommandLifecyclePayload
@@ -478,6 +479,10 @@ changing the emitted snapshot shape. Snapshot summary fields now split
 availability/error and identity writers under
 `command/observation/payload/snapshot/summary/*` while preserving the same
 summary keys.
+Snapshot runtime state fields now split availability, boolean state flags, and
+state error writers under `command/observation/payload/snapshot/state/*` while
+preserving the same `task_state_available`, `task_active`, `task_stopped`,
+`this_or_child_timed_out`, and `task_state_error` keys.
 Task-finished lifecycle detail field writers are split under
 `command/lifecycle/details/payload/taskfinished/*` so the
 `task_finished_event`, bound-root match fields, `finish_callback_received`, and
