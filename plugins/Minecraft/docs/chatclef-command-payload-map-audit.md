@@ -485,6 +485,10 @@ availability/error and identity writers under
 `command/observation/payload/snapshot/summary/*` while preserving the same
 summary keys. The availability/error summary writer delegates the `available`
 and `error` keys to separate field writers without changing their emitted names.
+The identity summary writer delegates the `class_name`, `description`, and
+`identity` keys to separate field writers under
+`command/observation/payload/snapshot/summary/identity/*` without changing their
+emitted names.
 Snapshot runtime state fields now split availability, boolean state flags, and
 state error writers under `command/observation/payload/snapshot/state/*` while
 preserving the same `task_state_available`, `task_active`, `task_stopped`,
