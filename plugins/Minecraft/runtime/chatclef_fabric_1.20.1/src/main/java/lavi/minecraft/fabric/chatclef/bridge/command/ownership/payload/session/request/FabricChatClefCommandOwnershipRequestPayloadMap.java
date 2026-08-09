@@ -4,9 +4,6 @@ import java.util.Map;
 
 //20260809_kpopmodder: Split request correlation ownership fields without changing emitted keys.
 public final class FabricChatClefCommandOwnershipRequestPayloadMap {
-    private static final String REQUEST_ID = "request_id";
-    private static final String CORRELATION_ID = "correlation_id";
-
     private FabricChatClefCommandOwnershipRequestPayloadMap() {
     }
 
@@ -15,7 +12,7 @@ public final class FabricChatClefCommandOwnershipRequestPayloadMap {
             String requestId,
             String correlationId
     ) {
-        payload.put(REQUEST_ID, requestId);
-        payload.put(CORRELATION_ID, correlationId);
+        FabricChatClefCommandOwnershipRequestIdPayloadMap.writeTo(payload, requestId);
+        FabricChatClefCommandOwnershipCorrelationPayloadMap.writeTo(payload, correlationId);
     }
 }

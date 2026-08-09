@@ -454,8 +454,9 @@ Command ownership session fields are split under
 `command/ownership/payload/session/*` so `request_id`, `correlation_id`,
 `session_id`, `connection_generation`, `accepted_at_ms`, `detached`, and
 `detached_reason` stay unchanged while request/session metadata and detach
-state are written by separate helpers. Request/correlation and
-connection/acceptance ownership fields are further split under
+state are written by separate helpers. Request id, correlation id, session id,
+connection generation, and acceptance timestamp ownership fields are further
+split under
 `command/ownership/payload/session/request/*` and
 `command/ownership/payload/session/connection/*` without changing emitted
 keys.
