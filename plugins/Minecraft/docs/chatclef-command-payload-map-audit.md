@@ -471,6 +471,12 @@ Runtime task observation fields are split under
 `command/observation/payload/runtime/*` so capture timing/thread fields and
 the `current_task` / `ownership` nested payload fields remain separately owned
 while the existing emitted shape stays unchanged.
+Runtime capture fields are further split under
+`command/observation/payload/runtime/capture/*` so `thread_name`,
+`observed_at_ms`, and `client_tick_id` each own their final Map write.
+Runtime current-task fields are further split under
+`command/observation/payload/runtime/current/*` so `current_task` and
+`ownership` each own their final Map write without changing nested shapes.
 Bound-root relationship fields are split under
 `command/observation/payload/relationship/*` so candidate task snapshots,
 `bound_root_task`, and the suffix-derived match/reason fields remain separately

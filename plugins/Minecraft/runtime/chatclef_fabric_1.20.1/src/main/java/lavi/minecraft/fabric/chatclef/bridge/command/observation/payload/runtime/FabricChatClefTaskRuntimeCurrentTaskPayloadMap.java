@@ -2,14 +2,13 @@ package lavi.minecraft.fabric.chatclef.bridge.command.observation.payload.runtim
 
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskOwnershipSnapshot;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskSnapshot;
+import lavi.minecraft.fabric.chatclef.bridge.command.observation.payload.runtime.current.FabricChatClefTaskRuntimeCurrentTaskSnapshotPayloadMap;
+import lavi.minecraft.fabric.chatclef.bridge.command.observation.payload.runtime.current.FabricChatClefTaskRuntimeOwnershipPayloadMap;
 
 import java.util.Map;
 
 //20260808_kpopmodder: Keep current-task and ownership fields isolated at the runtime observation Map edge.
 public final class FabricChatClefTaskRuntimeCurrentTaskPayloadMap {
-    private static final String CURRENT_TASK = "current_task";
-    private static final String OWNERSHIP = "ownership";
-
     private FabricChatClefTaskRuntimeCurrentTaskPayloadMap() {
     }
 
@@ -18,7 +17,7 @@ public final class FabricChatClefTaskRuntimeCurrentTaskPayloadMap {
             FabricChatClefTaskSnapshot currentTask,
             FabricChatClefTaskOwnershipSnapshot ownership
     ) {
-        payload.put(CURRENT_TASK, currentTask.toMap());
-        payload.put(OWNERSHIP, ownership.toMap());
+        FabricChatClefTaskRuntimeCurrentTaskSnapshotPayloadMap.writeTo(payload, currentTask);
+        FabricChatClefTaskRuntimeOwnershipPayloadMap.writeTo(payload, ownership);
     }
 }
