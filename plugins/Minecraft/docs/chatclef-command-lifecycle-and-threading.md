@@ -283,6 +283,135 @@ Duplicate Java terminal sends must be ignored. Late TaskFinishedEvent signals
 for a detached or already-cleared command must be logged as stale or late
 observation, not used to mutate unrelated command state.
 
+<!-- 20260814_kpopmodder: Documented unresolved Fabric ChatClef command lifecycle hazards before behavior changes. -->
+
+## Known Unresolved Lifecycle Hazards
+
+Status as of 2026-08-14: documentation only. This section records the current
+failure risks that must be resolved before treating command lifecycle ownership
+as stable. It does not approve Java changes, Python changes, protocol changes,
+Gradle build, Minecraft launch, commit, push, or merge.
+
+### Disconnect Must Not Clear Ownership Before Task State Is Resolved
+
+Observed risk:
+
+```text
+WebSocket disconnect or error
+  -> Java active command context cleared
+  -> lifecycle active execution cleared
+  -> AltoClef UserTaskChain root task may still be running
+  -> Baritone pathing or target pursuit may still continue
+```
+
+This can produce the diagnostic shape:
+
+```text
+commandContextAvailable=false
+commandContextError=no_active_command
+UserTaskChain still has the previous command root task
+```
+
+That state must be treated as a lifecycle ownership defect, not as proof that
+the Minecraft task has safely stopped.
+
+Required resolution:
+
+```text
+Disconnect observed
+  -> enqueue an immutable client-tick-owned control event
+  -> choose an explicit policy:
+       preserve detached running task and retain terminal result in an outbox
+       OR cancel the bound root task on the Minecraft client tick
+  -> observe the actual task stop or terminal condition
+  -> send or retain the terminal result according to policy
+  -> clear command ownership only after the chosen policy reaches its terminal point
+```
+
+While a detached or orphan root task may still exist, the bridge must not accept
+or dispatch a new command as if the previous command had no remaining runtime
+state.
+
+### Terminal Result Send Must Complete Before Clear
+
+Observed risk:
+
+```text
+terminal condition classified
+  -> terminalSent=true
+  -> Java active command context cleared
+  -> result envelope send attempted
+  -> send may fail because socket is null, generation is stale, or async send fails
+```
+
+This can produce split-brain ownership:
+
+```text
+Java believes the command was terminal and cleared
+Python never receives the terminal command_result
+Python still considers the request running
+```
+
+Required terminal send ordering:
+
+```text
+TERMINAL_READY
+  -> command_result payload built
+  -> SEND_IN_FLIGHT
+  -> explicit send outcome observed
+  -> SEND_SUCCEEDED
+  -> Java records terminal_result_sent
+  -> Java clears command ownership
+```
+
+Failures such as stale completion, null socket, generation mismatch, synchronous
+send failure, or asynchronous send failure must not be logged as
+`terminal_result_sent`. They need an explicit failure outcome and a retention,
+detached-terminal, or reconnect policy.
+
+### WebSocket Callback Must Not Read Live Engine State
+
+Observed risk:
+
+```text
+WebSocket callback thread
+  -> disconnect or error handling
+  -> command queue mutation
+  -> live task ownership snapshot
+  -> AltoClef / UserTaskChain / TaskRunner / Task state traversal
+  -> diagnostic payload formatting and synchronous log output
+```
+
+This violates the intended thread boundary. Live ChatClef, AltoClef, TaskRunner,
+Task, Baritone, Minecraft client, input, path, goal, and screen state must be
+read on the Minecraft client tick unless an immutable snapshot has already been
+published by the correct owner.
+
+Required thread-affinity direction:
+
+```text
+WebSocket callback:
+    decode
+    validate
+    create immutable command/control event
+    enqueue only
+
+Command queue synchronized region:
+    mutate queue, generation, and immutable command state only
+    do not traverse live engine state
+    do not emit synchronous logs while holding the queue monitor
+
+Fabric END_CLIENT_TICK:
+    dispatch commands
+    process disconnect control events
+    observe live AltoClef / TaskRunner / Task state
+    build task snapshots
+    emit diagnostics outside queue locks
+```
+
+Any fix for disconnect handling, terminal send ordering, or lifecycle
+diagnostics must preserve this thread-affinity boundary.
+
 ## Thread Affinity Matrix
 
 ```text
