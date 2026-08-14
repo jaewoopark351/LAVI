@@ -169,6 +169,23 @@
       "expression_mouth_smile": 0.0,
       "expression_face_angle_x": -6.0,
       "expression_face_angle_y": -10.0
+    },
+    {
+      "id": "DAY6_Love me or Leave me_hinggu",
+      "title": "DAY6_Love me or Leave me_hinggu",
+      "audio_path": "songs/DAY6_Love me or Leave me_hinggu/DAY6_Love me or Leave me_hinggu.wav",
+      "mouth_path": "songs/DAY6_Love me or Leave me_hinggu/DAY6_Love me or Leave me_hinggu_Vocal_only.wav",
+      "offset_ms": -100,
+      "mouth_gain": 1.2,
+      "mouth_floor": 0.05,
+      "expression_enabled": true,
+      "expression_threshold": 0.45,
+      "expression_hold_ms": 1000,
+      "expression_refresh_sec": 0.05,
+      "expression_eye_open": 0.0,
+      "expression_mouth_smile": 0.0,
+      "expression_face_angle_x": -6.0,
+      "expression_face_angle_y": -10.0
     }
   ]
 }
