@@ -2,7 +2,9 @@ package lavi.minecraft.fabric.chatclef.bridge.command;
 
 import lavi.minecraft.fabric.chatclef.bridge.command.control.FabricChatClefConnectionDetachedEvent;
 import lavi.minecraft.fabric.chatclef.bridge.command.control.FabricChatClefConnectionDetachResult;
+import lavi.minecraft.fabric.chatclef.bridge.command.control.FabricChatClefPendingDetachMutation;
 import lavi.minecraft.fabric.chatclef.bridge.command.queue.FabricChatClefCommandQueueCompletion;
+import lavi.minecraft.fabric.chatclef.bridge.command.result.send.FabricChatClefCommandResultSendCompletion;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -13,6 +15,7 @@ public final class FabricChatClefCommandQueue {
     //20260804_kpopmodder: Keep queue ownership under this object's monitor instead of mixing synchronized and atomics.
     private final Deque<FabricChatClefCommandContext> pending = new ArrayDeque<>();
     private final Deque<FabricChatClefConnectionDetachedEvent> connectionDetachedEvents = new ArrayDeque<>();
+    private final Deque<FabricChatClefCommandResultSendCompletion> resultSendCompletions = new ArrayDeque<>();
     private FabricChatClefCommandContext active;
 
     public synchronized boolean offer(FabricChatClefCommandContext context) {
@@ -56,6 +59,10 @@ public final class FabricChatClefCommandQueue {
         return context != null && active == context;
     }
 
+    public synchronized boolean isPending(FabricChatClefCommandContext context) {
+        return context != null && pending.contains(context);
+    }
+
     public synchronized FabricChatClefCommandQueueCompletion complete(
             FabricChatClefCommandContext context,
             String reason
@@ -84,6 +91,18 @@ public final class FabricChatClefCommandQueue {
         return pending.remove(context);
     }
 
+    public synchronized void enqueueCommandResultSendCompletion(
+            FabricChatClefCommandResultSendCompletion completion
+    ) {
+        if (completion != null) {
+            resultSendCompletions.offer(completion);
+        }
+    }
+
+    public synchronized FabricChatClefCommandResultSendCompletion pollCommandResultSendCompletion() {
+        return resultSendCompletions.poll();
+    }
+
     public synchronized void enqueueConnectionDetached(long connectionGeneration, String reason) {
         connectionDetachedEvents.offer(FabricChatClefConnectionDetachedEvent.of(connectionGeneration, reason));
     }
@@ -96,7 +115,7 @@ public final class FabricChatClefCommandQueue {
             FabricChatClefConnectionDetachedEvent event
     ) {
         FabricChatClefCommandContext activeBefore = active;
-        int pendingRemovedCount = removePendingForDetachedConnection(event);
+        FabricChatClefPendingDetachMutation pendingMutation = removePendingForDetachedConnection(event);
         FabricChatClefCommandContext detachedActive = null;
         FabricChatClefCommandContext activeContext = active;
         if (activeContext != null && activeContext.connectionGeneration() == event.connectionGeneration()) {
@@ -108,7 +127,8 @@ public final class FabricChatClefCommandQueue {
                 activeBefore,
                 active,
                 detachedActive,
-                pendingRemovedCount
+                pendingMutation.removedCount(),
+                pendingMutation.inFlightRetainedCount()
         );
     }
 
@@ -145,21 +165,30 @@ public final class FabricChatClefCommandQueue {
             activeContext.markDetached(reason);
         }
         connectionDetachedEvents.clear();
+        resultSendCompletions.clear();
     }
 
-    private int removePendingForDetachedConnection(FabricChatClefConnectionDetachedEvent event) {
+    private FabricChatClefPendingDetachMutation removePendingForDetachedConnection(
+            FabricChatClefConnectionDetachedEvent event
+    ) {
         int removed = 0;
+        int retainedInFlight = 0;
         Deque<FabricChatClefCommandContext> retained = new ArrayDeque<>();
         while (!pending.isEmpty()) {
             FabricChatClefCommandContext context = pending.poll();
             if (context != null && context.connectionGeneration() == event.connectionGeneration()) {
                 context.markDetached(event.reason());
-                removed++;
+                if (context.terminalSendInFlight()) {
+                    retained.offer(context);
+                    retainedInFlight++;
+                } else {
+                    removed++;
+                }
             } else if (context != null) {
                 retained.offer(context);
             }
         }
         pending.addAll(retained);
-        return removed;
+        return FabricChatClefPendingDetachMutation.of(removed, retainedInFlight);
     }
 }

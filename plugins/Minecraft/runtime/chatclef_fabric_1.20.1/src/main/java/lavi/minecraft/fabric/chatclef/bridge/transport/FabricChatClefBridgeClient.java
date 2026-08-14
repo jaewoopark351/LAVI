@@ -5,7 +5,7 @@ import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandContex
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandQueue;
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandResultSender;
 import lavi.minecraft.fabric.chatclef.bridge.command.result.FabricChatClefCommandResultPayload;
-import lavi.minecraft.fabric.chatclef.bridge.command.result.send.FabricChatClefCommandResultSendOutcome;
+import lavi.minecraft.fabric.chatclef.bridge.command.result.send.FabricChatClefCommandResultSendSubmission;
 import lavi.minecraft.fabric.chatclef.bridge.diagnostics.FabricChatClefBridgeDiagnostics;
 import lavi.minecraft.fabric.chatclef.bridge.protocol.FabricChatClefBridgeJson;
 import lavi.minecraft.fabric.chatclef.bridge.protocol.FabricChatClefBridgeMessageFactory;
@@ -60,7 +60,8 @@ public final class FabricChatClefBridgeClient implements WebSocket.Listener, Fab
                 diagnostics,
                 json,
                 () -> this.webSocket,
-                () -> this.activeConnectionGeneration
+                () -> this.activeConnectionGeneration,
+                commandQueue::enqueueCommandResultSendCompletion
         );
         FabricChatClefSessionGuard sessionGuard = new FabricChatClefSessionGuard(state, diagnostics);
         this.inboundMessageHandler = new FabricChatClefInboundMessageHandler(
@@ -209,11 +210,19 @@ public final class FabricChatClefBridgeClient implements WebSocket.Listener, Fab
     }
 
     @Override
-    public FabricChatClefCommandResultSendOutcome sendCommandResult(
+    public FabricChatClefCommandResultSendSubmission sendCommandResult(
             FabricChatClefCommandContext context,
             FabricChatClefCommandResultPayload payload
     ) {
         return resultEnvelopeSender.sendCommandResult(context, payload);
+    }
+
+    @Override
+    public FabricChatClefCommandResultSendSubmission sendTerminalCommandResult(
+            FabricChatClefCommandContext context,
+            FabricChatClefCommandResultPayload payload
+    ) {
+        return resultEnvelopeSender.sendTerminalCommandResult(context, payload);
     }
 
     private boolean isCurrentSocket(WebSocket socket) {

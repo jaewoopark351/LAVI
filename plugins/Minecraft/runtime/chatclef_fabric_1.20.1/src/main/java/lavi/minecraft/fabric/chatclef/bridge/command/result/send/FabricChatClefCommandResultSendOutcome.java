@@ -20,6 +20,13 @@ public final class FabricChatClefCommandResultSendOutcome {
         );
     }
 
+    public static FabricChatClefCommandResultSendOutcome inFlight() {
+        return new FabricChatClefCommandResultSendOutcome(
+                FabricChatClefCommandResultSendStatus.IN_FLIGHT,
+                ""
+        );
+    }
+
     public static FabricChatClefCommandResultSendOutcome failed(
             FabricChatClefCommandResultSendStatus status,
             String message
@@ -29,6 +36,10 @@ public final class FabricChatClefCommandResultSendOutcome {
 
     public boolean succeeded() {
         return status == FabricChatClefCommandResultSendStatus.SENT;
+    }
+
+    public boolean retryable() {
+        return status.retryable();
     }
 
     public FabricChatClefCommandResultSendStatus status() {

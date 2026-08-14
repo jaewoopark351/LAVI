@@ -196,8 +196,9 @@ class MinecraftFabricChatClefJavaBridgeContractTests(unittest.TestCase):
         self.assertIn("FabricChatClefCommandLifecycleCoordinator", components_text)
         self.assertIn("onEndClientTick", coordinator_text)
         self.assertIn("resultOutbox.sendTerminal", coordinator_text)
-        self.assertIn("beginTerminalSend()", outbox_text)
-        self.assertIn("completeTerminalSend(true)", outbox_text)
+        self.assertIn("beginTerminalSend(System.currentTimeMillis())", outbox_text)
+        self.assertIn("drainSendCompletions", outbox_text)
+        self.assertIn("completeTerminalSend(outcome)", outbox_text)
         self.assertIn("commandQueue.complete(context, \"terminal_result\")", outbox_text)
 
     def test_java_bridge_binds_results_to_connection_generation_and_context(self):
@@ -233,12 +234,15 @@ class MinecraftFabricChatClefJavaBridgeContractTests(unittest.TestCase):
         self.assertIn("FabricChatClefCommandContext", sender_text)
         self.assertIn("Deque<FabricChatClefCommandContext>", queue_text)
         self.assertIn("Deque<FabricChatClefConnectionDetachedEvent>", queue_text)
+        self.assertIn("Deque<FabricChatClefCommandResultSendCompletion>", queue_text)
         self.assertIn("clearDetachedActive", queue_text)
+        self.assertIn("enqueueCommandResultSendCompletion", queue_text)
         self.assertIn("connectionGeneration", context_text)
         self.assertIn("correlationId", context_text)
         self.assertIn("sessionId", context_text)
         self.assertIn("AtomicBoolean terminalSendInFlight", context_text)
         self.assertIn("AtomicBoolean terminalSent", context_text)
+        self.assertIn("terminalSendReady", context_text)
 
     def test_disconnect_is_processed_as_client_tick_control_event(self):
         client_text = (
@@ -261,9 +265,11 @@ class MinecraftFabricChatClefJavaBridgeContractTests(unittest.TestCase):
         self.assertIn("enqueueConnectionDetached(generation, \"websocket_error\")", client_text)
         self.assertNotIn("detachConnection", client_text)
         self.assertIn("processConnectionDetachedEvents()", dispatcher_text)
-        self.assertIn("cancelUserTaskForDetachedCommand()", dispatcher_text)
+        self.assertIn("matchesBoundRootTask(context, currentTask)", dispatcher_text)
+        self.assertIn("cancelUserTaskForDetachedCommand(rootMatchReason)", dispatcher_text)
+        self.assertIn("connection_detached_task_not_owned", dispatcher_text)
         self.assertIn("mod.cancelUserTask()", dispatcher_text)
-        self.assertIn("clearDetachedExecution(context, event.reason())", dispatcher_text)
+        self.assertIn("clearDetachedExecution(context, event.reason() + \":\" + rootMatchReason)", dispatcher_text)
         self.assertIn("clearDetachedActive", queue_text)
 
     def test_command_queue_does_not_read_live_task_state_under_monitor(self):
@@ -298,15 +304,20 @@ class MinecraftFabricChatClefJavaBridgeContractTests(unittest.TestCase):
             / "FabricChatClefCommandResultSender.java"
         ).read_text(encoding="utf-8")
 
-        send_index = outbox_text.index("resultSender.sendCommandResult(context, result)")
-        success_check_index = outbox_text.index("if (!sendOutcome.succeeded())")
+        send_index = outbox_text.index("resultSender.sendTerminalCommandResult(context, result)")
+        success_check_index = outbox_text.index("if (!submission.acceptedForAsyncSend())")
+        completion_index = outbox_text.index("context.completeTerminalSend(outcome)")
         clear_index = outbox_text.index("commandQueue.complete(context, \"terminal_result\")")
 
         self.assertLess(send_index, success_check_index)
-        self.assertLess(success_check_index, clear_index)
-        self.assertIn("FabricChatClefCommandResultSendOutcome", interface_text)
+        self.assertLess(completion_index, clear_index)
+        self.assertIn("FabricChatClefCommandResultSendSubmission", interface_text)
+        self.assertIn("sendTerminalCommandResult", interface_text)
         self.assertIn("socket.sendText(message, true)", sender_text)
+        self.assertIn(".whenComplete((ignored, error)", sender_text)
+        self.assertNotIn(".toCompletableFuture().join()", sender_text)
         self.assertIn("ASYNC_SEND_FAILED", sender_text)
+        self.assertIn("enqueueCompletion(context, outcome)", sender_text)
 
     def test_java_dispatcher_checks_active_deadline_before_busy_return(self):
         dispatcher_text = (

@@ -112,6 +112,16 @@ public final class FabricChatClefCommandLifecycleCoordinator {
     }
 
     public void onEndClientTick(Optional<FabricChatClefCommandContext> activeContext) {
+        FabricChatClefCommandExecution executionBeforeDrain = activeExecution.get();
+        if (resultOutbox.drainSendCompletions(executionBeforeDrain)
+                && activeExecution.compareAndSet(executionBeforeDrain, null)) {
+            commandDiagnostics.info(
+                    "terminal_result_sent",
+                    executionBeforeDrain,
+                    FabricChatClefLifecycleDetailsPayload.terminalResult(true, true)
+            );
+            lastWaitingDecisionKey = "";
+        }
         syncActiveContext(activeContext);
         drainObservations();
         FabricChatClefCommandExecution execution = activeExecution.get();
@@ -121,6 +131,9 @@ public final class FabricChatClefCommandLifecycleCoordinator {
     }
 
     public void completeActiveDeadline(FabricChatClefCommandContext context) {
+        if (!context.terminalSendReady(System.currentTimeMillis())) {
+            return;
+        }
         FabricChatClefCommandExecution execution = activeExecution.get();
         if (execution != null && execution.context() == context) {
             commandDiagnostics.warn("active_deadline_exceeded", execution);
@@ -147,9 +160,42 @@ public final class FabricChatClefCommandLifecycleCoordinator {
         );
     }
 
+    public void completePendingDeadline(FabricChatClefCommandContext context) {
+        if (!context.terminalSendReady(System.currentTimeMillis())) {
+            return;
+        }
+        commandDiagnostics.contextWarn(
+                "pending_deadline_exceeded",
+                context,
+                FabricChatClefLifecycleDetailsPayload.empty()
+        );
+        resultOutbox.sendPendingTerminal(
+                context,
+                () -> FabricChatClefCommandResult.deadlineExceeded(
+                        context.requestId(),
+                        "Fabric ChatClef command deadline expired before dispatch."
+                )
+        );
+    }
+
     public boolean hasActiveExecution(FabricChatClefCommandContext context) {
         FabricChatClefCommandExecution execution = activeExecution.get();
         return execution != null && execution.context() == context;
+    }
+
+    public boolean matchesBoundRootTask(FabricChatClefCommandContext context, Task candidateTask) {
+        FabricChatClefCommandExecution execution = activeExecution.get();
+        return execution != null
+                && execution.context() == context
+                && execution.matchesBoundRootTask(candidateTask);
+    }
+
+    public String boundRootMatchReason(FabricChatClefCommandContext context, Task candidateTask) {
+        FabricChatClefCommandExecution execution = activeExecution.get();
+        if (execution == null || execution.context() != context) {
+            return "no_matching_lifecycle_execution";
+        }
+        return execution.boundRootMatchReason(candidateTask);
     }
 
     private void drainObservations() {
@@ -193,6 +239,9 @@ public final class FabricChatClefCommandLifecycleCoordinator {
             logWaitingDecision(execution, decision.reason());
             return;
         }
+        if (!execution.context().terminalSendReady(System.currentTimeMillis())) {
+            return;
+        }
         commandDiagnostics.info(
                 "terminal_decision",
                 execution,
@@ -211,16 +260,12 @@ public final class FabricChatClefCommandLifecycleCoordinator {
             FabricChatClefCommandExecution execution,
             Supplier<FabricChatClefCommandResultPayload> resultFactory
     ) {
-        boolean terminalSent = resultOutbox.sendTerminal(execution, resultFactory);
-        boolean lifecycleCleared = terminalSent && activeExecution.compareAndSet(execution, null);
+        boolean sendStarted = resultOutbox.sendTerminal(execution, resultFactory);
         commandDiagnostics.info(
-                terminalSent ? "terminal_result_sent" : "terminal_result_send_failed",
+                sendStarted ? "terminal_result_send_started" : "terminal_result_send_waiting",
                 execution,
-                FabricChatClefLifecycleDetailsPayload.terminalResult(terminalSent, lifecycleCleared)
+                FabricChatClefLifecycleDetailsPayload.terminalResult(false, false)
         );
-        if (lifecycleCleared) {
-            lastWaitingDecisionKey = "";
-        }
     }
 
     public boolean clearDetachedExecution(FabricChatClefCommandContext context, String reason) {

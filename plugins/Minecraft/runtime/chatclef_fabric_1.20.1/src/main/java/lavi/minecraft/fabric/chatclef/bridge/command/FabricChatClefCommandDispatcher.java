@@ -2,6 +2,7 @@ package lavi.minecraft.fabric.chatclef.bridge.command;
 
 import adris.altoclef.AltoClef;
 import adris.altoclef.commandsystem.CommandExecutor;
+import adris.altoclef.tasksystem.Task;
 import lavi.minecraft.fabric.chatclef.bridge.command.control.FabricChatClefConnectionDetachedEvent;
 import lavi.minecraft.fabric.chatclef.bridge.command.control.FabricChatClefConnectionDetachResult;
 import lavi.minecraft.fabric.chatclef.bridge.command.diagnostics.FabricChatClefCommandContextUnbindDiagnostics;
@@ -10,7 +11,7 @@ import lavi.minecraft.fabric.chatclef.bridge.command.execution.FabricChatClefCom
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandLifecycleCoordinator;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskOwnershipSnapshot;
 import lavi.minecraft.fabric.chatclef.bridge.command.queue.FabricChatClefCommandQueueCompletion;
-import lavi.minecraft.fabric.chatclef.bridge.command.result.send.FabricChatClefCommandResultSendOutcome;
+import lavi.minecraft.fabric.chatclef.bridge.command.result.send.FabricChatClefCommandResultSendSubmission;
 import lavi.minecraft.fabric.chatclef.bridge.diagnostics.FabricChatClefBridgeDiagnostics;
 import net.minecraft.client.MinecraftClient;
 
@@ -40,10 +41,10 @@ public final class FabricChatClefCommandDispatcher {
 
     public void onEndClientTick(MinecraftClient client) {
         long nowMs = System.currentTimeMillis();
+        lifecycleCoordinator.onEndClientTick(commandQueue.activeContext());
         if (processConnectionDetachedEvents()) {
             return;
         }
-        lifecycleCoordinator.onEndClientTick(commandQueue.activeContext());
         Optional<FabricChatClefCommandContext> active = commandQueue.activeContext();
         if (active.isPresent()) {
             FabricChatClefCommandContext context = active.get();
@@ -55,25 +56,7 @@ public final class FabricChatClefCommandDispatcher {
         Optional<FabricChatClefCommandContext> pending = commandQueue.peekPending();
         if (pending.isPresent() && pending.get().isDeadlineExceeded(nowMs)) {
             FabricChatClefCommandContext context = pending.get();
-            commandQueue.removePending(context);
-            if (context.beginTerminalSend()) {
-                FabricChatClefCommandResultSendOutcome sendOutcome = resultSender.sendCommandResult(
-                        context,
-                        FabricChatClefCommandResult.deadlineExceeded(
-                                context.requestId(),
-                                "Fabric ChatClef command deadline expired before dispatch."
-                        )
-                );
-                context.completeTerminalSend(sendOutcome.succeeded());
-                if (!sendOutcome.succeeded()) {
-                    diagnostics.warn(
-                            "pending deadline result send failed request="
-                                    + context.requestId()
-                                    + " outcome="
-                                    + sendOutcome.diagnosticMessage()
-                    );
-                }
-            }
+            lifecycleCoordinator.completePendingDeadline(context);
             return;
         }
         if (!isEngineReady()) {
@@ -90,21 +73,42 @@ public final class FabricChatClefCommandDispatcher {
                 return processed;
             }
             processed = true;
-            handleConnectionDetached(event.get());
+            if (handleConnectionDetached(event.get())) {
+                return true;
+            }
         }
         return true;
     }
 
-    private void handleConnectionDetached(FabricChatClefConnectionDetachedEvent event) {
+    private boolean handleConnectionDetached(FabricChatClefConnectionDetachedEvent event) {
         FabricChatClefTaskOwnershipSnapshot ownershipBefore =
                 FabricChatClefCommandContextUnbindDiagnostics.captureOwnershipSnapshot();
         FabricChatClefConnectionDetachResult detachResult = commandQueue.markConnectionDetached(event);
         Optional<FabricChatClefCommandContext> detachedActive = detachResult.detachedActive();
         if (detachedActive.isEmpty()) {
+            if (detachResult.pendingInFlightRetainedCount() > 0) {
+                commandQueue.enqueueConnectionDetached(event.connectionGeneration(), event.reason());
+                return true;
+            }
             logDetachedWithoutActive(detachResult, ownershipBefore);
-            return;
+            return false;
         }
         FabricChatClefCommandContext context = detachedActive.get();
+        if (context.terminalSendInFlight()) {
+            commandQueue.enqueueConnectionDetached(event.connectionGeneration(), event.reason());
+            if (context.markTerminalDetachDeferLogged()) {
+                diagnostics.warn(
+                        "connection detach deferred while terminal result send is in flight request="
+                                + context.requestId()
+                                + " generation="
+                                + event.connectionGeneration()
+                );
+            }
+            return true;
+        }
+        Task currentTask = taskStateReader.currentTaskOrNull();
+        String rootMatchReason = lifecycleCoordinator.boundRootMatchReason(context, currentTask);
+        boolean ownsCurrentTask = lifecycleCoordinator.matchesBoundRootTask(context, currentTask);
         diagnostics.warn(
                 "connection detached with active command request="
                         + context.requestId()
@@ -112,16 +116,27 @@ public final class FabricChatClefCommandDispatcher {
                         + event.connectionGeneration()
                         + " reason="
                         + event.reason()
-                        + "; cancelling user task on client tick"
+                        + " bound_root_match_reason="
+                        + rootMatchReason
         );
-        cancelUserTaskForDetachedCommand();
+        if (ownsCurrentTask) {
+            cancelUserTaskForDetachedCommand(rootMatchReason);
+        } else {
+            diagnostics.warn(
+                    "connection detach cancel skipped because current user task is not owned by request="
+                            + context.requestId()
+                            + " bound_root_match_reason="
+                            + rootMatchReason
+            );
+        }
         lifecycleCoordinator.onEndClientTick(commandQueue.activeContext());
-        lifecycleCoordinator.clearDetachedExecution(context, event.reason());
+        lifecycleCoordinator.clearDetachedExecution(context, event.reason() + ":" + rootMatchReason);
         FabricChatClefCommandQueueCompletion completion = commandQueue.clearDetachedActive(
                 context,
-                "connection_detached_task_cancelled"
+                ownsCurrentTask ? "connection_detached_task_cancelled" : "connection_detached_task_not_owned"
         );
         logQueueCompletion(completion, ownershipBefore);
+        return false;
     }
 
     private void logDetachedWithoutActive(
@@ -157,12 +172,13 @@ public final class FabricChatClefCommandDispatcher {
         );
     }
 
-    private void cancelUserTaskForDetachedCommand() {
+    private void cancelUserTaskForDetachedCommand(String rootMatchReason) {
         AltoClef mod = AltoClef.getInstance();
         if (mod == null || mod.getUserTaskChain() == null) {
             diagnostics.warn("connection detach cancel skipped because AltoClef user task chain is unavailable");
             return;
         }
+        diagnostics.warn("connection detach cancelling owned user task bound_root_match_reason=" + rootMatchReason);
         mod.cancelUserTask();
     }
 
@@ -194,7 +210,16 @@ public final class FabricChatClefCommandDispatcher {
                         + " generation="
                         + context.connectionGeneration()
         );
-        resultSender.sendCommandResult(context, execution.runningResult());
+        FabricChatClefCommandResultSendSubmission runningSubmission =
+                resultSender.sendCommandResult(context, execution.runningResult());
+        if (!runningSubmission.acceptedForAsyncSend()) {
+            diagnostics.warn(
+                    "running result send submit failed request="
+                            + context.requestId()
+                            + " outcome="
+                            + runningSubmission.diagnosticMessage()
+            );
+        }
         try {
             executor.execute(
                     command,

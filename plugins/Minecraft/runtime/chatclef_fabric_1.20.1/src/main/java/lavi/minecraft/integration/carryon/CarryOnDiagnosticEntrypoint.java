@@ -16,5 +16,6 @@ public final class CarryOnDiagnosticEntrypoint implements ModInitializer {
         ChatClefDiagnostics.registerPostPlaceContainerInteractionObserver(postPlaceContainerMonitor);
         ChatClefDiagnostics.registerBlockInteractionObserver(containerInteractionMonitor);
         ClientTickEvents.END_CLIENT_TICK.register(observer::onEndClientTick);
+        ClientTickEvents.END_CLIENT_TICK.register(containerInteractionMonitor::onEndClientTick);
     }
 }

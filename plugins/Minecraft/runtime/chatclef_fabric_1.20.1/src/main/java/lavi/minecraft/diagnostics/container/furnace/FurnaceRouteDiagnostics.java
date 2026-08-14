@@ -50,6 +50,28 @@ final class FurnaceRouteDiagnostics {
         FurnaceTaskDiagnosticState.RouteObservation route = FurnaceTaskDiagnosticState.observeRoute(task, effectiveBranch);
         String rawCostRelation = rawCostRelation(nearestPosition, costToWalk, costToMakeNew);
         String costDeltaBand = costDeltaBand(costToWalk, costToMakeNew);
+        FurnaceRouteShiftDiagnostics.logOpenExistingToGetContainerItem(
+                mod,
+                task,
+                containerTarget,
+                containerBlocks,
+                route,
+                candidateChild,
+                candidateChildSemanticKey,
+                nearestPosition,
+                nearestSource,
+                overrideContainerPosition,
+                cachedContainerPositionBefore,
+                cachedContainerPositionAfter,
+                placeTaskPlaced,
+                costToWalk,
+                costToMakeNew,
+                rawCostRelation,
+                costDeltaBand,
+                hasContainerBlockItem,
+                containerBlockItemCount,
+                trigger
+        );
         String nearestKey = nearestPosition == null ? "none" : nearestPosition.toShortString();
         String fingerprint = FurnaceDiagnosticEmitter.joinFingerprint(
                 "FURNACE_CONTAINER_ROUTE_TRANSITION",

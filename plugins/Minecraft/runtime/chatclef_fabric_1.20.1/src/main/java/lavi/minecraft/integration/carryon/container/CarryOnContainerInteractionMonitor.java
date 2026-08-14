@@ -19,6 +19,8 @@ import java.util.Map;
 public final class CarryOnContainerInteractionMonitor implements BlockInteractionObserver {
     private final Map<Long, CarryOnContainerInteractionState> pendingInteractions = new HashMap<>();
     private final CarryOnContainerInteractionLogger logger = new CarryOnContainerInteractionLogger();
+    private final CarryOnContainerPostconditionWindow postconditionWindow = new CarryOnContainerPostconditionWindow(logger);
+    private final CarryOnContainerCarryingAttemptTracker carryingAttemptTracker = new CarryOnContainerCarryingAttemptTracker(logger);
     private String lastCapabilityKey = "";
 
     @Override
@@ -31,6 +33,7 @@ public final class CarryOnContainerInteractionMonitor implements BlockInteractio
         }
         CarryOnObservation before = CarryOnDiagnostics.observe();
         logCapabilityIfChanged(context, before);
+        carryingAttemptTracker.observe(context, before);
         pendingInteractions.put(context.interactionId(), new CarryOnContainerInteractionState(context, before));
     }
 
@@ -53,6 +56,7 @@ public final class CarryOnContainerInteractionMonitor implements BlockInteractio
         logCapabilityIfChanged(context, after);
 
         BlockInteractionScreenSnapshot screenAfter = BlockInteractionScreenSnapshot.current(MinecraftClient.getInstance(), player);
+        postconditionWindow.start(context, before, result, screenAfter, after);
         if (!CarryOnObservationClassifier.sameObservation(before, after)) {
             logger.logStateTransition(context, before, after, result, screenAfter);
         }
@@ -61,6 +65,10 @@ public final class CarryOnContainerInteractionMonitor implements BlockInteractio
             logger.logPickupAttribution(context, before, after, result, screenAfter, evidence);
             logger.logPostcondition(context, before, after, result, screenAfter);
         }
+    }
+
+    public void onEndClientTick(MinecraftClient client) {
+        postconditionWindow.onEndClientTick(client);
     }
 
     private boolean canObserve(BlockInteractionContext context) {

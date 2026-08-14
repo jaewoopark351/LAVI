@@ -11,19 +11,22 @@ public final class FabricChatClefConnectionDetachResult {
     private final FabricChatClefCommandContext activeAfter;
     private final FabricChatClefCommandContext detachedActive;
     private final int pendingRemovedCount;
+    private final int pendingInFlightRetainedCount;
 
     private FabricChatClefConnectionDetachResult(
             FabricChatClefConnectionDetachedEvent event,
             FabricChatClefCommandContext activeBefore,
             FabricChatClefCommandContext activeAfter,
             FabricChatClefCommandContext detachedActive,
-            int pendingRemovedCount
+            int pendingRemovedCount,
+            int pendingInFlightRetainedCount
     ) {
         this.event = event;
         this.activeBefore = activeBefore;
         this.activeAfter = activeAfter;
         this.detachedActive = detachedActive;
         this.pendingRemovedCount = pendingRemovedCount;
+        this.pendingInFlightRetainedCount = pendingInFlightRetainedCount;
     }
 
     public static FabricChatClefConnectionDetachResult of(
@@ -31,14 +34,16 @@ public final class FabricChatClefConnectionDetachResult {
             FabricChatClefCommandContext activeBefore,
             FabricChatClefCommandContext activeAfter,
             FabricChatClefCommandContext detachedActive,
-            int pendingRemovedCount
+            int pendingRemovedCount,
+            int pendingInFlightRetainedCount
     ) {
         return new FabricChatClefConnectionDetachResult(
                 event,
                 activeBefore,
                 activeAfter,
                 detachedActive,
-                pendingRemovedCount
+                pendingRemovedCount,
+                pendingInFlightRetainedCount
         );
     }
 
@@ -62,7 +67,14 @@ public final class FabricChatClefConnectionDetachResult {
         return pendingRemovedCount;
     }
 
+    public int pendingInFlightRetainedCount() {
+        return pendingInFlightRetainedCount;
+    }
+
     public boolean changedQueueState() {
-        return pendingRemovedCount > 0 || activeBefore != activeAfter || detachedActive != null;
+        return pendingRemovedCount > 0
+                || pendingInFlightRetainedCount > 0
+                || activeBefore != activeAfter
+                || detachedActive != null;
     }
 }

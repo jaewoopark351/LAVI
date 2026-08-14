@@ -15,6 +15,7 @@ import lavi.minecraft.integration.carryon.snapshot.CarryOnPlayerSnapshotCollecto
 import lavi.minecraft.integration.carryon.snapshot.CarryOnTaskSnapshot;
 import lavi.minecraft.integration.carryon.snapshot.CarryOnTaskSnapshotCollector;
 import net.minecraft.client.MinecraftClient;
+import lavi.minecraft.diagnostics.postplace.PostPlaceContainerOpenIntent;
 
 //20260805_kpopmodder: Emit Carry On container-interaction diagnostics without owning recovery behavior.
 final class CarryOnContainerInteractionLogger {
@@ -98,9 +99,94 @@ final class CarryOnContainerInteractionLogger {
         );
     }
 
+    void logOutcomeWindow(BlockInteractionContext context,
+                          Object interactResult,
+                          CarryOnContainerPostconditionSnapshot returnSnapshot,
+                          CarryOnContainerPostconditionSnapshot observedSnapshot,
+                          String windowEvent,
+                          CarryOnContainerPostconditionOutcome outcome,
+                          boolean terminal,
+                          boolean summary) {
+        CarryOnContainerPickupEvidence evidence = CarryOnContainerPickupEvidence.classify(
+                context,
+                observedSnapshot == null ? null : observedSnapshot.carryObservation()
+        );
+        ChatClefDiagnostics.logBoundary(
+                "CONTAINER_OPEN_INTERACTION_OUTCOME_WINDOW",
+                "carry_on_container_open_interaction_outcome_window",
+                null,
+                ChatClefDiagnostics.withCommandContextFields(fields(
+                        contextFields(context),
+                        runtimeFields(),
+                        postconditionSnapshotFields("return", returnSnapshot, context),
+                        postconditionSnapshotFields("observed", observedSnapshot, context),
+                        "windowEvent", windowEvent,
+                        "observationOffsetTicks", observedSnapshot == null ? "unavailable" : observedSnapshot.observationOffsetTicks(),
+                        "expectedScreenHandler", CarryOnContainerExpectedGui.expectedScreenHandler(context),
+                        "expectedGuiOpened", CarryOnContainerExpectedGui.expectedGuiOpened(
+                                context,
+                                observedSnapshot == null ? null : observedSnapshot.screenSnapshot()
+                        ),
+                        "screenHandlerChangedObserved", CarryOnContainerExpectedGui.screenHandlerChanged(
+                                context,
+                                observedSnapshot == null ? null : observedSnapshot.screenSnapshot()
+                        ),
+                        "pickupEvidenceLevel", evidence,
+                        "targetIdentityMatchesCarriedBlock", evidence == CarryOnContainerPickupEvidence.CONFIRMED_TARGET_IDENTITY,
+                        "interactResult", value(interactResult),
+                        "outcome", outcome,
+                        "terminal", terminal,
+                        "summary", summary,
+                        "behavior_effect", "none"
+                ))
+        );
+    }
+
+    void logAttemptWhileCarrying(BlockInteractionContext context,
+                                 CarryOnObservation observation,
+                                 String trigger,
+                                 boolean summary,
+                                 int suppressedRepeatCount) {
+        ChatClefDiagnostics.logWarningEvent(
+                "CONTAINER_OPEN_ATTEMPT_WHILE_CARRYING",
+                "container_open_attempt_while_carrying",
+                null,
+                ChatClefDiagnostics.withCommandContextFields(fields(
+                        contextFields(context),
+                        runtimeFields(),
+                        observationFields("current", observation),
+                        "trigger", trigger,
+                        "summary", summary,
+                        "suppressedRepeatCount", suppressedRepeatCount,
+                        "expectedScreenHandler", CarryOnContainerExpectedGui.expectedScreenHandler(context),
+                        "rawRightClickState", ChatClefDiagnostics.rawInputHeldState(Input.CLICK_RIGHT),
+                        "rawSneakKeyPressed", ChatClefDiagnostics.rawInputHeldState(Input.SNEAK),
+                        "inputSneakHeld", ChatClefDiagnostics.inputHeldState(Input.SNEAK),
+                        "behavior_effect", "none"
+                ))
+        );
+    }
+
+    void logAttemptWhileCarryingCap(int cap) {
+        ChatClefDiagnostics.logBoundary(
+                "CONTAINER_OPEN_ATTEMPT_WHILE_CARRYING_CAP_REACHED",
+                "container_open_attempt_while_carrying_cap_reached",
+                null,
+                ChatClefDiagnostics.withCommandContextFields(
+                        "diagnosticScope", "carry_on_container_open_attempt_while_carrying",
+                        "owner", "carry_on_container_interaction_monitor",
+                        "mode", "BOUNDARY",
+                        "trigger", "session_cap",
+                        "cap", cap,
+                        "behavior_effect", "none"
+                )
+        );
+    }
+
     private Object[] contextFields(BlockInteractionContext context) {
         return new Object[]{
                 "interactionId", context == null ? "unavailable" : context.interactionId(),
+                "postPlaceOperationId", postPlaceOperationId(context),
                 "interactionStartClientTick", context == null ? "unavailable" : context.startClientTickId(),
                 "matchedHead", context != null && context.matchedHead(),
                 "targetKind", context == null ? "unavailable" : context.targetKind(),
@@ -115,6 +201,52 @@ final class CarryOnContainerInteractionLogger {
                 "screenHandlerBefore", screenBefore(context).screenHandlerName(),
                 "screenHandlerSyncIdBefore", screenBefore(context).screenHandlerSyncId()
         };
+    }
+
+    private Object[] postconditionSnapshotFields(String prefix,
+                                                 CarryOnContainerPostconditionSnapshot snapshot,
+                                                 BlockInteractionContext context) {
+        if (snapshot == null) {
+            return new Object[]{
+                    prefix + "CarryOnLoaded", "unavailable",
+                    prefix + "CarryOnVersion", "unavailable",
+                    prefix + "CarryState", "unavailable",
+                    prefix + "CarriedBlockId", "unavailable",
+                    prefix + "CarriedBlockDescription", "unavailable",
+                    prefix + "CarriedBlockState", "unavailable",
+                    prefix + "ScreenName", "unavailable",
+                    prefix + "ScreenHandler", "unavailable",
+                    prefix + "ScreenHandlerSyncId", "unavailable",
+                    prefix + "TargetBlockId", "unavailable",
+                    prefix + "TargetBlockDescription", "unavailable",
+                    prefix + "TargetBlockState", "unavailable",
+                    prefix + "TargetRemoved", "unavailable",
+                    prefix + "TargetStillMatchesClicked", "unavailable",
+                    prefix + "InputSneakHeld", "unavailable",
+                    prefix + "RawSneakKeyPressed", "unavailable",
+                    prefix + "PlayerSneaking", "unavailable",
+                    prefix + "SneakStateStableTicks", "unavailable"
+            };
+        }
+        CarryOnObservation observation = snapshot.carryObservation();
+        BlockInteractionScreenSnapshot screen = snapshot.screenSnapshot();
+        CarryOnContainerTargetSnapshot target = snapshot.targetSnapshot();
+        return fields(
+                observationFields(prefix, observation),
+                "observationOffsetTicks" + capitalized(prefix), snapshot.observationOffsetTicks(),
+                prefix + "ScreenName", screen == null ? "unavailable" : screen.screenName(),
+                prefix + "ScreenHandler", screen == null ? "unavailable" : screen.screenHandlerName(),
+                prefix + "ScreenHandlerSyncId", screen == null ? "unavailable" : screen.screenHandlerSyncId(),
+                prefix + "TargetBlockId", target == null ? "unavailable" : target.blockId(),
+                prefix + "TargetBlockDescription", target == null ? "unavailable" : target.blockDescription(),
+                prefix + "TargetBlockState", target == null ? "unavailable" : target.blockState(),
+                prefix + "TargetRemoved", target != null && target.removed(),
+                prefix + "TargetStillMatchesClicked", target != null && target.stillMatches(context),
+                prefix + "InputSneakHeld", snapshot.inputSneakHeld(),
+                prefix + "RawSneakKeyPressed", snapshot.rawSneakKeyPressed(),
+                prefix + "PlayerSneaking", snapshot.playerSneaking(),
+                prefix + "SneakStateStableTicks", snapshot.sneakStateStableTicks()
+        );
     }
 
     private Object[] observationFields(String prefix, CarryOnObservation observation) {
@@ -200,6 +332,20 @@ final class CarryOnContainerInteractionLogger {
         return screenBefore == null
                 ? BlockInteractionScreenSnapshot.current(null, null)
                 : screenBefore;
+    }
+
+    private Object postPlaceOperationId(BlockInteractionContext context) {
+        PostPlaceContainerOpenIntent intent = context == null
+                ? null
+                : ChatClefDiagnostics.activePostPlaceContainerOpenIntent(context.targetPosition());
+        return intent == null ? "unavailable" : intent.operationId();
+    }
+
+    private String capitalized(String value) {
+        if (value == null || value.isEmpty()) {
+            return "";
+        }
+        return Character.toUpperCase(value.charAt(0)) + value.substring(1);
     }
 
     private String value(Object rawValue) {
