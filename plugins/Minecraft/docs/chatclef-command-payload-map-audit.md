@@ -354,6 +354,7 @@ command/lifecycle/payload/FabricChatClefCommandDeadlinePayloadMap
 command/lifecycle/payload/FabricChatClefCommandLifecyclePayloadMap
 command/lifecycle/payload/FabricChatClefCommandTerminationObservationPayload
 command/lifecycle/payload/FabricChatClefCommandTerminationObservationPayloadMap
+command/lifecycle/payload/termination/*
 command/lifecycle/details/FabricChatClefTaskFinishedEventDetailsPayload
 command/lifecycle/details/payload/*
 command/lifecycle/details/payload/exceptiondetail/*
@@ -442,6 +443,10 @@ Termination observations now keep their value wrapper in
 ownership to `command/lifecycle/payload/FabricChatClefCommandTerminationObservationPayloadMap`.
 The emitted `completion_source`, `termination_kind`, stop-state, duration, and
 `task` fields remain unchanged.
+Termination observation field writers are further split under
+`command/lifecycle/payload/termination/*` so completion source, stop-state,
+event identity, timing, task snapshot, and ownership fields remain separately
+owned without changing emitted key names.
 
 Command ownership and task observation value objects follow the same pattern:
 the public value object remains in its existing package, while final map key
