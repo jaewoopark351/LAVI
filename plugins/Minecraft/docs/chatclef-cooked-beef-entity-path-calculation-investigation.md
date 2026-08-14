@@ -122,6 +122,472 @@ This is not evidence that Fabric bridge completion was missed.
 Do not change command lifecycle ownership, command result payload shape, Python
 DTO handling, or task finished event matching for this incident.
 
+<!-- 20260814_kpopmodder: Added the cooked-beef progress-stall logging plan after the latest runtime log review. -->
+
+## 2026-08-14 Progress-Stall Reclassification
+
+This section records the later `get cooked_beef 10` runtime evidence from the
+Fabric01 instance. It updates investigation priority for the latest observed
+run, but it does not prove a behavior fix.
+
+Documentation status:
+
+```text
+documentation only
+does not approve Java behavior changes
+does not approve Python behavior changes
+does not approve command lifecycle changes
+does not approve terminal result changes
+does not approve task timeout, retry, cancellation, pathing, or target selection changes
+does not approve Gradle build, Minecraft launch, commit, push, or merge
+```
+
+Latest observed command:
+
+```text
+time=2026-08-14 21:23:21
+command=get cooked_beef 10
+normalized_command=@get cooked_beef 10
+request_id=lavi-input-ko-3474117fd76d49c2960ecb46b4d371cc
+correlation_id=lavi-11f41761b9d149878fd56f43cd47f6a0
+session_id=fabric-chatclef-3bf86be7687d4bc3b7ad090f6aacc9c8
+root_task_class=adris.altoclef.tasks.container.SmeltInFurnaceTask
+root_task_identity=40c5d8d
+root_task_description=<Doing stuff in [furnace] container: [[cooked_beef] x 30]>
+```
+
+Latest observed evidence:
+
+```text
+Python result status for this request: running only
+completed result for this request: not observed
+failed result for this request: not observed
+connection detached events: 0
+terminal_result_send_failed events: 0
+waiting_for_terminal_condition events in latest.log: 85
+VISIBLE_TASK_RETURN do_smelt_in_furnace_return_material_task events in latest.log: 6072
+VISIBLE_TASK_RETURN do_smelt_in_furnace_return_material_task events after cooked_beef accept: 4369
+same command context observed after accept: yes
+same root task identity observed after accept: yes
+this_or_child_timed_out=true observed later: yes
+TimeoutWanderTask observed later: yes
+```
+
+Use this classification:
+
+```text
+operational progress stall / livelock
+SmeltInFurnaceTask material-acquisition subtree is not reaching terminal state
+```
+
+Avoid this stronger wording until proven:
+
+```text
+permanent tight infinite loop
+WebSocket disconnect bug
+terminal result send bug
+Fabric bridge lost the completion event
+Baritone A* permanent worker-thread hang
+```
+
+Interpretation:
+
+```text
+The bridge is still waiting because the AltoClef root task has not reached a
+terminal state. The current evidence does not show a terminal result that was
+created and then lost. The terminal result appears not to have been created yet.
+```
+
+This makes command lifecycle, WebSocket disconnect handling, and terminal send
+ordering lower priority for this specific cooked-beef run. The first observable
+stall boundary is earlier in the task tree.
+
+## Current First Observable Boundary
+
+The first observable static boundary is:
+
+```text
+SmeltInFurnaceTask.DoSmeltInFurnaceTask material-insufficient gate
+  -> returns material acquisition child
+  -> material target is beef
+  -> candidate child is KillAndLootTask or a descendant of it
+```
+
+This is not necessarily the root cause. Returning a material acquisition task
+when raw material is insufficient is a normal branch decision.
+
+The first failure invariant to prove is:
+
+```text
+KillAndLootTask or a descendant runs for a long interval
+  -> raw beef count does not increase
+  -> cooked beef count does not increase
+  -> furnace input/output state does not make forward progress
+```
+
+Do not infer actual child restart count from `VISIBLE_TASK_RETURN` alone.
+`DoSmeltInFurnaceTask` may create a new candidate object every tick while the
+TaskRunner keeps the existing active child when semantic equality holds.
+
+The next diagnostic pass must distinguish:
+
+```text
+candidate child identity
+active child identity before tick
+candidate equals active child
+replacement actually applied
+active child identity after tick
+active child age
+```
+
+## Cooked-Beef Target Count Check
+
+The command requested `get cooked_beef 10`, while the root task description
+showed:
+
+```text
+[[cooked_beef] x 30]
+```
+
+Do not treat `x30` as wrong until the accepted-time inventory state is known.
+It may be an expected target total if the player already had 20 cooked beef
+when the command was accepted.
+
+Before a behavior fix, confirm:
+
+```text
+acceptedCookedBeefCount
+requestedIncrement
+calculatedTargetTotal
+targetCookedBeefCount
+currentCookedBeefCount
+```
+
+Expected normal example:
+
+```text
+acceptedCookedBeefCount=20
+requestedIncrement=10
+calculatedTargetTotal=30
+```
+
+If accepted cooked-beef count was not 20, then target calculation becomes a
+higher-priority boundary than material acquisition.
+
+## Diagnostics-Only Plan For The Next Pass
+
+Do not add more lifecycle or WebSocket logs for this symptom until material
+progress is observable. The current missing evidence is inside the smelting and
+loot-acquisition subtree.
+
+All diagnostics below must be bounded. They must emit on state transitions,
+inventory deltas, active-child changes, terminal events, exceptions, or a
+sampled no-progress heartbeat such as 200 ticks without progress. They must not
+emit unchanged per-tick snapshots.
+
+### P0: SMELT_MATERIAL_PROGRESS_SNAPSHOT
+
+Preferred location:
+
+```text
+SmeltInFurnaceTask.DoSmeltInFurnaceTask.onTick()
+at the material/fuel/output operation gate
+```
+
+Emit when:
+
+```text
+gate changes
+raw material count changes
+cooked output count changes
+furnace input/output/fuel relevant state changes
+active child changes
+no material progress for 200 ticks
+terminal or exception occurs
+```
+
+Required fields:
+
+```text
+requestId
+correlationId
+rootTaskIdentity
+doSmeltTaskIdentity
+targetCookedItem
+targetCookedCount
+acceptedCookedCount
+requestedIncrement
+currentCookedInventoryCount
+materialsNeeded
+currentRawMaterialInventoryCount
+rawMaterialInFurnaceInput
+cookedItemInFurnaceOutput
+furnaceFuelItem
+furnaceFuelCount
+currentSelectedGate
+currentSelectedBranch
+lastMaterialProgressTick
+ticksSinceMaterialProgress
+progressReason
+```
+
+Suggested `currentSelectedGate` values:
+
+```text
+GET_MATERIAL
+GET_FUEL
+MOVE_MATERIAL_TO_INPUT
+MOVE_FUEL_TO_FUEL_SLOT
+WAIT_FOR_SMELT
+COLLECT_OUTPUT
+UNKNOWN
+```
+
+This event should answer whether the task is truly making no inventory or
+furnace-slot progress, or whether progress is happening but not reaching the
+terminal condition.
+
+### P1: SMELT_CHILD_SELECTION_STATE
+
+Preferred location:
+
+```text
+the boundary that returns the next child task from DoSmeltInFurnaceTask
+```
+
+Required fields:
+
+```text
+requestId
+rootTaskIdentity
+doSmeltTaskIdentity
+candidateTaskClass
+candidateTaskIdentity
+candidateSemanticTarget
+activeChildBeforeClass
+activeChildBeforeIdentity
+activeChildRunId
+candidateEqualsActiveChild
+replacementApplied
+activeChildAfterClass
+activeChildAfterIdentity
+activeChildAgeTicks
+```
+
+Interpretation:
+
+```text
+candidateEqualsActiveChild=true and replacementApplied=false
+  -> candidate allocation is noisy but child execution may be stable
+
+candidateEqualsActiveChild=false and replacementApplied=true every tick
+  -> material acquisition may be repeatedly restarted before it can progress
+```
+
+This is required because repeated `VISIBLE_TASK_RETURN` alone does not prove
+actual active-child replacement.
+
+### P2: KILL_AND_LOOT_ENTITY_DISCOVERY
+
+Preferred location:
+
+```text
+KillAndLootTask or the closest-entity selection boundary it owns
+```
+
+Emit on:
+
+```text
+entityFound false -> true
+entityFound true -> false
+selected target change
+target invalidated
+search-wander branch selected
+kill branch selected
+```
+
+Required fields:
+
+```text
+requestId
+rootTaskIdentity
+killAndLootTaskIdentity
+entityFound
+trackedCowCount
+loadedCowCount
+selectedCowUuid
+selectedCowRuntimeId
+selectedCowAlive
+selectedCowRemoved
+selectedCowPosition
+playerPosition
+distanceToCow
+selectedBranch
+activeChildIdentity
+```
+
+Suggested `selectedBranch` values:
+
+```text
+SEARCH_WANDER
+KILL_TARGET
+WAIT_FOR_ENTITY_TRACKER
+UNKNOWN
+```
+
+If `entityFound=false` persists, the failure boundary is likely search or
+entity availability. If `entityFound=true` persists but distance does not
+decrease, movement or pathing becomes more likely.
+
+### P3: TIMEOUT_WANDER_PARENT
+
+Preferred location:
+
+```text
+TimeoutWanderTask start boundary or the parent that returns it
+```
+
+Required fields:
+
+```text
+requestId
+rootTaskIdentity
+timeoutWanderTaskIdentity
+directParentClass
+directParentIdentity
+directParentSemanticKey
+selectedCowUuid
+entityFound
+distanceToWander
+wanderReason
+sourceTaskPath
+```
+
+Interpretation:
+
+```text
+TimeoutWanderTask directly under KillAndLootTask
+  -> likely no cow target found, search fallback
+
+TimeoutWanderTask under GetToEntityTask or movement descendant
+  -> target may exist, but approach/path/movement progress failed
+```
+
+Do not interpret `this_or_child_timed_out=true` as proof that a command-level
+deadline expired. It only proves a timeout-like task or descendant condition is
+present in the task tree.
+
+### P4: KILL_LOOT_PICKUP_PROGRESS
+
+Preferred locations:
+
+```text
+KillEntityTask attack boundary
+loot item observation boundary
+inventory delta boundary
+```
+
+Required fields:
+
+```text
+requestId
+selectedCowUuid
+targetHealth
+targetHealthChanged
+attackAttempted
+targetDeathObserved
+beefItemEntityObserved
+beefDropPosition
+pickupAttempted
+pickupSucceeded
+rawBeefInventoryBefore
+rawBeefInventoryAfter
+```
+
+This separates:
+
+```text
+cannot find cow
+can find cow but cannot reach cow
+can reach cow but cannot damage cow
+cow dies but no beef drops
+beef drops but pickup fails
+pickup succeeds but smelt progress does not observe inventory delta
+```
+
+### P5: BARITONE_ENTITY_PATH_PHASE
+
+Only add this after `entityFound=true` and a stable selected cow have been
+observed. Do not make Baritone the first logging target for this latest run.
+
+Required fields when applicable:
+
+```text
+requestId
+targetUuid
+goalType
+goalIdentity
+pathGeneration
+calculationScheduled
+calculationStarted
+calculationReturned
+pathBuilt
+postProcessReturned
+pathAdoptionStarted
+pathAdoptionCompleted
+calculationCancelled
+forceCancelReason
+workerThread
+distanceTrend
+```
+
+This event is useful only after the target-discovery layer proves that a target
+exists and movement toward that target should be happening.
+
+### P6: DIAGNOSTIC_CAP_STATE
+
+When a diagnostic event appears absent, first prove it was enabled and not
+suppressed.
+
+Required fields:
+
+```text
+diagnosticMode
+eventEnabled
+eventSuppressed
+suppressionReason
+sessionEmissionCount
+sessionHardCap
+bucketEmissionCount
+bucketCap
+lastAcceptedEvent
+```
+
+Missing logs are not evidence until diagnostic enablement, rate limiting, and
+hard-cap state are known.
+
+## Behavior-Fix Gate For This Symptom
+
+Do not implement a behavior fix until the next logs identify which of these is
+true:
+
+```text
+target count calculation is wrong
+raw material never increases
+raw material increases but furnace input does not
+furnace input increases but cooked output does not
+cooked output increases but terminal condition does not observe it
+candidate child is restarted repeatedly
+active child is stable but entity discovery never finds a cow
+entity is found but approach distance does not improve
+entity is reached but attack/death/drop/pickup does not progress
+Baritone path calculation or adoption fails after a stable target is known
+```
+
+The preferred first diagnostics are P0 and P1. P2 and P3 are next if P0 proves
+that material count is not changing. P5 should remain conditional on a proven
+stable entity target.
+
 ## Player Position Pattern
 
 The bot spent a long interval around this position:
