@@ -262,6 +262,23 @@ public class SmeltInFurnaceTask extends ResourceTask {
                     "burnPercentage", furnaceCache.burnPercentage,
                     "inventoryMaterialCount", inventoryMaterialCount,
                     "inventoryFuelCount", inventoryFuelCount);
+            FurnaceContainerDiagnostics.logMaterialProgressSnapshot(mod,
+                    this,
+                    materialTarget,
+                    outputTarget,
+                    "MATERIAL_FUEL_GATE",
+                    inventoryMaterialCount,
+                    inventoryOutputCount,
+                    materialsNeeded,
+                    inventoryFuelCount,
+                    fuelNeeded,
+                    materialGateSatisfied,
+                    fuelGateSatisfied,
+                    furnaceCache.materialSlot,
+                    furnaceCache.fuelSlot,
+                    furnaceCache.outputSlot,
+                    furnaceCache.burningFuelCount,
+                    furnaceCache.burnPercentage);
 
             // We don't have enough materials...
             if (inventoryMaterialCount < materialsNeeded) {
@@ -287,6 +304,18 @@ public class SmeltInFurnaceTask extends ResourceTask {
                 ChatClefDiagnostics.logTaskTransition(this, null, materialTask, "do_smelt_in_furnace_return_material_task",
                         "materialsNeeded", materialsNeeded,
                         "materialTarget", materialTarget);
+                FurnaceContainerDiagnostics.logChildSelection(mod,
+                        this,
+                        materialTask,
+                        "GET_MATERIAL",
+                        "material_task|" + materialTarget,
+                        inventoryMaterialCount,
+                        inventoryOutputCount,
+                        materialsNeeded,
+                        inventoryFuelCount,
+                        fuelNeeded,
+                        false,
+                        fuelGateSatisfied);
                 return materialTask;
             }
 
@@ -313,6 +342,18 @@ public class SmeltInFurnaceTask extends ResourceTask {
                 ChatClefDiagnostics.logTaskTransition(this, null, fuelTask, "do_smelt_in_furnace_return_fuel_task",
                         "fuelNeeded", fuelNeeded,
                         "inventoryFuelCount", inventoryFuelCount);
+                FurnaceContainerDiagnostics.logChildSelection(mod,
+                        this,
+                        fuelTask,
+                        "GET_FUEL",
+                        "fuel_task",
+                        inventoryMaterialCount,
+                        inventoryOutputCount,
+                        materialsNeeded,
+                        inventoryFuelCount,
+                        fuelNeeded,
+                        materialGateSatisfied,
+                        false);
                 return fuelTask;
             }
 
@@ -337,6 +378,18 @@ public class SmeltInFurnaceTask extends ResourceTask {
                         "allMaterials", allMaterials);
                 ChatClefDiagnostics.logTaskTransition(this, null, moveTask, "do_smelt_in_furnace_return_accessible_material_task",
                         "allMaterials", allMaterials);
+                FurnaceContainerDiagnostics.logChildSelection(mod,
+                        this,
+                        moveTask,
+                        "MOVE_ACCESSIBLE_MATERIAL",
+                        "move_accessible_material|" + allMaterials,
+                        inventoryMaterialCount,
+                        inventoryOutputCount,
+                        materialsNeeded,
+                        inventoryFuelCount,
+                        fuelNeeded,
+                        materialGateSatisfied,
+                        fuelGateSatisfied);
                 return moveTask;
             }
 
@@ -363,7 +416,20 @@ public class SmeltInFurnaceTask extends ResourceTask {
                     "cachedMaterialSlot", ChatClefDiagnostics.itemStackSummary(furnaceCache.materialSlot),
                     "cachedFuelSlot", ChatClefDiagnostics.itemStackSummary(furnaceCache.fuelSlot),
                     "cachedOutputSlot", ChatClefDiagnostics.itemStackSummary(furnaceCache.outputSlot));
-            return super.onTick();
+            Task containerFlowTask = super.onTick();
+            FurnaceContainerDiagnostics.logChildSelection(mod,
+                    this,
+                    containerFlowTask,
+                    "ENTER_CONTAINER_FLOW",
+                    "container_flow",
+                    inventoryMaterialCount,
+                    inventoryOutputCount,
+                    materialsNeeded,
+                    inventoryFuelCount,
+                    fuelNeeded,
+                    materialGateSatisfied,
+                    fuelGateSatisfied);
+            return containerFlowTask;
         }
 
         // Override this if our materials must be acquired in a special way.

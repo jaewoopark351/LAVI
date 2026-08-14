@@ -212,13 +212,37 @@ public final class FabricChatClefCommandLifecycleCoordinator {
             Supplier<FabricChatClefCommandResultPayload> resultFactory
     ) {
         boolean terminalSent = resultOutbox.sendTerminal(execution, resultFactory);
-        boolean lifecycleCleared = activeExecution.compareAndSet(execution, null);
+        boolean lifecycleCleared = terminalSent && activeExecution.compareAndSet(execution, null);
         commandDiagnostics.info(
-                "terminal_result_sent",
+                terminalSent ? "terminal_result_sent" : "terminal_result_send_failed",
                 execution,
                 FabricChatClefLifecycleDetailsPayload.terminalResult(terminalSent, lifecycleCleared)
         );
-        lastWaitingDecisionKey = "";
+        if (lifecycleCleared) {
+            lastWaitingDecisionKey = "";
+        }
+    }
+
+    public boolean clearDetachedExecution(FabricChatClefCommandContext context, String reason) {
+        FabricChatClefCommandExecution execution = activeExecution.get();
+        if (execution == null || execution.context() != context) {
+            commandDiagnostics.contextWarn(
+                    "connection_detached_without_matching_lifecycle_execution",
+                    context,
+                    FabricChatClefLifecycleDetailsPayload.empty()
+            );
+            return false;
+        }
+        boolean cleared = activeExecution.compareAndSet(execution, null);
+        commandDiagnostics.warn(
+                "connection_detached_lifecycle_cleared",
+                execution,
+                FabricChatClefLifecycleDetailsPayload.terminalDecision(reason)
+        );
+        if (cleared) {
+            lastWaitingDecisionKey = "";
+        }
+        return cleared;
     }
 
     private void syncActiveContext(Optional<FabricChatClefCommandContext> activeContext) {

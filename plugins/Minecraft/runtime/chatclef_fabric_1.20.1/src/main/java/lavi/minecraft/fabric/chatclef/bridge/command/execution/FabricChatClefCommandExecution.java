@@ -116,10 +116,6 @@ public final class FabricChatClefCommandExecution {
         return resultFactory.deadlineExceededResult(message);
     }
 
-    public boolean markTerminalSent() {
-        return state.context().markTerminalSent();
-    }
-
     public String requestId() {
         return state.context().requestId();
     }

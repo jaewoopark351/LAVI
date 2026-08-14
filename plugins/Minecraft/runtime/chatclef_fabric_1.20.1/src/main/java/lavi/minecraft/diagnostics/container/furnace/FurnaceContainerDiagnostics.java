@@ -91,4 +91,44 @@ public final class FurnaceContainerDiagnostics {
                 materialGateSatisfied, inventoryFuelCount, fuelNeeded, fuelGateSatisfied, materialsAccessible,
                 containerFlowEligible, inventoryOutputCount);
     }
+
+    public static void logMaterialProgressSnapshot(AltoClef mod,
+                                                   Task task,
+                                                   ItemTarget materialTarget,
+                                                   ItemTarget outputTarget,
+                                                   String currentGate,
+                                                   int inventoryMaterialCount,
+                                                   int inventoryOutputCount,
+                                                   int materialsNeeded,
+                                                   double inventoryFuelCount,
+                                                   double fuelNeeded,
+                                                   boolean materialGateSatisfied,
+                                                   boolean fuelGateSatisfied,
+                                                   ItemStack cachedMaterialSlot,
+                                                   ItemStack cachedFuelSlot,
+                                                   ItemStack cachedOutputSlot,
+                                                   double burningFuelCount,
+                                                   double burnPercentage) {
+        FurnaceMaterialProgressDiagnostics.log(mod, task, materialTarget, outputTarget, currentGate,
+                inventoryMaterialCount, inventoryOutputCount, materialsNeeded, inventoryFuelCount, fuelNeeded,
+                materialGateSatisfied, fuelGateSatisfied, cachedMaterialSlot, cachedFuelSlot, cachedOutputSlot,
+                burningFuelCount, burnPercentage);
+    }
+
+    public static void logChildSelection(AltoClef mod,
+                                         Task task,
+                                         Task candidateChild,
+                                         String currentGate,
+                                         String candidateChildSemanticKey,
+                                         int inventoryMaterialCount,
+                                         int inventoryOutputCount,
+                                         int materialsNeeded,
+                                         double inventoryFuelCount,
+                                         double fuelNeeded,
+                                         boolean materialGateSatisfied,
+                                         boolean fuelGateSatisfied) {
+        FurnaceChildSelectionDiagnostics.log(mod, task, candidateChild, currentGate, candidateChildSemanticKey,
+                inventoryMaterialCount, inventoryOutputCount, materialsNeeded, inventoryFuelCount, fuelNeeded,
+                materialGateSatisfied, fuelGateSatisfied);
+    }
 }

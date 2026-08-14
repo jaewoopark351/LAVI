@@ -7,6 +7,7 @@ import baritone.behavior.PathingBehavior;
 import baritone.pathing.calc.AbstractNodeCostSearch;
 import baritone.pathing.movement.CalculationContext;
 import baritone.pathing.path.PathExecutor;
+import lavi.minecraft.diagnostics.mining.baritone.executor.BaritoneExecutorProgressDiagnostics;
 import lavi.minecraft.diagnostics.mining.baritone.BaritonePathCalculationDiagnostics;
 import net.minecraft.util.math.BlockPos;
 import org.objectweb.asm.Opcodes;
@@ -39,6 +40,34 @@ public abstract class PathingBehaviorDiagnosticMixin {
 
     @Shadow
     private BetterBlockPos expectedSegmentStart;
+
+    @Inject(method = "tickPath", at = @At("HEAD"), remap = false)
+    private void lavi$logExecutorProgressTickPathHead(CallbackInfo ci) {
+        BaritoneExecutorProgressDiagnostics.logTickPathHead(
+                (PathingBehavior) (Object) this,
+                current,
+                next,
+                inProgress,
+                goal,
+                expectedSegmentStart,
+                cancelRequested,
+                calcFailedLastTick
+        );
+    }
+
+    @Inject(method = "tickPath", at = @At("RETURN"), remap = false)
+    private void lavi$logExecutorProgressTickPathReturn(CallbackInfo ci) {
+        BaritoneExecutorProgressDiagnostics.logTickPathReturn(
+                (PathingBehavior) (Object) this,
+                current,
+                next,
+                inProgress,
+                goal,
+                expectedSegmentStart,
+                cancelRequested,
+                calcFailedLastTick
+        );
+    }
 
     @Inject(method = "secretInternalSetGoalAndPath", at = @At("RETURN"), remap = false)
     private void lavi$logGoalRequestDecision(PathingCommand command, CallbackInfoReturnable<Boolean> cir) {

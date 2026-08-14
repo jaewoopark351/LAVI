@@ -11,6 +11,7 @@ public final class FabricChatClefCommandContext {
     private final String sessionId;
     private final long connectionGeneration;
     private final long acceptedAtMs;
+    private final AtomicBoolean terminalSendInFlight = new AtomicBoolean(false);
     private final AtomicBoolean terminalSent = new AtomicBoolean(false);
     private volatile boolean detached;
     private volatile String detachedReason = "";
@@ -52,8 +53,16 @@ public final class FabricChatClefCommandContext {
         return request != null && request.isDeadlineExceeded(nowMs);
     }
 
-    public boolean markTerminalSent() {
-        return terminalSent.compareAndSet(false, true);
+    public boolean beginTerminalSend() {
+        if (terminalSent.get()) {
+            return false;
+        }
+        return terminalSendInFlight.compareAndSet(false, true);
+    }
+
+    public boolean completeTerminalSend(boolean succeeded) {
+        terminalSendInFlight.set(false);
+        return succeeded && terminalSent.compareAndSet(false, true);
     }
 
     public void markDetached(String reason) {

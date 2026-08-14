@@ -283,18 +283,19 @@ Duplicate Java terminal sends must be ignored. Late TaskFinishedEvent signals
 for a detached or already-cleared command must be logged as stale or late
 observation, not used to mutate unrelated command state.
 
-<!-- 20260814_kpopmodder: Documented unresolved Fabric ChatClef command lifecycle hazards before behavior changes. -->
+<!-- 20260814_kpopmodder: Documented Fabric ChatClef command lifecycle hazards and the implemented ownership guards. -->
 
-## Known Unresolved Lifecycle Hazards
+## Command Lifecycle Hazard Guards
 
-Status as of 2026-08-14: documentation only. This section records the current
-failure risks that must be resolved before treating command lifecycle ownership
-as stable. It does not approve Java changes, Python changes, protocol changes,
-Gradle build, Minecraft launch, commit, push, or merge.
+Status as of 2026-08-14: the Fabric Java bridge now has source-level guards for
+the three hazards below. Runtime validation still requires the separate clean
+Gradle build, copied jar, Minecraft launch, and log review flow defined in the
+build verification runbook. This section does not approve Gradle build,
+Minecraft launch, commit, push, or merge.
 
 ### Disconnect Must Not Clear Ownership Before Task State Is Resolved
 
-Observed risk:
+Guarded risk:
 
 ```text
 WebSocket disconnect or error
@@ -315,17 +316,16 @@ UserTaskChain still has the previous command root task
 That state must be treated as a lifecycle ownership defect, not as proof that
 the Minecraft task has safely stopped.
 
-Required resolution:
+Implemented resolution:
 
 ```text
 Disconnect observed
   -> enqueue an immutable client-tick-owned control event
-  -> choose an explicit policy:
-       preserve detached running task and retain terminal result in an outbox
-       OR cancel the bound root task on the Minecraft client tick
+  -> mark matching pending contexts detached and remove them
+  -> keep the active detached context visible until client-tick handling
+  -> cancel the bound root task on the Minecraft client tick
   -> observe the actual task stop or terminal condition
-  -> send or retain the terminal result according to policy
-  -> clear command ownership only after the chosen policy reaches its terminal point
+  -> clear command ownership only after the detach policy reaches its terminal point
 ```
 
 While a detached or orphan root task may still exist, the bridge must not accept
@@ -334,7 +334,7 @@ state.
 
 ### Terminal Result Send Must Complete Before Clear
 
-Observed risk:
+Guarded risk:
 
 ```text
 terminal condition classified
@@ -352,26 +352,26 @@ Python never receives the terminal command_result
 Python still considers the request running
 ```
 
-Required terminal send ordering:
+Implemented terminal send ordering:
 
 ```text
 TERMINAL_READY
   -> command_result payload built
   -> SEND_IN_FLIGHT
   -> explicit send outcome observed
-  -> SEND_SUCCEEDED
+  -> SEND_SUCCEEDED only after an explicit send outcome reports success
   -> Java records terminal_result_sent
   -> Java clears command ownership
 ```
 
 Failures such as stale completion, null socket, generation mismatch, synchronous
 send failure, or asynchronous send failure must not be logged as
-`terminal_result_sent`. They need an explicit failure outcome and a retention,
-detached-terminal, or reconnect policy.
+`terminal_result_sent`. The source-level guard records an explicit send failure
+outcome and keeps command ownership uncleared when the terminal send fails.
 
 ### WebSocket Callback Must Not Read Live Engine State
 
-Observed risk:
+Guarded risk:
 
 ```text
 WebSocket callback thread
@@ -387,7 +387,7 @@ Task, Baritone, Minecraft client, input, path, goal, and screen state must be
 read on the Minecraft client tick unless an immutable snapshot has already been
 published by the correct owner.
 
-Required thread-affinity direction:
+Implemented thread-affinity direction:
 
 ```text
 WebSocket callback:

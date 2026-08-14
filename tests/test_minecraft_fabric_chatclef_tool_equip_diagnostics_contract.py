@@ -29,6 +29,24 @@ class MinecraftFabricChatClefToolEquipDiagnosticsContractTests(unittest.TestCase
 
         self.assertTrue(diagnostics_file.exists())
         text = diagnostics_file.read_text(encoding="utf-8")
+        formatter_text = (
+            JAVA_ROOT
+            / "lavi"
+            / "minecraft"
+            / "diagnostics"
+            / "toolselect"
+            / "support"
+            / "ToolDiagnosticFormatter.java"
+        ).read_text(encoding="utf-8")
+        save_policy_text = (
+            JAVA_ROOT
+            / "lavi"
+            / "minecraft"
+            / "diagnostics"
+            / "toolselect"
+            / "support"
+            / "ToolSavePolicyDiagnostics.java"
+        ).read_text(encoding="utf-8")
 
         self.assertIn("package lavi.minecraft.diagnostics.toolselect;", text)
         self.assertIn("logBoundary(\"TOOL_SELECTION_DECISION\"", text)
@@ -37,10 +55,11 @@ class MinecraftFabricChatClefToolEquipDiagnosticsContractTests(unittest.TestCase
         self.assertIn("forceEquipReportedSuccess", text)
         self.assertIn("postconditionItemMatched", text)
         self.assertIn("postconditionExactStackMatched", text)
-        self.assertIn("MAX_CANDIDATES = 12", text)
+        self.assertIn("ToolDiagnosticFormatter.MAX_CANDIDATES", text)
+        self.assertIn("MAX_CANDIDATES = 12", formatter_text)
         self.assertIn("selectionOutcome", text)
         self.assertIn("saveDecision", text)
-        self.assertIn("LOW_DURABILITY_BLOCK_NOT_IRON_REQUIRED", text)
+        self.assertIn("LOW_DURABILITY_BLOCK_NOT_IRON_REQUIRED", save_policy_text)
         self.assertIn("defaultStackSuitable", text)
         self.assertNotIn("latest.log", text)
 
@@ -56,15 +75,27 @@ class MinecraftFabricChatClefToolEquipDiagnosticsContractTests(unittest.TestCase
 
         self.assertTrue(diagnostics_file.exists())
         text = diagnostics_file.read_text(encoding="utf-8")
+        save_policy_text = (
+            JAVA_ROOT
+            / "lavi"
+            / "minecraft"
+            / "diagnostics"
+            / "toolselect"
+            / "support"
+            / "ToolSavePolicyDiagnostics.java"
+        ).read_text(encoding="utf-8")
 
         self.assertIn("package lavi.minecraft.diagnostics.toolselect;", text)
         self.assertIn("logBoundary(\"BEST_TOOL_SLOT_DECISION\"", text)
         self.assertIn("storage_helper_get_best_tool_slot", text)
-        self.assertIn("lastBestToolSlotFingerprint", text)
+        self.assertIn("private static final DiagnosticDeduplicator DEDUPLICATOR", text)
+        self.assertIn("DEDUPLICATOR.shouldEmit(\"best_tool_slot\", fingerprint)", text)
+        self.assertIn("private String fingerprint(Slot bestToolSlot, String decisionReason, double highestSpeed)", text)
         self.assertIn("SKIP_SHOULD_SAVE", text)
         self.assertIn("NO_ELIGIBLE_TOOL", text)
         self.assertIn("HARDNESS_ZERO_USE_EQUIP_SLOT", text)
-        self.assertIn("LOW_DURABILITY_BLOCK_NOT_IRON_REQUIRED", text)
+        self.assertIn("ToolSavePolicyDiagnostics.observedDecision", text)
+        self.assertIn("LOW_DURABILITY_BLOCK_NOT_IRON_REQUIRED", save_policy_text)
         self.assertIn("not_evaluated#reason=NOT_DEFAULT_SUITABLE", text)
         self.assertNotIn("latest.log", text)
 

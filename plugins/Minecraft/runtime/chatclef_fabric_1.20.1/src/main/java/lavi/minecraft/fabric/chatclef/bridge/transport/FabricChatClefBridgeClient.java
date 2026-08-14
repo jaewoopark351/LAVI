@@ -5,6 +5,7 @@ import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandContex
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandQueue;
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandResultSender;
 import lavi.minecraft.fabric.chatclef.bridge.command.result.FabricChatClefCommandResultPayload;
+import lavi.minecraft.fabric.chatclef.bridge.command.result.send.FabricChatClefCommandResultSendOutcome;
 import lavi.minecraft.fabric.chatclef.bridge.diagnostics.FabricChatClefBridgeDiagnostics;
 import lavi.minecraft.fabric.chatclef.bridge.protocol.FabricChatClefBridgeJson;
 import lavi.minecraft.fabric.chatclef.bridge.protocol.FabricChatClefBridgeMessageFactory;
@@ -145,7 +146,7 @@ public final class FabricChatClefBridgeClient implements WebSocket.Listener, Fab
         this.webSocket = null;
         activeConnectionGeneration = 0;
         connecting.set(false);
-        commandQueue.detachConnection(generation, "websocket_closed");
+        commandQueue.enqueueConnectionDetached(generation, "websocket_closed");
         state.markDisconnected("closed status=" + statusCode + " reason=" + reason);
         diagnostics.warn(
                 "closed generation="
@@ -169,7 +170,7 @@ public final class FabricChatClefBridgeClient implements WebSocket.Listener, Fab
         this.webSocket = null;
         activeConnectionGeneration = 0;
         connecting.set(false);
-        commandQueue.detachConnection(generation, "websocket_error");
+        commandQueue.enqueueConnectionDetached(generation, "websocket_error");
         String message = error.getClass().getSimpleName() + ": " + error.getMessage();
         state.markFailed(message);
         diagnostics.warn("connection error generation=" + generation + " " + message);
@@ -208,8 +209,11 @@ public final class FabricChatClefBridgeClient implements WebSocket.Listener, Fab
     }
 
     @Override
-    public void sendCommandResult(FabricChatClefCommandContext context, FabricChatClefCommandResultPayload payload) {
-        resultEnvelopeSender.sendCommandResult(context, payload);
+    public FabricChatClefCommandResultSendOutcome sendCommandResult(
+            FabricChatClefCommandContext context,
+            FabricChatClefCommandResultPayload payload
+    ) {
+        return resultEnvelopeSender.sendCommandResult(context, payload);
     }
 
     private boolean isCurrentSocket(WebSocket socket) {

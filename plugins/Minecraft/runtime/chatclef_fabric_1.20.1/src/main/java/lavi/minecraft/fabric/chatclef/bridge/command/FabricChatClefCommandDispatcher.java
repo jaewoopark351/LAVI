@@ -2,9 +2,15 @@ package lavi.minecraft.fabric.chatclef.bridge.command;
 
 import adris.altoclef.AltoClef;
 import adris.altoclef.commandsystem.CommandExecutor;
+import lavi.minecraft.fabric.chatclef.bridge.command.control.FabricChatClefConnectionDetachedEvent;
+import lavi.minecraft.fabric.chatclef.bridge.command.control.FabricChatClefConnectionDetachResult;
+import lavi.minecraft.fabric.chatclef.bridge.command.diagnostics.FabricChatClefCommandContextUnbindDiagnostics;
 import lavi.minecraft.fabric.chatclef.bridge.command.diagnostics.FabricChatClefTaskStateReader;
 import lavi.minecraft.fabric.chatclef.bridge.command.execution.FabricChatClefCommandExecution;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandLifecycleCoordinator;
+import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskOwnershipSnapshot;
+import lavi.minecraft.fabric.chatclef.bridge.command.queue.FabricChatClefCommandQueueCompletion;
+import lavi.minecraft.fabric.chatclef.bridge.command.result.send.FabricChatClefCommandResultSendOutcome;
 import lavi.minecraft.fabric.chatclef.bridge.diagnostics.FabricChatClefBridgeDiagnostics;
 import net.minecraft.client.MinecraftClient;
 
@@ -34,6 +40,9 @@ public final class FabricChatClefCommandDispatcher {
 
     public void onEndClientTick(MinecraftClient client) {
         long nowMs = System.currentTimeMillis();
+        if (processConnectionDetachedEvents()) {
+            return;
+        }
         lifecycleCoordinator.onEndClientTick(commandQueue.activeContext());
         Optional<FabricChatClefCommandContext> active = commandQueue.activeContext();
         if (active.isPresent()) {
@@ -47,14 +56,23 @@ public final class FabricChatClefCommandDispatcher {
         if (pending.isPresent() && pending.get().isDeadlineExceeded(nowMs)) {
             FabricChatClefCommandContext context = pending.get();
             commandQueue.removePending(context);
-            if (context.markTerminalSent()) {
-                resultSender.sendCommandResult(
+            if (context.beginTerminalSend()) {
+                FabricChatClefCommandResultSendOutcome sendOutcome = resultSender.sendCommandResult(
                         context,
                         FabricChatClefCommandResult.deadlineExceeded(
                                 context.requestId(),
                                 "Fabric ChatClef command deadline expired before dispatch."
                         )
                 );
+                context.completeTerminalSend(sendOutcome.succeeded());
+                if (!sendOutcome.succeeded()) {
+                    diagnostics.warn(
+                            "pending deadline result send failed request="
+                                    + context.requestId()
+                                    + " outcome="
+                                    + sendOutcome.diagnosticMessage()
+                    );
+                }
             }
             return;
         }
@@ -62,6 +80,90 @@ public final class FabricChatClefCommandDispatcher {
             return;
         }
         commandQueue.pollForDispatch().ifPresent(this::dispatch);
+    }
+
+    private boolean processConnectionDetachedEvents() {
+        boolean processed = false;
+        for (int index = 0; index < 16; index++) {
+            Optional<FabricChatClefConnectionDetachedEvent> event = commandQueue.pollConnectionDetached();
+            if (event.isEmpty()) {
+                return processed;
+            }
+            processed = true;
+            handleConnectionDetached(event.get());
+        }
+        return true;
+    }
+
+    private void handleConnectionDetached(FabricChatClefConnectionDetachedEvent event) {
+        FabricChatClefTaskOwnershipSnapshot ownershipBefore =
+                FabricChatClefCommandContextUnbindDiagnostics.captureOwnershipSnapshot();
+        FabricChatClefConnectionDetachResult detachResult = commandQueue.markConnectionDetached(event);
+        Optional<FabricChatClefCommandContext> detachedActive = detachResult.detachedActive();
+        if (detachedActive.isEmpty()) {
+            logDetachedWithoutActive(detachResult, ownershipBefore);
+            return;
+        }
+        FabricChatClefCommandContext context = detachedActive.get();
+        diagnostics.warn(
+                "connection detached with active command request="
+                        + context.requestId()
+                        + " generation="
+                        + event.connectionGeneration()
+                        + " reason="
+                        + event.reason()
+                        + "; cancelling user task on client tick"
+        );
+        cancelUserTaskForDetachedCommand();
+        lifecycleCoordinator.onEndClientTick(commandQueue.activeContext());
+        lifecycleCoordinator.clearDetachedExecution(context, event.reason());
+        FabricChatClefCommandQueueCompletion completion = commandQueue.clearDetachedActive(
+                context,
+                "connection_detached_task_cancelled"
+        );
+        logQueueCompletion(completion, ownershipBefore);
+    }
+
+    private void logDetachedWithoutActive(
+            FabricChatClefConnectionDetachResult detachResult,
+            FabricChatClefTaskOwnershipSnapshot ownershipBefore
+    ) {
+        if (!detachResult.changedQueueState()) {
+            return;
+        }
+        FabricChatClefCommandContextUnbindDiagnostics.logBoundary(
+                "connection_detached_without_active_command",
+                null,
+                detachResult.activeBefore(),
+                detachResult.activeAfter(),
+                detachResult.changedQueueState(),
+                ownershipBefore,
+                FabricChatClefCommandContextUnbindDiagnostics.captureOwnershipSnapshot()
+        );
+    }
+
+    private void logQueueCompletion(
+            FabricChatClefCommandQueueCompletion completion,
+            FabricChatClefTaskOwnershipSnapshot ownershipBefore
+    ) {
+        FabricChatClefCommandContextUnbindDiagnostics.logBoundary(
+                completion.reason(),
+                completion.context(),
+                completion.activeBefore(),
+                completion.activeAfter(),
+                completion.mutationApplied(),
+                ownershipBefore,
+                FabricChatClefCommandContextUnbindDiagnostics.captureOwnershipSnapshot()
+        );
+    }
+
+    private void cancelUserTaskForDetachedCommand() {
+        AltoClef mod = AltoClef.getInstance();
+        if (mod == null || mod.getUserTaskChain() == null) {
+            diagnostics.warn("connection detach cancel skipped because AltoClef user task chain is unavailable");
+            return;
+        }
+        mod.cancelUserTask();
     }
 
     private boolean isEngineReady() {

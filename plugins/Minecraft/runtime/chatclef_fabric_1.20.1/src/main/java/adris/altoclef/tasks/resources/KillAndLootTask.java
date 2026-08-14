@@ -7,6 +7,7 @@ import adris.altoclef.tasks.movement.TimeoutWanderTask;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.ItemTarget;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.diagnostics.resources.loot.KillAndLootDiagnostics;
 import net.minecraft.entity.Entity;
 
 import java.util.function.Predicate;
@@ -40,6 +41,7 @@ public class KillAndLootTask extends ResourceTask {
         ChatClefDiagnostics.logEvent("RESOURCE", "ON_START", "kill_and_loot_start", this,
                 "targetClass", ChatClefDiagnostics.classList(new Class<?>[]{_toKill}),
                 "killTask", ChatClefDiagnostics.taskSummary(_killTask));
+        KillAndLootDiagnostics.logStart(mod, this, _toKill, itemTargets, _killTask);
     }
 
     @Override
@@ -52,20 +54,28 @@ public class KillAndLootTask extends ResourceTask {
                 "killTask", ChatClefDiagnostics.taskSummary(_killTask));
         if (!entityFound) {
             if (isInWrongDimension(mod)) {
+                Task dimensionTask = getToCorrectDimensionTask(mod);
                 ChatClefDiagnostics.logEvent("RESOURCE", "DECISION", "kill_and_loot_wrong_dimension", this,
                         "targetClass", ChatClefDiagnostics.classList(new Class<?>[]{_toKill}));
+                KillAndLootDiagnostics.logDecision(mod, this, _toKill, itemTargets, false,
+                        "WRONG_DIMENSION", dimensionTask);
                 setDebugState("Going to correct dimension.");
-                return getToCorrectDimensionTask(mod);
+                return dimensionTask;
             }
+            Task wanderTask = new TimeoutWanderTask();
             ChatClefDiagnostics.logEvent("RESOURCE", "DECISION", "kill_and_loot_search_wander", this,
                     "targetClass", ChatClefDiagnostics.classList(new Class<?>[]{_toKill}));
+            KillAndLootDiagnostics.logDecision(mod, this, _toKill, itemTargets, false,
+                    "SEARCH_WANDER", wanderTask);
             setDebugState("Searching for mob...");
-            return new TimeoutWanderTask();
+            return wanderTask;
         }
         // We found the mob!
         ChatClefDiagnostics.logEvent("RESOURCE", "DECISION", "kill_and_loot_return_kill_task", this,
                 "targetClass", ChatClefDiagnostics.classList(new Class<?>[]{_toKill}),
                 "killTask", ChatClefDiagnostics.taskSummary(_killTask));
+        KillAndLootDiagnostics.logDecision(mod, this, _toKill, itemTargets, true,
+                "RETURN_KILL_TASK", _killTask);
         return _killTask;
     }
 
@@ -74,6 +84,7 @@ public class KillAndLootTask extends ResourceTask {
         ChatClefDiagnostics.logEvent("RESOURCE", "ON_STOP", "kill_and_loot_stop", this,
                 "targetClass", ChatClefDiagnostics.classList(new Class<?>[]{_toKill}),
                 "interruptTask", ChatClefDiagnostics.taskSummary(interruptTask));
+        KillAndLootDiagnostics.logStop(mod, this, _toKill, itemTargets, _killTask, interruptTask);
     }
 
     @Override
