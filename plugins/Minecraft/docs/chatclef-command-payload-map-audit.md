@@ -424,6 +424,9 @@ as the facade used by the diagnostics emitter. Execution, context, and shared
 `command/diagnostics/payload/log/*`, and the diagnostics facade no longer
 accepts new raw `Map<String, Object>` detail overloads. Existing emitted log
 keys and detail object shapes remain unchanged.
+The shared `event` and `details` final field writers live under
+`command/diagnostics/payload/log/common/*` so the diagnostic log edge stays
+explicit without reintroducing raw-map detail overloads.
 
 Command lifecycle result data now keeps the lifecycle value object in
 `command/lifecycle/FabricChatClefCommandLifecyclePayload` and delegates final
@@ -447,6 +450,16 @@ Termination observation field writers are further split under
 `command/lifecycle/payload/termination/*` so completion source, stop-state,
 event identity, timing, task snapshot, and ownership fields remain separately
 owned without changing emitted key names.
+Termination completion, event identity, stop-state, ownership change/snapshot,
+and observation/dequeue timing fields now delegate to key-level writers under
+`command/lifecycle/payload/termination/completion/*`,
+`command/lifecycle/payload/termination/event/*`,
+`command/lifecycle/payload/termination/state/*`,
+`command/lifecycle/payload/termination/ownership/change/*`,
+`command/lifecycle/payload/termination/ownership/snapshot/*`,
+`command/lifecycle/payload/termination/timing/observation/*`, and
+`command/lifecycle/payload/termination/timing/dequeue/*` while preserving the
+same emitted diagnostic keys.
 
 Command ownership and task observation value objects follow the same pattern:
 the public value object remains in its existing package, while final map key

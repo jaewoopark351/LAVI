@@ -1,14 +1,14 @@
 package lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.payload.termination.timing;
 
+import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.payload.termination.timing.dequeue.FabricChatClefTerminationDequeuedAtPayloadMap;
+import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.payload.termination.timing.dequeue.FabricChatClefTerminationDequeuedClientTickPayloadMap;
+import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.payload.termination.timing.dequeue.FabricChatClefTerminationObservationAgePayloadMap;
+import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.payload.termination.timing.dequeue.FabricChatClefTerminationQueueDepthAfterDequeuePayloadMap;
+
 import java.util.Map;
 
 //20260814_kpopmodder: Keep dequeue timing fields separate without changing emitted keys.
 public final class FabricChatClefTerminationDequeueTimingPayloadMap {
-    private static final String DEQUEUED_AT_MS = "dequeued_at_ms";
-    private static final String DEQUEUED_CLIENT_TICK = "dequeued_client_tick";
-    private static final String OBSERVATION_AGE_MS = "observation_age_ms";
-    private static final String QUEUE_DEPTH_AFTER_DEQUEUE = "queue_depth_after_dequeue";
-
     private FabricChatClefTerminationDequeueTimingPayloadMap() {
     }
 
@@ -19,9 +19,9 @@ public final class FabricChatClefTerminationDequeueTimingPayloadMap {
             long observationAgeMs,
             int queueDepthAfterDequeue
     ) {
-        payload.put(DEQUEUED_AT_MS, dequeuedAtMs);
-        payload.put(DEQUEUED_CLIENT_TICK, dequeuedClientTick);
-        payload.put(OBSERVATION_AGE_MS, observationAgeMs);
-        payload.put(QUEUE_DEPTH_AFTER_DEQUEUE, queueDepthAfterDequeue);
+        FabricChatClefTerminationDequeuedAtPayloadMap.writeTo(payload, dequeuedAtMs);
+        FabricChatClefTerminationDequeuedClientTickPayloadMap.writeTo(payload, dequeuedClientTick);
+        FabricChatClefTerminationObservationAgePayloadMap.writeTo(payload, observationAgeMs);
+        FabricChatClefTerminationQueueDepthAfterDequeuePayloadMap.writeTo(payload, queueDepthAfterDequeue);
     }
 }
