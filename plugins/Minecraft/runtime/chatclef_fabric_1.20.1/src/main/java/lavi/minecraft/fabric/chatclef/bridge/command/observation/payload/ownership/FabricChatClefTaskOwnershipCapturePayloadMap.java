@@ -1,15 +1,15 @@
 package lavi.minecraft.fabric.chatclef.bridge.command.observation.payload.ownership;
 
+import lavi.minecraft.fabric.chatclef.bridge.command.observation.payload.ownership.capture.FabricChatClefTaskOwnershipCaptureAvailablePayloadMap;
+import lavi.minecraft.fabric.chatclef.bridge.command.observation.payload.ownership.capture.FabricChatClefTaskOwnershipCaptureErrorPayloadMap;
+import lavi.minecraft.fabric.chatclef.bridge.command.observation.payload.ownership.capture.FabricChatClefTaskOwnershipCaptureThreadPayloadMap;
+import lavi.minecraft.fabric.chatclef.bridge.command.observation.payload.ownership.capture.FabricChatClefTaskOwnershipCapturedAtPayloadMap;
+import lavi.minecraft.fabric.chatclef.bridge.command.observation.payload.ownership.capture.FabricChatClefTaskOwnershipCapturedClientTickPayloadMap;
+
 import java.util.Map;
 
 //20260808_kpopmodder: Split task ownership capture fields from the snapshot Map edge without changing keys.
 public final class FabricChatClefTaskOwnershipCapturePayloadMap {
-    private static final String AVAILABLE = "available";
-    private static final String ERROR = "error";
-    private static final String CAPTURED_AT_MS = "captured_at_ms";
-    private static final String CAPTURED_CLIENT_TICK = "captured_client_tick";
-    private static final String CAPTURE_THREAD = "capture_thread";
-
     private FabricChatClefTaskOwnershipCapturePayloadMap() {
     }
 
@@ -21,10 +21,10 @@ public final class FabricChatClefTaskOwnershipCapturePayloadMap {
             long capturedClientTick,
             String captureThread
     ) {
-        payload.put(AVAILABLE, available);
-        payload.put(ERROR, error);
-        payload.put(CAPTURED_AT_MS, capturedAtMs);
-        payload.put(CAPTURED_CLIENT_TICK, capturedClientTick);
-        payload.put(CAPTURE_THREAD, captureThread);
+        FabricChatClefTaskOwnershipCaptureAvailablePayloadMap.writeTo(payload, available);
+        FabricChatClefTaskOwnershipCaptureErrorPayloadMap.writeTo(payload, error);
+        FabricChatClefTaskOwnershipCapturedAtPayloadMap.writeTo(payload, capturedAtMs);
+        FabricChatClefTaskOwnershipCapturedClientTickPayloadMap.writeTo(payload, capturedClientTick);
+        FabricChatClefTaskOwnershipCaptureThreadPayloadMap.writeTo(payload, captureThread);
     }
 }

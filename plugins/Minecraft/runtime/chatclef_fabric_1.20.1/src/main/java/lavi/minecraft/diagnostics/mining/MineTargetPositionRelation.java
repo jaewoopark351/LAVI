@@ -3,11 +3,11 @@ package lavi.minecraft.diagnostics.mining;
 import net.minecraft.util.math.BlockPos;
 
 //20260809_kpopmodder: Classify mining target coordinate changes for target-level retry diagnostics.
-final class MineTargetPositionRelation {
+public final class MineTargetPositionRelation {
     private MineTargetPositionRelation() {
     }
 
-    static String classify(BlockPos previous, BlockPos candidate) {
+    public static String classify(BlockPos previous, BlockPos candidate) {
         if (candidate == null) {
             return "NO_CANDIDATE";
         }
@@ -32,7 +32,7 @@ final class MineTargetPositionRelation {
         return "DIFFERENT_REGION";
     }
 
-    static Object manhattanDistance(BlockPos previous, BlockPos candidate) {
+    public static Object manhattanDistance(BlockPos previous, BlockPos candidate) {
         if (previous == null || candidate == null) {
             return "unavailable";
         }
@@ -41,7 +41,7 @@ final class MineTargetPositionRelation {
                 + Math.abs(candidate.getZ() - previous.getZ());
     }
 
-    static Object chebyshevDistance(BlockPos previous, BlockPos candidate) {
+    public static Object chebyshevDistance(BlockPos previous, BlockPos candidate) {
         if (previous == null || candidate == null) {
             return "unavailable";
         }
@@ -51,7 +51,7 @@ final class MineTargetPositionRelation {
         return Math.max(dx, Math.max(dy, dz));
     }
 
-    static Object squaredDistance(BlockPos previous, BlockPos candidate) {
+    public static Object squaredDistance(BlockPos previous, BlockPos candidate) {
         if (previous == null || candidate == null) {
             return "unavailable";
         }

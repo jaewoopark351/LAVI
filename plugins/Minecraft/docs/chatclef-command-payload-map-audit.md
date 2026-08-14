@@ -472,6 +472,15 @@ Task ownership snapshot field groups are further split under
 `command/observation/payload/ownership/*` so capture metadata, UserTask root
 fields, and selected-chain fields can change internally without renaming the
 existing emitted keys.
+Capture metadata fields are further split under
+`command/observation/payload/ownership/capture/*` so `available`, `error`,
+`captured_at_ms`, `captured_client_tick`, and `capture_thread` each keep their
+existing emitted key while owning their final Map write.
+UserTask root fields are further split under
+`command/observation/payload/ownership/root/*`, and selected-chain fields are
+further split under `command/observation/payload/ownership/chain/*`, preserving
+the same `user_task_root_*`, `user_task_running_idle`, `next_task_idle_flag`,
+`task_runner_active`, and `selected_chain_*` keys.
 Runtime task observation fields are split under
 `command/observation/payload/runtime/*` so capture timing/thread fields and
 the `current_task` / `ownership` nested payload fields remain separately owned
