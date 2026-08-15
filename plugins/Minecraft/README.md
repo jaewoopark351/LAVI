@@ -211,6 +211,15 @@ Minecraft-active routing boundaries, read:
 plugins/Minecraft/docs/chatclef-korean-item-command-resolution-analysis.md
 ```
 
+For the v2 Korean item alias expansion shared by `get`, `equip`, `deposit`,
+and `give`, including default-policy boundaries, command-specific policy
+boundaries, conditional review notes, and the required Phase 0 contract freeze,
+read:
+
+```text
+plugins/Minecraft/docs/chatclef-korean-item-action-alias-v2-plan.md
+```
+
 For upstream-derived engine divergence, read:
 
 ```text
@@ -244,6 +253,9 @@ Python orchestration planning:
 
 Korean item command diagnosis:
   chatclef-korean-item-command-resolution-analysis.md
+
+Korean item action alias v2 planning:
+  chatclef-korean-item-action-alias-v2-plan.md
 
 Engine reference:
   chatclef-structure-overview.md
