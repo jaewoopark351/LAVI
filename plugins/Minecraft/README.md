@@ -197,6 +197,13 @@ For payload typing and map-shape stability, read:
 plugins/Minecraft/docs/chatclef-command-payload-map-audit.md
 ```
 
+For Python-only command replies, Korean mining phrases, transport result
+events, and inventory preflight cleanup planning, read:
+
+```text
+plugins/Minecraft/docs/chatclef-python-command-orchestration-plan.md
+```
+
 For upstream-derived engine divergence, read:
 
 ```text
@@ -224,6 +231,9 @@ Policy and investigation direction:
 Audit and active snapshot:
   chatclef-command-payload-map-audit.md
   chatclef-engine-divergence-record.md
+
+Python orchestration planning:
+  chatclef-python-command-orchestration-plan.md
 
 Engine reference:
   chatclef-structure-overview.md
