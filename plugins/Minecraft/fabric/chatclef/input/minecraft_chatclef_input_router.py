@@ -39,8 +39,11 @@ class MinecraftChatClefInputRouter:
             )
 
         translator = getattr(self.extension, "translate_natural_language_command", None)
+        submitter = getattr(self.extension, "submit_translated_command", None)
         handler = getattr(self.extension, "handle_natural_language_command", None)
-        if not callable(translator) or not callable(handler):
+        if not callable(translator) or not (
+            callable(submitter) or callable(handler)
+        ):
             self._log("route skipped: natural-language handler unavailable")
             return MinecraftChatClefInputRouteDecision.not_handled(
                 "handler_unavailable"
@@ -51,11 +54,26 @@ class MinecraftChatClefInputRouter:
         except Exception as error:
             return self._handled_exception("translation_failed", error)
 
-        if self._translation_status(translation) == "unknown":
-            return MinecraftChatClefInputRouteDecision.not_handled("unknown_intent")
+        translation_status = self._translation_status(translation)
+        if translation_status in {"unknown", "ambiguous", "unsupported"}:
+            return MinecraftChatClefInputRouteDecision.not_handled(
+                f"{translation_status}_intent"
+            )
+        if translation_status in {"invalid", "internal_error"}:
+            return self._handled_translation_rejection(translation)
+        if translation_status != "validated":
+            return self._handled_translation_rejection(translation)
+
+        bridge_precheck = self._validated_submission_precheck()
+        if bridge_precheck is not None:
+            return bridge_precheck
 
         try:
-            result = self._mapping_payload(handler(self._request(command_text)))
+            request = self._request(command_text)
+            if callable(submitter):
+                result = self._mapping_payload(submitter(request, translation))
+            else:
+                result = self._mapping_payload(handler(request))
         except Exception as error:
             return self._handled_exception("submission_failed", error, translation)
 
@@ -102,6 +120,76 @@ class MinecraftChatClefInputRouter:
             return str(status.get("status") or "").strip().lower()
         return str(status or "").strip().lower()
 
+    def _validated_submission_precheck(
+        self,
+    ) -> MinecraftChatClefInputRouteDecision | None:
+        status = self._extension_status()
+        bridge = self._bridge_status(status)
+        if not bridge:
+            return None
+        if "connected" in bridge and not bool(bridge.get("connected")):
+            detail = str(
+                bridge.get("detail")
+                or bridge.get("last_error_message")
+                or "Fabric ChatClef bridge client is not connected."
+            )
+            return MinecraftChatClefInputRouteDecision.handled_result(
+                reason="minecraft_bridge_disconnected",
+                response_text=f"[Minecraft] command rejected: {detail}",
+                result={
+                    "ok": False,
+                    "error": "not_connected",
+                    "message": detail,
+                    "status": bridge,
+                },
+            )
+        active_request_id = self._active_request_id(bridge)
+        if active_request_id:
+            message = f"Fabric ChatClef command already active: {active_request_id}"
+            return MinecraftChatClefInputRouteDecision.handled_result(
+                reason="minecraft_command_busy",
+                response_text=f"[Minecraft] command rejected: {message}",
+                result={
+                    "ok": False,
+                    "error": "active_command",
+                    "message": message,
+                    "status": bridge,
+                },
+            )
+        return None
+
+    def _extension_status(self) -> dict[str, Any]:
+        status_method = getattr(self.extension, "get_status", None)
+        if not callable(status_method):
+            return {}
+        try:
+            return self._mapping_payload(status_method())
+        except Exception as error:
+            self._log(
+                "status precheck skipped: "
+                f"error={type(error).__name__}: {error}"
+            )
+            return {}
+
+    def _bridge_status(self, status: Mapping[str, Any]) -> dict[str, Any]:
+        details = status.get("details")
+        if isinstance(details, Mapping) and (
+            "connected" in details or "enabled" in details
+        ):
+            return dict(details)
+        if "connected" in status or "enabled" in status:
+            return dict(status)
+        return {}
+
+    def _active_request_id(self, bridge: Mapping[str, Any]) -> str:
+        details = bridge.get("details")
+        if not isinstance(details, Mapping):
+            return ""
+        commands = details.get("commands")
+        if not isinstance(commands, Mapping):
+            return ""
+        return str(commands.get("active_request_id") or "").strip()
+
     def _response_text(
         self,
         translation: Mapping[str, Any],
@@ -121,6 +209,32 @@ class MinecraftChatClefInputRouter:
         if message:
             return f"[Minecraft] command rejected: {message}"
         return "[Minecraft] command rejected."
+
+    def _handled_translation_rejection(
+        self,
+        translation: Mapping[str, Any],
+    ) -> MinecraftChatClefInputRouteDecision:
+        reason_code = str(
+            translation.get("reason_code")
+            or translation.get("status")
+            or "translation_rejected"
+        )
+        message = str(translation.get("message") or reason_code).strip()
+        data = translation.get("data")
+        details = dict(data) if isinstance(data, Mapping) else {}
+        result = {
+            "ok": False,
+            "status": dict(translation),
+            "error": reason_code,
+            "message": message,
+            "details": details,
+        }
+        return MinecraftChatClefInputRouteDecision.handled_result(
+            reason="minecraft_translation_rejected",
+            response_text=f"[Minecraft] command rejected: {message}",
+            result=result,
+            translation=dict(translation),
+        )
 
     def _handled_exception(
         self,

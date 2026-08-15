@@ -12,6 +12,9 @@ from plugins.Minecraft.fabric.chatclef.intent.chatclef_intent_type import (
 from plugins.Minecraft.fabric.chatclef.intent.korean_quantity_parser import (
     KoreanQuantityParser,
 )
+from plugins.Minecraft.fabric.chatclef.intent.korean_acquisition_verb_matcher import (
+    KoreanAcquisitionVerbMatcher,
+)
 from plugins.Minecraft.fabric.chatclef.intent.korean_text_normalizer import (
     KoreanTextNormalizer,
 )
@@ -25,17 +28,18 @@ class KoreanChatClefRuleParser:
     _FOLLOW_RE = re.compile(
         r"(?P<player>[A-Za-z0-9_]{3,16})\s*(?:따라가|따라가줘|팔로우|쫓아가)"
     )
-    _GET_VERB_RE = re.compile(
-        r"(가져와줘|가져와|구해줘|구해|만들어줘|만들어|제작해줘|제작해|얻어줘|얻어)"
-    )
 
     def __init__(
         self,
         normalizer: KoreanTextNormalizer | None = None,
         quantity_parser: KoreanQuantityParser | None = None,
+        acquisition_verbs: KoreanAcquisitionVerbMatcher | None = None,
     ):
         self._normalizer = normalizer or KoreanTextNormalizer()
         self._quantity_parser = quantity_parser or KoreanQuantityParser()
+        self._acquisition_verbs = acquisition_verbs or KoreanAcquisitionVerbMatcher(
+            self._normalizer
+        )
 
     def parse(self, text: object) -> ChatClefIntentDTO:
         original = self._normalizer.normalize(text, lowercase_english=False)
@@ -98,18 +102,16 @@ class KoreanChatClefRuleParser:
         return None
 
     def _looks_like_get_item(self, normalized: str) -> bool:
-        if self._GET_VERB_RE.search(normalized):
+        if self._acquisition_verbs.matches(normalized):
             return True
         return self._quantity_parser.strip_quantity(normalized) != normalized
 
     def _item_phrase(self, normalized: str) -> str:
         without_quantity = self._quantity_parser.strip_quantity(normalized)
-        without_verbs = self._GET_VERB_RE.sub(" ", without_quantity)
-        without_particles = re.sub(
-            r"(?:\b(?:좀|제발|주세요|줘)\b|[을를]$)",
-            " ",
-            without_verbs,
-        )
+        without_verbs = self._acquisition_verbs.strip(without_quantity)
+        without_soft_words = re.sub(r"\b(?:좀|제발|주세요|줘)\b", " ", without_verbs)
+        compacted = re.sub(r"\s+", " ", without_soft_words).strip()
+        without_particles = re.sub(r"[을를]$", " ", compacted)
         return re.sub(r"\s+", " ", without_particles).strip()
 
     def _is_stop(self, normalized: str) -> bool:

@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Mapping
 
 from plugins.Minecraft.fabric.chatclef.intent.chatclef_intent_dto import (
     ChatClefIntentDTO,
@@ -10,6 +10,10 @@ from plugins.Minecraft.fabric.chatclef.intent.chatclef_intent_dto import (
 from plugins.Minecraft.fabric.chatclef.intent.chatclef_intent_status import (
     ChatClefIntentStatus,
 )
+
+
+def _coerce_dict(value: Any) -> dict[str, Any]:
+    return dict(value) if isinstance(value, Mapping) else {}
 
 
 @dataclass(frozen=True)
@@ -79,6 +83,28 @@ class ChatClefTranslationResultDTO:
             reason_code=reason_code,
             message=message,
             data=data or {},
+        )
+
+    @classmethod
+    def from_mapping(cls, value: Any) -> "ChatClefTranslationResultDTO":
+        if isinstance(value, cls):
+            return value
+        payload = value if isinstance(value, Mapping) else {}
+        intent_payload = payload.get("intent")
+        intent = (
+            None
+            if intent_payload is None
+            else ChatClefIntentDTO.from_mapping(intent_payload)
+        )
+        return cls(
+            status=payload.get("status", ChatClefIntentStatus.UNKNOWN),
+            executable=payload.get("executable", False),
+            command=payload.get("command"),
+            intent=intent,
+            resolved_target=payload.get("resolved_target"),
+            reason_code=payload.get("reason_code", ""),
+            message=payload.get("message", ""),
+            data=_coerce_dict(payload.get("data")),
         )
 
     def to_dict(self) -> dict[str, Any]:

@@ -75,6 +75,21 @@ class MinecraftFabricChatClefExtension(GameExtensionInterface):
             self._translated_command_request(command, translation, text)
         )
 
+    def submit_translated_command(
+        self,
+        command: Any,
+        translation: Any,
+    ) -> dict[str, Any]:
+        text = self._natural_language_text(command)
+        translated = ChatClefTranslationResultDTO.from_mapping(translation)
+        if not translated.executable:
+            payload = self._translation_rejection_payload(translated)
+            self.record_result(payload, action="submit_translated_command")
+            return payload
+        return self.handle_command(
+            self._translated_command_request(command, translated, text)
+        )
+
     def get_status(self) -> dict[str, Any]:
         status = self.adapter.get_status().to_dict()
         return self.apply_status_contract(
