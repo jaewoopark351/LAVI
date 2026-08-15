@@ -204,6 +204,13 @@ events, and inventory preflight cleanup planning, read:
 plugins/Minecraft/docs/chatclef-python-command-orchestration-plan.md
 ```
 
+For Korean standalone item aliases, mining/acquisition verb parsing, and
+Minecraft-active routing boundaries, read:
+
+```text
+plugins/Minecraft/docs/chatclef-korean-item-command-resolution-analysis.md
+```
+
 For upstream-derived engine divergence, read:
 
 ```text
@@ -234,6 +241,9 @@ Audit and active snapshot:
 
 Python orchestration planning:
   chatclef-python-command-orchestration-plan.md
+
+Korean item command diagnosis:
+  chatclef-korean-item-command-resolution-analysis.md
 
 Engine reference:
   chatclef-structure-overview.md
