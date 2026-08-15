@@ -72,6 +72,32 @@ class MinecraftChatClefKoreanCommandIntegrationTests(unittest.TestCase):
         self.assertEqual("get diamond 1", adapter.requests[0].command)
         self.assertEqual("router", adapter.requests[0].metadata["origin"])
 
+    def test_extension_rejects_malformed_validated_translation_without_adapter_submission(self):
+        adapter = _RecordingAdapter()
+        extension = MinecraftFabricChatClefExtension(adapter=adapter)
+
+        result = extension.submit_translated_command(
+            {
+                "request_id": "ko-translated-bad",
+                "text": "다이아몬드 캐줘",
+            },
+            {
+                "status": "validated",
+                "executable": "false",
+                "command": "get diamond 1",
+                "intent": {
+                    "intent_type": "get_item",
+                    "item_phrase": "다이아몬드",
+                    "quantity": 1,
+                },
+                "resolved_target": "diamond",
+            },
+        )
+
+        self.assertFalse(result["ok"])
+        self.assertEqual("malformed_translation_result", result["error"])
+        self.assertEqual([], adapter.requests)
+
 
 class _RecordingAdapter:
     backend_id = "fabric_chatclef"

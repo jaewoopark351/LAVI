@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "evidence_maturity": "PRE_SHARED_CASE",
+  "commands": [
+    { "command": "attack", "owner": "chatclef_java", "natural_language_status": "RAW_ONLY", "support_status": "java_only_task_command" },
+    { "command": "chatclef", "owner": "chatclef_java", "natural_language_status": "RAW_ONLY", "support_status": "java_only_user_or_dev_command" },
+    { "command": "deposit", "owner": "chatclef_java", "natural_language_status": "PLANNED", "support_status": "planned_item_action_phase" },
+    { "command": "equip", "owner": "chatclef_java", "natural_language_status": "PLANNED", "support_status": "planned_item_action_phase" },
+    { "command": "follow", "owner": "chatclef_java", "natural_language_status": "IMPLEMENTED", "support_status": "supported_korean" },
+    { "command": "food", "owner": "chatclef_java", "natural_language_status": "IMPLEMENTED", "support_status": "supported_korean" },
+    { "command": "gamer", "owner": "chatclef_java", "natural_language_status": "RAW_ONLY", "support_status": "java_only_task_command" },
+    { "command": "gamma", "owner": "chatclef_java", "natural_language_status": "RAW_ONLY", "support_status": "java_only_user_or_dev_command" },
+    { "command": "get", "owner": "chatclef_java", "natural_language_status": "IMPLEMENTED", "support_status": "supported_korean" },
+    { "command": "give", "owner": "chatclef_java", "natural_language_status": "PLANNED", "support_status": "planned_item_action_phase" },
+    { "command": "goto", "owner": "chatclef_java", "natural_language_status": "IMPLEMENTED", "support_status": "supported_korean" },
+    { "command": "hero", "owner": "chatclef_java", "natural_language_status": "RAW_ONLY", "support_status": "java_only_task_command" },
+    { "command": "idle", "owner": "chatclef_java", "natural_language_status": "IMPLEMENTED", "support_status": "supported_korean" },
+    { "command": "locate_structure", "owner": "chatclef_java", "natural_language_status": "RAW_ONLY", "support_status": "java_only_task_command" },
+    { "command": "meat", "owner": "chatclef_java", "natural_language_status": "IMPLEMENTED", "support_status": "supported_korean" },
+    { "command": "overlay", "owner": "lavi_overlay", "natural_language_status": "RAW_ONLY", "support_status": "java_only_user_or_dev_command" },
+    { "command": "reload_settings", "owner": "chatclef_java", "natural_language_status": "RAW_ONLY", "support_status": "java_only_user_or_dev_command" },
+    { "command": "resetmemory", "owner": "chatclef_java", "natural_language_status": "RAW_ONLY", "support_status": "java_only_user_or_dev_command" },
+    { "command": "scan", "owner": "chatclef_java", "natural_language_status": "RAW_ONLY", "support_status": "java_only_task_command" },
+    { "command": "stop", "owner": "chatclef_java", "natural_language_status": "IMPLEMENTED", "support_status": "supported_korean" }
+  ]
+}

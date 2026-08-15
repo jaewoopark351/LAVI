@@ -73,6 +73,71 @@ class MinecraftChatClefKoreanIntentSchemaTests(unittest.TestCase):
         self.assertFalse(valid)
         self.assertEqual("invalid_quantity", reason_code)
 
+    def test_malformed_numeric_slots_are_rejected_before_coercion(self):
+        validator = ChatClefIntentSchemaValidator()
+        invalid_cases = [
+            {"intent_type": "get_item", "item_phrase": "다이아몬드", "quantity": True},
+            {"intent_type": "get_item", "item_phrase": "다이아몬드", "quantity": 1.5},
+            {"intent_type": "get_item", "item_phrase": "다이아몬드", "quantity": "1.5"},
+            {"intent_type": "food", "food_units": True},
+            {"intent_type": "meat", "food_units": 1.5},
+            {"intent_type": "goto", "x": True, "y": 64, "z": 0},
+            {"intent_type": "goto", "x": 0, "y": 1.5, "z": 0},
+            {"intent_type": "goto", "x": 0, "y": 64, "z": "3"},
+        ]
+
+        for payload in invalid_cases:
+            with self.subTest(payload=payload):
+                valid, reason_code, _message = validator.validate(payload)
+
+                self.assertFalse(valid)
+                self.assertEqual("malformed_intent", reason_code)
+
+    def test_numeric_slots_reject_java_int_overflow(self):
+        validator = ChatClefIntentSchemaValidator()
+        invalid_cases = [
+            (
+                {
+                    "intent_type": "get_item",
+                    "item_phrase": "다이아몬드",
+                    "quantity": 2147483648,
+                },
+                "invalid_quantity",
+            ),
+            (
+                {
+                    "intent_type": "food",
+                    "food_units": 2147483648,
+                },
+                "invalid_food_units",
+            ),
+            (
+                {
+                    "intent_type": "goto",
+                    "x": -2147483649,
+                    "y": 64,
+                    "z": 0,
+                },
+                "invalid_coordinates",
+            ),
+            (
+                {
+                    "intent_type": "goto",
+                    "x": 0,
+                    "y": 64,
+                    "z": 2147483648,
+                },
+                "invalid_coordinates",
+            ),
+        ]
+
+        for payload, expected_reason in invalid_cases:
+            with self.subTest(payload=payload):
+                valid, reason_code, _message = validator.validate(payload)
+
+                self.assertFalse(valid)
+                self.assertEqual(expected_reason, reason_code)
+
 
 if __name__ == "__main__":
     unittest.main()

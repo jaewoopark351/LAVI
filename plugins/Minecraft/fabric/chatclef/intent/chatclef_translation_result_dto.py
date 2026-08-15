@@ -10,6 +10,9 @@ from plugins.Minecraft.fabric.chatclef.intent.chatclef_intent_dto import (
 from plugins.Minecraft.fabric.chatclef.intent.chatclef_intent_status import (
     ChatClefIntentStatus,
 )
+from plugins.Minecraft.fabric.chatclef.intent.chatclef_translation_result_validator import (
+    ChatClefTranslationResultValidator,
+)
 
 
 def _coerce_dict(value: Any) -> dict[str, Any]:
@@ -29,14 +32,20 @@ class ChatClefTranslationResultDTO:
 
     def __post_init__(self) -> None:
         status = ChatClefIntentStatus(self.status)
-        executable = bool(self.executable)
-        if executable != status.executable:
-            raise ValueError("executable must match ChatClefIntentStatus")
-        if not executable and self.command is not None:
-            raise ValueError("non-executable translations must not include command")
+        intent = self.intent
+        if intent is not None and not isinstance(intent, ChatClefIntentDTO):
+            intent = ChatClefIntentDTO.from_mapping(intent)
+        command = ChatClefTranslationResultValidator().validate(
+            status=status,
+            executable=self.executable,
+            command=self.command,
+            intent=intent,
+            resolved_target=self.resolved_target,
+        )
         object.__setattr__(self, "status", status)
-        object.__setattr__(self, "executable", executable)
-        object.__setattr__(self, "command", None if self.command is None else str(self.command))
+        object.__setattr__(self, "executable", self.executable)
+        object.__setattr__(self, "command", command)
+        object.__setattr__(self, "intent", intent)
         object.__setattr__(
             self,
             "resolved_target",

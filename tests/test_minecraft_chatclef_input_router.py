@@ -39,11 +39,7 @@ class MinecraftChatClefInputRouterTests(unittest.TestCase):
 
     def test_non_minecraft_input_is_not_handled(self):
         extension = _RecordingExtension(
-            translation={
-                "status": "validated",
-                "executable": True,
-                "command": "get gold_ingot 8",
-            }
+            translation=_validated_get_translation("get gold_ingot 8", "금괴", 8, "gold_ingot")
         )
         router = MinecraftChatClefInputRouter(
             extension=extension,
@@ -59,11 +55,7 @@ class MinecraftChatClefInputRouterTests(unittest.TestCase):
 
     def test_valid_minecraft_input_submits_translated_command_once(self):
         extension = _RecordingExtension(
-            translation={
-                "status": "validated",
-                "executable": True,
-                "command": "get gold_ingot 8",
-            },
+            translation=_validated_get_translation("get gold_ingot 8", "금괴", 8, "gold_ingot"),
             result={
                 "ok": True,
                 "status": {"status": "accepted"},
@@ -141,11 +133,7 @@ class MinecraftChatClefInputRouterTests(unittest.TestCase):
 
     def test_validated_translation_is_rejected_when_bridge_is_disconnected(self):
         extension = _RecordingExtension(
-            translation={
-                "status": "validated",
-                "executable": True,
-                "command": "get diamond 1",
-            },
+            translation=_validated_get_translation("get diamond 1", "다이아몬드", 1, "diamond"),
             bridge_status={
                 "details": {
                     "enabled": True,
@@ -168,11 +156,7 @@ class MinecraftChatClefInputRouterTests(unittest.TestCase):
 
     def test_validated_translation_is_rejected_when_command_is_active(self):
         extension = _RecordingExtension(
-            translation={
-                "status": "validated",
-                "executable": True,
-                "command": "get diamond 1",
-            },
+            translation=_validated_get_translation("get diamond 1", "다이아몬드", 1, "diamond"),
             bridge_status={
                 "details": {
                     "enabled": True,
@@ -252,6 +236,28 @@ class _RecordingExtension:
 
     def get_status(self):
         return dict(self.bridge_status)
+
+
+def _validated_get_translation(
+    command: str,
+    item_phrase: str,
+    quantity: int,
+    target: str,
+) -> dict[str, object]:
+    return {
+        "status": "validated",
+        "executable": True,
+        "command": command,
+        "intent": {
+            "intent_type": "get_item",
+            "item_phrase": item_phrase,
+            "quantity": quantity,
+        },
+        "resolved_target": target,
+        "reason_code": "validated",
+        "message": "Korean command was translated to ChatClef DSL.",
+        "data": {},
+    }
 
 
 class _ListenerSource:

@@ -11,6 +11,9 @@ from plugins.Minecraft.fabric.chatclef.input.minecraft_chatclef_input_intent_gat
 from plugins.Minecraft.fabric.chatclef.input.minecraft_chatclef_input_route_decision import (
     MinecraftChatClefInputRouteDecision,
 )
+from plugins.Minecraft.fabric.chatclef.intent.chatclef_translation_result_dto import (
+    ChatClefTranslationResultDTO,
+)
 
 
 class MinecraftChatClefInputRouter:
@@ -50,9 +53,14 @@ class MinecraftChatClefInputRouter:
             )
 
         try:
-            translation = self._mapping_payload(translator(command_text))
+            raw_translation = translator(command_text)
         except Exception as error:
             return self._handled_exception("translation_failed", error)
+
+        try:
+            translation = self._validated_translation_payload(raw_translation)
+        except Exception as error:
+            return self._handled_malformed_translation(error)
 
         translation_status = self._translation_status(translation)
         if translation_status in {"unknown", "ambiguous", "unsupported"}:
@@ -110,6 +118,12 @@ class MinecraftChatClefInputRouter:
         if callable(to_dict):
             return dict(to_dict())
         return {"raw": payload}
+
+    def _validated_translation_payload(self, payload: Any) -> dict[str, Any]:
+        translation = ChatClefTranslationResultDTO.from_mapping(
+            self._mapping_payload(payload)
+        )
+        return translation.to_dict()
 
     def _translation_status(self, translation: Mapping[str, Any]) -> str:
         return str(translation.get("status") or "").strip().lower()
@@ -249,6 +263,25 @@ class MinecraftChatClefInputRouter:
             response_text=f"[Minecraft] command failed: {message}",
             result={"ok": False, "error": reason, "message": message},
             translation=translation or {},
+        )
+
+    def _handled_malformed_translation(
+        self,
+        error: Exception,
+    ) -> MinecraftChatClefInputRouteDecision:
+        message = f"{type(error).__name__}: {error}"
+        self._log(f"route rejected malformed translation: error={message}")
+        result = {
+            "ok": False,
+            "error": "malformed_translation_result",
+            "message": message,
+            "details": {},
+        }
+        return MinecraftChatClefInputRouteDecision.handled_result(
+            reason="minecraft_translation_malformed",
+            response_text=f"[Minecraft] command rejected: {message}",
+            result=result,
+            translation={},
         )
 
     def _log(self, message: str) -> None:

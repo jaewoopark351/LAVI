@@ -79,6 +79,8 @@ class LaviMinecraftChatClefGradioRuntimeLifecycleTests(unittest.TestCase):
         submit_result = json.loads(submitted[0])
         self.assertTrue(submit_result["ok"], submit_result)
         self.assertEqual("accepted", submit_result["status"]["status"])
+        submitted_request_id = str(submit_result["status"]["request_id"])
+        self.assertTrue(submitted_request_id)
 
         timeout_sec = float(os.environ.get("LAVI_MINECRAFT_RUNTIME_TIMEOUT_SEC", "60"))
         poll_sec = float(os.environ.get("LAVI_MINECRAFT_RUNTIME_POLL_SEC", "2"))
@@ -90,9 +92,11 @@ class LaviMinecraftChatClefGradioRuntimeLifecycleTests(unittest.TestCase):
             commands = self._commands(status)
             last_snapshot = dict(commands)
             last_result = commands.get("last_result") or {}
-            last_status = str(last_result.get("status") or "")
-            if last_status in TERMINAL_STATUSES:
+            if _is_matching_terminal_result(last_result, submitted_request_id):
                 self.assertIsNone(commands.get("active_request_id"))
+                data = last_result.get("data") or {}
+                if isinstance(data, dict) and "result_reason" in data:
+                    self.assertTrue(str(data["result_reason"]).strip())
                 return
             time.sleep(poll_sec)
 
@@ -117,6 +121,41 @@ class LaviMinecraftChatClefGradioRuntimeLifecycleTests(unittest.TestCase):
         commands = details.get("commands")
         self.assertIsInstance(commands, dict)
         return dict(commands)
+
+
+class LaviMinecraftChatClefRuntimeResultMatchingTests(unittest.TestCase):
+    def test_stale_terminal_result_does_not_match_new_request(self):
+        self.assertFalse(
+            _is_matching_terminal_result(
+                {"request_id": "old-request", "status": "completed"},
+                "new-request",
+            )
+        )
+
+    def test_matching_terminal_result_requires_request_id_and_terminal_status(self):
+        self.assertTrue(
+            _is_matching_terminal_result(
+                {"request_id": "request-1", "status": "completed"},
+                "request-1",
+            )
+        )
+        self.assertFalse(
+            _is_matching_terminal_result(
+                {"request_id": "request-1", "status": "accepted"},
+                "request-1",
+            )
+        )
+
+
+def _is_matching_terminal_result(
+    last_result: object,
+    submitted_request_id: str,
+) -> bool:
+    if not isinstance(last_result, dict):
+        return False
+    if str(last_result.get("request_id") or "") != submitted_request_id:
+        return False
+    return str(last_result.get("status") or "") in TERMINAL_STATUSES
 
 
 if __name__ == "__main__":

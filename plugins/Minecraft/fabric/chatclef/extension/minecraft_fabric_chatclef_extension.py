@@ -81,7 +81,12 @@ class MinecraftFabricChatClefExtension(GameExtensionInterface):
         translation: Any,
     ) -> dict[str, Any]:
         text = self._natural_language_text(command)
-        translated = ChatClefTranslationResultDTO.from_mapping(translation)
+        try:
+            translated = ChatClefTranslationResultDTO.from_mapping(translation)
+        except (TypeError, ValueError) as error:
+            payload = self._malformed_translation_payload(error)
+            self.record_result(payload, action="submit_translated_command")
+            return payload
         if not translated.executable:
             payload = self._translation_rejection_payload(translated)
             self.record_result(payload, action="submit_translated_command")
@@ -181,6 +186,16 @@ class MinecraftFabricChatClefExtension(GameExtensionInterface):
             "error": translation.reason_code,
             "message": translation.message,
             "details": translation.data,
+        }
+
+    def _malformed_translation_payload(self, error: Exception) -> dict[str, Any]:
+        message = f"{type(error).__name__}: {error}"
+        return {
+            "ok": False,
+            "status": {},
+            "error": "malformed_translation_result",
+            "message": message,
+            "details": {},
         }
 
     def _plugin_status(self) -> dict[str, Any]:

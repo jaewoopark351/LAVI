@@ -6,6 +6,8 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.14'
@@ -56,6 +58,29 @@ jobs:
           tests\test_repository_contract.py
           tests\test_smoke_startup.py
           tests\test_plugin_system_imports.py
+      - name: Run ChatClef focused offline tests
+        shell: pwsh
+        run: |
+          #20260816_kpopmodder: Keep Windows CI aligned with the ChatClef merge gate.
+          $chatClefTests = @()
+
+          $chatClefTests += Get-ChildItem `
+            -LiteralPath .\tests\minecraft_chatclef `
+            -Recurse `
+            -Filter *.py `
+            -File |
+            Where-Object { $_.Name -like "test_*.py" } |
+            ForEach-Object { $_.FullName }
+
+          $chatClefTests += Get-ChildItem `
+            -LiteralPath .\tests `
+            -Filter "test_minecraft_chatclef_*.py" `
+            -File |
+            ForEach-Object { $_.FullName }
+
+          $chatClefTests += ".\tests\test_llm_minecraft_input_router.py"
+
+          .\venv\Scripts\python.exe -m pytest -q @chatClefTests
       - name: Run Core offline smoke
         run: >
           .\venv\Scripts\python.exe scripts\smoke_startup.py

@@ -10,6 +10,10 @@ from plugins.Minecraft.fabric.chatclef.intent.chatclef_intent_dto import (
 from plugins.Minecraft.fabric.chatclef.intent.chatclef_intent_type import (
     ChatClefIntentType,
 )
+from plugins.Minecraft.fabric.chatclef.intent.chatclef_numeric_constraints import (
+    JAVA_INT_MAX,
+    JAVA_INT_MIN,
+)
 
 
 class ChatClefIntentSchemaValidator:
@@ -51,14 +55,28 @@ class ChatClefIntentSchemaValidator:
         if intent.intent_type is ChatClefIntentType.GET_ITEM:
             if not intent.item_phrase.strip():
                 return False, "missing_item_phrase", "get_item requires item_phrase"
-            if intent.quantity is None or intent.quantity <= 0:
-                return False, "invalid_quantity", "get_item quantity must be positive"
+            if (
+                intent.quantity is None
+                or intent.quantity < 1
+                or intent.quantity > JAVA_INT_MAX
+            ):
+                return False, "invalid_quantity", "get_item quantity must be in 1..2147483647"
         if intent.intent_type in {ChatClefIntentType.FOOD, ChatClefIntentType.MEAT}:
-            if intent.food_units is None or intent.food_units <= 0:
-                return False, "invalid_food_units", "food units must be positive"
+            if (
+                intent.food_units is None
+                or intent.food_units < 1
+                or intent.food_units > JAVA_INT_MAX
+            ):
+                return False, "invalid_food_units", "food units must be in 1..2147483647"
         if intent.intent_type is ChatClefIntentType.GOTO:
             if intent.x is None or intent.y is None or intent.z is None:
                 return False, "missing_coordinates", "goto requires x, y, and z"
+            if not (
+                JAVA_INT_MIN <= intent.x <= JAVA_INT_MAX
+                and JAVA_INT_MIN <= intent.y <= JAVA_INT_MAX
+                and JAVA_INT_MIN <= intent.z <= JAVA_INT_MAX
+            ):
+                return False, "invalid_coordinates", "goto coordinates must be Java int values"
         if intent.intent_type is ChatClefIntentType.FOLLOW:
             if not self._PLAYER_RE.fullmatch(intent.player_name):
                 return False, "invalid_player_name", "follow requires a valid player name"

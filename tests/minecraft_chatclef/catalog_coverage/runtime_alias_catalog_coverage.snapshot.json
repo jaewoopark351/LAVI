@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "snapshot_kind": "runtime_reviewed_baseline",
+  "snapshot_authority": "git_blob_bytes",
+  "reviewed_source_commit": "cfc170ac024a46ea943bffcaf289a91ff6bc5ee7",
+  "coverage_algorithm_version": 1,
+  "catalog_path": "plugins/Minecraft/runtime/chatclef_fabric_1.20.1/CataloguedResources.txt",
+  "catalog_sha256": "4591ae83151dd2643943dfdcbb2e89a53d26de393c583902370c3f4d3c57188a",
+  "alias_source_path": "plugins/Minecraft/fabric/chatclef/intent/resources/korean_item_aliases.json",
+  "alias_source_sha256": "9dcf8b8fde97ab60abeceaee7ce0938eda030e80689f1d58d04d5e797b5896df",
+  "catalog_parser_source_path": "plugins/Minecraft/fabric/chatclef/intent/chatclef_target_catalog.py",
+  "catalog_parser_source_sha256": "bca08b987851fb9a27f0dcb06cd95d05c264fd0d276540d0bbd5cfd9d1e50893",
+  "catalog_target_count": 591,
+  "alias_count": 19,
+  "covered_target_count": 9,
+  "missing_target_count": 582,
+  "coverage_percent": 1.52,
+  "baseline_required_targets": [
+    "cooked_beef",
+    "diamond_axe",
+    "diamond_pickaxe",
+    "gold_ingot",
+    "golden_axe",
+    "iron_ingot",
+    "iron_shovel",
+    "log",
+    "netherite_sword",
+    "wooden_axe"
+  ]
+}

@@ -61,12 +61,12 @@ class MinecraftChatClefCommandCompilerTests(unittest.TestCase):
                         target=target,
                     )
 
-    def test_rejects_non_positive_get_counts(self):
+    def test_rejects_invalid_get_counts(self):
         compiler = ChatClefCommandCompiler()
 
-        for quantity in [0, -1]:
+        for quantity in [0, -1, 2147483648, True, False, 1.0, 1.5, "1.5"]:
             with self.subTest(quantity=quantity):
-                with self.assertRaises(ValueError):
+                with self.assertRaises((TypeError, ValueError)):
                     compiler.compile(
                         ChatClefIntentDTO(
                             intent_type=ChatClefIntentType.GET_ITEM,
@@ -74,6 +74,27 @@ class MinecraftChatClefCommandCompilerTests(unittest.TestCase):
                             quantity=quantity,
                         ),
                         target="diamond",
+                    )
+
+    def test_rejects_goto_coordinates_outside_java_int_contract(self):
+        compiler = ChatClefCommandCompiler()
+
+        invalid_cases = [
+            {"x": True, "y": 64, "z": 0},
+            {"x": 0, "y": 1.5, "z": 0},
+            {"x": 0, "y": 64, "z": "3"},
+            {"x": -2147483649, "y": 64, "z": 0},
+            {"x": 0, "y": 64, "z": 2147483648},
+        ]
+
+        for coordinates in invalid_cases:
+            with self.subTest(coordinates=coordinates):
+                with self.assertRaises((TypeError, ValueError)):
+                    compiler.compile(
+                        ChatClefIntentDTO(
+                            intent_type=ChatClefIntentType.GOTO,
+                            **coordinates,
+                        )
                     )
 
 

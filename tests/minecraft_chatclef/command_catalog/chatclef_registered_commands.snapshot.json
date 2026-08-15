@@ -1,0 +1,126 @@
+{
+  "schema_version": 1,
+  "snapshot_authority": "source_extraction",
+  "commands": [
+    {
+      "class_name": "AttackPlayerOrMobCommand",
+      "command": "attack",
+      "owner": "chatclef_java",
+      "path": "adris/altoclef/commands/AttackPlayerOrMobCommand.java"
+    },
+    {
+      "class_name": "DepositCommand",
+      "command": "deposit",
+      "owner": "chatclef_java",
+      "path": "adris/altoclef/commands/DepositCommand.java"
+    },
+    {
+      "class_name": "EquipCommand",
+      "command": "equip",
+      "owner": "chatclef_java",
+      "path": "adris/altoclef/commands/EquipCommand.java"
+    },
+    {
+      "class_name": "FollowCommand",
+      "command": "follow",
+      "owner": "chatclef_java",
+      "path": "adris/altoclef/commands/FollowCommand.java"
+    },
+    {
+      "class_name": "FoodCommand",
+      "command": "food",
+      "owner": "chatclef_java",
+      "path": "adris/altoclef/commands/FoodCommand.java"
+    },
+    {
+      "class_name": "GamerCommand",
+      "command": "gamer",
+      "owner": "chatclef_java",
+      "path": "adris/altoclef/commands/GamerCommand.java"
+    },
+    {
+      "class_name": "GetCommand",
+      "command": "get",
+      "owner": "chatclef_java",
+      "path": "adris/altoclef/commands/GetCommand.java"
+    },
+    {
+      "class_name": "GiveCommand",
+      "command": "give",
+      "owner": "chatclef_java",
+      "path": "adris/altoclef/commands/GiveCommand.java"
+    },
+    {
+      "class_name": "GotoCommand",
+      "command": "goto",
+      "owner": "chatclef_java",
+      "path": "adris/altoclef/commands/GotoCommand.java"
+    },
+    {
+      "class_name": "HeroCommand",
+      "command": "hero",
+      "owner": "chatclef_java",
+      "path": "adris/altoclef/commands/HeroCommand.java"
+    },
+    {
+      "class_name": "IdleCommand",
+      "command": "idle",
+      "owner": "chatclef_java",
+      "path": "adris/altoclef/commands/IdleCommand.java"
+    },
+    {
+      "class_name": "LocateStructureCommand",
+      "command": "locate_structure",
+      "owner": "chatclef_java",
+      "path": "adris/altoclef/commands/LocateStructureCommand.java"
+    },
+    {
+      "class_name": "MeatCommand",
+      "command": "meat",
+      "owner": "chatclef_java",
+      "path": "adris/altoclef/commands/MeatCommand.java"
+    },
+    {
+      "class_name": "ReloadSettingsCommand",
+      "command": "reload_settings",
+      "owner": "chatclef_java",
+      "path": "adris/altoclef/commands/ReloadSettingsCommand.java"
+    },
+    {
+      "class_name": "ResetMemoryCommand",
+      "command": "resetmemory",
+      "owner": "chatclef_java",
+      "path": "adris/altoclef/commands/ResetMemoryCommand.java"
+    },
+    {
+      "class_name": "ScanCommand",
+      "command": "scan",
+      "owner": "chatclef_java",
+      "path": "adris/altoclef/commands/random/ScanCommand.java"
+    },
+    {
+      "class_name": "SetAIBridgeEnabledCommand",
+      "command": "chatclef",
+      "owner": "chatclef_java",
+      "path": "adris/altoclef/commands/SetAIBridgeEnabledCommand.java"
+    },
+    {
+      "class_name": "SetGammaCommand",
+      "command": "gamma",
+      "owner": "chatclef_java",
+      "path": "adris/altoclef/commands/SetGammaCommand.java"
+    },
+    {
+      "class_name": "StopCommand",
+      "command": "stop",
+      "owner": "chatclef_java",
+      "path": "adris/altoclef/commands/StopCommand.java"
+    },
+    {
+      "class_name": "OverlayCommand",
+      "command": "overlay",
+      "owner": "lavi_overlay",
+      "path": "lavi/minecraft/overlay/command/OverlayCommand.java"
+    }
+  ]
+}

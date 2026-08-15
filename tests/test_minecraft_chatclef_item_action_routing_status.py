@@ -53,11 +53,7 @@ class MinecraftChatClefItemActionRoutingStatusTests(unittest.TestCase):
 
     def test_disconnected_submission_status_is_router_owned(self):
         extension = _RecordingExtension(
-            translation={
-                "status": "validated",
-                "executable": True,
-                "command": "get diamond 1",
-            },
+            translation=_validated_get_translation(),
             bridge_status={
                 "details": {
                     "enabled": True,
@@ -80,11 +76,7 @@ class MinecraftChatClefItemActionRoutingStatusTests(unittest.TestCase):
 
     def test_busy_submission_status_is_router_owned(self):
         extension = _RecordingExtension(
-            translation={
-                "status": "validated",
-                "executable": True,
-                "command": "get diamond 1",
-            },
+            translation=_validated_get_translation(),
             bridge_status={
                 "details": {
                     "enabled": True,
@@ -106,11 +98,7 @@ class MinecraftChatClefItemActionRoutingStatusTests(unittest.TestCase):
 
     def test_rejected_submission_is_not_retried_or_fallen_through(self):
         extension = _RecordingExtension(
-            translation={
-                "status": "validated",
-                "executable": True,
-                "command": "get diamond 1",
-            },
+            translation=_validated_get_translation(),
             result={
                 "ok": False,
                 "status": {"status": "rejected"},
@@ -131,11 +119,7 @@ class MinecraftChatClefItemActionRoutingStatusTests(unittest.TestCase):
 
     def test_accepted_get_is_not_replayed_for_quantity_recovery(self):
         extension = _RecordingExtension(
-            translation={
-                "status": "validated",
-                "executable": True,
-                "command": "get diamond 1",
-            },
+            translation=_validated_get_translation(),
             result={
                 "ok": True,
                 "status": {"status": "accepted"},
@@ -153,6 +137,42 @@ class MinecraftChatClefItemActionRoutingStatusTests(unittest.TestCase):
         self.assertEqual("minecraft_command_routed", decision.reason)
         self.assertEqual(1, len(extension.translated))
         self.assertEqual(1, len(extension.submitted))
+
+    def test_malformed_validated_translation_is_consumed_without_submission(self):
+        malformed_cases = [
+            {"executable": "false"},
+            {"command": None},
+            {"command": ""},
+            {"command": "   "},
+            {"command": "@get diamond 1"},
+            {"command": "get diamond 1\n@stop"},
+            {"command": "get diamond 1; stop"},
+            {"command": "get diamond 1 # stop"},
+            {"command": 'get "diamond" 1'},
+            {"command": "get diamond 1\u0000"},
+            {"executable": False},
+            {"status": "unknown", "executable": True},
+            {"status": "invalid", "executable": True},
+            {"intent": None},
+            {"command": "get diamond 2"},
+        ]
+
+        for override in malformed_cases:
+            with self.subTest(override=override):
+                translation = _validated_get_translation()
+                translation.update(override)
+                extension = _RecordingExtension(translation=translation)
+                router = MinecraftChatClefInputRouter(
+                    extension=extension,
+                    log_callback=lambda _message: None,
+                )
+
+                decision = router.route("다이아몬드 가져와줘")
+
+                self.assertTrue(decision.handled)
+                self.assertEqual("minecraft_translation_malformed", decision.reason)
+                self.assertEqual(["다이아몬드 가져와줘"], extension.translated)
+                self.assertEqual([], extension.submitted)
 
     def test_player_name_policy_blocks_dsl_separators(self):
         blocked_names = [
@@ -183,6 +203,23 @@ def _has_blocked_player_name_syntax(player_name: object) -> bool:
     if not text:
         return True
     return any(character in text for character in " \t\r\n@#;,[]\"'\\")
+
+
+def _validated_get_translation() -> dict[str, object]:
+    return {
+        "status": "validated",
+        "executable": True,
+        "command": "get diamond 1",
+        "intent": {
+            "intent_type": "get_item",
+            "item_phrase": "다이아몬드",
+            "quantity": 1,
+        },
+        "resolved_target": "diamond",
+        "reason_code": "validated",
+        "message": "Korean command was translated to ChatClef DSL.",
+        "data": {},
+    }
 
 
 class _RecordingExtension:

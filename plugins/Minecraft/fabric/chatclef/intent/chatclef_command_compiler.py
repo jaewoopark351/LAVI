@@ -3,11 +3,17 @@ from __future__ import annotations
 
 import re
 
+from plugins.Minecraft.fabric.chatclef.intent.chatclef_command_safety import (
+    ChatClefCommandSafetyValidator,
+)
 from plugins.Minecraft.fabric.chatclef.intent.chatclef_intent_dto import (
     ChatClefIntentDTO,
 )
 from plugins.Minecraft.fabric.chatclef.intent.chatclef_intent_type import (
     ChatClefIntentType,
+)
+from plugins.Minecraft.fabric.chatclef.intent.chatclef_numeric_constraints import (
+    ChatClefNumericConstraints,
 )
 
 
@@ -27,9 +33,9 @@ class ChatClefCommandCompiler:
         if intent.intent_type is ChatClefIntentType.MEAT:
             return f"meat {self._positive_int(intent.food_units, 'food_units')}"
         if intent.intent_type is ChatClefIntentType.GOTO:
-            x = self._required_int(intent.x, "x")
-            y = self._required_int(intent.y, "y")
-            z = self._required_int(intent.z, "z")
+            x = self._java_int(intent.x, "x")
+            y = self._java_int(intent.y, "y")
+            z = self._java_int(intent.z, "z")
             return f"goto {x} {y} {z}"
         if intent.intent_type is ChatClefIntentType.FOLLOW:
             player_name = intent.player_name
@@ -44,7 +50,7 @@ class ChatClefCommandCompiler:
         raise ValueError("unsupported_intent_type")
 
     def has_dangerous_text(self, text: object) -> bool:
-        return self._DANGEROUS_RE.search(str(text or "")) is not None
+        return ChatClefCommandSafetyValidator.has_dangerous_text(text)
 
     def reject_dangerous_text(self, text: object) -> None:
         if self.has_dangerous_text(text):
@@ -58,12 +64,14 @@ class ChatClefCommandCompiler:
         return target_text
 
     def _positive_int(self, value: int | None, field_name: str) -> int:
-        number = self._required_int(value, field_name)
-        if number <= 0:
-            raise ValueError(f"invalid_{field_name}")
-        return number
+        return ChatClefNumericConstraints.positive_java_int(value, field_name)
 
     def _required_int(self, value: int | None, field_name: str) -> int:
         if value is None:
             raise ValueError(f"missing_{field_name}")
-        return int(value)
+        return ChatClefNumericConstraints.required_exact_int(value, field_name)
+
+    def _java_int(self, value: int | None, field_name: str) -> int:
+        if value is None:
+            raise ValueError(f"missing_{field_name}")
+        return ChatClefNumericConstraints.java_int(value, field_name)

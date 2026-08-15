@@ -7,6 +7,9 @@ from typing import Any, Mapping
 from plugins.Minecraft.fabric.chatclef.intent.chatclef_intent_type import (
     ChatClefIntentType,
 )
+from plugins.Minecraft.fabric.chatclef.intent.chatclef_numeric_constraints import (
+    ChatClefNumericConstraints,
+)
 
 
 @dataclass(frozen=True)
@@ -34,11 +37,11 @@ class ChatClefIntentDTO:
         object.__setattr__(self, "language", str(self.language or "ko"))
         object.__setattr__(self, "confidence", float(self.confidence))
         object.__setattr__(self, "slots", dict(self.slots or {}))
-        object.__setattr__(self, "quantity", self._optional_int(self.quantity))
-        object.__setattr__(self, "food_units", self._optional_int(self.food_units))
-        object.__setattr__(self, "x", self._optional_int(self.x))
-        object.__setattr__(self, "y", self._optional_int(self.y))
-        object.__setattr__(self, "z", self._optional_int(self.z))
+        object.__setattr__(self, "quantity", self._optional_int(self.quantity, "quantity"))
+        object.__setattr__(self, "food_units", self._optional_int(self.food_units, "food_units"))
+        object.__setattr__(self, "x", self._optional_int(self.x, "x"))
+        object.__setattr__(self, "y", self._optional_int(self.y, "y"))
+        object.__setattr__(self, "z", self._optional_int(self.z, "z"))
 
     @classmethod
     def from_mapping(cls, value: Any) -> "ChatClefIntentDTO":
@@ -78,7 +81,7 @@ class ChatClefIntentDTO:
             "slots": dict(self.slots),
         }
 
-    def _optional_int(self, value: Any) -> int | None:
-        if value is None or value == "":
+    def _optional_int(self, value: Any, field_name: str) -> int | None:
+        if value is None:
             return None
-        return int(value)
+        return ChatClefNumericConstraints.required_exact_int(value, field_name)

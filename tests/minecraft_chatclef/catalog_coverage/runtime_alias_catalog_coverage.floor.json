@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "floor_kind": "runtime_alias_coverage_non_regression",
+  "minimum_alias_count": 19,
+  "minimum_covered_target_count": 9,
+  "minimum_coverage_percent": 1.52
+}

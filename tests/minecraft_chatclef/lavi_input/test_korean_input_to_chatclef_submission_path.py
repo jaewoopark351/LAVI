@@ -70,16 +70,7 @@ class KoreanInputToChatClefSubmissionPathTests(unittest.TestCase):
     def test_router_and_extension_translate_once_before_submission(self):
         adapter = _RecordingAdapter()
         service = _SingleUseNaturalLanguageService(
-            {
-                "status": "validated",
-                "executable": True,
-                "command": "get diamond 1",
-                "intent": None,
-                "resolved_target": "diamond",
-                "reason_code": "validated",
-                "message": "Korean command was translated to ChatClef DSL.",
-                "data": {},
-            }
+            _validated_get_translation()
         )
         extension = MinecraftFabricChatClefExtension(
             adapter=adapter,
@@ -100,11 +91,7 @@ class KoreanInputToChatClefSubmissionPathTests(unittest.TestCase):
     def test_non_minecraft_korean_chat_does_not_reach_adapter(self):
         adapter = _RecordingAdapter()
         service = _SingleUseNaturalLanguageService(
-            {
-                "status": "validated",
-                "executable": True,
-                "command": "get diamond 1",
-            }
+            _validated_get_translation()
         )
         extension = MinecraftFabricChatClefExtension(
             adapter=adapter,
@@ -222,6 +209,23 @@ class _RecordingAdapter:
                 }
             },
         )
+
+
+def _validated_get_translation() -> dict[str, object]:
+    return {
+        "status": "validated",
+        "executable": True,
+        "command": "get diamond 1",
+        "intent": {
+            "intent_type": "get_item",
+            "item_phrase": "다이아몬드",
+            "quantity": 1,
+        },
+        "resolved_target": "diamond",
+        "reason_code": "validated",
+        "message": "Korean command was translated to ChatClef DSL.",
+        "data": {},
+    }
 
 
 class _SingleUseNaturalLanguageService:
