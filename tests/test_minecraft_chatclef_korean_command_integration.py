@@ -37,6 +37,41 @@ class MinecraftChatClefKoreanCommandIntegrationTests(unittest.TestCase):
         self.assertEqual("dangerous_command_slot", result["error"])
         self.assertEqual([], adapter.requests)
 
+    def test_extension_submits_validated_translation_without_retranslating(self):
+        adapter = _RecordingAdapter()
+        service = _ExplodingNaturalLanguageService()
+        extension = MinecraftFabricChatClefExtension(
+            adapter=adapter,
+            natural_language_service=service,
+        )
+
+        result = extension.submit_translated_command(
+            {
+                "request_id": "ko-translated-1",
+                "text": "다이아몬드 캐줘",
+                "metadata": {"origin": "router"},
+            },
+            {
+                "status": "validated",
+                "executable": True,
+                "command": "get diamond 1",
+                "intent": {
+                    "intent_type": "get_item",
+                    "item_phrase": "다이아몬드",
+                    "quantity": 1,
+                },
+                "resolved_target": "diamond",
+                "reason_code": "validated",
+                "message": "Korean command was translated to ChatClef DSL.",
+                "data": {},
+            },
+        )
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(0, service.translate_calls)
+        self.assertEqual("get diamond 1", adapter.requests[0].command)
+        self.assertEqual("router", adapter.requests[0].metadata["origin"])
+
 
 class _RecordingAdapter:
     backend_id = "fabric_chatclef"
@@ -53,6 +88,15 @@ class _RecordingAdapter:
             message="accepted",
             data={"command": request.command},
         )
+
+
+class _ExplodingNaturalLanguageService:
+    def __init__(self):
+        self.translate_calls = 0
+
+    def translate(self, _text):
+        self.translate_calls += 1
+        raise AssertionError("translation should not run for validated submissions")
 
 
 if __name__ == "__main__":

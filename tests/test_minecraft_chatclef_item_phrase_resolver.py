@@ -33,6 +33,23 @@ class MinecraftChatClefItemPhraseResolverTests(unittest.TestCase):
         self.assertEqual("iron_ingot", resolver.resolve("철 주괴")["target"])
         self.assertEqual("cooked_beef", resolver.resolve("구운 소고기")["target"])
 
+    def test_resolves_standalone_resource_aliases(self):
+        resolver = KoreanItemPhraseResolver()
+        cases = {
+            "다이아몬드": "diamond",
+            "다이아": "diamond",
+            "돌": "stone",
+            "조약돌": "cobblestone",
+            "레드스톤": "redstone",
+            "석탄": "coal",
+            "철": "iron_ingot",
+            "금": "gold_ingot",
+        }
+
+        for phrase, expected_target in cases.items():
+            with self.subTest(phrase=phrase):
+                self.assertEqual(expected_target, resolver.resolve(phrase)["target"])
+
     def test_reports_ambiguous_unknown_and_unsupported_phrases(self):
         resolver = KoreanItemPhraseResolver()
 

@@ -1,0 +1,220 @@
+#20260815_kpopmodder: Lock routing status separation for Korean item actions.
+from __future__ import annotations
+
+import unittest
+
+from plugins.Minecraft.fabric.chatclef.input.minecraft_chatclef_input_router import (
+    MinecraftChatClefInputRouter,
+)
+
+
+class MinecraftChatClefItemActionRoutingStatusTests(unittest.TestCase):
+    def test_unknown_resolution_status_falls_through_without_submission(self):
+        extension = _RecordingExtension(
+            translation={
+                "status": "unknown",
+                "executable": False,
+                "command": None,
+                "reason_code": "unknown_item",
+            },
+        )
+        router = MinecraftChatClefInputRouter(
+            extension=extension,
+            log_callback=lambda _message: None,
+        )
+
+        decision = router.route("이상한광물 가져와줘")
+
+        self.assertFalse(decision.handled)
+        self.assertEqual("unknown_intent", decision.reason)
+        self.assertEqual(["이상한광물 가져와줘"], extension.translated)
+        self.assertEqual([], extension.submitted)
+
+    def test_invalid_resolution_status_is_consumed_without_submission(self):
+        extension = _RecordingExtension(
+            translation={
+                "status": "invalid",
+                "executable": False,
+                "command": None,
+                "reason_code": "dangerous_command_slot",
+                "message": "Korean command contains invalid input.",
+            },
+        )
+        router = MinecraftChatClefInputRouter(
+            extension=extension,
+            log_callback=lambda _message: None,
+        )
+
+        decision = router.route("다이아몬드 가져와줘")
+
+        self.assertTrue(decision.handled)
+        self.assertEqual("minecraft_translation_rejected", decision.reason)
+        self.assertEqual([], extension.submitted)
+
+    def test_disconnected_submission_status_is_router_owned(self):
+        extension = _RecordingExtension(
+            translation={
+                "status": "validated",
+                "executable": True,
+                "command": "get diamond 1",
+            },
+            bridge_status={
+                "details": {
+                    "enabled": True,
+                    "connected": False,
+                    "details": {"commands": {}},
+                }
+            },
+        )
+        router = MinecraftChatClefInputRouter(
+            extension=extension,
+            log_callback=lambda _message: None,
+        )
+
+        decision = router.route("다이아몬드 가져와줘")
+
+        self.assertTrue(decision.handled)
+        self.assertEqual("minecraft_bridge_disconnected", decision.reason)
+        self.assertEqual(["다이아몬드 가져와줘"], extension.translated)
+        self.assertEqual([], extension.submitted)
+
+    def test_busy_submission_status_is_router_owned(self):
+        extension = _RecordingExtension(
+            translation={
+                "status": "validated",
+                "executable": True,
+                "command": "get diamond 1",
+            },
+            bridge_status={
+                "details": {
+                    "enabled": True,
+                    "connected": True,
+                    "details": {"commands": {"active_request_id": "active-1"}},
+                }
+            },
+        )
+        router = MinecraftChatClefInputRouter(
+            extension=extension,
+            log_callback=lambda _message: None,
+        )
+
+        decision = router.route("다이아몬드 가져와줘")
+
+        self.assertTrue(decision.handled)
+        self.assertEqual("minecraft_command_busy", decision.reason)
+        self.assertEqual([], extension.submitted)
+
+    def test_rejected_submission_is_not_retried_or_fallen_through(self):
+        extension = _RecordingExtension(
+            translation={
+                "status": "validated",
+                "executable": True,
+                "command": "get diamond 1",
+            },
+            result={
+                "ok": False,
+                "status": {"status": "rejected"},
+                "message": "Fabric ChatClef command already pending or active.",
+            },
+        )
+        router = MinecraftChatClefInputRouter(
+            extension=extension,
+            log_callback=lambda _message: None,
+        )
+
+        decision = router.route("다이아몬드 가져와줘")
+
+        self.assertTrue(decision.handled)
+        self.assertEqual("minecraft_command_routed", decision.reason)
+        self.assertIn("command rejected", decision.response_text)
+        self.assertEqual(1, len(extension.submitted))
+
+    def test_accepted_get_is_not_replayed_for_quantity_recovery(self):
+        extension = _RecordingExtension(
+            translation={
+                "status": "validated",
+                "executable": True,
+                "command": "get diamond 1",
+            },
+            result={
+                "ok": True,
+                "status": {"status": "accepted"},
+                "message": "sent",
+            },
+        )
+        router = MinecraftChatClefInputRouter(
+            extension=extension,
+            log_callback=lambda _message: None,
+        )
+
+        decision = router.route("다이아몬드 가져와줘")
+
+        self.assertTrue(decision.handled)
+        self.assertEqual("minecraft_command_routed", decision.reason)
+        self.assertEqual(1, len(extension.translated))
+        self.assertEqual(1, len(extension.submitted))
+
+    def test_player_name_policy_blocks_dsl_separators(self):
+        blocked_names = [
+            "",
+            "Steve Jobs",
+            "Steve\t",
+            "Steve\n",
+            "@Steve",
+            "Steve#comment",
+            "Steve;stop",
+            "Steve,Alex",
+            "[Steve]",
+            '"Steve"',
+            "'Steve'",
+            r"Steve\Alex",
+        ]
+
+        for player_name in blocked_names:
+            with self.subTest(player_name=player_name):
+                self.assertTrue(_has_blocked_player_name_syntax(player_name))
+
+        self.assertFalse(_has_blocked_player_name_syntax("Steve"))
+        self.assertFalse(_has_blocked_player_name_syntax("Player_123"))
+
+
+def _has_blocked_player_name_syntax(player_name: object) -> bool:
+    text = str(player_name or "")
+    if not text:
+        return True
+    return any(character in text for character in " \t\r\n@#;,[]\"'\\")
+
+
+class _RecordingExtension:
+    def __init__(self, translation, result=None, bridge_status=None):
+        self.translation = dict(translation)
+        self.result = dict(result or {"ok": True, "status": {"status": "accepted"}})
+        self.bridge_status = dict(
+            bridge_status
+            or {
+                "details": {
+                    "enabled": True,
+                    "connected": True,
+                    "details": {"commands": {}},
+                }
+            }
+        )
+        self.translated: list[str] = []
+        self.submitted: list[dict[str, object]] = []
+
+    def translate_natural_language_command(self, text):
+        self.translated.append(str(text))
+        return dict(self.translation)
+
+    def submit_translated_command(self, request, translation):
+        payload = dict(request)
+        payload["translation"] = dict(translation)
+        self.submitted.append(payload)
+        return dict(self.result)
+
+    def get_status(self):
+        return dict(self.bridge_status)
+
+
+if __name__ == "__main__":
+    unittest.main()

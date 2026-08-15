@@ -40,22 +40,41 @@ class MinecraftChatClefCommandCompilerTests(unittest.TestCase):
     def test_rejects_dangerous_slots(self):
         compiler = ChatClefCommandCompiler()
 
-        with self.assertRaises(ValueError):
-            compiler.compile(
-                ChatClefIntentDTO(
-                    intent_type=ChatClefIntentType.FOLLOW,
-                    player_name="Steve;stop",
-                )
-            )
-        with self.assertRaises(ValueError):
-            compiler.compile(
-                ChatClefIntentDTO(
-                    intent_type=ChatClefIntentType.GET_ITEM,
-                    item_phrase="다이아 도끼",
-                    quantity=1,
-                ),
-                target="@diamond_axe",
-            )
+        for player_name in ["Steve;stop", "Steve#stop"]:
+            with self.subTest(player_name=player_name):
+                with self.assertRaises(ValueError):
+                    compiler.compile(
+                        ChatClefIntentDTO(
+                            intent_type=ChatClefIntentType.FOLLOW,
+                            player_name=player_name,
+                        )
+                    )
+        for target in ["@diamond_axe", "diamond#axe"]:
+            with self.subTest(target=target):
+                with self.assertRaises(ValueError):
+                    compiler.compile(
+                        ChatClefIntentDTO(
+                            intent_type=ChatClefIntentType.GET_ITEM,
+                            item_phrase="다이아 도끼",
+                            quantity=1,
+                        ),
+                        target=target,
+                    )
+
+    def test_rejects_non_positive_get_counts(self):
+        compiler = ChatClefCommandCompiler()
+
+        for quantity in [0, -1]:
+            with self.subTest(quantity=quantity):
+                with self.assertRaises(ValueError):
+                    compiler.compile(
+                        ChatClefIntentDTO(
+                            intent_type=ChatClefIntentType.GET_ITEM,
+                            item_phrase="다이아",
+                            quantity=quantity,
+                        ),
+                        target="diamond",
+                    )
 
 
 if __name__ == "__main__":

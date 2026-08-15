@@ -16,7 +16,7 @@ class LLMMinecraftInputRouterTests(unittest.TestCase):
             )
         )
 
-        output = list(llm.predict_wrapper("\uae08\uad34 1\uac1c \uad6c\ud574", [], ""))
+        output = list(llm.predict_wrapper("금괴 1개 구해", [], ""))
 
         self.assertEqual(["[Minecraft] command sent: get gold_ingot 1"], output)
 
@@ -33,12 +33,12 @@ class LLMMinecraftInputRouterTests(unittest.TestCase):
         llm.build_effective_system_prompt = lambda prompt: f"effective:{prompt}"
 
         output = list(
-            llm.predict_wrapper("\uc624\ub298 \ubb50 \uba39\uc9c0?", [], "system")
+            llm.predict_wrapper("오늘 뭐 먹지?", [], "system")
         )
 
         self.assertEqual(["llm response"], output)
         self.assertEqual(
-            [("\uc624\ub298 \ubb50 \uba39\uc9c0?", [], "effective:system")],
+            [("오늘 뭐 먹지?", [], "effective:system")],
             llm.response_pipeline.calls,
         )
 

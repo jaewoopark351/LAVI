@@ -14,23 +14,28 @@ class MinecraftChatClefInputRouterTests(unittest.TestCase):
     def test_gate_only_accepts_minecraft_like_korean_commands(self):
         gate = MinecraftChatClefInputIntentGate()
 
-        self.assertTrue(gate.should_consider("\uae08\uad34 8\uac1c \uad6c\ud574"))
+        self.assertTrue(gate.should_consider("금괴 8개 구해"))
+        self.assertTrue(gate.should_consider("다이아몬드 캐줘"))
+        self.assertTrue(gate.should_consider("석탄 5개 캐와줘"))
+        self.assertTrue(gate.should_consider("돌 10개 채굴해줘"))
         self.assertTrue(
             gate.should_consider(
-                "\ub2e4\uc774\uc544\ubaac\ub4dc \ub3c4\ub07c "
-                "\ud558\ub098 \uac00\uc838\uc640"
+                "다이아몬드 도끼 "
+                "하나 가져와"
             )
         )
         self.assertTrue(
-            gate.should_consider("100 64 -30\uc73c\ub85c \uc774\ub3d9\ud574")
+            gate.should_consider("100 64 -30으로 이동해")
         )
-        self.assertTrue(gate.should_consider("\uba48\ucdb0"))
+        self.assertTrue(gate.should_consider("멈춰"))
         self.assertFalse(
-            gate.should_consider("\uc624\ub298 \ubb50 \uba39\uc9c0?")
+            gate.should_consider("오늘 뭐 먹지?")
         )
         self.assertFalse(
-            gate.should_consider("\uadf8\ub0e5 \uc774\uc57c\uae30\ud558\uc790")
+            gate.should_consider("그냥 이야기하자")
         )
+        self.assertFalse(gate.should_consider("캐나다 여행 얘기하자"))
+        self.assertFalse(gate.should_consider("캐시가 10개 남았어"))
 
     def test_non_minecraft_input_is_not_handled(self):
         extension = _RecordingExtension(
@@ -45,14 +50,14 @@ class MinecraftChatClefInputRouterTests(unittest.TestCase):
             log_callback=lambda _message: None,
         )
 
-        decision = router.route("\uc624\ub298 \ubb50 \uba39\uc9c0?")
+        decision = router.route("오늘 뭐 먹지?")
 
         self.assertFalse(decision.handled)
         self.assertEqual("no_minecraft_trigger", decision.reason)
         self.assertEqual([], extension.translated)
         self.assertEqual([], extension.submitted)
 
-    def test_valid_minecraft_input_submits_natural_language_command(self):
+    def test_valid_minecraft_input_submits_translated_command_once(self):
         extension = _RecordingExtension(
             translation={
                 "status": "validated",
@@ -70,7 +75,7 @@ class MinecraftChatClefInputRouterTests(unittest.TestCase):
             log_callback=lambda _message: None,
         )
 
-        decision = router.route("\uae08\uad34 8\uac1c \uad6c\ud574")
+        decision = router.route("금괴 8개 구해")
 
         self.assertTrue(decision.handled)
         self.assertEqual("minecraft_command_routed", decision.reason)
@@ -78,11 +83,12 @@ class MinecraftChatClefInputRouterTests(unittest.TestCase):
             "[Minecraft] command sent: get gold_ingot 8",
             decision.response_text,
         )
-        self.assertEqual(["\uae08\uad34 8\uac1c \uad6c\ud574"], extension.translated)
+        self.assertEqual(["금괴 8개 구해"], extension.translated)
         self.assertEqual(
-            "\uae08\uad34 8\uac1c \uad6c\ud574",
+            "금괴 8개 구해",
             extension.submitted[0]["text"],
         )
+        self.assertEqual("get gold_ingot 8", extension.submitted[0]["translation"]["command"])
         self.assertEqual("lavi_chat_mic_router", extension.submitted[0]["source"])
 
     def test_unknown_translation_falls_through_to_llm(self):
@@ -99,7 +105,7 @@ class MinecraftChatClefInputRouterTests(unittest.TestCase):
             log_callback=lambda _message: None,
         )
 
-        decision = router.route("\ubb34\uc5b8\uac00 \uac00\uc838\uac08\uae4c?")
+        decision = router.route("무언가 가져와줘")
 
         self.assertFalse(decision.handled)
         self.assertEqual("unknown_intent", decision.reason)
@@ -125,13 +131,69 @@ class MinecraftChatClefInputRouterTests(unittest.TestCase):
         )
 
         decision = router.route(
-            "\ub2e4\uc774\uc544\ubaac\ub4dc \ub3c4\ub07c 1; "
-            "stop \uac00\uc838\uc640"
+            "다이아몬드 도끼 1; "
+            "stop 가져와"
         )
 
         self.assertTrue(decision.handled)
         self.assertIn("command rejected", decision.response_text)
-        self.assertEqual(1, len(extension.submitted))
+        self.assertEqual([], extension.submitted)
+
+    def test_validated_translation_is_rejected_when_bridge_is_disconnected(self):
+        extension = _RecordingExtension(
+            translation={
+                "status": "validated",
+                "executable": True,
+                "command": "get diamond 1",
+            },
+            bridge_status={
+                "details": {
+                    "enabled": True,
+                    "connected": False,
+                    "details": {"commands": {}},
+                }
+            },
+        )
+        router = MinecraftChatClefInputRouter(
+            extension=extension,
+            log_callback=lambda _message: None,
+        )
+
+        decision = router.route("다이아몬드 캐줘")
+
+        self.assertTrue(decision.handled)
+        self.assertEqual("minecraft_bridge_disconnected", decision.reason)
+        self.assertIn("not connected", decision.response_text)
+        self.assertEqual([], extension.submitted)
+
+    def test_validated_translation_is_rejected_when_command_is_active(self):
+        extension = _RecordingExtension(
+            translation={
+                "status": "validated",
+                "executable": True,
+                "command": "get diamond 1",
+            },
+            bridge_status={
+                "details": {
+                    "enabled": True,
+                    "connected": True,
+                    "details": {
+                        "commands": {"active_request_id": "already-active"}
+                    },
+                }
+            },
+        )
+        router = MinecraftChatClefInputRouter(
+            extension=extension,
+            log_callback=lambda _message: None,
+        )
+
+        decision = router.route("다이아몬드 캐줘")
+
+        self.assertTrue(decision.handled)
+        self.assertEqual("minecraft_command_busy", decision.reason)
+        self.assertIn("already active", decision.response_text)
+        self.assertEqual([], extension.submitted)
 
     def test_app_wiring_injects_router_without_replacing_input_listener(self):
         service = AppComponentWiringService()
@@ -158,9 +220,19 @@ class MinecraftChatClefInputRouterTests(unittest.TestCase):
 
 
 class _RecordingExtension:
-    def __init__(self, translation, result=None):
+    def __init__(self, translation, result=None, bridge_status=None):
         self.translation = dict(translation)
         self.result = dict(result or {"ok": True, "status": {"status": "accepted"}})
+        self.bridge_status = dict(
+            bridge_status
+            or {
+                "details": {
+                    "enabled": True,
+                    "connected": True,
+                    "details": {"commands": {}},
+                }
+            }
+        )
         self.translated = []
         self.submitted = []
 
@@ -171,6 +243,15 @@ class _RecordingExtension:
     def handle_natural_language_command(self, request):
         self.submitted.append(dict(request))
         return dict(self.result)
+
+    def submit_translated_command(self, request, translation):
+        payload = dict(request)
+        payload["translation"] = dict(translation)
+        self.submitted.append(payload)
+        return dict(self.result)
+
+    def get_status(self):
+        return dict(self.bridge_status)
 
 
 class _ListenerSource:

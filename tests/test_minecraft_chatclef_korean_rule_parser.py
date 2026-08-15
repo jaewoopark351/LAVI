@@ -17,6 +17,36 @@ class MinecraftChatClefKoreanRuleParserTests(unittest.TestCase):
         self.assertEqual("다이아몬드 도끼", intent.item_phrase)
         self.assertEqual(1, intent.quantity)
 
+    def test_parses_mining_phrases_as_get_item(self):
+        parser = KoreanChatClefRuleParser()
+        cases = {
+            "다이아몬드 캐줘": ("다이아몬드", 1),
+            "돌 10개 캐줘": ("돌", 10),
+            "석탄 5개 캐와줘": ("석탄", 5),
+            "레드스톤 5개 채굴해줘": ("레드스톤", 5),
+        }
+
+        for text, expected in cases.items():
+            with self.subTest(text=text):
+                intent = parser.parse(text)
+                self.assertEqual(ChatClefIntentType.GET_ITEM, intent.intent_type)
+                self.assertEqual(expected[0], intent.item_phrase)
+                self.assertEqual(expected[1], intent.quantity)
+
+    def test_removes_trailing_object_particles_from_item_phrase(self):
+        parser = KoreanChatClefRuleParser()
+        cases = {
+            "철괴를 10개 가져와줘": "철괴",
+            "다이아몬드를 가져와줘": "다이아몬드",
+            "돌을 10개 캐줘": "돌",
+        }
+
+        for text, expected_phrase in cases.items():
+            with self.subTest(text=text):
+                intent = parser.parse(text)
+                self.assertEqual(ChatClefIntentType.GET_ITEM, intent.intent_type)
+                self.assertEqual(expected_phrase, intent.item_phrase)
+
     def test_parses_food_and_meat_units(self):
         parser = KoreanChatClefRuleParser()
 
