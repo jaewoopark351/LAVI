@@ -220,6 +220,13 @@ read:
 plugins/Minecraft/docs/chatclef-korean-item-action-alias-v2-plan.md
 ```
 
+For Korean ChatClef test strategy, prefixless DSL ownership, alias coverage
+snapshots, command support matrix rules, and opt-in live test tiers, read:
+
+```text
+plugins/Minecraft/docs/chatclef-korean-test-strategy.md
+```
+
 For upstream-derived engine divergence, read:
 
 ```text
@@ -256,6 +263,9 @@ Korean item command diagnosis:
 
 Korean item action alias v2 planning:
   chatclef-korean-item-action-alias-v2-plan.md
+
+Korean ChatClef test strategy:
+  chatclef-korean-test-strategy.md
 
 Engine reference:
   chatclef-structure-overview.md
@@ -351,6 +361,19 @@ tests/test_minecraft_chatclef_korean_rule_parser.py
 tests/test_minecraft_chatclef_llm_intent_extractor.py
 tests/test_minecraft_chatclef_natural_language_service.py
 tests/test_minecraft_chatclef_item_phrase_resolver.py
+```
+
+Responsibility-split Korean ChatClef tests:
+
+```text
+tests/minecraft_chatclef/alias_contract/
+tests/minecraft_chatclef/catalog_coverage/
+tests/minecraft_chatclef/command_catalog/
+tests/minecraft_chatclef/input_gate/
+tests/minecraft_chatclef/korean_translation/
+tests/minecraft_chatclef/lavi_input/
+tests/minecraft_chatclef/lifecycle/
+tests/minecraft_chatclef/runtime/
 ```
 
 Run tests only when the current task explicitly authorizes tests or when the
