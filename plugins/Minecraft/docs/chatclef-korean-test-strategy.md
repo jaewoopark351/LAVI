@@ -1,4 +1,5 @@
 <!-- 20260815_kpopmodder: Documented the Korean ChatClef test strategy before expanding alias and action support. -->
+<!-- 20260815_chatgpt: Reconciled source provenance, activation chains, coverage parser authority, matrix maturity, and documentation-set acceptance. -->
 
 # ChatClef Korean Test Strategy
 
@@ -19,13 +20,31 @@ Read this document with:
 ```text
 plugins/Minecraft/docs/chatclef-korean-item-command-resolution-analysis.md
 plugins/Minecraft/docs/chatclef-korean-item-action-alias-v2-plan.md
+plugins/Minecraft/docs/chatclef-korean-post-review-merge-blockers.md
 plugins/Minecraft/docs/chatclef-command-lifecycle-and-threading.md
 plugins/Minecraft/docs/fabric-chatclef-bridge-protocol-v1.md
 ```
 
-The alias v2 plan owns item/action design. This document owns how that design
-should be tested without confusing current working behavior, future features,
-and live Minecraft side effects.
+The alias v2 plan owns item/action design, command-specific Korean UX policy,
+and phased implementation order. This document owns tests, artifact schemas,
+source and hash authority, coverage calculation authority, CI scope, and live
+Minecraft safety gates. The post-review merge-blocker document owns the current
+merge decision and the list of implementation work that is still incomplete.
+
+These three Korean ChatClef documents form one documentation commit unit:
+
+```text
+chatclef-korean-item-action-alias-v2-plan.md
+chatclef-korean-test-strategy.md
+chatclef-korean-post-review-merge-blockers.md
+```
+
+For test evidence, runtime coverage terminology, reviewed GET acquisition
+behavior, Java activation and source snapshot authority, and focused CI
+acceptance, this document supersedes older or conflicting wording in the alias
+v2 plan. For current pass/fail and merge status, the post-review merge-blocker
+document is authoritative. All three files must be committed together when any
+one of them changes a shared contract.
 
 ## Scope
 
@@ -114,16 +133,19 @@ Add or maintain tests in this order:
 8. Loopback transport tests without a real Minecraft client.
 9. Opt-in live Minecraft tests.
 
-The goal is quick failure localization. If a planned phrase such as `철 10개 캐줘` fails, the test suite
-should show whether the failure came from gate selection, parser phrase
-extraction, alias resolution, catalog validation, compiler serialization, or
-router submission.
+The goal is quick failure localization. If a supported phrase such as
+`철 10개 캐줘` fails, the test suite should show whether the failure came from
+gate selection, parser phrase extraction, alias resolution, catalog validation,
+compiler serialization, or router submission.
 
-## Current Committed-Baseline Golden Cases
+## Reviewed Implementation Golden Cases At cfc170a
 
-These cases represent committed-baseline GET behavior only. Do not include
-working-tree-only alias expansion or mining/acquisition verbs here until Phase
-0 proves the source and the focused tests are committed.
+These cases represent reviewed Korean GET behavior at implementation test
+commit `cfc170ac024a46ea943bffcaf289a91ff6bc5ee7`. Do not call this "current
+HEAD" after this documentation is committed, because HEAD will move.
+
+Do not mix this reviewed implementation baseline with the older historical
+baseline from `c912ff6491711c33dbf2e66320e634196f866ae8`.
 
 | Korean input | Expected DSL |
 | --- | --- |
@@ -132,16 +154,74 @@ working-tree-only alias expansion or mining/acquisition verbs here until Phase
 | `금괴 가져와줘` | `get gold_ingot 1` |
 | `구운 소고기 가져와줘` | `get cooked_beef 1` |
 | `원목 가져와줘` | `get log 1` |
+| `다이아몬드 가져와줘` | `get diamond 1` |
+| `다이아몬드 캐줘` | `get diamond 1` |
+| `돌 10개 가져와줘` | `get stone 10` |
+| `조약돌 10개 캐줘` | `get cobblestone 10` |
+| `석탄 5개 캐와줘` | `get coal 5` |
+| `철 10개 캐줘` | `get iron_ingot 10` |
 
-Current evidence tests:
+Current source evidence tests:
 
 ```text
 tests/minecraft_chatclef/korean_translation/test_korean_command_support_matrix.py
 tests/minecraft_chatclef/lavi_input/test_korean_input_to_chatclef_submission_path.py
 tests/minecraft_chatclef/alias_contract/test_get_alias_translation_priority.py
+tests/test_minecraft_chatclef_korean_command_integration.py
+tests/test_minecraft_chatclef_korean_rule_parser.py
+tests/test_minecraft_chatclef_item_phrase_resolver.py
 ```
 
-Keep the assertions separated by responsibility.
+Alias-wide evidence also lives in:
+
+```text
+tests/minecraft_chatclef/alias_contract/test_all_runtime_aliases_translate.py
+```
+
+Keep the assertions separated by responsibility. The `golden_case_ids` listed
+later in this document are planned contract IDs until a repository-owned case
+table with those IDs is committed.
+
+Planned shared case artifact shape:
+
+```python
+SUPPORTED_KOREAN_TRANSLATION_CASES = [
+    {
+        "id": "nl-get-diamond-basic",
+        "command": "get",
+        "text": "다이아몬드 가져와줘",
+        "expected": "get diamond 1",
+    },
+]
+```
+
+The same source must be used by:
+
+```text
+translation tests
+support matrix contract tests
+documentation snapshot generation
+golden_case_id validation
+```
+
+Planned golden IDs for reviewed implementation cases:
+
+| ID | Korean input | Expected DSL |
+| --- | --- | --- |
+| `nl-get-iron-ingot-basic` | `철괴 가져와줘` | `get iron_ingot 1` |
+| `nl-get-iron-ingot-spaced-quantity` | `철 주괴 10개 가져와줘` | `get iron_ingot 10` |
+| `nl-get-gold-ingot-basic` | `금괴 가져와줘` | `get gold_ingot 1` |
+| `nl-get-cooked-beef-basic` | `구운 소고기 가져와줘` | `get cooked_beef 1` |
+| `nl-get-log-basic` | `원목 가져와줘` | `get log 1` |
+| `nl-get-diamond-basic` | `다이아몬드 가져와줘` | `get diamond 1` |
+| `nl-get-diamond-mining` | `다이아몬드 캐줘` | `get diamond 1` |
+| `nl-get-stone-quantity` | `돌 10개 가져와줘` | `get stone 10` |
+| `nl-get-cobblestone-mining-quantity` | `조약돌 10개 캐줘` | `get cobblestone 10` |
+| `nl-get-coal-mining-quantity` | `석탄 5개 캐와줘` | `get coal 5` |
+| `nl-get-iron-mining-quantity` | `철 10개 캐줘` | `get iron_ingot 10` |
+
+Until this artifact exists, tests must not claim that `golden_case_ids` are
+already present in the repository's test data.
 
 Offline Korean-to-DSL tests prove:
 
@@ -173,12 +253,87 @@ submitted command is exact prefixless DSL
 Do not use only `submit count <= 1` for a successful route. That would allow a
 bug where the router validates a command but never submits it.
 
-## Planned And Future Korean Action Matching
+## Translation Result Invariants
 
-Do not treat mining/acquisition verb tests as committed-baseline regressions
-unless the matching source and tests are proven in Phase 0.
+Router submission tests must include malformed translation results, not only
+normal `VALIDATED` and false-positive paths.
 
-Planned or source-proven GET acquisition and mining phrases:
+Required DTO and submission invariants:
+
+```text
+type(executable) is bool
+executable == status.executable
+```
+
+When `executable` is `true`:
+
+```text
+status == VALIDATED
+command is str
+command.strip() is non-empty
+command is prefixless
+command contains no CR or LF
+command contains no @
+command contains no # comment delimiter
+command contains no semicolon
+command contains no quote
+command contains no control character
+intent is present
+compiler can reproduce the same command from the validated structured intent
+  and canonical resolution output when that intent requires item/action
+  resolution
+```
+
+Any invariant failure must produce:
+
+```text
+adapter submit count == 0
+retry count == 0
+no LLM fall-through after a malformed validated command
+```
+
+Required malformed regression vectors:
+
+| Translation result shape | Expected result |
+| --- | --- |
+| `executable="false"` | reject, submit `0` |
+| `status=VALIDATED, executable=True, command=None` | reject, submit `0` |
+| `status=VALIDATED, executable=True, command=""` | reject, submit `0` |
+| `status=VALIDATED, executable=True, command="   "` | reject, submit `0` |
+| `status=VALIDATED, executable=True, command="@get diamond 1"` | reject, submit `0` |
+| `status=VALIDATED, executable=True, command="get diamond 1\n@stop"` | reject, submit `0` |
+| `status=VALIDATED, executable=True, command="get diamond 1; stop"` | reject, submit `0` |
+| `status=VALIDATED, executable=True, command="get diamond 1 # stop"` | reject, submit `0` |
+| `status=VALIDATED, executable=True, command="get \"diamond\" 1"` | reject, submit `0` |
+| `status=VALIDATED, executable=True, command="get diamond 1\u0000"` | reject, submit `0` |
+| `status=VALIDATED, executable=False` | reject, submit `0` |
+| `status=UNKNOWN, executable=True` | reject, submit `0` |
+| `status=FALSE_POSITIVE, executable=True` | reject, submit `0` |
+| `status=INVALID, executable=True` | reject, submit `0` |
+
+Reproduction invariant by command family:
+
+```text
+GET/EQUIP/DEPOSIT/GIVE:
+  recompiled_command =
+    compiler.compile(validated_intent, canonical_resolution_if_applicable)
+
+GOTO/FOLLOW/IDLE/STOP/FOOD/MEAT:
+  recompiled_command =
+    compiler.compile(validated_intent)
+
+all executable paths:
+  recompiled_command == supplied_command
+```
+
+Do not rely on `bool(value)` coercion for `executable`. A string such as
+`"false"` is truthy in Python and must not become an executable command.
+
+## Current GET Acquisition Matching And Future Action Precedence
+
+Reviewed implementation source and tests include GET acquisition and mining
+phrases. Treat these as reviewed regression cases for the branch under review,
+not as unverified future behavior:
 
 ```text
 다이아몬드 캐줘 -> get diamond 1
@@ -186,9 +341,9 @@ Planned or source-proven GET acquisition and mining phrases:
 철 10개 캐줘 -> get iron_ingot 10
 ```
 
-If the committed baseline lacks `캐줘`, `캐와`, or `채굴해줘` recognition, these
-belong to separate implementation or restoration work, not to current
-regression preservation.
+If a document needs to describe the older `c912ff...` historical baseline, name
+that section `Historical Baseline At c912ff...` and keep it separate from
+reviewed implementation behavior.
 
 The future Phase 3 action matcher should distinguish two responsibilities:
 
@@ -291,8 +446,8 @@ All Minecraft items are already supported in Korean.
 
 ## Multi-Item GET Contracts
 
-Java `ItemList` grammar and Python canonical serialization are separate test
-responsibilities.
+Current Java `ItemList` grammar and planned Python canonical serialization are
+separate test responsibilities.
 
 Source-backed Java parser fixtures:
 
@@ -310,7 +465,7 @@ get [stone, stone 3]
   -> omitted count defaults to 1 and duplicate target count is summed to stone 4
 
 get []
-  -> rejected or documented as invalid before Python emits it
+  -> Java parser rejects and Python compiler must reject before adapter submission
 
 get [[stone 1]]
   -> rejected as invalid nested bracket structure
@@ -318,7 +473,7 @@ get [[stone 1]]
 
 Do not assert Java `HashMap` iteration order as a stable command contract.
 
-Python canonical multi-item GET output policy:
+Planned Python multi-item GET canonical output policy:
 
 ```text
 use bracketed ItemList syntax
@@ -329,13 +484,13 @@ keep the first occurrence position for a merged target
 emit prefixless DSL only
 ```
 
-Single-item canonical count output policy:
+Current and planned single-action count output policy:
 
 ```text
-GET always emits explicit count, for example get diamond 1
-GIVE always emits explicit count, for example give Steve diamond 1
-specific DEPOSIT emits explicit count only after Korean quantity policy resolves it
-bare DEPOSIT emits exactly deposit
+current GET emits explicit count, for example get diamond 1
+planned GIVE emits explicit count, for example give Steve diamond 1
+planned specific DEPOSIT emits explicit count only after Korean quantity policy resolves it
+planned bare DEPOSIT emits exactly deposit
 ```
 
 Item-action count validation:
@@ -353,15 +508,89 @@ Python natural-language compiler contract:
 count must be a positive integer
 minimum count is 1
 maximum count is 2147483647
+strict integer means type(value) is int, not isinstance(value, int)
 zero count rejects
 negative count rejects
 non-integer count rejects
+bool count rejects before int conversion
+float count rejects before int conversion
+None count rejects
 single count overflow rejects before adapter submission
 duplicate multi-item GET sum must be computed before emission
 duplicate-target sum overflow rejects before adapter submission
 duplicate multi-item GET sum must remain in the Java-compatible positive range
 new ItemActionResolution or multi-item paths must not bypass this validation
 ```
+
+Required quantity regression vectors:
+
+| Raw value | Expected result |
+| --- | --- |
+| `1` | accept |
+| `2147483647` | accept |
+| `0` | reject, adapter submit count `0` |
+| `-1` | reject, adapter submit count `0` |
+| `2147483648` | reject, adapter submit count `0` |
+| `True` | reject, adapter submit count `0` |
+| `False` | reject, adapter submit count `0` |
+| `1.0` | reject, adapter submit count `0` |
+| `1.5` | reject, adapter submit count `0` |
+| `"1.5"` | reject, adapter submit count `0` |
+| `None` | reject, adapter submit count `0` |
+
+String quantity `"1"` requires an explicit input-normalization policy before it
+can be accepted. Do not allow it accidentally through `int(value)` coercion.
+
+## Numeric Slot Validation Contracts
+
+The strict integer contract applies to every numeric intent slot, not only
+`quantity`.
+
+Slot ranges:
+
+| Slot | Accepted range |
+| --- | --- |
+| `quantity` | exact int `1..2147483647` |
+| `food_units` | exact int `1..2147483647` |
+| `x` | exact int `-2147483648..2147483647` |
+| `y` | exact int `-2147483648..2147483647` |
+| `z` | exact int `-2147483648..2147483647` |
+
+All numeric slots must reject:
+
+```text
+bool
+float
+None unless the slot is explicitly optional and absent
+overflow outside the slot range
+numeric strings unless an explicit input-normalization policy accepts them
+```
+
+Raw mapping type validation must happen before DTO numeric coercion:
+
+```text
+raw mapping -> type/range validation -> DTO construction -> compiler
+```
+
+DTO code must not silently normalize invalid raw types with `int(value)`.
+Once `1.5` has been converted to `1`, the compiler can no longer recover the
+original invalid type.
+
+Required non-quantity regression vectors:
+
+| Raw slot/value | Expected result |
+| --- | --- |
+| `food_units=True` | reject, adapter submit count `0` |
+| `food_units=1.5` | reject, adapter submit count `0` |
+| `food_units=2147483648` | reject, adapter submit count `0` |
+| `x=True` | reject, adapter submit count `0` |
+| `y=1.5` | reject, adapter submit count `0` |
+| `z="3"` | explicit numeric-string policy required |
+| `x=-2147483649` | reject, adapter submit count `0` |
+| `z=2147483648` | reject, adapter submit count `0` |
+
+The same exact-type rule applies to `executable`: raw mapping validation must
+reject non-bool executable values before `bool(value)` can coerce them.
 
 ## Coverage Snapshot
 
@@ -377,14 +606,18 @@ unless that draft is explicitly generated into:
 plugins/Minecraft/fabric/chatclef/intent/resources/korean_item_aliases.json
 ```
 
-Current runtime snapshot fields should describe the actual runtime file:
+Historical runtime baseline fields describe the older committed baseline only:
 
 ```json
 {
   "schema_version": 1,
-  "snapshot_kind": "runtime_current",
+  "snapshot_kind": "runtime_baseline",
   "snapshot_authority": "git_blob_bytes",
   "snapshot_baseline_commit": "c912ff6491711c33dbf2e66320e634196f866ae8",
+  "coverage_algorithm_version": 1,
+  "catalog_parser_source_commit": "cfc170ac024a46ea943bffcaf289a91ff6bc5ee7",
+  "catalog_parser_source_path": "plugins/Minecraft/fabric/chatclef/intent/chatclef_target_catalog.py",
+  "catalog_parser_source_sha256": "bca08b987851fb9a27f0dcb06cd95d05c264fd0d276540d0bbd5cfd9d1e50893",
   "catalog_path": "plugins/Minecraft/runtime/chatclef_fabric_1.20.1/CataloguedResources.txt",
   "catalog_sha256": "4591ae83151dd2643943dfdcbb2e89a53d26de393c583902370c3f4d3c57188a",
   "alias_source_path": "plugins/Minecraft/fabric/chatclef/intent/resources/korean_item_aliases.json",
@@ -403,12 +636,70 @@ Current runtime snapshot fields should describe the actual runtime file:
 }
 ```
 
+Reviewed implementation runtime snapshot fields must describe the runtime file
+at reviewed commit `cfc170ac024a46ea943bffcaf289a91ff6bc5ee7`, not the older
+`c912ff...` baseline and not a future HEAD:
+
+```json
+{
+  "schema_version": 1,
+  "snapshot_kind": "runtime_reviewed_baseline",
+  "snapshot_authority": "git_blob_bytes",
+  "reviewed_source_commit": "cfc170ac024a46ea943bffcaf289a91ff6bc5ee7",
+  "coverage_algorithm_version": 1,
+  "catalog_parser_source_commit": "cfc170ac024a46ea943bffcaf289a91ff6bc5ee7",
+  "catalog_parser_source_path": "plugins/Minecraft/fabric/chatclef/intent/chatclef_target_catalog.py",
+  "catalog_parser_source_sha256": "bca08b987851fb9a27f0dcb06cd95d05c264fd0d276540d0bbd5cfd9d1e50893",
+  "catalog_path": "plugins/Minecraft/runtime/chatclef_fabric_1.20.1/CataloguedResources.txt",
+  "catalog_sha256": "4591ae83151dd2643943dfdcbb2e89a53d26de393c583902370c3f4d3c57188a",
+  "alias_source_path": "plugins/Minecraft/fabric/chatclef/intent/resources/korean_item_aliases.json",
+  "alias_source_sha256": "9dcf8b8fde97ab60abeceaee7ce0938eda030e80689f1d58d04d5e797b5896df",
+  "raw_catalog_total": 591,
+  "raw_catalog_covered_targets": 9,
+  "raw_catalog_missing_targets": 582,
+  "raw_catalog_coverage_percent": 1.52,
+  "direct_alias_count": 19,
+  "direct_user_facing_target_total": null,
+  "resolved_user_facing_targets": null,
+  "unresolved_user_facing_targets": null,
+  "user_facing_coverage_percent": null,
+  "catalog_outside_targets": 0,
+  "compact_conflicts": 0
+}
+```
+
+Do not call both snapshots `runtime_current`. Tests must compare the historical
+baseline artifact to `snapshot_baseline_commit`, and compare the reviewed
+implementation artifact to `reviewed_source_commit`.
+
+If a "current runtime" check is needed, it must be computed dynamically from
+`HEAD`, not copied from the reviewed baseline:
+
+```text
+runtime_current == recomputed from git blob bytes at HEAD
+runtime_reviewed_baseline == fixed reviewed commit cfc170a
+```
+
+Current-drift tests should verify:
+
+```text
+sha256(git_blob(reviewed_source_commit, path)) == expected_sha256
+sha256(git_blob(HEAD, path)) == expected_sha256
+```
+
+Only an approved source change may update both `reviewed_source_commit` and the
+expected SHA-256 values.
+
 The proposed v2 draft snapshot should be a separate artifact:
 
 ```json
 {
   "schema_version": 1,
   "snapshot_kind": "proposed_v2_draft",
+  "coverage_algorithm_version": 1,
+  "catalog_parser_source_commit": "cfc170ac024a46ea943bffcaf289a91ff6bc5ee7",
+  "catalog_parser_source_path": "plugins/Minecraft/fabric/chatclef/intent/chatclef_target_catalog.py",
+  "catalog_parser_source_sha256": "bca08b987851fb9a27f0dcb06cd95d05c264fd0d276540d0bbd5cfd9d1e50893",
   "alias_source_path": "C:\\Users\\jaewo\\Downloads\\korean_item_aliases.v2.draft.json",
   "alias_source_sha256": "8b3541bba76c13ef7f1c35eb7cccb043d22c8ae3deac7a94482ff83dfd5f42f0",
   "default_policy_source_path": "C:\\Users\\jaewo\\Downloads\\korean_item_aliases.default_policy.draft.json",
@@ -439,12 +730,76 @@ a generated alias or coverage artifact:
 
 ```text
 catalog SHA-256
+catalog parser SHA-256
 ko_kr.json SHA-256
 generator schema version
 curated policy SHA-256
 default policy SHA-256
 canonicalization policy SHA-256
 item-command target policy SHA-256
+```
+
+Catalog parser and coverage algorithm authority:
+
+```json
+{
+  "coverage_algorithm_version": 1,
+  "catalog_parser_source_commit": "cfc170ac024a46ea943bffcaf289a91ff6bc5ee7",
+  "catalog_parser_source_path": "plugins/Minecraft/fabric/chatclef/intent/chatclef_target_catalog.py",
+  "catalog_parser_source_sha256": "bca08b987851fb9a27f0dcb06cd95d05c264fd0d276540d0bbd5cfd9d1e50893"
+}
+```
+
+The historical snapshot uses catalog and alias blobs from `c912ff...`, but its
+coverage counts are interpreted and must be reproducibly recomputed with
+coverage algorithm version `1` and the reviewed parser contract above. This
+does not claim that the same parser implementation existed at `c912ff...`.
+The reviewed baseline and dynamic HEAD artifacts use the same algorithm until
+an explicitly reviewed algorithm-version change is committed.
+
+The catalog file is not a pure one-target-per-line list. The reviewed
+`CataloguedResources.txt` contains a leading description line and a blank line
+before the actual targets. Do not count non-empty lines directly.
+
+Minimum line-format contract:
+
+```text
+trim each line
+skip blank lines
+skip leading non-target lines until the first valid target
+after the first valid target, reject every non-target line
+target regex is ^[a-z0-9_]+$
+reject duplicate targets
+expected reviewed target count is 591
+```
+
+Production baseline-target invariant:
+
+```text
+all required baseline targets must exist
+missing any required baseline target -> catalog load failure
+
+required baseline targets:
+  cooked_beef
+  diamond_axe
+  diamond_pickaxe
+  gold_ingot
+  golden_axe
+  iron_ingot
+  iron_shovel
+  log
+  netherite_sword
+  wooden_axe
+```
+
+Required catalog parser regressions:
+
+```text
+descriptive first line does not count as a target
+invalid line after the first valid target fails
+duplicate target fails
+missing any required baseline target fails
+recomputed target count == 591
 ```
 
 The `C:\Users\jaewo\Downloads\...` values are historical provenance for the
@@ -461,11 +816,14 @@ plugins/Minecraft/tools/chatclef_aliases/sources/chatclef_item_command_target_po
 Download paths may remain in reports as historical input provenance, but they
 must not be the long-term CI source of truth.
 
-Suggested artifact names:
+Required artifact names:
 
 ```text
-korean_item_aliases.runtime.snapshot.json
+korean_item_aliases.runtime_baseline.snapshot.json
+korean_item_aliases.runtime_reviewed_baseline.snapshot.json
+korean_item_aliases.runtime_current.generated.json
 korean_item_aliases.v2_draft.snapshot.json
+korean_item_aliases.runtime.floor.json
 ```
 
 The `user_facing_*` fields remain `null` until the generator and catalog
@@ -483,25 +841,26 @@ coverage is at or above the committed floor
 the draft is not reported as full support
 ```
 
-Keep non-regression floors separate from snapshots. Suggested files:
-
-```text
-korean_alias_coverage.snapshot.json
-korean_alias_coverage.floor.json
-```
-
-Suggested floor shape:
+Keep non-regression floors separate from snapshots. Suggested floor shape:
 
 ```json
 {
-  "snapshot_kind": "runtime_current",
-  "minimum_raw_covered_targets": 4
+  "floor_kind": "runtime_coverage_floor",
+  "applies_to_snapshot_kind": "runtime_reviewed_baseline",
+  "minimum_raw_covered_targets": 9
 }
 ```
 
 The authoritative non-regression value is the integer covered-target count.
 Percentages are derived display values only because rounding can create
 unnecessary failures.
+
+Lowering `minimum_raw_covered_targets` is a separate review decision. Do not
+hide a coverage regression by updating the snapshot and the floor together.
+
+The raw target floor does not protect individual Korean synonyms. User-critical
+phrases such as `철괴`, `다이아몬드`, `돌`, and `구운 소고기` should also be
+protected by golden translation cases or a future `protected_aliases` artifact.
 
 Define raw coverage as:
 
@@ -563,9 +922,6 @@ command modes, shortcut tokens, recipients, quantities, and routing statuses
   never count as item coverage
 ```
 
-Lowering the floor is a separate review decision. Do not hide a coverage
-regression by updating the snapshot and floor together.
-
 Do not add this as a current passing test:
 
 ```text
@@ -579,7 +935,9 @@ not the raw catalog total.
 ## Offline Test Determinism
 
 Tier 1 offline tests must not call external LLMs, OpenAI APIs, network
-services, Minecraft, Java processes, or a running LAVI UI.
+services, Minecraft, Java processes, or a running LAVI UI. Reading Java source
+files from Python and running a deterministic Python source/AST extractor is
+allowed; spawning `java`, Gradle, or a Minecraft process is not.
 
 Rules:
 
@@ -644,6 +1002,13 @@ chatclef_java
 lavi_overlay
 ```
 
+Source kind values:
+
+```text
+registered
+virtual
+```
+
 Natural-language status values:
 
 ```text
@@ -682,12 +1047,13 @@ NOT_APPLICABLE
 `planned`, or explanatory text into that field. Use `verification_state` and
 `verification_note` for non-boolean context.
 
-Matrix row shape:
+SHARED_CASE matrix row shape:
 
 ```json
 {
-  "command": "gamma",
+  "command": "example_client_state_command",
   "owner": "chatclef_java",
+  "source_kind": "virtual",
   "natural_language_status": "RAW_ONLY",
   "effect_class": "CLIENT_STATE",
   "live_test_tier": 4,
@@ -697,9 +1063,80 @@ Matrix row shape:
   "behavior_verified": true,
   "verification_state": "VERIFIED",
   "verification_note": "Source reviewed for client-state effect only.",
+  "golden_case_ids": [],
   "golden_tests": []
 }
 ```
+
+Schema version `1` is independent from evidence maturity. Both
+`PRE_SHARED_CASE` and `SHARED_CASE` are valid under schema version `1`;
+`evidence_maturity` alone selects the allowed evidence fields. A later schema
+version is required only for a structural change outside that maturity switch.
+
+PRE_SHARED_CASE support matrix top-level shape:
+
+```json
+{
+  "schema_version": 1,
+  "evidence_maturity": "PRE_SHARED_CASE",
+  "commands": [
+    {
+      "command": "get",
+      "owner": "chatclef_java",
+      "source_kind": "registered",
+      "natural_language_status": "IMPLEMENTED",
+      "effect_class": "INVENTORY_MUTATING",
+      "live_test_tier": 5,
+      "live_test_allowed": false,
+      "live_test_condition": "MUTATING_PREFLIGHT_REQUIRED",
+      "behavior_verified": true,
+      "verification_state": "VERIFIED",
+      "planned_golden_case_ids": [
+        "nl-get-diamond-basic"
+      ],
+      "current_golden_tests": [
+        "tests/minecraft_chatclef/korean_translation/test_korean_command_support_matrix.py::test_supported_korean_commands_translate_to_prefixless_chatclef_dsl"
+      ]
+    }
+  ]
+}
+```
+
+Evidence maturity rules:
+
+```text
+PRE_SHARED_CASE:
+  allowed evidence fields:
+    planned_golden_case_ids
+    current_golden_tests
+  forbidden evidence fields:
+    golden_case_ids
+    golden_tests
+
+SHARED_CASE:
+  allowed evidence fields:
+    golden_case_ids
+    golden_tests
+  forbidden evidence fields:
+    planned_golden_case_ids
+    current_golden_tests
+```
+
+The matrix artifact must fail validation when:
+
+```text
+schema_version is not the supported value 1
+unknown evidence_maturity value
+planned_golden_case_ids and golden_case_ids both exist
+current_golden_tests and golden_tests both exist
+evidence_maturity does not match the row evidence fields
+commands is missing or not an array
+```
+
+`effect_class` may be a conservative safety classification. It does not mean
+the exact runtime behavior has been fully verified. Exact source/runtime
+verification belongs to `behavior_verified`, `verification_state`, and
+`verification_note`.
 
 For commands whose effect is unknown, do not assign a live tier yet:
 
@@ -707,15 +1144,18 @@ For commands whose effect is unknown, do not assign a live tier yet:
 {
   "command": "scan",
   "owner": "chatclef_java",
+  "source_kind": "registered",
   "natural_language_status": "RAW_ONLY",
   "effect_class": "UNKNOWN_UNTIL_VERIFIED",
   "live_test_tier": null,
   "live_test_allowed": false,
   "live_test_condition": "SOURCE_REVIEW_REQUIRED",
   "live_test_note": "Live tests are blocked until effect classification is verified.",
+  "safety_default": "TREAT_AS_MUTATING_AND_DO_NOT_EXECUTE",
   "behavior_verified": false,
   "verification_state": "SOURCE_REVIEW_REQUIRED",
   "verification_note": "Review implementation before assigning any live tier.",
+  "golden_case_ids": [],
   "golden_tests": []
 }
 ```
@@ -734,24 +1174,168 @@ Snapshot shape:
 ```json
 {
   "schema_version": 1,
+  "snapshot_authority": "git_blob_bytes",
+  "reviewed_source_commit": "cfc170ac024a46ea943bffcaf289a91ff6bc5ee7",
+  "hash_extraction": "git show --no-textconv <commit>:<repository-relative-path>",
   "sources": {
-    "chatclef_java_registered_commands": {
-      "path": "plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/adris/altoclef/AltoClefCommands.java",
-      "sha256": "dc03102ecb1659f1ed0d0fc55852864c887541f6d5287f5ad39fd7aed563d5f7"
+    "fabric_mod_manifest": {
+      "path": "plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/resources/fabric.mod.json",
+      "sha256": "5979599569ba808c52d15c5c6206d027eaff81cf66ffdd7422c4988f35c679c4"
     },
-    "lavi_overlay_commands": {
+    "altoclef_mixin_config": {
+      "path": "plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/resources/altoclef.mixins.json",
+      "sha256": "c70c38a48b393ddcaeb75fcc4121d538a281a8ba0316502611b0982dea930471"
+    },
+    "altoclef_entry_mixin": {
+      "path": "plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/adris/altoclef/mixins/EntryMixin.java",
+      "sha256": "8bc0113969a76dc364edc3d6e0ebb5e25099c25923314239d41bd0648164ee55"
+    },
+    "altoclef_event_bus": {
+      "path": "plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/adris/altoclef/eventbus/EventBus.java",
+      "sha256": "f84d0bb0214a9631fbfd85619466d2dfc0dbef144632c9a9c03435b50a00f6e5"
+    },
+    "title_screen_entry_event": {
+      "path": "plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/adris/altoclef/eventbus/events/TitleScreenEntryEvent.java",
+      "sha256": "0766f7fa5ae9cd488a51a54311e8c2d28d48e845de78bd60bfb18e8cb2b03988"
+    },
+    "altoclef_entrypoint": {
+      "path": "plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/adris/altoclef/AltoClef.java",
+      "sha256": "442e31cf2cca6ba2e485ed0600eb3d7949618a8649627bf6496f0a83f7ded377"
+    },
+    "altoclef_commands_registration": {
+      "path": "plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/adris/altoclef/AltoClefCommands.java",
+      "sha256": "e48fe0bc2af71253f87270c11c4e2ce44bbec34f48588bf1077c659f35cd474e"
+    },
+    "get_command": {
+      "path": "plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/adris/altoclef/commands/GetCommand.java",
+      "sha256": "4f3b86aabd4d94eab1a97b11d8225e2852ea4407c216bab5848b542894dc461d"
+    },
+    "overlay_entrypoint": {
+      "path": "plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/overlay/OverlayEntrypoint.java",
+      "sha256": "35ecd965b671d10c08f005e8b0eaffe2c2c1ee5274524370aaf55c13b1d1cecd"
+    },
+    "overlay_registrar": {
+      "path": "plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/overlay/command/OverlayCommandRegistrar.java",
+      "sha256": "c0fa480fe302c481194a630a0a15edefdd717ea204c844e6970b38fac1792579"
+    },
+    "overlay_command": {
       "path": "plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/overlay/command/OverlayCommand.java",
-      "sha256": "ee3a5dcda914fb2c82a5776efe2963d4efa72cd0226b172ec285110fdba23e0f"
+      "sha256": "b817517d4a98bd0826889ec3a72f13d16f7d1d3d7c5963e131dae1b2de8af0ce"
+    },
+    "chatclef_command_executor": {
+      "path": "plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/adris/altoclef/commandsystem/CommandExecutor.java",
+      "sha256": "17ef21bf10e5841b4fd2c5fe0190eda1b6d9ce2e9825a5cf059fdf44b47e7136"
+    }
+  },
+  "activation_chains": {
+    "chatclef_builtins": {
+      "ordered_source_ids": [
+        "fabric_mod_manifest",
+        "altoclef_mixin_config",
+        "altoclef_entry_mixin",
+        "title_screen_entry_event",
+        "altoclef_event_bus",
+        "altoclef_entrypoint",
+        "altoclef_commands_registration",
+        "chatclef_command_executor"
+      ],
+      "edges": [
+        {
+          "from_source_id": "fabric_mod_manifest",
+          "relation": "declares_main_entrypoint",
+          "to_source_id": "altoclef_entrypoint"
+        },
+        {
+          "from_source_id": "fabric_mod_manifest",
+          "relation": "declares_mixin_config",
+          "to_source_id": "altoclef_mixin_config"
+        },
+        {
+          "from_source_id": "altoclef_mixin_config",
+          "relation": "enables_client_mixin",
+          "to_source_id": "altoclef_entry_mixin"
+        },
+        {
+          "from_source_id": "altoclef_entry_mixin",
+          "relation": "publishes_title_screen_entry_event_via",
+          "to_source_id": "altoclef_event_bus"
+        },
+        {
+          "from_source_id": "altoclef_entrypoint",
+          "relation": "subscribes_to_title_screen_entry_event_via",
+          "to_source_id": "altoclef_event_bus"
+        },
+        {
+          "from_source_id": "altoclef_entry_mixin",
+          "relation": "constructs_event",
+          "to_source_id": "title_screen_entry_event"
+        },
+        {
+          "from_source_id": "altoclef_entrypoint",
+          "relation": "on_event_calls_onInitializeLoad_then_initializeCommands",
+          "to_source_id": "altoclef_commands_registration"
+        },
+        {
+          "from_source_id": "altoclef_commands_registration",
+          "relation": "registers_commands_with",
+          "to_source_id": "chatclef_command_executor"
+        }
+      ]
+    },
+    "lavi_overlay": {
+      "ordered_source_ids": [
+        "fabric_mod_manifest",
+        "overlay_entrypoint",
+        "overlay_registrar",
+        "overlay_command",
+        "chatclef_command_executor"
+      ],
+      "edges": [
+        {
+          "from_source_id": "fabric_mod_manifest",
+          "relation": "declares_main_entrypoint",
+          "to_source_id": "overlay_entrypoint"
+        },
+        {
+          "from_source_id": "overlay_entrypoint",
+          "relation": "registers_end_client_tick_callback",
+          "to_source_id": "overlay_registrar"
+        },
+        {
+          "from_source_id": "overlay_registrar",
+          "relation": "registers_command_when_executor_available",
+          "to_source_id": "overlay_command"
+        },
+        {
+          "from_source_id": "overlay_registrar",
+          "relation": "uses_executor",
+          "to_source_id": "chatclef_command_executor"
+        }
+      ]
     }
   },
   "commands": [
     {
       "name": "get",
-      "owner": "chatclef_java"
+      "owner": "chatclef_java",
+      "source_kind": "registered",
+      "manifest_source_id": "fabric_mod_manifest",
+      "entrypoint_source_id": "altoclef_entrypoint",
+      "activation_chain_id": "chatclef_builtins",
+      "registration_source_id": "altoclef_commands_registration",
+      "command_class_source_id": "get_command",
+      "name_source_id": "get_command"
     },
     {
       "name": "overlay",
-      "owner": "lavi_overlay"
+      "owner": "lavi_overlay",
+      "source_kind": "registered",
+      "manifest_source_id": "fabric_mod_manifest",
+      "entrypoint_source_id": "overlay_entrypoint",
+      "activation_chain_id": "lavi_overlay",
+      "registration_source_id": "overlay_registrar",
+      "command_class_source_id": "overlay_command",
+      "name_source_id": "overlay_command"
     }
   ]
 }
@@ -762,10 +1346,128 @@ not only the two abbreviated examples above. Matrix tests should fail when a
 registered command has no matrix row, or when a matrix row points to no
 registered source unless it is explicitly marked as a virtual command.
 
+Each registered command entry must prove activation, registration, and name
+ownership:
+
+```text
+manifest_source_id points to the Fabric manifest that declares the entrypoint
+entrypoint_source_id points to the Fabric entrypoint implementation declared by
+  the manifest
+activation_chain_id points to a topologically ordered, source-backed activation chain
+registration_source_id points to a source that owns the command-class
+  registration call
+command_class_source_id points to the command implementation class
+name_source_id points to the constructor or constant that defines the command
+  name
+every referenced source_id and activation_chain_id exists
+every source entry has path and sha256
+every activation edge references existing source IDs
+```
+
+`AltoClefCommands.java` alone is not enough because it registers command
+classes such as `new GetCommand()`, while the literal command name `get` lives
+inside the command class constructor. `OverlayCommand.java` alone is also not
+enough because overlay registration flows through `OverlayEntrypoint.java` and
+`OverlayCommandRegistrar.java`.
+
+The snapshot must prove the activation chain, not only the final registration
+call:
+
+```text
+ChatClef built-in commands:
+  fabric.mod.json
+    -> declares adris.altoclef.AltoClef as a Fabric main entrypoint
+    -> declares altoclef.mixins.json
+  altoclef.mixins.json
+    -> enables client mixin EntryMixin
+  EntryMixin
+    -> injects into TitleScreen initialization
+    -> EventBus.publish(new TitleScreenEntryEvent())
+  AltoClef.onInitialize()
+    -> subscribes to TitleScreenEntryEvent
+    -> onInitializeLoad()
+    -> initializeCommands()
+    -> AltoClefCommands.init()
+    -> CommandExecutor.registerNewCommand(...)
+
+Overlay command:
+  fabric.mod.json
+    -> declares lavi.minecraft.overlay.OverlayEntrypoint
+  OverlayEntrypoint.onInitialize()
+    -> registers ClientTickEvents.END_CLIENT_TICK callback
+  OverlayCommandRegistrar.onEndClientTick()
+    -> waits for AltoClef CommandExecutor
+    -> CommandExecutor.registerNewCommand(new OverlayCommand())
+```
+
+If the manifest, mixin configuration, mixin event publication, event
+subscription, activation method, registration source, command class, or name
+source changes, the source-backed command snapshot must detect that drift.
+
+Required activation-chain regressions:
+
+```text
+remove EntryMixin from altoclef.mixins.json -> contract failure
+remove TitleScreenEntryEvent publication from EntryMixin -> contract failure
+remove TitleScreenEntryEvent subscription from AltoClef -> contract failure
+remove onInitializeLoad -> initializeCommands call -> contract failure
+remove OverlayEntrypoint from fabric.mod.json -> contract failure
+remove overlay tick callback or registrar call -> contract failure
+```
+
+Preferred implementation direction for a later test phase:
+
+```text
+default Tier 1 authority:
+  deterministic Python source/AST extractor
+  -> reads Java and JSON source without spawning a Java process
+  -> follows activation and registration call chains
+  -> reads each command constructor or name constant
+  -> compares source-derived output with the committed snapshot
+
+optional build-contract parity job:
+  small Java harness may generate or cross-check the same snapshot
+  -> runs outside default pytest and outside the default Windows focused job
+  -> never becomes a hidden Tier 1 Java-process dependency
+
+tests do not re-create the command-name dictionary by hand
+```
+
+Extractor semantic contract:
+
+```text
+do not use regex-only extraction over raw source text as the command authority
+commented or disabled code must not produce registered commands
+active command registration must produce a snapshot entry
+snapshot command name must equal the command constructor or name constant
+effective command names must be globally unique across chatclef_java and
+  lavi_overlay owners
+duplicate effective command name -> contract failure
+```
+
+Required extractor regressions:
+
+```text
+active new GetCommand() -> snapshot contains get
+commented // new StashCommand() -> snapshot does not contain stash
+constructor name "get" -> snapshot name is get
+same effective name in chatclef_java and lavi_overlay -> contract failure
+```
+
+Prefer a deterministic Python parser or AST-based source extractor for the
+default Tier 1 contract. A small Java harness is optional only in the separate
+build-contract parity job described above. Do not use a simple regular
+expression scan as the command authority. `CommandExecutor` rejects duplicate
+command names at runtime, and the snapshot contract should fail before runtime
+for the same collision class.
+
 The artifact paths and schema above are planned Phase 0 artifacts. Phase 0 is
 not complete until those JSON files are actually committed and contract tests
 prove that they contain every registered command, actual source hashes, exact
-owners, boolean `live_test_allowed`, and command-specific `golden_case_ids`.
+owners, boolean `live_test_allowed`, and command-specific golden-case evidence.
+Before the shared case artifact exists, that evidence is
+`planned_golden_case_ids` plus `current_golden_tests`; after it exists, it is
+`golden_case_ids`.
 
 Java item-command contract provenance must also be tested before trusting
 Python fixtures:
@@ -774,19 +1476,62 @@ Python fixtures:
 tests/minecraft_chatclef/command_catalog/test_java_item_command_contract_provenance.py
 ```
 
+The hash authority must be identical across documentation, fixtures, tests, and
+CI:
+
+```text
+snapshot_authority == git_blob_bytes
+reviewed_source_commit or snapshot_baseline_commit is a full 40-character commit SHA
+hash bytes come from:
+  git show --no-textconv <commit>:<repository-relative-path>
+tests must not use working-tree Path.read_bytes() as the authority for Git
+  source-blob contract hashes
+tests must not hash CRLF-converted working-tree files
+```
+
+Hash extraction must preserve raw stdout bytes. Do not route source bytes
+through a PowerShell text pipeline. A Python subprocess using raw stdout bytes
+is acceptable.
+
+If GitHub Actions needs to verify a baseline commit other than the checked-out
+HEAD, checkout must make that commit available:
+
+```yaml
+- uses: actions/checkout@v4
+  with:
+    fetch-depth: 0
+```
+
 Required assertion:
 
 ```text
-java_contract_baseline_commit matches the documented baseline
-plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/adris/altoclef/commands/GetCommand.java hash matches the documented contract source hash
-plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/adris/altoclef/commands/EquipCommand.java hash matches the documented contract source hash
-plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/adris/altoclef/commands/DepositCommand.java hash matches the documented contract source hash
-plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/adris/altoclef/commands/GiveCommand.java hash matches the documented contract source hash
-plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/FabricChatClefCommandDispatcher.java hash matches the documented contract source hash
-plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/adris/altoclef/commandsystem/ItemList.java hash matches the documented contract source hash
-plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/adris/altoclef/commandsystem/Arg.java hash matches the documented contract source hash
-plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/adris/altoclef/commandsystem/ArgParser.java hash matches the documented contract source hash
-contract fixture validation stops if any source hash drifts
+reviewed_source_commit matches the documented reviewed implementation commit
+for every Java contract source:
+  sha256(git_blob(reviewed_source_commit, path)) == expected_sha256
+  sha256(git_blob(HEAD, path)) == expected_sha256
+contract fixture validation stops if any baseline provenance or current drift
+  check fails
+```
+
+Reviewed Java item-command contract source snapshot:
+
+```json
+{
+  "snapshot_authority": "git_blob_bytes",
+  "reviewed_source_commit": "cfc170ac024a46ea943bffcaf289a91ff6bc5ee7",
+  "hash_extraction": "git show --no-textconv <commit>:<repository-relative-path>",
+  "java_contract_sources": {
+    "plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/adris/altoclef/commands/GetCommand.java": "sha256:4f3b86aabd4d94eab1a97b11d8225e2852ea4407c216bab5848b542894dc461d",
+    "plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/adris/altoclef/commands/EquipCommand.java": "sha256:fc63661acb97a98c989165f6499c2216a711b66359695e64682303f03af7848a",
+    "plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/adris/altoclef/commands/DepositCommand.java": "sha256:4259159f77f5467401bd6b96e89c3fc8898a75b72716c9ac26f4007cd881ca80",
+    "plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/adris/altoclef/commands/GiveCommand.java": "sha256:b88c70e31ee2f76cd078ec691fdc3ecf8acd8ba92acca6dfcb2779c60e1d0a45",
+    "plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/adris/altoclef/commandsystem/Arg.java": "sha256:26d54316c9b3336ba63dcbe848274d5005e21cc26ca00fe75c95840e9cfe40c2",
+    "plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/adris/altoclef/commandsystem/ArgParser.java": "sha256:d2fcd9aaa8c6f59d2958545319e0c0543940f2e62875c46e2460f1ef60347cc8",
+    "plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/adris/altoclef/commandsystem/CommandExecutor.java": "sha256:17ef21bf10e5841b4fd2c5fe0190eda1b6d9ce2e9825a5cf059fdf44b47e7136",
+    "plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/adris/altoclef/commandsystem/ItemList.java": "sha256:38c442cc01a700a91c2b3af2dadb86a32ca4316a81cbbec2f7d311d6f30783ef",
+    "plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/FabricChatClefCommandDispatcher.java": "sha256:957b76e4515edca4b5ed12d76b3dc27833488da41294a19495be73a6391d7f77"
+  }
+}
 ```
 
 Live test condition values:
@@ -834,83 +1579,93 @@ backend, instance, world, and matching-terminal-result guards exist in the
 actual live test implementation. Environment variables alone are not enough to
 make a mutating command live-testable.
 
-IMPLEMENTED rows must keep test evidence. Current evidence:
+IMPLEMENTED rows must keep test evidence. Until the shared case artifact is
+committed, split planned IDs from currently existing test paths:
 
 ```json
 {
   "get": {
-    "golden_case_ids": [
+    "planned_golden_case_ids": [
+      "nl-get-iron-ingot-basic",
+      "nl-get-iron-ingot-spaced-quantity",
+      "nl-get-gold-ingot-basic",
+      "nl-get-cooked-beef-basic",
+      "nl-get-log-basic",
       "nl-get-diamond-basic",
       "nl-get-diamond-mining",
       "nl-get-stone-quantity",
+      "nl-get-cobblestone-mining-quantity",
       "nl-get-coal-mining-quantity",
       "nl-get-iron-mining-quantity"
     ],
-    "golden_tests": [
+    "current_golden_tests": [
       "tests/minecraft_chatclef/korean_translation/test_korean_command_support_matrix.py::test_supported_korean_commands_translate_to_prefixless_chatclef_dsl",
-      "tests/minecraft_chatclef/lavi_input/test_korean_input_to_chatclef_submission_path.py::test_lavi_korean_input_reaches_adapter_as_prefixless_command"
+      "tests/minecraft_chatclef/lavi_input/test_korean_input_to_chatclef_submission_path.py::test_lavi_korean_input_reaches_adapter_as_prefixless_command",
+      "tests/minecraft_chatclef/alias_contract/test_all_runtime_aliases_translate.py"
     ]
   },
   "food": {
-    "golden_case_ids": [
+    "planned_golden_case_ids": [
       "nl-food-basic"
     ],
-    "golden_tests": [
+    "current_golden_tests": [
       "tests/minecraft_chatclef/korean_translation/test_korean_command_support_matrix.py::test_supported_korean_commands_translate_to_prefixless_chatclef_dsl"
     ]
   },
   "meat": {
-    "golden_case_ids": [
+    "planned_golden_case_ids": [
       "nl-meat-basic"
     ],
-    "golden_tests": [
+    "current_golden_tests": [
       "tests/minecraft_chatclef/korean_translation/test_korean_command_support_matrix.py::test_supported_korean_commands_translate_to_prefixless_chatclef_dsl"
     ]
   },
   "goto": {
-    "golden_case_ids": [
+    "planned_golden_case_ids": [
       "nl-goto-coordinate-basic"
     ],
-    "golden_tests": [
+    "current_golden_tests": [
       "tests/minecraft_chatclef/korean_translation/test_korean_command_support_matrix.py::test_supported_korean_commands_translate_to_prefixless_chatclef_dsl"
     ]
   },
   "follow": {
-    "golden_case_ids": [
+    "planned_golden_case_ids": [
       "nl-follow-player-basic"
     ],
-    "golden_tests": [
+    "current_golden_tests": [
       "tests/minecraft_chatclef/korean_translation/test_korean_command_support_matrix.py::test_supported_korean_commands_translate_to_prefixless_chatclef_dsl"
     ]
   },
   "idle": {
-    "golden_case_ids": [
+    "planned_golden_case_ids": [
       "nl-idle-basic"
     ],
-    "golden_tests": [
+    "current_golden_tests": [
       "tests/minecraft_chatclef/korean_translation/test_korean_command_support_matrix.py::test_supported_korean_commands_translate_to_prefixless_chatclef_dsl"
     ]
   },
   "stop": {
-    "golden_case_ids": [
+    "planned_golden_case_ids": [
       "nl-stop-basic"
     ],
-    "golden_tests": [
+    "current_golden_tests": [
       "tests/minecraft_chatclef/korean_translation/test_korean_command_support_matrix.py::test_supported_korean_commands_translate_to_prefixless_chatclef_dsl"
     ]
   }
 }
 ```
 
-When the matrix moves into a JSON artifact, a contract test should verify that
-each `golden_case_id` is present in the actual case table, not only that the
-test function path exists.
+After the shared case artifact exists, `planned_golden_case_ids` becomes
+`golden_case_ids`, and a contract test must verify that each `golden_case_id`
+is present in the actual case table, not only that the test function path
+exists.
 
 Support matrix tests should verify:
 
 ```text
 every registered command appears in the matrix exactly once
 every matrix row points to a registered source or an explicit virtual command
+source_kind is either registered or virtual
 no matrix row uses an "or" status
 behavior_verified is boolean
 live_test_allowed is boolean
@@ -919,7 +1674,12 @@ verification_state is one of the closed enum values
 UNKNOWN_UNTIL_VERIFIED rows have live_test_tier == null
 UNKNOWN_UNTIL_VERIFIED rows have live_test_allowed == false
 IMPLEMENTED commands have at least one golden case
-IMPLEMENTED commands have at least one golden_case_id
+before the shared case artifact exists, IMPLEMENTED commands have at least one
+  planned_golden_case_id or current_golden_tests entry
+after the shared case artifact exists, IMPLEMENTED commands have at least one
+  golden_case_id
+every row has a planned_golden_case_ids or golden_case_ids list, depending on
+  artifact maturity
 PLANNED commands do not require success golden cases yet
 RAW_ONLY commands are not invented by the natural-language compiler
 EXPLICIT_UNSUPPORTED commands reject clearly and submit nothing
@@ -1038,6 +1798,62 @@ put the real tests in the responsibility folder and include that folder in disco
 update the CI or local test command to include the folder path explicitly
 ```
 
+## Windows CI Required Offline Scope
+
+The default Windows CI must run the same offline ChatClef-focused test range
+used for local merge gating. GitHub Actions must not stay green while the
+ChatClef-focused suite is red.
+
+Required offline scope:
+
+```text
+tests/minecraft_chatclef/**
+tests/test_minecraft_chatclef_*.py
+tests/test_llm_minecraft_input_router.py
+```
+
+Required result:
+
+```text
+0 failed
+live runtime tests skipped unless explicit live opt-in is present
+```
+
+PowerShell-safe discovery should avoid Unix-only glob behavior:
+
+```powershell
+$chatClefTests = @()
+
+$chatClefTests += Get-ChildItem `
+    -LiteralPath .\tests\minecraft_chatclef `
+    -Recurse `
+    -Filter *.py `
+    -File |
+    Where-Object { $_.Name -like "test_*.py" } |
+    ForEach-Object { $_.FullName }
+
+$chatClefTests += Get-ChildItem `
+    -LiteralPath .\tests `
+    -Filter "test_minecraft_chatclef_*.py" `
+    -File |
+    ForEach-Object { $_.FullName }
+
+$chatClefTests += ".\tests\test_llm_minecraft_input_router.py"
+
+.\venv\Scripts\python.exe -m pytest -q @chatClefTests
+```
+
+If Java source contract tests read Git blob bytes from a documented baseline
+commit, the checkout must provide that commit:
+
+```yaml
+- uses: actions/checkout@v4
+  with:
+    fetch-depth: 0
+```
+
+Do not include live Minecraft tests in this default offline CI scope.
+
 ## Live Minecraft Test Tiers
 
 Live tests must be opt-in because they can change task state, movement,
@@ -1127,8 +1943,12 @@ stop
 follow
 give
 attack
-scan until proven read-only
 ```
+
+Unknown-effect commands such as `scan` are not Tier 5 test targets yet. Their
+safety default is `TREAT_AS_MUTATING_AND_DO_NOT_EXECUTE`, with
+`live_test_tier: null` and `live_test_allowed: false` until source review
+assigns a concrete effect class.
 
 Mutating tests must target only a dedicated Fabric test instance and test
 world. They must never run in default CI, never run against a personal survival
@@ -1226,34 +2046,83 @@ the test waits for a terminal command_result before ending
 the command is reclassified as non-mutating by source evidence
 ```
 
-The current mutating Korean runtime test follows the safer terminal pattern by
-waiting for a terminal result rather than stopping immediately at `accepted`.
-Future terminal success checks must be stricter than `active_request_id is
-None`, because an active request can disappear after disconnect, session
-replacement, server stop, or ownership reset.
+The current mutating Korean runtime test is safer than an ACCEPTED-only smoke
+test because it waits for a terminal result. It still does not satisfy the full
+matching-terminal contract until it verifies that the terminal result belongs
+to the submitted request. Until backend, instance, world, and request
+correlation guards exist, mutating live tests should hard skip before sending a
+command request or implement the guards immediately.
+
+Terminal success checks must be stricter than `active_request_id is None`,
+because an active request can disappear after disconnect, session replacement,
+server stop, ownership reset, or a stale terminal result from a previous
+request.
 
 Terminal success requires:
 
 ```text
 matching terminal CommandResultDTO observed
 result request ownership matches the submitted command
-terminal status and result_reason are recorded
+submitted request_id == terminal result request_id
+terminal status and `data.result_reason` are recorded
 active request is cleared after the matching terminal result
 ```
 
-Minimum matching fields:
+Live E2E directly observed fields:
 
 ```text
-request_id
-correlation_id when available
+last_result.request_id
+last_result.status
+last_result.data.result_reason
+```
+
+The current live status surface does not expose envelope `session_id`,
+`correlation_id`, or `connection_generation` inside `last_result`. Do not make
+the live E2E test require fields it cannot observe.
+
+Server ownership and loopback tests must cover:
+
+```text
 session_id
+correlation_id
 connection_generation
-terminal status
-result_reason
+stale session result rejection
+stale generation result rejection
+wrong request_id result rejection
+```
+
+If a future implementation needs live E2E visibility for those ownership
+fields, add Python-internal observation metadata without changing the Java wire
+payload or `CommandResultDTO` shape:
+
+```json
+{
+  "last_result": {
+    "request_id": "...",
+    "status": "completed",
+    "data": {
+      "result_reason": "matching_task_finished"
+    }
+  },
+  "last_result_observation": {
+    "session_id": "...",
+    "correlation_id": "...",
+    "connection_generation": 3
+  }
+}
 ```
 
 Do not pass a terminal live test solely because `active_request_id` became
 empty.
+
+Required stale-result regression:
+
+```text
+previous request terminal last_result exists
+new command is submitted
+old last_result remains terminal
+test does not pass until last_result.request_id == submitted request_id
+```
 
 Do not:
 
@@ -1267,13 +2136,68 @@ replay the original command after failure
 fallback to Forge MineMind
 ```
 
-## Immediate Documentation-Level Acceptance
+## Current Implementation Status At Documentation Review
 
-Before the next implementation phase, the documented test plan should make the
-following true:
+This section records the known status at the documentation review point. It is
+not an implementation claim.
+
+Satisfied in the revised documentation set when these three files are committed
+together:
 
 ```text
-current working behavior is represented by green tests
+runtime baseline, reviewed implementation baseline, and dynamic HEAD current are separated
+reviewed source SHA-256 values are recorded with Git blob-byte authority
+all Related Documents in the Korean ChatClef documentation unit are present
+ChatClef built-in activation provenance includes manifest, mixin config,
+  EntryMixin event publication, AltoClef event subscription, and command registration
+coverage snapshots identify coverage algorithm version and catalog parser provenance
+catalog parsing requires all ten production baseline targets
+support-matrix schema version 1 is independent from evidence maturity
+Tier 1 source extraction does not spawn Java; an optional Java harness belongs to
+  a separate build-contract parity job
+quantity and malformed TranslationResult regression vectors are documented
+Windows CI focused scope is documented
+live mutating-test safety expectations are documented
+```
+
+Not yet satisfied in implementation or CI:
+
+```text
+focused ChatClef suite still reports 98 passed, 9 failed, 2 skipped, and
+  258 subtests passed
+the 9 failures are Java source-hash subtests
+the current hash test still uses old constants and working-tree Path.read_bytes()
+Windows CI does not yet execute the ChatClef-focused offline scope
+Windows CI checkout does not yet use fetch-depth: 0 for source-blob baselines
+registered-command JSON artifacts are not committed
+support-matrix JSON artifact is not committed
+golden_case_ids are not present in the actual shared test data
+live backend/instance/world preflight is not implemented
+live matching-result request_id guard is not implemented
+session/correlation/generation live observation is not exposed through last_result
+```
+
+Do not treat the implementation gate below as already satisfied.
+
+## Documentation Acceptance
+
+The documentation set is acceptable when the following are true:
+
+```text
+terminology and responsibility boundaries are internally consistent
+historical baseline, reviewed baseline, and dynamic HEAD current are separated
+artifact schemas contain all required fields
+registered-command activation chains cover the actual Fabric manifest, mixin,
+  event, entrypoint, and registration path
+coverage artifacts identify algorithm version, parser path, parser hash, and parser commit
+catalog parser contracts require all production baseline targets
+support-matrix schema version and evidence maturity have deterministic, non-conflicting roles
+Tier 1 source extraction and any optional Java harness run in explicitly separate jobs
+current source-backed contracts and planned phase contracts are not mixed
+Related Documents references are present in the same commit or removed
+golden_case_ids are marked planned until the shared case artifact exists
+result_reason observation path matches the current DTO/status projection shape
+numeric slot contracts cover quantity, food_units, and goto x/y/z
 future command behavior is represented by the support matrix, not failing tests
 support matrix rows use one natural-language status, one effect class, and one live tier field
 live_test_allowed is boolean and live_test_condition carries condition text
@@ -1282,20 +2206,40 @@ unknown-effect commands have null live tier and live tests disabled
 registered command authority is source-backed and owner-scoped
 registered command snapshot and support matrix artifact paths are defined
 registered command artifacts are planned and do not make Phase 0 complete until committed and tested
-current aliases are hard-validated
 raw catalog coverage breadth is visible but not treated as complete
-runtime coverage and proposed v2 draft coverage are separate
+runtime baseline, reviewed runtime baseline, dynamic current, and proposed v2
+  draft coverage are separate
 coverage snapshot and coverage floor are separate
 coverage floor uses integer covered-target count as the authority
 natural-language commands stay prefixless through the adapter boundary
 raw command tests may still use @ when they are not natural-language tests
-Tier 1 offline tests do not call real LLMs or networks
 live tests are opt-in and side-effect-classified
-mutating live tests do not end at ACCEPTED only without teardown or terminal observation
-mutating live tests require backend, instance, and world preflight before command_request
-terminal live success requires a matching terminal result, not only active_request_id clear
 accepted commands are never automatically replayed
 Fabric ChatClef tests do not import Forge MineMind fixtures
+```
+
+## Implementation Gate Before Phase 1
+
+Before treating Phase 0 as complete or starting the next implementation phase,
+the actual implementation and CI must satisfy:
+
+```text
+focused ChatClef suite has 0 failed tests
+Windows CI runs the ChatClef-focused offline scope
+checkout provides source blobs needed by baseline tests, for example fetch-depth: 0
+hash tests use raw Git blob bytes and updated expected hashes
+registered-command snapshot artifact is committed and validates the full
+  Fabric activation chains
+support-matrix artifact is committed with schema_version 1 and an explicit
+  evidence_maturity
+coverage artifacts carry algorithm and parser provenance and pass baseline-target checks
+shared golden-case artifact is committed or all planned IDs remain clearly planned
+current aliases are hard-validated
+Tier 1 offline tests do not call real LLMs or networks
+mutating live tests require backend, instance, and world preflight before command_request
+terminal live success requires matching last_result.request_id, last_result.status,
+  and last_result.data.result_reason
+mutating live tests do not end at ACCEPTED only without teardown or terminal observation
 ```
 
 ## ChatGPT Handoff Summary
@@ -1303,128 +2247,53 @@ Fabric ChatClef tests do not import Forge MineMind fixtures
 Use this when asking ChatGPT to continue reviewing the test plan:
 
 ```text
-Codex documented the Korean ChatClef test strategy in:
+Codex/ChatGPT reconciled the Korean ChatClef test strategy in:
 
 plugins/Minecraft/docs/chatclef-korean-test-strategy.md
 
-The strategy separates:
+Documentation authority split:
 
-1. current correctness tests
-2. alias coverage snapshot tests
-3. command support/planned matrix tests
+- item/action UX design and phase order:
+  chatclef-korean-item-action-alias-v2-plan.md
+- test, artifact, source/hash, coverage-parser, CI, and live-safety authority:
+  chatclef-korean-test-strategy.md
+- current merge status and incomplete implementation work:
+  chatclef-korean-post-review-merge-blockers.md
 
-Python Korean natural-language output and router-to-adapter requests must be
-prefixless, for example `get diamond 1`. Raw command entrypoints and transport
-fixtures may still use `@get diamond 1` when they are not testing the
-natural-language compiler.
+The three files are one documentation commit unit.
 
-The committed-baseline GET golden cases are:
+Key frozen contracts:
 
-- 철괴 가져와줘 -> get iron_ingot 1
-- 철 주괴 10개 가져와줘 -> get iron_ingot 10
-- 금괴 가져와줘 -> get gold_ingot 1
-- 구운 소고기 가져와줘 -> get cooked_beef 1
-- 원목 가져와줘 -> get log 1
+1. Python Korean natural-language output remains prefixless.
+2. Historical c912ff baseline, reviewed cfc170a baseline, and dynamic HEAD current
+   remain separate.
+3. Coverage algorithm version 1 uses the reviewed catalog parser at cfc170a and
+   requires the ten production baseline targets.
+4. Registered-command provenance follows the full built-in activation path:
+   fabric.mod.json -> altoclef.mixins.json -> EntryMixin ->
+   TitleScreenEntryEvent -> AltoClef subscription -> onInitializeLoad ->
+   initializeCommands -> AltoClefCommands -> CommandExecutor.
+5. Overlay provenance follows manifest -> OverlayEntrypoint -> tick callback ->
+   OverlayCommandRegistrar -> OverlayCommand.
+6. Default Tier 1 tests may parse Java source from Python but do not spawn Java.
+   An optional Java harness belongs only to a separate build-contract parity job.
+7. Support-matrix schema version 1 supports PRE_SHARED_CASE and SHARED_CASE;
+   evidence_maturity selects mutually exclusive evidence fields.
+8. result_reason is observed as last_result.data.result_reason.
+9. golden_case_ids remain planned until a shared repository-owned case artifact exists.
+10. Current source-backed Java contracts remain separate from planned Python
+    multi-item GET, EQUIP, DEPOSIT, and GIVE work.
 
-Offline Korean-to-DSL tests assert VALIDATED, executable, exact prefixless DSL,
-and no @ prefix. Router tests are separate: VALIDATED + connected + idle must
-submit exactly once, no-submit cases must submit zero times, rejected adapter
-results submit once and do not retry, and all paths submit at most once.
+Current implementation status remains not green:
 
-False-positive phrases such as 캐나다 여행 얘기하자, 캐릭터 만들어줘,
-캐시 확인해줘, 오늘 다이아몬드가 예쁘다, 돌 10개가 창고에 있어, and
-마인크래프트에서 다이아몬드 캐는 법 알려줘 must submit nothing.
+- reported focused suite: 98 passed, 9 failed, 2 skipped, 258 subtests passed
+- the 9 failures are Java source-hash subtests
+- the current hash test still uses old constants and working-tree Path.read_bytes()
+- Windows CI does not run the focused ChatClef offline scope
+- registered-command, support-matrix, coverage, and shared golden-case artifacts
+  are not committed
+- live backend/instance/world and matching-request guards are not implemented
 
-Alias tests hard-validate aliases currently present, while coverage snapshot
-tests record raw catalog breadth without requiring all 591 raw catalog targets
-to have Korean aliases. Runtime coverage and proposed v2 draft coverage are
-separate. Current runtime coverage comes from
-plugins/Minecraft/fabric/chatclef/intent/resources/korean_item_aliases.json:
-11 aliases, 4 unique catalog targets, 587 raw missing targets, and 0.68%
-raw coverage. The 191 aliases / 167 targets / 424 missing / 28.26% values
-belong to the proposed v2 draft seed until that draft is generated into the
-runtime resource. user_facing_* fields stay null until the catalog classifier
-exists. Coverage snapshot and coverage floor are separate files so a floor
-reduction cannot be hidden inside a snapshot update. The authoritative floor is
-the integer covered-target count; percent is a derived display value.
-
-The support matrix now separates command owner, natural-language status,
-effect_class, live_test_tier, live_test_allowed, live_test_condition,
-live_test_note, behavior_verified, verification_state, verification_note,
-golden_case_ids, and golden_tests. Natural language status values are
-IMPLEMENTED, PLANNED, RAW_ONLY, and EXPLICIT_UNSUPPORTED. LIVE_ONLY was removed
-from natural-language status and belongs to live test tier/effect
-classification instead. behavior_verified and live_test_allowed are boolean
-only; non-boolean context belongs to verification_state, verification_note,
-live_test_condition, and live_test_note.
-
-Current PLANNED Korean item-action commands are equip, deposit, and give.
-Commands such as attack, scan, gamma, overlay, hero, locate_structure,
-reload_settings, resetmemory, gamer, and chatclef are RAW_ONLY until a separate
-Korean UX phase is approved. scan remains UNKNOWN_UNTIL_VERIFIED for effect
-classification until source behavior proves whether it is read-only. Any
-UNKNOWN_UNTIL_VERIFIED command keeps live_test_tier null,
-live_test_allowed false, and live_test_condition SOURCE_REVIEW_REQUIRED until
-source review assigns a concrete effect class and live tier.
-
-Registered command authority is defined as future source-backed artifacts:
-
-- tests/minecraft_chatclef/command_catalog/chatclef_registered_commands.snapshot.json
-- tests/minecraft_chatclef/command_catalog/chatclef_command_support_matrix.json
-
-These artifact paths and schemas are planned. Phase 0 is not complete until the
-JSON artifacts are committed and contract tests prove that they contain every
-registered command, actual source hashes, exact owners, boolean
-live_test_allowed values, and command-specific golden_case_ids.
-
-Current source hashes recorded in the document:
-
-- AltoClefCommands.java sha256 dc03102ecb1659f1ed0d0fc55852864c887541f6d5287f5ad39fd7aed563d5f7
-- OverlayCommand.java sha256 ee3a5dcda914fb2c82a5776efe2963d4efa72cd0226b172ec285110fdba23e0f
-
-IMPLEMENTED commands must keep golden test references. Current implemented
-commands are get, food, meat, goto, follow, idle, and stop. Matrix evidence
-must include command-specific golden_case_ids so a shared parameterized test
-function path alone cannot hide a removed case.
-
-GET acquisition/mining matcher behavior is not committed-baseline verified
-unless Phase 0 proves the implementation source and focused tests:
-
-- 다이아몬드 캐줘 -> get diamond 1
-- 석탄 5개 캐와줘 -> get coal 5
-- 철 10개 캐줘 -> get iron_ingot 10
-
-Future Phase 3 action matching means either proving or implementing GET
-mining/acquisition recognition separately from GET/EQUIP/DEPOSIT/GIVE
-cross-command precedence.
-
-Live Minecraft tests are separated into offline, loopback, real-bridge
-connection, client-state mutation, and character/world/inventory/task mutation
-tiers. Current live env gates are LAVI_MINECRAFT_RUNTIME_TESTS=1 and
-LAVI_MINECRAFT_RUNTIME_MUTATING=1. Future pytest live tests should require both
-env opt-in and explicit marker selection. Mutating tests require explicit
-opt-in and a dedicated Fabric test instance/world. Do not live-test every alias.
-Do not run ACCEPTED-only smoke tests for mutating commands unless the test owns
-teardown, cleanup, terminal observation, or source evidence reclassifies the
-command as non-mutating.
-
-Future mutating live tests must preflight:
-
-- LAVI_MINECRAFT_EXPECTED_BACKEND=fabric_chatclef
-- LAVI_MINECRAFT_EXPECTED_INSTANCE=LAVI_TEST_Fabric01
-- LAVI_MINECRAFT_EXPECTED_WORLD=<dedicated-test-world>
-
-Mismatch must fail before command_request. Terminal success must observe a
-matching terminal CommandResultDTO by request_id, correlation_id when available,
-session_id, connection_generation, terminal status, and result_reason before
-checking that the active request cleared.
-
-Accepted commands must not be replayed automatically after running, completed,
-failed, cancelled, timeout, unknown terminal, disconnect, or duplicate terminal
-result. Tier 1 offline tests must use direct rule tests or deterministic
-fakes/stubs and must not call real LLMs, OpenAI APIs, networks, Minecraft,
-Java, or LAVI UI.
-
-No Java, DTO, payload, ChatClef engine, Forge MineMind, or live Minecraft
-behavior was changed by this documentation step.
+No Java, DTO, wire payload, ChatClef engine, Forge MineMind, live Minecraft
+behavior, or test execution was changed by this documentation revision.
 ```

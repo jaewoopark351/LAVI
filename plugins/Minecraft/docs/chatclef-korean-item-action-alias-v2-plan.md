@@ -1,4 +1,5 @@
 <!-- 20260815_kpopmodder: Documented v2 Korean item alias expansion across get/equip/deposit/give before implementation. -->
+<!-- 20260815_chatgpt: Synchronized design authority, reviewed coverage provenance, and Phase 0 gates with the test strategy and merge-blocker documents. -->
 
 # ChatClef Korean Item Action Alias V2 Plan
 
@@ -41,6 +42,36 @@ A later ChatGPT conditional review approved the responsibility boundaries in
 this document, but did not approve immediate full implementation. That review
 requires an additional contract-freeze phase before expanding beyond the
 current `GET_ITEM` behavior.
+
+## Related Documents And Authority
+
+Read and commit this plan together with:
+
+```text
+plugins/Minecraft/docs/chatclef-korean-test-strategy.md
+plugins/Minecraft/docs/chatclef-korean-post-review-merge-blockers.md
+plugins/Minecraft/docs/chatclef-korean-item-command-resolution-analysis.md
+plugins/Minecraft/docs/chatclef-command-lifecycle-and-threading.md
+plugins/Minecraft/docs/fabric-chatclef-bridge-protocol-v1.md
+```
+
+Authority is split as follows:
+
+```text
+this plan:
+  Korean item/action UX design, command-specific policies, and phase order
+
+test strategy:
+  test evidence, artifact schemas, source/hash authority, coverage algorithm,
+  catalog parser provenance, CI scope, and live-test safety
+
+post-review merge blockers:
+  current pass/fail status and the implementation work required before merge
+```
+
+When wording conflicts, the test strategy controls test/provenance/coverage
+contracts and the post-review document controls current merge status. The three
+Korean ChatClef documents are one documentation commit unit.
 
 ## Goal
 
@@ -139,16 +170,17 @@ The same concrete item lexicon can be reused by multiple commands:
 | `deposit` | specific item target | bare deposit mode and quantity policy |
 | `give` | single item target | recipient slot and player-name validation |
 
-Examples below separate the shared alias target from command behavior. Results
-marked pending must not be treated as verified runtime behavior until Phase 0
-capability verification is complete.
+Examples below separate reviewed runtime alias availability from
+command-specific behavior. Rows explicitly marked planned or pending must not be
+treated as verified runtime behavior until the relevant Phase 0 capability
+verification is complete.
 
-| Korean phrase | Shared target | Command-specific status |
-| --- | --- | --- |
-| `다이아몬드` | `diamond` | proposed v2 GET target; not in the committed runtime alias baseline |
-| `철` | `iron_ingot` | proposed v2 shorthand; committed baseline already supports `철괴` / `철 주괴`; not `equip iron` by itself |
-| `철 흉갑` | `iron_chestplate` | explicit EQUIP target after equipment capability verification |
-| `잡템` | none | deposit context may compile bare `deposit` after UX wording policy is frozen |
+| Korean phrase | Shared target | Runtime alias status | Command-specific status |
+| --- | --- | --- | --- |
+| `다이아몬드` | `diamond` | present in the reviewed `cfc170a` runtime alias baseline | preserve as a current GET regression |
+| `철` | `iron_ingot` | present in the reviewed `cfc170a` runtime alias baseline | preserve as a current GET shorthand; `equip iron` is allowed only in material + armor-set context such as `철 갑옷` |
+| `철 흉갑` | `iron_chestplate` | planned v2 alias | explicit EQUIP target after equipment capability verification |
+| `잡템` | none | must not be stored in the flat item alias map | deposit context may compile bare `deposit` after UX wording policy is frozen |
 
 ## Command-Specific Policy
 
@@ -162,11 +194,10 @@ Natural-language examples:
 원목 20개와 돌 10개 가져와줘 -> get [log 20, stone 10]
 ```
 
-Mining/acquisition phrases such as `캐줘`, `캐와`, and `채굴해줘` are not
-classified as committed-baseline verified behavior by this document. If a local
-working tree already contains a matcher for them, Phase 0 must still prove that
-source and its tests before these examples can move from planned behavior to
-regression coverage.
+Post-implementation note: the reviewed implementation has source and tests for
+GET mining/acquisition phrases such as `캐줘`, `캐와`, and `채굴해줘`. Treat
+those as reviewed GET regression coverage for the branch under review. Future
+GET/EQUIP/DEPOSIT/GIVE action precedence remains a separate phase.
 
 The existing `GET_ITEM` intent can remain the base for single-item get. Multi
 item support requires explicit item-request list parsing and compiler support.
@@ -340,12 +371,11 @@ Review entries require a user policy decision before runtime inclusion:
 연어
 ```
 
-## Current Runtime Alias Snapshot
+## Historical Runtime Alias Baseline Snapshot
 
-This snapshot describes the committed Git blob at
-`java_contract_baseline_commit`, not any uncommitted working-tree alias
-expansion. Do not confuse it with the proposed v2 draft seed or a local
-worktree that has already started alias implementation.
+This snapshot describes the older committed Git blob at
+`c912ff6491711c33dbf2e66320e634196f866ae8`, not the reviewed runtime alias
+file and not the proposed v2 draft seed.
 
 Hash authority for this documentation pass:
 
@@ -356,9 +386,13 @@ Do not mix LF/CRLF-normalized hashes with Git-blob hashes in one snapshot.
 ```
 
 ```text
-snapshot_kind: runtime_current
+snapshot_kind: runtime_baseline
 snapshot_authority: git_blob_bytes
 snapshot_baseline_commit: c912ff6491711c33dbf2e66320e634196f866ae8
+coverage_algorithm_version: 1
+catalog_parser_source_commit: cfc170ac024a46ea943bffcaf289a91ff6bc5ee7
+catalog_parser_source_path: plugins/Minecraft/fabric/chatclef/intent/chatclef_target_catalog.py
+catalog_parser_source_sha256: bca08b987851fb9a27f0dcb06cd95d05c264fd0d276540d0bbd5cfd9d1e50893
 catalog_path: plugins/Minecraft/runtime/chatclef_fabric_1.20.1/CataloguedResources.txt
 catalog_sha256: 4591ae83151dd2643943dfdcbb2e89a53d26de393c583902370c3f4d3c57188a
 alias_source_path: plugins/Minecraft/fabric/chatclef/intent/resources/korean_item_aliases.json
@@ -371,6 +405,42 @@ coverage_percent: 0.68
 catalog_outside_targets: 0
 compact_target_conflicts: 0
 ```
+
+## Reviewed Runtime Alias Baseline Snapshot
+
+This snapshot describes the reviewed runtime alias file at
+`cfc170ac024a46ea943bffcaf289a91ff6bc5ee7`. It is a reviewed baseline, not a
+future moving HEAD snapshot:
+
+```text
+snapshot_kind: runtime_reviewed_baseline
+snapshot_authority: git_blob_bytes
+reviewed_source_commit: cfc170ac024a46ea943bffcaf289a91ff6bc5ee7
+coverage_algorithm_version: 1
+catalog_parser_source_commit: cfc170ac024a46ea943bffcaf289a91ff6bc5ee7
+catalog_parser_source_path: plugins/Minecraft/fabric/chatclef/intent/chatclef_target_catalog.py
+catalog_parser_source_sha256: bca08b987851fb9a27f0dcb06cd95d05c264fd0d276540d0bbd5cfd9d1e50893
+catalog_path: plugins/Minecraft/runtime/chatclef_fabric_1.20.1/CataloguedResources.txt
+catalog_sha256: 4591ae83151dd2643943dfdcbb2e89a53d26de393c583902370c3f4d3c57188a
+alias_source_path: plugins/Minecraft/fabric/chatclef/intent/resources/korean_item_aliases.json
+alias_source_sha256: 9dcf8b8fde97ab60abeceaee7ce0938eda030e80689f1d58d04d5e797b5896df
+catalog_target_count: 591
+alias_count: 19
+covered_target_count: 9
+missing_target_count: 582
+coverage_percent: 1.52
+catalog_outside_targets: 0
+compact_target_conflicts: 0
+```
+
+Do not call both the historical baseline and reviewed baseline
+`runtime_current`. A true current snapshot must be recomputed from HEAD.
+
+Both snapshots use coverage algorithm version `1` and the reviewed catalog
+parser contract at `cfc170a` to interpret their catalog and alias blobs. The
+historical artifact still reads the catalog and alias blobs from `c912ff...`;
+recording the reviewed parser provenance does not claim that the same parser
+implementation existed in the historical commit.
 
 ## Proposed V2 Draft Snapshot
 
@@ -394,6 +464,10 @@ coverage_report_sha256: ba7f8960ec423db86a80fcd283cb46278c86e2b981c0512ffd9f9359
 generator_path: C:\Users\jaewo\Downloads\generate_korean_item_aliases.py
 generator_sha256: f19ce90755c6be3fceafe7e322dc25012b09d6c53e700ad3c4a4b6904b376c3f
 generator_schema_version: 2
+coverage_algorithm_version: 1
+catalog_parser_source_commit: cfc170ac024a46ea943bffcaf289a91ff6bc5ee7
+catalog_parser_source_path: plugins/Minecraft/fabric/chatclef/intent/chatclef_target_catalog.py
+catalog_parser_source_sha256: bca08b987851fb9a27f0dcb06cd95d05c264fd0d276540d0bbd5cfd9d1e50893
 ```
 
 The `C:\Users\jaewo\Downloads\...` paths above are historical provenance for
@@ -525,25 +599,26 @@ Python may still canonicalize Korean recipient phrases to `give Steve diamond
 1` because that emits the required explicit count.
 
 Java accepted grammar and Python canonical serialization are separate
-contracts. Python natural-language compiler output should be deterministic:
+contracts. Current GET output and planned Phase outputs should be documented
+separately:
 
 ```text
-GET:
+Current GET:
   always emit an explicit count, including default one-count requests
   다이아몬드 가져와줘 -> get diamond 1
 
-GIVE:
+Planned Phase 6 GIVE:
   always emit an explicit count, including default one-count requests
   Steve에게 다이아몬드 줘 -> give Steve diamond 1
 
-specific DEPOSIT:
+Planned Phase 5 specific DEPOSIT:
   emit an explicit count only after Korean quantity policy resolves the count
   다이아몬드 2개 넣어줘 -> deposit diamond 2
 
-bare DEPOSIT:
+Planned Phase 5 bare DEPOSIT:
   emit exactly deposit
 
-multi-item GET:
+Planned Phase 7 multi-item GET:
   use brackets, separate entries with comma-space, emit every count explicitly,
   merge duplicate canonical targets by summing counts, and keep the first
   occurrence position for the merged target
@@ -573,7 +648,7 @@ tests are implemented, pass, and no unresolved contract remains.
 | player name syntax policy | Java treats username as a string and performs loaded-player validation at runtime; `ArgParser` treats `#` as a comment delimiter | `GiveCommand.java`; `Arg.java`; `ArgParser.java` | Python rejects empty names, whitespace, line breaks, `#`, and DSL separators; Java owns actual loaded-player validation | `tests/minecraft_chatclef/lifecycle/test_item_action_routing_status.py::test_player_name_policy_is_minimal_syntax_only`; assert injection-shaped names, including `#` comment truncation attempts, reject and ordinary names pass to Java-owned validation |
 | player loaded validation | runtime rejects if `EntityTracker.isPlayerLoaded(username)` is false | `GiveCommand.java` | Python may syntax-validate names, but runtime loaded-player validation remains Java-owned | `tests/minecraft_chatclef/lifecycle/test_item_action_routing_status.py::test_loaded_player_validation_is_not_claimed_by_python`; assert Python does not claim loaded-player success |
 | prefix insertion | Fabric dispatcher trims command and prepends current ChatClef prefix only if missing | `FabricChatClefCommandDispatcher.java`; `CommandExecutor.java` | Python compiler remains prefixless | `tests/minecraft_chatclef/command_catalog/test_java_item_command_contract.py::test_bridge_dispatcher_owns_prefix_insertion`; assert Python emits `get diamond 1`, not `@get diamond 1` |
-| Java contract provenance | documented `java_contract_baseline_commit` and Java source SHA-256 values must match the current source before Python contract fixtures are trusted | `GetCommand.java`; `EquipCommand.java`; `DepositCommand.java`; `GiveCommand.java`; `FabricChatClefCommandDispatcher.java`; `ItemList.java`; `Arg.java`; `ArgParser.java` | stop Phase 0 contract validation if provenance drifts | `tests/minecraft_chatclef/command_catalog/test_java_item_command_contract_provenance.py::test_java_contract_source_hashes_match_documented_baseline`; assert baseline commit and all documented source hashes match |
+| Java contract provenance | the strategy-owned `reviewed_source_commit`, Git-blob SHA-256 registry, activation chains, and HEAD-drift checks must match before Python contract fixtures are trusted | `chatclef-korean-test-strategy.md`; reviewed Java source registry | stop Phase 0 contract validation if reviewed provenance or HEAD drift fails | `tests/minecraft_chatclef/command_catalog/test_java_item_command_contract_provenance.py::test_java_contract_source_hashes_match_documented_baseline`; assert reviewed commit provenance and HEAD source hashes match the strategy-owned artifact |
 | contextual policy non-flattening | contextual command policies are not concrete item aliases | `korean_item_aliases.json`; default/contextual policy source | keep `잡템`, `갑옷`, armor-set shortcuts, `bare_deposit`, and `full_armor_set_shortcut` out of the flat runtime alias map | `tests/minecraft_chatclef/alias_contract/test_korean_alias_generation_contract.py::test_contextual_policy_entries_are_not_flattened_into_item_aliases`; assert contextual keys and pseudo-policy values are absent from concrete runtime item entries |
 
 Minimal Python player-name validation blocks only structure-breaking input.
@@ -874,6 +949,8 @@ Generation reports should record:
 
 ```text
 catalog SHA-256
+coverage algorithm version
+catalog parser source commit, path, and SHA-256
 ko_kr.json SHA-256
 generator schema version
 curated policy SHA-256
@@ -881,6 +958,24 @@ default policy SHA-256
 canonicalization policy SHA-256
 item-command target policy SHA-256
 ```
+
+The production catalog parser also requires these baseline targets:
+
+```text
+cooked_beef
+diamond_axe
+diamond_pickaxe
+gold_ingot
+golden_axe
+iron_ingot
+iron_shovel
+log
+netherite_sword
+wooden_axe
+```
+
+A generated catalog or coverage artifact fails if any required baseline target
+is missing, even when the total target count remains `591`.
 
 Generated output should be deterministic. If `generated_at` exists, exclude it
 from the byte-identical runtime JSON body or place it only in a report.
@@ -961,15 +1056,14 @@ Recommended order when code changes are later approved:
 2. Phase 1 - define generated, curated, default-policy, and canonicalization
    sources; finish generator, validator, coverage classification, deterministic
    output, and compact-collision checks.
-3. Phase 2 - expand aliases for the committed GET path while preserving the
-   current parser, resolver priority, compiler shape, and FOOD/MEAT/GOTO/FOLLOW
-   regressions. Korean mining/acquisition verbs are not committed-baseline
-   regressions unless Phase 0 proves an existing implementation source.
-4. Phase 3 - add or validate Korean mining/acquisition verbs as a separate
-   action-matching contract, then generalize action precedence across GET,
-   EQUIP, DEPOSIT, and GIVE with a shared action matcher, resolved action
-   model, command schemas, resolution statuses, submission outcomes, and
-   single-pass translation boundaries.
+3. Phase 2 - expand aliases for the current GET path while preserving the
+   current parser, resolver priority, compiler shape, FOOD/MEAT/GOTO/FOLLOW
+   regressions, and current GET mining/acquisition regressions.
+4. Phase 3 - generalize action precedence across GET, EQUIP, DEPOSIT, and GIVE
+   with a shared action matcher, resolved action model, command schemas,
+   resolution statuses, submission outcomes, and single-pass translation
+   boundaries. This phase must not reclassify already-supported GET
+   mining/acquisition phrases as future-only behavior.
 5. Phase 4 - add EQUIP support with closed full-set shortcut mapping and
    explicit equipment capability checks.
 6. Phase 5 - add DEPOSIT support with frozen bare/specific mode behavior and
@@ -992,7 +1086,7 @@ Each phase must satisfy its exit criteria before the next command family starts.
 | --- | --- |
 | Phase 0 | every grammar and capability row has source evidence, Python policy, concrete test file/function/assertion, and implemented passing contract tests |
 | Phase 1 | generated from actual catalog sources; catalog-outside targets `0`; compact conflicts `0`; deterministic output; source hashes recorded |
-| Phase 2 | committed GET alias expansion passes focused alias-only tests; GET/FOOD/MEAT/GOTO/FOLLOW regressions pass; mining/acquisition verbs remain planned unless source-proven in Phase 0 |
+| Phase 2 | committed GET alias expansion passes focused alias-only tests; GET/FOOD/MEAT/GOTO/FOLLOW regressions pass; reviewed cfc170a mining/acquisition cases remain green, while only new verb forms require separate approval |
 | Phase 3 | Korean GET mining/acquisition verb tests pass as source-proven existing behavior or newly approved implementation work; cross-command action precedence tests for GET/EQUIP/DEPOSIT/GIVE pass separately from alias-only tests; resolution status and submission status are separated; exactly-once tests pass |
 | Phase 4 EQUIP | full-set shortcuts and explicit equipment capability tests pass; unsupported equipment targets reject explicitly |
 | Phase 5 DEPOSIT | no-count, bare, all, and specific deposit policies are frozen and tested |
@@ -1054,7 +1148,7 @@ Phase 2 GET alias expansion:
 돌 64개 가져와줘 -> get stone 64
 석탄 구해줘 -> get coal 1
 
-GET acquisition / mining matcher planned or source-proven cases:
+Reviewed implementation GET acquisition / mining matcher cases:
 다이아몬드 캐줘 -> get diamond 1
 석탄 캐와 -> get coal 1
 레드스톤 채굴해줘 -> get redstone 1
@@ -1066,11 +1160,10 @@ Future Phase 3 cross-command action precedence:
 Steve에게 다이아몬드 줘 -> GIVE
 ```
 
-Do not call these mining/acquisition phrases committed-baseline regressions
-unless Phase 0 proves the implementation source and passing tests. If the
-committed baseline lacks `캐줘`, `캐와`, or `채굴해줘` support, classify this as
-separate implementation or restoration work. Alias expansion and action
-precedence are separate risks.
+Do not move these reviewed GET mining/acquisition phrases back into a
+future-only section. Historical baseline notes for `c912ff...` must stay
+separate from current regression coverage. Alias expansion and cross-command
+action precedence are still separate risks.
 
 Routing and lifecycle:
 
@@ -1288,10 +1381,12 @@ resolution and submission status separation:
   which statuses fall through, reject, ask for clarification, or submit
 
 source provenance:
-  catalog, language file, generator, curated policy, and default policy hashes
+  catalog, coverage algorithm, catalog parser, language file, generator,
+  curated policy, and default policy hashes
 
-Java contract provenance:
-  java_contract_baseline_commit and Java contract source hashes
+Java contract and activation provenance:
+  owned by chatclef-korean-test-strategy.md; includes reviewed commit,
+  Git-blob source hashes, full Fabric/Mixin activation chain, and HEAD drift
 
 deterministic output:
   identical source inputs produce byte-identical runtime JSON
@@ -1303,157 +1398,62 @@ no wire payload expansion:
   action resolution model remains Python-internal
 ```
 
-Current Java contract source snapshot for this documentation pass:
+Current Java contract and activation provenance is intentionally not duplicated
+in this design plan. The authoritative reviewed source registry, Git-blob
+SHA-256 values, full Fabric/Mixin activation chain, item-command source list,
+and HEAD-drift assertions live in:
 
-```json
-{
-  "java_contract_baseline_commit": "c912ff6491711c33dbf2e66320e634196f866ae8",
-  "java_contract_sources": {
-    "plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/adris/altoclef/commands/GetCommand.java": "sha256:4b49e3d4569c3b8843c7a24aab2a8dd5976b32b5ec1288629991eed13cddef69",
-    "plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/adris/altoclef/commands/EquipCommand.java": "sha256:613ba1faec1a9625dd7042675fc660fdc41f478fef2c1718265bc5683855a00a",
-    "plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/adris/altoclef/commands/DepositCommand.java": "sha256:d4d598c6d1f2f3465a18f0a150b8294f621f3248c35dbcd97896ac75209f09b5",
-    "plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/adris/altoclef/commands/GiveCommand.java": "sha256:c02c59de782c1f20fab7b004c3dc173c08e3f8ffa5e1e4052744b811ab67cf85",
-    "plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/FabricChatClefCommandDispatcher.java": "sha256:458edb3b1639e4a7db282f61ae743d780575a33a18bedcfc1b78bf12e3178f7c",
-    "plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/adris/altoclef/commandsystem/ItemList.java": "sha256:cc54ee78aa933ddc29f161131b6c80165ebcd7b1330b6038ca37c1ad6d193c93",
-    "plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/adris/altoclef/commandsystem/Arg.java": "sha256:f319d8751f9b210536ffbee9d353642f2e1a08a50e141ee41a1473bc10f4a382",
-    "plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/adris/altoclef/commandsystem/ArgParser.java": "sha256:657ed1aaa019f043b32740eeb69d180f1c38c7ac6f6611befa7a9c5b9f919efb"
-  }
-}
+```text
+plugins/Minecraft/docs/chatclef-korean-test-strategy.md
 ```
+
+The strategy must include at least the manifest, `altoclef.mixins.json`,
+`EntryMixin`, `EventBus`, `TitleScreenEntryEvent`, `AltoClef`,
+`AltoClefCommands`, `CommandExecutor`, command implementation/name sources, and
+the LAVI overlay entrypoint/registrar/command sources. This plan must not carry a
+second copy of those hashes because duplicated source snapshots drift.
 
 ## ChatGPT Handoff Summary
 
 Use this when asking ChatGPT to continue reviewing the plan:
 
 ```text
-Codex documented the v2 Korean ChatClef item-action alias plan in:
+Codex/ChatGPT reconciled the v2 Korean ChatClef item-action alias plan in:
 
 plugins/Minecraft/docs/chatclef-korean-item-action-alias-v2-plan.md
 
-Completed documentation decisions:
+Authority split:
 
-- `korean_item_aliases.json` remains a flat concrete exact-compact item lexicon.
-- equip armor-set shortcuts, deposit modes, give recipients, quantities, and
-  routing outcomes are command-specific policy, not shared item aliases.
-- Python emits prefixless DSL only, such as `get diamond 10`,
-  `equip iron_chestplate`, `deposit diamond 2`, and `give Steve diamond 3`.
-- Java, bridge DTOs, wire payloads, and the ChatClef / AltoClef engine remain
-  unchanged by this plan.
-- optional-count notation is frozen as `get <item> [count]`,
-  `deposit <item> [count]`, Java Butler/current-user `give <item> [count]`,
-  and Java explicit-recipient `give <username> <item> <count>`.
-- player-name policy is minimal Python syntax/injection validation; Java owns
-  loaded-player validation.
-- resolution statuses and submission statuses are separate.
-- `ItemActionResolution` is Python-internal and is not a bridge DTO.
-- `connected` means active Fabric WebSocket session only, not world/player or
-  ChatClef executor readiness.
-- GET acquisition/mining matcher behavior is not committed-baseline verified
-  unless Phase 0 proves the implementation source and focused tests. Future
-  Phase 3 must treat `캐줘` / `캐와` / `채굴해줘` as separate source-proven or
-  newly approved implementation work before cross-command precedence.
-- Phase 2 alias expansion must not call mining/acquisition phrases existing
-  regressions unless Phase 0 proves they exist in the committed baseline.
-- user-facing coverage uses `resolved_canonical_user_facing_targets /
-  canonical_user_facing_target_total`, where
-  `canonical_user_facing_targets = canonicalize(direct union generic_policy)
-  minus canonicalize(command_internal_only)`. Legacy duplicates are reported as
-  `legacy_target -> canonical_target` mappings, not subtracted again, and all
-  coverage set operations use canonical target IDs.
-- `targets_resolvable_from_korean` contains concrete canonical catalog targets
-  only; command modes, shortcut tokens, recipients, quantities, and routing
-  statuses never count as item coverage.
-- bare `deposit` semantics are source-backed as excluding
-  `PlayerSlot.ARMOR_SLOTS` and `ToolItem` stacks, not excluding every armor
-  item by type.
-- unqualified meat/fish cooked defaults are marked `proposed_not_frozen` until
-  the user freezes that UX policy.
-- multi-item GET separates Java parser grammar from Python canonical
-  serialization. Java duplicate targets sum counts; Python canonical output
-  emits explicit counts, comma-space separators, and first-occurrence merged
-  target order.
-- proposed v2 draft snapshot records draft alias, default policy, target
-  policy, validation report, coverage report, and generator hashes.
-  Generation provenance also requires canonicalization policy and item-command
-  target policy hashes. Download paths are historical provenance only; Phase 1
-  must define repository-owned source paths under
-  `plugins/Minecraft/tools/chatclef_aliases/sources/`.
-- Java contract provenance uses full repository-relative source paths rather
-  than basename-only keys.
-- exactly-once assertions now use strong path-specific counts, with
-  `submit count <= 1` kept only as a common safety invariant.
-- Phase exit criteria and Java source provenance are recorded.
+- this plan owns Korean item/action design and phase order
+- chatclef-korean-test-strategy.md owns tests, artifacts, source/hash authority,
+  coverage algorithm/parser provenance, CI, and live safety
+- chatclef-korean-post-review-merge-blockers.md owns current merge status
 
-Current coverage wording:
+Frozen design boundaries:
 
-- actual runtime alias resource:
-  `plugins/Minecraft/fabric/chatclef/intent/resources/korean_item_aliases.json`
-- actual runtime aliases: 11 aliases
-- actual runtime covered targets: 4
-- actual runtime missing targets: 587
-- actual runtime raw coverage: 0.68%
-- proposed v2 alias draft: 191 aliases
-- proposed v2 covered targets: 167
-- proposed v2 missing targets: 424
-- proposed v2 raw coverage: 28.26%
-- proposed v2 catalog-outside targets: 0
-- proposed v2 compact target conflicts: 0
+- korean_item_aliases.json remains a flat concrete exact-compact item lexicon
+- equip shortcuts, deposit modes, give recipients, quantities, and routing
+  outcomes remain command-specific policy
+- Python emits prefixless DSL only
+- Java, bridge DTOs, wire payloads, and ChatClef/AltoClef engine code remain
+  unchanged by this plan
+- current reviewed GET mining/acquisition phrases at cfc170a remain regressions
+- EQUIP, DEPOSIT, GIVE, and multi-item GET remain phased future work
+- accepted commands are never automatically replayed
 
-The proposed v2 draft is not automatically copied into the runtime resource.
-Runtime coverage and proposed v2 draft coverage must remain separate snapshots.
+Coverage state:
 
-Committed-baseline GET examples:
+- historical c912ff runtime baseline: 11 aliases, 4 covered targets, 587 missing, 0.68%
+- reviewed cfc170a runtime baseline: 19 aliases, 9 covered targets, 582 missing, 1.52%
+- proposed v2 seed: 191 aliases, 167 covered targets, 424 missing, 28.26%
+- all accepted coverage artifacts use algorithm version 1 and record catalog
+  parser commit/path/hash
+- the production parser requires the ten documented baseline targets
 
-- 철괴 가져와줘 -> get iron_ingot 1
-- 철 주괴 10개 가져와줘 -> get iron_ingot 10
-- 금괴 가져와줘 -> get gold_ingot 1
-- 구운 소고기 가져와줘 -> get cooked_beef 1
-- 원목 가져와줘 -> get log 1
+Phase 0 is not complete until the focused tests, source-backed artifacts,
+capability rules, CI scope, and merge gates in the test strategy and
+post-review document are implemented and green.
 
-Still-open Phase 0 contracts:
-
-- Planned Phase 0 tests must be implemented in the responsibility-owned paths:
-  `tests/minecraft_chatclef/command_catalog/`,
-  `tests/minecraft_chatclef/alias_contract/`, and
-  `tests/minecraft_chatclef/lifecycle/`.
-- Do not add flat wrapper tests that import and re-export those test functions.
-- GET no-replay tests must assert `total submit count == 1` and
-  `resubmit count == 0` after accepted + completed, failed, cancelled,
-  deadline exceeded, unknown, disconnect, and duplicate terminal result cases.
-- Bare deposit tests must distinguish equipped armor slots, spare armor in
-  inventory, `ToolItem`, food, torch, fuel, ingot, and block categories against
-  the source predicate.
-- Multi-item GET tests must cover Java grammar and Python canonical output
-  separately, including duplicate-target merge and invalid empty/nested lists.
-- Java contract provenance tests must fail when baseline commit or documented
-  source hashes drift.
-- Contextual policy tests must prove `잡템`, `갑옷`, armor-set shortcuts,
-  `bare_deposit`, and `full_armor_set_shortcut` are not flattened into concrete
-  runtime item aliases.
-- Action-precedence tests should reject or clarify `다이아몬드 입어줘`,
-  `철 입어줘`, and `금 입어줘` unless an armor-set context is present.
-- Count validation tests must reject zero, negative, and non-integer counts and
-  keep duplicate multi-item GET sums Java-compatible. The Python compiler
-  allows `1..2147483647`, rejects single-count overflow before submission, and
-  rejects duplicate-target sum overflow before emission.
-- DEPOSIT/GIVE capability `verify` rows are not closed yet. Representative
-  category checks must become exact allowlists, verified category rules,
-  canonicalized concrete target rules, or explicit unsupported rules.
-- A representative target success must not automatically allow every target in
-  the same broad category.
-- Phase 0 is complete only when planned tests are implemented, all focused
-  tests pass, capability verify count is `0`, and unresolved runtime contract
-  count is `0`.
-
-Blocked feature implementation:
-
-- Do not start EQUIP, DEPOSIT, or GIVE natural-language feature implementation
-  until Phase 0 capability and routing contracts are implemented and passing.
-- Do not change Java, bridge DTOs, wire payloads, ChatClef / AltoClef engine
-  code, Forge MineMind, build behavior, Minecraft runtime behavior, or automatic
-  command replay as part of this plan.
-
-After Phase 0 is actually complete, implementation may proceed in phases:
-alias generator, existing GET expansion, shared action model, EQUIP, DEPOSIT,
-GIVE, multi-item GET, then router lifecycle integration.
+Do not start EQUIP, DEPOSIT, or GIVE natural-language implementation before
+Phase 0 is complete.
 ```

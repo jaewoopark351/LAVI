@@ -227,6 +227,15 @@ snapshots, command support matrix rules, and opt-in live test tiers, read:
 plugins/Minecraft/docs/chatclef-korean-test-strategy.md
 ```
 
+For the post-implementation Korean ChatClef merge-blocker review, including
+Java contract hash authority, CI coverage, quantity validation,
+TranslationResultDTO safety, live result correlation, and alias snapshot
+follow-up, read:
+
+```text
+plugins/Minecraft/docs/chatclef-korean-post-review-merge-blockers.md
+```
+
 For upstream-derived engine divergence, read:
 
 ```text
@@ -266,6 +275,9 @@ Korean item action alias v2 planning:
 
 Korean ChatClef test strategy:
   chatclef-korean-test-strategy.md
+
+Korean ChatClef post-review merge blockers:
+  chatclef-korean-post-review-merge-blockers.md
 
 Engine reference:
   chatclef-structure-overview.md
