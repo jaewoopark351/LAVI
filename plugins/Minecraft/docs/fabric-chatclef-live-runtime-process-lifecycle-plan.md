@@ -65,11 +65,11 @@ working tree: dirty
 | --- | --- | --- |
 | live/mutating 명시적 opt-in | implemented in current dirty working tree | HEAD 포함 여부와 별개 |
 | submitted request ID matching | implemented in current dirty working tree | stale result 차단 포함 |
-| backend/instance/world preflight | partially implemented | current dirty test 기준 |
-| 지정된 `latest.log` fallback | partially implemented | strict fail-closed 보강 필요 |
-| Windows listener/process identity preflight | planned | read-only probe만 계획; 자동 종료 기능은 범위 밖이며 수동 종료는 recovery runbook에서 별도 승인 필요 |
-| bridge `connected`/`lifecycle_state` 직접 gate | planned | current dirty helper에는 완전하지 않음 |
-| replacement decode 자동 통과 금지 | known implementation gap | diagnostics 전용으로 제한해야 함 |
+| backend/instance/world preflight | implemented in current dirty working tree | test-only runner 기준; HEAD 포함 여부와 별개 |
+| 지정된 `latest.log` fallback | implemented in current dirty working tree | test-only shared snapshot과 strict UTF-8/CP949 판정 |
+| Windows listener/process identity preflight | implemented in current dirty working tree | read-only probe만 구현; 자동 종료 기능은 범위 밖이며 수동 종료는 recovery runbook에서 별도 승인 필요 |
+| bridge `connected`/`lifecycle_state` 직접 gate | implemented in current dirty working tree | command 직전 idle과 함께 재확인 |
+| replacement decode 자동 통과 금지 | implemented in current dirty working tree | 두 strict decoder가 모두 실패하면 fail closed |
 | status별 `result_reason` 계약 | unverified | strategy에서 별도 확정 필요 |
 | production single-instance guard | out of scope | 별도 설계와 승인 필요 |
 

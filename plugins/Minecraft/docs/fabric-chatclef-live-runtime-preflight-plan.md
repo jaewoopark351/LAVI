@@ -1,4 +1,5 @@
 <!-- 20260816_kpopmodder: Added an implementation-status-aware, fail-closed preflight plan for Fabric ChatClef live mutating tests and Minecraft latest.log fallback. -->
+<!-- 20260817_kpopmodder: Documented the user-approved elevated retry boundary for antivirus-blocked read-only Windows probes. -->
 
 # Fabric ChatClef Live Runtime Preflight Plan
 
@@ -51,13 +52,13 @@ manager를 만들지 않는다.
 | --- | --- | --- |
 | live/mutating opt-in | implemented in current dirty working tree | HEAD 포함 또는 테스트 완료를 뜻하지 않음 |
 | submitted request ID matching | implemented in current dirty working tree | stale terminal result 차단 포함 |
-| backend/instance/world helper | partially implemented | current dirty runtime test 기준 |
-| 명시된 `latest.log` fallback | partially implemented | strict decode와 session 계약 보강 필요 |
-| Windows listener/process identity | planned | process를 종료하지 않는 read-only probe |
-| selected Gradio endpoint와 `4316` same-PID gate | planned | current dirty helper에는 없음 |
-| `connected`/`lifecycle_state` direct gate | planned | status는 제공하지만 preflight에서 완전 사용하지 않음 |
-| `active_request_id == null` idle gate | partially implemented | command 전송 직전 재확인 필요 |
-| replacement decode 자동 통과 금지 | known implementation gap | diagnostics 전용으로 제한해야 함 |
+| backend/instance/world helper | implemented in current dirty working tree | test-only runner 기준; HEAD 포함 또는 commit 완료를 뜻하지 않음 |
+| 명시된 `latest.log` fallback | implemented in current dirty working tree | shared stable snapshot과 strict UTF-8/CP949 판정 |
+| Windows listener/process identity | implemented in current dirty working tree | process를 종료하지 않는 read-only probe |
+| selected Gradio endpoint와 `4316` same-PID gate | implemented in current dirty working tree | fallback 범위의 별도 verified LAVI도 차단 |
+| `connected`/`lifecycle_state` direct gate | implemented in current dirty working tree | command 직전 status 재확인 포함 |
+| `active_request_id == null` idle gate | implemented in current dirty working tree | command 직전 status 재확인 포함 |
+| replacement decode 자동 통과 금지 | implemented in current dirty working tree | strict decode 실패 시 identity 판정에 사용하지 않음 |
 | status별 `result_reason` 계약 | unverified | test strategy에서 별도 확정 |
 | production DTO/Java payload identity 확장 | out of scope | instance/world를 payload에 추가하지 않음 |
 
@@ -151,7 +152,7 @@ command submission 후 success 판정은
 
 ## 7. Windows listener/process identity preflight
 
-상태: `[planned]`.
+상태: `[implemented in current dirty working tree]`.
 
 이 probe는 process를 종료하지 않고 다음 정보만 읽는다.
 
@@ -190,9 +191,31 @@ fail closed한다. process probe는 실제 사용자 Python/Java process를 종�
 않으며, offline test가 만든 loopback fixture만 test teardown에서 정확한 PID로
 정리할 수 있다.
 
+### 7.1 AVG 또는 권한 차단 시 운영자 인계
+
+Windows listener/process probe가 AVG Behavior Shield 탐지(예:
+`IDP.HELU.PSE88`) 또는 접근 거부로 실행되지 않으면 자동 preflight는 다음 계약을
+따른다.
+
+1. 자동으로 관리자 권한을 요청하거나 elevated child process를 생성하지 않는다.
+2. AVG, Behavior Shield 또는 다른 보안 기능을 끄지 않으며 광범위한 예외를 추가하지
+   않는다.
+3. `process_identity` 단계에서 `skip` 또는 fail-closed 결과를 반환하고
+   `command_request`를 전송하지 않는다.
+4. 차단된 실행 파일, 탐지 이름, 읽기 전용 명령의 목적과 종료 상태만 운영자에게
+   보고한다. encoded payload 전체를 증거로 재사용하거나 자동 allowlist 대상으로
+   만들지 않는다.
+5. 사용자가 해당 재시도를 명시적으로 승인한 경우에만 recovery runbook의
+   "AVG 또는 권한 차단 시 관리자 read-only 재시도" 절차로 인계한다.
+
+관리자 권한은 Windows 조회 권한 문제를 구분하기 위한 운영자 승인 재시도 수단일
+뿐, 백신 탐지를 우회한다는 보장이 아니다. 관리자 창에서도 AVG가 다시 차단하면
+재시도하지 않고 중단한다. PowerShell 의존성을 제거하는 구현은 별도 코드 변경
+승인과 검증이 필요한 후속 작업이며 이 문서는 그 변경을 승인하지 않는다.
+
 ## 8. bridge와 idle gate
 
-상태: `[planned/partially implemented]`.
+상태: `[implemented in current dirty working tree]`.
 
 runtime status에서 최소한 다음을 요구한다.
 
@@ -284,7 +307,7 @@ stop marker와 multi-session 선택 규칙은 fixture로 검증되기 전 자동
 
 ## 11. fail-closed log fallback 계약
 
-상태: `[partially implemented / proposed hardening]`.
+상태: `[implemented in current dirty working tree]`.
 
 1. `LAVI_MINECRAFT_INSTANCE_LOG_DIR`가 명시되지 않으면 사용하지 않는다.
 2. wildcard로 다른 CurseForge instance를 검색하지 않는다.
@@ -304,9 +327,9 @@ stop marker와 multi-session 선택 규칙은 fixture로 검증되기 전 자동
 13. multiple session 또는 stop 상태를 안정적으로 판정할 수 없으면 자동 통과하지
     않는다.
 
-현재 dirty working-tree code에 replacement decode가 자동 판정 경로로 남아 있다면
-이는 `known implementation gap`이다. 이 문서는 코드 수정 승인이 아니며, 별도
-구현 단계에서 strict fail-closed로 맞춰야 한다.
+현재 dirty working-tree의 test-only parser는 전체 snapshot에 strict UTF-8을 먼저
+적용하고 실패하면 strict CP949를 적용한다. 두 decoder가 모두 실패하면 identity를
+만들지 않으며 replacement decode 결과를 자동 통과 근거로 사용하지 않는다.
 
 ## 12. bounded policy 값
 

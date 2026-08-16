@@ -1,4 +1,5 @@
 <!-- 20260816_kpopmodder: Added an evidence-bounded Windows runbook for identifying and manually recovering hidden LAVI processes without broad process termination. -->
+<!-- 20260817_kpopmodder: Added a bounded, user-approved elevated retry procedure for antivirus-blocked read-only PowerShell probes. -->
 
 # Fabric ChatClef Hidden LAVI Recovery Runbook
 
@@ -331,8 +332,29 @@ $descendantsBefore = @(Get-ProcessDescendants -RootProcessId $laviPid)
 $descendantsBefore | Sort-Object Depth, ProcessId | Format-List
 ```
 
+### 7.5 AVG 또는 권한 차단 시 관리자 read-only 재시도
 
-### 7.5 종료 직전 TOCTOU 재검증
+7.1~7.4의 읽기 전용 PowerShell 조사가 AVG Behavior Shield 탐지(예:
+`IDP.HELU.PSE88`) 또는 접근 거부로 실행되지 않을 때에만 이 절차를 사용한다.
+
+1. 차단된 명령이 listener, process identity, ancestor 또는 descendant를 읽기만
+   하는지 다시 확인한다. `taskkill`, `Stop-Process`, `/T`, `/F`, 파일 쓰기, 설정
+   변경, registry 변경 또는 보안 기능 변경이 포함되면 이 절차를 사용하지 않는다.
+2. 실행할 평문 명령과 조회 목적을 사용자에게 먼저 보여 주고 관리자 실행에 대한
+   명시적 승인을 받는다.
+3. 승인 후 보이는 관리자 PowerShell 창을 한 번 열고, `-EncodedCommand` 대신
+   검토된 동일 read-only 명령을 평문으로 한 번만 실행한다.
+4. UAC 승인 여부, AVG 탐지 이름, 명령의 성공 또는 차단 결과와 관찰한 PID/port만
+   기록한다. 관리자 실행을 process 종료, Minecraft command 전송 또는 다른 작업의
+   포괄 승인으로 해석하지 않는다.
+5. AVG가 관리자 창에서도 다시 차단하면 즉시 중단한다. AVG/Behavior Shield를
+   비활성화하거나 PowerShell 폴더 전체를 예외 처리하거나 반복 재시도하지 않는다.
+
+자동 test/preflight가 스스로 권한을 올리는 것은 금지한다. 이 절차는 사용자가
+그 시점의 정확한 읽기 전용 명령을 확인하고 승인한 수동 운영 절차이며, 관리자
+권한으로 실행했다는 사실만으로 조회 결과의 LAVI identity가 증명되지는 않는다.
+
+### 7.6 종료 직전 TOCTOU 재검증
 
 처음 조사와 실제 종료 사이에 PID가 재사용될 수 있다. 종료 명령 직전에 다음을
 다시 비교한다.
