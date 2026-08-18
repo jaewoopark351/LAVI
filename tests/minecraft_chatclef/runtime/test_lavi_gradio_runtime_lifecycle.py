@@ -1,26 +1,23 @@
 #20260815_kpopmodder: Add opt-in live runtime checks for Korean ChatClef commands.
+#20260818_kpopmodder: Require fail-closed preflight and structured one-shot observation.
 from __future__ import annotations
 
-import json
-import os
-import time
 import unittest
 
-
-RUNTIME_TESTS_ENABLED = os.environ.get("LAVI_MINECRAFT_RUNTIME_TESTS") == "1"
-MUTATING_RUNTIME_TESTS_ENABLED = (
-    os.environ.get("LAVI_MINECRAFT_RUNTIME_MUTATING") == "1"
+from .preflight.runtime_environment import (
+    load_live_runtime_environment,
 )
-DEFAULT_GRADIO_URL = "http://127.0.0.1:47860"
-DEFAULT_KOREAN_COMMAND = "돌 1개 가져와줘"
-TERMINAL_STATUSES = {
-    "completed",
-    "rejected",
-    "failed",
-    "cancelled",
-    "deadline_exceeded",
-    "unknown",
-}
+from .submission.gradio_runtime_gateway import (
+    LaviGradioRuntimeGateway,
+)
+from .supervised_live_run import (
+    run_supervised_live_command,
+)
+
+
+RUNTIME_ENVIRONMENT = load_live_runtime_environment()
+RUNTIME_TESTS_ENABLED = bool(RUNTIME_ENVIRONMENT["live_opt_in"])
+MUTATING_RUNTIME_TESTS_ENABLED = bool(RUNTIME_ENVIRONMENT["mutating_opt_in"])
 
 
 @unittest.skipUnless(
@@ -30,16 +27,18 @@ TERMINAL_STATUSES = {
 class LaviMinecraftChatClefGradioRuntimeLifecycleTests(unittest.TestCase):
     def setUp(self):
         try:
-            from gradio_client import Client
+            gradio_url = str(RUNTIME_ENVIRONMENT.get("gradio_url") or "")
+            if not gradio_url:
+                raise ValueError("explicit LAVI_GRADIO_URL is required")
+            self.gateway = LaviGradioRuntimeGateway(gradio_url)
         except Exception as error:
-            self.skipTest(f"gradio_client unavailable: {type(error).__name__}: {error}")
-        self.client = Client(
-            os.environ.get("LAVI_GRADIO_URL", DEFAULT_GRADIO_URL),
-            verbose=False,
-        )
+            message = f"live Gradio gateway unavailable: {type(error).__name__}: {error}"
+            if MUTATING_RUNTIME_TESTS_ENABLED:
+                self.fail(message)
+            self.skipTest(message)
 
     def test_runtime_status_reports_connected_bridge(self):
-        status = self._status_payload()
+        status = self.gateway.read_status()
         bridge = self._bridge(status)
         commands = self._commands(status)
 
@@ -58,56 +57,16 @@ class LaviMinecraftChatClefGradioRuntimeLifecycleTests(unittest.TestCase):
         ),
     )
     def test_korean_command_reaches_terminal_result_not_only_accepted(self):
-        initial_status = self._status_payload()
-        initial_commands = self._commands(initial_status)
-        self.assertIsNone(
-            initial_commands.get("active_request_id"),
-            (
-                "live runtime command test requires an idle bridge; "
-                "stop the current ChatClef task manually with @stop first"
-            ),
-        )
-
-        command = os.environ.get(
-            "LAVI_MINECRAFT_RUNTIME_KOREAN_COMMAND",
-            DEFAULT_KOREAN_COMMAND,
-        )
-        submitted = self.client.predict(
-            command=command,
-            api_name="/on_submit_korean_command_click",
-        )
-        submit_result = json.loads(submitted[0])
-        self.assertTrue(submit_result["ok"], submit_result)
-        self.assertEqual("accepted", submit_result["status"]["status"])
-        submitted_request_id = str(submit_result["status"]["request_id"])
-        self.assertTrue(submitted_request_id)
-
-        timeout_sec = float(os.environ.get("LAVI_MINECRAFT_RUNTIME_TIMEOUT_SEC", "60"))
-        poll_sec = float(os.environ.get("LAVI_MINECRAFT_RUNTIME_POLL_SEC", "2"))
-        deadline = time.monotonic() + timeout_sec
-        last_snapshot = {}
-
-        while time.monotonic() < deadline:
-            status = self._status_payload()
-            commands = self._commands(status)
-            last_snapshot = dict(commands)
-            last_result = commands.get("last_result") or {}
-            if _is_matching_terminal_result(last_result, submitted_request_id):
-                self.assertIsNone(commands.get("active_request_id"))
-                data = last_result.get("data") or {}
-                if isinstance(data, dict) and "result_reason" in data:
-                    self.assertTrue(str(data["result_reason"]).strip())
-                return
-            time.sleep(poll_sec)
-
-        self.fail(
-            "live command did not reach a terminal result; "
-            f"last command snapshot={json.dumps(last_snapshot, ensure_ascii=False)}"
-        )
-
-    def _status_payload(self) -> dict[str, object]:
-        result = self.client.predict(api_name="/on_refresh_click_2")
-        return json.loads(result[3])
+        result = run_supervised_live_command(RUNTIME_ENVIRONMENT, self.gateway)
+        preflight = result["preflight"]
+        observation = result["observation"]
+        self.assertEqual("ok", preflight.get("status"), preflight)
+        self.assertEqual("accepted", observation.get("submission_outcome"), observation)
+        self.assertEqual(1, observation.get("gradio_submit_call_count"), observation)
+        self.assertEqual(0, observation.get("automatic_resubmit_count"), observation)
+        self.assertEqual(0, observation.get("automatic_rerun_count"), observation)
+        self.assertIs(True, observation.get("terminal_lifecycle_observed"), observation)
+        self.assertEqual("same_snapshot", observation.get("active_clear_observation"))
 
     def _bridge(self, status: dict[str, object]) -> dict[str, object]:
         bridge = status.get("details")
@@ -121,41 +80,6 @@ class LaviMinecraftChatClefGradioRuntimeLifecycleTests(unittest.TestCase):
         commands = details.get("commands")
         self.assertIsInstance(commands, dict)
         return dict(commands)
-
-
-class LaviMinecraftChatClefRuntimeResultMatchingTests(unittest.TestCase):
-    def test_stale_terminal_result_does_not_match_new_request(self):
-        self.assertFalse(
-            _is_matching_terminal_result(
-                {"request_id": "old-request", "status": "completed"},
-                "new-request",
-            )
-        )
-
-    def test_matching_terminal_result_requires_request_id_and_terminal_status(self):
-        self.assertTrue(
-            _is_matching_terminal_result(
-                {"request_id": "request-1", "status": "completed"},
-                "request-1",
-            )
-        )
-        self.assertFalse(
-            _is_matching_terminal_result(
-                {"request_id": "request-1", "status": "accepted"},
-                "request-1",
-            )
-        )
-
-
-def _is_matching_terminal_result(
-    last_result: object,
-    submitted_request_id: str,
-) -> bool:
-    if not isinstance(last_result, dict):
-        return False
-    if str(last_result.get("request_id") or "") != submitted_request_id:
-        return False
-    return str(last_result.get("status") or "") in TERMINAL_STATUSES
 
 
 if __name__ == "__main__":
