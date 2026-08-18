@@ -8,6 +8,53 @@ from plugins.Minecraft.fabric.chatclef.input import MinecraftChatClefInputRouter
 
 
 class RouterSubmissionPrecheckTests(unittest.TestCase):
+    def test_unambiguous_direct_and_nested_bridge_shapes_still_submit(self):
+        cases = {
+            "direct": _direct_bridge_status(),
+            "nested": _bridge_status(),
+        }
+
+        for name, status_behavior in cases.items():
+            with self.subTest(name=name):
+                extension = _StatusExtension(status_behavior=status_behavior)
+                router = MinecraftChatClefInputRouter(
+                    extension=extension,
+                    log_callback=lambda _message: None,
+                )
+
+                router.route("다이아몬드 캐줘")
+
+                self.assertEqual(1, len(extension.submitted))
+
+    def test_conflicting_direct_and_nested_bridge_objects_never_submit(self):
+        cases = {
+            "backend_conflict": _conflicting_bridge_status(
+                nested_backend_id="forge_minemind",
+            ),
+            "connection_conflict": _conflicting_bridge_status(
+                nested_connected=False,
+                nested_lifecycle_state="disconnected",
+            ),
+        }
+
+        for name, status_behavior in cases.items():
+            with self.subTest(name=name):
+                extension = _StatusExtension(status_behavior=status_behavior)
+                router = MinecraftChatClefInputRouter(
+                    extension=extension,
+                    log_callback=lambda _message: None,
+                )
+
+                decision = router.route("다이아몬드 캐줘")
+
+                self.assertTrue(decision.handled)
+                self.assertEqual(
+                    "minecraft_bridge_status_unavailable",
+                    decision.reason,
+                )
+                self.assertIn("ambiguous bridge objects", decision.response_text)
+                self.assertEqual([], extension.submitted)
+
     def test_unreadable_or_incomplete_status_never_submits(self):
         cases = {
             "missing_status_reader": _NO_STATUS_READER,
@@ -223,6 +270,34 @@ def _bridge_status(
     if include_lifecycle:
         bridge["lifecycle_state"] = lifecycle_state
     return {"details": bridge}
+
+
+def _conflicting_bridge_status(
+    *,
+    nested_backend_id: str = "fabric_chatclef",
+    nested_connected: bool = True,
+    nested_lifecycle_state: str = "connected",
+) -> dict[str, object]:
+    nested_bridge = _bridge_status(
+        backend_id=nested_backend_id,
+        connected=nested_connected,
+        lifecycle_state=nested_lifecycle_state,
+    )["details"]
+    assert isinstance(nested_bridge, dict)
+    nested_bridge["commands"] = {"active_request_id": None}
+    return {
+        "backend_id": "fabric_chatclef",
+        "enabled": True,
+        "connected": True,
+        "lifecycle_state": "connected",
+        "details": nested_bridge,
+    }
+
+
+def _direct_bridge_status() -> dict[str, object]:
+    bridge = _bridge_status()["details"]
+    assert isinstance(bridge, dict)
+    return bridge
 
 
 if __name__ == "__main__":

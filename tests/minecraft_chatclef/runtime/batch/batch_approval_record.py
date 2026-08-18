@@ -17,17 +17,19 @@ def validate_batch_approval_record(
     expected_commands: Sequence[str],
     environment: Mapping[str, object],
 ) -> tuple[list[dict[str, str]], str]:
-    if not _text(approval.get("approval_source")):
+    if not _exact_text(approval.get("approval_source")):
         return [], "batch approval_source is required"
     if approval.get("one_shot") is not True:
         return [], "batch approval must set one_shot=true for every listed command"
     if approval.get("automatic_rerun_disabled") is not True:
         return [], "batch approval must confirm automatic_rerun_disabled=true"
     for approval_field, environment_field in APPROVAL_TARGET_FIELDS:
-        approved = _text(approval.get(approval_field))
-        expected = _text(environment.get(environment_field))
+        approved = _exact_text(approval.get(approval_field))
+        expected = _exact_text(environment.get(environment_field))
         if not approved:
             return [], f"batch approval field is missing: {approval_field}"
+        if not expected:
+            return [], f"batch environment field is invalid: {environment_field}"
         if approved != expected:
             return [], f"batch approval field mismatch: {approval_field}"
     raw_commands = approval.get("commands")
@@ -41,12 +43,15 @@ def validate_batch_approval_record(
     normalized: list[dict[str, str]] = []
     invocation_ids: set[str] = set()
     for index, expected_command in enumerate(expected_commands):
+        exact_expected_command = _exact_text(expected_command)
+        if not exact_expected_command:
+            return [], f"fixed batch command {index} is invalid"
         raw_step = raw_commands[index]
         if not isinstance(raw_step, Mapping):
             return [], f"batch approval command {index} must be an object"
-        command = _text(raw_step.get("command"))
-        invocation_id = _text(raw_step.get("invocation_id"))
-        if command != expected_command:
+        command = _exact_text(raw_step.get("command"))
+        invocation_id = _exact_text(raw_step.get("invocation_id"))
+        if command != exact_expected_command:
             return [], f"batch approval command mismatch at index {index}"
         if not invocation_id:
             return [], f"batch invocation {index} is blank"
@@ -57,5 +62,7 @@ def validate_batch_approval_record(
     return normalized, ""
 
 
-def _text(value: object) -> str:
-    return str(value or "").strip()
+def _exact_text(value: object) -> str:
+    if type(value) is not str or not value or value != value.strip():
+        return ""
+    return value

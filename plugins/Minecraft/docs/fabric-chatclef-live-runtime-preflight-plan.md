@@ -272,9 +272,19 @@ explicit live/mutating opt-in
   -> runtime status의 instance/world 사용 가능 여부 확인
   -> 누락된 값만 명시된 Minecraft latest.log fallback으로 보완
   -> expected instance/world와 정확히 비교
-  -> command submit 직전 status, listener ownership과 approval tuple 재검증
-  -> 모두 통과한 뒤에만 /on_submit_korean_command_click 1회 호출
+  -> approved command와 tuple을 immutable live-run ticket으로 고정
+  -> one-shot guard claim
+  -> actual gateway URL, status, listener ownership, approval tuple과 ticket을 재검증
+  -> 모두 통과한 직후 ticket.command로 /on_submit_korean_command_click 1회 호출
 ```
+
+<!-- 20260819_kpopmodder: Closed the guard-to-submit TOCTOU and gateway identity gap. -->
+
+최종 재검증은 guard claim 뒤에 수행한다. guard 또는 다른 callback이 mutable
+environment를 바꾸더라도 submit은 environment의 command를 다시 읽지 않고 ticket에
+고정된 command만 사용한다. actual gateway object가 가리키는 loopback URL도 승인된
+URL과 initial/final 두 경계에서 같아야 한다. 이 최종 재검증과 submit 사이에는 다른
+callback, approval normalization 또는 command translation을 삽입하지 않는다.
 
 Audited baseline 4239c23 test가 직접 보장하는 one-shot 범위는 test body의 Gradio
 submit API 호출 한 번이다. 그 아래 server/adapter가 Fabric `command_request`를
@@ -891,9 +901,10 @@ LAVI, Minecraft, Python 또는 Java process를 종료하지 않는다.
 11. stop/session marker가 unverified이면 운영자가 실제 월드 진입을 별도 확인한다.
 12. gameplay effect를 판정하려면 command 전 inventory/world/location baseline과
     prohibited effect를 먼저 기록한다.
-13. command submit 직전에 status, listener ownership과 approval tuple을 다시
-    확인한다.
-14. approved command를 Gradio submit API로 한 번만 제출한다.
+13. one-shot guard claim 뒤 immutable ticket 기준으로 actual gateway URL, status,
+    listener ownership과 approval tuple을 다시 확인한다.
+14. mutable environment를 다시 읽지 않고 ticket의 approved command를 Gradio submit
+    API로 한 번만 제출한다.
 15. accepted response를 받기 전 timeout, disconnect 또는 malformed response가
     발생하면 `submission_outcome_unknown`으로 기록하고 재제출하지 않는다.
 16. submission outcome unknown이면 active request, last result, correlation evidence와

@@ -76,6 +76,9 @@ def append_batch_step(
             ),
             "end_to_end_success": observation.get("end_to_end_success"),
             "gameplay_oracle_scope": observation.get("gameplay_oracle_scope"),
+            "gameplay_test_objective": environment.get(
+                "gameplay_test_objective"
+            ),
             "expected_item_delta": observation.get("expected_item_delta"),
             "observed_item_delta": observation.get("observed_item_delta"),
             "baseline_status": baseline_status,

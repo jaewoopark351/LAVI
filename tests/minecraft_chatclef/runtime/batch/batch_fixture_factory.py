@@ -1,6 +1,8 @@
 #20260818_kpopmodder: Build deterministic batch decision fixtures without live submission.
 from __future__ import annotations
 
+from ..preflight.preflight_fixture_factory import process_result_fixture
+
 
 def batch_environment_fixture(
     command: str,
@@ -9,17 +11,25 @@ def batch_environment_fixture(
     return {"command": command, "invocation_id": invocation_id}
 
 
-def completed_command_result_fixture() -> dict[str, object]:
+def completed_command_result_fixture(
+    *,
+    process_id: int = 4100,
+) -> dict[str, object]:
     return {
-        "preflight": {"status": "ok"},
+        "preflight": {
+            "status": "ok",
+            "observed": process_result_fixture(process_id)["observed"],
+        },
         "observation": {
             "submission_outcome": "accepted",
             "gradio_submit_call_count": 1,
             "adapter_command_request_count": "unknown",
             "automatic_resubmit_count": 0,
             "automatic_rerun_count": 0,
+            "submitted_request_id": "request-1",
             "connection_state_verified": True,
             "terminal_lifecycle_observed": True,
+            "terminal_request_id": "request-1",
             "terminal_status": "completed",
             "active_request_clear": True,
             "active_clear_observation": "same_snapshot",

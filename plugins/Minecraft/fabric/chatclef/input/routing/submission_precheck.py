@@ -3,11 +3,20 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
+from .bridge_status_selector import MinecraftChatClefBridgeStatusSelector
 from .submission_readiness import MinecraftChatClefSubmissionReadiness
 
 
 class MinecraftChatClefSubmissionPrecheck:
     EXPECTED_BACKEND = "fabric_chatclef"
+
+    def __init__(
+        self,
+        bridge_status_selector: MinecraftChatClefBridgeStatusSelector | None = None,
+    ):
+        self._bridge_status_selector = (
+            bridge_status_selector or MinecraftChatClefBridgeStatusSelector()
+        )
 
     def inspect(self, extension: Any) -> MinecraftChatClefSubmissionReadiness:
         status_method = getattr(extension, "get_status", None)
@@ -27,11 +36,9 @@ class MinecraftChatClefSubmissionPrecheck:
                 "Fabric ChatClef status must be an object."
             )
 
-        bridge = self._bridge_status(raw_status)
+        bridge, selection_error = self._bridge_status_selector.select(raw_status)
         if bridge is None:
-            return self._status_unavailable(
-                "Fabric ChatClef bridge status is missing."
-            )
+            return self._status_unavailable(selection_error)
         backend = self._text(bridge.get("backend_id")).lower()
         if backend != self.EXPECTED_BACKEND:
             return self._status_unavailable(
@@ -110,17 +117,6 @@ class MinecraftChatClefSubmissionPrecheck:
             message=message,
             status=bridge,
         )
-
-    def _bridge_status(
-        self,
-        status: Mapping[str, Any],
-    ) -> dict[str, Any] | None:
-        if "backend_id" in status:
-            return dict(status)
-        details = status.get("details")
-        if isinstance(details, Mapping) and "backend_id" in details:
-            return dict(details)
-        return None
 
     def _command_status(
         self,

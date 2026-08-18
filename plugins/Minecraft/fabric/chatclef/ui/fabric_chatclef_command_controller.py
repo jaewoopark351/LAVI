@@ -10,6 +10,9 @@ from plugins.Minecraft.common.protocol.bridge_error_code import BridgeErrorCode
 from plugins.Minecraft.common.protocol.command_result_status import (
     CommandResultStatus,
 )
+from plugins.Minecraft.fabric.chatclef.input.routing.submission.submission_result_normalizer import (
+    MinecraftChatClefSubmissionResultNormalizer,
+)
 from plugins.Minecraft.fabric.chatclef.ui.fabric_chatclef_json_formatter import (
     FabricChatClefJsonFormatter,
 )
@@ -29,6 +32,9 @@ class FabricChatClefCommandController:
         self.plugin = plugin
         self.extension = extension
         self.formatter = formatter or FabricChatClefJsonFormatter()
+        self._submission_result_normalizer = (
+            MinecraftChatClefSubmissionResultNormalizer()
+        )
         self.status_presenter = status_presenter or FabricChatClefStatusPresenter(
             plugin=plugin,
             extension=extension,
@@ -68,7 +74,10 @@ class FabricChatClefCommandController:
             try:
                 return self.formatter.mapping_payload(handler(request))
             except Exception as error:
-                return self.exception_result(request["request_id"], error)
+                return self.submission_exception_result(
+                    request["request_id"],
+                    error,
+                )
         return self.submit_with_plugin_adapter(CommandRequestDTO.from_mapping(request))
 
     def submit_korean_command(self, command_text: str) -> dict[str, Any]:
@@ -90,7 +99,10 @@ class FabricChatClefCommandController:
         try:
             return self.formatter.mapping_payload(handler(request))
         except Exception as error:
-            return self.exception_result(request["request_id"], error)
+            return self.submission_exception_result(
+                request["request_id"],
+                error,
+            )
 
     def submit_with_plugin_adapter(
         self,
@@ -104,7 +116,18 @@ class FabricChatClefCommandController:
                 "Fabric ChatClef adapter is unavailable.",
             )
         try:
-            result = adapter_factory().submit_command(request)
+            adapter = adapter_factory()
+            submitter = getattr(adapter, "submit_command", None)
+        except Exception as error:
+            return self.exception_result(request.request_id, error)
+        if not callable(submitter):
+            return self.error_result(
+                request.request_id,
+                BridgeErrorCode.NOT_IMPLEMENTED,
+                "Fabric ChatClef adapter command handler is unavailable.",
+            )
+        try:
+            result = submitter(request)
             result_dto = CommandResultDTO.from_mapping(result)
             return {
                 "ok": result_dto.ok,
@@ -118,7 +141,7 @@ class FabricChatClefCommandController:
                 "details": result_dto.data,
             }
         except Exception as error:
-            return self.exception_result(request.request_id, error)
+            return self.submission_exception_result(request.request_id, error)
 
     def empty_command_result(self) -> dict[str, Any]:
         return self.error_result(
@@ -139,6 +162,18 @@ class FabricChatClefCommandController:
             request_id,
             BridgeErrorCode.INTERNAL_ERROR,
             f"{type(error).__name__}: {error}",
+        )
+
+    #20260819_kpopmodder: Fail closed when a submit invocation may already have crossed the boundary.
+    def submission_exception_result(
+        self,
+        request_id: str,
+        error: Exception,
+    ) -> dict[str, Any]:
+        return self._submission_result_normalizer.unknown(
+            request_id,
+            "Fabric ChatClef UI submission outcome is unknown; reconciliation "
+            f"is required: {type(error).__name__}: {error}",
         )
 
     def error_result(

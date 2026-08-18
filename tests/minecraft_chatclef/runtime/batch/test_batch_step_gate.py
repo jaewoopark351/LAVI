@@ -41,6 +41,40 @@ class BatchStepGateTests(unittest.TestCase):
             batch_step_gate_error(result),
         )
 
+    def test_missing_or_malformed_request_ownership_is_rejected(self):
+        cases = (
+            ("submitted_request_id", "absent", "submitted_request_id_invalid"),
+            ("submitted_request_id", 123, "submitted_request_id_invalid"),
+            ("submitted_request_id", " request-1", "submitted_request_id_invalid"),
+            ("terminal_request_id", "absent", "terminal_request_id_invalid"),
+            ("terminal_request_id", 123, "terminal_request_id_invalid"),
+            ("terminal_request_id", "request-1 ", "terminal_request_id_invalid"),
+        )
+        for field, value, expected_error in cases:
+            with self.subTest(field=field, value=value):
+                result = completed_command_result_fixture()
+                result["observation"][field] = value
+
+                self.assertEqual(expected_error, batch_step_gate_error(result))
+
+    def test_terminal_request_must_match_submitted_request(self):
+        result = completed_command_result_fixture()
+        result["observation"]["terminal_request_id"] = "request-2"
+
+        self.assertEqual(
+            "terminal_request_id_mismatch",
+            batch_step_gate_error(result),
+        )
+
+    def test_complete_process_identity_is_required(self):
+        result = completed_command_result_fixture()
+        result["preflight"]["observed"].pop("process_identity_fingerprint")
+
+        self.assertEqual(
+            "process_identity_not_verified",
+            batch_step_gate_error(result),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -58,6 +58,48 @@ class BatchApprovalRecordTests(unittest.TestCase):
 
         self.assertEqual("batch approval field mismatch: world", error)
 
+    def test_external_identity_fields_require_exact_trimmed_strings(self):
+        cases = (
+            ("approval_source", 1),
+            ("approval_source", " operator-console"),
+            ("gradio_url", 1),
+            ("backend", True),
+            ("instance", "LAVI_TEST_Fabric01 "),
+            ("world", 1.0),
+        )
+        for field, value in cases:
+            with self.subTest(field=field, value=value):
+                approval = _approval_fixture()
+                approval[field] = value
+
+                _steps, error = validate_batch_approval_record(
+                    approval,
+                    COMMANDS,
+                    _environment_fixture(),
+                )
+
+                self.assertTrue(error)
+
+    def test_command_and_invocation_require_exact_trimmed_strings(self):
+        cases = (
+            ("command", 123),
+            ("command", f" {COMMANDS[0]}"),
+            ("invocation_id", 123),
+            ("invocation_id", " batch-invocation-1"),
+        )
+        for field, value in cases:
+            with self.subTest(field=field, value=value):
+                approval = _approval_fixture()
+                approval["commands"][0][field] = value
+
+                _steps, error = validate_batch_approval_record(
+                    approval,
+                    COMMANDS,
+                    _environment_fixture(),
+                )
+
+                self.assertTrue(error)
+
 
 def _environment_fixture() -> dict[str, object]:
     return {

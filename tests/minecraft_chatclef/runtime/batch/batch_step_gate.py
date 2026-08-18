@@ -3,14 +3,28 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
+from .batch_process_identity import batch_process_identity_key
+
 
 def batch_step_gate_error(command_result: Mapping[str, object]) -> str:
     preflight = _mapping(command_result.get("preflight"))
     observation = _mapping(command_result.get("observation"))
     if preflight.get("status") != "ok":
         return "preflight_not_ok"
+    if batch_process_identity_key(command_result) is None:
+        return "process_identity_not_verified"
     if observation.get("submission_outcome") != "accepted":
         return "submission_not_accepted"
+    submitted_request_id = _exact_request_id(
+        observation.get("submitted_request_id")
+    )
+    if submitted_request_id is None:
+        return "submitted_request_id_invalid"
+    terminal_request_id = _exact_request_id(observation.get("terminal_request_id"))
+    if terminal_request_id is None:
+        return "terminal_request_id_invalid"
+    if submitted_request_id != terminal_request_id:
+        return "terminal_request_id_mismatch"
     submit_count = observation.get("gradio_submit_call_count")
     if type(submit_count) is not int or submit_count != 1:
         return "submit_call_count_violation"
@@ -44,3 +58,14 @@ def batch_step_gate_error(command_result: Mapping[str, object]) -> str:
 
 def _mapping(value: object) -> dict[str, object]:
     return dict(value) if isinstance(value, Mapping) else {}
+
+
+def _exact_request_id(value: object) -> str | None:
+    if (
+        type(value) is not str
+        or not value
+        or value != value.strip()
+        or value in {"absent", "unknown"}
+    ):
+        return None
+    return value

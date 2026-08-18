@@ -1,7 +1,12 @@
 #20260818_kpopmodder: Validate all required live preflight inputs without side effects.
 from __future__ import annotations
 
+import math
 from typing import Mapping
+
+from .windows_listener.process_identity.expected_process_identity import (
+    expected_process_identity_fingerprint,
+)
 
 
 REQUIRED_TEXT_FIELDS = (
@@ -18,11 +23,16 @@ REQUIRED_TEXT_FIELDS = (
 
 def validate_preflight_environment(environment: Mapping[str, object]) -> str:
     for field in REQUIRED_TEXT_FIELDS:
-        if not str(environment.get(field) or "").strip():
-            return f"required live runtime value is missing: {field}"
-    if _positive_float(environment.get("timeout_sec")) is None:
+        if not _exact_text(environment.get(field)):
+            return f"required live runtime value is missing or invalid: {field}"
+    _expected_process_identity, identity_error = (
+        expected_process_identity_fingerprint(environment)
+    )
+    if identity_error:
+        return identity_error
+    if _positive_number(environment.get("timeout_sec")) is None:
         return "runtime timeout must be positive"
-    if _positive_float(environment.get("poll_sec")) is None:
+    if _positive_number(environment.get("poll_sec")) is None:
         return "runtime poll interval must be positive"
     fabric_port = _port(environment.get("fabric_port"))
     range_start = _port(environment.get("gradio_range_start"))
@@ -34,17 +44,20 @@ def validate_preflight_environment(environment: Mapping[str, object]) -> str:
     return ""
 
 
-def _positive_float(value: object) -> float | None:
-    try:
-        parsed = float(value)
-    except (TypeError, ValueError):
+def _exact_text(value: object) -> str:
+    if type(value) is not str or not value or value != value.strip():
+        return ""
+    return value
+
+
+def _positive_number(value: object) -> float | None:
+    if type(value) not in {int, float}:
         return None
-    return parsed if parsed > 0 else None
+    parsed = float(value)
+    return parsed if math.isfinite(parsed) and parsed > 0 else None
 
 
 def _port(value: object) -> int | None:
-    try:
-        parsed = int(value)
-    except (TypeError, ValueError):
+    if type(value) is not int:
         return None
-    return parsed if 1 <= parsed <= 65535 else None
+    return value if 1 <= value <= 65535 else None

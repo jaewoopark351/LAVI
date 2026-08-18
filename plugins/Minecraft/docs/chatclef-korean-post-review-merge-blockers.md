@@ -452,6 +452,12 @@ catalog parser provenance and ten baseline-target invariants are tested
 shared golden IDs are committed or remain explicitly planned
 live preflight requires an explicit loopback Gradio URL, exact one-shot approval
   tuple, backend/instance/world/process identity, and command-immediate recheck
+the actual gateway endpoint matches the approved endpoint before initial
+  preflight and immediately before submit
+the approved command candidate is snapshotted before preflight, bound with the
+  validated evidence in an immutable ticket, and not reread at submission
+the fixed batch retains the first verified process fingerprint across steps and
+  requires exact submitted/terminal request-ID equality before advancement
 selected mutating runs fail deterministically on missing/unknown/stale/ambiguous evidence
 existing live request-ID matching remains covered by regression tests
 terminal lifecycle, runtime-reported completion, gameplay effect, and end-to-end
@@ -467,6 +473,8 @@ submission_outcome_unknown blocks replay and requires reconciliation
 observer timeout does not cause automatic stop, cancel, retry, or replay
 mutating tests are not automatically rerun by IDE/CI/flaky/Codex tooling
 accepted commands are never automatically retried or replayed
+the supported GET live objective verifies additive acquisition delta; the
+  movement/mining objective fails before submission until complete observers exist
 ```
 
 ## Next Work Classification

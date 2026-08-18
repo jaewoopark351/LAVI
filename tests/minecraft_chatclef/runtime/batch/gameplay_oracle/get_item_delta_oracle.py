@@ -13,6 +13,7 @@ def get_item_delta_checkpoint(
     delta = after_count - before_count
     expected_verified = delta >= requested_count
     partial_observed = 0 < delta < requested_count
+    target_loss_observed = delta < 0
     return {
         "reason": (
             "target inventory delta verified; broader gameplay observation incomplete"
@@ -28,6 +29,8 @@ def get_item_delta_checkpoint(
         "gameplay_effect_observed": delta != 0,
         "expected_gameplay_effect_verified": expected_verified,
         "partial_gameplay_effect_observed": partial_observed,
-        "unexpected_effect_observed": None,
-        "prohibited_effect_absence_verified": None,
+        "unexpected_effect_observed": True if target_loss_observed else None,
+        "prohibited_effect_absence_verified": (
+            False if target_loss_observed else None
+        ),
     }

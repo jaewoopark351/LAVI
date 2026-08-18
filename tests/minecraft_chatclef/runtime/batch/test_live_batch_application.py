@@ -67,6 +67,12 @@ class LiveBatchApplicationTests(unittest.TestCase):
         self.assertEqual(4, len(gateway_urls))
         self.assertEqual(4, len(reconciled))
         self.assertTrue(
+            all(
+                step["gameplay_test_objective"] == "get_acquisition_delta"
+                for step in result["steps"]
+            )
+        )
+        self.assertTrue(
             all(step["baseline_status"] == "verified" for step in result["steps"])
         )
         self.assertEqual(0, result["automatic_retry_count"])
@@ -146,6 +152,51 @@ class LiveBatchApplicationTests(unittest.TestCase):
         self.assertEqual(0, gateway_calls)
         self.assertEqual(0, result["attempted_count"])
 
+    def test_movement_and_mining_objective_stops_before_gateway_creation(self):
+        environment = _environment_fixture()
+        environment["gameplay_test_objective"] = "movement_and_mining"
+        gateway_calls = 0
+
+        def gateway_factory(_url):
+            nonlocal gateway_calls
+            gateway_calls += 1
+            return object()
+
+        result = run_live_get_batch_application(
+            environment,
+            json.dumps(_approval_fixture(), ensure_ascii=False),
+            gateway_factory=gateway_factory,
+        )
+
+        self.assertEqual("stopped", result["status"])
+        self.assertEqual(
+            "movement_and_mining_observer_unavailable",
+            result["stop_reason"],
+        )
+        self.assertEqual(0, gateway_calls)
+        self.assertEqual(0, result["attempted_count"])
+
+    def test_unknown_or_malformed_objective_stops_before_gateway_creation(self):
+        for value in ("final_inventory_only", 1, " get_acquisition_delta"):
+            with self.subTest(value=value):
+                environment = _environment_fixture()
+                environment["gameplay_test_objective"] = value
+                gateway_calls = 0
+
+                def gateway_factory(_url):
+                    nonlocal gateway_calls
+                    gateway_calls += 1
+                    return object()
+
+                result = run_live_get_batch_application(
+                    environment,
+                    json.dumps(_approval_fixture(), ensure_ascii=False),
+                    gateway_factory=gateway_factory,
+                )
+
+                self.assertEqual("stopped", result["status"])
+                self.assertEqual(0, gateway_calls)
+
 
 def _environment_fixture() -> dict[str, object]:
     return {
@@ -155,6 +206,7 @@ def _environment_fixture() -> dict[str, object]:
         "expected_backend": "fabric_chatclef",
         "expected_instance": "LAVI_TEST_Fabric01",
         "expected_world": "test-world",
+        "gameplay_test_objective": "get_acquisition_delta",
     }
 
 

@@ -9,6 +9,7 @@ class LaviGradioRuntimeGateway:
     def __init__(self, gradio_url: str):
         from gradio_client import Client
 
+        self.gradio_url = gradio_url
         self._client = Client(gradio_url, verbose=False)
         self.submit_call_count = 0
         self.status_call_count = 0

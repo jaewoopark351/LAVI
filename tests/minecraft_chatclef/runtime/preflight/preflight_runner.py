@@ -30,6 +30,9 @@ from .windows_listener_preflight import (
 from .windows_listener.process_identity.process_identity_key import (
     process_identity_key,
 )
+from .windows_listener.process_identity.expected_process_identity import (
+    expected_process_identity_fingerprint,
+)
 from .world_identity import inspect_world_identity
 
 
@@ -93,6 +96,18 @@ def run_live_runtime_preflight(
             observed,
         )
     observed.update(_observed(initial_process))
+    expected_process_key, _identity_error = expected_process_identity_fingerprint(
+        environment
+    )
+    if (
+        expected_process_key is not None
+        and initial_process_key != expected_process_key
+    ):
+        return _failure(
+            "process_identity",
+            "listener process identity does not match the approved batch owner",
+            observed,
+        )
 
     initial_status = _read_status(status_reader)
     if not initial_status.get("ok"):
@@ -125,6 +140,15 @@ def run_live_runtime_preflight(
     final_environment_error = validate_preflight_environment(environment)
     if final_environment_error:
         return _failure("pre_submit_recheck", final_environment_error, observed)
+    final_expected_process_key, _identity_error = (
+        expected_process_identity_fingerprint(environment)
+    )
+    if final_expected_process_key != expected_process_key:
+        return _failure(
+            "pre_submit_recheck",
+            "batch process identity expectation changed during preflight",
+            observed,
+        )
     final_endpoint = inspect_loopback_gradio_url(environment.get("gradio_url"))
     if not final_endpoint.get("ok") or final_endpoint.get("url") != endpoint.get("url"):
         return _failure("pre_submit_recheck", "Gradio endpoint changed", observed)

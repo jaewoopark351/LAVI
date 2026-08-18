@@ -21,6 +21,7 @@ def build_batch_command_environments(
                 "invocation_id": invocation_id,
                 "expected_item_id": str(step.get("expected_item_id") or ""),
                 "expected_item_delta": step.get("expected_item_delta"),
+                "gameplay_test_objective": step.get("gameplay_test_objective"),
                 "approval_json": json.dumps(
                     {
                         "command": command,

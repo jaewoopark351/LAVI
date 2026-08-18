@@ -32,13 +32,15 @@ def validate_approval_record(
     expected: Mapping[str, object],
 ) -> str:
     for field in APPROVAL_FIELDS:
-        approved = _text(approval.get(field))
-        required = _text(expected.get(field))
+        approved = _exact_text(approval.get(field))
+        required = _exact_text(expected.get(field))
         if not approved:
             return f"approval field is missing: {field}"
+        if not required:
+            return f"expected approval field is invalid: {field}"
         if approved != required:
             return f"approval field mismatch: {field}"
-    if not _text(approval.get("approval_source")):
+    if not _exact_text(approval.get("approval_source")):
         return "approval_source is required"
     if approval.get("one_shot") is not True:
         return "approval must explicitly set one_shot=true"
@@ -47,5 +49,7 @@ def validate_approval_record(
     return ""
 
 
-def _text(value: object) -> str:
-    return str(value or "").strip()
+def _exact_text(value: object) -> str:
+    if type(value) is not str or not value or value != value.strip():
+        return ""
+    return value

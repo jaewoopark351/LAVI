@@ -14,6 +14,7 @@ DEFAULT_RUNTIME_TIMEOUT_SEC = 900.0
 DEFAULT_GAMEPLAY_OBSERVATION_TIMEOUT_SEC = 390.0
 DEFAULT_GAMEPLAY_OBSERVATION_POLL_SEC = 2.0
 DEFAULT_GAMEPLAY_SNAPSHOT_MAX_AGE_SEC = 30.0
+DEFAULT_GAMEPLAY_TEST_OBJECTIVE = "get_acquisition_delta"
 
 
 def load_live_runtime_environment(
@@ -64,6 +65,10 @@ def load_live_runtime_environment(
             values.get("LAVI_MINECRAFT_GAMEPLAY_SNAPSHOT_MAX_AGE_SEC"),
             DEFAULT_GAMEPLAY_SNAPSHOT_MAX_AGE_SEC,
         ),
+        "gameplay_test_objective": _text(
+            values.get("LAVI_MINECRAFT_GAMEPLAY_TEST_OBJECTIVE")
+        )
+        or DEFAULT_GAMEPLAY_TEST_OBJECTIVE,
         "fabric_port": DEFAULT_FABRIC_PORT,
         "gradio_range_start": DEFAULT_GRADIO_RANGE_START,
         "gradio_range_end": DEFAULT_GRADIO_RANGE_END,

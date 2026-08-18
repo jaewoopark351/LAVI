@@ -17,6 +17,10 @@ class RuntimeEnvironmentTests(unittest.TestCase):
         )
         self.assertEqual(2.0, environment["gameplay_observation_poll_sec"])
         self.assertEqual(30.0, environment["gameplay_snapshot_max_age_sec"])
+        self.assertEqual(
+            "get_acquisition_delta",
+            environment["gameplay_test_objective"],
+        )
 
     def test_invalid_gameplay_timing_fails_environment_validation_later(self):
         environment = load_live_runtime_environment(
@@ -24,6 +28,16 @@ class RuntimeEnvironmentTests(unittest.TestCase):
         )
 
         self.assertEqual(-1.0, environment["gameplay_observation_timeout_sec"])
+
+    def test_explicit_gameplay_objective_is_preserved_for_batch_policy(self):
+        environment = load_live_runtime_environment(
+            {"LAVI_MINECRAFT_GAMEPLAY_TEST_OBJECTIVE": "movement_and_mining"}
+        )
+
+        self.assertEqual(
+            "movement_and_mining",
+            environment["gameplay_test_objective"],
+        )
 
 
 if __name__ == "__main__":

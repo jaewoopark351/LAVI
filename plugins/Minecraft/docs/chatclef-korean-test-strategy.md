@@ -2328,6 +2328,27 @@ single submission, checkpoint gating, and no replay; it does not prove that the
 default live observer can safely advance all four commands. Automatic four-step
 live advancement requires a separately reviewed complete multi-surface oracle.
 
+<!-- 20260819_kpopmodder: Clarified additive GET evidence and immutable batch ownership. -->
+
+The current ChatClef GET contract is additive: the requested quantity is added
+to the target derived from the inventory already present when the command
+starts. Therefore the supported live objective is named
+`get_acquisition_delta`, and its functional evidence is `after - before >=
+requested_count`. A final-total-only check is not sufficient because an
+already-present stack could make a no-op look successful.
+
+`movement_and_mining` is a separate test objective. It requires a verified
+initial shortage plus complete movement, mined-block, inventory, and prohibited
+surface observers. The current harness rejects that objective before gateway
+creation because those complete observers do not yet exist; terminal completion
+or a positive target delta must not be relabeled as movement success.
+
+The fixed four-step plan is represented by frozen step values. Each step must
+retain the first verified listener process fingerprint, exact nonblank submitted
+and terminal request IDs must match, and callbacks receive read-only environment
+snapshots. A process change, malformed identity, request-ID mismatch, or attempt
+to mutate the approved command stops the batch before another submission.
+
 Offline fixtures must distinguish at least:
 
 ```text

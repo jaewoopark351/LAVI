@@ -4,6 +4,11 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 
 from .batch_plan_validator import validate_batch_plan
+from .batch_environment_snapshot import batch_environment_snapshot
+from .batch_process_identity import (
+    batch_process_identity_key,
+    bind_expected_process_identity,
+)
 from .batch_run_result import append_batch_step, new_batch_run_result
 from .batch_step_gate import batch_step_gate_error
 from .gameplay_checkpoint import apply_batch_gameplay_checkpoint
@@ -27,13 +32,20 @@ def run_supervised_live_batch(
     batch_result = new_batch_run_result(len(plan))
     if plan_error:
         return _stop(batch_result, f"invalid_plan: {plan_error}")
+    approved_process_identity: str | None = None
     for environment in plan:
+        execution_environment = batch_environment_snapshot(
+            bind_expected_process_identity(
+                environment,
+                approved_process_identity,
+            )
+        )
         try:
-            baseline = baseline_provider(environment)
+            baseline = baseline_provider(execution_environment)
         except Exception as error:
             append_batch_step(
                 batch_result,
-                environment,
+                execution_environment,
                 None,
                 baseline_status="provider_failed",
                 checkpoint_status="not_attempted",
@@ -46,7 +58,7 @@ def run_supervised_live_batch(
         if not isinstance(baseline, Mapping) or baseline.get("ok") is not True:
             append_batch_step(
                 batch_result,
-                environment,
+                execution_environment,
                 None,
                 baseline_status="not_verified",
                 checkpoint_status="not_attempted",
@@ -55,11 +67,11 @@ def run_supervised_live_batch(
             return _stop(batch_result, _baseline_reason(baseline))
         batch_result["attempted_count"] = int(batch_result["attempted_count"]) + 1
         try:
-            raw_result = execute_command(environment)
+            raw_result = execute_command(execution_environment)
         except Exception as error:
             append_batch_step(
                 batch_result,
-                environment,
+                execution_environment,
                 None,
                 baseline_status="verified",
                 checkpoint_status="not_attempted",
@@ -72,7 +84,7 @@ def run_supervised_live_batch(
         if not isinstance(raw_result, Mapping):
             append_batch_step(
                 batch_result,
-                environment,
+                execution_environment,
                 None,
                 baseline_status="verified",
                 checkpoint_status="not_attempted",
@@ -84,19 +96,36 @@ def run_supervised_live_batch(
         if gate_error:
             append_batch_step(
                 batch_result,
-                environment,
+                execution_environment,
                 command_result,
                 baseline_status="verified",
                 checkpoint_status="not_attempted",
                 guard_reconciliation_status="not_attempted",
             )
             return _stop(batch_result, gate_error)
+        current_process_identity = batch_process_identity_key(command_result)
+        if approved_process_identity is None:
+            approved_process_identity = current_process_identity
+        elif current_process_identity != approved_process_identity:
+            append_batch_step(
+                batch_result,
+                execution_environment,
+                command_result,
+                baseline_status="verified",
+                checkpoint_status="not_attempted",
+                guard_reconciliation_status="not_attempted",
+            )
+            return _stop(batch_result, "batch_process_identity_changed")
         try:
-            checkpoint = checkpoint_provider(environment, command_result, baseline)
+            checkpoint = checkpoint_provider(
+                execution_environment,
+                command_result,
+                baseline,
+            )
         except Exception as error:
             append_batch_step(
                 batch_result,
-                environment,
+                execution_environment,
                 command_result,
                 baseline_status="verified",
                 checkpoint_status="provider_failed",
@@ -112,7 +141,7 @@ def run_supervised_live_batch(
         if not checkpoint_result.get("ok"):
             append_batch_step(
                 batch_result,
-                environment,
+                execution_environment,
                 command_result,
                 baseline_status="verified",
                 checkpoint_status="not_verified",
@@ -123,7 +152,7 @@ def run_supervised_live_batch(
                 str(checkpoint_result.get("reason") or "gameplay checkpoint failed"),
             )
         try:
-            reconciliation = reconcile_guard(environment, command_result)
+            reconciliation = reconcile_guard(execution_environment, command_result)
         except Exception as error:
             reconciliation = {
                 "ok": False,
@@ -132,7 +161,7 @@ def run_supervised_live_batch(
         if not _result_ok(reconciliation):
             append_batch_step(
                 batch_result,
-                environment,
+                execution_environment,
                 command_result,
                 baseline_status="verified",
                 checkpoint_status="verified",
@@ -143,7 +172,7 @@ def run_supervised_live_batch(
         batch_result["completed_count"] = int(batch_result["completed_count"]) + 1
         append_batch_step(
             batch_result,
-            environment,
+            execution_environment,
             command_result,
             baseline_status="verified",
             checkpoint_status="verified",

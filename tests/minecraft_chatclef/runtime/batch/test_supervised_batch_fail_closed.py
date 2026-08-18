@@ -208,6 +208,90 @@ class SupervisedBatchFailClosedTests(unittest.TestCase):
         self.assertIn("duplicated", result["stop_reason"])
         self.assertEqual(0, calls.execution_count)
 
+    def test_process_identity_is_fixed_before_the_second_submission(self):
+        first_result = completed_command_result_fixture(process_id=4100)
+        second_result = completed_command_result_fixture(process_id=4200)
+        approved_identity = first_result["preflight"]["observed"][
+            "process_identity_fingerprint"
+        ]
+        submit_count = 0
+        execution_count = 0
+        expected_identity_inputs: list[object] = []
+
+        def execute(environment):
+            nonlocal execution_count, submit_count
+            execution_count += 1
+            expected_identity_inputs.append(
+                environment.get("expected_process_identity_fingerprint")
+            )
+            result = first_result if execution_count == 1 else second_result
+            actual_identity = result["preflight"]["observed"][
+                "process_identity_fingerprint"
+            ]
+            expected_identity = environment.get(
+                "expected_process_identity_fingerprint"
+            )
+            if expected_identity is not None and expected_identity != actual_identity:
+                return {
+                    "preflight": {
+                        "status": "fail",
+                        "reason": "listener process identity does not match the approved batch owner",
+                        "observed": result["preflight"]["observed"],
+                    },
+                    "observation": result["observation"],
+                }
+            submit_count += 1
+            return result
+
+        result = run_supervised_live_batch(
+            self.environments,
+            execute_command=execute,
+            baseline_provider=lambda _environment: (
+                complete_inventory_baseline_fixture()
+            ),
+            checkpoint_provider=lambda _environment, _result, _baseline: (
+                complete_gameplay_checkpoint_fixture()
+            ),
+            reconcile_guard=lambda _environment, _result: {
+                "ok": True,
+                "reason": "reconciled",
+            },
+        )
+
+        self.assertEqual("stopped", result["status"])
+        self.assertEqual("preflight_not_ok", result["stop_reason"])
+        self.assertEqual([None, approved_identity], expected_identity_inputs)
+        self.assertEqual(1, submit_count)
+
+    def test_baseline_cannot_mutate_the_approved_command_before_submission(self):
+        execution_count = 0
+
+        def mutate_baseline(environment):
+            environment["command"] = "다이아몬드 64개 캐줘"
+            return complete_inventory_baseline_fixture()
+
+        def execute(_environment):
+            nonlocal execution_count
+            execution_count += 1
+            return completed_command_result_fixture()
+
+        result = run_supervised_live_batch(
+            self.environments,
+            execute_command=execute,
+            baseline_provider=mutate_baseline,
+            checkpoint_provider=lambda _environment, _result, _baseline: (
+                complete_gameplay_checkpoint_fixture()
+            ),
+            reconcile_guard=lambda _environment, _result: {
+                "ok": True,
+                "reason": "reconciled",
+            },
+        )
+
+        self.assertEqual("stopped", result["status"])
+        self.assertEqual("baseline_exception: TypeError", result["stop_reason"])
+        self.assertEqual(0, execution_count)
+
     def _run(self, calls):
         return run_supervised_live_batch(
             self.environments,

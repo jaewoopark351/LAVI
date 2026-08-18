@@ -1186,6 +1186,12 @@ future-only section. Historical baseline notes for `c912ff...` must stay
 separate from current regression coverage. Alias expansion and cross-command
 action precedence are still separate risks.
 
+<!-- 20260819_kpopmodder: Kept live GET evidence semantics owned by the test strategy. -->
+
+This alias plan does not redefine gameplay success. The additive GET delta
+objective, immutable sequential batch contract, and the currently unsupported
+movement/mining objective are owned by `chatclef-korean-test-strategy.md`.
+
 Routing and lifecycle:
 
 ```text

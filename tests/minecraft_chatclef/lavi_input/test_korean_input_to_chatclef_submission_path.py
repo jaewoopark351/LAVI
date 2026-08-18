@@ -19,12 +19,15 @@ from plugins.Minecraft.fabric.chatclef.input import MinecraftChatClefInputRouter
 
 KOREAN_INPUT_TO_COMMAND_CASES = [
     ("다이아몬드 가져와줘", "get diamond 1"),
+    ("다이아몬드를 가져와줘", "get diamond 1"),
     ("다이아몬드 캐줘", "get diamond 1"),
     ("돌 10개 가져와줘", "get stone 10"),
+    ("돌을 10개 캐줘", "get stone 10"),
     ("조약돌 10개 캐줘", "get cobblestone 10"),
     ("레드스톤 5개 구해줘", "get redstone 5"),
     ("석탄 5개 캐와줘", "get coal 5"),
     ("철 10개 캐줘", "get iron_ingot 10"),
+    ("다이아몬드 곡괭이 하나 가져와", "get diamond_pickaxe 1"),
 ]
 
 

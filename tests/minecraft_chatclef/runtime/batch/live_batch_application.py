@@ -10,13 +10,15 @@ from .batch_approval_parser import parse_batch_approval_record
 from .batch_approval_record import validate_batch_approval_record
 from .batch_environment_builder import build_batch_command_environments
 from .batch_run_result import new_batch_run_result
+from .get_item_expectation_attacher import attach_get_item_expectations
 from .gameplay_oracle.get_item_inventory_baseline import (
     capture_get_item_inventory_baseline,
 )
 from .gameplay_oracle.post_terminal_get_item_checkpoint import (
     collect_post_terminal_get_item_checkpoint,
 )
-from .live_get_batch_commands import COMMANDS, attach_get_item_expectations
+from .gameplay_test_objective import validate_gameplay_test_objective
+from .live_get_batch_plan import COMMANDS
 from .one_shot_guard_reconciliation import reconcile_batch_one_shot_guard
 from .supervised_batch_runner import run_supervised_live_batch
 
@@ -43,6 +45,11 @@ def run_live_get_batch_application(
 ) -> dict[str, object]:
     if not live_mutating_run_selected(base_environment):
         return _setup_result("skipped", "live_and_mutating_opt_ins_required")
+    objective_error = validate_gameplay_test_objective(
+        base_environment.get("gameplay_test_objective")
+    )
+    if objective_error:
+        return _setup_result("stopped", objective_error)
     approval, approval_error = parse_batch_approval_record(raw_batch_approval)
     if approval_error:
         return _setup_result("stopped", approval_error)

@@ -22,12 +22,14 @@ class BatchEnvironmentBuilderTests(unittest.TestCase):
                 "invocation_id": "batch-1",
                 "expected_item_id": "minecraft:cobblestone",
                 "expected_item_delta": 1,
+                "gameplay_test_objective": "get_acquisition_delta",
             },
             {
                 "command": "석탄 1개 캐와줘",
                 "invocation_id": "batch-2",
                 "expected_item_id": "minecraft:coal",
                 "expected_item_delta": 1,
+                "gameplay_test_objective": "get_acquisition_delta",
             },
         ]
 
@@ -48,6 +50,10 @@ class BatchEnvironmentBuilderTests(unittest.TestCase):
             self.assertEqual(
                 step["expected_item_delta"],
                 environment["expected_item_delta"],
+            )
+            self.assertEqual(
+                step["gameplay_test_objective"],
+                environment["gameplay_test_objective"],
             )
             self.assertIs(True, flat_approval["one_shot"])
             self.assertIs(True, flat_approval["automatic_rerun_disabled"])

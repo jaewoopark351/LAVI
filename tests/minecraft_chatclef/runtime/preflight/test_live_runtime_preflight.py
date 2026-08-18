@@ -83,6 +83,59 @@ class LiveRuntimePreflightTests(unittest.TestCase):
         self.assertEqual(2, len(status_calls))
         self.assertTrue(decision["observed"]["pre_submit_recheck_passed"])
 
+    def test_matching_batch_process_identity_passes(self):
+        environment = live_environment_fixture()
+        process = process_result_fixture(4100)
+        environment["expected_process_identity_fingerprint"] = process["observed"][
+            "process_identity_fingerprint"
+        ]
+
+        decision = run_live_runtime_preflight(
+            environment,
+            status_reader=runtime_status_fixture,
+            process_probe=lambda **_kwargs: process_result_fixture(4100),
+            log_identity_inspector=log_identity_result_fixture,
+        )
+
+        self.assertEqual("ok", decision["status"])
+
+    def test_changed_batch_process_identity_fails_before_status_read(self):
+        environment = live_environment_fixture()
+        environment["expected_process_identity_fingerprint"] = (
+            process_result_fixture(4100)["observed"][
+                "process_identity_fingerprint"
+            ]
+        )
+
+        decision = run_live_runtime_preflight(
+            environment,
+            status_reader=lambda: self.fail("status must not be read"),
+            process_probe=lambda **_kwargs: process_result_fixture(4200),
+            log_identity_inspector=log_identity_result_fixture,
+        )
+
+        self.assertEqual("fail", decision["status"])
+        self.assertEqual("process_identity", decision["stage"])
+        self.assertIn("approved batch owner", decision["reason"])
+
+    def test_malformed_batch_process_identity_fails_before_process_probe(self):
+        for value in (True, 1, "not-a-fingerprint", " " + "a" * 64):
+            with self.subTest(value=value):
+                environment = live_environment_fixture()
+                environment["expected_process_identity_fingerprint"] = value
+
+                decision = run_live_runtime_preflight(
+                    environment,
+                    status_reader=lambda: self.fail("status must not be read"),
+                    process_probe=lambda **_kwargs: self.fail(
+                        "process must not be probed"
+                    ),
+                )
+
+                self.assertEqual("fail", decision["status"])
+                self.assertEqual("approval", decision["stage"])
+                self.assertIn("process identity fingerprint", decision["reason"])
+
     def test_busy_status_fails_with_no_pre_submit_recheck(self):
         decision = run_live_runtime_preflight(
             live_environment_fixture(),
