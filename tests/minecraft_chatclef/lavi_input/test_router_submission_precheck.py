@@ -1,4 +1,5 @@
 #20260818_kpopmodder: Lock fail-closed router status checks and the single-pass submit boundary.
+#20260819_kpopmodder: Prove contradictory result mirrors remain unknown without resubmission.
 from __future__ import annotations
 
 import unittest
@@ -89,6 +90,23 @@ class RouterSubmissionPrecheckTests(unittest.TestCase):
         self.assertEqual("unknown", decision.result["status"]["status"])
         self.assertTrue(decision.result["details"]["reconciliation_required"])
 
+    def test_contradictory_submit_result_is_unknown_and_submitted_once(self):
+        extension = _ContradictorySubmitResultExtension(
+            status_behavior=_bridge_status()
+        )
+        router = MinecraftChatClefInputRouter(
+            extension=extension,
+            log_callback=lambda _message: None,
+        )
+
+        decision = router.route("다이아몬드 캐줘")
+
+        self.assertTrue(decision.handled)
+        self.assertEqual("minecraft_submission_outcome_unknown", decision.reason)
+        self.assertEqual("unknown", decision.result["status"]["status"])
+        self.assertTrue(decision.result["details"]["reconciliation_required"])
+        self.assertEqual(1, len(extension.submitted))
+
 
 _NO_STATUS_READER = object()
 _DEFAULT_COMMANDS = object()
@@ -140,6 +158,26 @@ class _MalformedSubmitResultExtension(_StatusExtension):
     def submit_translated_command(self, request, translation):
         self.submitted.append((dict(request), dict(translation)))
         return None
+
+
+class _ContradictorySubmitResultExtension(_StatusExtension):
+    def submit_translated_command(self, request, translation):
+        self.submitted.append((dict(request), dict(translation)))
+        request_id = str(request["request_id"])
+        return {
+            "ok": True,
+            "status": {
+                "request_id": request_id,
+                "ok": False,
+                "status": "accepted",
+                "error_code": "internal_error",
+                "message": "contradictory result",
+                "data": {},
+            },
+            "error": "internal_error",
+            "message": "contradictory result",
+            "details": {},
+        }
 
 
 def _validated_translation() -> dict[str, object]:

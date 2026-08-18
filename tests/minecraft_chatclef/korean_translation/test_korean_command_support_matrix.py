@@ -20,6 +20,7 @@ SUPPORTED_KOREAN_TRANSLATION_CASES = {
         ("레드스톤 5개 구해줘", "get redstone 5"),
         ("석탄 5개 캐와줘", "get coal 5"),
         ("철 10개 캐줘", "get iron_ingot 10"),
+        ("다이아몬드 곡괭이 하나 가져와", "get diamond_pickaxe 1"),
     ],
     "food": [
         ("음식 10만큼 모아", "food 10"),

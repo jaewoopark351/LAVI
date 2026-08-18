@@ -516,3 +516,31 @@ verified prohibited-effect absence before end-to-end success can be true.
 Do not merge until the focused suite has 0 failures and every gate in Required
 Acceptance Before Merge is satisfied.
 ```
+
+## 2026-08-19 Current Hardening Addendum
+
+This addendum records the current implementation gate without rewriting the
+historical `4239c23` counts above. The current hardening change set implements
+the reviewed work within LAVI-owned Python and offline tests:
+
+```text
+P1: parse the actual Windows Python invocation and require exact entrypoint
+    provenance; bind PID/start time/executable/invocation/resolved entrypoint/
+    repository root/approved ancestor in the pre-submit identity recheck
+P2: canonicalize outer and nested submit-result mirrors and convert every
+    malformed or contradictory result to UNKNOWN + reconciliation required
+P2: exercise a real delayed asyncio send so timeout ownership, no second wire
+    request, late first delivery, and clean teardown are proven
+```
+
+Direct `python <absolute repository root>\main.py` is the only direct script
+form approved without launcher evidence. Relative `main.py` requires exact
+approved launcher provenance. `-c`, descendant or other-checkout `main.py`, and
+`-m lavi` without a resolved module path fail closed.
+
+The default saved-target-inventory GET oracle remains intentionally incomplete.
+It stops a real batch at the first gameplay checkpoint; fixture-driven
+four-command completion is orchestration evidence only. This addendum does not
+authorize Java, ChatClef/AltoClef, DTO, wire-payload, live Minecraft, commit, or
+push changes. Passing the local offline suite closes these implementation gaps
+but does not replace a final read-only merge review.

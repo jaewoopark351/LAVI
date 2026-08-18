@@ -1,4 +1,5 @@
 #20260815_kpopmodder: Lock routing status separation for Korean item actions.
+#20260819_kpopmodder: Keep router fakes aligned with the canonical mirrored result contract.
 from __future__ import annotations
 
 import unittest
@@ -103,11 +104,12 @@ class MinecraftChatClefItemActionRoutingStatusTests(unittest.TestCase):
     def test_rejected_submission_is_not_retried_or_fallen_through(self):
         extension = _RecordingExtension(
             translation=_validated_get_translation(),
-            result={
-                "ok": False,
-                "status": {"status": "rejected"},
-                "message": "Fabric ChatClef command already pending or active.",
-            },
+            result=_submission_result(
+                ok=False,
+                status="rejected",
+                error_code="invalid_request",
+                message="Fabric ChatClef command already pending or active.",
+            ),
         )
         router = MinecraftChatClefInputRouter(
             extension=extension,
@@ -124,11 +126,7 @@ class MinecraftChatClefItemActionRoutingStatusTests(unittest.TestCase):
     def test_accepted_get_is_not_replayed_for_quantity_recovery(self):
         extension = _RecordingExtension(
             translation=_validated_get_translation(),
-            result={
-                "ok": True,
-                "status": {"status": "accepted"},
-                "message": "sent",
-            },
+            result=_submission_result(message="sent"),
         )
         router = MinecraftChatClefInputRouter(
             extension=extension,
@@ -229,7 +227,7 @@ def _validated_get_translation() -> dict[str, object]:
 class _RecordingExtension:
     def __init__(self, translation, result=None, bridge_status=None):
         self.translation = dict(translation)
-        self.result = dict(result or {"ok": True, "status": {"status": "accepted"}})
+        self.result = dict(result or _submission_result())
         self.bridge_status = dict(
             bridge_status
             or {
@@ -263,6 +261,29 @@ class _RecordingExtension:
 
     def get_status(self):
         return dict(self.bridge_status)
+
+
+def _submission_result(
+    *,
+    ok: bool = True,
+    status: str = "accepted",
+    error_code: str | None = None,
+    message: str = "accepted",
+) -> dict[str, object]:
+    data: dict[str, object] = {}
+    return {
+        "ok": ok,
+        "status": {
+            "ok": ok,
+            "status": status,
+            "error_code": error_code,
+            "message": message,
+            "data": dict(data),
+        },
+        "error": error_code,
+        "message": message,
+        "details": dict(data),
+    }
 
 
 if __name__ == "__main__":

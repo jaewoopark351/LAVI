@@ -202,3 +202,18 @@ partial-effect observation과 prohibited-effect absence verification의 의미�
 - status별 `result_reason`을 증거 없이 필수 또는 선택으로 확정
 - Windows console handler, shutdown diagnostics 또는 behavioral fix 추가
 - evidence-only 계획만으로 fixture/LAVI/Minecraft 재현 실행
+
+## 2026-08-19 Current preflight hardening cross-reference
+
+Current mutating-preflight entrypoint parsing, complete process identity
+fingerprinting, canonical submit-result mirrors, and delayed-send/no-replay
+tests are owned by
+[`fabric-chatclef-live-runtime-preflight-plan.md`](./fabric-chatclef-live-runtime-preflight-plan.md)
+and
+[`chatclef-korean-test-strategy.md`](./chatclef-korean-test-strategy.md).
+This lifecycle document does not duplicate those field-level contracts.
+
+In particular, unresolved `python -m lavi` provenance is fail closed, and the
+default target-inventory-only gameplay oracle cannot authorize automatic
+advancement past the first incomplete checkpoint. These clarifications do not
+change the historical audited-baseline tables in this document.

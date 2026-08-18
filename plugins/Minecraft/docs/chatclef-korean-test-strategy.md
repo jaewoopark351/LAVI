@@ -1746,6 +1746,36 @@ test_duplicate_terminal_result_is_handled_once
 These tests belong to lifecycle or router submission responsibility, not alias
 coverage.
 
+### Canonical submit-result boundary
+
+The Python router and the supervised one-shot runner must consume the same
+canonical submit-result normalizer. The extension result is untrusted even when
+it is an in-process mapping. A valid result requires:
+
+```text
+outer ok and nested status.ok are exact bool values
+outer ok == nested status.ok == CommandResultStatus.ok
+nested request_id is a nonblank string and matches the expected request ID
+outer request_id, when present, matches the nested request_id
+status and error_code are known closed-enum values
+successful status has no error_code
+outer error/message/details mirror nested error_code/message/data
+normal output is rebuilt as fresh top-level, nested, and data mappings
+```
+
+String `"false"`, integer `0` or `1`, an unknown enum, a malformed nested
+status, an accepted status with `internal_error`, or any mirror contradiction
+must become `submission_outcome_unknown` with
+`reconciliation_required == true`. Neither consumer may infer acceptance or
+retry from a contradictory payload.
+
+The timeout regression must use a coroutine scheduled on a real running
+`asyncio` event loop. It must prove that a first send which times out but later
+reaches the wire retains command ownership, rejects a second submit, never
+sends the second request, and tears down with no pending task or unawaited
+coroutine. A fake future that closes the coroutine immediately is useful only
+for local classification and is not sufficient evidence for late-send ordering.
+
 ## Test File Organization
 
 The repository currently has legacy flat Minecraft test files and a newer
@@ -2286,6 +2316,17 @@ The oracle maps its evidence to `gameplay_observation_complete`,
 incomplete, observation completeness is false or `unknown`, expected/prohibited
 evidence and end-to-end success remain `unknown`, and runtime-reported
 completion must not be promoted to end-to-end success.
+
+The current default GET batch oracle observes only the saved target-item
+inventory delta. It intentionally reports
+`gameplay_observation_complete == false` and leaves prohibited-effect absence
+unverified because it does not observe movement, blocks, other inventory slots,
+or every command-specific prohibited surface. Consequently, the production
+default four-command batch must stop at the first incomplete gameplay
+checkpoint. The fixture-driven four-step completion test proves ordering,
+single submission, checkpoint gating, and no replay; it does not prove that the
+default live observer can safely advance all four commands. Automatic four-step
+live advancement requires a separately reviewed complete multi-surface oracle.
 
 Offline fixtures must distinguish at least:
 

@@ -1,4 +1,5 @@
 #20260803_kpopmodder: Cover chat/mic routing from LAVI input into Fabric ChatClef.
+#20260819_kpopmodder: Keep router fakes aligned with the canonical mirrored result contract.
 import unittest
 
 from app_core.composition_core.app_component_wiring_service import (
@@ -57,11 +58,7 @@ class MinecraftChatClefInputRouterTests(unittest.TestCase):
     def test_valid_minecraft_input_submits_translated_command_once(self):
         extension = _RecordingExtension(
             translation=_validated_get_translation("get gold_ingot 8", "금괴", 8, "gold_ingot"),
-            result={
-                "ok": True,
-                "status": {"status": "accepted"},
-                "message": "sent",
-            },
+            result=_submission_result(message="sent"),
         )
         router = MinecraftChatClefInputRouter(
             extension=extension,
@@ -211,7 +208,7 @@ class MinecraftChatClefInputRouterTests(unittest.TestCase):
 class _RecordingExtension:
     def __init__(self, translation, result=None, bridge_status=None):
         self.translation = dict(translation)
-        self.result = dict(result or {"ok": True, "status": {"status": "accepted"}})
+        self.result = dict(result or _submission_result())
         self.bridge_status = dict(
             bridge_status
             or {
@@ -270,6 +267,29 @@ def _validated_get_translation(
         "reason_code": "validated",
         "message": "Korean command was translated to ChatClef DSL.",
         "data": {},
+    }
+
+
+def _submission_result(
+    *,
+    ok: bool = True,
+    status: str = "accepted",
+    error_code: str | None = None,
+    message: str = "accepted",
+) -> dict[str, object]:
+    data: dict[str, object] = {}
+    return {
+        "ok": ok,
+        "status": {
+            "ok": ok,
+            "status": status,
+            "error_code": error_code,
+            "message": message,
+            "data": dict(data),
+        },
+        "error": error_code,
+        "message": message,
+        "details": dict(data),
     }
 
 

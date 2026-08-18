@@ -301,15 +301,29 @@ Audited baseline 4239c23 상태: `[absent; historical dirty-tree implementation 
 - effective Gradio fallback range의 listener PID
 - candidate process의 Name, PID, PPID, CreationDate, ExecutablePath, CommandLine
 - candidate의 ancestor chain
-- candidate의 approved entrypoint
+- candidate의 parsed invocation mode와 primary operand
+- exact resolved entrypoint와 repository provenance
+- 승인 launcher가 필요한 경우 launcher PID, CreationDate, ExecutablePath,
+  resolved path
 - read-only runtime status
 
-승인된 app entrypoint:
+Production app은 repository `main.py`, `python -m lavi`, `python -m lavi app`,
+`run.bat`, `run_lav_dev.cmd`를 통해 시작될 수 있다. 그러나 mutating preflight의
+승인은 실제 probe가 provenance를 증명한 실행 형식으로 더 좁게 제한한다.
 
-- repository `main.py`
-- `python -m lavi`
-- `python -m lavi app`
-- 위 entrypoint를 시작하는 `run.bat` 또는 `run_lav_dev.cmd` chain
+Mutating preflight에서 승인되는 app entrypoint:
+
+- Python의 primary script operand가 exact absolute
+  `<repository_root>\main.py`인 direct invocation
+- primary script operand가 relative `main.py`이고 exact repository
+  `run.bat` 또는 `run_lav_dev.cmd` ancestor가 working-root provenance를
+  증명하며 그 launcher identity까지 같은 observation에 결합된 invocation
+
+`python -c ... main.py`의 trailing argument, repository descendant의 다른
+`tmp\main.py`, 다른 checkout의 `main.py`, 임의 argv 위치의 launcher 이름은
+거절한다. 현재 process probe는 resolved module path를 관찰하지 않으므로
+`python -m lavi`와 `python -m lavi app`은 production launch form이더라도
+module provenance 구현 전까지 mutating preflight에서 fail closed한다.
 
 통과 조건:
 
@@ -662,6 +676,23 @@ PreflightDecision:
     identity_source
     listener_pid_by_port
     process_entrypoint
+    intended_lavi_pid
+    intended_lavi_creation_date
+    intended_lavi_executable_path
+    process_invocation_mode
+    resolved_entrypoint_path
+    entrypoint_provenance
+    repository_root
+    approved_ancestor: null | object
+    approved_ancestor fields when present:
+      process_id
+      parent_process_id
+      creation_date
+      executable_path
+      invocation_mode
+      resolved_entrypoint_path
+      entrypoint_provenance
+    process_identity_fingerprint
     log_encoding
     log_snapshot_stable
     pre_submit_recheck_passed
@@ -760,8 +791,17 @@ allowlist 밖의 arbitrary user command를 diagnostics에 그대로 저장하지
 - process command line access denied -> opt-in 뒤 fail
 - AVG/권한 차단 뒤 승인된 elevated read-only 재시도 1회
 - elevated 재시도도 차단됨 -> fail, 추가 재시도 없음
-- `main.py`, `-m lavi`, `-m lavi app` 각각의 승인 entrypoint
-- base Python listener + venv launcher parent
+- exact absolute repository `main.py` primary operand -> 통과 후보
+- relative `main.py`인데 approved launcher provenance 없음 -> fail
+- `python -c "..." main.py` -> fail
+- repository descendant `tmp\main.py` -> fail
+- 다른 checkout의 `main.py` -> fail
+- `main.py` 또는 launcher path가 trailing argument일 뿐임 -> fail
+- resolved module provenance 없는 `-m lavi`, `-m lavi app` -> fail
+- exact approved launcher ancestor + relative primary `main.py` -> 통과 후보
+- 같은 PID/CreationDate라도 executable, invocation mode, resolved entrypoint,
+  repository root 또는 launcher provenance가 바뀜 -> fail
+- required structured identity field가 누락됨 -> fail
 - Chess 비활성으로 `8790`이 없음 -> 단독 실패 아님
 - GPT-SoVITS 별도 PID가 `9880` 사용 -> 단독 실패 아님
 

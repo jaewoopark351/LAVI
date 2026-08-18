@@ -1,4 +1,5 @@
 #20260818_kpopmodder: Verify supervised composition never bypasses preflight or submits twice.
+#20260819_kpopmodder: Use the complete mirrored result fixture required by canonical parsing.
 from __future__ import annotations
 
 import unittest
@@ -86,7 +87,17 @@ class _SupervisedGateway:
         self.submit_call_count += 1
         return {
             "ok": True,
-            "status": {"status": "accepted", "request_id": "request-1"},
+            "status": {
+                "request_id": "request-1",
+                "ok": True,
+                "status": "accepted",
+                "error_code": None,
+                "message": "accepted",
+                "data": {},
+            },
+            "error": None,
+            "message": "accepted",
+            "details": {},
         }
 
     def read_status(self):

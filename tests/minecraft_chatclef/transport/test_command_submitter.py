@@ -1,6 +1,7 @@
 #20260818_kpopmodder: Lock ambiguous scheduled-send outcomes behind active ownership.
 from __future__ import annotations
 
+import json
 import threading
 import unittest
 from concurrent.futures import TimeoutError as FutureTimeoutError
@@ -16,8 +17,34 @@ from plugins.Minecraft.fabric.chatclef.transport.fabric_chatclef_connection_owne
     FabricChatClefConnectionOwnership,
 )
 
+from .fixtures import DelayedCommandSubmissionHarness
+
 
 class FabricChatClefCommandSubmitterTests(unittest.TestCase):
+    def test_real_delayed_send_timeout_blocks_second_wire_until_release(self):
+        with DelayedCommandSubmissionHarness() as harness:
+            first = harness.submit("cmd-1", "get stone 1")
+            harness.wait_until_send_started()
+
+            second = harness.submit("cmd-2", "get coal 1")
+
+            self.assertEqual(CommandResultStatus.UNKNOWN, first.status)
+            self.assertTrue(first.data["reconciliation_required"])
+            self.assertEqual("cmd-1", harness.active_request_id)
+            self.assertEqual(CommandResultStatus.REJECTED, second.status)
+            self.assertEqual(1, harness.scheduled_future_count)
+            self.assertEqual([], harness.wire_messages)
+
+            harness.release_delayed_send()
+            harness.wait_for_scheduled_futures()
+
+            wire_messages = [json.loads(raw) for raw in harness.wire_messages]
+            self.assertEqual(1, len(wire_messages))
+            self.assertEqual("cmd-1", wire_messages[0]["correlation_id"])
+            self.assertEqual("cmd-1", wire_messages[0]["payload"]["request_id"])
+            self.assertEqual("cmd-1", harness.active_request_id)
+            self.assertEqual(0, harness.pending_task_count())
+
     def test_scheduled_send_timeout_is_unknown_and_keeps_active_guard(self):
         ownership = _connected_ownership()
         submitter = _submitter(

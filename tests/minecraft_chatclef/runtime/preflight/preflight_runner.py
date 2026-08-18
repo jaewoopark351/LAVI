@@ -1,4 +1,5 @@
 #20260818_kpopmodder: Orchestrate fail-closed test-only admission before one live submit.
+#20260819_kpopmodder: Bind the complete process fingerprint across the submit recheck.
 from __future__ import annotations
 
 from typing import Callable, Mapping
@@ -24,6 +25,9 @@ from .runtime_status_identity import (
 from .runtime_environment import DEFAULT_KOREAN_COMMAND
 from .windows_listener_preflight import (
     inspect_windows_listener_identity,
+)
+from .windows_listener.process_identity.process_identity_key import (
+    process_identity_key,
 )
 from .world_identity import inspect_world_identity
 
@@ -80,6 +84,13 @@ def run_live_runtime_preflight(
         return _failure(
             "process_identity",
             str(initial_process.get("reason") or "process identity failed"),
+            observed,
+        )
+    initial_process_key = _process_identity_key(initial_process)
+    if initial_process_key is None:
+        return _failure(
+            "process_identity",
+            "listener process identity evidence is incomplete or inconsistent",
             observed,
         )
     observed.update(_observed(initial_process))
@@ -139,7 +150,8 @@ def run_live_runtime_preflight(
             str(final_process.get("reason") or "process recheck failed"),
             observed,
         )
-    if _process_identity_key(initial_process) != _process_identity_key(final_process):
+    final_process_key = _process_identity_key(final_process)
+    if final_process_key is None or initial_process_key != final_process_key:
         return _failure(
             "pre_submit_recheck",
             "listener owner identity changed during preflight",
@@ -237,16 +249,8 @@ def _read_approval(
     return parse_approval_record(raw_approval)
 
 
-def _process_identity_key(result: Mapping[str, object]) -> tuple[int, str]:
-    evidence = _observed(result)
-    try:
-        process_id = int(evidence.get("intended_lavi_pid") or -1)
-    except (TypeError, ValueError):
-        process_id = -1
-    return (
-        process_id,
-        str(evidence.get("intended_lavi_creation_date") or "").strip(),
-    )
+def _process_identity_key(result: Mapping[str, object]) -> str | None:
+    return process_identity_key(_observed(result))
 
 
 def _observed(result: Mapping[str, object]) -> dict[str, object]:

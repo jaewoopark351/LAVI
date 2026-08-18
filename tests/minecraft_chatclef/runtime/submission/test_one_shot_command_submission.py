@@ -1,4 +1,5 @@
 #20260818_kpopmodder: Verify submit uncertainty and replay prevention with offline gateways.
+#20260819_kpopmodder: Reject contradictory canonical submit-result mirrors in one-shot runs.
 from __future__ import annotations
 
 import unittest
@@ -27,15 +28,32 @@ class OneShotCommandSubmissionTests(unittest.TestCase):
 
     def test_explicit_rejection_is_not_retried(self):
         gateway = _SubmissionGateway(
-            {"ok": False, "status": {"status": "rejected", "request_id": "request-1"}}
+            _result_payload(
+                ok=False,
+                status="rejected",
+                error_code="invalid_request",
+                message="rejected",
+            )
         )
         observation = submit_command_once(gateway, "돌 1개 가져와줘")
-        self.assertEqual("submit_response_not_accepted", observation["submission_outcome"])
+        self.assertEqual(
+            "submit_response_not_accepted",
+            observation["submission_outcome"],
+        )
         self.assertEqual(1, gateway.submit_call_count)
 
     def test_explicit_unknown_response_requires_reconciliation(self):
         gateway = _SubmissionGateway(
-            {"ok": False, "status": {"status": "unknown", "request_id": "request-1"}}
+            _result_payload(
+                ok=False,
+                status="unknown",
+                error_code="internal_error",
+                message="outcome unknown",
+                data={
+                    "submission_outcome": "submission_outcome_unknown",
+                    "reconciliation_required": True,
+                },
+            )
         )
 
         observation = submit_command_once(gateway, "test command")
@@ -45,6 +63,54 @@ class OneShotCommandSubmissionTests(unittest.TestCase):
             observation["submission_outcome"],
         )
         self.assertTrue(observation["reconciliation_required"])
+
+    def test_contradictory_mirrors_are_unknown_and_never_replayed(self):
+        cases = {}
+
+        nested_false = _accepted_payload()
+        nested_false["status"]["ok"] = False
+        cases["nested_false"] = nested_false
+
+        rejected_nested_true = _result_payload(
+            ok=False,
+            status="rejected",
+            error_code="invalid_request",
+            message="rejected",
+        )
+        rejected_nested_true["status"]["ok"] = True
+        cases["rejected_nested_true"] = rejected_nested_true
+
+        accepted_with_error = _accepted_payload()
+        accepted_with_error["status"]["error_code"] = "internal_error"
+        accepted_with_error["error"] = "internal_error"
+        cases["accepted_with_error"] = accepted_with_error
+
+        for name, payload in cases.items():
+            with self.subTest(name=name):
+                gateway = _SubmissionGateway(payload)
+                observation = submit_command_once(gateway, "test command")
+                self.assertEqual(
+                    "submission_outcome_unknown",
+                    observation["submission_outcome"],
+                )
+                self.assertTrue(observation["reconciliation_required"])
+                self.assertEqual(1, gateway.submit_call_count)
+                self.assertEqual(0, observation["automatic_resubmit_count"])
+
+    def test_string_or_integer_nested_ok_is_unknown(self):
+        for value in ("false", 0, 1):
+            with self.subTest(value=value):
+                payload = _accepted_payload()
+                payload["status"]["ok"] = value
+                observation = submit_command_once(
+                    _SubmissionGateway(payload),
+                    "test command",
+                )
+                self.assertEqual(
+                    "submission_outcome_unknown",
+                    observation["submission_outcome"],
+                )
+                self.assertTrue(observation["reconciliation_required"])
 
     def test_malformed_status_response_requires_reconciliation(self):
         gateway = _SubmissionGateway({"ok": False, "status": "rejected"})
@@ -57,6 +123,7 @@ class OneShotCommandSubmissionTests(unittest.TestCase):
         )
         self.assertTrue(observation["reconciliation_required"])
 
+
 class _SubmissionGateway:
     def __init__(self, submit_result):
         self._submit_result = submit_result
@@ -68,10 +135,35 @@ class _SubmissionGateway:
             raise self._submit_result
         return dict(self._submit_result)
 
+
 def _accepted_payload() -> dict[str, object]:
+    return _result_payload()
+
+
+def _result_payload(
+    *,
+    ok=True,
+    status="accepted",
+    error_code=None,
+    message="accepted",
+    data=None,
+) -> dict[str, object]:
+    details = dict(data or {})
     return {
-        "ok": True,
-        "status": {"status": "accepted", "request_id": "request-1"},
+        "ok": ok,
+        "status": {
+            "request_id": "request-1",
+            "ok": ok,
+            "status": status,
+            "error_code": error_code,
+            "message": message,
+            "data": dict(details),
+        },
+        "error": error_code,
+        "message": message,
+        "details": dict(details),
     }
+
+
 if __name__ == "__main__":
     unittest.main()

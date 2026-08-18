@@ -1,4 +1,5 @@
 #20260818_kpopmodder: Lock fail-closed live runtime admission with offline fixtures.
+#20260819_kpopmodder: Lock complete process identity across the immediate recheck.
 from __future__ import annotations
 
 import json
@@ -11,6 +12,9 @@ from .preflight_fixture_factory import (
     runtime_status_fixture,
 )
 from .preflight_runner import run_live_runtime_preflight
+from .windows_listener.process_identity.process_identity_key import (
+    process_identity_fingerprint,
+)
 
 
 class LiveRuntimePreflightTests(unittest.TestCase):
@@ -227,6 +231,85 @@ class LiveRuntimePreflightTests(unittest.TestCase):
         self.assertEqual("fail", decision["status"])
         self.assertEqual("pre_submit_recheck", decision["stage"])
         self.assertIn("owner identity changed", decision["reason"])
+
+    def test_structured_process_identity_changes_fail_pre_submit_recheck(self):
+        approved_ancestor = {
+            "process_id": 4000,
+            "parent_process_id": 0,
+            "creation_date": "20260818115900.000000+540",
+            "executable_path": "c:\\windows\\system32\\cmd.exe",
+            "invocation_mode": "cmd_launcher",
+            "resolved_entrypoint_path": (
+                "c:\\vtuber_souorce_code\\lavi\\run_lav_dev.cmd"
+            ),
+            "entrypoint_provenance": "exact_repository_launcher",
+        }
+        mutations = {
+            "executable": {
+                "intended_lavi_executable_path": "c:\\python311\\python.exe",
+            },
+            "invocation_mode": {
+                "process_invocation_mode": "python_module",
+            },
+            "resolved_entrypoint": {
+                "resolved_entrypoint_path": (
+                    "c:\\vtuber_souorce_code\\lavi\\tmp\\main.py"
+                ),
+            },
+            "repository_root": {
+                "repository_root": "c:\\vtuber_souorce_code\\lavi-copy",
+                "resolved_entrypoint_path": (
+                    "c:\\vtuber_souorce_code\\lavi-copy\\main.py"
+                ),
+            },
+            "provenance": {
+                "intended_lavi_parent_process_id": 4000,
+                "entrypoint_provenance": "approved_launcher_relative_script",
+                "approved_ancestor": approved_ancestor,
+            },
+            "approved_ancestor": {
+                "intended_lavi_parent_process_id": 4000,
+                "approved_ancestor": approved_ancestor,
+            },
+        }
+        for label, mutation in mutations.items():
+            with self.subTest(identity_field=label):
+                initial = process_result_fixture(4100)
+                final = process_result_fixture(4100)
+                final["observed"].update(mutation)
+                final["observed"]["process_identity_fingerprint"] = (
+                    process_identity_fingerprint(final["observed"])
+                )
+                results = iter((initial, final))
+
+                decision = run_live_runtime_preflight(
+                    live_environment_fixture(),
+                    status_reader=runtime_status_fixture,
+                    process_probe=lambda **_kwargs: next(results),
+                    log_identity_inspector=log_identity_result_fixture,
+                )
+
+                self.assertEqual("fail", decision["status"])
+                self.assertEqual("pre_submit_recheck", decision["stage"])
+                self.assertIn("owner identity changed", decision["reason"])
+
+    def test_missing_structured_process_identity_fails_closed(self):
+        initial = process_result_fixture(4100)
+        final = process_result_fixture(4100)
+        initial["observed"].pop("resolved_entrypoint_path")
+        final["observed"].pop("resolved_entrypoint_path")
+        results = iter((initial, final))
+
+        decision = run_live_runtime_preflight(
+            live_environment_fixture(),
+            status_reader=runtime_status_fixture,
+            process_probe=lambda **_kwargs: next(results),
+            log_identity_inspector=log_identity_result_fixture,
+        )
+
+        self.assertEqual("fail", decision["status"])
+        self.assertEqual("process_identity", decision["stage"])
+        self.assertIn("evidence", decision["reason"])
 
     def test_approval_change_fails_pre_submit_recheck(self):
         environment = live_environment_fixture()

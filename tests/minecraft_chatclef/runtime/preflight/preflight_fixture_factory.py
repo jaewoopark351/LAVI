@@ -1,7 +1,12 @@
 #20260818_kpopmodder: Build deterministic offline fixtures for live preflight tests.
+#20260819_kpopmodder: Emit complete process identity fingerprints in preflight fixtures.
 from __future__ import annotations
 
 import json
+
+from .windows_listener.process_identity.process_identity_key import (
+    process_identity_fingerprint,
+)
 
 
 def live_environment_fixture() -> dict[str, object]:
@@ -71,16 +76,28 @@ def process_result_fixture(
     process_id: int,
     *,
     creation_date: str = "20260818120000.000000+540",
+    executable_path: str = (
+        "c:\\vtuber_souorce_code\\lavi\\venv\\scripts\\python.exe"
+    ),
 ) -> dict[str, object]:
+    observed: dict[str, object] = {
+        "intended_lavi_pid": process_id,
+        "intended_lavi_parent_process_id": 0,
+        "listener_pid_by_port": {"47860": process_id, "4316": process_id},
+        "process_entrypoint": "main.py",
+        "process_invocation_mode": "python_script",
+        "resolved_entrypoint_path": "c:\\vtuber_souorce_code\\lavi\\main.py",
+        "entrypoint_provenance": "exact_repository_script",
+        "repository_root": "c:\\vtuber_souorce_code\\lavi",
+        "approved_ancestor": None,
+        "intended_lavi_creation_date": creation_date,
+        "intended_lavi_executable_path": executable_path,
+    }
+    observed["process_identity_fingerprint"] = process_identity_fingerprint(observed)
     return {
         "ok": True,
         "reason": "listener_process_identity_validated",
-        "observed": {
-            "intended_lavi_pid": process_id,
-            "listener_pid_by_port": {"47860": process_id, "4316": process_id},
-            "process_entrypoint": "main.py",
-            "intended_lavi_creation_date": creation_date,
-        },
+        "observed": observed,
     }
 
 
