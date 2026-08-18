@@ -709,11 +709,13 @@ LiveRunObservation:
     accepted
     submit_response_not_accepted
     submission_outcome_unknown
-  gradio_submit_call_count: nonnegative integer
+  gradio_submit_call_count: nonnegative integer | unknown
   adapter_command_request_count: nonnegative integer | unknown
   automatic_resubmit_count: nonnegative integer
   automatic_rerun_count: nonnegative integer
   submitted_request_id: value | absent | unknown
+  connection_state_verified: true | false | unknown
+  connection_state_error: controlled message | absent
   terminal_lifecycle_observed: true | false | unknown
   terminal_request_id: value | absent | unknown
   terminal_status:
@@ -735,6 +737,13 @@ LiveRunObservation:
 
 Audited baseline 4239c23의 `active_clear_observation` 통과값은 `same_snapshot`뿐이다.
 `bounded_followup`은 strategy와 fixture가 별도로 승인된 이후에만 사용할 수 있다.
+
+Accepted submission 이후의 terminal observer도 각 status snapshot에서 하나의
+unambiguous bridge object를 선택한 뒤 exact Fabric backend, enabled, connected 및
+`lifecycle_state == connected`를 다시 확인한다. 이 연결 증거가 누락되거나
+모순되면 `connection_state_verified == false`,
+`reconciliation_required == true`로 남기고 같은 snapshot의 completed 값만으로
+batch를 다음 단계로 진행하지 않는다.
 
 `end_to_end_success == true`는 runtime-reported completion,
 `gameplay_observation_complete`, expected gameplay effect와 prohibited-effect absence가

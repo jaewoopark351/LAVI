@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 import time
-from typing import Callable, Mapping
+from typing import Callable
 
 from ..preflight.runtime_command_snapshot import (
     command_snapshot,
 )
+from .runtime_connection_state import runtime_connection_error
+from .terminal_result_application import apply_terminal_result_snapshot
 from .terminal_result_matcher import is_matching_terminal_result
 
 
@@ -19,61 +21,43 @@ def observe_terminal_result(
     monotonic: Callable[[], float] = time.monotonic,
     sleeper: Callable[[float], None] = time.sleep,
 ) -> dict[str, object]:
-    request_id = str(observation.get("submitted_request_id") or "").strip()
-    if observation.get("submission_outcome") != "accepted" or not request_id:
+    request_id = observation.get("submitted_request_id")
+    if observation.get("submission_outcome") != "accepted":
+        return observation
+    if (
+        type(request_id) is not str
+        or not request_id
+        or request_id != request_id.strip()
+    ):
+        observation["reconciliation_required"] = True
         return observation
     deadline = monotonic() + timeout_sec
     while monotonic() < deadline:
         try:
             status = gateway.read_status()
         except Exception:
+            observation["connection_state_verified"] = False
+            observation["connection_state_error"] = "runtime status read failed"
             observation["reconciliation_required"] = True
             return observation
+        connection_error = runtime_connection_error(status)
+        if connection_error:
+            observation["connection_state_verified"] = False
+            observation["connection_state_error"] = connection_error
+            observation["reconciliation_required"] = True
+            return observation
+        observation["connection_state_verified"] = True
+        observation["connection_state_error"] = ""
         commands = command_snapshot(status)
         last_result = commands.get("last_result")
         if is_matching_terminal_result(last_result, request_id):
-            result = dict(last_result)
-            terminal_status = str(result.get("status") or "").strip().lower()
-            active_clear = _active_request_clear(commands)
-            observation.update(
-                {
-                    "terminal_request_id": request_id,
-                    "terminal_status": terminal_status,
-                    "active_request_clear": active_clear,
-                    "active_clear_observation": (
-                        "same_snapshot"
-                        if active_clear is True
-                        else "not_observed"
-                    ),
-                    "terminal_lifecycle_observed": active_clear is True,
-                    "runtime_reported_completion": (
-                        terminal_status == "completed"
-                        if active_clear is True
-                        else False
-                    ),
-                }
+            return apply_terminal_result_snapshot(
+                observation,
+                commands,
+                last_result,
+                request_id,
             )
-            data = result.get("data")
-            if isinstance(data, Mapping) and "result_reason" in data:
-                if not str(data.get("result_reason") or "").strip():
-                    observation["terminal_lifecycle_observed"] = False
-                    observation["runtime_reported_completion"] = False
-                    observation["reconciliation_required"] = True
-            if active_clear is not True or terminal_status == "unknown":
-                observation["reconciliation_required"] = True
-            return observation
         sleeper(poll_sec)
     observation["observer_timeout"] = True
     observation["reconciliation_required"] = True
     return observation
-
-
-def _active_request_clear(commands: Mapping[str, object]) -> bool | None:
-    if "active_request_id" not in commands:
-        return None
-    active_request_id = commands["active_request_id"]
-    if active_request_id is None:
-        return True
-    if isinstance(active_request_id, str) and active_request_id.strip():
-        return False
-    return None

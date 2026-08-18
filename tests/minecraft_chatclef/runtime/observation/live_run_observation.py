@@ -10,6 +10,8 @@ def new_live_run_observation() -> dict[str, object]:
         "automatic_resubmit_count": 0,
         "automatic_rerun_count": 0,
         "submitted_request_id": "absent",
+        "connection_state_verified": None,
+        "connection_state_error": "",
         "terminal_lifecycle_observed": None,
         "terminal_request_id": "absent",
         "terminal_status": "absent",

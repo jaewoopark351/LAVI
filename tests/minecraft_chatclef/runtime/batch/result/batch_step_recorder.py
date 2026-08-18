@@ -46,8 +46,33 @@ def append_batch_step(
             "terminal_lifecycle_observed": observation.get(
                 "terminal_lifecycle_observed"
             ),
+            "connection_state_verified": observation.get(
+                "connection_state_verified"
+            ),
+            "connection_state_error": observation.get(
+                "connection_state_error",
+                "",
+            ),
             "runtime_reported_completion": observation.get(
                 "runtime_reported_completion"
+            ),
+            "gameplay_observation_complete": observation.get(
+                "gameplay_observation_complete"
+            ),
+            "gameplay_effect_observed": observation.get(
+                "gameplay_effect_observed"
+            ),
+            "expected_gameplay_effect_verified": observation.get(
+                "expected_gameplay_effect_verified"
+            ),
+            "partial_gameplay_effect_observed": observation.get(
+                "partial_gameplay_effect_observed"
+            ),
+            "unexpected_effect_observed": observation.get(
+                "unexpected_effect_observed"
+            ),
+            "prohibited_effect_absence_verified": observation.get(
+                "prohibited_effect_absence_verified"
             ),
             "end_to_end_success": observation.get("end_to_end_success"),
             "gameplay_oracle_scope": observation.get("gameplay_oracle_scope"),

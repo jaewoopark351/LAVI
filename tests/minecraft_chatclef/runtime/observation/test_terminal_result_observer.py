@@ -62,6 +62,88 @@ class TerminalResultObserverTests(unittest.TestCase):
         self.assertIs(False, result["runtime_reported_completion"])
         self.assertTrue(result["reconciliation_required"])
 
+    def test_non_string_result_reason_does_not_pass_lifecycle(self):
+        result = observe_terminal_result(
+            _SequenceStatusGateway(
+                [
+                    _status(
+                        "request-1",
+                        "completed",
+                        active_request_id=None,
+                        result_reason=1,
+                    )
+                ]
+            ),
+            _accepted_observation("request-1"),
+            timeout_sec=10,
+            poll_sec=0,
+            sleeper=lambda _seconds: None,
+        )
+
+        self.assertIs(False, result["terminal_lifecycle_observed"])
+        self.assertIs(False, result["runtime_reported_completion"])
+        self.assertTrue(result["reconciliation_required"])
+
+    def test_disconnected_snapshot_never_completes_terminal_lifecycle(self):
+        result = observe_terminal_result(
+            _SequenceStatusGateway(
+                [
+                    _status(
+                        "request-1",
+                        "completed",
+                        active_request_id=None,
+                        connected=False,
+                        lifecycle_state="disconnected",
+                    )
+                ]
+            ),
+            _accepted_observation("request-1"),
+            timeout_sec=10,
+            poll_sec=0,
+            sleeper=lambda _seconds: None,
+        )
+
+        self.assertIs(False, result["connection_state_verified"])
+        self.assertIn("disconnected", result["connection_state_error"])
+        self.assertIsNone(result["terminal_lifecycle_observed"])
+        self.assertIsNone(result["runtime_reported_completion"])
+        self.assertTrue(result["reconciliation_required"])
+
+    def test_first_status_read_failure_marks_connection_unverified(self):
+        result = observe_terminal_result(
+            _SequenceStatusGateway([RuntimeError("status failed")]),
+            _accepted_observation("request-1"),
+            timeout_sec=10,
+            poll_sec=0,
+            sleeper=lambda _seconds: None,
+        )
+
+        self.assertIs(False, result["connection_state_verified"])
+        self.assertEqual("runtime status read failed", result["connection_state_error"])
+        self.assertTrue(result["reconciliation_required"])
+
+    def test_later_status_read_failure_overrides_prior_connection_success(self):
+        result = observe_terminal_result(
+            _SequenceStatusGateway(
+                [
+                    _status(
+                        "old-request",
+                        "completed",
+                        active_request_id="request-1",
+                    ),
+                    RuntimeError("status failed"),
+                ]
+            ),
+            _accepted_observation("request-1"),
+            timeout_sec=10,
+            poll_sec=0,
+            sleeper=lambda _seconds: None,
+        )
+
+        self.assertIs(False, result["connection_state_verified"])
+        self.assertEqual("runtime status read failed", result["connection_state_error"])
+        self.assertTrue(result["reconciliation_required"])
+
     def test_missing_active_request_field_does_not_complete_lifecycle(self):
         status = _status("request-1", "completed", active_request_id=None)
         del status["details"]["details"]["commands"]["active_request_id"]
@@ -120,16 +202,23 @@ class TerminalResultObserverTests(unittest.TestCase):
 
 class _SequenceStatusGateway:
     def __init__(self, statuses, *, repeat_last=False):
-        self._statuses = [dict(status) for status in statuses]
+        self._statuses = list(statuses)
         self._repeat_last = repeat_last
-        self._last = dict(self._statuses[-1])
+        self._last = {}
+        for status in reversed(self._statuses):
+            if isinstance(status, dict):
+                self._last = dict(status)
+                break
         self.read_calls = 0
         self.submit_calls = 0
 
     def read_status(self):
         self.read_calls += 1
         if self._statuses:
-            self._last = self._statuses.pop(0)
+            current = self._statuses.pop(0)
+            if isinstance(current, Exception):
+                raise current
+            self._last = dict(current)
             return dict(self._last)
         if self._repeat_last:
             return dict(self._last)
@@ -149,19 +238,21 @@ def _accepted_observation(request_id: str) -> dict[str, object]:
 
 
 def _status(
-    request_id: str,
-    terminal_status: str,
+    request_id: object,
+    terminal_status: object,
     *,
     active_request_id: object,
-    result_reason: str | None = "finished",
+    result_reason: object = "finished",
+    connected: object = True,
+    lifecycle_state: object = "connected",
 ) -> dict[str, object]:
     data = {} if result_reason is None else {"result_reason": result_reason}
     return {
         "details": {
             "backend_id": "fabric_chatclef",
             "enabled": True,
-            "connected": True,
-            "lifecycle_state": "connected",
+            "connected": connected,
+            "lifecycle_state": lifecycle_state,
             "details": {
                 "commands": {
                     "active_request_id": active_request_id,

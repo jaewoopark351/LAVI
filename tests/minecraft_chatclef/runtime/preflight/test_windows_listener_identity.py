@@ -23,6 +23,46 @@ class WindowsListenerIdentityFixtureTests(unittest.TestCase):
         self.assertTrue(result["ok"], result)
         self.assertEqual(4100, result["observed"]["intended_lavi_pid"])
 
+    def test_missing_required_listener_fails_closed(self):
+        for missing_port in (47860, 4316):
+            with self.subTest(missing_port=missing_port):
+                payload = listener_payload_fixture()
+                payload["listeners"] = [
+                    listener
+                    for listener in payload["listeners"]
+                    if listener["local_port"] != missing_port
+                ]
+
+                result = _validate(payload)
+
+                self.assertFalse(result["ok"], result)
+                self.assertIn("one listener owner", result["reason"])
+
+    def test_gradio_and_fabric_different_owner_pids_fail_closed(self):
+        payload = listener_payload_fixture()
+        payload["listeners"][1]["process_id"] = 4200
+        payload["processes"].append(
+            {
+                **payload["processes"][0],
+                "process_id": 4200,
+                "creation_date": "20260818120100.000000+540",
+            }
+        )
+
+        result = _validate(payload)
+
+        self.assertFalse(result["ok"], result)
+        self.assertIn("different owners", result["reason"])
+
+    def test_duplicate_process_evidence_fails_closed(self):
+        payload = listener_payload_fixture()
+        payload["processes"].append(dict(payload["processes"][0]))
+
+        result = _validate(payload)
+
+        self.assertFalse(result["ok"], result)
+        self.assertIn("duplicate process", result["reason"])
+
     def test_second_lavi_candidate_fails(self):
         payload = listener_payload_fixture()
         payload["listeners"].append(

@@ -36,8 +36,11 @@ def submit_command_once(gateway: object, command: str) -> dict[str, object]:
     return apply_submission_result_to_observation(observation, result)
 
 
-def _call_count(gateway: object) -> int:
+def _call_count(gateway: object) -> int | str:
     try:
-        return int(getattr(gateway, "submit_call_count", 0))
-    except (TypeError, ValueError):
-        return 0
+        value = getattr(gateway, "submit_call_count", None)
+    except Exception:
+        return "unknown"
+    if type(value) is not int or value < 0:
+        return "unknown"
+    return value

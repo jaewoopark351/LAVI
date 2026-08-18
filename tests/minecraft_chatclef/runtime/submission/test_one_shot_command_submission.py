@@ -9,6 +9,9 @@ from .one_shot_command_submission import (
 )
 
 
+_DEFAULT_REPORTED_COUNT = object()
+
+
 class OneShotCommandSubmissionTests(unittest.TestCase):
     def test_accepted_response_records_one_submit(self):
         gateway = _SubmissionGateway(_accepted_payload())
@@ -123,14 +126,34 @@ class OneShotCommandSubmissionTests(unittest.TestCase):
         )
         self.assertTrue(observation["reconciliation_required"])
 
+    def test_malformed_submit_count_is_not_coerced_to_one(self):
+        for value in (True, "1", 1.0, -1, None, RuntimeError("count failed")):
+            with self.subTest(value=value):
+                gateway = _SubmissionGateway(
+                    _accepted_payload(),
+                    reported_count=value,
+                )
+                observation = submit_command_once(gateway, "test command")
+                self.assertEqual("unknown", observation["gradio_submit_call_count"])
+                self.assertEqual(1, gateway.actual_submit_calls)
+
 
 class _SubmissionGateway:
-    def __init__(self, submit_result):
+    def __init__(self, submit_result, *, reported_count=_DEFAULT_REPORTED_COUNT):
         self._submit_result = submit_result
-        self.submit_call_count = 0
+        self._reported_count = reported_count
+        self.actual_submit_calls = 0
+
+    @property
+    def submit_call_count(self):
+        if self._reported_count is _DEFAULT_REPORTED_COUNT:
+            return self.actual_submit_calls
+        if isinstance(self._reported_count, Exception):
+            raise self._reported_count
+        return self._reported_count
 
     def submit_korean_command(self, _command):
-        self.submit_call_count += 1
+        self.actual_submit_calls += 1
         if isinstance(self._submit_result, Exception):
             raise self._submit_result
         return dict(self._submit_result)

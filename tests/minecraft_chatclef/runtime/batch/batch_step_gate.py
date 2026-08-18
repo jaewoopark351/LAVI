@@ -11,10 +11,13 @@ def batch_step_gate_error(command_result: Mapping[str, object]) -> str:
         return "preflight_not_ok"
     if observation.get("submission_outcome") != "accepted":
         return "submission_not_accepted"
-    if observation.get("gradio_submit_call_count") != 1:
+    submit_count = observation.get("gradio_submit_call_count")
+    if type(submit_count) is not int or submit_count != 1:
         return "submit_call_count_violation"
     adapter_count = observation.get("adapter_command_request_count")
-    if isinstance(adapter_count, int) and adapter_count != 1:
+    if adapter_count != "unknown" and (
+        type(adapter_count) is not int or adapter_count != 1
+    ):
         return "adapter_command_request_count_violation"
     automatic_resubmit_count = observation.get("automatic_resubmit_count")
     if type(automatic_resubmit_count) is not int or automatic_resubmit_count != 0:
@@ -24,6 +27,8 @@ def batch_step_gate_error(command_result: Mapping[str, object]) -> str:
         return "automatic_rerun_violation"
     if observation.get("observer_timeout") is True:
         return "observer_timeout"
+    if observation.get("connection_state_verified") is not True:
+        return "runtime_connection_not_verified"
     if observation.get("terminal_lifecycle_observed") is not True:
         return "terminal_lifecycle_not_observed"
     if observation.get("active_request_clear") is not True:

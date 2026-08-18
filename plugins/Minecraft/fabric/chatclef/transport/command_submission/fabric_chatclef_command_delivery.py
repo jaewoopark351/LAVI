@@ -1,14 +1,11 @@
 #20260818_kpopmodder: Classify one coroutine delivery attempt without retry or cancellation.
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any, Callable
 
-
-@dataclass(frozen=True)
-class FabricChatClefCommandDeliveryOutcome:
-    status: str
-    error: Exception | None = None
+from .fabric_chatclef_command_delivery_outcome import (
+    FabricChatClefCommandDeliveryOutcome,
+)
 
 
 class FabricChatClefCommandDelivery:

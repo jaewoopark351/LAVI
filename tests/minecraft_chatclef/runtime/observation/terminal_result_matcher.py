@@ -20,6 +20,13 @@ def is_matching_terminal_result(
 ) -> bool:
     if not isinstance(last_result, Mapping):
         return False
-    if str(last_result.get("request_id") or "") != submitted_request_id:
+    if (
+        type(submitted_request_id) is not str
+        or not submitted_request_id
+        or submitted_request_id != submitted_request_id.strip()
+    ):
         return False
-    return str(last_result.get("status") or "").strip().lower() in TERMINAL_STATUSES
+    if last_result.get("request_id") != submitted_request_id:
+        return False
+    status = last_result.get("status")
+    return type(status) is str and status in TERMINAL_STATUSES

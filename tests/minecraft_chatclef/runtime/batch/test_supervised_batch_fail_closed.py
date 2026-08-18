@@ -66,6 +66,50 @@ class SupervisedBatchFailClosedTests(unittest.TestCase):
         self.assertEqual(0, result["automatic_retry_count"])
         self.assertEqual(0, result["automatic_replay_count"])
 
+    def test_malformed_submit_counts_stop_before_gameplay_checkpoint(self):
+        cases = (
+            ("gradio_submit_call_count", True, "submit_call_count_violation"),
+            ("gradio_submit_call_count", "1", "submit_call_count_violation"),
+            ("gradio_submit_call_count", 1.0, "submit_call_count_violation"),
+            (
+                "adapter_command_request_count",
+                True,
+                "adapter_command_request_count_violation",
+            ),
+            (
+                "adapter_command_request_count",
+                "1",
+                "adapter_command_request_count_violation",
+            ),
+            (
+                "adapter_command_request_count",
+                1.0,
+                "adapter_command_request_count_violation",
+            ),
+        )
+        for field, value, reason in cases:
+            with self.subTest(field=field, value=value):
+                result_fixture = completed_command_result_fixture()
+                result_fixture["observation"][field] = value
+                calls = _BatchCalls(result_fixture)
+
+                result = self._run(calls)
+
+                self.assertEqual(reason, result["stop_reason"])
+                self.assertEqual(1, calls.execution_count)
+                self.assertEqual(0, calls.checkpoint_count)
+
+    def test_unverified_runtime_connection_stops_before_gameplay_checkpoint(self):
+        result_fixture = completed_command_result_fixture()
+        result_fixture["observation"]["connection_state_verified"] = False
+        calls = _BatchCalls(result_fixture)
+
+        result = self._run(calls)
+
+        self.assertEqual("runtime_connection_not_verified", result["stop_reason"])
+        self.assertEqual(1, calls.execution_count)
+        self.assertEqual(0, calls.checkpoint_count)
+
     def test_incomplete_gameplay_checkpoint_stops_before_reconciliation(self):
         checkpoint = complete_gameplay_checkpoint_fixture()
         checkpoint["gameplay_observation_complete"] = False
@@ -98,6 +142,11 @@ class SupervisedBatchFailClosedTests(unittest.TestCase):
         self.assertEqual(1, calls.execution_count)
         self.assertEqual(1, calls.checkpoint_count)
         self.assertEqual(0, calls.reconciliation_count)
+        step = result["steps"][0]
+        self.assertIs(False, step["gameplay_observation_complete"])
+        self.assertIs(True, step["expected_gameplay_effect_verified"])
+        self.assertIs(False, step["partial_gameplay_effect_observed"])
+        self.assertIsNone(step["prohibited_effect_absence_verified"])
 
     def test_guard_reconciliation_failure_stops_before_second_command(self):
         calls = _BatchCalls(

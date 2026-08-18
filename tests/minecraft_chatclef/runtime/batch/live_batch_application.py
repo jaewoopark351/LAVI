@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 
+from ..preflight.runtime_opt_in import live_mutating_run_selected
 from ..submission.gradio_runtime_gateway import LaviGradioRuntimeGateway
 from ..supervised_live_run import run_supervised_live_command
 from .batch_approval_parser import parse_batch_approval_record
@@ -40,9 +41,7 @@ def run_live_get_batch_application(
         object,
     ] = reconcile_batch_one_shot_guard,
 ) -> dict[str, object]:
-    if not bool(base_environment.get("live_opt_in")) or not bool(
-        base_environment.get("mutating_opt_in")
-    ):
+    if not live_mutating_run_selected(base_environment):
         return _setup_result("skipped", "live_and_mutating_opt_ins_required")
     approval, approval_error = parse_batch_approval_record(raw_batch_approval)
     if approval_error:

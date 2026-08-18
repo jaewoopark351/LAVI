@@ -3,17 +3,17 @@ from __future__ import annotations
 
 from typing import Mapping
 
+from .runtime_bridge_snapshot import runtime_bridge_snapshot
+
 
 def inspect_runtime_status(
     payload: object,
     *,
     expected_backend: str,
 ) -> dict[str, object]:
-    if not isinstance(payload, Mapping):
-        return _failure("runtime status must be an object")
-    bridge = _bridge(payload)
-    if not bridge:
-        return _failure("Fabric ChatClef bridge status is missing")
+    bridge, bridge_error = runtime_bridge_snapshot(payload)
+    if bridge_error:
+        return _failure(bridge_error)
     backend = _text(bridge.get("backend_id"))
     connected = bridge.get("connected") is True
     lifecycle_state = _text(bridge.get("lifecycle_state"))
@@ -48,17 +48,6 @@ def inspect_runtime_status(
     if active_request_id:
         return _failure("Fabric ChatClef command is already active", observed)
     return {"ok": True, "reason": "runtime_status_validated", "observed": observed}
-
-
-def _bridge(payload: Mapping[str, object]) -> dict[str, object]:
-    details = payload.get("details")
-    if isinstance(details, Mapping):
-        return dict(details)
-    if "backend_id" in payload:
-        return dict(payload)
-    return {}
-
-
 def _commands(bridge: Mapping[str, object]) -> dict[str, object] | None:
     details = bridge.get("details")
     if not isinstance(details, Mapping):

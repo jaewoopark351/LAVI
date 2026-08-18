@@ -55,6 +55,13 @@ class SupervisedBatchHappyPathTests(unittest.TestCase):
         self.assertEqual(0, result["automatic_replay_count"])
         self.assertEqual(0, result["automatic_resubmit_count"])
         self.assertEqual(0, result["automatic_rerun_count"])
+        first_step = result["steps"][0]
+        self.assertIs(True, first_step["gameplay_observation_complete"])
+        self.assertIs(True, first_step["gameplay_effect_observed"])
+        self.assertIs(True, first_step["expected_gameplay_effect_verified"])
+        self.assertIs(False, first_step["partial_gameplay_effect_observed"])
+        self.assertIs(False, first_step["unexpected_effect_observed"])
+        self.assertIs(True, first_step["prohibited_effect_absence_verified"])
         serialized = json.dumps(result, ensure_ascii=False)
         for command in COMMANDS:
             self.assertNotIn(command, serialized)

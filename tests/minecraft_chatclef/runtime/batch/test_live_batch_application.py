@@ -92,6 +92,27 @@ class LiveBatchApplicationTests(unittest.TestCase):
         self.assertEqual(0, gateway_calls)
         self.assertEqual(0, result["attempted_count"])
 
+    def test_truthy_non_boolean_opt_in_skips_without_gateway_creation(self):
+        for field in ("live_opt_in", "mutating_opt_in"):
+            with self.subTest(field=field):
+                environment = _environment_fixture()
+                environment[field] = "1"
+                gateway_calls = 0
+
+                def gateway_factory(_url):
+                    nonlocal gateway_calls
+                    gateway_calls += 1
+                    return object()
+
+                result = run_live_get_batch_application(
+                    environment,
+                    None,
+                    gateway_factory=gateway_factory,
+                )
+
+                self.assertEqual("skipped", result["status"])
+                self.assertEqual(0, gateway_calls)
+
     def test_default_batch_path_does_not_use_console_checkpoint(self):
         import inspect
 

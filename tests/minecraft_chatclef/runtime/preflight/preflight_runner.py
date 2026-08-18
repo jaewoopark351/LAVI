@@ -23,6 +23,7 @@ from .runtime_status_identity import (
     inspect_runtime_status,
 )
 from .runtime_environment import DEFAULT_KOREAN_COMMAND
+from .runtime_opt_in import live_mutating_run_selected
 from .windows_listener_preflight import (
     inspect_windows_listener_identity,
 )
@@ -40,9 +41,7 @@ def run_live_runtime_preflight(
     log_identity_inspector: Callable[..., dict[str, object]] = inspect_minecraft_log_identity,
     approval_reader: Callable[[], object] | None = None,
 ) -> dict[str, object]:
-    selected = bool(environment.get("live_opt_in")) and bool(
-        environment.get("mutating_opt_in")
-    )
+    selected = live_mutating_run_selected(environment)
     if not selected:
         return preflight_decision(
             status="skip",

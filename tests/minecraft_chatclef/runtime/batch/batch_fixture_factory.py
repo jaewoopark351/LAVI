@@ -15,8 +15,10 @@ def completed_command_result_fixture() -> dict[str, object]:
         "observation": {
             "submission_outcome": "accepted",
             "gradio_submit_call_count": 1,
+            "adapter_command_request_count": "unknown",
             "automatic_resubmit_count": 0,
             "automatic_rerun_count": 0,
+            "connection_state_verified": True,
             "terminal_lifecycle_observed": True,
             "terminal_status": "completed",
             "active_request_clear": True,

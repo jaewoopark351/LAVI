@@ -1,27 +1,15 @@
 #20260818_kpopmodder: Own Fabric ChatClef connection and active-command admission.
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any
 
 from plugins.Minecraft.common.dto.command_request_dto import CommandRequestDTO
 from plugins.Minecraft.common.protocol.bridge_error_code import BridgeErrorCode
 
+from .fabric_chatclef_command_admission_decision import (
+    FabricChatClefCommandAdmissionDecision,
+)
 from .fabric_chatclef_command_request_normalizer import normalize_command_request
-
-
-@dataclass(frozen=True)
-class FabricChatClefCommandAdmissionDecision:
-    request: CommandRequestDTO
-    command_context: Any = None
-    error_code: BridgeErrorCode | None = None
-    message: str = ""
-    event: str = ""
-    details: dict[str, Any] | None = None
-
-    @property
-    def accepted(self) -> bool:
-        return self.command_context is not None and self.error_code is None
 
 
 class FabricChatClefCommandAdmission:

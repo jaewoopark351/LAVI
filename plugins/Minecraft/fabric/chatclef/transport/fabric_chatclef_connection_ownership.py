@@ -2,32 +2,17 @@
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass, field
 from typing import Any
 
 from plugins.Minecraft.common.dto.bridge_envelope_dto import BridgeEnvelopeDTO
 from plugins.Minecraft.common.dto.command_result_dto import CommandResultDTO
 from plugins.Minecraft.common.protocol.command_result_status import CommandResultStatus
-
-
-@dataclass(frozen=True)
-class FabricChatClefConnectionAdmission:
-    accepted: bool
-    session_id: str
-    generation: int
-    reason: str = ""
-
-
-@dataclass(frozen=True)
-class FabricChatClefActiveCommand:
-    websocket: Any = field(compare=False, repr=False)
-    session_id: str
-    generation: int
-    request_id: str
-    command_message_id: str
-    command: str = field(default="", compare=False)
-    source: str = field(default="", compare=False)
-    started_at_ms: int = field(default=0, compare=False)
+from plugins.Minecraft.fabric.chatclef.transport.fabric_chatclef_active_command import (
+    FabricChatClefActiveCommand,
+)
+from plugins.Minecraft.fabric.chatclef.transport.fabric_chatclef_connection_admission import (
+    FabricChatClefConnectionAdmission,
+)
 
 
 class FabricChatClefConnectionOwnership:
