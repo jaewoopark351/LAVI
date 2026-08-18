@@ -20,6 +20,7 @@ from plugins.Minecraft.fabric.chatclef.input import MinecraftChatClefInputRouter
 HARD_GATE_FALSE_POSITIVES = [
     "캐나다 여행 얘기하자",
     "캐시 10개 필요해",
+    "캐시 확인해줘",
     "다이아몬드 같은 노래 추천해줘",
     "오늘 사과 10개 먹었어",
 ]

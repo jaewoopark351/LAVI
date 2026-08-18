@@ -1,0 +1,160 @@
+#20260818_kpopmodder: Lock fail-closed router status checks and the single-pass submit boundary.
+from __future__ import annotations
+
+import unittest
+
+from plugins.Minecraft.fabric.chatclef.input import MinecraftChatClefInputRouter
+
+
+class RouterSubmissionPrecheckTests(unittest.TestCase):
+    def test_unreadable_or_incomplete_status_never_submits(self):
+        cases = {
+            "missing_status_reader": _NO_STATUS_READER,
+            "status_reader_error": RuntimeError("status failed"),
+            "non_mapping_status": [],
+            "missing_bridge_details": {},
+            "wrong_backend": _bridge_status(backend_id="forge_minemind"),
+            "disabled": _bridge_status(enabled=False),
+            "string_enabled": _bridge_status(enabled="true"),
+            "missing_connected": _bridge_status(include_connected=False),
+            "string_connected": _bridge_status(connected="true"),
+            "missing_lifecycle": _bridge_status(include_lifecycle=False),
+            "lifecycle_not_connected": _bridge_status(
+                lifecycle_state="disconnected"
+            ),
+            "missing_command_status": _bridge_status(commands=None),
+            "missing_active_request_id": _bridge_status(commands={}),
+            "invalid_active_request_id": _bridge_status(
+                commands={"active_request_id": 1}
+            ),
+        }
+
+        for name, status_behavior in cases.items():
+            with self.subTest(name=name):
+                extension = _StatusExtension(status_behavior=status_behavior)
+                router = MinecraftChatClefInputRouter(
+                    extension=extension,
+                    log_callback=lambda _message: None,
+                )
+
+                decision = router.route("다이아몬드 캐줘")
+
+                self.assertTrue(decision.handled)
+                self.assertIn(
+                    decision.reason,
+                    {
+                        "minecraft_bridge_status_unavailable",
+                        "minecraft_bridge_disabled",
+                        "minecraft_bridge_disconnected",
+                    },
+                )
+                self.assertEqual([], extension.submitted)
+
+    def test_legacy_retranslating_handler_is_not_used_as_submit_fallback(self):
+        extension = _LegacyHandlerOnlyExtension()
+        router = MinecraftChatClefInputRouter(
+            extension=extension,
+            log_callback=lambda _message: None,
+        )
+
+        decision = router.route("다이아몬드 캐줘")
+
+        self.assertFalse(decision.handled)
+        self.assertEqual("handler_unavailable", decision.reason)
+        self.assertEqual(0, extension.translate_calls)
+        self.assertEqual(0, extension.handler_calls)
+
+
+_NO_STATUS_READER = object()
+_DEFAULT_COMMANDS = object()
+
+
+class _StatusExtension:
+    def __init__(self, *, status_behavior):
+        self.status_behavior = status_behavior
+        self.submitted = []
+
+    def translate_natural_language_command(self, _text):
+        return _validated_translation()
+
+    def submit_translated_command(self, request, translation):
+        self.submitted.append((dict(request), dict(translation)))
+        return {"ok": True, "status": {"status": "accepted"}}
+
+    def __getattribute__(self, name):
+        if name == "get_status":
+            behavior = object.__getattribute__(self, "status_behavior")
+            if behavior is _NO_STATUS_READER:
+                raise AttributeError(name)
+        return object.__getattribute__(self, name)
+
+    def get_status(self):
+        if isinstance(self.status_behavior, Exception):
+            raise self.status_behavior
+        return self.status_behavior
+
+
+class _LegacyHandlerOnlyExtension:
+    def __init__(self):
+        self.translate_calls = 0
+        self.handler_calls = 0
+
+    def translate_natural_language_command(self, _text):
+        self.translate_calls += 1
+        return _validated_translation()
+
+    def handle_natural_language_command(self, _request):
+        self.handler_calls += 1
+        return {"ok": True, "status": {"status": "accepted"}}
+
+    def get_status(self):
+        return _bridge_status()
+
+
+def _validated_translation() -> dict[str, object]:
+    return {
+        "status": "validated",
+        "executable": True,
+        "command": "get diamond 1",
+        "intent": {
+            "intent_type": "get_item",
+            "item_phrase": "다이아몬드",
+            "quantity": 1,
+        },
+        "resolved_target": "diamond",
+        "reason_code": "validated",
+        "message": "translated",
+        "data": {},
+    }
+
+
+def _bridge_status(
+    *,
+    backend_id: str = "fabric_chatclef",
+    enabled: object = True,
+    connected: object = True,
+    lifecycle_state: str = "connected",
+    commands: object = _DEFAULT_COMMANDS,
+    include_connected: bool = True,
+    include_lifecycle: bool = True,
+) -> dict[str, object]:
+    bridge: dict[str, object] = {
+        "backend_id": backend_id,
+        "enabled": enabled,
+        "details": {
+            "commands": (
+                {"active_request_id": None}
+                if commands is _DEFAULT_COMMANDS
+                else commands
+            )
+        },
+    }
+    if include_connected:
+        bridge["connected"] = connected
+    if include_lifecycle:
+        bridge["lifecycle_state"] = lifecycle_state
+    return {"details": bridge}
+
+
+if __name__ == "__main__":
+    unittest.main()

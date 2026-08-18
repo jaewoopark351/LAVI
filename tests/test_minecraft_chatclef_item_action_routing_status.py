@@ -56,9 +56,11 @@ class MinecraftChatClefItemActionRoutingStatusTests(unittest.TestCase):
             translation=_validated_get_translation(),
             bridge_status={
                 "details": {
+                    "backend_id": "fabric_chatclef",
                     "enabled": True,
                     "connected": False,
-                    "details": {"commands": {}},
+                    "lifecycle_state": "disconnected",
+                    "details": {"commands": {"active_request_id": None}},
                 }
             },
         )
@@ -79,8 +81,10 @@ class MinecraftChatClefItemActionRoutingStatusTests(unittest.TestCase):
             translation=_validated_get_translation(),
             bridge_status={
                 "details": {
+                    "backend_id": "fabric_chatclef",
                     "enabled": True,
                     "connected": True,
+                    "lifecycle_state": "connected",
                     "details": {"commands": {"active_request_id": "active-1"}},
                 }
             },
@@ -230,9 +234,11 @@ class _RecordingExtension:
             bridge_status
             or {
                 "details": {
+                    "backend_id": "fabric_chatclef",
                     "enabled": True,
                     "connected": True,
-                    "details": {"commands": {}},
+                    "lifecycle_state": "connected",
+                    "details": {"commands": {"active_request_id": None}},
                 }
             }
         )

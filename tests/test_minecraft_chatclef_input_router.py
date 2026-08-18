@@ -36,6 +36,7 @@ class MinecraftChatClefInputRouterTests(unittest.TestCase):
         )
         self.assertFalse(gate.should_consider("캐나다 여행 얘기하자"))
         self.assertFalse(gate.should_consider("캐시가 10개 남았어"))
+        self.assertFalse(gate.should_consider("캐시 확인해줘"))
 
     def test_non_minecraft_input_is_not_handled(self):
         extension = _RecordingExtension(
@@ -136,9 +137,11 @@ class MinecraftChatClefInputRouterTests(unittest.TestCase):
             translation=_validated_get_translation("get diamond 1", "다이아몬드", 1, "diamond"),
             bridge_status={
                 "details": {
+                    "backend_id": "fabric_chatclef",
                     "enabled": True,
                     "connected": False,
-                    "details": {"commands": {}},
+                    "lifecycle_state": "disconnected",
+                    "details": {"commands": {"active_request_id": None}},
                 }
             },
         )
@@ -159,8 +162,10 @@ class MinecraftChatClefInputRouterTests(unittest.TestCase):
             translation=_validated_get_translation("get diamond 1", "다이아몬드", 1, "diamond"),
             bridge_status={
                 "details": {
+                    "backend_id": "fabric_chatclef",
                     "enabled": True,
                     "connected": True,
+                    "lifecycle_state": "connected",
                     "details": {
                         "commands": {"active_request_id": "already-active"}
                     },
@@ -211,9 +216,11 @@ class _RecordingExtension:
             bridge_status
             or {
                 "details": {
+                    "backend_id": "fabric_chatclef",
                     "enabled": True,
                     "connected": True,
-                    "details": {"commands": {}},
+                    "lifecycle_state": "connected",
+                    "details": {"commands": {"active_request_id": None}},
                 }
             }
         )
