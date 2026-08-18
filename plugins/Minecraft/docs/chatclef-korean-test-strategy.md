@@ -1,5 +1,8 @@
 <!-- 20260815_kpopmodder: Documented the Korean ChatClef test strategy before expanding alias and action support. -->
 <!-- 20260815_chatgpt: Reconciled source provenance, activation chains, coverage parser authority, matrix maturity, and documentation-set acceptance. -->
+<!-- 20260818_kpopmodder: Reconciled the post-restore live lifecycle test, existing request correlation, and missing fail-closed preflight. -->
+<!-- 20260818_kpopmodder: Fixed audited-baseline live semantics, no-replay handling, and terminal/runtime/gameplay success separation. -->
+<!-- 20260818_kpopmodder: Aligned gameplay observation completeness and expected/partial/prohibited effect semantics with the final-reviewed preflight schema. -->
 
 # ChatClef Korean Test Strategy
 
@@ -23,6 +26,8 @@ plugins/Minecraft/docs/chatclef-korean-item-action-alias-v2-plan.md
 plugins/Minecraft/docs/chatclef-korean-post-review-merge-blockers.md
 plugins/Minecraft/docs/chatclef-command-lifecycle-and-threading.md
 plugins/Minecraft/docs/fabric-chatclef-bridge-protocol-v1.md
+plugins/Minecraft/docs/fabric-chatclef-live-runtime-preflight-plan.md
+plugins/Minecraft/docs/fabric-chatclef-live-runtime-process-lifecycle-plan.md
 ```
 
 The alias v2 plan owns item/action design, command-specific Korean UX policy,
@@ -1957,7 +1962,8 @@ world, and never auto-retry or replay a command after timeout or failure.
 Do not live-test all aliases. Alias coverage belongs in offline tests. Live
 tests should use representative smoke cases by command family.
 
-The current unittest-gated mutating runtime test uses:
+Audited implementation baseline `4239c23`의 unittest-gated mutating runtime test는
+다음 값을 사용한다.
 
 ```text
 LAVI_MINECRAFT_RUNTIME_TESTS=1
@@ -1967,14 +1973,62 @@ LAVI_MINECRAFT_RUNTIME_TIMEOUT_SEC=60
 LAVI_MINECRAFT_RUNTIME_POLL_SEC=2
 ```
 
+이 목록은 audited baseline의 현재 동작이지 안전한 목표 preflight 계약이 아니다.
+특히 baseline test는 `LAVI_GRADIO_URL`이 없으면 `http://127.0.0.1:47860`을
+사용한다. 복구 목표 계약의 mutating mode는 explicit loopback
+`LAVI_GRADIO_URL`을 필수로 하고 default endpoint를 사용하지 않는다.
+
+At the 2026-08-18 post-restore audit, baseline `4239c23` performs one Gradio
+submission, records the returned `request_id`, polls status, ignores stale
+request results, and waits until the same request reaches a terminal status.
+The polling loop refreshes status only; it does not retry or replay the command.
+This proves one Gradio submit call in the test body; it does not by itself prove
+one lower adapter `command_request` without separate instrumentation or
+correlation evidence.
+
+This is a lifecycle-correlation contract, not a gameplay-success contract. The
+current terminal set includes:
+
+```text
+completed
+rejected
+failed
+cancelled
+deadline_exceeded
+unknown
+```
+
+The exact audited-baseline pass condition is:
+
+```text
+matching request_id
++ terminal status
++ active_request_id == null in the same refresh snapshot
++ when data is a dict and result_reason exists, result_reason is nonblank
+```
+
+Missing `result_reason` alone is not an audited-baseline failure. Its
+status-specific requiredness remains `[unverified]`.
+
+Therefore a passing audited-baseline test means that a matching terminal
+lifecycle was observed. It does not mean that the command completed
+successfully, that the character moved, that a block was broken, or that
+inventory increased.
+
 Mutating live tests must also gain a dedicated-environment preflight before any
 future command-request implementation is expanded. Required policy variables:
 
 ```text
+LAVI_GRADIO_URL=http://127.0.0.1:<explicit-port>
 LAVI_MINECRAFT_EXPECTED_BACKEND=fabric_chatclef
 LAVI_MINECRAFT_EXPECTED_INSTANCE=LAVI_TEST_Fabric01
 LAVI_MINECRAFT_EXPECTED_WORLD=<dedicated-test-world>
 ```
+
+The operator must also provide a fresh approval record bound to the exact
+command text, Gradio URL, backend, instance, world/save directory, and one-shot
+invocation. The default smoke candidate `돌 1개 가져와줘` still requires that
+approval; any override requires separate exact approval.
 
 Before sending `command_request`, the test must compare these expected values
 with the runtime status. Mismatch behavior:
@@ -1985,9 +2039,12 @@ instance mismatch -> fail before command_request
 world mismatch -> fail before command_request
 ```
 
-If runtime status cannot report instance or world identity yet, the mutating
-test must skip or fail before command submission. Do not silently continue.
-Forge MineMind fallback remains forbidden.
+If the live or mutating opt-in is absent, the live test skips and submits zero
+commands. Once both opt-ins select a mutating run, a missing dependency/value,
+unknown or inaccessible identity, stale/unstable evidence, ambiguity, or
+mismatch is a deterministic preflight failure with zero submissions. Do not
+silently continue or relabel selected-run evidence failure as a skip. Forge
+MineMind fallback remains forbidden.
 
 Future pytest-based live tests should require both environment opt-in and marker
 selection, for example:
@@ -2003,7 +2060,9 @@ markers:
   chatclef_mutating
 ```
 
-Do not let a single accidental environment variable run mutating tests.
+Do not let a single accidental environment variable run mutating tests. Do not
+allow IDE, CI, a flaky-test plugin, a wrapper, or Codex automation to rerun a
+mutating test automatically.
 
 ## Live Test Safety Rules
 
@@ -2011,6 +2070,8 @@ Live test execution requires explicit user approval and opt-in environment
 variables. A safe live test design should identify:
 
 ```text
+exact approved command and one-shot invocation
+explicit loopback Gradio URL
 expected backend
 dedicated test instance
 dedicated test world
@@ -2019,7 +2080,9 @@ whether movement can occur
 whether inventory can change
 whether world blocks can change
 whether client state can change
-terminal condition checked: ACCEPTED only or COMPLETED
+terminal lifecycle predicate
+runtime-reported completion predicate
+gameplay effect oracle and prohibited effects
 ```
 
 Split live tests by terminal expectation:
@@ -2046,27 +2109,82 @@ the test waits for a terminal command_result before ending
 the command is reclassified as non-mutating by source evidence
 ```
 
-The current mutating Korean runtime test is safer than an ACCEPTED-only smoke
-test because it waits for a terminal result. It still does not satisfy the full
-matching-terminal contract until it verifies that the terminal result belongs
-to the submitted request. Until backend, instance, world, and request
-correlation guards exist, mutating live tests should hard skip before sending a
-command request or implement the guards immediately.
+The audited baseline `4239c23` mutating Korean runtime test is safer than an ACCEPTED-only smoke
+test because it waits for a terminal result. Since `6d75c6e`, it also verifies
+that the terminal result belongs to the submitted `request_id` and includes an
+offline stale-result regression test. The remaining unsafe gap is the missing
+fail-closed backend, instance, world, listener/process ownership, and
+command-immediate TOCTOU preflight. Until that preflight is restored and
+verified, mutating live tests must not run unattended. A supervised one-shot run
+still requires fresh exact-tuple user approval, an explicit loopback endpoint,
+manual verification of every missing identity condition, and automatic rerun
+disabled.
 
 Terminal success checks must be stricter than `active_request_id is None`,
 because an active request can disappear after disconnect, session replacement,
 server stop, ownership reset, or a stale terminal result from a previous
 request.
 
-Terminal success requires:
+Audited baseline terminal lifecycle observation requires:
 
 ```text
 matching terminal CommandResultDTO observed
 result request ownership matches the submitted command
 submitted request_id == terminal result request_id
-terminal status and `data.result_reason` are recorded
-active request is cleared after the matching terminal result
+terminal status is recorded
+active request is clear in the same refresh snapshot
+if data is a dict and result_reason is present, result_reason is nonblank
 ```
+
+The result hierarchy uses four independent terms:
+
+```text
+terminal lifecycle observed:
+  matching request_id + terminal status + active request clear
+
+runtime-reported completion:
+  terminal lifecycle observed + status == completed
+
+gameplay effect observed:
+  expected, partial, or unexpected Minecraft state/effect observed independently
+  of terminal status
+
+end-to-end success:
+  runtime-reported completion
+  + gameplay observation complete
+  + expected gameplay effect verified
+  + prohibited effect absence verified
+```
+
+For example, a future GET effect test must define and observe its inventory or
+world-state success evidence. A matching `failed`, `cancelled`, `rejected`,
+`deadline_exceeded`, or runtime terminal status `"unknown"` result completes
+lifecycle observation but is not runtime-reported completion. Runtime status
+`"unknown"` is distinct from tri-state `unknown`, which means an observation
+value could not be established. A non-completed terminal can still leave
+movement, block, or inventory side effects, so partial and unexpected effects
+are recorded independently and require reconciliation.
+
+The authoritative gameplay projection in `LiveRunObservation` uses these
+separate tri-state fields:
+
+```text
+gameplay_observation_complete: true | false | unknown
+gameplay_effect_observed: true | false | unknown
+expected_gameplay_effect_verified: true | false | unknown
+partial_gameplay_effect_observed: true | false | unknown
+unexpected_effect_observed: true | false | unknown
+prohibited_effect_absence_verified: true | false | unknown
+end_to_end_success: true | false | unknown
+```
+
+`prohibited_effect_absence_verified == true` requires complete observation of
+every state surface named by the command-specific oracle. Merely failing to see
+a prohibited effect is not absence evidence when the observation source is
+missing or incomplete. `end_to_end_success == true` is allowed only when
+runtime-reported completion, `gameplay_observation_complete`,
+`expected_gameplay_effect_verified`, and
+`prohibited_effect_absence_verified` are all true.
 
 Live E2E directly observed fields:
 
@@ -2113,7 +2231,19 @@ payload or `CommandResultDTO` shape:
 ```
 
 Do not pass a terminal live test solely because `active_request_id` became
-empty.
+empty. Even after matching terminal, `active_request_id == null` proves only
+that the Python request lifecycle is clear. It does not prove that the
+Minecraft ChatClef Task stopped or that no partial/unexpected effect remains.
+
+If the server may have received the submit request but accepted response was
+lost through timeout, connection reset, disconnect, or malformed response,
+record `submission_outcome_unknown`. Never treat that as `not submitted`, never
+replay the original command, and block the next mutating run until the operator
+reconciles active request, last result, request/correlation evidence, and
+Minecraft state.
+
+An observer timeout is not a terminal status, failure, or cancellation. It must
+not trigger automatic `@stop`, cancel, retry, replay, or test rerun.
 
 Required stale-result regression:
 
@@ -2133,8 +2263,88 @@ execute all 591 catalog targets live
 run deposit or give without prepared inventory and recipient preconditions
 retry command_request automatically
 replay the original command after failure
+rerun a mutating test automatically from IDE, CI, flaky plugin, wrapper, or Codex
+send automatic @stop or cancel after observer timeout
 fallback to Forge MineMind
 ```
+
+Each future gameplay-effect oracle must define, per command:
+
+```text
+pre-state
+expected effect
+observation source
+tolerance
+forbidden/prohibited effect
+observation timeout
+reconciliation procedure
+```
+
+The oracle maps its evidence to `gameplay_observation_complete`,
+`expected_gameplay_effect_verified`, `partial_gameplay_effect_observed`, and
+`prohibited_effect_absence_verified`. If the observation source is missing or
+incomplete, observation completeness is false or `unknown`, expected/prohibited
+evidence and end-to-end success remain `unknown`, and runtime-reported
+completion must not be promoted to end-to-end success.
+
+Offline fixtures must distinguish at least:
+
+```text
+complete observation + expected effect + prohibited-effect absence -> E2E true
+completed runtime result + expected effect false -> E2E false
+prohibited effect not seen + incomplete observation -> absence and E2E unknown
+non-completed terminal + partial effect -> partial true, E2E false, reconcile
+runtime terminal status "unknown" -> lifecycle terminal value, not tri-state unknown
+```
+
+## 2026-08-18 Post-Restore Live Runtime Status
+
+This audited-baseline section supersedes only the live-runtime implementation
+claims in older documentation-review snapshots and handoff summaries below.
+It does not rewrite their historical test counts or broader merge findings.
+The fixed implementation baseline is commit `4239c23`; a later source/test
+commit requires a new read-only audit before this status is updated.
+
+Implemented in audited baseline `4239c23`:
+
+```text
+explicit live/mutating opt-in
+one Gradio Korean-command submission
+accepted response and submitted request_id capture
+matching request_id terminal polling
+stale terminal rejection helper and regression test
+same-refresh active_request_id clear check with matching terminal
+conditional nonblank result_reason check when data is a dict and the key exists
+no retry/replay inside the current test flow
+```
+
+Absent or incomplete in audited baseline `4239c23`:
+
+```text
+explicit mutating LAVI_GRADIO_URL requirement without default fallback
+fresh exact command/URL/backend/instance/world/one-shot approval tuple
+fail-closed expected backend/instance/world gate
+selected Gradio and Fabric 4316 same-process ownership gate
+hidden second LAVI detection across the effective Gradio range
+exact latest.log stable-snapshot and strict UTF-8/CP949 fallback
+command-immediate status and listener-ownership TOCTOU recheck
+structured preflight ok/skip/fail runner and offline fixtures
+deterministic fail rather than skip after mutating opt-in
+submission_outcome_unknown reconciliation and next-run block
+external IDE/CI/flaky/Codex automatic-rerun guard
+status == completed requirement for runtime-reported completion
+inventory, movement, block, or other expected/partial/unexpected effect verification
+gameplay_observation_complete and prohibited_effect_absence_verified evidence
+end-to-end success oracle
+```
+
+The 2026-08-16~17 documents recorded the missing preflight items as implemented
+in a dirty working tree, but those changes were not committed and are absent
+from audited baseline `4239c23`. They are recovery-and-reverification work, not
+current implementation claims. The complete `PreflightDecision` and
+`LiveRunObservation` structures are owned by
+`fabric-chatclef-live-runtime-preflight-plan.md`; this strategy owns the
+gameplay field semantics and command-specific oracle requirements.
 
 ## Current Implementation Status At Documentation Review
 
@@ -2145,7 +2355,7 @@ Satisfied in the revised documentation set when these three files are committed
 together:
 
 ```text
-runtime baseline, reviewed implementation baseline, and dynamic HEAD current are separated
+runtime baseline, reviewed implementation baseline, and fixed audited implementation baseline are separated
 reviewed source SHA-256 values are recorded with Git blob-byte authority
 all Related Documents in the Korean ChatClef documentation unit are present
 ChatClef built-in activation provenance includes manifest, mixin config,
@@ -2172,8 +2382,8 @@ Windows CI checkout does not yet use fetch-depth: 0 for source-blob baselines
 registered-command JSON artifacts are not committed
 support-matrix JSON artifact is not committed
 golden_case_ids are not present in the actual shared test data
-live backend/instance/world preflight is not implemented
-live matching-result request_id guard is not implemented
+live backend/instance/world preflight is not implemented in audited baseline 4239c23
+live matching-result request_id guard is implemented in `6d75c6e`; older review snapshot retained here for history
 session/correlation/generation live observation is not exposed through last_result
 ```
 
@@ -2185,7 +2395,7 @@ The documentation set is acceptable when the following are true:
 
 ```text
 terminology and responsibility boundaries are internally consistent
-historical baseline, reviewed baseline, and dynamic HEAD current are separated
+historical baseline, reviewed baseline, and fixed audited implementation baseline are separated
 artifact schemas contain all required fields
 registered-command activation chains cover the actual Fabric manifest, mixin,
   event, entrypoint, and registration path
@@ -2237,8 +2447,16 @@ shared golden-case artifact is committed or all planned IDs remain clearly plann
 current aliases are hard-validated
 Tier 1 offline tests do not call real LLMs or networks
 mutating live tests require backend, instance, and world preflight before command_request
-terminal live success requires matching last_result.request_id, last_result.status,
-  and last_result.data.result_reason
+terminal lifecycle observation requires matching last_result.request_id, a terminal
+  last_result.status, same-refresh active_request_id clear, and a nonblank
+  last_result.data.result_reason only when that key exists in a dict data payload
+runtime-reported completion additionally requires status == completed
+gameplay observation records completeness plus expected, partial, unexpected,
+  and prohibited-effect absence as separate tri-state fields
+end-to-end success additionally requires gameplay_observation_complete,
+  expected_gameplay_effect_verified, and prohibited_effect_absence_verified
+  all to be true
+incomplete observation never converts "prohibited effect not seen" into verified absence
 mutating live tests do not end at ACCEPTED only without teardown or terminal observation
 ```
 
@@ -2265,8 +2483,9 @@ The three files are one documentation commit unit.
 Key frozen contracts:
 
 1. Python Korean natural-language output remains prefixless.
-2. Historical c912ff baseline, reviewed cfc170a baseline, and dynamic HEAD current
-   remain separate.
+2. Historical c912ff baseline, reviewed cfc170a baseline, and audited
+   implementation baseline 4239c23 remain separate; later source/test commits
+   require re-audit.
 3. Coverage algorithm version 1 uses the reviewed catalog parser at cfc170a and
    requires the ten production baseline targets.
 4. Registered-command provenance follows the full built-in activation path:
@@ -2292,7 +2511,13 @@ Current implementation status remains not green:
 - Windows CI does not run the focused ChatClef offline scope
 - registered-command, support-matrix, coverage, and shared golden-case artifacts
   are not committed
-- live backend/instance/world and matching-request guards are not implemented
+- live matching-request guard is implemented in `6d75c6e`
+- live backend/instance/world/process preflight is not implemented in audited
+  baseline 4239c23
+- the audited live test observes matching terminal lifecycle, not
+  runtime-reported completion or end-to-end gameplay success
+- gameplay E2E requires complete observation, expected-effect verification, and
+  actively verified prohibited-effect absence; partial effect remains separate
 
 No Java, DTO, wire payload, ChatClef engine, Forge MineMind, live Minecraft
 behavior, or test execution was changed by this documentation revision.

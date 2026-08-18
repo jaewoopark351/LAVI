@@ -1,5 +1,6 @@
 <!-- 20260815_kpopmodder: Documented v2 Korean item alias expansion across get/equip/deposit/give before implementation. -->
 <!-- 20260815_chatgpt: Synchronized design authority, reviewed coverage provenance, and Phase 0 gates with the test strategy and merge-blocker documents. -->
+<!-- 20260818_kpopmodder: Linked the post-restore live lifecycle and fail-closed preflight status without expanding item-action scope. -->
 
 # ChatClef Korean Item Action Alias V2 Plan
 
@@ -53,6 +54,8 @@ plugins/Minecraft/docs/chatclef-korean-post-review-merge-blockers.md
 plugins/Minecraft/docs/chatclef-korean-item-command-resolution-analysis.md
 plugins/Minecraft/docs/chatclef-command-lifecycle-and-threading.md
 plugins/Minecraft/docs/fabric-chatclef-bridge-protocol-v1.md
+plugins/Minecraft/docs/fabric-chatclef-live-runtime-preflight-plan.md
+plugins/Minecraft/docs/fabric-chatclef-live-runtime-process-lifecycle-plan.md
 ```
 
 Authority is split as follows:
@@ -67,11 +70,29 @@ test strategy:
 
 post-review merge blockers:
   current pass/fail status and the implementation work required before merge
+
+live-runtime preflight plan:
+  exact one-shot approval, endpoint/process/world gates, submission uncertainty,
+  and PreflightDecision/LiveRunObservation structure
+
+live-runtime process lifecycle index:
+  fixed audit snapshots, ownership runbooks, and cross-document navigation
 ```
 
 When wording conflicts, the test strategy controls test/provenance/coverage
-contracts and the post-review document controls current merge status. The three
-Korean ChatClef documents are one documentation commit unit.
+contracts, the preflight plan controls live-run admission and result structure,
+and the post-review document controls current merge status. The three Korean
+ChatClef documents remain one core documentation unit; the linked live-runtime
+documents must be updated in the same docs-only change whenever their shared
+live-test contract changes.
+
+The 2026-08-18 post-restore audit does not change item/action UX policy or phase
+order. Live-test implementation status, exact pass semantics, approval,
+preflight, no-replay policy, terminal/runtime-completion terminology, and
+gameplay-effect oracles are intentionally not duplicated here. The test
+strategy, post-review merge blockers, and live-runtime preflight plan own those
+contracts against audited implementation baseline `4239c23` and must be
+re-audited before a later source/test commit is described as current.
 
 ## Goal
 

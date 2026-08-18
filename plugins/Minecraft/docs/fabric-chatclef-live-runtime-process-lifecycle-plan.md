@@ -1,4 +1,7 @@
 <!-- 20260817_kpopmodder: Maintained the stable lifecycle index and added the shutdown/launch-ownership investigation document and snapshot boundary. -->
+<!-- 20260818_kpopmodder: Added the clean-HEAD post-restore snapshot and separated historical dirty-tree evidence from current implementation. -->
+<!-- 20260818_kpopmodder: Bound current-status claims to audited baseline 4239c23 and indexed the explicit approval, no-replay, and observation contracts. -->
+<!-- 20260818_kpopmodder: Indexed evidence-complete gameplay E2E semantics without duplicating the authoritative observation schema. -->
 
 # Fabric ChatClef Live Runtime Process Lifecycle Documentation Index
 
@@ -19,14 +22,18 @@ live mutating test, 코드 수정, 빌드, commit 또는 push를 승인하지 �
 
 2. [`fabric-chatclef-live-runtime-preflight-plan.md`](./fabric-chatclef-live-runtime-preflight-plan.md)
    - Fabric ChatClef live mutating test 전용 read-only preflight 설계
+   - exact command/URL/backend/instance/world/one-shot approval tuple
    - intended LAVI listener ownership, bridge 상태, idle 상태 검증
    - 명시된 Minecraft instance의 `logs/latest.log` fallback 계약
+   - deterministic skip/fail, submission uncertainty와 preflight/live-result 분리
    - offline fixture와 manual live validation 계획
 
 3. [`chatclef-korean-test-strategy.md`](./chatclef-korean-test-strategy.md)
    - command submission과 terminal result의 상세 테스트 계약
-   - submitted request ID와 동일한 terminal result만 성공 후보
-   - stale result 및 자동 replay 금지
+   - submitted request ID와 동일한 terminal result만 lifecycle 종료 후보
+   - terminal lifecycle, runtime completion, gameplay effect와 E2E 판정 분리
+   - complete observation, expected/partial effect, prohibited-effect absence 판정
+   - stale result, 자동 replay와 외부 automatic rerun 금지
    - `result_reason`은 이 문서에서 추측하지 않고 status별 계약이 확정된 뒤
      test strategy에서 관리
 
@@ -71,6 +78,24 @@ HEAD: 4a87e9018a9e2743764ec5d4215eb8923a401da4
 working tree: dirty
 ```
 
+### 2026-08-18 원복 후 audited implementation baseline 재검토
+
+```text
+branch: minecraft-plugin-fix/alto-clef-infinite-loop
+audited implementation baseline: 4239c23
+working tree at audit start: clean
+```
+
+Audited baseline 4239c23에는 기본 opt-in live lifecycle test와 submitted
+request-ID matching이 남아 있다. 2026-08-16~17 dirty working tree에만 있었다고
+문서화된
+backend/instance/world, listener/process identity, same-PID, hidden-LAVI,
+`latest.log` 및 command 직전 TOCTOU preflight 구현은 audited baseline에 없다.
+
+이 baseline은 고정 source snapshot이다. docs-only commit으로 `HEAD`가 바뀌어도
+구현 상태가 자동 갱신되지 않으며, 이후 source/test commit을 현재 상태로 설명하려면
+다시 read-only audit해야 한다.
+
 각 snapshot은 해당 시점의 line reference와 관찰을 해석하기 위한 경계다. 업로드 ZIP,
 다른 날짜의 working tree 또는 현재 local repository와 동일하다는 증명이 아니며,
 한 snapshot의 구현 상태를 다른 snapshot에 자동으로 이월하지 않는다.
@@ -97,6 +122,46 @@ working tree: dirty
 `implemented in current dirty working tree`는 HEAD baseline 또는 검증 완료를 뜻하지
 않는다. 현재 수정된 working-tree implementation이 존재한다는 의미뿐이다.
 
+## 2026-08-18 원복 후 audited baseline 구현 상태
+
+이 표는 위 역사적 dirty-tree 표를 현재 repository 상태로 해석할 때 우선한다.
+
+| 기능 | audited baseline 4239c23 상태 | 비고 |
+| --- | --- | --- |
+| live/mutating 명시적 opt-in | implemented | 현재 runtime lifecycle test에 존재 |
+| submitted request ID matching | implemented | `6d75c6e`부터 stale result 차단 포함 |
+| Gradio submit one-shot | implemented | test body submit API 1회; lower adapter `command_request` 횟수 증거는 별도 필요 |
+| matching terminal lifecycle 대기 | implemented | submitted ID 일치, terminal status, same-snapshot active clear를 요구 |
+| conditional `result_reason` 검사 | implemented | `data`가 dict이고 key가 있을 때 nonblank; status별 requiredness는 미확정 |
+| runtime-reported completion 검증 | not implemented | matching `status == completed`를 필수로 요구하지 않음 |
+| gameplay/end-to-end effect 검증 | not implemented | complete observation, expected/partial effect와 verified prohibited-effect absence를 확인하지 않음 |
+| explicit mutating `LAVI_GRADIO_URL` gate | absent | audited baseline은 URL 미설정 시 default endpoint 사용 |
+| exact approval tuple | absent | command/URL/backend/instance/world/one-shot 승인 근거 필요 |
+| backend/instance/world preflight | absent | historical dirty-tree implementation을 복구·재검증해야 함 |
+| 지정된 `latest.log` fallback | absent | strict UTF-8/CP949 및 stable snapshot 계약만 문서에 남음 |
+| Windows listener/process identity preflight | absent | selected Gradio와 `4316` same-PID gate 포함 |
+| hidden second LAVI 차단 | absent | effective fallback range identity 검증 필요 |
+| command 직전 connected/lifecycle/idle/ownership 재확인 | absent | current initial idle assert만으로 대체할 수 없음 |
+| submission outcome unknown reconciliation | absent | 응답 유실 가능 시 자동 재제출 금지와 다음 run 차단 필요 |
+| external automatic rerun 차단 | absent | IDE/CI/flaky/Codex wrapper rerun 0회 계약 필요 |
+| status별 `result_reason` 계약 | unverified | strategy에서 별도 확정 필요 |
+
+Audited baseline 4239c23 test는 `one-shot lifecycle correlation live test`로
+분류한다. 완전한
+fail-closed preflight가 복구되기 전에는 무인 mutating E2E runner로 분류하거나
+실행하지 않는다.
+
+실제 mutating run의 exact approval tuple, explicit loopback URL, opt-in 뒤
+deterministic `fail`, `submission_outcome_unknown`, observer timeout, 자동 rerun 금지,
+`PreflightDecision`/`LiveRunObservation` 분리는
+[`fabric-chatclef-live-runtime-preflight-plan.md`](./fabric-chatclef-live-runtime-preflight-plan.md)가
+소유한다. terminal lifecycle observed, runtime-reported completion, gameplay effect
+observed와 end-to-end success의 판정 및 command별 oracle은
+[`chatclef-korean-test-strategy.md`](./chatclef-korean-test-strategy.md)가 소유한다.
+특히 strategy는 `gameplay_observation_complete`, expected-effect verification,
+partial-effect observation과 prohibited-effect absence verification의 의미를 소유하며,
+이 인덱스는 해당 필드 스키마를 중복 정의하지 않는다.
+
 ## 공통 안전 불변조건
 
 1. 테스트 코드가 LAVI, Minecraft 또는 외부 자식 프로세스를 자동 종료하지 않는다.
@@ -113,6 +178,16 @@ working tree: dirty
 10. 확인할 수 없는 identity 또는 process ownership은 fail closed한다.
 11. shutdown fixture, exact-PID 종료 재현과 실제 LAVI/Minecraft integration은 단계별
     사용자 승인 없이 실행하지 않는다.
+12. matching terminal 관찰을 실제 command 성공 또는 gameplay effect 성공으로
+    표현하지 않는다.
+13. observer timeout, disconnect 또는 accepted response 유실 가능성 뒤 원래 command를
+    자동 retry/replay하거나 자동 `@stop`/cancel하지 않는다.
+14. `active_request_id == null`만으로 Minecraft Task 종료나 partial/unexpected effect
+    부재를 주장하지 않는다.
+15. 관찰 범위가 불완전하면 prohibited effect를 보지 못했다는 사실을 verified
+    absence 또는 end-to-end success로 승격하지 않는다.
+15. mutating test를 IDE, CI, flaky-test plugin 또는 Codex wrapper가 자동 rerun하지
+    않는다.
 
 ## 범위 밖 변경
 

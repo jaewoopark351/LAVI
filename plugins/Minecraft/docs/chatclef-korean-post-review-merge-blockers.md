@@ -1,9 +1,16 @@
 <!-- 20260815_kpopmodder: Recorded the post-implementation Korean ChatClef merge-blocker review. -->
 <!-- 20260815_chatgpt: Reconciled the documentation-set resolution and retained only implementation/CI blockers as current merge gates. -->
+<!-- 20260818_kpopmodder: Added the post-restore live-test addendum and corrected request-correlation versus environment-preflight status. -->
+<!-- 20260818_kpopmodder: Bound live status to audited baseline 4239c23 and added approval, no-replay, and end-to-end observation blockers. -->
+<!-- 20260818_kpopmodder: Added gameplay observation completeness and verified expected/partial/prohibited effect merge criteria. -->
 
 # ChatClef Korean Post-Review Merge Blockers
 
-Date: 2026-08-15
+Original review date: 2026-08-15
+
+Current live-status reconciliation date: 2026-08-18
+
+Audited implementation baseline: `4239c23`
 
 This document records the current documentation-only merge review for Korean
 Fabric ChatClef routing and test work around:
@@ -89,7 +96,7 @@ Ruff was unavailable in the review environment.
 The revised three-file set now documents:
 
 ```text
-historical c912ff baseline, reviewed cfc170a baseline, and dynamic HEAD current
+historical c912ff baseline, reviewed cfc170a baseline, and a fixed audited implementation baseline
   as separate states
 Git blob bytes as the source-hash authority
 reviewed commit provenance and HEAD drift as separate assertions
@@ -122,6 +129,56 @@ current Java source-backed contracts separated from planned Python phases
 
 These documentation resolutions do not mean the implementation or CI gates
 below are complete.
+
+## 2026-08-18 Post-Restore Live-Test Addendum
+
+This addendum supersedes only the live request-correlation and preflight status
+wording in the older review snapshot below. It does not claim that unrelated
+merge blockers have been re-audited or cleared.
+
+Read-only review of clean audited implementation baseline `4239c23` found:
+
+```text
+implemented:
+  explicit live/mutating opt-in
+  one Gradio command submission
+  submitted request_id capture
+  matching terminal request_id polling
+  stale-result rejection regression test
+  matching terminal and same-refresh active_request_id clear
+  conditional nonblank result_reason check when data is a dict and the key exists
+  no retry/replay in the current polling flow
+
+absent or incomplete:
+  explicit mutating loopback LAVI_GRADIO_URL without default fallback
+  fresh exact command/URL/backend/instance/world/one-shot approval tuple
+  fail-closed backend/instance/world preflight
+  Gradio/Fabric listener same-process ownership gate
+  hidden second LAVI detection
+  exact latest.log strict-decode fallback
+  command-immediate status/ownership TOCTOU recheck
+  structured preflight runner and offline fixtures
+  deterministic fail rather than skip after mutating opt-in
+  lower adapter command_request exactly-once evidence
+  submission_outcome_unknown reconciliation and next-run block
+  IDE/CI/flaky/Codex automatic-rerun guard
+  runtime-reported completion and gameplay/end-to-end effect verification
+  gameplay_observation_complete and explicit expected/partial/prohibited effect fields
+```
+
+The request-ID correlation gap was closed in `6d75c6e` and is present in
+audited baseline `4239c23`. The enhanced preflight was documented as implemented
+only in a later dirty working tree; it was not included in the docs-only commits
+and is absent from the audited baseline after restoration. A later source/test
+commit requires re-audit rather than inheriting this status from the word
+`HEAD`.
+
+The current live test accepts any matching terminal status as lifecycle
+completion, including failure statuses. It does not require `completed` and
+does not inspect inventory, movement, or block changes. Consequently it is a
+one-shot lifecycle-correlation live test, not a complete gameplay-effect E2E
+test, and must not run unattended before fail-closed preflight is restored and
+verified.
 
 ## Merge-Blocking Implementation Findings
 
@@ -267,32 +324,95 @@ catalog_parser_source_sha256
 They must fail when a production baseline target is missing, even if the total
 catalog count remains 591.
 
-### 6. Live Mutating Test Correlation And Environment Guards Are Missing
+### 6. Live Mutating Environment Preflight Is Missing
 
 Before sending a mutating command, the live test must verify:
 
 ```text
+fresh approval tuple matches exact command, Gradio URL, backend, instance,
+  world/save directory, and one-shot invocation
+explicit Gradio URL is an approved loopback endpoint; no default fallback
 backend == fabric_chatclef
 instance == dedicated expected instance
 world == dedicated expected world
 no conflicting active request
 ```
 
-Terminal success requires:
+No live/mutating opt-in means `skip` and zero submissions. Once both opt-ins
+select a mutating run, a missing dependency/value or unknown, inaccessible,
+stale, unstable, ambiguous, or mismatched evidence is `fail`, not `skip`, and
+must leave both Gradio submit and adapter command counts at zero.
+
+Audited baseline terminal lifecycle observation requires:
 
 ```text
 last_result.request_id == submitted request_id
 last_result.status is terminal
-last_result.data.result_reason is observed when present
-active request clears after the matching terminal result
+active_request_id == null in the same refresh snapshot
+if last_result.data is a dict and result_reason exists, it is nonblank
 ```
+
+Missing `result_reason` alone is not a baseline failure; status-specific
+requiredness remains `[unverified]`. Submitted request-ID matching is already
+implemented in audited baseline `4239c23`. The
+remaining blocker is to run that correlation only after the intended backend,
+process, instance, world, connection, lifecycle, and idle ownership have been
+verified fail closed immediately before submission.
+
+Keep lifecycle, runtime report, effect observation, and end-to-end success
+separate:
+
+```text
+terminal lifecycle observed:
+  same request_id + terminal status + active request clear
+
+runtime-reported completion:
+  terminal lifecycle observed + status == completed
+
+gameplay effect observed:
+  expected, partial, or unexpected Minecraft state/effect recorded independently
+  of terminal status
+
+end-to-end success:
+  runtime-reported completion
+  + gameplay observation complete
+  + expected gameplay effect verified
+  + prohibited effect absence verified
+```
+
+A failed, rejected, cancelled, deadline-exceeded, or runtime terminal status
+`"unknown"` can still leave partial movement, block, or inventory changes.
+Runtime value `"unknown"` is distinct from tri-state `unknown`, meaning an
+observation value could not be established.
+
+The strategy and `LiveRunObservation` must preserve these separate fields:
+
+```text
+gameplay_observation_complete
+expected_gameplay_effect_verified
+partial_gameplay_effect_observed
+prohibited_effect_absence_verified
+```
+
+The future command-specific oracle must define pre-state, expected effect,
+observation source, tolerance, forbidden effect, timeout, and reconciliation
+procedure. Not seeing a prohibited effect through an incomplete observation
+source is not verified absence and must leave prohibited-effect absence and E2E
+as `unknown`.
 
 Ownership and loopback tests must cover session, correlation, connection
 generation, stale-session rejection, stale-generation rejection, and wrong
 request-ID rejection. A stale terminal result from an earlier command must not
 make a new live test pass.
 
-No mutating live test may auto-retry or replay an accepted command.
+No mutating live test may auto-retry or replay an accepted command. If the
+server may have received a request but the accepted response was lost, record
+`submission_outcome_unknown`, do not replay, and reconcile active request, last
+result, request/correlation evidence, and Minecraft state before another
+mutating run. Observer timeout is not terminal and must not trigger automatic
+`@stop`, cancel, replay, or IDE/CI/flaky/Codex rerun. `active_request_id == null`
+proves only Python lifecycle clear, not Minecraft Task cessation or absence of
+partial/unexpected effects.
 
 ## Accepted Direction
 
@@ -330,8 +450,22 @@ registered-command and support-matrix artifacts are committed and source-backed
 coverage artifacts and a separate non-regression floor are committed
 catalog parser provenance and ten baseline-target invariants are tested
 shared golden IDs are committed or remain explicitly planned
-live backend/instance/world preflight is implemented
-live terminal result is matched to the submitted request_id
+live preflight requires an explicit loopback Gradio URL, exact one-shot approval
+  tuple, backend/instance/world/process identity, and command-immediate recheck
+selected mutating runs fail deterministically on missing/unknown/stale/ambiguous evidence
+existing live request-ID matching remains covered by regression tests
+terminal lifecycle, runtime-reported completion, gameplay effect, and end-to-end
+  success are recorded separately
+gameplay_observation_complete, expected_gameplay_effect_verified,
+  partial_gameplay_effect_observed, and prohibited_effect_absence_verified are
+  represented with the same tri-state meanings as the test strategy
+end-to-end success requires runtime completion plus complete observation,
+  expected effect verified, and prohibited-effect absence verified
+incomplete observation never turns "prohibited effect not seen" into verified absence
+failure terminals are checked for partial and unexpected gameplay effects
+submission_outcome_unknown blocks replay and requires reconciliation
+observer timeout does not cause automatic stop, cancel, retry, or replay
+mutating tests are not automatically rerun by IDE/CI/flaky/Codex tooling
 accepted commands are never automatically retried or replayed
 ```
 
@@ -345,7 +479,7 @@ add focused Windows CI coverage
 harden DTO/raw mapping numeric validation
 harden TranslationResult and submission boundaries
 commit source-backed command/matrix/coverage/golden artifacts
-implement live environment and request-correlation guards
+restore live backend/instance/world/process preflight while preserving existing request correlation
 run the focused suite to 0 failures
 ```
 
@@ -368,8 +502,16 @@ Documentation is acceptable; implementation merge remains on hold.
 
 Reported focused result remains 98 passed, 9 failed, 2 skipped, 258 subtests.
 The 9 failures are Java source-hash subtests. Windows CI still does not run the
-focused scope. Numeric/TranslationResult hardening, source-backed artifacts,
-and live request correlation are still unimplemented.
+focused scope. Numeric/TranslationResult hardening and source-backed artifacts
+remain part of the historical review findings. Live request correlation is
+implemented in `6d75c6e`, while fail-closed approval/endpoint/backend/instance/
+world/process preflight, submission-unknown reconciliation, automatic-rerun
+protection, and gameplay-effect oracles remain absent from audited baseline
+`4239c23`.
+
+The documentation contract now requires complete gameplay observation,
+expected-effect verification, a separate partial-effect field, and actively
+verified prohibited-effect absence before end-to-end success can be true.
 
 Do not merge until the focused suite has 0 failures and every gate in Required
 Acceptance Before Merge is satisfied.
