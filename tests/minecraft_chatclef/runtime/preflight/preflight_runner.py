@@ -206,6 +206,8 @@ def _process_identity(
         gradio_range_start=int(environment["gradio_range_start"]),
         gradio_range_end=int(environment["gradio_range_end"]),
         repository_root=str(environment["repository_root"]),
+        gradio_host=str(endpoint["host"]),
+        fabric_host="127.0.0.1",
     )
 
 

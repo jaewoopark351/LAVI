@@ -117,7 +117,7 @@ class MinecraftChatClefItemActionRoutingStatusTests(unittest.TestCase):
         decision = router.route("다이아몬드 가져와줘")
 
         self.assertTrue(decision.handled)
-        self.assertEqual("minecraft_command_routed", decision.reason)
+        self.assertEqual("minecraft_command_rejected", decision.reason)
         self.assertIn("command rejected", decision.response_text)
         self.assertEqual(1, len(extension.submitted))
 
@@ -253,7 +253,13 @@ class _RecordingExtension:
         payload = dict(request)
         payload["translation"] = dict(translation)
         self.submitted.append(payload)
-        return dict(self.result)
+        result = dict(self.result)
+        status = result.get("status")
+        if isinstance(status, dict):
+            status = dict(status)
+            status.setdefault("request_id", payload["request_id"])
+            result["status"] = status
+        return result
 
     def get_status(self):
         return dict(self.bridge_status)

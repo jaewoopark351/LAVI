@@ -39,7 +39,11 @@ def capture_get_item_inventory_baseline(
     max_age_sec = _positive_number(environment.get("gameplay_snapshot_max_age_sec"))
     if timeout_sec is None or poll_sec is None or max_age_sec is None:
         return _failure("gameplay observation timing is invalid")
-    freshness_floor_ns = wall_clock_ns() - int(max_age_sec * 1_000_000_000)
+    collection_started_ns = wall_clock_ns()
+    freshness_floor_ns = max(
+        collection_started_ns,
+        wall_clock_ns() - int(max_age_sec * 1_000_000_000),
+    )
     deadline = monotonic() + timeout_sec
     last_reason = "fresh player inventory snapshot was not observed"
     while monotonic() < deadline:
@@ -59,6 +63,7 @@ def capture_get_item_inventory_baseline(
                     "reason": "fresh target-item baseline captured",
                     "player_data_path": str(player_data_path),
                     "snapshot_mtime_ns": mtime_ns,
+                    "collection_started_ns": collection_started_ns,
                     "target_item_id": item_id,
                     "requested_count": requested_count,
                     "target_count_before": target_count_before,

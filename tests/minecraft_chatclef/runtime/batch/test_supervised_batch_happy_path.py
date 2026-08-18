@@ -53,6 +53,8 @@ class SupervisedBatchHappyPathTests(unittest.TestCase):
         self.assertEqual(executed, reconciled)
         self.assertEqual(0, result["automatic_retry_count"])
         self.assertEqual(0, result["automatic_replay_count"])
+        self.assertEqual(0, result["automatic_resubmit_count"])
+        self.assertEqual(0, result["automatic_rerun_count"])
         serialized = json.dumps(result, ensure_ascii=False)
         for command in COMMANDS:
             self.assertNotIn(command, serialized)
@@ -102,6 +104,32 @@ class SupervisedBatchHappyPathTests(unittest.TestCase):
             )
         self.assertEqual("completed", result["status"])
         self.assertEqual(expected_trace, trace)
+
+    def test_observed_automatic_counts_are_preserved_and_aggregated(self):
+        environments = [batch_environment_fixture("command-1", "counted-1")]
+        command_result = completed_command_result_fixture()
+        command_result["observation"]["automatic_resubmit_count"] = 2
+        command_result["observation"]["automatic_rerun_count"] = 3
+
+        result = run_supervised_live_batch(
+            environments,
+            execute_command=lambda _environment: command_result,
+            baseline_provider=lambda _environment: (
+                complete_inventory_baseline_fixture()
+            ),
+            checkpoint_provider=lambda _environment, _result, _baseline: (
+                complete_gameplay_checkpoint_fixture()
+            ),
+            reconcile_guard=lambda _environment, _result: True,
+        )
+
+        self.assertEqual("stopped", result["status"])
+        self.assertEqual(2, result["automatic_resubmit_count"])
+        self.assertEqual(3, result["automatic_rerun_count"])
+        self.assertEqual(2, result["automatic_retry_count"])
+        self.assertEqual(3, result["automatic_replay_count"])
+        self.assertEqual(2, result["steps"][0]["automatic_resubmit_count"])
+        self.assertEqual(3, result["steps"][0]["automatic_rerun_count"])
 
 
 if __name__ == "__main__":

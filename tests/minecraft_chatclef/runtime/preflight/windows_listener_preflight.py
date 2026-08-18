@@ -14,6 +14,8 @@ def inspect_windows_listener_identity(
     gradio_range_start: int,
     gradio_range_end: int,
     repository_root: str,
+    gradio_host: str,
+    fabric_host: str,
     probe_reader: Callable[..., dict[str, object]] = read_windows_listener_probe,
 ) -> dict[str, object]:
     ports = list(range(gradio_range_start, gradio_range_end + 1))
@@ -35,4 +37,6 @@ def inspect_windows_listener_identity(
         gradio_range_start=gradio_range_start,
         gradio_range_end=gradio_range_end,
         repository_root=repository_root,
+        gradio_host=gradio_host,
+        fabric_host=fabric_host,
     )

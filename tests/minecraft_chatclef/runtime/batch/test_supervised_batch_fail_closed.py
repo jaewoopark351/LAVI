@@ -9,6 +9,7 @@ from .batch_fixture_factory import (
     complete_inventory_baseline_fixture,
     completed_command_result_fixture,
 )
+from .gameplay_oracle.get_item_delta_oracle import get_item_delta_checkpoint
 from .supervised_batch_runner import run_supervised_live_batch
 
 
@@ -75,6 +76,25 @@ class SupervisedBatchFailClosedTests(unittest.TestCase):
 
         self.assertEqual("stopped", result["status"])
         self.assertIn("did not prove", result["stop_reason"])
+        self.assertEqual(1, calls.execution_count)
+        self.assertEqual(1, calls.checkpoint_count)
+        self.assertEqual(0, calls.reconciliation_count)
+
+    def test_target_delta_only_checkpoint_never_auto_advances(self):
+        checkpoint = get_item_delta_checkpoint(
+            before_count=4,
+            after_count=5,
+            requested_count=1,
+        )
+        calls = _BatchCalls(
+            completed_command_result_fixture(),
+            checkpoint=checkpoint,
+        )
+
+        result = self._run(calls)
+
+        self.assertEqual("stopped", result["status"])
+        self.assertIn("broader gameplay observation incomplete", result["stop_reason"])
         self.assertEqual(1, calls.execution_count)
         self.assertEqual(1, calls.checkpoint_count)
         self.assertEqual(0, calls.reconciliation_count)

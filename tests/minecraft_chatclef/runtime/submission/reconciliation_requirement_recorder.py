@@ -28,10 +28,19 @@ class ReconciliationRequirementRecorder:
         if not self._state_directory.is_relative_to(self._repository_root):
             raise ValueError("reconciliation state must stay inside the repository")
 
-    def record(self, invocation_id: str, reason: str) -> dict[str, object]:
+    def record(
+        self,
+        invocation_id: str,
+        command_fingerprint: str,
+        reason: str,
+    ) -> dict[str, object]:
+        command_hash = str(command_fingerprint or "").strip()
+        if not command_hash:
+            return {"ok": False, "reason": "command fingerprint is missing"}
         marker = self._state_directory / "reconciliation-required.json"
         payload = {
             "invocation_fingerprint": invocation_fingerprint(invocation_id),
+            "command_fingerprint": command_hash,
             "reason": str(reason or "live_run_reconciliation_required")[:120],
             "recorded_at_utc": datetime.now(timezone.utc).isoformat(),
         }

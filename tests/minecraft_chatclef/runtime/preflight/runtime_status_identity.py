@@ -21,7 +21,13 @@ def inspect_runtime_status(
     commands = _commands(bridge)
     if commands is None or "active_request_id" not in commands:
         return _failure("Fabric ChatClef command status is incomplete")
-    active_request_id = _text(commands.get("active_request_id"))
+    active_request_value = commands["active_request_id"]
+    if active_request_value is None:
+        active_request_id = ""
+    elif isinstance(active_request_value, str) and active_request_value.strip():
+        active_request_id = active_request_value.strip()
+    else:
+        return _failure("Fabric ChatClef active request status is invalid")
     observed = {
         "backend": backend,
         "enabled": enabled,

@@ -16,7 +16,9 @@ class GetItemDeltaOracleTests(unittest.TestCase):
 
         self.assertIs(True, checkpoint["expected_gameplay_effect_verified"])
         self.assertIs(False, checkpoint["partial_gameplay_effect_observed"])
-        self.assertIs(True, checkpoint["prohibited_effect_absence_verified"])
+        self.assertIs(False, checkpoint["gameplay_observation_complete"])
+        self.assertIsNone(checkpoint["unexpected_effect_observed"])
+        self.assertIsNone(checkpoint["prohibited_effect_absence_verified"])
 
     def test_target_item_loss_is_a_prohibited_unexpected_effect(self):
         checkpoint = get_item_delta_checkpoint(
@@ -26,8 +28,9 @@ class GetItemDeltaOracleTests(unittest.TestCase):
         )
 
         self.assertIs(False, checkpoint["expected_gameplay_effect_verified"])
-        self.assertIs(True, checkpoint["unexpected_effect_observed"])
-        self.assertIs(False, checkpoint["prohibited_effect_absence_verified"])
+        self.assertIs(False, checkpoint["gameplay_observation_complete"])
+        self.assertIsNone(checkpoint["unexpected_effect_observed"])
+        self.assertIsNone(checkpoint["prohibited_effect_absence_verified"])
 
 
 if __name__ == "__main__":

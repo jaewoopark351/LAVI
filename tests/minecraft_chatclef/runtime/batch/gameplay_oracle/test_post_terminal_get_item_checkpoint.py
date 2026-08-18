@@ -9,7 +9,7 @@ from .post_terminal_get_item_checkpoint import (
 
 
 class PostTerminalGetItemCheckpointTests(unittest.TestCase):
-    def test_newer_save_with_requested_delta_proves_checkpoint(self):
+    def test_newer_save_proves_target_delta_but_not_complete_gameplay(self):
         checkpoint = collect_post_terminal_get_item_checkpoint(
             _environment(),
             {},
@@ -23,12 +23,12 @@ class PostTerminalGetItemCheckpointTests(unittest.TestCase):
             monotonic=lambda: 0.0,
         )
 
-        self.assertIs(True, checkpoint["gameplay_observation_complete"])
+        self.assertIs(False, checkpoint["gameplay_observation_complete"])
         self.assertIs(True, checkpoint["expected_gameplay_effect_verified"])
-        self.assertIs(True, checkpoint["prohibited_effect_absence_verified"])
+        self.assertIsNone(checkpoint["prohibited_effect_absence_verified"])
         self.assertEqual(1, checkpoint["observed_item_delta"])
 
-    def test_save_without_target_increase_is_complete_but_not_successful(self):
+    def test_save_without_target_increase_remains_incomplete_and_unsuccessful(self):
         checkpoint = collect_post_terminal_get_item_checkpoint(
             _environment(),
             {},
@@ -42,8 +42,9 @@ class PostTerminalGetItemCheckpointTests(unittest.TestCase):
             monotonic=lambda: 0.0,
         )
 
-        self.assertIs(True, checkpoint["gameplay_observation_complete"])
+        self.assertIs(False, checkpoint["gameplay_observation_complete"])
         self.assertIs(False, checkpoint["expected_gameplay_effect_verified"])
+        self.assertIsNone(checkpoint["prohibited_effect_absence_verified"])
         self.assertEqual(0, checkpoint["observed_item_delta"])
 
     def test_no_post_terminal_save_returns_unknown_evidence_without_replay(self):

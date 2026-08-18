@@ -239,7 +239,13 @@ class _RecordingExtension:
         payload = dict(request)
         payload["translation"] = dict(translation)
         self.submitted.append(payload)
-        return dict(self.result)
+        result = dict(self.result)
+        status = result.get("status")
+        if isinstance(status, dict):
+            status = dict(status)
+            status.setdefault("request_id", payload["request_id"])
+            result["status"] = status
+        return result
 
     def get_status(self):
         return dict(self.bridge_status)

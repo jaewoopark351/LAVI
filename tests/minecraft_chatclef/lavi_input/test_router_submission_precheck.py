@@ -27,6 +27,15 @@ class RouterSubmissionPrecheckTests(unittest.TestCase):
             "invalid_active_request_id": _bridge_status(
                 commands={"active_request_id": 1}
             ),
+            "blank_active_request_id": _bridge_status(
+                commands={"active_request_id": ""}
+            ),
+            "whitespace_active_request_id": _bridge_status(
+                commands={"active_request_id": "   "}
+            ),
+            "boolean_active_request_id": _bridge_status(
+                commands={"active_request_id": False}
+            ),
         }
 
         for name, status_behavior in cases.items():
@@ -63,6 +72,22 @@ class RouterSubmissionPrecheckTests(unittest.TestCase):
         self.assertEqual("handler_unavailable", decision.reason)
         self.assertEqual(0, extension.translate_calls)
         self.assertEqual(0, extension.handler_calls)
+
+    def test_malformed_submit_result_is_unknown_not_routed(self):
+        extension = _MalformedSubmitResultExtension(
+            status_behavior=_bridge_status()
+        )
+        router = MinecraftChatClefInputRouter(
+            extension=extension,
+            log_callback=lambda _message: None,
+        )
+
+        decision = router.route("다이아몬드 캐줘")
+
+        self.assertTrue(decision.handled)
+        self.assertEqual("minecraft_submission_outcome_unknown", decision.reason)
+        self.assertEqual("unknown", decision.result["status"]["status"])
+        self.assertTrue(decision.result["details"]["reconciliation_required"])
 
 
 _NO_STATUS_READER = object()
@@ -109,6 +134,12 @@ class _LegacyHandlerOnlyExtension:
 
     def get_status(self):
         return _bridge_status()
+
+
+class _MalformedSubmitResultExtension(_StatusExtension):
+    def submit_translated_command(self, request, translation):
+        self.submitted.append((dict(request), dict(translation)))
+        return None
 
 
 def _validated_translation() -> dict[str, object]:

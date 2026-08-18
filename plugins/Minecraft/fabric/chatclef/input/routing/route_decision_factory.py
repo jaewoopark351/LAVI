@@ -32,8 +32,20 @@ class MinecraftChatClefRouteDecisionFactory:
         translation: Mapping[str, Any],
         result: Mapping[str, Any],
     ) -> MinecraftChatClefInputRouteDecision:
+        result_status = self.result_status(result)
+        details = result.get("details")
+        result_details = dict(details) if isinstance(details, Mapping) else {}
+        if (
+            result_status == "unknown"
+            or result_details.get("reconciliation_required") is True
+        ):
+            reason = "minecraft_submission_outcome_unknown"
+        elif result.get("ok") is True:
+            reason = "minecraft_command_routed"
+        else:
+            reason = "minecraft_command_rejected"
         return MinecraftChatClefInputRouteDecision.handled_result(
-            reason="minecraft_command_routed",
+            reason=reason,
             response_text=self._response_text(translation, result),
             result=dict(result),
             translation=dict(translation),
@@ -111,6 +123,10 @@ class MinecraftChatClefRouteDecisionFactory:
             if result_status == "completed":
                 return f"[Minecraft] command completed: {command}"
             return f"[Minecraft] command routed: {command}"
+        if result_status == "unknown":
+            if message:
+                return f"[Minecraft] command status unknown: {message}"
+            return "[Minecraft] command status unknown; reconciliation required."
         if message:
             return f"[Minecraft] command rejected: {message}"
         return "[Minecraft] command rejected."

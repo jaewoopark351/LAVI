@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock
 
+from ..preflight.command_fingerprint import command_fingerprint
 from .reconciliation_requirement_recorder import (
     ReconciliationRequirementRecorder,
 )
@@ -19,11 +20,18 @@ class ReconciliationRequirementRecorderTests(unittest.TestCase):
         )
         recorder._write_exclusive = Mock(return_value=True)
 
-        result = recorder.record("private-invocation", "x" * 200)
+        expected_command = command_fingerprint("private-command")
+        result = recorder.record(
+            "private-invocation",
+            expected_command,
+            "x" * 200,
+        )
 
         self.assertTrue(result["ok"])
         payload = recorder._write_exclusive.call_args.args[1]
         self.assertNotIn("private-invocation", str(payload))
+        self.assertNotIn("private-command", str(payload))
+        self.assertEqual(expected_command, payload["command_fingerprint"])
         self.assertEqual(120, len(payload["reason"]))
 
     def test_state_directory_outside_repository_is_rejected(self):

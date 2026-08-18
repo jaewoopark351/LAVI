@@ -1,0 +1,42 @@
+#20260818_kpopmodder: Classify one coroutine delivery attempt without retry or cancellation.
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any, Callable
+
+
+@dataclass(frozen=True)
+class FabricChatClefCommandDeliveryOutcome:
+    status: str
+    error: Exception | None = None
+
+
+class FabricChatClefCommandDelivery:
+    def __init__(
+        self,
+        *,
+        future_scheduler: Callable[[Any, Any], Any],
+        send_timeout_sec: float,
+    ):
+        self._future_scheduler = future_scheduler
+        self._send_timeout_sec = send_timeout_sec
+
+    def deliver(self, coroutine: Any, loop: Any) -> FabricChatClefCommandDeliveryOutcome:
+        try:
+            future = self._future_scheduler(coroutine, loop)
+        except Exception as error:
+            close = getattr(coroutine, "close", None)
+            if callable(close):
+                close()
+            return FabricChatClefCommandDeliveryOutcome(
+                status="not_scheduled",
+                error=error,
+            )
+        try:
+            future.result(timeout=self._send_timeout_sec)
+        except Exception as error:
+            return FabricChatClefCommandDeliveryOutcome(
+                status="outcome_unknown",
+                error=error,
+            )
+        return FabricChatClefCommandDeliveryOutcome(status="sent")

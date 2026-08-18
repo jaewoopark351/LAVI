@@ -87,24 +87,29 @@ class MinecraftChatClefSubmissionPrecheck:
                 bridge,
             )
         active_request_id = commands.get("active_request_id")
-        if active_request_id is not None and not isinstance(active_request_id, str):
+        if active_request_id is None:
+            return MinecraftChatClefSubmissionReadiness.accepted(bridge)
+        if not isinstance(active_request_id, str):
             return self._status_unavailable(
                 "Fabric ChatClef active request status is invalid.",
                 bridge,
             )
         active_request_text = self._text(active_request_id)
-        if active_request_text:
-            message = (
-                "Fabric ChatClef command already active: "
-                f"{active_request_text}"
+        if not active_request_text:
+            return self._status_unavailable(
+                "Fabric ChatClef active request status is blank and ambiguous.",
+                bridge,
             )
-            return MinecraftChatClefSubmissionReadiness.rejected(
-                reason="minecraft_command_busy",
-                error="active_command",
-                message=message,
-                status=bridge,
-            )
-        return MinecraftChatClefSubmissionReadiness.accepted(bridge)
+        message = (
+            "Fabric ChatClef command already active: "
+            f"{active_request_text}"
+        )
+        return MinecraftChatClefSubmissionReadiness.rejected(
+            reason="minecraft_command_busy",
+            error="active_command",
+            message=message,
+            status=bridge,
+        )
 
     def _bridge_status(
         self,

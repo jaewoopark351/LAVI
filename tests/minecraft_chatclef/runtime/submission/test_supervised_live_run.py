@@ -113,7 +113,7 @@ class _ReconciliationRecorder:
     def __init__(self):
         self.record_calls = 0
 
-    def record(self, _invocation_id, _reason):
+    def record(self, _invocation_id, _command_fingerprint, _reason):
         self.record_calls += 1
         return {"ok": True, "reason": "recorded"}
 

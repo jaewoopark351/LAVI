@@ -131,6 +131,34 @@ class LiveRuntimePreflightTests(unittest.TestCase):
         self.assertEqual("fail", decision["status"])
         self.assertIn("incomplete", decision["reason"])
 
+    def test_blank_active_request_field_fails_closed(self):
+        status = runtime_status_fixture()
+        status["details"]["details"]["commands"]["active_request_id"] = "   "
+
+        decision = run_live_runtime_preflight(
+            live_environment_fixture(),
+            status_reader=lambda: status,
+            process_probe=lambda **_kwargs: process_result_fixture(4100),
+            log_identity_inspector=log_identity_result_fixture,
+        )
+
+        self.assertEqual("fail", decision["status"])
+        self.assertIn("invalid", decision["reason"])
+
+    def test_wrong_type_active_request_field_fails_closed(self):
+        status = runtime_status_fixture()
+        status["details"]["details"]["commands"]["active_request_id"] = False
+
+        decision = run_live_runtime_preflight(
+            live_environment_fixture(),
+            status_reader=lambda: status,
+            process_probe=lambda **_kwargs: process_result_fixture(4100),
+            log_identity_inspector=log_identity_result_fixture,
+        )
+
+        self.assertEqual("fail", decision["status"])
+        self.assertIn("invalid", decision["reason"])
+
     def test_runtime_world_mismatch_fails_without_log_fallback(self):
         decision = run_live_runtime_preflight(
             live_environment_fixture(),

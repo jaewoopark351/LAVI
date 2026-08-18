@@ -34,18 +34,22 @@ def observe_terminal_result(
         if is_matching_terminal_result(last_result, request_id):
             result = dict(last_result)
             terminal_status = str(result.get("status") or "").strip().lower()
-            active_clear = commands.get("active_request_id") is None
+            active_clear = _active_request_clear(commands)
             observation.update(
                 {
                     "terminal_request_id": request_id,
                     "terminal_status": terminal_status,
                     "active_request_clear": active_clear,
                     "active_clear_observation": (
-                        "same_snapshot" if active_clear else "not_observed"
+                        "same_snapshot"
+                        if active_clear is True
+                        else "not_observed"
                     ),
-                    "terminal_lifecycle_observed": active_clear,
+                    "terminal_lifecycle_observed": active_clear is True,
                     "runtime_reported_completion": (
-                        terminal_status == "completed" if active_clear else False
+                        terminal_status == "completed"
+                        if active_clear is True
+                        else False
                     ),
                 }
             )
@@ -55,10 +59,21 @@ def observe_terminal_result(
                     observation["terminal_lifecycle_observed"] = False
                     observation["runtime_reported_completion"] = False
                     observation["reconciliation_required"] = True
-            if not active_clear or terminal_status == "unknown":
+            if active_clear is not True or terminal_status == "unknown":
                 observation["reconciliation_required"] = True
             return observation
         sleeper(poll_sec)
     observation["observer_timeout"] = True
     observation["reconciliation_required"] = True
     return observation
+
+
+def _active_request_clear(commands: Mapping[str, object]) -> bool | None:
+    if "active_request_id" not in commands:
+        return None
+    active_request_id = commands["active_request_id"]
+    if active_request_id is None:
+        return True
+    if isinstance(active_request_id, str) and active_request_id.strip():
+        return False
+    return None

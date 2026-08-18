@@ -45,6 +45,26 @@ class GetItemInventoryBaselineTests(unittest.TestCase):
         self.assertIs(False, baseline["ok"])
         self.assertEqual(0, reads)
 
+    def test_snapshot_from_before_collection_start_is_not_accepted(self):
+        times = iter((2_000, 2_000))
+        monotonic_values = iter((0.0, 0.0, 2.0))
+
+        baseline = capture_get_item_inventory_baseline(
+            _environment(),
+            path_resolver=lambda _environment: (Path("fixture.dat"), ""),
+            snapshot_reader=lambda _path: {
+                "ok": True,
+                "mtime_ns": 1_999,
+                "inventory_counts": {"minecraft:coal": 5},
+            },
+            wall_clock_ns=lambda: next(times),
+            monotonic=lambda: next(monotonic_values),
+            sleeper=lambda _seconds: None,
+        )
+
+        self.assertIs(False, baseline["ok"])
+        self.assertIn("stale", baseline["reason"])
+
 
 def _environment() -> dict[str, object]:
     return {

@@ -62,6 +62,37 @@ class TerminalResultObserverTests(unittest.TestCase):
         self.assertIs(False, result["runtime_reported_completion"])
         self.assertTrue(result["reconciliation_required"])
 
+    def test_missing_active_request_field_does_not_complete_lifecycle(self):
+        status = _status("request-1", "completed", active_request_id=None)
+        del status["details"]["details"]["commands"]["active_request_id"]
+
+        result = observe_terminal_result(
+            _SequenceStatusGateway([status]),
+            _accepted_observation("request-1"),
+            timeout_sec=10,
+            poll_sec=0,
+            sleeper=lambda _seconds: None,
+        )
+
+        self.assertIs(False, result["terminal_lifecycle_observed"])
+        self.assertIsNone(result["active_request_clear"])
+        self.assertTrue(result["reconciliation_required"])
+
+    def test_blank_active_request_field_does_not_complete_lifecycle(self):
+        result = observe_terminal_result(
+            _SequenceStatusGateway(
+                [_status("request-1", "completed", active_request_id="   ")]
+            ),
+            _accepted_observation("request-1"),
+            timeout_sec=10,
+            poll_sec=0,
+            sleeper=lambda _seconds: None,
+        )
+
+        self.assertIs(False, result["terminal_lifecycle_observed"])
+        self.assertIsNone(result["active_request_clear"])
+        self.assertTrue(result["reconciliation_required"])
+
     def test_observer_timeout_does_not_submit_stop_cancel_or_replay(self):
         gateway = _SequenceStatusGateway(
             [_status("old-request", "completed", active_request_id="request-1")],
@@ -121,7 +152,7 @@ def _status(
     request_id: str,
     terminal_status: str,
     *,
-    active_request_id: str | None,
+    active_request_id: object,
     result_reason: str | None = "finished",
 ) -> dict[str, object]:
     data = {} if result_reason is None else {"result_reason": result_reason}

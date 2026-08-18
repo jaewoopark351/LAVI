@@ -117,9 +117,21 @@ def log_snapshot_fixture(
 def listener_payload_fixture() -> dict[str, list[dict[str, object]]]:
     return {
         "listeners": [
-            {"local_port": 47860, "process_id": 4100},
-            {"local_port": 4316, "process_id": 4100},
-            {"local_port": 47861, "process_id": 9999},
+            {
+                "local_address": "127.0.0.1",
+                "local_port": 47860,
+                "process_id": 4100,
+            },
+            {
+                "local_address": "127.0.0.1",
+                "local_port": 4316,
+                "process_id": 4100,
+            },
+            {
+                "local_address": "127.0.0.1",
+                "local_port": 47861,
+                "process_id": 9999,
+            },
         ],
         "processes": [
             {

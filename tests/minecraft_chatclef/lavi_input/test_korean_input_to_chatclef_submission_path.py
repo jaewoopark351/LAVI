@@ -151,8 +151,26 @@ class KoreanInputToChatClefSubmissionPathTests(unittest.TestCase):
         decision = router.route("다이아몬드 캐줘")
 
         self.assertTrue(decision.handled)
-        self.assertEqual("minecraft_command_routed", decision.reason)
+        self.assertEqual("minecraft_command_rejected", decision.reason)
         self.assertIn("command rejected", decision.response_text)
+        self.assertEqual(1, len(adapter.requests))
+
+    def test_unknown_adapter_result_requires_reconciliation_without_retry(self):
+        adapter = _RecordingAdapter(
+            result_status=CommandResultStatus.UNKNOWN,
+            result_message="send outcome unknown",
+        )
+        extension = MinecraftFabricChatClefExtension(adapter=adapter)
+        router = MinecraftChatClefInputRouter(
+            extension=extension,
+            log_callback=lambda _message: None,
+        )
+
+        decision = router.route("다이아몬드 캐줘")
+
+        self.assertTrue(decision.handled)
+        self.assertEqual("minecraft_submission_outcome_unknown", decision.reason)
+        self.assertTrue(decision.result["details"]["reconciliation_required"])
         self.assertEqual(1, len(adapter.requests))
 
 

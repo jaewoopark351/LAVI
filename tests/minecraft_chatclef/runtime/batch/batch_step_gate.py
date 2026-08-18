@@ -16,9 +16,11 @@ def batch_step_gate_error(command_result: Mapping[str, object]) -> str:
     adapter_count = observation.get("adapter_command_request_count")
     if isinstance(adapter_count, int) and adapter_count != 1:
         return "adapter_command_request_count_violation"
-    if observation.get("automatic_resubmit_count") != 0:
+    automatic_resubmit_count = observation.get("automatic_resubmit_count")
+    if type(automatic_resubmit_count) is not int or automatic_resubmit_count != 0:
         return "automatic_resubmit_violation"
-    if observation.get("automatic_rerun_count") != 0:
+    automatic_rerun_count = observation.get("automatic_rerun_count")
+    if type(automatic_rerun_count) is not int or automatic_rerun_count != 0:
         return "automatic_rerun_violation"
     if observation.get("observer_timeout") is True:
         return "observer_timeout"

@@ -48,10 +48,11 @@ def run_supervised_live_command(
     recorder = reconciliation_recorder or ReconciliationRequirementRecorder(
         str(environment["repository_root"])
     )
+    approved_command_fingerprint = command_fingerprint(environment.get("command"))
     try:
         guard_result = guard.claim(
             str(environment["invocation_id"]),
-            command_fingerprint(environment.get("command")),
+            approved_command_fingerprint,
         )
     except Exception as error:
         guard_result = {
@@ -74,6 +75,7 @@ def run_supervised_live_command(
         observation["reconciliation_required"] = True
         recorder.record(
             str(environment["invocation_id"]),
+            approved_command_fingerprint,
             "unexpected_gradio_submit_call_count",
         )
         return {"preflight": preflight, "observation": observation}
@@ -92,6 +94,7 @@ def run_supervised_live_command(
     if observation.get("reconciliation_required") is True:
         recorder.record(
             str(environment["invocation_id"]),
+            approved_command_fingerprint,
             _reconciliation_reason(observation),
         )
     return {"preflight": preflight, "observation": observation}

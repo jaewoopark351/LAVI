@@ -23,12 +23,25 @@ def submit_command_once(gateway: object, command: str) -> dict[str, object]:
         observation["reconciliation_required"] = True
         return observation
     status = payload.get("status")
-    status_payload = dict(status) if isinstance(status, Mapping) else {}
+    if not isinstance(status, Mapping) or type(payload.get("ok")) is not bool:
+        observation["submission_outcome"] = "submission_outcome_unknown"
+        observation["reconciliation_required"] = True
+        return observation
+    status_payload = dict(status)
     request_id = str(status_payload.get("request_id") or "").strip()
     terminal_status = str(status_payload.get("status") or "").strip().lower()
-    if payload.get("ok") is not True or terminal_status != "accepted" or not request_id:
+    if not request_id or not terminal_status:
+        observation["submission_outcome"] = "submission_outcome_unknown"
+        observation["reconciliation_required"] = True
+        return observation
+    if terminal_status == "unknown":
+        observation["submission_outcome"] = "submission_outcome_unknown"
+        observation["submitted_request_id"] = request_id
+        observation["reconciliation_required"] = True
+        return observation
+    if payload.get("ok") is not True or terminal_status != "accepted":
         observation["submission_outcome"] = "submit_response_not_accepted"
-        observation["submitted_request_id"] = request_id or "absent"
+        observation["submitted_request_id"] = request_id
         return observation
     observation["submission_outcome"] = "accepted"
     observation["submitted_request_id"] = request_id

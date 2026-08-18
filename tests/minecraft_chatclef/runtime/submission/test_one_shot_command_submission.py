@@ -33,6 +33,30 @@ class OneShotCommandSubmissionTests(unittest.TestCase):
         self.assertEqual("submit_response_not_accepted", observation["submission_outcome"])
         self.assertEqual(1, gateway.submit_call_count)
 
+    def test_explicit_unknown_response_requires_reconciliation(self):
+        gateway = _SubmissionGateway(
+            {"ok": False, "status": {"status": "unknown", "request_id": "request-1"}}
+        )
+
+        observation = submit_command_once(gateway, "test command")
+
+        self.assertEqual(
+            "submission_outcome_unknown",
+            observation["submission_outcome"],
+        )
+        self.assertTrue(observation["reconciliation_required"])
+
+    def test_malformed_status_response_requires_reconciliation(self):
+        gateway = _SubmissionGateway({"ok": False, "status": "rejected"})
+
+        observation = submit_command_once(gateway, "test command")
+
+        self.assertEqual(
+            "submission_outcome_unknown",
+            observation["submission_outcome"],
+        )
+        self.assertTrue(observation["reconciliation_required"])
+
 class _SubmissionGateway:
     def __init__(self, submit_result):
         self._submit_result = submit_result

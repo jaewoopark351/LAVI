@@ -39,18 +39,33 @@ class OneShotRunReconciler:
             state_directory=self._state_directory,
         )
 
-    def reconcile(self, invocation_id: str) -> dict[str, object]:
+    def reconcile(
+        self,
+        invocation_id: str,
+        expected_command_fingerprint: str,
+    ) -> dict[str, object]:
         expected = invocation_fingerprint(invocation_id)
+        command_expected = str(expected_command_fingerprint or "").strip()
+        if not command_expected:
+            return _result(False, "expected command fingerprint is missing")
         block = self._state_directory / "live-run-block.json"
         marker = self._state_directory / "reconciliation-required.json"
         if not self._record_exists(block):
             return _result(False, "matching one-shot block is missing")
-        block_error = _record_error(self._record_reader(block), expected)
+        block_error = _record_error(
+            self._record_reader(block),
+            expected,
+            command_expected,
+        )
         if block_error:
             return _result(False, f"one-shot block {block_error}")
         marker_exists = self._record_exists(marker)
         if marker_exists:
-            marker_error = _record_error(self._record_reader(marker), expected)
+            marker_error = _record_error(
+                self._record_reader(marker),
+                expected,
+                command_expected,
+            )
             if marker_error:
                 return _result(False, f"reconciliation marker {marker_error}")
         consumed = self._invocation_ledger.mark_consumed(invocation_id)
@@ -75,12 +90,19 @@ def _read_json_record(path: Path) -> object:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def _record_error(record: object, expected_fingerprint: str) -> str:
+def _record_error(
+    record: object,
+    expected_fingerprint: str,
+    expected_command_fingerprint: str,
+) -> str:
     if not isinstance(record, Mapping):
         return "record is invalid"
     observed = str(record.get("invocation_fingerprint") or "").strip()
     if observed != expected_fingerprint:
         return "invocation does not match"
+    observed_command = str(record.get("command_fingerprint") or "").strip()
+    if observed_command != expected_command_fingerprint:
+        return "command does not match"
     return ""
 
 
