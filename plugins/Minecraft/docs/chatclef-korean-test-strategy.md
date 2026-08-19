@@ -24,7 +24,10 @@ Read this document with:
 ```text
 plugins/Minecraft/docs/chatclef-korean-item-command-resolution-analysis.md
 plugins/Minecraft/docs/chatclef-korean-item-action-alias-v2-plan.md
+plugins/Minecraft/docs/chatclef-python-command-orchestration-plan.md
+plugins/Minecraft/docs/chatclef-python-inventory-cleanup-preflight-contract.md
 plugins/Minecraft/docs/chatclef-korean-post-review-merge-blockers.md
+plugins/Minecraft/README.md
 plugins/Minecraft/docs/chatclef-command-lifecycle-and-threading.md
 plugins/Minecraft/docs/fabric-chatclef-bridge-protocol-v1.md
 plugins/Minecraft/docs/fabric-chatclef-live-runtime-preflight-plan.md
@@ -32,25 +35,27 @@ plugins/Minecraft/docs/fabric-chatclef-live-runtime-process-lifecycle-plan.md
 ```
 
 The alias v2 plan owns item/action design, command-specific Korean UX policy,
-and phased implementation order. This document owns tests, artifact schemas,
+canonical aliases, display wording, capability gates, and phased item/action
+implementation order. The Python command orchestration plan owns user-facing
+response evidence, lifecycle wording, single-pass submission, and primary
+command sequencing. The inventory cleanup contract owns inventory evidence,
+protected-item policy, targeted cleanup, fresh post-cleanup verification, and
+fail-closed primary admission. This document owns tests, artifact schemas,
 source and hash authority, coverage calculation authority, CI scope, and live
-Minecraft safety gates. The post-review merge-blocker document owns the current
-merge decision and the list of implementation work that is still incomplete.
+Minecraft safety gates. The post-review merge-blocker document owns current
+implementation/CI status and the merge decision. The historical analysis is
+diagnosis only, and the README is navigation only.
 
-These three Korean ChatClef documents form one documentation commit unit:
-
-```text
-chatclef-korean-item-action-alias-v2-plan.md
-chatclef-korean-test-strategy.md
-chatclef-korean-post-review-merge-blockers.md
-```
+The 2026-08-19 documentation migration touched seven directly affected files as
+one documentation-only consistency update. Later changes do not have to modify
+all seven files; they must update the owning normative documents whenever a
+shared contract changes.
 
 For test evidence, runtime coverage terminology, reviewed GET acquisition
 behavior, Java activation and source snapshot authority, and focused CI
 acceptance, this document supersedes older or conflicting wording in the alias
 v2 plan. For current pass/fail and merge status, the post-review merge-blocker
-document is authoritative. All three files must be committed together when any
-one of them changes a shared contract.
+document is authoritative.
 
 ## Scope
 
@@ -450,6 +455,141 @@ It does not mean:
 All Minecraft items are already supported in Korean.
 ```
 
+## Current e08af Acquisition Regression
+
+The reviewed archive baseline for the current Korean orchestration follow-up is:
+
+```text
+e08af63948a3fa4675c70279db59c2a70b00a332
+```
+
+The following are existing GET acquisition regressions, not future-only
+features:
+
+```text
+철 10개 캐줘 -> get iron_ingot 10
+철 10개 캐오기 -> get iron_ingot 10
+철 10개 캐와줘 -> get iron_ingot 10
+철을 10개 채굴해줘 -> get iron_ingot 10
+```
+
+Compiler output remains prefixless and must not start with `@`.
+
+## Canonical Korean Display Contract
+
+Response tests should prove that input aliases and canonical display names are
+separate:
+
+```text
+철갑바 response display -> 철 흉갑
+철바지 response display -> 철 레깅스
+철신발 response display -> 철 부츠
+철모자 response display -> 철 투구
+철헬멧 response display -> 철 투구
+```
+
+Display names are Python-owned presentation data. They must not be added to
+common DTOs or wire payloads.
+
+## Equipment Colloquial Alias Contract
+
+Required representative equipment alias regressions:
+
+```text
+철갑바 만들어줘 -> get iron_chestplate 1
+철 흉갑 만들어줘 -> get iron_chestplate 1
+철바지 만들어줘 -> get iron_leggings 1
+철 레깅스 만들어줘 -> get iron_leggings 1
+철신발 만들어줘 -> get iron_boots 1
+철 부츠 만들어줘 -> get iron_boots 1
+철모자 만들어줘 -> get iron_helmet 1
+철헬멧 만들어줘 -> get iron_helmet 1
+철 투구 만들어줘 -> get iron_helmet 1
+다이아몬드 곡괭이 만들어줘 -> get diamond_pickaxe 1
+```
+
+Negative composition regressions:
+
+```text
+철학 모자 must not resolve to iron_helmet
+금요일 바지 must not resolve to golden_leggings
+```
+
+Craft wording remains GET acquisition:
+
+```text
+횃불 만들어줘 -> get torch 1
+```
+
+There is no separate craft DSL.
+
+## Response Evidence And Wording Contract
+
+Response truthfulness tests must separate lifecycle evidence:
+
+```text
+validated alone does not say submitted
+accepted does not say started
+running does not say completed
+terminal completed does not say gameplay effect verified
+gameplay effect wording requires separate observer evidence
+unknown does not advance orchestration
+busy/disconnected/rejected responses submit 0
+UI receives the response exactly once
+Translate listener receives the response exactly once when dispatch is enabled
+TTS listener receives the response exactly once when dispatch is enabled
+LLM provider call count is 0
+llm.receive_input() recursion count is 0
+ordinary chat history storage is 0 by default
+```
+
+## Inventory Cleanup Postcondition Contract
+
+Detailed cleanup safety tests are owned by:
+
+```text
+plugins/Minecraft/docs/chatclef-python-inventory-cleanup-preflight-contract.md
+```
+
+The test strategy must include the responsibility folder when implementation is
+approved:
+
+```text
+tests/minecraft_chatclef/inventory_preflight/
+```
+
+The central postcondition is:
+
+```text
+cleanup terminal completed alone -> primary 0
+fresh post-cleanup AVAILABLE verified -> primary 1
+protected_item_preservation_verified false or unknown -> primary 0
+post-cleanup UNKNOWN -> primary 0
+post-cleanup FULL -> primary 0
+```
+
+Automatic cleanup must create zero bare `deposit` commands and zero placeholder
+quantities.
+
+## Catalog-Driven Coverage Artifacts
+
+Catalog coverage artifacts must prove at least:
+
+```text
+emerald, torch, and iron_leggings exist in the catalog
+every runtime alias target exists in the catalog
+generated aliases and curated aliases merge deterministically
+compact alias conflict count is 0
+catalog-outside target count is 0
+coverage floor does not decrease
+raw coverage and requestable concrete coverage are separate
+ambiguous/default-policy targets are explicitly classified
+alias resolution success and command capability success are separate
+equip rejects non-equipment targets as explicit unsupported
+craft wording compiles to GET
+craft DSL is never generated
+```
+
 ## Multi-Item GET Contracts
 
 Current Java `ItemList` grammar and planned Python canonical serialization are
@@ -496,7 +636,8 @@ Current and planned single-action count output policy:
 current GET emits explicit count, for example get diamond 1
 planned GIVE emits explicit count, for example give Steve diamond 1
 planned specific DEPOSIT emits explicit count only after Korean quantity policy resolves it
-planned bare DEPOSIT emits exactly deposit
+source-backed Java zero-argument DEPOSIT serializes as deposit, but Korean
+  exposure and automatic cleanup use remain disabled unless separately approved
 ```
 
 Item-action count validation:
@@ -633,10 +774,14 @@ Historical runtime baseline fields describe the older committed baseline only:
   "raw_catalog_missing_targets": 587,
   "raw_catalog_coverage_percent": 0.68,
   "direct_alias_count": 11,
-  "direct_user_facing_target_total": null,
-  "resolved_user_facing_targets": null,
-  "unresolved_user_facing_targets": null,
-  "user_facing_coverage_percent": null,
+  "canonical_user_facing_target_total": null,
+  "resolved_canonical_user_facing_targets": null,
+  "unresolved_canonical_user_facing_targets": null,
+  "alias_resolution_coverage_percent": null,
+  "get_actionable_target_total": null,
+  "resolved_get_actionable_targets": null,
+  "unresolved_get_actionable_targets": null,
+  "get_actionable_coverage_percent": null,
   "catalog_outside_targets": 0,
   "compact_conflicts": 0
 }
@@ -665,10 +810,14 @@ at reviewed commit `cfc170ac024a46ea943bffcaf289a91ff6bc5ee7`, not the older
   "raw_catalog_missing_targets": 582,
   "raw_catalog_coverage_percent": 1.52,
   "direct_alias_count": 19,
-  "direct_user_facing_target_total": null,
-  "resolved_user_facing_targets": null,
-  "unresolved_user_facing_targets": null,
-  "user_facing_coverage_percent": null,
+  "canonical_user_facing_target_total": null,
+  "resolved_canonical_user_facing_targets": null,
+  "unresolved_canonical_user_facing_targets": null,
+  "alias_resolution_coverage_percent": null,
+  "get_actionable_target_total": null,
+  "resolved_get_actionable_targets": null,
+  "unresolved_get_actionable_targets": null,
+  "get_actionable_coverage_percent": null,
   "catalog_outside_targets": 0,
   "compact_conflicts": 0
 }
@@ -901,10 +1050,24 @@ canonical_user_facing_targets
 resolved_canonical_user_facing_targets
   = canonical_user_facing_targets intersect targets_resolvable_from_korean
 
-user_facing_coverage_percent
+alias_resolution_coverage_percent
   = round(
       size(resolved_canonical_user_facing_targets)
       / canonical_user_facing_target_total
+      * 100,
+      2
+    )
+
+get_actionable_user_facing_targets
+  = canonical_user_facing_targets intersect supports_get_targets
+
+resolved_get_actionable_targets
+  = get_actionable_user_facing_targets intersect targets_resolvable_from_korean
+
+get_actionable_coverage_percent
+  = round(
+      size(resolved_get_actionable_targets)
+      / size(get_actionable_user_facing_targets)
       * 100,
       2
     )
@@ -913,6 +1076,11 @@ user_facing_coverage_percent
 Canonicalized legacy targets are reported as `legacy_target -> canonical_target`
 mappings. They are not subtracted again after canonicalization and are not
 separate denominator targets.
+
+Alias resolution coverage proves that Korean wording maps to canonical catalog
+targets. GET actionable coverage additionally requires the target policy to say
+`supports_get(target) == true`; do not treat alias coverage as executable
+command coverage.
 
 Classifier invariants:
 
@@ -924,6 +1092,8 @@ command_internal_only_targets means targets with no user-facing direct or
 if a canonical target has at least one user-facing source, an internal alias to
   the same canonical target must not remove the whole canonical target
 targets_resolvable_from_korean contains concrete canonical catalog targets only
+supports_get_targets contains canonical catalog targets that the current target
+  policy allows for GET
 command modes, shortcut tokens, recipients, quantities, and routing statuses
   never count as item coverage
 ```
@@ -1792,9 +1962,12 @@ tests/minecraft_chatclef/
   alias_contract/
   catalog_coverage/
   command_catalog/
+  inventory_preflight/
   input_gate/
   korean_translation/
   lavi_input/
+  orchestration/
+  response/
   lifecycle/
   runtime/
 ```
@@ -1809,6 +1982,9 @@ Recommended responsibility mapping:
 | alias resolver priority and exact matching | `tests/minecraft_chatclef/alias_contract/` |
 | runtime alias coverage snapshot | `tests/minecraft_chatclef/catalog_coverage/` |
 | registered command support matrix | `tests/minecraft_chatclef/command_catalog/` |
+| inventory cleanup preflight | `tests/minecraft_chatclef/inventory_preflight/` |
+| Python command orchestration | `tests/minecraft_chatclef/orchestration/` |
+| deterministic response rendering | `tests/minecraft_chatclef/response/` |
 | single active command lifecycle | `tests/minecraft_chatclef/lifecycle/` |
 | opt-in live or Gradio runtime checks | `tests/minecraft_chatclef/runtime/` |
 
@@ -2409,13 +2585,13 @@ current implementation claims. The complete `PreflightDecision` and
 `fabric-chatclef-live-runtime-preflight-plan.md`; this strategy owns the
 gameplay field semantics and command-specific oracle requirements.
 
-## Current Implementation Status At Documentation Review
+## Original 2026-08-15 Implementation Status At Documentation Review
 
-This section records the known status at the documentation review point. It is
-not an implementation claim.
+This section records the originally reported 2026-08-15 documentation-review
+snapshot. It is retained for provenance and is not the current implementation
+or CI status at reviewed archive baseline `e08af639`.
 
-Satisfied in the revised documentation set when these three files are committed
-together:
+Reported as satisfied in the original revised documentation set:
 
 ```text
 runtime baseline, reviewed implementation baseline, and fixed audited implementation baseline are separated
@@ -2433,7 +2609,8 @@ Windows CI focused scope is documented
 live mutating-test safety expectations are documented
 ```
 
-Not yet satisfied in implementation or CI:
+Reported as not yet satisfied in implementation or CI at that original review
+snapshot:
 
 ```text
 focused ChatClef suite still reports 98 passed, 9 failed, 2 skipped, and
@@ -2572,7 +2749,11 @@ Documentation authority split:
 - current merge status and incomplete implementation work:
   chatclef-korean-post-review-merge-blockers.md
 
-The three files are one documentation commit unit.
+In that historical 2026-08-18 scope, the alias plan, test strategy, and
+post-review merge-blocker document were treated as one documentation unit. The
+2026-08-19 Python Korean command orchestration follow-up expands the directly
+affected documentation authority set; see the current post-review addendum and
+README reading map for that later scope.
 
 Key frozen contracts:
 

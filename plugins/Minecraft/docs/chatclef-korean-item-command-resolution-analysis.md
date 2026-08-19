@@ -1,8 +1,22 @@
 <!-- 20260815_kpopmodder: Documented Korean item and mining command resolution failures before implementation. -->
+<!-- 20260819_kpopmodder: Marked this file as historical diagnosis after reviewed Korean GET fixes. -->
 
 # ChatClef Korean Item Command Resolution Analysis
 
 Date: 2026-08-15
+
+Status: Historical diagnosis captured before the reviewed Korean GET fixes. It
+is not the current implementation authority.
+
+Current behavior and future contracts are owned by:
+
+```text
+plugins/Minecraft/docs/chatclef-python-command-orchestration-plan.md
+plugins/Minecraft/docs/chatclef-korean-item-action-alias-v2-plan.md
+plugins/Minecraft/docs/chatclef-korean-test-strategy.md
+plugins/Minecraft/docs/chatclef-korean-post-review-merge-blockers.md
+plugins/Minecraft/docs/chatclef-python-inventory-cleanup-preflight-contract.md
+```
 
 This document records the read-only analysis for Korean Minecraft item requests
 such as:
@@ -430,4 +444,3 @@ invalid raw material targets
 accidental @ prefix emission from Python
 over-broad mining verb substring matches
 ```
-

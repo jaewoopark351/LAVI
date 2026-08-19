@@ -4,6 +4,7 @@
 <!-- 20260818_kpopmodder: Bound live status to audited baseline 4239c23 and added approval, no-replay, and end-to-end observation blockers. -->
 <!-- 20260818_kpopmodder: Added gameplay observation completeness and verified expected/partial/prohibited effect merge criteria. -->
 <!-- 20260819_kpopmodder: Recorded strict listener identity, canonical submission reconciliation, and split batch advancement gates. -->
+<!-- 20260819_kpopmodder: Added the Python Korean command orchestration v2 documentation-status addendum for reviewed archive e08af639. -->
 
 # ChatClef Korean Post-Review Merge Blockers
 
@@ -11,9 +12,16 @@ Original review date: 2026-08-15
 
 Current live-status reconciliation date: 2026-08-18
 
-Audited implementation baseline: `4239c23`
+Historical live-status audited implementation baseline: `4239c23`
 
-This document records the current documentation-only merge review for Korean
+Current reviewed source baseline for the 2026-08-19 Korean orchestration and
+cleanup documentation pass:
+
+```text
+e08af63948a3fa4675c70279db59c2a70b00a332
+```
+
+This document records the original documentation-only merge review for Korean
 Fabric ChatClef routing and test work around:
 
 ```text
@@ -21,7 +29,7 @@ Fabric ChatClef routing and test work around:
 cfc170a test: cover Korean ChatClef item command routing
 ```
 
-The current conclusion is:
+The original conclusion was:
 
 ```text
 The revised documentation set is acceptable when committed together.
@@ -35,7 +43,7 @@ replay.
 
 ## Documentation Set And Authority
 
-Commit these three files together:
+Original 2026-08-15 Korean alias documentation unit:
 
 ```text
 plugins/Minecraft/docs/chatclef-korean-item-action-alias-v2-plan.md
@@ -43,11 +51,33 @@ plugins/Minecraft/docs/chatclef-korean-test-strategy.md
 plugins/Minecraft/docs/chatclef-korean-post-review-merge-blockers.md
 ```
 
+The 2026-08-19 Python Korean command orchestration follow-up expands the
+directly affected documentation set to seven files:
+
+```text
+plugins/Minecraft/README.md
+plugins/Minecraft/docs/chatclef-python-command-orchestration-plan.md
+plugins/Minecraft/docs/chatclef-python-inventory-cleanup-preflight-contract.md
+plugins/Minecraft/docs/chatclef-korean-item-action-alias-v2-plan.md
+plugins/Minecraft/docs/chatclef-korean-test-strategy.md
+plugins/Minecraft/docs/chatclef-korean-post-review-merge-blockers.md
+plugins/Minecraft/docs/chatclef-korean-item-command-resolution-analysis.md
+```
+
 Authority is split as follows:
 
 ```text
 alias v2 plan:
-  item/action UX design, command-specific policy, and phase order
+  item/action UX design, aliases, canonical display, capability gates, and
+  phase order
+
+Python command orchestration plan:
+  response evidence, lifecycle wording, single-pass submission, and primary
+  command sequencing
+
+Python inventory cleanup contract:
+  inventory evidence, protected-item policy, targeted cleanup, fresh
+  post-cleanup verification, and fail-closed primary admission
 
 test strategy:
   test evidence, artifact schemas, source/hash and activation authority,
@@ -55,6 +85,12 @@ test strategy:
 
 this document:
   current implementation/CI status and the merge decision
+
+Korean item command resolution analysis:
+  historical diagnosis only
+
+README:
+  navigation and ownership summary only
 ```
 
 The revised test strategy supersedes older conflicting test, coverage,
@@ -62,7 +98,7 @@ activation, hash, and CI wording in the v2 plan. This document does not repeat
 large source-hash or command tables; the strategy and future JSON artifacts are
 the authority for those details.
 
-## Review Scope And Reported Result
+## Original 2026-08-15 Review Scope And Reported Result
 
 The review covered the local source snapshot around `cfc170a` and the parent
 implementation commit `9f90246`.
@@ -92,9 +128,9 @@ Full repository pytest has unrelated collection errors from optional
 Ruff was unavailable in the review environment.
 ```
 
-## Documentation Findings Resolved In This Revision
+## Original 2026-08-15 Documentation Findings
 
-The revised three-file set now documents:
+The original revised three-file set documented:
 
 ```text
 historical c912ff baseline, reviewed cfc170a baseline, and a fixed audited implementation baseline
@@ -478,9 +514,10 @@ the supported GET live objective verifies additive acquisition delta; the
   movement/mining objective fails before submission until complete observers exist
 ```
 
-## Next Work Classification
+## Historical Next Work Classification Before 2026-08-19 Hardening
 
-The next work is implementation/test/CI work, not another broad design rewrite:
+At the original review point, the next work was implementation/test/CI work,
+not another broad design rewrite:
 
 ```text
 repair Java source-hash tests
@@ -492,12 +529,17 @@ restore live backend/instance/world/process preflight while preserving existing 
 run the focused suite to 0 failures
 ```
 
-These remain Python, test, artifact, and CI responsibilities unless a separate
-source review explicitly approves the smallest necessary Java-side change. Do
-not modify bridge DTOs, wire payloads, the ChatClef/AltoClef engine, Forge
-MineMind, or automatic command replay as part of merely closing these gates.
+The latest dated addenda below own the current status. Do not read the original
+98/9 focused-suite result or the historical blocker list as the current
+`e08af639` implementation state.
 
-## ChatGPT Handoff Summary
+These historical items remain Python, test, artifact, and CI responsibilities
+unless a separate source review explicitly approves the smallest necessary
+Java-side change. Do not modify bridge DTOs, wire payloads, the ChatClef/AltoClef
+engine, Forge MineMind, or automatic command replay as part of merely closing
+these gates.
+
+## Historical ChatGPT Handoff Summary Before 2026-08-19 Hardening
 
 ```text
 The revised Korean ChatClef documentation set is internally reconciled and
@@ -567,3 +609,58 @@ active ownership stops before that checkpoint. This addendum does not authorize
 Java, ChatClef/AltoClef, DTO, wire-payload, live Minecraft, commit, or push
 changes. Passing the local offline suite closes these implementation gaps but
 does not replace a final read-only merge review.
+
+## 2026-08-19 Python Korean Command Orchestration V2 Addendum
+
+This addendum records the docs-only status for the user-requested Korean
+response, item-alias, craft-wording, and inventory-cleanup follow-up. It does
+not rewrite the historical `4239c23` or `cfc170a` findings above.
+
+Reviewed archive baseline:
+
+```text
+e08af63948a3fa4675c70279db59c2a70b00a332
+```
+
+Implemented at the reviewed archive:
+
+```text
+GET acquisition matcher
+철 10개 캐줘 / 캐오기 / 캐와줘 family
+prefixless GET compiler
+single-pass submission and reconciliation
+some equipment composition cases, for example 철바지, 철신발, 철헬멧
+```
+
+Not implemented at the reviewed archive:
+
+```text
+canonical Korean display resource
+broad alias generator
+emerald / torch aliases
+갑바 / 레깅스 / 모자 component aliases
+deterministic Korean response renderer
+external response dispatch to Translate/TTS
+transport result publisher
+command orchestrator
+reliable Python inventory snapshot provider
+cleanup planner
+automatic cleanup execution
+```
+
+Craft wording remains GET acquisition. The runtime has no separate registered
+ChatClef craft command, so `만들어줘` and `제작해줘` must compile to prefixless
+`get <target> <count>` when the target is supported.
+
+Inventory cleanup is not approved as Java behavior. Automatic cleanup must be
+Python-owned, targeted, one-attempt, and fail-closed. It must not use bare
+`deposit`, placeholder quantities, retry, replay, or cleanup-completed alone as
+permission to submit the primary command. The detailed contract is owned by:
+
+```text
+plugins/Minecraft/docs/chatclef-python-inventory-cleanup-preflight-contract.md
+```
+
+This addendum is a documentation-status record only. It does not authorize
+code, tests, settings, Java, DTO, wire-payload, ChatClef/AltoClef behavior,
+Minecraft launch, runtime reproduction, commit, or push changes.

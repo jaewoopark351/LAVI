@@ -1,6 +1,8 @@
 <!-- 20260815_kpopmodder: Documented v2 Korean item alias expansion across get/equip/deposit/give before implementation. -->
 <!-- 20260815_chatgpt: Synchronized design authority, reviewed coverage provenance, and Phase 0 gates with the test strategy and merge-blocker documents. -->
 <!-- 20260818_kpopmodder: Linked the post-restore live lifecycle and fail-closed preflight status without expanding item-action scope. -->
+<!-- 20260819_kpopmodder: Added reviewed-baseline Korean craft-wording, colloquial equipment alias, canonical display, and catalog coverage contracts. -->
+<!-- 20260819_chatgpt: Reconciled e08af source classification, cross-document authority, and safe junk-deposit policy. -->
 
 # ChatClef Korean Item Action Alias V2 Plan
 
@@ -46,9 +48,12 @@ current `GET_ITEM` behavior.
 
 ## Related Documents And Authority
 
-Read and commit this plan together with:
+Read this plan with:
 
 ```text
+plugins/Minecraft/README.md
+plugins/Minecraft/docs/chatclef-python-command-orchestration-plan.md
+plugins/Minecraft/docs/chatclef-python-inventory-cleanup-preflight-contract.md
 plugins/Minecraft/docs/chatclef-korean-test-strategy.md
 plugins/Minecraft/docs/chatclef-korean-post-review-merge-blockers.md
 plugins/Minecraft/docs/chatclef-korean-item-command-resolution-analysis.md
@@ -62,14 +67,29 @@ Authority is split as follows:
 
 ```text
 this plan:
-  Korean item/action UX design, command-specific policies, and phase order
+  Korean item/action language, concrete aliases, canonical Korean display,
+  command-capability boundaries, and item-action phase order
+
+Python command orchestration plan:
+  evidence-bounded Korean responses, operation context, lifecycle sequencing,
+  and exactly-once primary-command submission
+
+Python inventory cleanup preflight contract:
+  inventory evidence, protected-item policy, targeted cleanup planning,
+  fresh post-cleanup verification, and fail-closed primary admission
 
 test strategy:
   test evidence, artifact schemas, source/hash authority, coverage algorithm,
   catalog parser provenance, CI scope, and live-test safety
 
 post-review merge blockers:
-  current pass/fail status and the implementation work required before merge
+  current implementation/CI status, remaining blockers, and merge decision
+
+historical resolution analysis:
+  historical diagnosis only; it has no current normative authority
+
+plugins/Minecraft/README.md:
+  reading map and ownership summary only; it does not own detailed contracts
 
 live-runtime preflight plan:
   exact one-shot approval, endpoint/process/world gates, submission uncertainty,
@@ -79,21 +99,69 @@ live-runtime process lifecycle index:
   fixed audit snapshots, ownership runbooks, and cross-document navigation
 ```
 
-When wording conflicts, the test strategy controls test/provenance/coverage
-contracts, the preflight plan controls live-run admission and result structure,
-and the post-review document controls current merge status. The three Korean
-ChatClef documents remain one core documentation unit; the linked live-runtime
-documents must be updated in the same docs-only change whenever their shared
-live-test contract changes.
+When wording conflicts, this plan controls Korean item/action language and alias
+policy; the orchestration plan controls user-response evidence and operation
+sequencing; the cleanup contract controls automatic or junk-policy cleanup; the
+test strategy controls tests, provenance, and coverage; and the post-review
+document controls current implementation and merge status. The historical
+analysis and README cannot override any normative contract.
 
-The 2026-08-18 post-restore audit does not change item/action UX policy or phase
-order. Live-test implementation status, exact pass semantics, approval,
-preflight, no-replay policy, terminal/runtime-completion terminology, and
-gameplay-effect oracles are intentionally not duplicated here. The test
-strategy, post-review merge blockers, and live-runtime preflight plan own those
-contracts against audited implementation baseline `4239c23` and must be
-re-audited before a later source/test commit is described as current.
+For the 2026-08-19 authority migration, the seven user-listed documents are one
+docs-only change unit. Later changes must update and commit every directly
+affected normative document together. Linked live-runtime documents need an
+update only when their live-run contract actually changes.
 
+The 2026-08-18 post-restore audit remains a live-runtime-specific audit against
+baseline `4239c23`. It does not replace the item/action source baseline below.
+Live-test pass semantics, approval, preflight, terminal/runtime-completion
+terminology, and gameplay-effect oracles remain owned by the test strategy,
+post-review merge blockers, and live-runtime preflight plan.
+
+## Reviewed Source Baseline And Implementation Classification
+
+This documentation review classifies source against the fixed archive baseline:
+
+```text
+e08af63948a3fa4675c70279db59c2a70b00a332
+```
+
+This is a source-audited classification. It does not claim that this docs-only
+change executed tests, built Java, launched Minecraft, or reproduced runtime
+behavior. The older `cfc170a` alias snapshot and `4239c23` live audit remain
+scoped evidence records, not replacements for the overall `e08af639` baseline.
+At `e08af639`, `korean_item_aliases.json` remains byte-identical to the reviewed
+`cfc170a` alias snapshot, so its 19-alias / 9-target coverage figures still apply
+to that resource file only.
+
+Source-present at `e08af639`:
+
+```text
+- shared Korean acquire / craft-wording / mining-verb matcher
+- GET_ITEM routing for 가져와, 구해, 얻어, 만들어줘, 제작해줘,
+  캐줘, 캐와, 캐오기, and 채굴해줘 forms
+- quantity removal -> verb removal -> soft-word removal -> whitespace
+  normalization -> trailing 을/를 removal
+- prefixless single-item GET compilation: get <target> <count>
+- source-resolvable GET behavior including 철 10개 캐줘 / 캐오기 / 캐와줘
+- current flat aliases including 철 -> iron_ingot and 다이아몬드 -> diamond
+- current equipment components including 바지, 신발, and 헬멧
+- router-side single-pass submission and unresolved-submission reconciliation gate
+```
+
+Not source-present at `e08af639` and therefore still planned:
+
+```text
+- emerald and torch Korean item aliases
+- 갑바, 레깅스, and 모자 equipment-component aliases
+- whole-phrase equipment-composition enforcement; the current resolver still
+  accepts material/equipment substring containment
+- canonical Korean display-name resource and deterministic response renderer
+- Korean EQUIP_ITEM / DEPOSIT_ITEM / GIVE_ITEM compiler support
+- explicit Minecraft responses for unknown / ambiguous / unsupported outcomes
+- reliable Python inventory snapshot provider
+- protected-item cleanup planner, targeted cleanup orchestration, and fresh
+  post-cleanup inventory-effect verification
+```
 ## Goal
 
 The user-facing goal is broad item coverage:
@@ -182,13 +250,17 @@ Those are command-specific context rules.
 
 ## Shared Alias Consumers
 
-The same concrete item lexicon can be reused by multiple commands:
+GET acquisition, including Korean craft wording, EQUIP, DEPOSIT, and GIVE share
+the same concrete item lexicon. Craft is not a separate registered ChatClef
+command in this runtime.
+
+The same concrete item lexicon can be reused by multiple command families:
 
 | Command | Shared alias usage | Extra policy needed |
 | --- | --- | --- |
 | `get` | concrete resource target | quantity and optional item-list parsing |
 | `equip` | explicit equippable target | armor-set shortcut policy |
-| `deposit` | specific item target | bare deposit mode and quantity policy |
+| `deposit` | specific item target | specific-item quantity policy; junk handling remains a Python policy mode and Java bare-deposit exposure is separate |
 | `give` | single item target | recipient slot and player-name validation |
 
 Examples below separate reviewed runtime alias availability from
@@ -196,12 +268,225 @@ command-specific behavior. Rows explicitly marked planned or pending must not be
 treated as verified runtime behavior until the relevant Phase 0 capability
 verification is complete.
 
-| Korean phrase | Shared target | Runtime alias status | Command-specific status |
+| Korean phrase | Shared target or policy | Status at `e08af639` | Command-specific status |
 | --- | --- | --- | --- |
-| `다이아몬드` | `diamond` | present in the reviewed `cfc170a` runtime alias baseline | preserve as a current GET regression |
-| `철` | `iron_ingot` | present in the reviewed `cfc170a` runtime alias baseline | preserve as a current GET shorthand; `equip iron` is allowed only in material + armor-set context such as `철 갑옷` |
-| `철 흉갑` | `iron_chestplate` | planned v2 alias | explicit EQUIP target after equipment capability verification |
-| `잡템` | none | must not be stored in the flat item alias map | deposit context may compile bare `deposit` after UX wording policy is frozen |
+| `다이아몬드` | `diamond` | current fixed alias; unchanged from the reviewed `cfc170a` alias snapshot | preserve as a current GET regression |
+| `철` | `iron_ingot` | current fixed alias; unchanged from the reviewed `cfc170a` alias snapshot | preserve as a current GET shorthand; `equip iron` is allowed only in material + armor-set context such as `철 갑옷` |
+| `철 흉갑` | `iron_chestplate` | current equipment composition, not a planned flat alias | source-present for GET; explicit EQUIP remains future work pending capability verification |
+| `철바지` / `철신발` / `철헬멧` | `iron_leggings` / `iron_boots` / `iron_helmet` | current equipment compositions | preserve source-present GET behavior; explicit EQUIP remains future work |
+| `철갑바` / `철 레깅스` / `철모자` | corresponding iron armor target | planned component aliases | required post-implementation regressions |
+| `에메랄드` / `횃불` | `emerald` / `torch` | planned fixed/generated aliases | required post-implementation GET regressions |
+| `잡템` | Python junk-deposit policy mode | contextual policy only; no concrete target and no direct DSL | hand off to the cleanup contract; never compile directly to bare `deposit` |
+
+## Craft Wording Is GET Acquisition
+
+Korean craft wording does not introduce a separate `CRAFT_ITEM` intent or a new
+craft DSL command. ChatClef's Java command set uses `GetCommand` for resource
+acquisition and item crafting.
+
+Contract:
+
+```text
+만들어줘 / 제작해줘
+  -> Python action wording: craft
+  -> executable command family: GET
+  -> DSL: get <target> <count>
+```
+
+Current reviewed craft-wording example:
+
+```text
+철 삽 하나 만들어 -> get iron_shovel 1
+```
+
+Required post-implementation regression cases after the corresponding aliases
+are added:
+
+```text
+횃불 만들어줘 -> get torch 1
+철갑바 만들어줘 -> get iron_chestplate 1
+철 레깅스 만들어줘 -> get iron_leggings 1
+```
+
+The three cases above are not current `e08af639` successes.
+
+Do not emit `craft torch 1`, `@craft`, or any new Java craft command.
+
+This mapping applies only after Minecraft item/action context is established and
+a concrete target resolves. Generic `만들어줘` wording with an unknown or
+non-Minecraft target must not submit ChatClef. This contract defines
+command-family selection and serialization only. It does not prove that every
+resolved target is obtainable or craftable, does not bypass command-specific
+capability checks, and does not prove terminal completion or a gameplay effect.
+
+## Input Alias Versus Canonical Korean Display Name
+
+Input aliases and user-facing canonical display names are separate
+responsibilities.
+
+| Input alias | Target | Canonical display |
+| --- | --- | --- |
+| `철갑바` | `iron_chestplate` | `철 흉갑` |
+| `철바지` | `iron_leggings` | `철 레깅스` |
+| `철신발` | `iron_boots` | `철 부츠` |
+| `철모자` | `iron_helmet` | `철 투구` |
+| `철헬멧` | `iron_helmet` | `철 투구` |
+
+Recommended Python-owned runtime resource:
+
+```text
+plugins/Minecraft/fabric/chatclef/intent/resources/korean_item_display_names.json
+```
+
+Responsibility:
+
+```text
+concrete target -> canonical Korean display name
+```
+
+The response renderer should use canonical display names. It should not echo a
+colloquial input such as `갑바` when the canonical item name is `철 흉갑`.
+
+## Equipment Component Alias Policy
+
+The following words form the desired equipment component alias contract, not a
+flat concrete item alias map:
+
+```json
+{
+  "갑바": "chestplate",
+  "흉갑": "chestplate",
+  "레깅스": "leggings",
+  "바지": "leggings",
+  "각반": "leggings",
+  "부츠": "boots",
+  "신발": "boots",
+  "투구": "helmet",
+  "헬멧": "helmet",
+  "모자": "helmet"
+}
+```
+
+Placement:
+
+```text
+plugins/Minecraft/fabric/chatclef/intent/resources/korean_equipment_aliases.json
+```
+
+Status at `e08af639`:
+
+```text
+current component aliases:
+  흉갑, 바지, 각반, 부츠, 신발, 투구, 헬멧
+
+planned component aliases:
+  갑바, 레깅스, 모자
+
+planned resolver hardening:
+  require full compact-phrase consumption instead of substring containment
+```
+
+After the planned aliases and resolver hardening are implemented, component
+aliases such as `갑바` and `모자` are valid only when the full phrase resolves as
+material plus equipment component:
+
+```text
+철갑바 -> valid after implementation
+철모자 -> valid after implementation
+모자 만들어줘 -> do not infer iron_helmet
+```
+
+## Layered Resolution Precedence
+
+Action/context policy, concrete target resolution, catalog membership, and
+command capability are separate:
+
+```text
+Layer 1: action/context policy
+  acquisition / equip / deposit / give
+  armor-set mode
+  junk-deposit policy mode
+  recipient extraction
+
+Layer 2: concrete target resolver
+  1. equipment composition
+  2. fixed item alias
+  3. unsupported
+  4. unknown
+
+Layer 3: catalog membership and canonical target validation
+
+Layer 4: command-specific capability validation
+  GET / EQUIP / DEPOSIT / GIVE
+```
+
+The Layer 2 order remains fixed as equipment composition -> fixed item alias ->
+unsupported -> unknown. `AMBIGUOUS` is a Layer 1 policy result, not a
+concrete-target fallback. A concrete alias resolution is not executable until
+Layers 3 and 4 also pass.
+
+Equipment composition must consume the whole compact phrase as material plus
+equipment component. Do not accept accidental substring matches:
+
+```text
+철 + 갑바 -> valid
+다이아몬드 + 곡괭이 -> valid
+철학 + 모자 -> invalid
+금요일 + 바지 -> invalid
+```
+
+Existing combinations such as `diamond_pickaxe` must remain valid.
+
+## Catalog-Driven Alias Coverage
+
+The reviewed runtime snapshot remains intentionally narrow:
+
+```text
+catalog targets: 591
+runtime aliases: 19
+covered targets: 9
+coverage: 1.52%
+```
+
+Manual additions alone cannot satisfy the "all Minecraft items in Korean"
+request. Future coverage should use layered, deterministic inputs:
+
+```text
+1. version-pinned Minecraft 1.20.1 Korean language source
+2. direct vanilla item/block target mapping
+3. curated colloquial aliases
+4. ambiguous/default policy
+5. ChatClef synthetic/group target canonicalization
+6. command-specific capability policy
+7. deterministic generated runtime alias map
+```
+
+Coverage metrics must distinguish:
+
+```text
+raw catalog coverage:
+  alias coverage across all 591 catalog targets
+
+requestable concrete coverage:
+  alias coverage across concrete item/block targets that can be requested
+```
+
+Coverage acceptance must separate current preservation from
+post-implementation cases:
+
+| Target | Korean phrase status at `e08af639` | Required result |
+| --- | --- | --- |
+| `emerald` | `에메랄드` missing | fixed/generated alias regression after implementation |
+| `torch` | `횃불` missing | fixed/generated alias regression after implementation |
+| `iron_leggings` | current through `철바지` / `철각반`; `철 레깅스` missing | preserve current composition and add `레깅스` regression |
+| `iron_chestplate` | current through `철 흉갑`; `철갑바` missing | preserve current composition and add `갑바` regression |
+| `iron_boots` | current through `철신발` / `철 부츠` | preserve current composition coverage |
+| `iron_helmet` | current through `철헬멧` / `철 투구`; `철모자` missing | preserve current composition and add `모자` regression |
+| `diamond_pickaxe` | current through `다이아몬드 곡괭이` | preserve existing composition regression |
+
+`iron_leggings` should normally come from equipment composition such as
+`철 + 레깅스`, not from a broad one-off flat alias for every armor phrase.
+`emerald` and `torch` are fixed/generated item-alias targets.
 
 ## Command-Specific Policy
 
@@ -274,7 +559,7 @@ Python-side capability check should prevent obvious invalid submissions such as:
 Natural-language examples:
 
 ```text
-잡템 상자에 넣어줘 -> deposit
+잡템 상자에 넣어줘 -> Python junk-deposit policy mode; no direct DSL
 다이아몬드 2개 상자에 넣어줘 -> deposit diamond 2
 돌 32개 보관해줘 -> deposit stone 32
 ```
@@ -285,7 +570,15 @@ path builds targets through `getAllNonEquippedOrToolItemsAsTarget`, excluding
 normal inventory slot is therefore not the same category as equipped armor.
 Bare `deposit` can include useful items such as food, torches, fuel, ingots,
 and blocks.
-Therefore `잡템` must be a deposit-mode policy, not a fake item alias.
+
+Therefore `잡템` must be a Python-owned policy mode, not a fake item alias and
+not a direct synonym for bare `deposit`. This plan owns only Korean recognition
+and item/action policy. The cleanup contract owns inventory evidence, protected
+items, exact targeted `deposit <target> <count>` planning, post-cleanup effect
+verification, and fail-closed admission of any following primary command.
+Automatic inventory-full cleanup and user-requested `잡템` cleanup must not use
+bare `deposit`. If reliable evidence cannot produce a safe targeted plan, no
+cleanup command is submitted.
 
 Initial unresolved quantity policy:
 
@@ -374,7 +667,7 @@ Contextual entries are not flattened into the runtime item alias map:
   "잡템": {
     "decision": "contextual",
     "contexts": {
-      "deposit": "bare_deposit"
+      "deposit": "python_junk_deposit_policy"
     }
   }
 }
@@ -568,7 +861,7 @@ code changes are approved:
 | alias generator / validator / compact index | approved to implement |
 | existing GET alias expansion | approved after focused regression tests |
 | EQUIP natural-language support | requires capability matrix first |
-| DEPOSIT natural-language support | requires deposit quantity and bare-mode policy first |
+| DEPOSIT natural-language support | requires specific-item quantity policy, junk-policy mode, and explicit broad-deposit exposure policy first |
 | GIVE natural-language support | requires recipient grammar and player validation first |
 | full 591 target coverage claim | not approved; draft is seed coverage only |
 
@@ -636,8 +929,10 @@ Planned Phase 5 specific DEPOSIT:
   emit an explicit count only after Korean quantity policy resolves the count
   다이아몬드 2개 넣어줘 -> deposit diamond 2
 
-Planned Phase 5 bare DEPOSIT:
-  emit exactly deposit
+Java bare DEPOSIT grammar (documented, not exposed by default):
+  exact Java-compatible shape is deposit
+  Korean `잡템` wording and automatic cleanup emit no bare command
+  any future Korean broad-deposit exposure requires separate explicit approval
 
 Planned Phase 7 multi-item GET:
   use brackets, separate entries with comma-space, emit every count explicitly,
@@ -659,9 +954,9 @@ tests are implemented, pass, and no unresolved contract remains.
 | `equip` full-set shortcut | exactly `leather`, `iron`, `gold`, `diamond`, `netherite` | `EquipCommand.java` | only material + armor-set context may emit these shortcut tokens | `tests/minecraft_chatclef/command_catalog/test_item_command_capability_policy.py::test_equip_set_shortcuts_match_java_contract`; assert only those five shortcut tokens are accepted |
 | `equip` explicit target | parses `ItemList`, then rejects any matched item that is not `Equipment` | `EquipCommand.java` | use a conservative explicit equipment allowlist before submission | `tests/minecraft_chatclef/command_catalog/test_item_command_capability_policy.py::test_explicit_equip_targets_require_equipment_capability`; assert armor items pass and `stone` rejects as `UNSUPPORTED_ACTION_TARGET` |
 | `equip` multi-item exposure | Java can parse an `ItemList`, but Python v2 should not expose arbitrary multi-item equip initially | `EquipCommand.java`; `ItemList.java` | support armor-set shortcut or single explicit equipment only in initial EQUIP phase | `tests/minecraft_chatclef/command_catalog/test_item_command_capability_policy.py::test_python_v2_does_not_expose_multi_item_equip_initially`; assert multi explicit equip phrase is unsupported until separately approved |
-| bare `deposit` | zero arguments produce `null` `ItemList`; command excludes `PlayerSlot.ARMOR_SLOTS` and `ToolItem` stacks, not every armor item by type | `DepositCommand.java`; `Arg.java`; `ArgParser.java` | only compile bare `deposit` for approved deposit-mode Korean phrases | `tests/minecraft_chatclef/command_catalog/test_java_item_command_contract.py::test_bare_deposit_contract_matches_source_predicate`; assert the source-backed truth table exactly: equipped armor slot false, spare armor inventory true, `ToolItem` false, food true, torch true, fuel true, ingot true, ordinary block true |
+| bare `deposit` | zero arguments produce `null` `ItemList`; command excludes `PlayerSlot.ARMOR_SLOTS` and `ToolItem` stacks, not every armor item by type | `DepositCommand.java`; `Arg.java`; `ArgParser.java` | document the Java grammar, but do not expose it through `잡템` or automatic cleanup; any separate broad-deposit phrase requires explicit future approval | `tests/minecraft_chatclef/command_catalog/test_java_item_command_contract.py::test_bare_deposit_contract_matches_source_predicate`; assert the source-backed truth table exactly, and a separate Python policy test must assert that `잡템` and automatic cleanup emit no bare `deposit` |
 | specific `deposit` count | `deposit <item> [count]` parses through `ItemList`; omitted count defaults to `1` | `DepositCommand.java`; `ItemList.java` | Java default is known, but Korean no-count wording remains a UX policy decision | `tests/minecraft_chatclef/command_catalog/test_java_item_command_contract.py::test_deposit_java_default_count_contract_is_one`; assert Java contract is `1` while Korean no-count policy remains separately tested |
-| `deposit` multi-item exposure | Java can parse bracketed `ItemList`, but Python v2 initial deposit should support bare or single specific item only | `DepositCommand.java`; `ItemList.java` | mark multi-item deposit as intentionally unsupported until a later explicit phase | `tests/minecraft_chatclef/command_catalog/test_item_command_capability_policy.py::test_python_v2_deposit_multi_item_is_intentionally_unsupported_initially`; assert `deposit [diamond 2, stone 10]` is not emitted by Korean v2 compiler |
+| `deposit` multi-item exposure | Java can parse bracketed `ItemList`, but Python v2 initially exposes only single specific-item deposit; broad bare grammar remains unexposed by default | `DepositCommand.java`; `ItemList.java` | mark multi-item deposit as intentionally unsupported until a later explicit phase | `tests/minecraft_chatclef/command_catalog/test_item_command_capability_policy.py::test_python_v2_deposit_multi_item_is_intentionally_unsupported_initially`; assert `deposit [diamond 2, stone 10]` is not emitted by Korean v2 compiler |
 | `give` Butler/current-user syntax | no explicit username uses `give <item> [count]`; omitted count defaults to `1` through Java defaulting | `GiveCommand.java`; `Arg.java`; `ArgParser.java` | Korean natural-language GIVE should not rely on Butler/current-user mode | `tests/minecraft_chatclef/command_catalog/test_java_item_command_contract.py::test_give_butler_current_user_mode_contract`; assert `give diamond` and `give diamond 3` are Butler/current-user forms, not explicit-recipient forms |
 | `give` explicit recipient syntax | explicit recipient uses `give <username> <item> <count>`; count is required for this mode | `GiveCommand.java`; `Arg.java`; `ArgParser.java` | Korean GIVE with recipient must compile a count-bearing command such as `give Steve diamond 1` or `give Steve diamond 3` | `tests/minecraft_chatclef/command_catalog/test_java_item_command_contract.py::test_give_explicit_recipient_requires_count_contract`; assert `give Steve diamond 1` is valid explicit-recipient shape and `give Steve diamond` is not documented as explicit-recipient shorthand |
 | `give` multi-item support | Java `GiveCommand` accepts a single `String item`, not an `ItemList` | `GiveCommand.java` | Python v2 GIVE supports one recipient plus one item only | `tests/minecraft_chatclef/command_catalog/test_item_command_capability_policy.py::test_give_multi_item_is_not_supported_by_v2_contract`; assert no Korean phrase compiles to `give Steve [diamond 2, stone 10]` |
@@ -670,7 +965,7 @@ tests are implemented, pass, and no unresolved contract remains.
 | player loaded validation | runtime rejects if `EntityTracker.isPlayerLoaded(username)` is false | `GiveCommand.java` | Python may syntax-validate names, but runtime loaded-player validation remains Java-owned | `tests/minecraft_chatclef/lifecycle/test_item_action_routing_status.py::test_loaded_player_validation_is_not_claimed_by_python`; assert Python does not claim loaded-player success |
 | prefix insertion | Fabric dispatcher trims command and prepends current ChatClef prefix only if missing | `FabricChatClefCommandDispatcher.java`; `CommandExecutor.java` | Python compiler remains prefixless | `tests/minecraft_chatclef/command_catalog/test_java_item_command_contract.py::test_bridge_dispatcher_owns_prefix_insertion`; assert Python emits `get diamond 1`, not `@get diamond 1` |
 | Java contract provenance | the strategy-owned `reviewed_source_commit`, Git-blob SHA-256 registry, activation chains, and HEAD-drift checks must match before Python contract fixtures are trusted | `chatclef-korean-test-strategy.md`; reviewed Java source registry | stop Phase 0 contract validation if reviewed provenance or HEAD drift fails | `tests/minecraft_chatclef/command_catalog/test_java_item_command_contract_provenance.py::test_java_contract_source_hashes_match_documented_baseline`; assert reviewed commit provenance and HEAD source hashes match the strategy-owned artifact |
-| contextual policy non-flattening | contextual command policies are not concrete item aliases | `korean_item_aliases.json`; default/contextual policy source | keep `잡템`, `갑옷`, armor-set shortcuts, `bare_deposit`, and `full_armor_set_shortcut` out of the flat runtime alias map | `tests/minecraft_chatclef/alias_contract/test_korean_alias_generation_contract.py::test_contextual_policy_entries_are_not_flattened_into_item_aliases`; assert contextual keys and pseudo-policy values are absent from concrete runtime item entries |
+| contextual policy non-flattening | contextual command policies are not concrete item aliases | `korean_item_aliases.json`; default/contextual policy source | keep `잡템`, `갑옷`, junk-deposit modes, armor-set shortcuts, and other policy tokens out of the flat runtime alias map | `tests/minecraft_chatclef/alias_contract/test_korean_alias_generation_contract.py::test_contextual_policy_entries_are_not_flattened_into_item_aliases`; assert contextual keys and pseudo-policy values are absent from concrete runtime item entries |
 
 Minimal Python player-name validation blocks only structure-breaking input.
 Actual loaded-player existence remains Java-owned. Block at least:
@@ -768,7 +1063,8 @@ Conservative initial policy:
 
 ```text
 GET:
-  catalog targets with canonicalization
+  canonical user-facing targets with catalog membership and
+  supports_get(target) == true
 
 EQUIP:
   closed full-set shortcuts and explicit equipment allowlist
@@ -828,11 +1124,15 @@ Recommended initial policy:
 
 | Korean input | Initial result |
 | --- | --- |
-| `잡템 상자에 넣어줘` | bare `deposit`, with documented broad behavior |
+| `잡템 상자에 넣어줘` | Python junk-deposit policy mode; no direct DSL; require safe targeted plan under the cleanup contract |
 | `전부 상자에 넣어줘` | unsupported or clarification |
 | `인벤토리 비워줘` | unsupported or clarification |
 | `다이아몬드 2개 넣어줘` | `deposit diamond 2` |
 | `다이아몬드 넣어줘` | ambiguous until no-count policy is frozen |
+
+The bare-deposit truth table below documents Java reality and explains why the
+broad form is not a safe junk-cleanup primitive. It does not approve exposing
+bare `deposit` through Korean `잡템` wording or through automatic cleanup.
 
 Source-backed bare deposit truth table:
 
@@ -848,7 +1148,10 @@ Source-backed bare deposit truth table:
 | ordinary block | yes | not excluded by the bare predicate |
 
 Do not invent an arbitrary count such as `deposit diamond 9999` without an
-inventory snapshot and an explicit policy.
+inventory snapshot and an explicit policy. A cleanup terminal status of
+`completed` is also insufficient by itself; fresh post-cleanup inventory
+evidence must prove the required effect before any following primary command is
+eligible for submission.
 
 ### Routing Outcome Policy
 
@@ -937,14 +1240,29 @@ canonical_user_facing_targets
 resolved_canonical_user_facing_targets
   = canonical_user_facing_targets intersect targets_resolvable_from_korean
 
-user_facing_coverage
+alias_resolution_coverage
   = size(resolved_canonical_user_facing_targets)
     / canonical_user_facing_target_total
+
+get_actionable_user_facing_targets
+  = canonical_user_facing_targets intersect supports_get_targets
+
+resolved_get_actionable_targets
+  = get_actionable_user_facing_targets intersect targets_resolvable_from_korean
+
+get_actionable_coverage
+  = size(resolved_get_actionable_targets)
+    / size(get_actionable_user_facing_targets)
 ```
 
 Legacy targets canonicalized into a covered target should be reported as
 `legacy_target -> canonical_target` mappings. They are not subtracted again
 after canonicalization and are not reported as missing aliases.
+
+Alias resolution coverage only proves that Korean wording resolves to canonical
+catalog targets. GET actionable coverage additionally requires command
+capability evidence from the target policy; do not treat a Korean-resolvable
+target as executable for GET until `supports_get(target)` is true.
 
 Classifier invariants:
 
@@ -956,6 +1274,8 @@ command_internal_only_targets means targets with no user-facing direct or
 if a canonical target has at least one user-facing source, an internal alias to
   the same canonical target must not remove the whole canonical target
 targets_resolvable_from_korean contains concrete canonical catalog targets only
+supports_get_targets contains canonical catalog targets that the current target
+  policy allows for GET
 command modes, shortcut tokens, recipients, quantities, and routing statuses
   never count as item coverage
 ```
@@ -1001,9 +1321,9 @@ is missing, even when the total target count remains `591`.
 Generated output should be deterministic. If `generated_at` exists, exclude it
 from the byte-identical runtime JSON body or place it only in a report.
 
-## Current Code Gap
+## Current `e08af639` Code Gap
 
-At the time this plan was documented, the Python natural-language command path
+At the reviewed archive baseline, the Python natural-language command path
 already supports these intent families:
 
 ```text
@@ -1060,13 +1380,14 @@ The current flat item alias resolver should preserve this order:
 ```text
 1. normalize phrase
 2. equipment composition
-3. command-specific contextual phrase
-4. fixed item alias exact-compact lookup
-5. catalog validation
-6. command-specific capability validation
+3. fixed item alias exact-compact lookup
+4. unsupported
+5. unknown
 ```
 
 Fixed aliases must remain exact-compact matches. Do not use substring matching.
+Command-specific contextual phrases, ambiguity, shortcut modes, and recipient
+extraction are Layer 1 action/context policy, not flat concrete item aliases.
 
 ## Implementation Order
 
@@ -1087,8 +1408,9 @@ Recommended order when code changes are later approved:
    mining/acquisition phrases as future-only behavior.
 5. Phase 4 - add EQUIP support with closed full-set shortcut mapping and
    explicit equipment capability checks.
-6. Phase 5 - add DEPOSIT support with frozen bare/specific mode behavior and
-   count-omission policy.
+6. Phase 5 - add DEPOSIT support with frozen specific-item quantity behavior,
+   Python junk-policy recognition, and broad-deposit exposure disabled by
+   default.
 7. Phase 6 - add GIVE support with recipient extraction, player-name
    validation, and single-item/count compiler support.
 8. Phase 7 - add multi-item GET only after single-item action behavior is
@@ -1096,8 +1418,10 @@ Recommended order when code changes are later approved:
 9. Phase 8 - integrate router lifecycle behavior: translate once, compile once,
    submit once, no busy/rejected retry, and no accepted-command replay.
 
-Do not combine this with Java bridge changes, DTO changes, inventory cleanup
-orchestration, or ChatClef engine changes.
+Do not combine alias/action implementation with Java bridge changes, DTO
+changes, inventory-cleanup orchestration, or ChatClef engine changes. Automatic
+cleanup remains a separately approved phase governed by
+`chatclef-python-inventory-cleanup-preflight-contract.md`.
 
 ## Phase Exit Criteria
 
@@ -1107,10 +1431,10 @@ Each phase must satisfy its exit criteria before the next command family starts.
 | --- | --- |
 | Phase 0 | every grammar and capability row has source evidence, Python policy, concrete test file/function/assertion, and implemented passing contract tests |
 | Phase 1 | generated from actual catalog sources; catalog-outside targets `0`; compact conflicts `0`; deterministic output; source hashes recorded |
-| Phase 2 | committed GET alias expansion passes focused alias-only tests; GET/FOOD/MEAT/GOTO/FOLLOW regressions pass; reviewed cfc170a mining/acquisition cases remain green, while only new verb forms require separate approval |
+| Phase 2 | committed GET alias expansion passes focused alias-only tests; GET/FOOD/MEAT/GOTO/FOLLOW regressions pass; reviewed `e08af639` mining/acquisition cases remain green, while only new verb forms require separate approval |
 | Phase 3 | Korean GET mining/acquisition verb tests pass as source-proven existing behavior or newly approved implementation work; cross-command action precedence tests for GET/EQUIP/DEPOSIT/GIVE pass separately from alias-only tests; resolution status and submission status are separated; exactly-once tests pass |
 | Phase 4 EQUIP | full-set shortcuts and explicit equipment capability tests pass; unsupported equipment targets reject explicitly |
-| Phase 5 DEPOSIT | no-count, bare, all, and specific deposit policies are frozen and tested |
+| Phase 5 DEPOSIT | specific-item quantity and junk-policy behavior are frozen and tested; `잡템` and automatic cleanup emit no bare `deposit`; broad-deposit exposure remains disabled unless separately approved |
 | Phase 6 GIVE | recipient extraction, player-name syntax, and no-recipient rejection tests pass |
 | Phase 7 | single-action command families are stable before adding multi-item GET |
 | Phase 8 | router lifecycle tests prove no busy/rejected retry and no accepted-command replay |
@@ -1155,7 +1479,7 @@ approved:
 철 갑옷 입어줘 -> equip iron
 금 갑옷 입어줘 -> equip gold
 철 흉갑 입어줘 -> equip iron_chestplate
-잡템 상자에 넣어줘 -> deposit
+잡템 상자에 넣어줘 -> Python junk-deposit policy mode; direct DSL absent
 다이아몬드 2개 상자에 넣어줘 -> deposit diamond 2
 다이아몬드 3개 Steve에게 줘 -> give Steve diamond 3
 Steve한테 다이아몬드 3개 줘 -> give Steve diamond 3
@@ -1169,7 +1493,10 @@ Phase 2 GET alias expansion:
 돌 64개 가져와줘 -> get stone 64
 석탄 구해줘 -> get coal 1
 
-Reviewed implementation GET acquisition / mining matcher cases:
+Reviewed `e08af639` GET acquisition / mining matcher cases:
+철 10개 캐줘 -> get iron_ingot 10
+철 10개 캐오기 -> get iron_ingot 10
+철 10개 캐와줘 -> get iron_ingot 10
 다이아몬드 캐줘 -> get diamond 1
 석탄 캐와 -> get coal 1
 레드스톤 채굴해줘 -> get redstone 1
@@ -1182,8 +1509,9 @@ Steve에게 다이아몬드 줘 -> GIVE
 ```
 
 Do not move these reviewed GET mining/acquisition phrases back into a
-future-only section. Historical baseline notes for `c912ff...` must stay
-separate from current regression coverage. Alias expansion and cross-command
+future-only section. Historical baseline notes for `c912ff...` and the scoped
+`cfc170a...` alias snapshot must stay separate from current `e08af639`
+regression coverage. Alias expansion and cross-command
 action precedence are still separate risks.
 
 <!-- 20260819_kpopmodder: Kept live GET evidence semantics owned by the test strategy. -->
@@ -1373,8 +1701,11 @@ These are LAVI Korean UX policies that the user must choose:
 specific deposit without quantity:
   ambiguous or Java-compatible 1
 
-bare/all deposit wording:
-  allow only "잡템" or also "전부"
+junk-deposit wording:
+  `잡템` selects a Python policy mode, never a flat alias or direct bare command
+
+explicit broad-deposit exposure:
+  whether any separate wording may emit Java bare `deposit`; default is none
 
 cooked/raw food defaults:
   소고기, 닭고기, 돼지고기, 양고기, 토끼고기, 대구, 연어
@@ -1394,6 +1725,8 @@ Recommended initial UX choices to freeze before implementation:
 | Policy | Recommended initial value |
 | --- | --- |
 | specific deposit without quantity | `AMBIGUOUS_ITEM`; ask how many to store |
+| `잡템 넣어줘` | Python junk-deposit policy mode; require reliable inventory evidence and a safe targeted plan; no direct bare `deposit` |
+| explicit broad `deposit` wording | disabled initially; no Korean phrase emits bare `deposit` |
 | `전부 넣어줘` | unsupported or clarification; do not map to bare `deposit` automatically |
 | unqualified meat and fish | `proposed_not_frozen`: cooked target by default; explicit `생...` maps to raw target only after the user freezes this policy |
 | `목재` | unresolved initially; `원목` / `나무` / `통나무` map to `log`, and `판자` / `나무판자` map to `planks` |
@@ -1440,38 +1773,99 @@ The strategy must include at least the manifest, `altoclef.mixins.json`,
 the LAVI overlay entrypoint/registrar/command sources. This plan must not carry a
 second copy of those hashes because duplicated source snapshots drift.
 
+## Hard Prohibitions
+
+This documentation and every later implementation phase under it MUST NOT:
+
+```text
+- modify Java under plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/**
+- modify ChatClef, AltoClef, Baritone task selection, retry, timeout,
+  completion, container-transfer, or goal behavior
+- modify plugins/Minecraft/common/dto/**, common/protocol/**, or common/schema/**
+- add, remove, rename, or reinterpret any v1 wire message or payload field
+- add CRAFT_ITEM, a craft DSL command, or a new Java craft command
+- implement Korean parsing, canonical display, response rendering, junk policy,
+  or orchestration in Java
+- put 잡템, 갑옷, recipients, quantities, command modes, or shortcut tokens in
+  korean_item_aliases.json
+- compile Korean junk-policy wording or automatic inventory cleanup directly to
+  the broad zero-argument `deposit` command
+- use argument-less deposit as the inventory-full cleanup primitive
+- invent cleanup targets or placeholder quantities
+- infer inventory-full from logs, task duration, timeout, deadline, path stalls,
+  terminal UNKNOWN, or missing evidence
+- advance the primary command from cleanup terminal completion alone, or when
+  cleanup/post-cleanup evidence is stale, mismatched, or UNKNOWN
+- retry, replay, rerun, or automatically resubmit cleanup or primary commands
+- submit a follow-up command inline from a WebSocket callback
+- infer gameplay effect from VALIDATED, ACCEPTED, RUNNING, terminal COMPLETED,
+  active-request clearing, or connection state alone
+- emit an @ prefix from the Python natural-language compiler
+- let an LLM generate raw ChatClef DSL or control workflow state transitions
+- introduce Forge MineMind fallback or shared Fabric/Forge orchestration
+```
+
+If a later implementation appears to require any prohibited change, stop that
+phase and open a separate evidence-backed design review. Do not expand scope
+implicitly.
+
 ## ChatGPT Handoff Summary
 
 Use this when asking ChatGPT to continue reviewing the plan:
 
 ```text
-Codex/ChatGPT reconciled the v2 Korean ChatClef item-action alias plan in:
+Codex/ChatGPT reconciled the v2 Korean ChatClef item-action alias plan at the
+fixed overall source baseline:
 
-plugins/Minecraft/docs/chatclef-korean-item-action-alias-v2-plan.md
+e08af63948a3fa4675c70279db59c2a70b00a332
 
 Authority split:
 
-- this plan owns Korean item/action design and phase order
+- this plan owns Korean item/action language, aliases, canonical display,
+  capability boundaries, and item-action phase order
+- chatclef-python-command-orchestration-plan.md owns evidence-bounded Korean
+  responses, lifecycle sequencing, and exactly-once primary submission
+- chatclef-python-inventory-cleanup-preflight-contract.md owns inventory
+  evidence, protected-item policy, targeted cleanup, fresh post-cleanup
+  verification, and fail-closed primary admission
 - chatclef-korean-test-strategy.md owns tests, artifacts, source/hash authority,
   coverage algorithm/parser provenance, CI, and live safety
-- chatclef-korean-post-review-merge-blockers.md owns current merge status
+- chatclef-korean-post-review-merge-blockers.md owns current implementation and
+  merge status
+- chatclef-korean-item-command-resolution-analysis.md is historical diagnosis
+  only
+- plugins/Minecraft/README.md is navigation and ownership summary only
 
 Frozen design boundaries:
 
 - korean_item_aliases.json remains a flat concrete exact-compact item lexicon
-- equip shortcuts, deposit modes, give recipients, quantities, and routing
-  outcomes remain command-specific policy
+- equipment components and fixed aliases remain separate resources
+- input aliases and canonical Korean display names remain separate
+- craft wording uses existing GET acquisition and emits get <target> <count>
+- resolver order remains equipment composition -> fixed item alias ->
+  unsupported -> unknown, followed by catalog and command-capability checks
+- 잡템 is a Python policy mode, not an item alias and not a direct synonym for
+  bare deposit
+- automatic or user-requested junk cleanup uses safe targeted deposit only
+  under the cleanup contract; unknown cleanup effect blocks the primary command
 - Python emits prefixless DSL only
 - Java, bridge DTOs, wire payloads, and ChatClef/AltoClef engine code remain
-  unchanged by this plan
-- current reviewed GET mining/acquisition phrases at cfc170a remain regressions
-- EQUIP, DEPOSIT, GIVE, and multi-item GET remain phased future work
+  unchanged
 - accepted commands are never automatically replayed
+
+Source classification at e08af639:
+
+- GET acquire/craft/mining matching, 철 10개 캐줘-family source behavior,
+  prefixless GET compilation, and single-pass reconciliation are source-present;
+  exact test-evidence maturity remains owned by the test strategy
+- emerald/torch aliases, 갑바/레깅스/모자 components, whole-phrase equipment
+  composition, canonical display, EQUIP/DEPOSIT/GIVE Korean compilation,
+  user-response rendering, and inventory cleanup orchestration are still planned
 
 Coverage state:
 
 - historical c912ff runtime baseline: 11 aliases, 4 covered targets, 587 missing, 0.68%
-- reviewed cfc170a runtime baseline: 19 aliases, 9 covered targets, 582 missing, 1.52%
+- cfc170a reviewed alias snapshot, unchanged at e08af639: 19 aliases, 9 covered targets, 582 missing, 1.52%
 - proposed v2 seed: 191 aliases, 167 covered targets, 424 missing, 28.26%
 - all accepted coverage artifacts use algorithm version 1 and record catalog
   parser commit/path/hash
@@ -1481,6 +1875,6 @@ Phase 0 is not complete until the focused tests, source-backed artifacts,
 capability rules, CI scope, and merge gates in the test strategy and
 post-review document are implemented and green.
 
-Do not start EQUIP, DEPOSIT, or GIVE natural-language implementation before
-Phase 0 is complete.
+Do not start EQUIP, DEPOSIT, GIVE, or automatic inventory-cleanup implementation
+before its owning contract and required preceding gates are complete.
 ```

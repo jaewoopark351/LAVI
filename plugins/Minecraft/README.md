@@ -232,8 +232,15 @@ events, and inventory preflight cleanup planning, read:
 plugins/Minecraft/docs/chatclef-python-command-orchestration-plan.md
 ```
 
-For Korean standalone item aliases, mining/acquisition verb parsing, and
-Minecraft-active routing boundaries, read:
+For the Python-only inventory-full cleanup preflight contract, protected-item
+policy, post-cleanup verification, and fail-closed primary-submit gate, read:
+
+```text
+plugins/Minecraft/docs/chatclef-python-inventory-cleanup-preflight-contract.md
+```
+
+For the historical diagnosis of Korean standalone item aliases,
+mining/acquisition verb parsing, and Minecraft-active routing boundaries, read:
 
 ```text
 plugins/Minecraft/docs/chatclef-korean-item-command-resolution-analysis.md
@@ -307,6 +314,9 @@ Incident analyses:
 Python orchestration planning:
   chatclef-python-command-orchestration-plan.md
 
+Python inventory cleanup preflight contract:
+  chatclef-python-inventory-cleanup-preflight-contract.md
+
 Korean item command diagnosis:
   chatclef-korean-item-command-resolution-analysis.md
 
@@ -341,6 +351,11 @@ active session identity
 single active command request
 accepting or rejecting terminal command_result envelopes
 UI and extension result adaptation
+Korean command interpretation
+deterministic user response rendering
+Python-local command orchestration
+inventory preflight evidence evaluation
+targeted cleanup planning
 ```
 
 Java bridge owns:

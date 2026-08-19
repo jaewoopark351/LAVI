@@ -1,12 +1,13 @@
 <!-- 20260815_kpopmodder: Documented the Python-only plan for ChatClef command replies, Korean mining phrases, and inventory preflight cleanup. -->
 <!-- 20260819_kpopmodder: Recorded the implemented single-pass canonical submission and reconciliation boundary. -->
+<!-- 20260819_kpopmodder: Bound Korean response and cleanup planning to reviewed archive e08af639 and split inventory cleanup into its own fail-closed contract. -->
 
 # ChatClef Python Command Orchestration Plan
 
 Date: 2026-08-15
 
-This document records the pre-implementation plan for three requested Fabric
-ChatClef behaviors:
+This document records the design and reviewed-baseline status for the requested
+Fabric ChatClef Python orchestration behaviors:
 
 ```text
 1. Emit a short LAVI-side reply when a Minecraft command is routed.
@@ -20,6 +21,45 @@ It is documentation only. It does not approve Python behavior changes, Java
 changes, wire protocol changes, DTO changes, build execution, Minecraft launch,
 runtime reproduction, commit, push, broad refactoring, file moves, or automatic
 replay logic.
+
+## Document Authority And Reviewed Baseline
+
+Reviewed archive baseline:
+
+```text
+e08af63948a3fa4675c70279db59c2a70b00a332
+```
+
+This document owns Python user replies, lifecycle wording, operation context,
+single-pass submission, and the high-level command-orchestration flow.
+
+Implemented at the reviewed archive baseline:
+
+```text
+shared Korean acquisition matcher
+철 10개 캐줘 / 캐오기 / 캐와줘 family
+prefixless GET compilation
+single-pass submission and reconciliation latch
+```
+
+Planned, not implemented at that baseline:
+
+```text
+deterministic Korean response renderer
+normal LAVI output listener dispatch
+accepted-result event publisher
+command orchestrator
+inventory snapshot provider
+automatic cleanup
+```
+
+Inventory cleanup details are intentionally not owned here. The fail-closed
+cleanup evidence, protected-item policy, postcondition, and no-replay contract
+are owned by:
+
+```text
+plugins/Minecraft/docs/chatclef-python-inventory-cleanup-preflight-contract.md
+```
 
 ## Scope
 
@@ -72,6 +112,44 @@ TTS calls directly from Minecraft transport code
 LLM generation of raw ChatClef DSL
 ```
 
+## Hard Prohibitions
+
+This work MUST NOT:
+
+```text
+modify any file under
+  plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/**
+modify plugins/Minecraft/common/dto/**
+modify plugins/Minecraft/common/protocol/**
+modify plugins/Minecraft/common/schema/**
+add, remove, rename, or reinterpret any v1 wire message or payload field
+add fields to CommandRequestDTO, CommandResultDTO, StatusSnapshotDTO,
+  or BridgeEnvelopeDTO
+add a new Java craft command or change GetCommand semantics
+change DepositCommand, EquipCommand, GiveCommand, or ChatClef command grammar
+change ChatClef, AltoClef, Baritone task selection, retry, timeout,
+  completion, container transfer, or goal behavior
+implement Korean parsing, aliases, responses, junk policy, or orchestration
+  in Java
+infer inventory-full from logs, task duration, path stalls, timeout,
+  deadline, or UNKNOWN results
+infer gameplay effect from ACCEPTED, RUNNING, terminal COMPLETED,
+  active-request clearing, or connection state alone
+use argument-less deposit as automatic junk cleanup
+generate placeholder cleanup quantities
+automatically retry, replay, rerun, or resubmit cleanup or primary commands
+submit a follow-up command inline from a WebSocket callback
+let an LLM generate raw ChatClef DSL or decide workflow state transitions
+emit an @ prefix from the Python natural-language compiler
+put contextual pseudo-targets such as 잡템, 갑옷, player names, quantities,
+  or command modes into korean_item_aliases.json
+introduce Forge MineMind fallback or shared Fabric/Forge orchestration
+```
+
+If an implementation appears to require any prohibited change, stop the phase
+and open a separate evidence-backed design review. Do not expand this scope
+implicitly.
+
 ## Current Code Observations
 
 The current code largely matches the proposed boundary, but some required
@@ -102,9 +180,11 @@ The reply feature should be implemented as a general external-response
 dispatch API on the LLM side, not as a Minecraft-specific branch inside TTS or
 transport code.
 
-### Korean Mining Phrase Gap
+### Historical Korean Mining Phrase Gap Before cfc170a
 
-The current Korean command path has these gaps:
+Before the reviewed Korean GET fixes, the Korean command path had these gaps.
+Do not read this historical section as the current behavior at reviewed archive
+baseline `e08af63948a3fa4675c70279db59c2a70b00a332`:
 
 ```text
 Input: 철 10개 캐줘
@@ -129,28 +209,22 @@ The safe translation target for standalone "철" is currently `iron_ingot`,
 because the public target catalog exposes `iron_ingot` while `raw_iron` or
 `iron_ore` are not guaranteed public ChatClef targets.
 
-### Natural-Language Double Translation
+### Natural-Language Single-Pass Translation
 
-The current input router first calls:
-
-```text
-translate_natural_language_command(text)
-```
-
-and then calls:
+At reviewed archive baseline `e08af639`, the Python router already preserves the
+single-pass translation boundary:
 
 ```text
-handle_natural_language_command(request)
+MinecraftChatClefTranslationBoundary.translate_once(text)
+  -> one validated translation
+MinecraftChatClefSubmissionBoundary.submit_once(request, validated_translation)
+  -> submit_translated_command(request, validated_translation)
 ```
 
-The handler translates again. With only deterministic rule parsing this usually
-produces the same result, but future LLM extraction could make the two results
-diverge. A later implementation should expose a Python-only API that submits a
-previously validated translation without re-translating:
-
-```text
-submit_translated_command(request, validated_translation)
-```
+Future response rendering, orchestration, cleanup preflight, or event publishing
+must preserve this invariant. Do not re-run natural-language translation in the
+submission layer, and do not let cleanup planning reinterpret the raw Korean
+input after a validated primary command has already been produced.
 
 ### Command Submission Flow
 
@@ -272,6 +346,10 @@ quantity
 submission_status
 error_code
 terminal_status
+runtime_completion_status
+gameplay_observation_complete
+expected_gameplay_effect_verified
+prohibited_effect_absence_verified
 ```
 
 It must not parse raw DSL such as `get iron_ingot 10` to recover meaning.
@@ -280,10 +358,10 @@ Example reply policy:
 
 ```text
 primary accepted:
-  철 10개 캐러 갈게요.
+  철 10개 수집 명령을 제출했어요.
 
 cleanup starting:
-  인벤토리부터 정리하고 철 10개 캐러 갈게요.
+  인벤토리 정리 명령을 제출했어요. 정리 결과를 확인하기 전에는 철 수집 명령을 보내지 않아요.
 
 already busy:
   지금 다른 작업을 하고 있어요.
@@ -295,7 +373,10 @@ cleanup failed:
   인벤토리를 정리하지 못해서 작업을 시작하지 않았어요.
 
 primary completed:
-  철 10개 수집 끝났어요.
+  철 10개 수집 명령의 완료 응답을 받았어요. 아이템 증가는 별도로 확인해야 해요.
+
+primary gameplay effect verified:
+  철 10개 수집 결과를 확인했어요.
 
 primary failed:
   철 수집에 실패했어요.
@@ -308,6 +389,29 @@ The initial reply path should use deterministic templates only. A future LLM
 paraphraser may be added behind the same interface, but it must receive only
 confirmed facts and may change tone only. It must not change command status,
 command text, lifecycle state, retry policy, or cleanup policy.
+
+### Response Evidence And Wording Contract
+
+User-facing Korean replies must not claim more than Python has proved:
+
+| Python evidence | Allowed response meaning | Forbidden overclaim |
+| --- | --- | --- |
+| translation validated | understood, or no reply | submitted, started |
+| submission accepted | command was submitted | work started, mining started |
+| trusted runtime running | runtime appears to be executing | completed |
+| terminal completed | terminal response was observed | item count increased |
+| gameplay effect verified | requested effect was verified | none |
+| unknown | result unclear; no next step | success, completion, retry |
+
+For example, after accepted submission the safe default is:
+
+```text
+철 10개 수집 명령을 제출했어요.
+```
+
+It is too strong to say "철 10개 캐러 갈게요" at accepted time, because Python
+does not know whether AltoClef will mine, craft, trade, pick up, or satisfy the
+request from existing inventory.
 
 Recommended LLM-side dispatch boundary:
 
@@ -531,6 +635,7 @@ IDLE
 PREFLIGHT_EVALUATION
 CLEANUP_SUBMITTING
 WAITING_CLEANUP_TERMINAL
+VERIFYING_CLEANUP_EFFECT
 PRIMARY_SUBMITTING
 WAITING_PRIMARY_TERMINAL
 COMPLETED
@@ -557,9 +662,15 @@ CLEANUP_SUBMITTING
   -> FAILED_BEFORE_PRIMARY when cleanup is immediately rejected
 
 WAITING_CLEANUP_TERMINAL
-  -> PRIMARY_SUBMITTING only when cleanup completed
+  -> VERIFYING_CLEANUP_EFFECT only when the matching cleanup terminal completed
   -> FAILED_BEFORE_PRIMARY for rejected, failed, cancelled, deadline_exceeded, or unknown
   -> ABORTED on disconnect
+
+VERIFYING_CLEANUP_EFFECT
+  -> PRIMARY_SUBMITTING only when fresh post-cleanup inventory evidence proves
+     the required free slots and protected-item preservation
+  -> FAILED_BEFORE_PRIMARY when evidence is FULL, UNKNOWN, stale, mismatched,
+     incomplete, or protected-item preservation is not verified
 
 PRIMARY_SUBMITTING
   -> WAITING_PRIMARY_TERMINAL when primary is accepted
@@ -583,14 +694,43 @@ these are true:
 
 ```text
 cleanup request was accepted
-cleanup terminal status is completed
+matching cleanup terminal has completed
 active command has been cleared by transport ownership
 the operation ID still matches
-cleanup_attempt_count <= 1
+cleanup_attempt_count == 1
+matching request/session/correlation/generation
+fresh post-cleanup snapshot available
+post-cleanup free slot count >= required_free_slots
+protected_item_preservation_verified == true
 primary_was_accepted is false
 ```
 
 If any condition is false, do not submit the primary command automatically.
+
+The current cleanup contract adds one mandatory state between cleanup terminal
+and primary submission:
+
+```text
+WAITING_CLEANUP_TERMINAL
+  -> VERIFYING_CLEANUP_EFFECT
+```
+
+Primary submission after cleanup additionally requires fresh post-cleanup
+inventory evidence:
+
+```text
+matching request/session/correlation/generation
+fresh post-cleanup snapshot available
+post-cleanup free slot count >= required_free_slots
+protected_item_preservation_verified == true
+```
+
+`cleanup terminal status == completed` alone is insufficient. The detailed
+contract is:
+
+```text
+plugins/Minecraft/docs/chatclef-python-inventory-cleanup-preflight-contract.md
+```
 
 ### Replay Guard
 
@@ -663,11 +803,12 @@ Recommended modes:
 ```text
 off
 targeted
-deposit_all_non_gear
 ```
 
 Default should be `off` or `targeted` with reliable inventory snapshots.
-`deposit_all_non_gear` must be explicit opt-in only.
+Any broad or "non-gear" cleanup mode is outside the current contract and
+requires a separate approval. Even then, it must not mean bare `deposit` unless
+a later evidence-backed contract explicitly approves that exact behavior.
 
 Do not treat argument-less `deposit` as "store junk only". The existing
 ChatClef command can store many non-gear items, including food, torches, fuel,
@@ -702,15 +843,18 @@ max_cleanup_attempts = 1
 
 ## Implementation Phases
 
-### Phase A: Korean Phrases And Start Replies
+### Historical Phase A: Korean Phrases And Start Replies
 
 ```text
-1. Add korean_acquisition_verb_matcher.py.
-2. Connect gate and rule parser to the shared matcher.
-3. Add "철": "iron_ingot" alias.
-4. Add parser/resolver/compiler tests for Korean mining phrases.
-5. Add deterministic response renderer.
-6. Add a general LLM external-response dispatch API.
+Implemented at e08af639:
+1. Shared Korean acquisition matcher.
+2. Gate and rule parser use the shared matcher.
+3. Standalone 철 mining/acquisition phrases resolve to iron_ingot.
+4. Parser/resolver/compiler regressions cover Korean mining phrases.
+
+Still planned:
+5. Deterministic response renderer.
+6. General LAVI external-response dispatch API.
 ```
 
 This phase must not add orchestration or inventory cleanup.
@@ -745,9 +889,32 @@ This phase must not automatically submit cleanup or primary follow-up commands.
 2. Default provider returns UNKNOWN.
 3. Add cleanup policy.
 4. Support targeted cleanup only with reliable FULL evidence.
-5. Submit primary only after cleanup completed and replay guard passes.
+5. Submit primary only after cleanup completed, fresh post-cleanup inventory
+   evidence verifies the required effect, protected-item preservation is
+   verified, and the replay guard passes.
 6. Keep cleanup attempt count capped at one.
 ```
+
+Phase D is only the old high-level placeholder. The current authoritative
+cleanup contract splits this into shadow-mode inventory evidence first and
+automatic cleanup execution later. Do not run cleanup from UNKNOWN inventory
+state, do not use bare `deposit`, and do not submit the primary command after
+cleanup until fresh post-cleanup evidence proves the required free slot.
+
+## 2026-08-19 Phase Mapping
+
+Use these phases for the reviewed archive baseline follow-up:
+
+| Phase | Scope |
+| --- | --- |
+| Phase 0 | freeze document authority, craft wording as GET, response evidence vocabulary, unknown routing policy, cleanup postconditions, no-retry/no-replay, and hard prohibitions |
+| Phase 1 | preserve existing GET acquisition regressions such as `철 10개 캐줘 -> get iron_ingot 10` and false-positive no-submit cases |
+| Phase 2 | add reported alias/display gaps such as 갑바, 레깅스, 모자, emerald, and torch |
+| Phase 3 | add catalog-driven alias coverage pipeline without changing command orchestration |
+| Phase 4 | add deterministic immediate Korean response rendering from translation/precheck/accepted facts only |
+| Phase 5 | add transport events and operation orchestrator without cleanup execution |
+| Phase 6 | add reliable inventory provider and cleanup shadow mode with actual submit count 0 |
+| Phase 7 | enable automatic targeted cleanup only after the cleanup contract is satisfied |
 
 ## Existing Tests To Reuse
 
@@ -860,7 +1027,8 @@ Required orchestrator tests:
 ```text
 inventory AVAILABLE -> primary submitted once
 inventory UNKNOWN -> primary submitted once, no cleanup
-inventory FULL with safe targeted cleanup -> cleanup completed, then primary once
+inventory FULL with safe targeted cleanup -> cleanup completed, fresh
+  post-cleanup AVAILABLE/effect verified, then primary once
 cleanup rejected/failed/cancelled/deadline/unknown -> primary not submitted
 cleanup disconnect -> primary not submitted
 primary completed -> terminal reply once
