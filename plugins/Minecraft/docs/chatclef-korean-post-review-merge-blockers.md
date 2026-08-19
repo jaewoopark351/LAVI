@@ -5,6 +5,7 @@
 <!-- 20260818_kpopmodder: Added gameplay observation completeness and verified expected/partial/prohibited effect merge criteria. -->
 <!-- 20260819_kpopmodder: Recorded strict listener identity, canonical submission reconciliation, and split batch advancement gates. -->
 <!-- 20260819_kpopmodder: Added the Python Korean command orchestration v2 documentation-status addendum for reviewed archive e08af639. -->
+<!-- 20260820_kpopmodder: Added Korean command registry and lifecycle-axis documentation status. -->
 
 # ChatClef Korean Post-Review Merge Blockers
 
@@ -64,12 +65,23 @@ plugins/Minecraft/docs/chatclef-korean-post-review-merge-blockers.md
 plugins/Minecraft/docs/chatclef-korean-item-command-resolution-analysis.md
 ```
 
+The 2026-08-20 Korean command-registry split adds one normative planning
+document without changing code:
+
+```text
+plugins/Minecraft/docs/chatclef-python-korean-command-registry-plan.md
+```
+
 Authority is split as follows:
 
 ```text
 alias v2 plan:
   item/action UX design, aliases, canonical display, capability gates, and
   phase order
+
+Python Korean command registry plan:
+  20 registered command snapshot, command resolver domains, lifecycle kinds,
+  safety tiers, confirmation modes, allowed sources, and public enablement axes
 
 Python command orchestration plan:
   response evidence, lifecycle wording, single-pass submission, and primary
@@ -678,3 +690,95 @@ plugins/Minecraft/docs/chatclef-python-inventory-cleanup-preflight-contract.md
 This addendum is a documentation-status record only. It does not authorize
 code, tests, settings, Java, DTO, wire-payload, ChatClef/AltoClef behavior,
 Minecraft launch, runtime reproduction, commit, or push changes.
+
+## 2026-08-20 Korean Command Registry Addendum
+
+This addendum records the docs-only status for the user request to make all
+registered ChatClef commands available through Korean natural language and to
+support all Minecraft item targets in Korean.
+
+The current registered command surface is source-backed as 20 commands:
+
+```text
+attack
+chatclef
+deposit
+equip
+follow
+food
+gamer
+gamma
+get
+give
+goto
+hero
+idle
+locate_structure
+meat
+overlay
+reload_settings
+resetmemory
+scan
+stop
+```
+
+The command registry must verify actual registration through `AltoClefCommands`
+and `OverlayCommandRegistrar`. It must not count commented or unregistered
+command classes such as `StashCommand`.
+
+The status term `IMPLEMENTED` must not be used as a single end-to-end readiness
+claim. Future status reviews must split at least these axes:
+
+```text
+SOURCE_REGISTERED
+KOREAN_PARSE_COMPILE_READY
+PYTHON_ADMISSION_READY
+BRIDGE_LIFECYCLE_READY
+GAMEPLAY_EFFECT_VERIFIABLE
+PUBLIC_KOREAN_ENABLED
+```
+
+Current classification constraints:
+
+```text
+get, food, goto, meat:
+  Korean parser/compiler present for the current supported scope; finite command
+  path intended but live mutating gates still apply.
+
+follow, idle:
+  Korean parser/compiler present, but persistent lifecycle and cancellation
+  contracts remain unresolved.
+
+stop:
+  Korean parser/compiler present for idle-state submission; active-command
+  cancellation through the normal command-request lane is not proven.
+
+attack, chatclef, deposit, equip, gamer, gamma, give, hero, locate_structure,
+overlay, reload_settings, resetmemory, scan:
+  no current public Korean parser/compiler contract.
+```
+
+Full item coverage also remains a classified-catalog goal, not an unconditional
+alias-per-target claim. All 591 ChatClef catalog targets must be classified as
+one of:
+
+```text
+DIRECT_ITEM
+DIRECT_BLOCK
+CANONICALIZED_LEGACY
+GENERIC_GROUP
+COMMAND_INTERNAL
+AMBIGUOUS_POLICY
+UNSUPPORTED
+UNRESOLVED
+```
+
+The `잡템` wording remains Python junk-cleanup policy mode only. It is not a
+flat item alias and must not compile directly to bare `deposit`. A future
+cleanup execution path may submit only a safe targeted command such as
+`deposit <observed_disposable_target> <observed_quantity>` after reliable
+inventory evidence and post-cleanup verification are available.
+
+This addendum is documentation-only. It does not authorize code, tests, build,
+runtime execution, Java, DTO, wire-payload, ChatClef/AltoClef behavior, commit,
+or push changes.

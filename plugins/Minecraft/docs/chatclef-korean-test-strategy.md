@@ -23,6 +23,7 @@ Read this document with:
 
 ```text
 plugins/Minecraft/docs/chatclef-korean-item-command-resolution-analysis.md
+plugins/Minecraft/docs/chatclef-python-korean-command-registry-plan.md
 plugins/Minecraft/docs/chatclef-korean-item-action-alias-v2-plan.md
 plugins/Minecraft/docs/chatclef-python-command-orchestration-plan.md
 plugins/Minecraft/docs/chatclef-python-inventory-cleanup-preflight-contract.md
@@ -34,8 +35,11 @@ plugins/Minecraft/docs/fabric-chatclef-live-runtime-preflight-plan.md
 plugins/Minecraft/docs/fabric-chatclef-live-runtime-process-lifecycle-plan.md
 ```
 
-The alias v2 plan owns item/action design, command-specific Korean UX policy,
-canonical aliases, display wording, capability gates, and phased item/action
+The Python Korean command registry plan owns the 20-command snapshot,
+command-by-command resolver domains, lifecycle kinds, safety tiers,
+confirmation modes, allowed input sources, and public enablement axes. The alias
+v2 plan owns item/action design, command-specific Korean UX policy, canonical
+aliases, display wording, capability gates, and phased item/action
 implementation order. The Python command orchestration plan owns user-facing
 response evidence, lifecycle wording, single-pass submission, and primary
 command sequencing. The inventory cleanup contract owns inventory evidence,
@@ -1168,6 +1172,12 @@ ChatClef can register commands that Python Korean natural language does not yet
 support. Every registered command should have a matrix row so the project does
 not confuse "registered in Java" with "implemented in Korean."
 
+The detailed command registry status is multi-axis and owned by
+`chatclef-python-korean-command-registry-plan.md`. The legacy
+`natural_language_status` field below is only a parser/compiler readiness
+summary. It must not be read as bridge lifecycle readiness, gameplay-effect
+verification, or public Korean enablement.
+
 The matrix must use exactly one current value for each axis. Do not write
 values such as `PLANNED or RAW_ONLY`; those cannot become stable tests.
 
@@ -1192,6 +1202,17 @@ IMPLEMENTED
 PLANNED
 RAW_ONLY
 EXPLICIT_UNSUPPORTED
+```
+
+Command registry readiness axes to test separately:
+
+```text
+SOURCE_REGISTERED
+KOREAN_PARSE_COMPILE_READY
+PYTHON_ADMISSION_READY
+BRIDGE_LIFECYCLE_READY
+GAMEPLAY_EFFECT_VERIFIABLE
+PUBLIC_KOREAN_ENABLED
 ```
 
 Execution effect values:
@@ -1755,6 +1776,13 @@ backend, instance, world, and matching-terminal-result guards exist in the
 actual live test implementation. Environment variables alone are not enough to
 make a mutating command live-testable.
 
+Rows marked `IMPLEMENTED` in the legacy natural-language column prove only the
+Korean parser/compiler or current support-matrix scope described by their tests.
+They do not prove natural completion, active-command cancellation, gameplay
+effect, or public enablement. In particular, `idle`, `follow`, and `stop` must
+keep separate lifecycle/cancellation evidence before they can be promoted in the
+command registry axes.
+
 IMPLEMENTED rows must keep test evidence. Until the shared case artifact is
 committed, split planned IDs from currently existing test paths:
 
@@ -1841,8 +1869,12 @@ Support matrix tests should verify:
 ```text
 every registered command appears in the matrix exactly once
 every matrix row points to a registered source or an explicit virtual command
+actual registration chain is verified, not inferred from all Command subclasses
+commented StashCommand and unregistered helper command classes are excluded
 source_kind is either registered or virtual
 no matrix row uses an "or" status
+multi-axis registry status fields are present or linked from the command
+  registry plan
 behavior_verified is boolean
 live_test_allowed is boolean
 live_test_condition is one of the closed enum values

@@ -1,6 +1,7 @@
 <!-- 20260815_kpopmodder: Documented the Python-only plan for ChatClef command replies, Korean mining phrases, and inventory preflight cleanup. -->
 <!-- 20260819_kpopmodder: Recorded the implemented single-pass canonical submission and reconciliation boundary. -->
 <!-- 20260819_kpopmodder: Bound Korean response and cleanup planning to reviewed archive e08af639 and split inventory cleanup into its own fail-closed contract. -->
+<!-- 20260820_kpopmodder: Linked command orchestration to the full Korean command registry lifecycle axes. -->
 
 # ChatClef Python Command Orchestration Plan
 
@@ -32,6 +33,14 @@ e08af63948a3fa4675c70279db59c2a70b00a332
 
 This document owns Python user replies, lifecycle wording, operation context,
 single-pass submission, and the high-level command-orchestration flow.
+
+The full 20-command Korean registry, per-command resolver domains, lifecycle
+kinds, safety tiers, confirmation modes, allowed input sources, and public
+enablement axes are owned by:
+
+```text
+plugins/Minecraft/docs/chatclef-python-korean-command-registry-plan.md
+```
 
 Implemented at the reviewed archive baseline:
 
@@ -79,6 +88,28 @@ are owned by:
 ```text
 plugins/Minecraft/docs/chatclef-python-inventory-cleanup-preflight-contract.md
 ```
+
+## Command Registry Lifecycle Boundary
+
+Do not treat a Korean parser/compiler row as end-to-end command readiness. The
+orchestrator may only publicly enable a command family when the command registry
+has separately classified these axes:
+
+```text
+SOURCE_REGISTERED
+KOREAN_PARSE_COMPILE_READY
+PYTHON_ADMISSION_READY
+BRIDGE_LIFECYCLE_READY
+GAMEPLAY_EFFECT_VERIFIABLE
+PUBLIC_KOREAN_ENABLED
+```
+
+This distinction matters for persistent or control commands. For example,
+`idle`, `follow`, and `stop` can have Korean parser/compiler support while still
+requiring source-backed lifecycle or cancellation proof before broad public
+enablement. The orchestration state machine must preserve exactly-once
+submission and no-replay behavior even when a command is parser-ready but not
+bridge-lifecycle-ready.
 
 ## Scope
 

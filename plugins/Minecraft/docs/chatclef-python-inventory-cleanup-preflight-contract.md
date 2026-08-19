@@ -25,6 +25,10 @@ chatclef-python-command-orchestration-plan.md
   -> user replies, lifecycle wording, operation-level flow, and references to
      this cleanup contract
 
+chatclef-python-korean-command-registry-plan.md
+  -> Korean command taxonomy and whether wording such as 잡템 enters
+     JUNK_CLEANUP_MODE instead of item-action DSL
+
 chatclef-python-inventory-cleanup-preflight-contract.md
   -> inventory evidence, FULL / AVAILABLE / UNKNOWN policy, protected-item
      policy, cleanup planning, cleanup postconditions, and fail-closed gates

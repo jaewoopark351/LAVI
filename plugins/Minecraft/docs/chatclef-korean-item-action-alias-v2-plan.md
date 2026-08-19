@@ -3,6 +3,8 @@
 <!-- 20260818_kpopmodder: Linked the post-restore live lifecycle and fail-closed preflight status without expanding item-action scope. -->
 <!-- 20260819_kpopmodder: Added reviewed-baseline Korean craft-wording, colloquial equipment alias, canonical display, and catalog coverage contracts. -->
 <!-- 20260819_chatgpt: Reconciled e08af source classification, cross-document authority, and safe junk-deposit policy. -->
+<!-- 20260820_kpopmodder: Split full Korean command registry authority from item-action alias planning. -->
+<!-- 20260820_chatgpt: Clarified full-registry authority, docs-only provenance, readiness gates, and handoff synchronization. -->
 
 # ChatClef Korean Item Action Alias V2 Plan
 
@@ -42,9 +44,10 @@ runtime configuration, and this document does not copy them into the runtime
 resource directory.
 
 A later ChatGPT conditional review approved the responsibility boundaries in
-this document, but did not approve immediate full implementation. That review
-requires an additional contract-freeze phase before expanding beyond the
-current `GET_ITEM` behavior.
+this document, but did not approve immediate full implementation. Before any
+later code implementation is authorized, the full-command registry/lifecycle
+prerequisite and the item-action Phase 0 contract gates must both be closed and
+the user must separately approve the code-changing phase.
 
 ## Related Documents And Authority
 
@@ -52,6 +55,7 @@ Read this plan with:
 
 ```text
 plugins/Minecraft/README.md
+plugins/Minecraft/docs/chatclef-python-korean-command-registry-plan.md
 plugins/Minecraft/docs/chatclef-python-command-orchestration-plan.md
 plugins/Minecraft/docs/chatclef-python-inventory-cleanup-preflight-contract.md
 plugins/Minecraft/docs/chatclef-korean-test-strategy.md
@@ -69,6 +73,11 @@ Authority is split as follows:
 this plan:
   Korean item/action language, concrete aliases, canonical Korean display,
   command-capability boundaries, and item-action phase order
+
+Python Korean command registry plan:
+  20 registered command snapshot, per-command lifecycle kind, resolver domain,
+  safety tier, confirmation mode, allowed input source, and public enablement
+  axes
 
 Python command orchestration plan:
   evidence-bounded Korean responses, operation context, lifecycle sequencing,
@@ -99,17 +108,35 @@ live-runtime process lifecycle index:
   fixed audit snapshots, ownership runbooks, and cross-document navigation
 ```
 
-When wording conflicts, this plan controls Korean item/action language and alias
-policy; the orchestration plan controls user-response evidence and operation
-sequencing; the cleanup contract controls automatic or junk-policy cleanup; the
-test strategy controls tests, provenance, and coverage; and the post-review
-document controls current implementation and merge status. The historical
-analysis and README cannot override any normative contract.
+When wording conflicts, this plan controls Korean item/action language, alias
+policy, and item-target capability. The command registry plan controls the full
+20-command registration taxonomy and each command's lifecycle kind, resolver
+domain, safety tier, confirmation mode, allowed input source, readiness axes,
+and public enablement. The orchestration plan controls user-response evidence
+and operation sequencing; the cleanup contract controls automatic or
+junk-policy cleanup; the test strategy controls tests, provenance, and coverage;
+and the post-review document controls current implementation and merge status.
+The historical analysis and README cannot override any normative contract.
 
-For the 2026-08-19 authority migration, the seven user-listed documents are one
+For the 2026-08-19 authority migration, the seven user-listed documents were one
 docs-only change unit. Later changes must update and commit every directly
 affected normative document together. Linked live-runtime documents need an
 update only when their live-run contract actually changes.
+
+For the 2026-08-20 command-registry split, the current docs-only change unit is:
+
+```text
+plugins/Minecraft/README.md
+plugins/Minecraft/docs/chatclef-python-korean-command-registry-plan.md
+plugins/Minecraft/docs/chatclef-korean-item-action-alias-v2-plan.md
+plugins/Minecraft/docs/chatclef-python-command-orchestration-plan.md
+plugins/Minecraft/docs/chatclef-python-inventory-cleanup-preflight-contract.md
+plugins/Minecraft/docs/chatclef-korean-test-strategy.md
+plugins/Minecraft/docs/chatclef-korean-post-review-merge-blockers.md
+```
+
+The historical resolution analysis remains linked but is not part of this
+2026-08-20 change unit unless its historical-status contract changes.
 
 The 2026-08-18 post-restore audit remains a live-runtime-specific audit against
 baseline `4239c23`. It does not replace the item/action source baseline below.
@@ -163,7 +190,8 @@ Not source-present at `e08af639` and therefore still planned:
   post-cleanup inventory-effect verification
 ```
 
-Current working-tree implementation after the 2026-08-19 follow-up:
+Reported post-baseline working-tree implementation carried forward from the
+2026-08-19 follow-up:
 
 ```text
 - emerald and torch fixed Korean aliases are source-present
@@ -176,6 +204,13 @@ Current working-tree implementation after the 2026-08-19 follow-up:
   reliable inventory snapshot collection and automatic cleanup execution remain
   planned
 ```
+
+This is a carried-forward working-tree report, not a replacement for the fixed
+`e08af639` baseline and not an assertion that the 2026-08-20 docs-only change
+implemented or re-ran any Python source or test. Current implementation status is
+owned by the post-review merge-blocker document; current test evidence is owned
+by the test strategy and must be re-audited when the working tree changes.
+
 ## Goal
 
 The user-facing goal is broad item coverage:
@@ -313,8 +348,8 @@ Current reviewed craft-wording example:
 철 삽 하나 만들어 -> get iron_shovel 1
 ```
 
-Required post-implementation regression cases after the corresponding aliases
-are added:
+Required regressions for the reported post-`e08af639` working-tree
+implementation:
 
 ```text
 횃불 만들어줘 -> get torch 1
@@ -322,7 +357,9 @@ are added:
 철 레깅스 만들어줘 -> get iron_leggings 1
 ```
 
-The three cases above are not current `e08af639` successes.
+The three cases above are not `e08af639` successes. Their current source/test
+status is a carried-forward report whose authority remains the post-review
+merge-blocker document and test strategy.
 
 Do not emit `craft torch 1`, `@craft`, or any new Java craft command.
 
@@ -459,13 +496,19 @@ catalog targets: 591
 runtime aliases at e08af639/cfc170a: 19
 covered targets at e08af639/cfc170a: 9
 coverage at e08af639/cfc170a: 1.52%
-current working-tree runtime aliases: 21
-current working-tree covered targets: 11
-current working-tree coverage: 1.86%
+reported post-e08af working-tree runtime aliases: 21
+reported post-e08af working-tree covered targets: 11
+reported post-e08af working-tree coverage: 1.86%
 ```
 
+The three working-tree figures above are a carried-forward reported snapshot,
+not a fixed commit baseline. The test strategy owns the coverage artifact and
+provenance; the post-review document owns whether that snapshot is current.
+
 Manual additions alone cannot satisfy the "all Minecraft items in Korean"
-request. Future coverage should use layered, deterministic inputs:
+request. "All 591 targets" means every catalog target is classified; it does
+not mean every raw catalog target receives an unconditional public Korean alias.
+Future coverage should use layered, deterministic inputs:
 
 ```text
 1. version-pinned Minecraft 1.20.1 Korean language source
@@ -486,6 +529,25 @@ raw catalog coverage:
 requestable concrete coverage:
   alias coverage across concrete item/block targets that can be requested
 ```
+
+Every raw catalog target must receive exactly one primary classification before
+the project claims catalog-classification completeness:
+
+```text
+DIRECT_ITEM
+DIRECT_BLOCK
+CANONICALIZED_LEGACY
+GENERIC_GROUP
+COMMAND_INTERNAL
+AMBIGUOUS_POLICY
+UNSUPPORTED
+UNRESOLVED
+```
+
+Classification completeness is necessary but not sufficient for an "all items
+supported in Korean" claim. `UNSUPPORTED` and `UNRESOLVED` remain explicit
+coverage gaps, and command-specific public readiness still requires catalog,
+capability, lifecycle, safety, confirmation, and public-enablement gates.
 
 Coverage acceptance must separate current preservation from
 post-implementation cases:
@@ -869,16 +931,17 @@ Java / DTO / payload / ChatClef engine
 ```
 
 The approval is not a green light to implement all of `get`, `equip`,
-`deposit`, and `give` immediately. The following work can start after local
-code changes are approved:
+`deposit`, and `give` immediately. No row below authorizes code changes until
+the registry/lifecycle prerequisite and item-action Phase 0 gates are complete
+and the user separately approves the implementation phase.
 
 | Area | Status |
 | --- | --- |
-| alias generator / validator / compact index | approved to implement |
-| existing GET alias expansion | approved after focused regression tests |
-| EQUIP natural-language support | requires capability matrix first |
-| DEPOSIT natural-language support | requires specific-item quantity policy, junk-policy mode, and explicit broad-deposit exposure policy first |
-| GIVE natural-language support | requires recipient grammar and player validation first |
+| alias generator / validator / compact index | design-approved in principle; implementation remains blocked by the registry/lifecycle prerequisite, item-action Phase 0, and separate user approval |
+| existing GET alias expansion | design-approved after focused regression gates; implementation still requires separate user approval |
+| EQUIP natural-language support | requires capability matrix and command-registry readiness first |
+| DEPOSIT natural-language support | requires specific-item quantity policy, junk-policy mode, explicit broad-deposit exposure policy, and command-registry readiness first |
+| GIVE natural-language support | requires recipient grammar, player validation, and command-registry readiness first |
 | full 591 target coverage claim | not approved; draft is seed coverage only |
 
 ## Phase 0 Contract Freeze Required
@@ -1340,7 +1403,7 @@ from the byte-identical runtime JSON body or place it only in a report.
 ## Current `e08af639` Code Gap
 
 At the reviewed archive baseline, the Python natural-language command path
-already supports these intent families:
+already contains parser/compiler support for these intent families:
 
 ```text
 GET_ITEM
@@ -1351,6 +1414,11 @@ FOLLOW
 IDLE
 STOP
 ```
+
+This list is a legacy parser/compiler-readiness summary only. It does not prove
+Python admission readiness, bridge lifecycle readiness, gameplay-effect
+verifiability, or public Korean enablement. The command registry plan owns those
+independent readiness axes for every registered command.
 
 The v2 design requires additional Python intent and compiler support for:
 
@@ -1409,14 +1477,22 @@ extraction are Layer 1 action/context policy, not flat concrete item aliases.
 
 Recommended order when code changes are later approved:
 
+0. Registry Phase 0 prerequisite - close the 20-command registration,
+   lifecycle, resolver-domain, safety, confirmation, allowed-source, readiness,
+   and public-enablement contracts in
+   `chatclef-python-korean-command-registry-plan.md`. This is a hard gate: no
+   later implementation phase starts while a required registry/lifecycle
+   contract remains unresolved, and item-action grammar alone never proves
+   public command enablement.
 1. Phase 0 - freeze Java grammar, command capability, default policy, deposit
    safety, routing status, normalization, provenance, and coverage metrics.
 2. Phase 1 - define generated, curated, default-policy, and canonicalization
    sources; finish generator, validator, coverage classification, deterministic
    output, and compact-collision checks.
 3. Phase 2 - expand aliases for the current GET path while preserving the
-   current parser, resolver priority, compiler shape, FOOD/MEAT/GOTO/FOLLOW
-   regressions, and current GET mining/acquisition regressions.
+   current parser, resolver priority, compiler shape, existing
+   FOOD/MEAT/GOTO/FOLLOW/IDLE/STOP parser/compiler regressions, and current
+   GET mining/acquisition regressions.
 4. Phase 3 - generalize action precedence across GET, EQUIP, DEPOSIT, and GIVE
    with a shared action matcher, resolved action model, command schemas,
    resolution statuses, submission outcomes, and single-pass translation
@@ -1447,7 +1523,7 @@ Each phase must satisfy its exit criteria before the next command family starts.
 | --- | --- |
 | Phase 0 | every grammar and capability row has source evidence, Python policy, concrete test file/function/assertion, and implemented passing contract tests |
 | Phase 1 | generated from actual catalog sources; catalog-outside targets `0`; compact conflicts `0`; deterministic output; source hashes recorded |
-| Phase 2 | committed GET alias expansion passes focused alias-only tests; GET/FOOD/MEAT/GOTO/FOLLOW regressions pass; reviewed `e08af639` mining/acquisition cases remain green, while only new verb forms require separate approval |
+| Phase 2 | committed GET alias expansion passes focused alias-only tests; GET/FOOD/MEAT/GOTO/FOLLOW/IDLE/STOP parser/compiler regressions pass; reviewed `e08af639` mining/acquisition cases remain green; these checks do not promote registry lifecycle or public-enablement axes, while only new verb forms require separate approval |
 | Phase 3 | Korean GET mining/acquisition verb tests pass as source-proven existing behavior or newly approved implementation work; cross-command action precedence tests for GET/EQUIP/DEPOSIT/GIVE pass separately from alias-only tests; resolution status and submission status are separated; exactly-once tests pass |
 | Phase 4 EQUIP | full-set shortcuts and explicit equipment capability tests pass; unsupported equipment targets reject explicitly |
 | Phase 5 DEPOSIT | specific-item quantity and junk-policy behavior are frozen and tested; `잡템` and automatic cleanup emit no bare `deposit`; broad-deposit exposure remains disabled unless separately approved |
@@ -1816,6 +1892,10 @@ This documentation and every later implementation phase under it MUST NOT:
 - submit a follow-up command inline from a WebSocket callback
 - infer gameplay effect from VALIDATED, ACCEPTED, RUNNING, terminal COMPLETED,
   active-request clearing, or connection state alone
+- treat legacy `IMPLEMENTED` wording or `KOREAN_PARSE_COMPILE_READY` as proof of
+  Python admission, bridge lifecycle, gameplay effect, or public enablement
+- bypass the command registry's lifecycle, safety, confirmation, allowed-source,
+  readiness-axis, or public-enablement gate for any item command
 - emit an @ prefix from the Python natural-language compiler
 - let an LLM generate raw ChatClef DSL or control workflow state transitions
 - introduce Forge MineMind fallback or shared Fabric/Forge orchestration
@@ -1839,6 +1919,9 @@ Authority split:
 
 - this plan owns Korean item/action language, aliases, canonical display,
   capability boundaries, and item-action phase order
+- chatclef-python-korean-command-registry-plan.md owns the full 20-command
+  registration snapshot, lifecycle kind, resolver domain, safety tier,
+  confirmation mode, allowed input source, readiness axes, and public enablement
 - chatclef-python-command-orchestration-plan.md owns evidence-bounded Korean
   responses, lifecycle sequencing, and exactly-once primary submission
 - chatclef-python-inventory-cleanup-preflight-contract.md owns inventory
@@ -1860,6 +1943,10 @@ Frozen design boundaries:
 - craft wording uses existing GET acquisition and emits get <target> <count>
 - resolver order remains equipment composition -> fixed item alias ->
   unsupported -> unknown, followed by catalog and command-capability checks
+- SOURCE_REGISTERED, KOREAN_PARSE_COMPILE_READY, PYTHON_ADMISSION_READY,
+  BRIDGE_LIFECYCLE_READY, GAMEPLAY_EFFECT_VERIFIABLE, and
+  PUBLIC_KOREAN_ENABLED remain separate registry-owned axes; no legacy
+  `IMPLEMENTED` label collapses them
 - 잡템 is a Python policy mode, not an item alias and not a direct synonym for
   bare deposit
 - automatic or user-requested junk cleanup uses safe targeted deposit only
@@ -1876,7 +1963,9 @@ Source classification at e08af639:
   exact test-evidence maturity remains owned by the test strategy
 - emerald/torch aliases, 갑바/레깅스/모자 components, whole-phrase equipment
   composition, canonical display, deterministic route-response rendering, and
-  Python cleanup policy helpers are source-present in the current working tree
+  Python cleanup policy helpers are reported source-present in the pre-existing
+  post-e08af working tree; the 2026-08-20 docs-only registry change did not
+  implement or re-test them
 - EQUIP/DEPOSIT/GIVE Korean compilation, reliable inventory snapshots, and
   automatic cleanup execution are still planned
 
@@ -1884,19 +1973,21 @@ Coverage state:
 
 - historical c912ff runtime baseline: 11 aliases, 4 covered targets, 587 missing, 0.68%
 - cfc170a reviewed alias snapshot, unchanged at e08af639: 19 aliases, 9 covered targets, 582 missing, 1.52%
-- current working-tree snapshot: 21 aliases, 11 covered targets, 580 missing, 1.86%
+- reported post-e08af working-tree snapshot: 21 aliases, 11 covered targets, 580 missing, 1.86%; current authority remains the test strategy and post-review document
 - proposed v2 seed: 191 aliases, 167 covered targets, 424 missing, 28.26%
 - all accepted coverage artifacts use algorithm version 1 and record catalog
   parser commit/path/hash
 - the production parser requires the ten documented baseline targets
 
-The current working-tree follow-up has focused Python regressions and the
-source-backed runtime alias coverage snapshot for the initial GET alias,
-response-rendering, and cleanup-policy helper gaps. Broader CI/live gates,
-external response dispatch, reliable inventory snapshots, and automatic cleanup
-execution remain outside this implemented subset and are still governed by the
-test strategy and post-review document.
+The pre-existing post-e08af working-tree follow-up is reported to have focused
+Python regressions and a runtime alias coverage snapshot for the initial GET
+alias, response-rendering, and cleanup-policy helper gaps. The 2026-08-20
+registry update was docs-only and did not execute those tests. Broader CI/live
+gates, external response dispatch, reliable inventory snapshots, and automatic
+cleanup execution remain outside this reported subset and are still governed by
+the test strategy and post-review document.
 
-Do not start EQUIP, DEPOSIT, GIVE, or automatic inventory-cleanup implementation
-before its owning contract and required preceding gates are complete.
+Do not start EQUIP, DEPOSIT, GIVE, automatic inventory-cleanup, or any other
+command implementation before the registry/lifecycle Phase 0 prerequisite and
+the command's owning contracts and gates are complete.
 ```

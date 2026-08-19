@@ -232,6 +232,14 @@ events, and inventory preflight cleanup planning, read:
 plugins/Minecraft/docs/chatclef-python-command-orchestration-plan.md
 ```
 
+For the full 20-command Korean registry, command-by-command lifecycle
+classification, safety tiers, confirmation modes, resolver domains, and public
+enablement axes, read:
+
+```text
+plugins/Minecraft/docs/chatclef-python-korean-command-registry-plan.md
+```
+
 For the Python-only inventory-full cleanup preflight contract, protected-item
 policy, post-cleanup verification, and fail-closed primary-submit gate, read:
 
@@ -313,6 +321,9 @@ Incident analyses:
 
 Python orchestration planning:
   chatclef-python-command-orchestration-plan.md
+
+Python Korean command registry planning:
+  chatclef-python-korean-command-registry-plan.md
 
 Python inventory cleanup preflight contract:
   chatclef-python-inventory-cleanup-preflight-contract.md
