@@ -31,6 +31,16 @@ KOREAN_INPUT_TO_COMMAND_CASES = [
     ("레드스톤 5개 구해줘", "get redstone 5"),
     ("석탄 5개 캐와줘", "get coal 5"),
     ("철 10개 캐줘", "get iron_ingot 10"),
+    ("철 10개 캐오기", "get iron_ingot 10"),
+    ("철 10개 캐와줘", "get iron_ingot 10"),
+    ("철갑바 만들어줘", "get iron_chestplate 1"),
+    ("철바지 만들어줘", "get iron_leggings 1"),
+    ("철 레깅스 만들어줘", "get iron_leggings 1"),
+    ("철신발 만들어줘", "get iron_boots 1"),
+    ("철모자 만들어줘", "get iron_helmet 1"),
+    ("철헬멧 만들어줘", "get iron_helmet 1"),
+    ("에메랄드 캐줘", "get emerald 1"),
+    ("횃불 만들어줘", "get torch 1"),
     ("다이아몬드 곡괭이 하나 가져와", "get diamond_pickaxe 1"),
 ]
 
@@ -50,10 +60,7 @@ class KoreanInputToChatClefSubmissionPathTests(unittest.TestCase):
 
                 self.assertTrue(decision.handled)
                 self.assertEqual("minecraft_command_routed", decision.reason)
-                self.assertEqual(
-                    f"[Minecraft] command sent: {expected_command}",
-                    decision.response_text,
-                )
+                self.assertIn("수집 명령을 제출했어요", decision.response_text)
                 self.assertEqual(1, len(adapter.requests))
 
                 request = adapter.requests[0]
@@ -159,7 +166,7 @@ class KoreanInputToChatClefSubmissionPathTests(unittest.TestCase):
 
         self.assertTrue(decision.handled)
         self.assertEqual("minecraft_command_rejected", decision.reason)
-        self.assertIn("command rejected", decision.response_text)
+        self.assertIn("명령을 제출하지 않았어요", decision.response_text)
         self.assertEqual(1, len(adapter.requests))
 
     def test_unknown_adapter_result_requires_reconciliation_without_retry(self):

@@ -24,6 +24,8 @@ class MinecraftChatClefKoreanRuleParserTests(unittest.TestCase):
             "돌 10개 캐줘": ("돌", 10),
             "석탄 5개 캐와줘": ("석탄", 5),
             "레드스톤 5개 채굴해줘": ("레드스톤", 5),
+            "철갑바 만들어줘": ("철갑바", 1),
+            "횃불 제작해줘": ("횃불", 1),
         }
 
         for text, expected in cases.items():

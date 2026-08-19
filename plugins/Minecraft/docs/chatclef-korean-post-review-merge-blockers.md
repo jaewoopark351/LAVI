@@ -648,6 +648,20 @@ cleanup planner
 automatic cleanup execution
 ```
 
+Current working-tree follow-up after this addendum:
+
+```text
+emerald / torch aliases are source-present
+갑바 / 레깅스 / 모자 equipment-component aliases are source-present
+whole-phrase equipment composition enforcement is source-present
+canonical Korean display-name resource is source-present for initial GET replies
+deterministic Korean router response_text rendering is source-present
+Python targeted cleanup policy helper is source-present
+Python post-cleanup primary admission helper is source-present
+reliable inventory snapshot provider, external response dispatch, and automatic
+cleanup execution remain planned
+```
+
 Craft wording remains GET acquisition. The runtime has no separate registered
 ChatClef craft command, so `만들어줘` and `제작해줘` must compile to prefixless
 `get <target> <count>` when the target is supported.

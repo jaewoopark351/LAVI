@@ -562,7 +562,7 @@ The central postcondition is:
 
 ```text
 cleanup terminal completed alone -> primary 0
-fresh post-cleanup AVAILABLE verified -> primary 1
+fresh post-cleanup AVAILABLE verified + protected preservation verified -> primary 1
 protected_item_preservation_verified false or unknown -> primary 0
 post-cleanup UNKNOWN -> primary 0
 post-cleanup FULL -> primary 0

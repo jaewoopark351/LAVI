@@ -53,6 +53,25 @@ inventory snapshot provider
 automatic cleanup
 ```
 
+Current working-tree implementation after the 2026-08-19 follow-up:
+
+```text
+deterministic Korean route response renderer
+canonical Korean display-name lookup for initial GET responses
+Python-only targeted cleanup policy helper
+post-cleanup primary admission gate helper
+```
+
+Still planned after that follow-up:
+
+```text
+normal LAVI output listener dispatch beyond router response_text
+accepted-result event publisher
+long-lived command orchestrator
+reliable inventory snapshot provider
+automatic cleanup execution
+```
+
 Inventory cleanup details are intentionally not owned here. The fail-closed
 cleanup evidence, protected-item policy, postcondition, and no-replay contract
 are owned by:
@@ -329,7 +348,8 @@ single command request at a time, not the owner of multi-step LAVI workflows.
 
 ## Reply Rendering
 
-Add a deterministic response renderer before considering any LLM paraphrasing:
+The current working tree includes a deterministic response renderer for
+router-owned `response_text` before considering any LLM paraphrasing:
 
 ```text
 plugins/Minecraft/fabric/chatclef/response/
@@ -385,10 +405,12 @@ primary unknown:
   철 수집 결과를 확인하지 못했어요.
 ```
 
-The initial reply path should use deterministic templates only. A future LLM
-paraphraser may be added behind the same interface, but it must receive only
-confirmed facts and may change tone only. It must not change command status,
-command text, lifecycle state, retry policy, or cleanup policy.
+The initial reply path uses deterministic templates only. Normal external
+dispatch to Translate, TTS, or other LAVI output listeners remains a separate
+planned integration step. A future LLM paraphraser may be added behind the same
+interface, but it must receive only confirmed facts and may change tone only. It
+must not change command status, command text, lifecycle state, retry policy, or
+cleanup policy.
 
 ### Response Evidence And Wording Contract
 
@@ -909,11 +931,11 @@ Use these phases for the reviewed archive baseline follow-up:
 | --- | --- |
 | Phase 0 | freeze document authority, craft wording as GET, response evidence vocabulary, unknown routing policy, cleanup postconditions, no-retry/no-replay, and hard prohibitions |
 | Phase 1 | preserve existing GET acquisition regressions such as `철 10개 캐줘 -> get iron_ingot 10` and false-positive no-submit cases |
-| Phase 2 | add reported alias/display gaps such as 갑바, 레깅스, 모자, emerald, and torch |
-| Phase 3 | add catalog-driven alias coverage pipeline without changing command orchestration |
-| Phase 4 | add deterministic immediate Korean response rendering from translation/precheck/accepted facts only |
+| Phase 2 | implemented for the initial gaps: 갑바, 레깅스, 모자, emerald, and torch |
+| Phase 3 | partially implemented: current runtime alias coverage snapshot updated without changing command orchestration |
+| Phase 4 | implemented for router `response_text`: deterministic immediate Korean response rendering from translation/precheck/accepted facts only |
 | Phase 5 | add transport events and operation orchestrator without cleanup execution |
-| Phase 6 | add reliable inventory provider and cleanup shadow mode with actual submit count 0 |
+| Phase 6 | partially implemented: cleanup policy and post-cleanup admission helper exist; reliable inventory provider and shadow-mode runtime wiring remain planned |
 | Phase 7 | enable automatic targeted cleanup only after the cleanup contract is satisfied |
 
 ## Existing Tests To Reuse

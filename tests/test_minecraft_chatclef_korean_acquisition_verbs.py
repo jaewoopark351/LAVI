@@ -19,6 +19,8 @@ class MinecraftChatClefKoreanAcquisitionVerbMatcherTests(unittest.TestCase):
             "조약돌 10개 캐오기",
             "레드스톤 5개 채굴해줘",
             "돌 채굴해서 가져와",
+            "철갑바 만들어줘",
+            "횃불 제작해줘",
         ]
 
         for text in cases:
@@ -46,6 +48,8 @@ class MinecraftChatClefKoreanAcquisitionVerbMatcherTests(unittest.TestCase):
             "철 10개 캐줘": "철 10개",
             "석탄 5개 캐와줘": "석탄 5개",
             "돌 채굴해서 가져와": "돌",
+            "철갑바 만들어줘": "철갑바",
+            "횃불 제작해줘": "횃불",
         }
 
         for text, expected in cases.items():

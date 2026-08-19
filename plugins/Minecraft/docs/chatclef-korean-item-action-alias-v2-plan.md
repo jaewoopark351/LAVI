@@ -162,6 +162,20 @@ Not source-present at `e08af639` and therefore still planned:
 - protected-item cleanup planner, targeted cleanup orchestration, and fresh
   post-cleanup inventory-effect verification
 ```
+
+Current working-tree implementation after the 2026-08-19 follow-up:
+
+```text
+- emerald and torch fixed Korean aliases are source-present
+- 갑바, 레깅스, and 모자 equipment-component aliases are source-present
+- equipment composition now requires full compact-phrase consumption
+- canonical Korean display-name resource is source-present for the initial
+  response cases
+- deterministic Python response rendering is source-present for route decisions
+- Python cleanup policy and post-cleanup admission helpers are source-present;
+  reliable inventory snapshot collection and automatic cleanup execution remain
+  planned
+```
 ## Goal
 
 The user-facing goal is broad item coverage:
@@ -274,8 +288,8 @@ verification is complete.
 | `철` | `iron_ingot` | current fixed alias; unchanged from the reviewed `cfc170a` alias snapshot | preserve as a current GET shorthand; `equip iron` is allowed only in material + armor-set context such as `철 갑옷` |
 | `철 흉갑` | `iron_chestplate` | current equipment composition, not a planned flat alias | source-present for GET; explicit EQUIP remains future work pending capability verification |
 | `철바지` / `철신발` / `철헬멧` | `iron_leggings` / `iron_boots` / `iron_helmet` | current equipment compositions | preserve source-present GET behavior; explicit EQUIP remains future work |
-| `철갑바` / `철 레깅스` / `철모자` | corresponding iron armor target | planned component aliases | required post-implementation regressions |
-| `에메랄드` / `횃불` | `emerald` / `torch` | planned fixed/generated aliases | required post-implementation GET regressions |
+| `철갑바` / `철 레깅스` / `철모자` | corresponding iron armor target | current working-tree equipment compositions | covered by current GET regressions |
+| `에메랄드` / `횃불` | `emerald` / `torch` | current working-tree fixed aliases | covered by current GET regressions |
 | `잡템` | Python junk-deposit policy mode | contextual policy only; no concrete target and no direct DSL | hand off to the cleanup contract; never compile directly to bare `deposit` |
 
 ## Craft Wording Is GET Acquisition
@@ -373,26 +387,25 @@ Placement:
 plugins/Minecraft/fabric/chatclef/intent/resources/korean_equipment_aliases.json
 ```
 
-Status at `e08af639`:
+Status at `e08af639` and after the 2026-08-19 follow-up:
 
 ```text
-current component aliases:
+component aliases at e08af639:
   흉갑, 바지, 각반, 부츠, 신발, 투구, 헬멧
 
-planned component aliases:
+additional working-tree component aliases:
   갑바, 레깅스, 모자
 
-planned resolver hardening:
+working-tree resolver hardening:
   require full compact-phrase consumption instead of substring containment
 ```
 
-After the planned aliases and resolver hardening are implemented, component
-aliases such as `갑바` and `모자` are valid only when the full phrase resolves as
-material plus equipment component:
+Component aliases such as `갑바` and `모자` are valid only when the full phrase
+resolves as material plus equipment component:
 
 ```text
-철갑바 -> valid after implementation
-철모자 -> valid after implementation
+철갑바 -> valid
+철모자 -> valid
 모자 만들어줘 -> do not infer iron_helmet
 ```
 
@@ -443,9 +456,12 @@ The reviewed runtime snapshot remains intentionally narrow:
 
 ```text
 catalog targets: 591
-runtime aliases: 19
-covered targets: 9
-coverage: 1.52%
+runtime aliases at e08af639/cfc170a: 19
+covered targets at e08af639/cfc170a: 9
+coverage at e08af639/cfc170a: 1.52%
+current working-tree runtime aliases: 21
+current working-tree covered targets: 11
+current working-tree coverage: 1.86%
 ```
 
 Manual additions alone cannot satisfy the "all Minecraft items in Korean"
@@ -474,14 +490,14 @@ requestable concrete coverage:
 Coverage acceptance must separate current preservation from
 post-implementation cases:
 
-| Target | Korean phrase status at `e08af639` | Required result |
+| Target | Korean phrase status | Required result |
 | --- | --- | --- |
-| `emerald` | `에메랄드` missing | fixed/generated alias regression after implementation |
-| `torch` | `횃불` missing | fixed/generated alias regression after implementation |
-| `iron_leggings` | current through `철바지` / `철각반`; `철 레깅스` missing | preserve current composition and add `레깅스` regression |
-| `iron_chestplate` | current through `철 흉갑`; `철갑바` missing | preserve current composition and add `갑바` regression |
+| `emerald` | `에메랄드` source-present in the current working tree | fixed alias regression |
+| `torch` | `횃불` source-present in the current working tree | fixed alias regression |
+| `iron_leggings` | current through `철바지` / `철각반` / `철 레깅스` | preserve component regression |
+| `iron_chestplate` | current through `철 흉갑` / `철갑바` | preserve component regression |
 | `iron_boots` | current through `철신발` / `철 부츠` | preserve current composition coverage |
-| `iron_helmet` | current through `철헬멧` / `철 투구`; `철모자` missing | preserve current composition and add `모자` regression |
+| `iron_helmet` | current through `철헬멧` / `철 투구` / `철모자` | preserve component regression |
 | `diamond_pickaxe` | current through `다이아몬드 곡괭이` | preserve existing composition regression |
 
 `iron_leggings` should normally come from equipment composition such as
@@ -1859,21 +1875,27 @@ Source classification at e08af639:
   prefixless GET compilation, and single-pass reconciliation are source-present;
   exact test-evidence maturity remains owned by the test strategy
 - emerald/torch aliases, 갑바/레깅스/모자 components, whole-phrase equipment
-  composition, canonical display, EQUIP/DEPOSIT/GIVE Korean compilation,
-  user-response rendering, and inventory cleanup orchestration are still planned
+  composition, canonical display, deterministic route-response rendering, and
+  Python cleanup policy helpers are source-present in the current working tree
+- EQUIP/DEPOSIT/GIVE Korean compilation, reliable inventory snapshots, and
+  automatic cleanup execution are still planned
 
 Coverage state:
 
 - historical c912ff runtime baseline: 11 aliases, 4 covered targets, 587 missing, 0.68%
 - cfc170a reviewed alias snapshot, unchanged at e08af639: 19 aliases, 9 covered targets, 582 missing, 1.52%
+- current working-tree snapshot: 21 aliases, 11 covered targets, 580 missing, 1.86%
 - proposed v2 seed: 191 aliases, 167 covered targets, 424 missing, 28.26%
 - all accepted coverage artifacts use algorithm version 1 and record catalog
   parser commit/path/hash
 - the production parser requires the ten documented baseline targets
 
-Phase 0 is not complete until the focused tests, source-backed artifacts,
-capability rules, CI scope, and merge gates in the test strategy and
-post-review document are implemented and green.
+The current working-tree follow-up has focused Python regressions and the
+source-backed runtime alias coverage snapshot for the initial GET alias,
+response-rendering, and cleanup-policy helper gaps. Broader CI/live gates,
+external response dispatch, reliable inventory snapshots, and automatic cleanup
+execution remain outside this implemented subset and are still governed by the
+test strategy and post-review document.
 
 Do not start EQUIP, DEPOSIT, GIVE, or automatic inventory-cleanup implementation
 before its owning contract and required preceding gates are complete.

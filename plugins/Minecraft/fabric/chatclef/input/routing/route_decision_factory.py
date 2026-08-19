@@ -7,11 +7,18 @@ from typing import Any, Mapping
 from plugins.Minecraft.fabric.chatclef.input.minecraft_chatclef_input_route_decision import (
     MinecraftChatClefInputRouteDecision,
 )
+from plugins.Minecraft.fabric.chatclef.response import ChatClefCommandResponseRenderer
 
 from .submission_readiness import MinecraftChatClefSubmissionReadiness
 
 
 class MinecraftChatClefRouteDecisionFactory:
+    def __init__(
+        self,
+        response_renderer: ChatClefCommandResponseRenderer | None = None,
+    ):
+        self._response_renderer = response_renderer or ChatClefCommandResponseRenderer()
+
     def reconciled_without_submission(
         self,
         request_id: str,
@@ -33,7 +40,7 @@ class MinecraftChatClefRouteDecisionFactory:
         }
         return MinecraftChatClefInputRouteDecision.handled_result(
             reason="minecraft_submission_reconciled_command_not_submitted",
-            response_text=f"[Minecraft] {message}",
+            response_text=self._response_renderer.render_reconciled_without_submission(),
             result=result,
         )
 
@@ -49,7 +56,10 @@ class MinecraftChatClefRouteDecisionFactory:
         }
         return MinecraftChatClefInputRouteDecision.handled_result(
             reason=readiness.reason,
-            response_text=f"[Minecraft] command rejected: {readiness.message}",
+            response_text=self._response_renderer.render_precheck_rejection(
+                readiness.reason,
+                readiness.message,
+            ),
             result=result,
         )
 
@@ -98,7 +108,9 @@ class MinecraftChatClefRouteDecisionFactory:
         }
         return MinecraftChatClefInputRouteDecision.handled_result(
             reason="minecraft_translation_rejected",
-            response_text=f"[Minecraft] command rejected: {message}",
+            response_text=self._response_renderer.render_translation_rejection(
+                translation
+            ),
             result=result,
             translation=dict(translation),
         )
@@ -116,7 +128,10 @@ class MinecraftChatClefRouteDecisionFactory:
         }
         return MinecraftChatClefInputRouteDecision.handled_result(
             reason="minecraft_translation_malformed",
-            response_text=f"[Minecraft] command rejected: {message}",
+            response_text=self._response_renderer.render_operation_failure(
+                "malformed_translation_result",
+                message,
+            ),
             result=result,
             translation={},
         )
@@ -130,7 +145,10 @@ class MinecraftChatClefRouteDecisionFactory:
         message = f"{type(error).__name__}: {error}"
         return MinecraftChatClefInputRouteDecision.handled_result(
             reason=reason,
-            response_text=f"[Minecraft] command failed: {message}",
+            response_text=self._response_renderer.render_operation_failure(
+                reason,
+                message,
+            ),
             result={"ok": False, "error": reason, "message": message},
             translation=dict(translation or {}),
         )
@@ -140,22 +158,7 @@ class MinecraftChatClefRouteDecisionFactory:
         translation: Mapping[str, Any],
         result: Mapping[str, Any],
     ) -> str:
-        command = str(translation.get("command") or "").strip()
-        result_status = self.result_status(result)
-        message = str(result.get("message") or "").strip()
-        if result.get("ok") is True:
-            if result_status in {"accepted", "running"}:
-                return f"[Minecraft] command sent: {command}"
-            if result_status == "completed":
-                return f"[Minecraft] command completed: {command}"
-            return f"[Minecraft] command routed: {command}"
-        if result_status == "unknown":
-            if message:
-                return f"[Minecraft] command status unknown: {message}"
-            return "[Minecraft] command status unknown; reconciliation required."
-        if message:
-            return f"[Minecraft] command rejected: {message}"
-        return "[Minecraft] command rejected."
+        return self._response_renderer.render_submitted(translation, result)
 
     def result_status(self, result: Mapping[str, Any]) -> str:
         status = result.get("status")

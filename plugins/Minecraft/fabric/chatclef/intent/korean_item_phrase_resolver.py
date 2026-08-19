@@ -60,13 +60,11 @@ class KoreanItemPhraseResolver:
             self._aliases.material_aliases
         ):
             material_compact = material_alias.replace(" ", "")
-            if material_compact not in compact:
-                continue
             for equipment_alias, equipment in self._aliases.sorted_aliases(
                 self._aliases.equipment_aliases
             ):
                 equipment_compact = equipment_alias.replace(" ", "")
-                if equipment_compact not in compact:
+                if material_compact + equipment_compact != compact:
                     continue
                 target = self._composer.compose(material, equipment)
                 if target is None:

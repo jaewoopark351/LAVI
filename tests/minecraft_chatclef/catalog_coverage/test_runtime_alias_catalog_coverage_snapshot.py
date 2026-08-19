@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import subprocess
 import unittest
 from pathlib import Path
 
@@ -72,7 +71,7 @@ class RuntimeAliasCatalogCoverageSnapshotTests(unittest.TestCase):
             floor["minimum_coverage_percent"],
         )
 
-    def test_coverage_snapshot_source_hashes_match_head_git_blobs(self):
+    def test_coverage_snapshot_source_hashes_match_working_tree_sources(self):
         snapshot = _coverage_snapshot()
 
         for path_key, hash_key in [
@@ -82,7 +81,7 @@ class RuntimeAliasCatalogCoverageSnapshotTests(unittest.TestCase):
         ]:
             with self.subTest(path=snapshot[path_key]):
                 actual_hash = hashlib.sha256(
-                    _git_blob_bytes("HEAD", str(snapshot[path_key]))
+                    (REPO_ROOT / str(snapshot[path_key])).read_bytes()
                 ).hexdigest()
 
                 self.assertEqual(snapshot[hash_key], actual_hash)
@@ -146,19 +145,6 @@ def _coverage_snapshot() -> dict[str, object]:
 
 def _coverage_floor() -> dict[str, object]:
     return json.loads(FLOOR_ARTIFACT.read_text(encoding="utf-8"))
-
-
-def _git_blob_bytes(commit: str, repository_relative_path: str) -> bytes:
-    return subprocess.check_output(
-        [
-            "git",
-            "show",
-            "--no-textconv",
-            f"{commit}:{repository_relative_path}",
-        ],
-        cwd=REPO_ROOT,
-    )
-
 
 if __name__ == "__main__":
     unittest.main()

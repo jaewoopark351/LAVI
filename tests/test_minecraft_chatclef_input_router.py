@@ -70,7 +70,7 @@ class MinecraftChatClefInputRouterTests(unittest.TestCase):
         self.assertTrue(decision.handled)
         self.assertEqual("minecraft_command_routed", decision.reason)
         self.assertEqual(
-            "[Minecraft] command sent: get gold_ingot 8",
+            "[Minecraft] 금괴 8개 수집 명령을 제출했어요.",
             decision.response_text,
         )
         self.assertEqual(["금괴 8개 구해"], extension.translated)
@@ -126,7 +126,7 @@ class MinecraftChatClefInputRouterTests(unittest.TestCase):
         )
 
         self.assertTrue(decision.handled)
-        self.assertIn("command rejected", decision.response_text)
+        self.assertIn("명령을 이해하지 못했어요", decision.response_text)
         self.assertEqual([], extension.submitted)
 
     def test_validated_translation_is_rejected_when_bridge_is_disconnected(self):
@@ -151,7 +151,7 @@ class MinecraftChatClefInputRouterTests(unittest.TestCase):
 
         self.assertTrue(decision.handled)
         self.assertEqual("minecraft_bridge_disconnected", decision.reason)
-        self.assertIn("not connected", decision.response_text)
+        self.assertIn("마인크래프트 연결이 끊겨 있어요", decision.response_text)
         self.assertEqual([], extension.submitted)
 
     def test_validated_translation_is_rejected_when_command_is_active(self):
@@ -178,7 +178,7 @@ class MinecraftChatClefInputRouterTests(unittest.TestCase):
 
         self.assertTrue(decision.handled)
         self.assertEqual("minecraft_command_busy", decision.reason)
-        self.assertIn("already active", decision.response_text)
+        self.assertIn("다른 마인크래프트 작업", decision.response_text)
         self.assertEqual([], extension.submitted)
 
     def test_app_wiring_injects_router_without_replacing_input_listener(self):

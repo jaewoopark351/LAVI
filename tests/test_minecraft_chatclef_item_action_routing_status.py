@@ -120,7 +120,7 @@ class MinecraftChatClefItemActionRoutingStatusTests(unittest.TestCase):
 
         self.assertTrue(decision.handled)
         self.assertEqual("minecraft_command_rejected", decision.reason)
-        self.assertIn("command rejected", decision.response_text)
+        self.assertIn("명령을 제출하지 않았어요", decision.response_text)
         self.assertEqual(1, len(extension.submitted))
 
     def test_accepted_get_is_not_replayed_for_quantity_recovery(self):

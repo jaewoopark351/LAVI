@@ -32,6 +32,8 @@ class MinecraftChatClefItemPhraseResolverTests(unittest.TestCase):
 
         self.assertEqual("iron_ingot", resolver.resolve("철 주괴")["target"])
         self.assertEqual("cooked_beef", resolver.resolve("구운 소고기")["target"])
+        self.assertEqual("emerald", resolver.resolve("에메랄드")["target"])
+        self.assertEqual("torch", resolver.resolve("횃불")["target"])
 
     def test_resolves_standalone_resource_aliases(self):
         resolver = KoreanItemPhraseResolver()
@@ -65,6 +67,31 @@ class MinecraftChatClefItemPhraseResolverTests(unittest.TestCase):
             ChatClefIntentStatus.UNSUPPORTED.value,
             resolver.resolve("구리 검")["status"],
         )
+
+    def test_resolves_colloquial_equipment_component_aliases(self):
+        resolver = KoreanItemPhraseResolver()
+
+        cases = {
+            "철갑바": "iron_chestplate",
+            "철 레깅스": "iron_leggings",
+            "철모자": "iron_helmet",
+            "철헬멧": "iron_helmet",
+            "철신발": "iron_boots",
+        }
+
+        for phrase, expected_target in cases.items():
+            with self.subTest(phrase=phrase):
+                self.assertEqual(expected_target, resolver.resolve(phrase)["target"])
+
+    def test_equipment_composition_requires_full_compact_phrase(self):
+        resolver = KoreanItemPhraseResolver()
+
+        for phrase in ["철학 모자", "금요일 바지"]:
+            with self.subTest(phrase=phrase):
+                self.assertNotEqual(
+                    ChatClefIntentStatus.VALIDATED.value,
+                    resolver.resolve(phrase)["status"],
+                )
 
     def test_all_equipment_matrix_targets_exist_in_chatclef_catalog(self):
         catalog = ChatClefTargetCatalog()
