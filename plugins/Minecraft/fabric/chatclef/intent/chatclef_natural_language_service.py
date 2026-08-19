@@ -31,6 +31,13 @@ from plugins.Minecraft.fabric.chatclef.intent.korean_item_phrase_resolver import
 
 
 class ChatClefNaturalLanguageService:
+    _ITEM_ACTION_INTENTS = {
+        ChatClefIntentType.GET_ITEM,
+        ChatClefIntentType.EQUIP_ITEM,
+        ChatClefIntentType.DEPOSIT_ITEM,
+        ChatClefIntentType.GIVE_ITEM,
+    }
+
     def __init__(
         self,
         extractor: CompositeChatClefIntentExtractor | None = None,
@@ -76,8 +83,8 @@ class ChatClefNaturalLanguageService:
                     "Korean command did not match a supported ChatClef intent.",
                     intent,
                 )
-            if intent.intent_type is ChatClefIntentType.GET_ITEM:
-                return self._translate_get_item(intent)
+            if intent.intent_type in self._ITEM_ACTION_INTENTS:
+                return self._translate_item_action(intent)
             command = self._compiler.compile(intent)
             return ChatClefTranslationResultDTO.validated(command=command, intent=intent)
         except Exception as error:
@@ -87,7 +94,7 @@ class ChatClefNaturalLanguageService:
                 f"{type(error).__name__}: {error}",
             )
 
-    def _translate_get_item(
+    def _translate_item_action(
         self,
         intent: ChatClefIntentDTO,
     ) -> ChatClefTranslationResultDTO:
@@ -111,6 +118,15 @@ class ChatClefNaturalLanguageService:
                 intent,
                 {"resolution": resolution},
             )
+        if intent.intent_type is ChatClefIntentType.EQUIP_ITEM:
+            if not self._resolver.supports_equipment_target(target):
+                return self._reject(
+                    ChatClefIntentStatus.UNSUPPORTED,
+                    "target_not_equippable",
+                    f"Resolved target cannot be equipped by ChatClef: {target}",
+                    intent,
+                    {"resolution": resolution},
+                )
         command = self._compiler.compile(intent, target=target)
         return ChatClefTranslationResultDTO.validated(
             command=command,

@@ -28,6 +28,20 @@ class ChatClefCommandCompiler:
             target_text = self._target(target)
             quantity = self._positive_int(intent.quantity, "quantity")
             return f"get {target_text} {quantity}"
+        if intent.intent_type is ChatClefIntentType.EQUIP_ITEM:
+            return f"equip {self._target(target)}"
+        if intent.intent_type is ChatClefIntentType.DEPOSIT_ITEM:
+            target_text = self._target(target)
+            quantity = self._positive_int(intent.quantity, "quantity")
+            return f"deposit {target_text} {quantity}"
+        if intent.intent_type is ChatClefIntentType.GIVE_ITEM:
+            player_name = intent.player_name
+            self.reject_dangerous_text(player_name)
+            if not self._PLAYER_RE.fullmatch(player_name):
+                raise ValueError("invalid_player_name")
+            target_text = self._target(target)
+            quantity = self._positive_int(intent.quantity, "quantity")
+            return f"give {player_name} {target_text} {quantity}"
         if intent.intent_type is ChatClefIntentType.FOOD:
             return f"food {self._positive_int(intent.food_units, 'food_units')}"
         if intent.intent_type is ChatClefIntentType.MEAT:

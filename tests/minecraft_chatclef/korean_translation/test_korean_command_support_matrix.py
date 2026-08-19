@@ -34,7 +34,21 @@ SUPPORTED_KOREAN_TRANSLATION_CASES = {
         ("철헬멧 만들어줘", "get iron_helmet 1"),
         ("에메랄드 캐줘", "get emerald 1"),
         ("횃불 만들어줘", "get torch 1"),
+        ("oak_log 2개 가져와줘", "get oak_log 2"),
         ("다이아몬드 곡괭이 하나 가져와", "get diamond_pickaxe 1"),
+    ],
+    "equip": [
+        ("철 흉갑 입어줘", "equip iron_chestplate"),
+        ("철갑바 장착해줘", "equip iron_chestplate"),
+        ("철 레깅스 착용해", "equip iron_leggings"),
+    ],
+    "deposit": [
+        ("다이아몬드 2개 상자에 넣어줘", "deposit diamond 2"),
+        ("상자에 다이아몬드 2개 넣어줘", "deposit diamond 2"),
+    ],
+    "give": [
+        ("Steve에게 다이아몬드 3개 줘", "give Steve diamond 3"),
+        ("Alex한테 횃불 하나 전달해", "give Alex torch 1"),
     ],
     "food": [
         ("음식 10만큼 모아", "food 10"),
@@ -57,9 +71,7 @@ SUPPORTED_KOREAN_TRANSLATION_CASES = {
 }
 
 UNSUPPORTED_OR_PLANNED_KOREAN_CASES = {
-    "equip": "철 갑옷 입어줘",
-    "deposit": "다이아몬드 2개 상자에 넣어줘",
-    "give": "Steve에게 다이아몬드 3개 줘",
+    "deposit_bare_junk": "잡템 상자에 넣어줘",
     "attack": "좀비 2마리 공격해",
     "gamma": "감마 1로 설정해",
     "hero": "주변 몬스터 처리해",
@@ -89,7 +101,18 @@ class KoreanCommandSupportMatrixTests(unittest.TestCase):
 
     def test_current_supported_korean_command_set_is_explicit(self):
         self.assertEqual(
-            {"get", "food", "meat", "goto", "follow", "idle", "stop"},
+            {
+                "deposit",
+                "equip",
+                "follow",
+                "food",
+                "get",
+                "give",
+                "goto",
+                "idle",
+                "meat",
+                "stop",
+            },
             set(SUPPORTED_KOREAN_TRANSLATION_CASES),
         )
 
@@ -104,13 +127,14 @@ class KoreanCommandSupportMatrixTests(unittest.TestCase):
                 self.assertIsNone(result.command)
                 self.assertNotEqual(ChatClefIntentStatus.VALIDATED, result.status)
 
-    def test_item_action_gaps_are_visible_before_full_korean_command_coverage(self):
-        item_action_commands = {"equip", "deposit", "give"}
+    def test_junk_cleanup_wording_does_not_compile_to_bare_deposit(self):
+        service = ChatClefNaturalLanguageService()
 
-        self.assertTrue(
-            item_action_commands.issubset(UNSUPPORTED_OR_PLANNED_KOREAN_CASES)
-        )
-        self.assertTrue(item_action_commands.isdisjoint(SUPPORTED_KOREAN_TRANSLATION_CASES))
+        result = service.translate("잡템 상자에 넣어줘")
+
+        self.assertFalse(result.executable)
+        self.assertIsNone(result.command)
+        self.assertNotEqual(ChatClefIntentStatus.VALIDATED, result.status)
 
 
 if __name__ == "__main__":

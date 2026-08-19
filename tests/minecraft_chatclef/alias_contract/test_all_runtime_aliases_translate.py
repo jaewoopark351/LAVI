@@ -10,6 +10,9 @@ from plugins.Minecraft.fabric.chatclef.intent import (
 from plugins.Minecraft.fabric.chatclef.intent.chatclef_alias_repository import (
     ChatClefKoreanAliasRepository,
 )
+from plugins.Minecraft.fabric.chatclef.intent.chatclef_target_catalog import (
+    ChatClefTargetCatalog,
+)
 
 
 class AllRuntimeKoreanAliasesTranslateTests(unittest.TestCase):
@@ -39,6 +42,19 @@ class AllRuntimeKoreanAliasesTranslateTests(unittest.TestCase):
                 self.assertEqual(ChatClefIntentStatus.VALIDATED, result.status)
                 self.assertEqual(expected_target, result.resolved_target)
                 self.assertEqual(f"get {expected_target} 3", result.command)
+
+    def test_every_chatclef_catalog_target_accepts_explicit_canonical_name(self):
+        service = ChatClefNaturalLanguageService()
+        catalog = ChatClefTargetCatalog()
+
+        for target in sorted(catalog.targets):
+            with self.subTest(target=target):
+                result = service.translate(f"{target} 1개 가져와줘")
+
+                self.assertTrue(result.executable)
+                self.assertEqual(ChatClefIntentStatus.VALIDATED, result.status)
+                self.assertEqual(target, result.resolved_target)
+                self.assertEqual(f"get {target} 1", result.command)
 
 
 if __name__ == "__main__":

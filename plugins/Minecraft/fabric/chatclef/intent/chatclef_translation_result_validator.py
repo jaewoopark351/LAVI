@@ -58,8 +58,13 @@ class ChatClefTranslationResultValidator:
         intent: ChatClefIntentDTO,
         resolved_target: str | None,
     ) -> str:
-        if intent.intent_type is ChatClefIntentType.GET_ITEM:
+        if intent.intent_type in {
+            ChatClefIntentType.GET_ITEM,
+            ChatClefIntentType.EQUIP_ITEM,
+            ChatClefIntentType.DEPOSIT_ITEM,
+            ChatClefIntentType.GIVE_ITEM,
+        }:
             if not isinstance(resolved_target, str) or not resolved_target.strip():
-                raise ValueError("get_item_translation_requires_resolved_target")
+                raise ValueError("item_action_translation_requires_resolved_target")
             return self._compiler.compile(intent, target=resolved_target)
         return self._compiler.compile(intent)

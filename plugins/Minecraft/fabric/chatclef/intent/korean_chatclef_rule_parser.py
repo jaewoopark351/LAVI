@@ -15,6 +15,9 @@ from plugins.Minecraft.fabric.chatclef.intent.korean_quantity_parser import (
 from plugins.Minecraft.fabric.chatclef.intent.korean_acquisition_verb_matcher import (
     KoreanAcquisitionVerbMatcher,
 )
+from plugins.Minecraft.fabric.chatclef.intent.korean_item_action_rule_parser import (
+    KoreanItemActionRuleParser,
+)
 from plugins.Minecraft.fabric.chatclef.intent.korean_text_normalizer import (
     KoreanTextNormalizer,
 )
@@ -34,11 +37,16 @@ class KoreanChatClefRuleParser:
         normalizer: KoreanTextNormalizer | None = None,
         quantity_parser: KoreanQuantityParser | None = None,
         acquisition_verbs: KoreanAcquisitionVerbMatcher | None = None,
+        item_actions: KoreanItemActionRuleParser | None = None,
     ):
         self._normalizer = normalizer or KoreanTextNormalizer()
         self._quantity_parser = quantity_parser or KoreanQuantityParser()
         self._acquisition_verbs = acquisition_verbs or KoreanAcquisitionVerbMatcher(
             self._normalizer
+        )
+        self._item_actions = item_actions or KoreanItemActionRuleParser(
+            self._normalizer,
+            self._quantity_parser,
         )
 
     def parse(self, text: object) -> ChatClefIntentDTO:
@@ -67,6 +75,9 @@ class KoreanChatClefRuleParser:
         food_intent = self._food_or_meat_intent(original, normalized)
         if food_intent is not None:
             return food_intent
+        item_action_intent = self._item_actions.parse(original, normalized)
+        if item_action_intent is not None:
+            return item_action_intent
         if self._looks_like_get_item(normalized):
             quantity = self._quantity_parser.parse(normalized)
             item_phrase = self._item_phrase(normalized)

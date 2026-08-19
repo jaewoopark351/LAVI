@@ -91,12 +91,20 @@ class JavaChatClefCommandCatalogContractTests(unittest.TestCase):
         unsupported_or_planned = set(_support_by_command()) - supported
 
         self.assertEqual(
-            {"get", "food", "meat", "goto", "follow", "idle", "stop"},
+            {
+                "deposit",
+                "equip",
+                "follow",
+                "food",
+                "get",
+                "give",
+                "goto",
+                "idle",
+                "meat",
+                "stop",
+            },
             supported,
         )
-        self.assertIn("equip", unsupported_or_planned)
-        self.assertIn("deposit", unsupported_or_planned)
-        self.assertIn("give", unsupported_or_planned)
         self.assertGreater(len(unsupported_or_planned), 0)
 
     def test_support_matrix_uses_pre_shared_case_schema(self):

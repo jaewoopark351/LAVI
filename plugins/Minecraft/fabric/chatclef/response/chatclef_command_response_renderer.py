@@ -81,11 +81,29 @@ class ChatClefCommandResponseRenderer:
 
     def _command_label(self, translation: Mapping[str, Any]) -> str:
         intent = translation.get("intent")
-        if isinstance(intent, Mapping) and intent.get("intent_type") == "get_item":
+        if isinstance(intent, Mapping) and intent.get("intent_type") in {
+            "get_item",
+            "equip_item",
+            "deposit_item",
+            "give_item",
+        }:
+            intent_type = self._text(intent.get("intent_type"))
             target = self._text(translation.get("resolved_target"))
             item_phrase = self._text(intent.get("item_phrase"))
             display = self._display_names.display_name(target, item_phrase or target)
             quantity = intent.get("quantity")
+            if intent_type == "equip_item":
+                return f"{display} 장착"
+            if intent_type == "deposit_item":
+                if type(quantity) is int and quantity > 0:
+                    return f"{display} {quantity}개 보관"
+                return f"{display} 보관"
+            if intent_type == "give_item":
+                player_name = self._text(intent.get("player_name"))
+                recipient = f"{player_name}에게 " if player_name else ""
+                if type(quantity) is int and quantity > 0:
+                    return f"{recipient}{display} {quantity}개 전달"
+                return f"{recipient}{display} 전달"
             if type(quantity) is int and quantity > 0:
                 return f"{display} {quantity}개 수집"
             return f"{display} 수집"

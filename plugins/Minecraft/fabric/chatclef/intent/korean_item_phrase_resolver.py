@@ -12,6 +12,9 @@ from plugins.Minecraft.fabric.chatclef.intent.chatclef_equipment_target_composer
 from plugins.Minecraft.fabric.chatclef.intent.chatclef_intent_status import (
     ChatClefIntentStatus,
 )
+from plugins.Minecraft.fabric.chatclef.intent.chatclef_target_catalog import (
+    ChatClefTargetCatalog,
+)
 from plugins.Minecraft.fabric.chatclef.intent.korean_text_normalizer import (
     KoreanTextNormalizer,
 )
@@ -27,10 +30,12 @@ class KoreanItemPhraseResolver:
         aliases: ChatClefKoreanAliasRepository | None = None,
         composer: ChatClefEquipmentTargetComposer | None = None,
         normalizer: KoreanTextNormalizer | None = None,
+        target_catalog: ChatClefTargetCatalog | None = None,
     ):
         self._aliases = aliases or ChatClefKoreanAliasRepository()
         self._composer = composer or ChatClefEquipmentTargetComposer()
         self._normalizer = normalizer or KoreanTextNormalizer()
+        self._target_catalog = target_catalog
 
     def resolve(self, phrase: object) -> dict[str, object]:
         normalized = self._cleanup(self._normalizer.normalize(phrase))
@@ -47,9 +52,15 @@ class KoreanItemPhraseResolver:
         fixed_result = self._resolve_fixed_alias(normalized, compact)
         if fixed_result is not None:
             return fixed_result
+        catalog_result = self._resolve_direct_catalog_target(normalized, compact)
+        if catalog_result is not None:
+            return catalog_result
         if self._has_unsupported_material(compact):
             return self._result(ChatClefIntentStatus.UNSUPPORTED, "unsupported_material")
         return self._result(ChatClefIntentStatus.UNKNOWN, "unknown_item_phrase")
+
+    def supports_equipment_target(self, target: object) -> bool:
+        return str(target or "").strip() in self._composer.all_targets()
 
     def _resolve_equipment(
         self,
@@ -98,6 +109,28 @@ class KoreanItemPhraseResolver:
                     phrase=normalized,
                 )
         return None
+
+    def _resolve_direct_catalog_target(
+        self,
+        normalized: str,
+        compact: str,
+    ) -> dict[str, object] | None:
+        target = normalized.replace(" ", "_")
+        compact_target = compact.replace(" ", "_")
+        for candidate in {target, compact_target}:
+            if candidate and self._catalog().contains(candidate):
+                return self._result(
+                    ChatClefIntentStatus.VALIDATED,
+                    "resolved_direct_catalog_target",
+                    target=candidate,
+                    phrase=normalized,
+                )
+        return None
+
+    def _catalog(self) -> ChatClefTargetCatalog:
+        if self._target_catalog is None:
+            self._target_catalog = ChatClefTargetCatalog()
+        return self._target_catalog
 
     def _cleanup(self, text: str) -> str:
         text = re.sub(r"\b(?:좀|제발|please)\b", " ", text)

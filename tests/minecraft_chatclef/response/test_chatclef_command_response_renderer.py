@@ -17,6 +17,50 @@ class ChatClefCommandResponseRendererTests(unittest.TestCase):
         self.assertNotIn("캤", response)
         self.assertNotIn("얻었", response)
 
+    def test_item_action_labels_match_command_without_claiming_effect(self):
+        renderer = ChatClefCommandResponseRenderer()
+
+        cases = [
+            (
+                _translation(
+                    "iron_chestplate",
+                    "철 흉갑",
+                    intent_type="equip_item",
+                    command="equip iron_chestplate",
+                ),
+                "철 흉갑 장착 명령을 제출했어요",
+            ),
+            (
+                _translation(
+                    "diamond",
+                    "다이아몬드",
+                    intent_type="deposit_item",
+                    command="deposit diamond 2",
+                    quantity=2,
+                ),
+                "다이아몬드 2개 보관 명령을 제출했어요",
+            ),
+            (
+                _translation(
+                    "torch",
+                    "횃불",
+                    intent_type="give_item",
+                    command="give Steve torch 1",
+                    player_name="Steve",
+                ),
+                "Steve에게 횃불 1개 전달 명령을 제출했어요",
+            ),
+        ]
+        for translation, expected_text in cases:
+            with self.subTest(command=translation["command"]):
+                response = renderer.render_submitted(
+                    translation,
+                    _result(status="accepted", ok=True),
+                )
+
+                self.assertIn(expected_text, response)
+                self.assertNotIn("성공", response)
+
     def test_completed_without_effect_keeps_gameplay_verification_separate(self):
         response = ChatClefCommandResponseRenderer().render_submitted(
             _translation("torch", "횃불"),
@@ -57,16 +101,25 @@ class ChatClefCommandResponseRendererTests(unittest.TestCase):
         )
 
 
-def _translation(target: str, item_phrase: str) -> dict[str, object]:
+def _translation(
+    target: str,
+    item_phrase: str,
+    *,
+    intent_type: str = "get_item",
+    command: str | None = None,
+    quantity: int = 1,
+    player_name: str = "",
+) -> dict[str, object]:
     return {
         "status": "validated",
         "executable": True,
-        "command": f"get {target} 1",
+        "command": command or f"get {target} {quantity}",
         "resolved_target": target,
         "intent": {
-            "intent_type": "get_item",
+            "intent_type": intent_type,
             "item_phrase": item_phrase,
-            "quantity": 1,
+            "quantity": quantity,
+            "player_name": player_name,
         },
     }
 

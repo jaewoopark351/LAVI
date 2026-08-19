@@ -41,6 +41,10 @@ KOREAN_INPUT_TO_COMMAND_CASES = [
     ("철헬멧 만들어줘", "get iron_helmet 1"),
     ("에메랄드 캐줘", "get emerald 1"),
     ("횃불 만들어줘", "get torch 1"),
+    ("철 흉갑 입어줘", "equip iron_chestplate"),
+    ("다이아몬드 2개 상자에 넣어줘", "deposit diamond 2"),
+    ("Steve에게 다이아몬드 3개 줘", "give Steve diamond 3"),
+    ("oak_log 2개 가져와줘", "get oak_log 2"),
     ("다이아몬드 곡괭이 하나 가져와", "get diamond_pickaxe 1"),
 ]
 
@@ -60,7 +64,7 @@ class KoreanInputToChatClefSubmissionPathTests(unittest.TestCase):
 
                 self.assertTrue(decision.handled)
                 self.assertEqual("minecraft_command_routed", decision.reason)
-                self.assertIn("수집 명령을 제출했어요", decision.response_text)
+                self.assertIn("명령을 제출했어요", decision.response_text)
                 self.assertEqual(1, len(adapter.requests))
 
                 request = adapter.requests[0]
@@ -121,6 +125,20 @@ class KoreanInputToChatClefSubmissionPathTests(unittest.TestCase):
         self.assertFalse(decision.handled)
         self.assertEqual("no_minecraft_trigger", decision.reason)
         self.assertEqual(0, service.translate_calls)
+        self.assertEqual([], adapter.requests)
+
+    def test_junk_cleanup_wording_never_submits_bare_deposit(self):
+        adapter = _RecordingAdapter()
+        extension = MinecraftFabricChatClefExtension(adapter=adapter)
+        router = MinecraftChatClefInputRouter(
+            extension=extension,
+            log_callback=lambda _message: None,
+        )
+
+        decision = router.route("잡템 상자에 넣어줘")
+
+        self.assertFalse(decision.handled)
+        self.assertIn(decision.reason, {"unknown_intent", "ambiguous_intent"})
         self.assertEqual([], adapter.requests)
 
     def test_connected_precheck_blocks_disconnected_adapter_submission(self):

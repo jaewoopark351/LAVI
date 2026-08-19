@@ -22,6 +22,16 @@ class MinecraftChatClefInputIntentGate:
         "\uadf8\ub9cc",
         "\uac00\ub9cc\ud788",
         "\ub300\uae30",
+        "\uc0c1\uc790\uc5d0\ub123",
+        "\uc0c1\uc790\uc5d0\uc800\uc7a5",
+        "\uc0c1\uc790\uc5d0\ubcf4\uad00",
+        "\ucc3d\uace0\uc5d0\ub123",
+        "\ubcf4\uad00\ud568\uc5d0\ub123",
+        "\uc785\uc5b4",
+        "\ucc29\uc6a9",
+        "\uc7a5\ucc29",
+        "\uc5d0\uac8c",
+        "\ud55c\ud14c",
         "idle",
     )
 

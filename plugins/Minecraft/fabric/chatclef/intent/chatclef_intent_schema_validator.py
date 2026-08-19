@@ -52,15 +52,22 @@ class ChatClefIntentSchemaValidator:
     def _validate_intent(self, intent: ChatClefIntentDTO) -> tuple[bool, str, str]:
         if intent.intent_type is ChatClefIntentType.UNKNOWN:
             return True, "validated_unknown_intent", "unknown intent is non-executable"
-        if intent.intent_type is ChatClefIntentType.GET_ITEM:
+        if intent.intent_type in {
+            ChatClefIntentType.GET_ITEM,
+            ChatClefIntentType.DEPOSIT_ITEM,
+            ChatClefIntentType.GIVE_ITEM,
+        }:
             if not intent.item_phrase.strip():
-                return False, "missing_item_phrase", "get_item requires item_phrase"
+                return False, "missing_item_phrase", "item action requires item_phrase"
             if (
                 intent.quantity is None
                 or intent.quantity < 1
                 or intent.quantity > JAVA_INT_MAX
             ):
-                return False, "invalid_quantity", "get_item quantity must be in 1..2147483647"
+                return False, "invalid_quantity", "item action quantity must be in 1..2147483647"
+        if intent.intent_type is ChatClefIntentType.EQUIP_ITEM:
+            if not intent.item_phrase.strip():
+                return False, "missing_item_phrase", "equip_item requires item_phrase"
         if intent.intent_type in {ChatClefIntentType.FOOD, ChatClefIntentType.MEAT}:
             if (
                 intent.food_units is None
@@ -80,4 +87,7 @@ class ChatClefIntentSchemaValidator:
         if intent.intent_type is ChatClefIntentType.FOLLOW:
             if not self._PLAYER_RE.fullmatch(intent.player_name):
                 return False, "invalid_player_name", "follow requires a valid player name"
+        if intent.intent_type is ChatClefIntentType.GIVE_ITEM:
+            if not self._PLAYER_RE.fullmatch(intent.player_name):
+                return False, "invalid_player_name", "give_item requires a valid player name"
         return True, "validated_intent", "intent schema is valid"
