@@ -1160,11 +1160,15 @@ proves the DepositCommand origin and is documented here:
 ```text
 plugins/Minecraft/docs/chatclef-bare-deposit-container-handoff-loop-investigation.md
 plugins/Minecraft/docs/chatclef-bare-deposit-diagnostics-plan.md
+plugins/Minecraft/docs/chatclef-bare-deposit-diagnostics-reproduction-2026-08-19-r1.md
 ```
 
 The first file is the finalized incident evidence record; the exact root cause
-remains unverified. The second is the bounded diagnostics-only design for a
-future reproduction and remains unimplemented.
+remains unverified. The second is the canonical bounded diagnostics-only design
+and implementation-status ledger. The third is a separate live-prefix
+reproduction made with the first partial diagnostics patch batch; it is not a
+finalized terminal record. Use the plan ledger rather than assuming that every
+proposed event is implemented.
 
 Do not assume Carry On is the primary cause when carry state is
 `AVAILABLE_NOT_CARRYING` and no click attempt or Carry On state transition
@@ -1975,8 +1979,13 @@ chatclef-bare-deposit-container-handoff-loop-investigation.md
     interpretation, and the container branch/lifecycle coordination boundary.
 
 chatclef-bare-deposit-diagnostics-plan.md
-    Proposed bounded operation correlation, cap-independent aggregates, and
-    terminal summaries for a future bare deposit reproduction.
+    Canonical bounded operation correlation, cap-independent aggregate, and
+    terminal-summary design plus the current partial-implementation ledger.
+
+chatclef-bare-deposit-diagnostics-reproduction-2026-08-19-r1.md
+    Separate live-prefix reproduction showing which partial diagnostics emitted,
+    where the new detail caps became blind, and which first-failure boundaries
+    remain unobserved.
 
 chatclef-carryon-integration-direction.md
     Engine boundary, ownership, diagnostics-only, and root-cause patch gates.

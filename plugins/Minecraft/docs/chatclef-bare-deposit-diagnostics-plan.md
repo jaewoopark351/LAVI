@@ -7,7 +7,10 @@ Date: 2026-08-19
 Status:
 
 ```text
-DOCUMENTED_NOT_IMPLEMENTED
+design status: DOCUMENTED
+implementation status: PARTIALLY_IMPLEMENTED_DIAGNOSTICS_ONLY
+implementation completeness: 0 canonical event families complete
+runtime evidence: LIVE_PREFIX_REPRODUCTION_RECORDED
 root cause: still unverified
 behavior change: prohibited
 wire change: prohibited
@@ -35,6 +38,7 @@ plugins/Minecraft/docs/chatclef-baritone-cache-troubleshooting.md
 plugins/Minecraft/docs/chatclef-fabric-build-verification.md
 plugins/Minecraft/docs/chatclef-engine-divergence-record.md
 plugins/Minecraft/docs/chatclef-post-completion-store-loop-investigation.md
+plugins/Minecraft/docs/chatclef-bare-deposit-diagnostics-reproduction-2026-08-19-r1.md
 ```
 
 The task-lifecycle document owns the generic event and bounded-logging rules;
@@ -45,8 +49,10 @@ hunk; and the post-completion document is historical 2026-08-07 context only.
 
 이 문서는 Java 또는 Python source 변경, build, Minecraft 실행, runtime
 재현, dependency 변경, wire payload 변경, commit 또는 push를 승인하지
-않는다. 아래 event, field, helper, budget은 모두 별도로 `EXISTING`이라고
-표시된 항목을 제외하면 `PROPOSED_NOT_IMPLEMENTED`다.
+않는다. 설계 자체와 실제 구현 상태를 구분한다. 아래 canonical contract는
+완료 기준이며, 현재 source 상태는 `Implementation Status Ledger`가 권위다.
+그 ledger에서 `SOURCE_PRESENT_PARTIAL` 또는 `IMPLEMENTED_EXTENSION_PARTIAL`로
+표시되지 않은 제안 항목은 `PROPOSED_NOT_IMPLEMENTED`다.
 
 ## Goal And Non-Goals
 
@@ -185,6 +191,167 @@ STORE_DEPOSIT_EFFECT_SUMMARY
 STORE_BARITONE_OPERATION_SUMMARY
 STORE_DEPOSIT_DIAGNOSTIC_COVERAGE_SUMMARY
 STORE_DEPOSIT_TERMINAL_GROUP_RESERVE_EXHAUSTED  bounded control fallback
+```
+
+## Implementation Status Ledger
+
+이 section은 canonical 설계를 현재 source 수준으로 낮추지 않고, 2026-08-19
+첫 partial diagnostics patch batch가 실제로 구현한 범위와 남은 gap을 기록한다. 상세 runtime
+증거는 다음 별도 문서가 권위다.
+
+Pre-implementation canonical design snapshot:
+
+```text
+bytes: 115,613
+SHA-256: 08b9110333d5fc56ce555ef2d6acdbf560d2343fc3e698702d9f6e512e54562f
+```
+
+현재 update는 implementation/runtime ledger를 추가하며, 위 snapshot의
+canonical completion contract를 partial source 수준으로 완화하지 않는다.
+
+```text
+plugins/Minecraft/docs/chatclef-bare-deposit-diagnostics-reproduction-2026-08-19-r1.md
+```
+
+현재 구현 판정:
+
+```text
+PARTIALLY_IMPLEMENTED_DIAGNOSTICS_ONLY
+NOT_REPRODUCTION_COMPLETE
+NOT_READY_FOR_BEHAVIOR_FIX
+NOT_READY_FOR_MERGE
+root cause: still unverified
+```
+
+계획된 신규/targeted event 24개 중 source에 event 이름과 emission 경계가
+생긴 것은 9개다. 9개 모두 canonical schema, boundedness, correlation 또는
+terminal contract가 불완전하므로 `SOURCE_PRESENT_PARTIAL`이다. canonical
+contract를 완전히 충족한 신규 event family는 아직 0개다.
+
+| Event or extension | Current status | Runtime observation in R1 | Material limitation |
+| --- | --- | --- | --- |
+| `DEPOSIT_COMMAND_INVOCATION_DECISION` Store merge | `IMPLEMENTED_EXTENSION_PARTIAL` | observed once | local operation ID는 연결됐지만 전체 canonical operation ledger는 미구현 |
+| `STORE_IN_ANY_CONTAINER_START` Store merge | `IMPLEMENTED_EXTENSION_PARTIAL` | observed once | activation/start fields 일부만 구현 |
+| `STORE_IN_ANY_CONTAINER_STOP` callback merge | `IMPLEMENTED_EXTENSION_PARTIAL` | not observed before live cutoff | callback-only 의미는 유지하지만 terminal authority 전체는 미구현 |
+| `USER_TASK_CHAIN_CANCEL_REQUESTED` correlation | `SOURCE_PRESENT_PARTIAL` | not observed before live cutoff | existing cancel event payload에 exact operation/cancel/root-generation field가 없고 hidden boolean marker만 기록 |
+| `STORE_TASK_LIFECYCLE_BOUNDARY` | `SOURCE_PRESENT_PARTIAL` | 256 emitted records | STOP/INTERRUPT placement는 있으나 activation/tombstone/idempotent terminal contract와 bounded coverage가 불완전 |
+| `STORE_TASK_CHILD_RECONCILIATION` | `SOURCE_PRESENT_PARTIAL` | 256 emitted records | `ROOT_ROUTE`/`TARGET_ACTION`/`SEARCH_FALLBACK` role을 구분하지 못하고 256 이후 suppression coverage가 없음 |
+| `STORE_CONTAINER_TRANSFER_DECISION` | `SOURCE_PRESENT_PARTIAL` | zero before live cutoff | 일부 transfer return만 관찰하며 missing-item/source/destination authority와 canonical enum이 불완전 |
+| `STORE_CONTAINER_EFFECT_OBSERVATION` | `SOURCE_PRESENT_PARTIAL` | zero before live cutoff | mutation ID, requested-item filter, ROOT/TARGET dedupe, baseline/net/high-watermark가 없음 |
+| `USER_BLOCK_RANGE_NULL_INPUT_OBSERVED` | `SOURCE_PRESENT_PARTIAL` | observed once before the first logged NPE | pre-dereference 관찰은 동작하지만 `lastActiveState()` 기반 operation 연결은 exact immutable binding이 아님 |
+| terminal four-summary names | `SOURCE_PRESENT_PARTIAL` | zero because the Store root was still active at cutoff | atomic reserve, idempotence, complete aggregate projection, fallback control event가 없음 |
+| parent / filtered search / pursuit / target callback events | `PROPOSED_NOT_IMPLEMENTED` | not available | raw-parent to filtered-child handoff를 증명할 수 없음 |
+| craft route entry / cost / interaction target events | `PROPOSED_NOT_IMPLEMENTED` | not available | repeated `return_open_table_task`의 최초 미관측 경계를 좁힐 수 없음 |
+| container access and Store-bound open-event merge | `PROPOSED_NOT_IMPLEMENTED` | not available | GUI/cache/access 경계가 Store attempt와 연결되지 않음 |
+| Store-bound Baritone context and aggregate | `PROPOSED_NOT_IMPLEMENTED` | not available | generation/result/adoption/NPE를 exact attempt에 연결할 수 없음 |
+| `STORE_DEPOSIT_CHECKPOINT_SUMMARY` | `PROPOSED_NOT_IMPLEMENTED` | not available | detail cap 이후 full-run progress를 복원할 수 없음 |
+| scanner summary / late Baritone summary / path exception | `CONDITIONAL_DEFERRED` | not available | 앞선 최소 slice로도 gap이 남을 때만 검토 |
+
+Canonical D-slice status mapping:
+
+| Slice | Current status | Test/runtime status | Exact limitation |
+| --- | --- | --- | --- |
+| D0a context | `PARTIAL` | focused tests missing | operation context와 mutable counters가 canonical focused types로 완전히 분리되지 않음 |
+| D0b binding | `PARTIAL` | focused tests missing | task/tracker binding은 있으나 descendant retirement, per-operation cap, eviction coverage 없음 |
+| D0c budget | `PARTIAL_NONCANONICAL` | focused cap tests missing | event-name별 256 gate만 있고 5000 session/critical reserve contract 없음 |
+| D0d emission | `NOT_IMPLEMENTED` | tests missing | 별도 atomic/reserved emission owner 없음 |
+| D0e Baritone context/counter/late summary | `NOT_IMPLEMENTED` | race tests missing | Store attempt와 generation을 bind하지 않음 |
+| D0f existing diagnostic-state cleanup | `NOT_IMPLEMENTED` | cleanup tests missing | Store progress/crafting state의 authoritative cleanup 없음 |
+| D1 invocation binding | `PARTIAL` | R1 observed | one local operation ID는 발급되지만 full ledger fields가 불완전 |
+| D2 explicit cancel provenance | `PARTIAL` | R1 not observed | hidden boolean marker만 있고 exact cancel payload correlation 없음 |
+| D3a stop lifecycle/tombstone | `PARTIAL` | descendant records observed; root terminal unobserved | BEGIN/END hook은 있으나 canonical tombstone/idempotence 없음 |
+| D3b interrupt lifecycle | `PARTIAL` | R1 not observed | hook은 있으나 activation/resume contract가 불완전 |
+| D4a root activation | `PARTIAL` | R1 observed | start merge만 구현 |
+| D4b parent/root-state observation | `NOT_IMPLEMENTED` | unavailable | parent candidate와 target-state event 없음 |
+| D4c natural terminal observation | `PARTIAL` | R1 not observed | cached finish result를 받지만 canonical atomic finalizer 없음 |
+| D4d stop callback snapshot | `PARTIAL` | R1 not observed | callback merge만 구현 |
+| D5 valid-container rejection | `NOT_IMPLEMENTED` | unavailable | rejection role/reason aggregate 없음 |
+| D6a filtered result | `NOT_IMPLEMENTED` | unavailable | active retained child search result 없음 |
+| D6b retained-pursuit validation | `NOT_IMPLEMENTED` | unavailable | validation role/result 없음 |
+| D7 scanner summary | `CONDITIONAL_DEFERRED` | unavailable | previous slices 이후 gap이 남을 때만 검토 |
+| D8 pursuit | `NOT_IMPLEMENTED` | unavailable | transition/returned action 없음 |
+| D8b target callback/reset | `NOT_IMPLEMENTED` | unavailable | actual reference comparison/reset outcome 없음 |
+| D9 Task child reconciliation | `PARTIAL_NONCANONICAL` | R1 observed; focused tests missing | generic root/descendant only, canonical role와 null-clear outcome 불완전 |
+| D10a-D10c craft route/cost/branch | `NOT_IMPLEMENTED` | unavailable | existing unbound route events만 존재 |
+| D11a-D11b craft interaction projections | `NOT_IMPLEMENTED` | unavailable | Store attempt context projection 없음 |
+| D12a-D12b interaction binding/merge | `NOT_IMPLEMENTED` | unavailable | existing open events와 operation join 없음 |
+| D13 container access | `NOT_IMPLEMENTED` | unavailable | GUI/cache/access decision 없음 |
+| D14a target predicate | `PARTIAL` | R1 not observed | actual predicate snapshot 일부만 있고 shared mutation authority 없음 |
+| D14b missing-item boundary | `NOT_IMPLEMENTED` | unavailable | missing-item return observation 없음 |
+| D14c transfer decision | `PARTIAL_NONCANONICAL` | R1 not observed | 일부 return만, slot identity와 canonical enum 불완전 |
+| D14d canFit comparison | `CONDITIONAL_DEFERRED` | unavailable | source authority가 필요할 때만 검토 |
+| D15 effect observation | `PARTIAL_NONCANONICAL` | R1 not observed | mutation identity/dedupe/baseline/oracle 불완전 |
+| D16 Baritone owners | `NOT_IMPLEMENTED` | unavailable | generation/result/adoption aggregate 없음 |
+| D17 null-input observation | `PARTIAL_NONCANONICAL` | R1 observed once | pre-dereference 관찰은 있으나 exact immutable context가 아님 |
+| D18 path exception | `CONDITIONAL_DEFERRED` | unavailable | safe existing propagation boundary 미확정 |
+| D19 bounded reproduction | `PERFORMED_WITH_INCOMPLETE_PATCH` | live prefix recorded | canonical cap, terminal, effect, and first-failure coverage 미충족 |
+
+이 patch batch는 여러 canonical D-slice와 upstream lifecycle owner를 한 번에
+가로질렀다. 위 표는 그 사실을 정당화하거나 이후 slice의 자동 진행을 승인하지
+않는다. 앞으로는 `Implementation Slices And Stop Gates`의 한 slice씩 진행하고,
+각 slice의 focused test와 종료 보고를 완료한 뒤 다음 승인을 판단한다.
+
+현재 LAVI-owned source 구조는 다음 package를 새로 사용한다.
+
+```text
+lavi/minecraft/diagnostics/container/store/deposit/
+    StoreDepositDiagnostics.java              compatibility facade/orchestrator
+    context/                                   operation identity and aggregate state
+    binding/                                   task/tracker binding
+    budget/                                    current emission gate
+    event/                                     flat event field construction
+```
+
+이는 upstream-derived classes를 이동하거나 분할하지 않는다. 다만 현재 facade,
+binding, budget, event model은 canonical responsibility and boundedness contract를
+완료한 상태가 아니다. 특히 다음 gap은 문서상 merge blocker다.
+
+```text
+StoreDepositEmissionGate
+    actual: event-name별 session-global distinct key 256, exception signature 16
+    missing: total session cap 5000, per-operation family budgets, checkpoints,
+             suppression accounting, 4936/64 critical partition
+
+terminal summary group
+    actual: four event names를 reserve 없이 순차 직접 방출한 뒤 purge
+    missing: atomic four-slot reservation, idempotent finalization,
+             terminal/control reserve, reserve-exhausted fallback
+
+binding registry
+    actual: descendant Task identity를 strong map에 계속 추가
+    missing: per-operation bound, descendant retirement, eviction coverage record
+
+correlation
+    actual: NPE를 last active Store operation에 시간상 연결
+    missing: immutable generation/task/attempt binding; 추측 연결 실패 시 unbound 처리
+
+effect and coverage semantics
+    actual: one effect callback만 있어도 effectObservationComplete=true가 될 수 있음
+    missing: complete observation predicate, requested-target filtering,
+             durable effect oracle, complete implemented/unimplemented family ledger
+```
+
+`max_emission=session_cap=5000` 같은 payload 문구는 실제 gate 구현의 증거로
+사용하지 않는다. current source의 gate code와 live emitted/suppressed evidence가
+authority다. 새 reproduction에서 lifecycle과 child reconciliation이 각각 256개에서
+더 이상 방출되지 않았지만, 새 gate는 별도 cap-reached 또는 suppression summary를
+남기지 않았다.
+
+Diagnostics-only source review에서는 return value, Task selection, retry, timeout,
+input, Baritone goal/path, click/transfer 또는 원래 NPE propagation을 바꾸는 hunk를
+찾지 못했다. 그러나 global synchronized registry/gate와 unbounded descendant
+binding의 장시간 성능 및 thread-interleaving 영향까지 검증됐다는 뜻은 아니다.
+
+Authorized verification already completed for this partial slice:
+
+```text
+clean forced offline Gradle build: PASS
+139 actionable tasks: 139 executed
+built 1.20.1 JAR and active CurseForge JAR: byte-for-byte SHA-256 match
+runtime code-source path: active LAVI_TEST_Fabric01 mods JAR
+BOUNDARY reproduction: observed as a live, non-finalized prefix
+focused StoreDeposit helper tests: NOT IMPLEMENTED
+terminal summary runtime validation: NOT OBSERVED
 ```
 
 ## Ownership And Responsibility Split
@@ -2263,14 +2430,18 @@ storeOperationId
 
 한 fingerprint의 첫 event만 full stack를 포함한다. 반복은 counter와
 checkpoint/final summary로 기록한다.
-2026-08-19의 여섯 NPE 중 첫 episode만 UserBlockRangeTracker stack을
-포함했다. 나머지 다섯 episode를 같은 원인으로 묶지 않으며, 다음 재현에서도
-matching exception signature/context가 있을 때만 같은 episode family로
-집계한다.
+원 2026-08-19 50분 46초 사건의 여섯 NPE 중 첫 episode만
+UserBlockRangeTracker stack을 포함했다. 나머지 다섯 episode를 같은 원인으로
+묶지 않으며, 다음 재현에서도 matching exception signature/context가 있을
+때만 같은 episode family로 집계한다. 이는 별도 R1 live prefix에서 관측된
+일곱 NPE episode의 수치와 합산하지 않는다.
 
 ### First Targeted P2: `USER_BLOCK_RANGE_NULL_INPUT_OBSERVED`
 
-이 event도 현재 구현에 존재하지 않으며 targeted P2 observation이다.
+이 event는 현재 source에 부분 구현되어 R1 live prefix에서 한 번 관측됐다.
+다만 현재 `lastActiveState()` 기반 operation 연결은 exact immutable provenance가
+아니므로 canonical targeted P2 contract는 아직 미완료다. 구현 상태의 권위는
+위 Implementation Status Ledger를 따른다.
 
 Placement:
 

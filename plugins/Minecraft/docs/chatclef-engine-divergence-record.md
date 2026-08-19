@@ -4,7 +4,7 @@
 
 ## Current Status
 
-Verification status: BUILT_NOT_RUNTIME_REPRODUCED
+Verification status: MIXED; use each divergence record's own build and runtime status
 
 Active behavior-changing engine divergence: PRESENT
 
@@ -719,6 +719,173 @@ Open P2 follow-up items:
 - Global mutable `traceId` should not be used as causal correlation.
 - Observation session auto-restart and heartbeat policy should be redesigned or removed when verbose diagnostics are
   revisited.
+
+## Active Diagnostics Divergence Record: Bare Deposit Operation Correlation First Partial Patch Batch
+
+Date: 2026-08-19
+
+Review baseline SHA: `a41c54c72f239fe4759cf255d415eaa7805e82af`
+
+The built and observed JAR came from a dirty working-tree snapshot based on
+that repository HEAD. The baseline identifies the comparison point; it does
+not claim that the partial diagnostic patch was committed.
+
+Verification status:
+
+```text
+PARTIALLY_IMPLEMENTED_DIAGNOSTICS_ONLY
+BUILT_AND_LIVE_PREFIX_OBSERVED
+NOT_CANONICAL_REPRODUCTION_COMPLETE
+NOT_READY_FOR_MERGE
+root cause: still unverified
+```
+
+Canonical design and exact implementation ledger:
+
+```text
+plugins/Minecraft/docs/chatclef-bare-deposit-diagnostics-plan.md
+```
+
+Runtime evidence:
+
+```text
+plugins/Minecraft/docs/chatclef-bare-deposit-diagnostics-reproduction-2026-08-19-r1.md
+```
+
+Modified upstream-derived observation boundaries:
+
+```text
+adris/altoclef/chains/SingleTaskChain.java
+    SingleTaskChain.onTick(): observe the already evaluated natural-finish result
+adris/altoclef/chains/UserTaskChain.java
+    UserTaskChain.cancel(AltoClef): mark the current root as an explicit-cancel candidate
+adris/altoclef/tasks/container/ContainerStoredTracker.java
+    ContainerStoredTracker.startTracking(): observe the existing slot-change callback and predicate result
+adris/altoclef/tasks/container/StoreInAnyContainerTask.java
+    StoreInAnyContainerTask.onStart(): bind the existing root stored-item tracker
+adris/altoclef/tasks/container/StoreInContainerTask.java
+    StoreInContainerTask.onStart(): observe the target-container predicate and bind the target tracker
+    StoreInContainerTask.onContainerOpenSubtask(...): observe selected transfer return boundaries
+adris/altoclef/tasksystem/Task.java
+    Task.tick(TaskChain): observe child reconciliation in the non-null and null candidate branches
+    Task.stop(Task): observe STOP BEGIN/END boundaries
+    Task.interrupt(Task): observe INTERRUPT BEGIN/END boundaries
+adris/altoclef/trackers/UserBlockRangeTracker.java
+    UserBlockRangeTracker.updateState(): observe null BlockPos immediately before the original dereference
+```
+
+Modified existing LAVI-owned diagnostic boundaries:
+
+```text
+lavi/minecraft/diagnostics/command/deposit/DepositCommandDiagnosticFields.java
+lavi/minecraft/diagnostics/command/deposit/DepositCommandDiagnostics.java
+lavi/minecraft/diagnostics/container/store/StoreInAnyContainerDiagnostics.java
+```
+
+New LAVI-owned package:
+
+```text
+lavi/minecraft/diagnostics/container/store/deposit/StoreDepositDiagnostics.java
+lavi/minecraft/diagnostics/container/store/deposit/binding/StoreDepositBindingRegistry.java
+lavi/minecraft/diagnostics/container/store/deposit/budget/StoreDepositEmissionGate.java
+lavi/minecraft/diagnostics/container/store/deposit/context/StoreDepositOperationContext.java
+lavi/minecraft/diagnostics/container/store/deposit/context/StoreDepositOperationState.java
+lavi/minecraft/diagnostics/container/store/deposit/event/StoreDepositEventFields.java
+```
+
+Diagnostic intent:
+
+```text
+issue one local storeOperationId for a bare DepositCommand
+merge that ID into the Store root start/stop callback fields
+observe generic Task stop/interrupt and child reconciliation boundaries
+observe selected StoreInContainer transfer returns
+observe ContainerStoredTracker slot-change callbacks
+observe a null UserBlockRangeTracker BlockPos immediately before the original dereference
+emit placeholder terminal/effect/Baritone/coverage summary names when the root finalizes
+```
+
+Behavior intended to remain unchanged:
+
+```text
+return values
+Task selection, ordering, completion, equality, replacement, and interruption semantics
+retry, timeout, cooldown, and fallback policy
+input state and ownership
+Baritone goal, path, process, adoption, and cancellation
+container click, cursor, screen, slot, and transfer behavior
+original NPE propagation
+wire payload, acknowledgement, and command terminal status
+```
+
+Source review found no intentional changes to those behavior owners. The
+existing predicate, inventory query, `isFinished()` result, and null dereference
+are not called a second time for diagnostics. This is diagnostics-only intent,
+not proof of zero runtime impact.
+
+Build evidence:
+
+```text
+command:
+    .\gradlew.bat clean build --rerun-tasks --no-daemon --offline
+JDK:
+    Eclipse Adoptium 21.0.12.8
+result:
+    BUILD SUCCESSFUL in 3m 11s
+    139 actionable tasks: 139 executed
+1.20.1 JAR bytes:
+    6,431,821
+1.20.1 JAR SHA-256:
+    e8c097a75dc205954224bb22e406f33ab9141a0f59de83e5d50c0235a28520bf
+active CurseForge JAR SHA-256:
+    e8c097a75dc205954224bb22e406f33ab9141a0f59de83e5d50c0235a28520bf
+```
+
+Runtime prefix evidence:
+
+```text
+one DEPOSIT_COMMAND_INVOCATION_DECISION
+one STORE_IN_ANY_CONTAINER_START
+same storeOperationId=store-deposit-549
+256 STORE_TASK_CHILD_RECONCILIATION records
+256 STORE_TASK_LIFECYCLE_BOUNDARY records
+one USER_BLOCK_RANGE_NULL_INPUT_OBSERVED before the first logged NPE
+Store root still active at the fixed prefix cutoff
+terminal summary group not observed
+```
+
+Known divergence and correctness gaps:
+
+```text
+the slice spans multiple upstream lifecycle owners rather than one isolated boundary
+the required investigation marker is absent from the first new upstream diagnostic block in this patch batch
+child roles do not distinguish ROOT_ROUTE/TARGET_ACTION/SEARCH_FALLBACK
+NPE operation correlation uses last-active temporal inference, not exact immutable provenance
+event-specific 256-key gates do not implement the canonical 5000 session cap and critical reserve
+descendant Task bindings have no per-operation retirement/cap
+terminal four-summary emission is sequential, not atomically reserved or idempotently finalized
+effectObservationComplete and expected-effect semantics can overclaim incomplete observation
+focused helper, race, cap, cleanup, and terminal-summary tests are absent
+```
+
+The live prefix confirms that this source is loaded and that some boundaries
+emit. It also confirms that lifecycle and reconciliation detail becomes blind
+early while the Store loop continues. It does not prove the parent raw candidate,
+filtered search, pursuit, target callback, craft interaction, Baritone generation,
+slot effect, or earliest failure boundary.
+
+Rollback unit:
+
+```text
+revert only the bare-deposit diagnostic calls/imports in the listed upstream-derived files
+revert only the Store-operation field merge in the listed existing LAVI diagnostics
+remove the new LAVI-owned deposit diagnostics package as one coherent diagnostic unit
+do not use git reset, broad checkout, broad restore, or repository cleanup
+```
+
+No behavior-changing fix is authorized by this record. Correct the canonical
+boundedness/correlation gaps and obtain focused test evidence before another
+long reproduction or merge decision.
 
 ## Previous REQUEST CHANGES Cleanup Record
 

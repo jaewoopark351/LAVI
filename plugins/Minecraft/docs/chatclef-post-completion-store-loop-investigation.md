@@ -33,6 +33,7 @@ plugins/Minecraft/docs/chatclef-command-payload-map-audit.md
 plugins/Minecraft/docs/chatclef-resource-target-retry-thrashing-analysis.md
 plugins/Minecraft/docs/chatclef-bare-deposit-container-handoff-loop-investigation.md
 plugins/Minecraft/docs/chatclef-bare-deposit-diagnostics-plan.md
+plugins/Minecraft/docs/chatclef-bare-deposit-diagnostics-reproduction-2026-08-19-r1.md
 ```
 
 The 2026-08-19 bare `deposit` incident is a separate evidence set. Its Store
@@ -42,9 +43,11 @@ scanner absence, `branchChangeCount` is defined as a composite-signature
 counter, `costToMakeNew=Infinity` is an intentional policy sentinel, and task
 instance evidence must distinguish start/tick from a complete stop/restart
 cycle. Use the dedicated incident document rather than transferring this
-2026-08-07 hypothesis directly to that run. The future bounded diagnostics
-design for the 2026-08-19 incident is in
-`chatclef-bare-deposit-diagnostics-plan.md`; it is not an implementation record.
+2026-08-07 hypothesis directly to that run. The canonical bounded diagnostics
+design and current partial-implementation ledger for the 2026-08-19 incident
+are in `chatclef-bare-deposit-diagnostics-plan.md`. Runtime evidence from the
+first partial diagnostics patch batch is a third, separate evidence set in
+`chatclef-bare-deposit-diagnostics-reproduction-2026-08-19-r1.md`.
 
 ## Evidence Snapshot
 
@@ -435,8 +438,11 @@ that the hot path is being exercised.
 
 This section records the diagnostics added for the 2026-08-07 evidence set. It
 is not the complete diagnostics design for the separate 2026-08-19 bare deposit
-incident; use `chatclef-bare-deposit-diagnostics-plan.md` for that proposed,
-currently unimplemented design.
+incident. Use `chatclef-bare-deposit-diagnostics-plan.md` for that canonical
+design and current partial-implementation ledger, and use
+`chatclef-bare-deposit-diagnostics-reproduction-2026-08-19-r1.md` for the
+separate live-prefix runtime evidence. Do not import either run's counts into
+this 2026-08-07 window.
 
 The follow-up diagnostics added for this investigation are log-only events.
 They do not change `command_request`, `command_result`, status values, task

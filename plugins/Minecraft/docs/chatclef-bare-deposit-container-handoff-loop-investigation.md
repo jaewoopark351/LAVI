@@ -51,6 +51,7 @@ bounded StoreInAnyContainer diagnostics
 plugins/Minecraft/docs/chatclef-post-completion-store-loop-investigation.md
 plugins/Minecraft/docs/chatclef-task-lifecycle-diagnostics.md
 plugins/Minecraft/docs/chatclef-bare-deposit-diagnostics-plan.md
+plugins/Minecraft/docs/chatclef-bare-deposit-diagnostics-reproduction-2026-08-19-r1.md
 plugins/Minecraft/docs/chatclef-baritone-cache-troubleshooting.md
 plugins/Minecraft/docs/chatclef-resource-target-retry-thrashing-analysis.md
 plugins/Minecraft/docs/chatclef-carryon-integration-direction.md
@@ -710,6 +711,35 @@ UNRESOLVED
     exact origin of the null BlockPos consumed by UserBlockRangeTracker
 ```
 
+## Follow-Up Diagnostics Reproduction
+
+The first partial-diagnostics reproduction is recorded separately:
+
+```text
+plugins/Minecraft/docs/chatclef-bare-deposit-diagnostics-reproduction-2026-08-19-r1.md
+```
+
+It is a different Minecraft session, build artifact, deposit invocation, Store
+task, operation ID, target set, and log window. Do not add its counts to the
+frozen 50-minute-46-second incident counts in this document.
+
+At the follow-up document's live prefix cutoff, the new runtime had proven one
+bare operation ID and early generic child/lifecycle visibility, but the Store
+root was still repeating and had not emitted a natural terminal, Stop callback,
+verified effect, or terminal summary. Parent raw candidate, filtered search,
+pursuit, target callback/reset, craft interaction, Baritone generation, and
+durable slot-effect correlation remained unobserved.
+
+The follow-up therefore corroborates the non-converging symptom and validates
+that part of the first diagnostic slice is loaded. It does not retroactively
+prove the first failing boundary in this frozen incident, and it does not
+convert the parent-raw versus child-filtered candidate mismatch from a
+hypothesis into a confirmed cause.
+
+Current implementation status belongs to the diagnostics plan's
+`Implementation Status Ledger`; current runtime evidence belongs to the dated
+reproduction document.
+
 ## Next Read-Only Analysis
 
 Before changing source, reconstruct bounded timelines around:
@@ -755,8 +785,10 @@ The canonical bounded diagnostics-only design for a future reproduction is:
 plugins/Minecraft/docs/chatclef-bare-deposit-diagnostics-plan.md
 ```
 
-That plan is `DOCUMENTED_NOT_IMPLEMENTED`; it does not authorize source edits,
-build, runtime reproduction, commit, or push.
+That plan now contains a partial-implementation ledger and remains the
+canonical completion contract. The separate dated reproduction records which
+partial boundaries actually emitted. Neither document authorizes additional
+source edits, build, runtime reproduction, commit, or push.
 
 If a later read-only analysis leaves the candidate handoff materially
 unobservable, the smallest useful diagnostic would capture values already

@@ -205,11 +205,18 @@ plugins/Minecraft/docs/chatclef-resource-target-retry-thrashing-analysis.md
     2026-08-08 resource target/path retry thrashing that eventually completed
 ```
 
-For the bounded diagnostics-only design for the next bare deposit
-reproduction, read:
+For the bounded diagnostics-only design and its current slice-by-slice
+implementation status, read:
 
 ```text
 plugins/Minecraft/docs/chatclef-bare-deposit-diagnostics-plan.md
+```
+
+For the first live prefix captured with the partial diagnostics JAR, read:
+
+```text
+plugins/Minecraft/docs/chatclef-bare-deposit-diagnostics-reproduction-2026-08-19-r1.md
+    separate run; live prefix, not a finalized terminal record
 ```
 
 For payload typing and map-shape stability, read:
@@ -278,8 +285,11 @@ Diagnostic runbooks:
   chatclef-task-lifecycle-diagnostics.md
   chatclef-baritone-cache-troubleshooting.md
 
-Diagnostics-only plans:
+Diagnostics-only design and implementation status:
   chatclef-bare-deposit-diagnostics-plan.md
+
+Diagnostics reproduction evidence:
+  chatclef-bare-deposit-diagnostics-reproduction-2026-08-19-r1.md
 
 Policy and investigation direction:
   chatclef-carryon-integration-direction.md
