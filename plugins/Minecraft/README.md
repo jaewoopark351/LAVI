@@ -191,6 +191,20 @@ smelting command is active, read:
 plugins/Minecraft/docs/chatclef-task-lifecycle-diagnostics.md
 ```
 
+For the dated Store/container incident evidence, read the matching incident
+analysis instead of applying one run's hypothesis to another:
+
+```text
+plugins/Minecraft/docs/chatclef-post-completion-store-loop-investigation.md
+    2026-08-07 post-completion Store/Craft/Baritone loop
+
+plugins/Minecraft/docs/chatclef-bare-deposit-container-handoff-loop-investigation.md
+    2026-08-19 bare deposit branch/lifecycle loop and explicit StopCommand end
+
+plugins/Minecraft/docs/chatclef-resource-target-retry-thrashing-analysis.md
+    2026-08-08 resource target/path retry thrashing that eventually completed
+```
+
 For payload typing and map-shape stability, read:
 
 ```text
@@ -263,6 +277,12 @@ Policy and investigation direction:
 Audit and active snapshot:
   chatclef-command-payload-map-audit.md
   chatclef-engine-divergence-record.md
+
+Incident analyses:
+  chatclef-cooked-beef-entity-path-calculation-investigation.md
+  chatclef-post-completion-store-loop-investigation.md
+  chatclef-bare-deposit-container-handoff-loop-investigation.md
+  chatclef-resource-target-retry-thrashing-analysis.md
 
 Python orchestration planning:
   chatclef-python-command-orchestration-plan.md

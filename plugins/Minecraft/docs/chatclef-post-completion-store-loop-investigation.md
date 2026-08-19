@@ -30,7 +30,18 @@ plugins/Minecraft/docs/chatclef-command-lifecycle-and-threading.md
 plugins/Minecraft/docs/chatclef-task-lifecycle-diagnostics.md
 plugins/Minecraft/docs/chatclef-baritone-cache-troubleshooting.md
 plugins/Minecraft/docs/chatclef-command-payload-map-audit.md
+plugins/Minecraft/docs/chatclef-resource-target-retry-thrashing-analysis.md
+plugins/Minecraft/docs/chatclef-bare-deposit-container-handoff-loop-investigation.md
 ```
+
+The 2026-08-19 bare `deposit` incident is a separate evidence set. Its Store
+task origin is proven, and its source/log audit corrects several tempting
+over-interpretations: fallback `closestContainerPresent=false` is not proof of
+scanner absence, `branchChangeCount` is defined as a composite-signature
+counter, `costToMakeNew=Infinity` is an intentional policy sentinel, and task
+instance evidence must distinguish start/tick from a complete stop/restart
+cycle. Use the dedicated incident document rather than transferring this
+2026-08-07 hypothesis directly to that run.
 
 ## Evidence Snapshot
 
@@ -174,7 +185,7 @@ high-value boundary to verify: distance-nearby table preference must be checked
 against actual path result, path adoption result, blacklist state, and
 interaction progress.
 
-## Store Task Origin Must Be Proven
+## Store Task Origin Must Be Proven For This 2026-08-07 Window
 
 Do not assume the Store task is a leftover child from a completed `get`
 command. The current evidence fits a newly started AltoClef user or idle task
@@ -463,19 +474,40 @@ task was actually created by the idle command".
 
 ```text
 STORE_IN_ANY_CONTAINER_START
-STORE_IN_ANY_CONTAINER_BRANCH
-STORE_IN_ANY_CONTAINER_PROGRESS_STATE
-STORE_IN_ANY_CONTAINER_REPEAT_SUMMARY
 STORE_IN_ANY_CONTAINER_STOP
+    owner=store_in_any_container_observer
+    mode=BOUNDARY
+    trigger=<start|stop>
+    max_emission=one_per_task_lifecycle_boundary
+    correlation=storeTaskIdentity=<identity>
+    payload=flat_fields
+    terminal=true only for STOP
+    behavior_effect=none
+
+STORE_IN_ANY_CONTAINER_BRANCH
+STORE_IN_ANY_CONTAINER_REPEAT_SUMMARY
 STORE_IN_ANY_CONTAINER_DIAGNOSTIC_CAP_REACHED
     owner=store_in_any_container_observer
     mode=BOUNDARY
-    trigger=<start|branch|progress_state|repeat_summary|stop|session_cap>
+    trigger=<branch|repeat_summary|session_cap>
     dedupe_key=STORE_IN_ANY_CONTAINER_BRANCH|...
     max_emission=detail_per_bucket=1,session=512,summary_ticks=200
     correlation=storeTaskIdentity=<identity>
     payload=flat_fields
-    terminal=true only for STOP
+    terminal=false
+    behavior_effect=none
+
+STORE_IN_ANY_CONTAINER_PROGRESS_STATE
+STORE_IN_ANY_CONTAINER_PROGRESS_DIAGNOSTIC_CAP_REACHED
+    owner=store_in_any_container_progress_observer
+    mode=BOUNDARY
+    trigger=<first_observation|progress_signature_changed|
+             progress_stable_summary|session_cap>
+    dedupe_key=store_progress|...
+    max_emission=first_change_summary_ticks=200,session=256
+    correlation=storeTaskIdentity=<identity>
+    payload=flat_fields
+    terminal=false
     behavior_effect=none
 ```
 
@@ -620,7 +652,7 @@ command result status
 
 ## Current Working Conclusion
 
-The current best conclusion is:
+For the 2026-08-07 evidence window only, the current best conclusion is:
 
 ```text
 The bridge command lifecycle is not the active loop.

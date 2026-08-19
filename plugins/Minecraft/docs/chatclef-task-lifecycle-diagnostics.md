@@ -1120,9 +1120,15 @@ whether old TaskFinishedEvent observations are attached to the active command
 Do not fix this by adding a command timeout. A timeout would only hide the
 failure boundary unless the owner of timeout and cleanup has been proven.
 
-## Current Container Loop Checklist
+## 2026-08-07 Container Loop Checklist
 
-For the local crafting-table/container symptom, current logs may show:
+This checklist is scoped to the 2026-08-07 post-completion evidence window:
+
+```text
+plugins/Minecraft/docs/chatclef-post-completion-store-loop-investigation.md
+```
+
+For that local crafting-table/container symptom, the logs may show:
 
 ```text
 topLevelTask=StoreInAnyContainerTask
@@ -1145,6 +1151,14 @@ whether click was attempted
 whether click input was accepted
 whether GUI open was observed after the click
 whether child replacement repeatedly force-cancelled pathing
+```
+
+Do not transfer the origin or field interpretations in this historical
+checklist to the 2026-08-19 bare deposit incident. That separate evidence set
+proves the DepositCommand origin and is documented here:
+
+```text
+plugins/Minecraft/docs/chatclef-bare-deposit-container-handoff-loop-investigation.md
 ```
 
 Do not assume Carry On is the primary cause when carry state is
@@ -1946,6 +1960,14 @@ chatclef-resource-target-retry-thrashing-analysis.md
     Corrected gold-ingot diagnosis and target-level timeline plan for
     path/target retry thrashing after command lifecycle and path adoption are
     ruled out.
+
+chatclef-post-completion-store-loop-investigation.md
+    2026-08-07 post-completion Store/Craft/Baritone incident and the bounded
+    diagnostics introduced for that investigation.
+
+chatclef-bare-deposit-container-handoff-loop-investigation.md
+    2026-08-19 bare deposit evidence, corrected Store progress-field
+    interpretation, and the container branch/lifecycle coordination boundary.
 
 chatclef-carryon-integration-direction.md
     Engine boundary, ownership, diagnostics-only, and root-cause patch gates.
