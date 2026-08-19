@@ -4,6 +4,7 @@ import adris.altoclef.AltoClef;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.ItemTarget;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.diagnostics.container.store.deposit.StoreDepositDiagnostics;
 
 //20260807_kpopmodder: Attribute deposit-created StoreInAnyContainerTask without changing command execution.
 public final class DepositCommandDiagnostics {
@@ -17,6 +18,12 @@ public final class DepositCommandDiagnostics {
         if (!ChatClefDiagnostics.isBoundaryEnabled()) {
             return;
         }
+        Object[] storeDepositFields = StoreDepositDiagnostics.registerBareDepositInvocation(
+                mod,
+                explicitItemListProvided,
+                selectedItems,
+                taskToRun
+        );
         ChatClefDiagnostics.logBoundary("DEPOSIT_COMMAND_INVOCATION_DECISION",
                 "deposit_command_invocation_decision",
                 taskToRun,
@@ -25,7 +32,8 @@ public final class DepositCommandDiagnostics {
                                 mod,
                                 explicitItemListProvided,
                                 selectedItems,
-                                taskToRun
+                                taskToRun,
+                                storeDepositFields
                         )));
     }
 }

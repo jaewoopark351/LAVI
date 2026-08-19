@@ -6,6 +6,7 @@ import adris.altoclef.tasksystem.Task;
 import adris.altoclef.tasksystem.TaskChain;
 import adris.altoclef.tasksystem.TaskRunner;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.diagnostics.container.store.deposit.StoreDepositDiagnostics;
 
 public abstract class SingleTaskChain extends TaskChain {
 
@@ -49,6 +50,9 @@ public abstract class SingleTaskChain extends TaskChain {
                     "mainTaskFinished", mainTaskFinished,
                     "mainTaskStoppedEvaluated", !mainTaskFinished,
                     "mainTaskStopped", mainTaskStopped);
+            if (mainTaskFinished) {
+                StoreDepositDiagnostics.logNaturalFinish(mainTask);
+            }
             if ((mainTaskFinished) || mainTaskStopped) {
                 ChatClefDiagnostics.logTaskTransition(mainTask, mainTask, null, "single_task_chain_onTaskFinish_begin",
                         "chain", ChatClefDiagnostics.chainName(this));

@@ -5,6 +5,7 @@ import time
 from collections.abc import Callable, Mapping
 from pathlib import Path
 
+from .finite_positive_timing import finite_positive_seconds
 from .get_item_delta_oracle import get_item_delta_checkpoint
 from .player_inventory_snapshot import read_stable_player_inventory_snapshot
 
@@ -39,10 +40,12 @@ def collect_post_terminal_get_item_checkpoint(
     ):
         return _unknown_checkpoint("gameplay baseline fields are invalid")
 
-    timeout_sec = _positive_number(
+    timeout_sec = finite_positive_seconds(
         environment.get("gameplay_observation_timeout_sec")
     )
-    poll_sec = _positive_number(environment.get("gameplay_observation_poll_sec"))
+    poll_sec = finite_positive_seconds(
+        environment.get("gameplay_observation_poll_sec")
+    )
     if timeout_sec is None or poll_sec is None:
         return _unknown_checkpoint("gameplay observation timing is invalid")
     post_terminal_floor_ns = max(baseline_mtime_ns, wall_clock_ns())
@@ -90,13 +93,3 @@ def _item_count(counts: Mapping[object, object], item_id: str) -> int:
     if not isinstance(value, int) or value < 0:
         raise ValueError("target item count is invalid")
     return value
-
-
-def _positive_number(value: object) -> float | None:
-    if isinstance(value, bool):
-        return None
-    try:
-        parsed = float(value)
-    except (TypeError, ValueError):
-        return None
-    return parsed if parsed > 0 else None

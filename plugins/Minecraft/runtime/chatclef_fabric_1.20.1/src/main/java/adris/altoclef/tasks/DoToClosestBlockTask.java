@@ -4,6 +4,7 @@ import adris.altoclef.AltoClef;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.helpers.WorldHelper;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.diagnostics.container.store.deposit.StoreDepositDiagnostics;
 import net.minecraft.block.Block;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
@@ -67,6 +68,7 @@ public class DoToClosestBlockTask extends AbstractDoToClosestObjectTask<BlockPos
                 "resultPresent", result.isPresent(),
                 "result", result.map(Object::toString).orElse("none"),
                 "resultBlockState", result.map(blockPos -> ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(blockPos))).orElse("unavailable"));
+        StoreDepositDiagnostics.logFilteredSearchResult(this, result, targetBlocks);
         return result;
     }
 
@@ -101,6 +103,7 @@ public class DoToClosestBlockTask extends AbstractDoToClosestObjectTask<BlockPos
         // Our valid predicate
         boolean predicateValid = isValid == null || isValid.test(obj);
         if (!predicateValid) {
+            StoreDepositDiagnostics.logPursuitDecision(this, obj, obj, "PURSUIT_VALIDATION_REJECTED_BY_PREDICATE");
             ChatClefDiagnostics.logEvent("CLOSEST_BLOCK", "VALIDATE", "predicate_rejected_block", this,
                     "targetBlocks", Arrays.toString(targetBlocks),
                     "blockPosition", obj,
@@ -109,6 +112,7 @@ public class DoToClosestBlockTask extends AbstractDoToClosestObjectTask<BlockPos
         }
         // Correct block
         boolean blockMatches = mod.getBlockScanner().isBlockAtPosition(obj, targetBlocks);
+        StoreDepositDiagnostics.logPursuitDecision(this, obj, obj, blockMatches ? "PURSUIT_VALIDATION_ACCEPTED" : "PURSUIT_VALIDATION_BLOCK_TYPE_MISMATCH");
         ChatClefDiagnostics.logEvent("CLOSEST_BLOCK", "VALIDATE", "block_match_check", this,
                 "targetBlocks", Arrays.toString(targetBlocks),
                 "blockPosition", obj,

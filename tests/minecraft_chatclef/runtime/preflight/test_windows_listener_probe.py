@@ -5,9 +5,17 @@ import subprocess
 import unittest
 
 from .windows_listener_probe import read_windows_listener_probe
+from .windows_listener_probe_script import build_windows_listener_probe_script
 
 
 class WindowsListenerProbeTests(unittest.TestCase):
+    def test_probe_emits_strict_utc_process_start_ticks(self):
+        script = build_windows_listener_probe_script([4316, 47860])
+
+        self.assertIn("CreationDate.ToUniversalTime().Ticks", script)
+        self.assertIn("creation_time_utc_ticks=$creationTimeUtcTicks", script)
+        self.assertIn("process creation time unavailable", script)
+
     def test_cp949_error_output_is_preserved_as_a_fail_closed_reason(self):
         def command_runner(*_args, **kwargs):
             self.assertFalse(kwargs["text"])

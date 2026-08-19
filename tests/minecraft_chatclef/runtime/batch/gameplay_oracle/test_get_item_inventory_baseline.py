@@ -65,6 +65,49 @@ class GetItemInventoryBaselineTests(unittest.TestCase):
         self.assertIs(False, baseline["ok"])
         self.assertIn("stale", baseline["reason"])
 
+    def test_non_finite_or_boolean_timing_stops_before_snapshot_loop(self):
+        invalid_values = (
+            True,
+            float("nan"),
+            float("inf"),
+            float("-inf"),
+        )
+        timing_fields = (
+            "gameplay_observation_timeout_sec",
+            "gameplay_observation_poll_sec",
+            "gameplay_snapshot_max_age_sec",
+        )
+        for field in timing_fields:
+            for value in invalid_values:
+                with self.subTest(field=field, value=value):
+                    environment = _environment()
+                    environment[field] = value
+                    reads = 0
+
+                    def read_snapshot(_path):
+                        nonlocal reads
+                        reads += 1
+                        return {}
+
+                    baseline = capture_get_item_inventory_baseline(
+                        environment,
+                        path_resolver=lambda _environment: (
+                            Path("fixture.dat"),
+                            "",
+                        ),
+                        snapshot_reader=read_snapshot,
+                        sleeper=lambda _seconds: self.fail(
+                            "invalid timing must not enter the polling loop"
+                        ),
+                    )
+
+                    self.assertIs(False, baseline["ok"])
+                    self.assertEqual(
+                        "gameplay observation timing is invalid",
+                        baseline["reason"],
+                    )
+                    self.assertEqual(0, reads)
+
 
 def _environment() -> dict[str, object]:
     return {

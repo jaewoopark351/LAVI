@@ -3,6 +3,7 @@ package adris.altoclef.tasksystem;
 import adris.altoclef.Debug;
 import adris.altoclef.tasks.movement.TimeoutWanderTask;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.diagnostics.container.store.deposit.StoreDepositDiagnostics;
 import lavi.minecraft.diagnostics.mining.MiningPathDiagnostics;
 
 import java.util.function.Predicate;
@@ -115,6 +116,16 @@ public abstract class Task {
                         previousChildStopCalled,
                         sub,
                         subTasksEqual);
+                StoreDepositDiagnostics.logChildReconciliation(
+                        this,
+                        activeChildBefore,
+                        newSub,
+                        subTasksEqual,
+                        canInterruptEvaluated,
+                        canInterrupt,
+                        replacementApplied,
+                        previousChildStopCalled,
+                        sub);
 
                 // Run our child
                 if (diagnosticsVerbose) {
@@ -128,7 +139,10 @@ public abstract class Task {
                 }
             } else {
                 // We are null
+                Task activeChildBefore = sub;
                 boolean canInterrupt = sub == null || canBeInterrupted(sub, null);
+                boolean previousChildStopCalled = false;
+                boolean childCleared = false;
                 if (diagnosticsVerbose) {
                     ChatClefDiagnostics.logTaskTransition(this, sub, null, "null_child_result",
                             "canInterruptPreviousChild", canInterrupt);
@@ -138,15 +152,27 @@ public abstract class Task {
                     if (diagnosticsVerbose) {
                         ChatClefDiagnostics.logTaskTransition(this, sub, null, "previous_child_stop_begin");
                     }
+                    previousChildStopCalled = true;
                     sub.stop();
                     if (diagnosticsVerbose) {
                         ChatClefDiagnostics.logTaskTransition(this, sub, null, "previous_child_stop_end");
                     }
                     sub = null;
+                    childCleared = true;
                     if (diagnosticsVerbose) {
                         ChatClefDiagnostics.logTaskTransition(this, null, null, "child_cleared");
                     }
                 }
+                StoreDepositDiagnostics.logChildReconciliation(
+                        this,
+                        activeChildBefore,
+                        null,
+                        activeChildBefore == null,
+                        true,
+                        canInterrupt,
+                        childCleared,
+                        previousChildStopCalled,
+                        sub);
             }
         } finally {
             ChatClefDiagnostics.exitTask(this);
@@ -174,6 +200,7 @@ public abstract class Task {
             }
             return;
         }
+        StoreDepositDiagnostics.logTaskLifecycleBoundary(this, interruptTask, "STOP", "BEGIN", true);
         if (diagnosticsVerbose) {
             ChatClefDiagnostics.logTaskTransition(this, this, interruptTask, "stop_begin");
         }
@@ -198,6 +225,7 @@ public abstract class Task {
         first = true;
         active = false;
         stopped = true;
+        StoreDepositDiagnostics.logTaskLifecycleBoundary(this, interruptTask, "STOP", "END", true);
         if (diagnosticsVerbose) {
             ChatClefDiagnostics.logTaskTransition(this, this, interruptTask, "stop_end");
         }
@@ -223,6 +251,7 @@ public abstract class Task {
             }
             return;
         }
+        StoreDepositDiagnostics.logTaskLifecycleBoundary(this, interruptTask, "INTERRUPT", "BEGIN", true);
         if (diagnosticsVerbose) {
             ChatClefDiagnostics.logTaskTransition(this, this, interruptTask, "interrupt_begin");
         }
@@ -244,6 +273,7 @@ public abstract class Task {
         }
 
         first = true;
+        StoreDepositDiagnostics.logTaskLifecycleBoundary(this, interruptTask, "INTERRUPT", "END", true);
         if (diagnosticsVerbose) {
             ChatClefDiagnostics.logTaskTransition(this, this, interruptTask, "interrupt_end");
         }

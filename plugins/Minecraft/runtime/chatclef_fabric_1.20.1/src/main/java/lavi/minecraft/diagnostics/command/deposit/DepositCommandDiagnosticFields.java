@@ -17,8 +17,9 @@ final class DepositCommandDiagnosticFields {
     static Object[] invocationFields(AltoClef mod,
                                      boolean explicitItemListProvided,
                                      ItemTarget[] selectedItems,
-                                     Task taskToRun) {
-        return new Object[]{
+                                     Task taskToRun,
+                                     Object[] storeDepositFields) {
+        return mergeFields(new Object[]{
                 "diagnosticScope", "deposit_command",
                 "owner", "deposit_command_observer",
                 "mode", "BOUNDARY",
@@ -40,7 +41,7 @@ final class DepositCommandDiagnosticFields {
                 "playerPosition", ChatClefDiagnostics.playerPosition(mod),
                 "threadName", Thread.currentThread().getName(),
                 "callerSummary", callerSummary()
-        };
+        }, storeDepositFields);
     }
 
     private static String callerSummary() {
@@ -70,6 +71,19 @@ final class DepositCommandDiagnosticFields {
                 || className.equals(Thread.class.getName())
                 || className.equals(DepositCommandDiagnosticFields.class.getName())
                 || className.equals(DepositCommandDiagnostics.class.getName());
+    }
+
+    private static Object[] mergeFields(Object[] first, Object[] second) {
+        if (first == null || first.length == 0) {
+            return second == null ? new Object[0] : second;
+        }
+        if (second == null || second.length == 0) {
+            return first;
+        }
+        Object[] merged = new Object[first.length + second.length];
+        System.arraycopy(first, 0, merged, 0, first.length);
+        System.arraycopy(second, 0, merged, first.length, second.length);
+        return merged;
     }
 
     private static String identity(Task task) {

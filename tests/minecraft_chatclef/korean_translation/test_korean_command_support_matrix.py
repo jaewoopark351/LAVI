@@ -1,4 +1,5 @@
 #20260815_kpopmodder: Cover current Korean support and unsupported ChatClef command gaps.
+#20260819_kpopmodder: Lock the approved four-command live GET translations.
 from __future__ import annotations
 
 import unittest
@@ -14,6 +15,9 @@ SUPPORTED_KOREAN_TRANSLATION_CASES = {
         ("다이아몬드 가져와줘", "get diamond 1"),
         ("다이아몬드를 가져와줘", "get diamond 1"),
         ("다이아몬드 캐줘", "get diamond 1"),
+        ("조약돌 1개 캐줘", "get cobblestone 1"),
+        ("석탄 1개 캐와줘", "get coal 1"),
+        ("철 1개 캐줘", "get iron_ingot 1"),
         ("돌 10개 가져와줘", "get stone 10"),
         ("돌을 10개 캐줘", "get stone 10"),
         ("조약돌 10개 캐줘", "get cobblestone 10"),

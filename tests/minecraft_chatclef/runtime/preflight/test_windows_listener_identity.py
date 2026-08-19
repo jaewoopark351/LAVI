@@ -46,6 +46,7 @@ class WindowsListenerIdentityFixtureTests(unittest.TestCase):
                 **payload["processes"][0],
                 "process_id": 4200,
                 "creation_date": "20260818120100.000000+540",
+                "creation_time_utc_ticks": 638911008600000000,
             }
         )
 
@@ -78,8 +79,9 @@ class WindowsListenerIdentityFixtureTests(unittest.TestCase):
                 "parent_process_id": 0,
                 "name": "python.exe",
                 "creation_date": "20260818120100.000000+540",
+                "creation_time_utc_ticks": 638911008600000000,
                 "executable_path": "C:/Vtuber_Souorce_Code/LAVI/venv/Scripts/python.exe",
-                "command_line": "python C:/Vtuber_Souorce_Code/LAVI/main.py",
+                "command_line": "python.exe C:/Vtuber_Souorce_Code/LAVI/main.py",
             }
         )
         result = validate_listener_probe_payload(
@@ -206,6 +208,22 @@ class WindowsListenerIdentityFixtureTests(unittest.TestCase):
         self.assertFalse(result["ok"], result)
         self.assertIn("entrypoint", result["reason"])
 
+    def test_pythonw_entrypoint_fails_even_with_exact_main(self):
+        payload = listener_payload_fixture()
+        process = payload["processes"][0]
+        process["name"] = "pythonw.exe"
+        process["executable_path"] = (
+            "C:/Vtuber_Souorce_Code/LAVI/venv/Scripts/pythonw.exe"
+        )
+        process["command_line"] = (
+            "pythonw.exe C:/Vtuber_Souorce_Code/LAVI/main.py"
+        )
+
+        result = _validate(payload)
+
+        self.assertFalse(result["ok"], result)
+        self.assertIn("entrypoint", result["reason"])
+
     def test_descendant_main_file_is_not_the_repository_entrypoint(self):
         payload = listener_payload_fixture()
         payload["processes"][0]["command_line"] = (
@@ -228,12 +246,13 @@ class WindowsListenerIdentityFixtureTests(unittest.TestCase):
                 self.assertFalse(result["ok"], result)
                 self.assertIn("entrypoint", result["reason"])
 
-    def test_relative_main_with_exact_launcher_ancestor_passes(self):
+    def test_absolute_main_with_exact_launcher_ancestor_is_bound(self):
         payload = listener_payload_fixture()
         owner = payload["processes"][0]
         owner["parent_process_id"] = 4000
         owner["command_line"] = (
-            "C:/Vtuber_Souorce_Code/LAVI/venv/Scripts/python.exe main.py"
+            "C:/Vtuber_Souorce_Code/LAVI/venv/Scripts/python.exe "
+            "C:/Vtuber_Souorce_Code/LAVI/main.py"
         )
         payload["processes"].append(_approved_launcher_process())
 
@@ -242,7 +261,7 @@ class WindowsListenerIdentityFixtureTests(unittest.TestCase):
         self.assertTrue(result["ok"], result)
         observed = result["observed"]
         self.assertEqual(
-            "approved_launcher_relative_script",
+            "exact_repository_script",
             observed["entrypoint_provenance"],
         )
         self.assertEqual(4000, observed["approved_ancestor"]["process_id"])
@@ -263,11 +282,25 @@ class WindowsListenerIdentityFixtureTests(unittest.TestCase):
             observed["approved_ancestor"]["resolved_entrypoint_path"],
         )
 
-    def test_relative_main_with_incomplete_launcher_identity_fails(self):
+    def test_relative_main_with_exact_launcher_ancestor_still_fails(self):
         payload = listener_payload_fixture()
         owner = payload["processes"][0]
         owner["parent_process_id"] = 4000
         owner["command_line"] = "python.exe main.py"
+        payload["processes"].append(_approved_launcher_process())
+
+        result = _validate(payload)
+
+        self.assertFalse(result["ok"], result)
+        self.assertIn("entrypoint", result["reason"])
+
+    def test_relative_main_with_incomplete_launcher_identity_fails(self):
+        payload = listener_payload_fixture()
+        owner = payload["processes"][0]
+        owner["parent_process_id"] = 4000
+        owner["command_line"] = (
+            "python.exe C:/Vtuber_Souorce_Code/LAVI/main.py"
+        )
         launcher = _approved_launcher_process()
         launcher["creation_date"] = ""
         payload["processes"].append(launcher)
@@ -276,6 +309,140 @@ class WindowsListenerIdentityFixtureTests(unittest.TestCase):
 
         self.assertFalse(result["ok"], result)
         self.assertIn("entrypoint", result["reason"])
+
+    def test_absolute_main_with_later_launcher_start_fails(self):
+        payload = listener_payload_fixture()
+        owner = payload["processes"][0]
+        owner["parent_process_id"] = 4000
+        owner["command_line"] = (
+            "python.exe C:/Vtuber_Souorce_Code/LAVI/main.py"
+        )
+        launcher = _approved_launcher_process()
+        launcher["creation_date"] = "20260818120100.000000+540"
+        launcher["creation_time_utc_ticks"] = 638911008600000000
+        payload["processes"].append(launcher)
+
+        result = _validate(payload)
+
+        self.assertFalse(result["ok"], result)
+        self.assertIn("entrypoint", result["reason"])
+
+    def test_absolute_main_with_rogue_cmd_path_fails(self):
+        payload = listener_payload_fixture()
+        owner = payload["processes"][0]
+        owner["parent_process_id"] = 4000
+        owner["command_line"] = (
+            "python.exe C:/Vtuber_Souorce_Code/LAVI/main.py"
+        )
+        launcher = _approved_launcher_process()
+        launcher["executable_path"] = "C:/Temp/cmd.exe"
+        launcher["command_line"] = (
+            '"C:/Temp/cmd.exe" /c '
+            '"C:/Vtuber_Souorce_Code/LAVI/run_lav_dev.cmd"'
+        )
+        payload["processes"].append(launcher)
+
+        result = _validate(payload)
+
+        self.assertFalse(result["ok"], result)
+        self.assertIn("entrypoint", result["reason"])
+
+    def test_absolute_main_with_ordinary_cmd_parent_passes_without_claim(self):
+        payload = listener_payload_fixture()
+        payload["processes"][0]["parent_process_id"] = 4000
+        parent = _approved_launcher_process()
+        parent["command_line"] = "C:/Windows/System32/cmd.exe"
+        payload["processes"].append(parent)
+
+        result = _validate(payload)
+
+        self.assertTrue(result["ok"], result)
+        self.assertIsNone(result["observed"]["approved_ancestor"])
+
+    def test_approved_launcher_rejects_trailing_or_compound_commands(self):
+        for command_line in (
+            "C:/Windows/System32/cmd.exe /c "
+            "C:/Vtuber_Souorce_Code/LAVI/run.bat evil",
+            "C:/Windows/System32/cmd.exe /c "
+            '"C:/Vtuber_Souorce_Code/LAVI/run.bat" & evil',
+        ):
+            with self.subTest(command_line=command_line):
+                payload = listener_payload_fixture()
+                payload["processes"][0]["parent_process_id"] = 4000
+                launcher = _approved_launcher_process()
+                launcher["command_line"] = command_line
+                payload["processes"].append(launcher)
+
+                result = _validate(payload)
+
+                self.assertFalse(result["ok"], result)
+                self.assertIn("entrypoint", result["reason"])
+
+    def test_absolute_main_with_missing_parent_evidence_fails(self):
+        payload = listener_payload_fixture()
+        payload["processes"][0]["parent_process_id"] = 4000
+
+        result = _validate(payload)
+
+        self.assertFalse(result["ok"], result)
+        self.assertIn("entrypoint", result["reason"])
+
+    def test_python_identity_fields_and_argv0_must_agree(self):
+        cases = (
+            (
+                "name_pythonw",
+                "pythonw.exe",
+                "C:/Vtuber_Souorce_Code/LAVI/venv/Scripts/python.exe",
+                "python.exe C:/Vtuber_Souorce_Code/LAVI/main.py",
+            ),
+            (
+                "argv0_pythonw",
+                "python.exe",
+                "C:/Vtuber_Souorce_Code/LAVI/venv/Scripts/python.exe",
+                "pythonw.exe C:/Vtuber_Souorce_Code/LAVI/main.py",
+            ),
+            (
+                "argv0_other_absolute_python",
+                "python.exe",
+                "C:/Vtuber_Souorce_Code/LAVI/venv/Scripts/python.exe",
+                "C:/Temp/python.exe C:/Vtuber_Souorce_Code/LAVI/main.py",
+            ),
+            (
+                "argv0_relative_python_path",
+                "python.exe",
+                "C:/Vtuber_Souorce_Code/LAVI/venv/Scripts/python.exe",
+                "venv/Scripts/python.exe C:/Vtuber_Souorce_Code/LAVI/main.py",
+            ),
+        )
+        for label, name, executable_path, command_line in cases:
+            with self.subTest(label=label):
+                payload = listener_payload_fixture()
+                owner = payload["processes"][0]
+                owner["name"] = name
+                owner["executable_path"] = executable_path
+                owner["command_line"] = command_line
+
+                result = _validate(payload)
+
+                self.assertFalse(result["ok"], result)
+                self.assertIn("entrypoint", result["reason"])
+
+    def test_python_direct_form_rejects_options_and_trailing_arguments(self):
+        entrypoint = "C:/Vtuber_Souorce_Code/LAVI/main.py"
+        for command_line in (
+            f"python.exe -O {entrypoint}",
+            f"python.exe -- {entrypoint}",
+            f"python.exe {entrypoint} extra",
+            f"python.exe {entrypoint} main.py",
+        ):
+            with self.subTest(command_line=command_line):
+                payload = listener_payload_fixture()
+                payload["processes"][0]["command_line"] = command_line
+
+                result = _validate(payload)
+
+                self.assertFalse(result["ok"], result)
+                self.assertIn("entrypoint", result["reason"])
 
     def test_approved_launcher_does_not_approve_an_arbitrary_child_script(self):
         payload = listener_payload_fixture()
@@ -292,10 +459,28 @@ class WindowsListenerIdentityFixtureTests(unittest.TestCase):
         self.assertIn("entrypoint", result["reason"])
 
     def test_required_listener_owner_process_evidence_fails_closed(self):
-        for field in ("executable_path", "creation_date", "command_line"):
+        for field in (
+            "executable_path",
+            "creation_date",
+            "creation_time_utc_ticks",
+            "command_line",
+        ):
             with self.subTest(field=field):
                 payload = listener_payload_fixture()
-                payload["processes"][0][field] = ""
+                payload["processes"][0][field] = (
+                    0 if field == "creation_time_utc_ticks" else ""
+                )
+
+                result = _validate(payload)
+
+                self.assertFalse(result["ok"], result)
+                self.assertIn("entrypoint", result["reason"])
+
+    def test_process_start_ticks_require_a_positive_exact_integer(self):
+        for invalid_value in (None, True, "638911008000000000", 1.0, 0, -1):
+            with self.subTest(invalid_value=invalid_value):
+                payload = listener_payload_fixture()
+                payload["processes"][0]["creation_time_utc_ticks"] = invalid_value
 
                 result = _validate(payload)
 
@@ -319,6 +504,194 @@ class WindowsListenerIdentityFixtureTests(unittest.TestCase):
         self.assertFalse(result["ok"], result)
         self.assertIn("entrypoint", result["reason"])
 
+    def test_unapproved_module_lavi_on_fallback_port_fails(self):
+        for command_line in (
+            "python.exe -m lavi",
+            "python.exe -m lavi.app",
+            "python.exe -mlavi",
+        ):
+            with self.subTest(command_line=command_line):
+                payload = listener_payload_fixture()
+                payload["listeners"].append(
+                    {
+                        "local_address": "127.0.0.1",
+                        "local_port": 47862,
+                        "process_id": 4200,
+                    }
+                )
+                payload["processes"].append(
+                    {
+                        "process_id": 4200,
+                        "parent_process_id": 0,
+                        "name": "python.exe",
+                        "creation_date": "20260818120100.000000+540",
+                        "creation_time_utc_ticks": 638911008600000000,
+                        "executable_path": "C:/Python311/python.exe",
+                        "command_line": command_line,
+                    }
+                )
+
+                result = _validate(payload)
+
+                self.assertFalse(result["ok"], result)
+                self.assertIn("second LAVI", result["reason"])
+
+    def test_pythonw_main_on_fallback_port_fails_as_hidden_candidate(self):
+        payload = listener_payload_fixture()
+        payload["listeners"].append(
+            {
+                "local_address": "127.0.0.1",
+                "local_port": 47862,
+                "process_id": 4200,
+            }
+        )
+        payload["processes"].append(
+            {
+                "process_id": 4200,
+                "parent_process_id": 0,
+                "name": "pythonw.exe",
+                "creation_date": "20260818120100.000000+540",
+                "creation_time_utc_ticks": 638911008600000000,
+                "executable_path": "C:/Python311/pythonw.exe",
+                "command_line": (
+                    "pythonw.exe C:/Vtuber_Souorce_Code/LAVI/main.py"
+                ),
+            }
+        )
+
+        result = _validate(payload)
+
+        self.assertFalse(result["ok"], result)
+        self.assertIn("second LAVI", result["reason"])
+
+    def test_unrelated_python_script_on_fallback_port_is_not_lavi(self):
+        payload = listener_payload_fixture()
+        payload["listeners"].append(
+            {
+                "local_address": "127.0.0.1",
+                "local_port": 47862,
+                "process_id": 4200,
+            }
+        )
+        payload["processes"].append(
+            {
+                "process_id": 4200,
+                "parent_process_id": 0,
+                "name": "python.exe",
+                "creation_date": "20260818120100.000000+540",
+                "creation_time_utc_ticks": 638911008600000000,
+                "executable_path": "C:/Python311/python.exe",
+                "command_line": "python.exe C:/Other/http_server.py",
+            }
+        )
+
+        result = _validate(payload)
+
+        self.assertTrue(result["ok"], result)
+
+    def test_malformed_fallback_python_is_ambiguous_and_fails(self):
+        payload = listener_payload_fixture()
+        payload["listeners"].append(
+            {
+                "local_address": "127.0.0.1",
+                "local_port": 47862,
+                "process_id": 4200,
+            }
+        )
+        payload["processes"].append(
+            {
+                "process_id": 4200,
+                "parent_process_id": 0,
+                "name": "python.exe",
+                "creation_date": "20260818120100.000000+540",
+                "creation_time_utc_ticks": 638911008600000000,
+                "executable_path": "C:/Python311/python.exe",
+                "command_line": "python.exe --unsupported C:/Other/server.py",
+            }
+        )
+
+        result = _validate(payload)
+
+        self.assertFalse(result["ok"], result)
+        self.assertIn("ambiguous", result["reason"])
+
+    def test_malformed_main_candidate_on_fallback_port_fails(self):
+        payload = listener_payload_fixture()
+        payload["listeners"].append(
+            {
+                "local_address": "127.0.0.1",
+                "local_port": 47862,
+                "process_id": 4200,
+            }
+        )
+        payload["processes"].append(
+            {
+                "process_id": 4200,
+                "parent_process_id": 0,
+                "name": "python.exe",
+                "creation_date": "20260818120100.000000+540",
+                "creation_time_utc_ticks": 638911008600000000,
+                "executable_path": "C:/Python311/python.exe",
+                "command_line": "python.exe --unsupported main.py",
+            }
+        )
+
+        result = _validate(payload)
+
+        self.assertFalse(result["ok"], result)
+        self.assertIn("second LAVI", result["reason"])
+
+    def test_fallback_listener_with_missing_process_evidence_fails(self):
+        payload = listener_payload_fixture()
+        payload["listeners"].append(
+            {
+                "local_address": "127.0.0.1",
+                "local_port": 47862,
+                "process_id": 4200,
+            }
+        )
+
+        result = _validate(payload)
+
+        self.assertFalse(result["ok"], result)
+        self.assertIn("ambiguous", result["reason"])
+
+    def test_incomplete_fallback_process_identity_fails_ambiguous(self):
+        base_process = {
+            "process_id": 4200,
+            "parent_process_id": 0,
+            "name": "python.exe",
+            "creation_date": "20260818120100.000000+540",
+            "creation_time_utc_ticks": 638911008600000000,
+            "executable_path": "C:/Python311/python.exe",
+            "command_line": "python.exe C:/Other/server.py",
+        }
+        for field in (
+            "parent_process_id",
+            "name",
+            "creation_date",
+            "creation_time_utc_ticks",
+            "executable_path",
+            "command_line",
+        ):
+            with self.subTest(field=field):
+                payload = listener_payload_fixture()
+                payload["listeners"].append(
+                    {
+                        "local_address": "127.0.0.1",
+                        "local_port": 47862,
+                        "process_id": 4200,
+                    }
+                )
+                process = dict(base_process)
+                process[field] = None
+                payload["processes"].append(process)
+
+                result = _validate(payload)
+
+                self.assertFalse(result["ok"], result)
+                self.assertIn("ambiguous", result["reason"])
+
 
 def _validate(payload, *, repository_root="C:/Vtuber_Souorce_Code/LAVI"):
     return validate_listener_probe_payload(
@@ -339,6 +712,7 @@ def _approved_launcher_process() -> dict[str, object]:
         "parent_process_id": 0,
         "name": "cmd.exe",
         "creation_date": "20260818115900.000000+540",
+        "creation_time_utc_ticks": 638911007400000000,
         "executable_path": "C:/Windows/System32/cmd.exe",
         "command_line": (
             '"C:/Windows/System32/cmd.exe" /c '

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 
+from .batch_advancement_policy import batch_advancement_error
 from .batch_plan_validator import validate_batch_plan
 from .batch_environment_snapshot import batch_environment_snapshot
 from .batch_process_identity import (
@@ -10,8 +11,8 @@ from .batch_process_identity import (
     bind_expected_process_identity,
 )
 from .batch_run_result import append_batch_step, new_batch_run_result
-from .batch_step_gate import batch_step_gate_error
 from .gameplay_checkpoint import apply_batch_gameplay_checkpoint
+from .terminal_checkpoint_gate import terminal_checkpoint_gate_error
 
 
 def run_supervised_live_batch(
@@ -92,7 +93,7 @@ def run_supervised_live_batch(
             )
             return _stop(batch_result, "execution_result_invalid")
         command_result = dict(raw_result)
-        gate_error = batch_step_gate_error(command_result)
+        gate_error = terminal_checkpoint_gate_error(command_result)
         if gate_error:
             append_batch_step(
                 batch_result,
@@ -138,19 +139,24 @@ def run_supervised_live_batch(
         observation = _mapping(command_result.get("observation"))
         checkpoint_result = apply_batch_gameplay_checkpoint(observation, checkpoint)
         command_result["observation"] = observation
-        if not checkpoint_result.get("ok"):
+        advancement_error = batch_advancement_error(
+            command_result,
+            checkpoint_result,
+        )
+        if advancement_error:
             append_batch_step(
                 batch_result,
                 execution_environment,
                 command_result,
                 baseline_status="verified",
-                checkpoint_status="not_verified",
+                checkpoint_status=(
+                    "verified"
+                    if checkpoint_result.get("ok") is True
+                    else "not_verified"
+                ),
                 guard_reconciliation_status="not_attempted",
             )
-            return _stop(
-                batch_result,
-                str(checkpoint_result.get("reason") or "gameplay checkpoint failed"),
-            )
+            return _stop(batch_result, advancement_error)
         try:
             reconciliation = reconcile_guard(execution_environment, command_result)
         except Exception as error:

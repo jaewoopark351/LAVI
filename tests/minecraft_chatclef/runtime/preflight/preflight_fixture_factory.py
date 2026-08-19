@@ -76,6 +76,7 @@ def process_result_fixture(
     process_id: int,
     *,
     creation_date: str = "20260818120000.000000+540",
+    creation_time_utc_ticks: int = 638911008000000000,
     executable_path: str = (
         "c:\\vtuber_souorce_code\\lavi\\venv\\scripts\\python.exe"
     ),
@@ -91,6 +92,7 @@ def process_result_fixture(
         "repository_root": "c:\\vtuber_souorce_code\\lavi",
         "approved_ancestor": None,
         "intended_lavi_creation_date": creation_date,
+        "intended_lavi_creation_time_utc_ticks": creation_time_utc_ticks,
         "intended_lavi_executable_path": executable_path,
     }
     observed["process_identity_fingerprint"] = process_identity_fingerprint(observed)
@@ -156,14 +158,16 @@ def listener_payload_fixture() -> dict[str, list[dict[str, object]]]:
                 "parent_process_id": 0,
                 "name": "python.exe",
                 "creation_date": "20260818120000.000000+540",
+                "creation_time_utc_ticks": 638911008000000000,
                 "executable_path": "C:/Vtuber_Souorce_Code/LAVI/venv/Scripts/python.exe",
-                "command_line": "python C:/Vtuber_Souorce_Code/LAVI/main.py",
+                "command_line": "python.exe C:/Vtuber_Souorce_Code/LAVI/main.py",
             },
             {
                 "process_id": 9999,
                 "parent_process_id": 0,
                 "name": "unrelated.exe",
                 "creation_date": "20260818115900.000000+540",
+                "creation_time_utc_ticks": 638911007400000000,
                 "executable_path": "C:/Other/unrelated.exe",
                 "command_line": "C:/Other/unrelated.exe",
             },

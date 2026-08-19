@@ -267,10 +267,12 @@ class LiveRuntimePreflightTests(unittest.TestCase):
                 process_result_fixture(
                     4100,
                     creation_date="20260818120000.000000+540",
+                    creation_time_utc_ticks=638911008000000000,
                 ),
                 process_result_fixture(
                     4100,
                     creation_date="20260818120100.000000+540",
+                    creation_time_utc_ticks=638911008600000000,
                 ),
             )
         )
@@ -290,6 +292,7 @@ class LiveRuntimePreflightTests(unittest.TestCase):
             "process_id": 4000,
             "parent_process_id": 0,
             "creation_date": "20260818115900.000000+540",
+            "creation_time_utc_ticks": 638911007400000000,
             "executable_path": "c:\\windows\\system32\\cmd.exe",
             "invocation_mode": "cmd_launcher",
             "resolved_entrypoint_path": (

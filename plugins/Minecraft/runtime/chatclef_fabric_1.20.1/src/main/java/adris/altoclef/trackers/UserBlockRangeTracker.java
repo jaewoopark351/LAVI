@@ -8,6 +8,7 @@ import java.util.Set;
 import com.google.common.collect.Streams;
 
 import adris.altoclef.AltoClef;
+import lavi.minecraft.diagnostics.container.store.deposit.StoreDepositDiagnostics;
 import adris.altoclef.util.helpers.BaritoneHelper;
 import adris.altoclef.util.helpers.ItemHelper;
 import net.minecraft.block.Block;
@@ -56,6 +57,9 @@ public class UserBlockRangeTracker extends Tracker {
         // TODO: for some reason we haven't been validating in the world for block tracking... so we do it manually.
         //      would "fixing" it cause problems?
         userBlocks.removeIf(bpos -> {
+            if (bpos == null) {
+                StoreDepositDiagnostics.logUserBlockRangeNullInput(this, null);
+            }
             Block b = AltoClef.getInstance().getWorld().getBlockState(bpos).getBlock();
             return !userIndicatorBlocks.contains(b);
         });

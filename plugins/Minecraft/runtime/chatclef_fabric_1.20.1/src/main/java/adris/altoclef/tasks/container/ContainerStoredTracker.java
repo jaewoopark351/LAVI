@@ -6,6 +6,7 @@ import adris.altoclef.eventbus.Subscription;
 import adris.altoclef.eventbus.events.SlotClickChangedEvent;
 import adris.altoclef.util.ItemTarget;
 import adris.altoclef.util.slots.Slot;
+import lavi.minecraft.diagnostics.container.store.deposit.StoreDepositDiagnostics;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 
@@ -30,9 +31,25 @@ public class ContainerStoredTracker {
     public void startTracking() {
         _slotClickChangedSubscription = EventBus.subscribe(SlotClickChangedEvent.class, evt -> {
             Slot slot = evt.slot;
-            if (!slot.isSlotInPlayerInventory() && _acceptDeposit.test(slot)) {
-                ItemStack before = evt.before;
-                ItemStack after = evt.after;
+            ItemStack before = evt.before;
+            ItemStack after = evt.after;
+            StoreDepositDiagnostics.clearPredicateSnapshot();
+            boolean playerInventorySlot = slot.isSlotInPlayerInventory();
+            boolean acceptPredicateEvaluated = false;
+            boolean acceptPredicateResult = false;
+            if (!playerInventorySlot) {
+                acceptPredicateEvaluated = true;
+                acceptPredicateResult = _acceptDeposit.test(slot);
+            }
+            StoreDepositDiagnostics.logEffectObservation(
+                    this,
+                    slot,
+                    before,
+                    after,
+                    playerInventorySlot,
+                    acceptPredicateEvaluated,
+                    acceptPredicateResult);
+            if (!playerInventorySlot && acceptPredicateResult) {
                 if (before.getItem() != after.getItem()) {
                     // Before has been replaced! We lost before and added all of after.
                     if (!before.isEmpty())

@@ -1,4 +1,5 @@
 <!-- 20260815_kpopmodder: Documented the Python-only plan for ChatClef command replies, Korean mining phrases, and inventory preflight cleanup. -->
+<!-- 20260819_kpopmodder: Recorded the implemented single-pass canonical submission and reconciliation boundary. -->
 
 # ChatClef Python Command Orchestration Plan
 
@@ -938,3 +939,25 @@ After a primary command is accepted, automatic replay of that command is
 forbidden unless a later approved design provides exact remaining quantity or a
 safe idempotent command contract.
 ```
+
+## 2026-08-19 Single-Pass Submission Boundary
+
+The implemented router keeps natural-language translation separate from
+submission. It translates once, classifies the validated result, checks runtime
+readiness, and passes the same translation into exactly one submit call. DTO
+revalidation may recompile the supplied DSL at a trust boundary; that is
+validation, not a second natural-language translation.
+
+Untrusted submit responses are normalized through one shared Python
+canonicalizer used by the ordinary router and one-shot test boundary. Canonical
+output always carries the same request ID at the top level and in nested status.
+Malformed mirrors, non-bool success flags, mismatched request IDs, missing nested
+status, or contradictory outcome/error combinations become UNKNOWN with
+reconciliation required. No string or numeric value is coerced into a bool.
+
+UNKNOWN ownership is latched before another Minecraft route may translate or
+submit. It is cleared only through explicit validation of matching terminal
+evidence from a trusted Fabric status snapshot. The first later route may perform
+that read-only reconciliation, but its triggering command is never translated
+or submitted even when reconciliation succeeds; a fresh explicit command is
+required. There is no automatic replay, rerun, retry, or inference of success.

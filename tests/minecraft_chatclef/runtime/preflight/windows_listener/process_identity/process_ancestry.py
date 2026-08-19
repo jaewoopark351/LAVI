@@ -4,13 +4,15 @@ from __future__ import annotations
 import ntpath
 from typing import Mapping
 
+from .approved_launcher_ancestry import find_approved_launcher_ancestor
 from .entrypoint_provenance import (
-    inspect_approved_launcher,
     inspect_script_operand,
     normalize_windows_path,
     normalized_repository_root,
 )
 from .process_identity_key import process_identity_fingerprint
+from .process_evidence import process_evidence_error
+from .process_start_time import process_start_time_utc_ticks
 from .python_invocation import inspect_python_invocation
 
 
@@ -29,19 +31,25 @@ def inspect_approved_process_identity(
     if not owner_identity.get("ok"):
         return _failure(str(owner_identity.get("reason") or "owner identity is invalid"))
     invocation = inspect_python_invocation(owner)
-    if not invocation.get("ok") or invocation.get("mode") != "python_script":
+    if (
+        not invocation.get("ok")
+        or invocation.get("mode") != "python_script"
+        or invocation.get("executable_name") != "python.exe"
+        or invocation.get("strict_script_form") is not True
+    ):
         return _failure("listener owner is not an approved Python script entrypoint")
     script = inspect_script_operand(invocation.get("operand"), root)
     if not script.get("ok"):
         return _failure(str(script.get("reason") or "script entrypoint is invalid"))
 
-    approved_ancestor = _approved_launcher_ancestor(
+    approved_ancestor, ancestry_error = find_approved_launcher_ancestor(
         _parent_process_id(owner),
         processes,
         root,
+        owner,
     )
-    if script.get("relative") and approved_ancestor is None:
-        return _failure("relative main.py lacks approved launcher entrypoint provenance")
+    if ancestry_error:
+        return _failure(f"listener ancestor identity is invalid: {ancestry_error}")
 
     observed = {
         **dict(owner_identity["observed"]),
@@ -68,14 +76,22 @@ def _owner_identity(
     process: Mapping[str, object],
     expected_process_id: int,
 ) -> dict[str, object]:
+    evidence_error = process_evidence_error(
+        process,
+        expected_process_id=expected_process_id,
+    )
+    if evidence_error:
+        return _failure(f"listener owner identity evidence is incomplete: {evidence_error}")
     process_id = _process_id(process.get("process_id"))
     parent_process_id = _parent_process_id(process)
     creation_date = _required_text(process.get("creation_date"))
+    creation_time_utc_ticks = process_start_time_utc_ticks(process)
     executable_path = normalize_windows_path(process.get("executable_path"))
     if (
         process_id != expected_process_id
         or parent_process_id < 0
         or not creation_date
+        or creation_time_utc_ticks is None
         or not executable_path
         or not ntpath.isabs(executable_path)
     ):
@@ -86,40 +102,19 @@ def _owner_identity(
             "intended_lavi_pid": process_id,
             "intended_lavi_parent_process_id": parent_process_id,
             "intended_lavi_creation_date": creation_date,
+            "intended_lavi_creation_time_utc_ticks": creation_time_utc_ticks,
             "intended_lavi_executable_path": executable_path,
         },
     }
 
 
-def _approved_launcher_ancestor(
-    first_parent_id: int,
-    processes: Mapping[int, Mapping[str, object]],
-    repository_root: str,
-) -> dict[str, object] | None:
-    current = first_parent_id
-    seen: set[int] = set()
-    for _depth in range(10):
-        if current <= 0 or current in seen:
-            return None
-        seen.add(current)
-        process = processes.get(current)
-        if process is None or _process_id(process.get("process_id")) != current:
-            return None
-        launcher = inspect_approved_launcher(process, repository_root)
-        if launcher.get("ok"):
-            observed = launcher.get("observed")
-            return dict(observed) if isinstance(observed, Mapping) else None
-        current = _parent_process_id(process)
-    return None
+def _parent_process_id(process: Mapping[str, object]) -> int:
+    value = process.get("parent_process_id")
+    return value if type(value) is int and value >= 0 else -1
 
 
 def _process_id(value: object) -> int:
     return value if type(value) is int and value > 0 else -1
-
-
-def _parent_process_id(process: Mapping[str, object]) -> int:
-    value = process.get("parent_process_id")
-    return value if type(value) is int and value >= 0 else -1
 
 
 def _required_text(value: object) -> str:

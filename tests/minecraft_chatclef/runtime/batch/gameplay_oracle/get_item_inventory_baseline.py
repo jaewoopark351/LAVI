@@ -5,6 +5,7 @@ import time
 from collections.abc import Callable, Mapping
 from pathlib import Path
 
+from .finite_positive_timing import finite_positive_seconds
 from .player_data_path_resolver import resolve_player_data_path
 from .player_inventory_snapshot import read_stable_player_inventory_snapshot
 
@@ -32,11 +33,15 @@ def capture_get_item_inventory_baseline(
     if path_error or player_data_path is None:
         return _failure(path_error or "playerdata path is unavailable")
 
-    timeout_sec = _positive_number(
+    timeout_sec = finite_positive_seconds(
         environment.get("gameplay_observation_timeout_sec")
     )
-    poll_sec = _positive_number(environment.get("gameplay_observation_poll_sec"))
-    max_age_sec = _positive_number(environment.get("gameplay_snapshot_max_age_sec"))
+    poll_sec = finite_positive_seconds(
+        environment.get("gameplay_observation_poll_sec")
+    )
+    max_age_sec = finite_positive_seconds(
+        environment.get("gameplay_snapshot_max_age_sec")
+    )
     if timeout_sec is None or poll_sec is None or max_age_sec is None:
         return _failure("gameplay observation timing is invalid")
     collection_started_ns = wall_clock_ns()
@@ -80,16 +85,6 @@ def _item_count(counts: Mapping[object, object], item_id: str) -> int:
     if not isinstance(value, int) or value < 0:
         raise ValueError("target item count is invalid")
     return value
-
-
-def _positive_number(value: object) -> float | None:
-    if isinstance(value, bool):
-        return None
-    try:
-        parsed = float(value)
-    except (TypeError, ValueError):
-        return None
-    return parsed if parsed > 0 else None
 
 
 def _failure(reason: str) -> dict[str, object]:

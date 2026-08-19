@@ -8,18 +8,19 @@ from .batch_step_gate import batch_step_gate_error
 
 
 class BatchStepGateTests(unittest.TestCase):
-    def test_completed_same_snapshot_result_may_advance(self):
+    def test_completed_same_snapshot_result_may_reach_checkpoint(self):
         self.assertEqual(
             "",
             batch_step_gate_error(completed_command_result_fixture()),
         )
 
-    def test_runtime_completed_flag_cannot_override_failed_terminal(self):
+    def test_matching_failed_terminal_may_reach_read_only_checkpoint(self):
         result = completed_command_result_fixture()
         result["observation"]["terminal_status"] = "failed"
+        result["observation"]["runtime_reported_completion"] = False
 
         self.assertEqual(
-            "terminal_status_not_completed",
+            "",
             batch_step_gate_error(result),
         )
 
@@ -29,6 +30,15 @@ class BatchStepGateTests(unittest.TestCase):
 
         self.assertEqual(
             "automatic_resubmit_violation",
+            batch_step_gate_error(result),
+        )
+
+    def test_automatic_rerun_is_never_allowed_to_reach_checkpoint(self):
+        result = completed_command_result_fixture()
+        result["observation"]["automatic_rerun_count"] = 1
+
+        self.assertEqual(
+            "automatic_rerun_violation",
             batch_step_gate_error(result),
         )
 
@@ -74,6 +84,23 @@ class BatchStepGateTests(unittest.TestCase):
             "process_identity_not_verified",
             batch_step_gate_error(result),
         )
+
+    def test_timeout_flag_must_be_exact_false(self):
+        result = completed_command_result_fixture()
+        result["observation"]["observer_timeout"] = "false"
+
+        self.assertEqual("observer_timeout", batch_step_gate_error(result))
+
+    def test_terminal_status_must_be_an_exact_known_terminal_value(self):
+        for value in ("accepted", ["completed"], True):
+            with self.subTest(value=value):
+                result = completed_command_result_fixture()
+                result["observation"]["terminal_status"] = value
+
+                self.assertEqual(
+                    "terminal_status_invalid",
+                    batch_step_gate_error(result),
+                )
 
 
 if __name__ == "__main__":

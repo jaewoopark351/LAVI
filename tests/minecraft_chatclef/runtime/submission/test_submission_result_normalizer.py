@@ -23,7 +23,14 @@ class SubmissionResultNormalizerTests(unittest.TestCase):
             expected_request_id="request-1",
         )
 
-        self.assertEqual(payload, normalized)
+        expected = copy.deepcopy(payload)
+        expected["request_id"] = "request-1"
+        self.assertEqual(expected, normalized)
+        self.assertNotIn("request_id", payload)
+        self.assertEqual(
+            normalized["request_id"],
+            normalized["status"]["request_id"],
+        )
         self.assertIsNot(payload, normalized)
         self.assertIsNot(payload["status"], normalized["status"])
         self.assertIsNot(payload["status"]["data"], normalized["status"]["data"])
@@ -57,8 +64,16 @@ class SubmissionResultNormalizerTests(unittest.TestCase):
 
         self.assertEqual("rejected", rejected["status"]["status"])
         self.assertFalse(rejected["ok"])
+        self.assertEqual(
+            rejected["request_id"],
+            rejected["status"]["request_id"],
+        )
         self.assertEqual("unknown", unknown["status"]["status"])
         self.assertTrue(unknown["details"]["reconciliation_required"])
+        self.assertEqual(
+            unknown["request_id"],
+            unknown["status"]["request_id"],
+        )
 
     def test_outer_and_nested_boolean_contradictions_are_unknown(self):
         cases = {}
@@ -123,7 +138,35 @@ class SubmissionResultNormalizerTests(unittest.TestCase):
             expected_request_id="request-2",
         )
         self.assertEqual("unknown", result["status"]["status"])
+        self.assertEqual("request-2", result["request_id"])
         self.assertEqual("request-2", result["status"]["request_id"])
+
+    def test_matching_raw_outer_request_identity_remains_valid(self):
+        payload = _submit_payload()
+        payload["request_id"] = "request-1"
+
+        result = self.normalizer.normalize(
+            payload,
+            expected_request_id="request-1",
+        )
+
+        self.assertTrue(result["ok"])
+        self.assertEqual("request-1", result["request_id"])
+        self.assertEqual("request-1", result["status"]["request_id"])
+
+    def test_untrusted_mirror_mismatch_does_not_guess_identity(self):
+        payload = _submit_payload(request_id="nested-request")
+        payload["request_id"] = "outer-request"
+
+        result = self.normalizer.normalize(
+            payload,
+            expected_request_id=None,
+        )
+
+        self.assertEqual("unknown", result["status"]["status"])
+        self.assertEqual("", result["request_id"])
+        self.assertEqual("", result["status"]["request_id"])
+        self.assertTrue(result["details"]["reconciliation_required"])
 
     def test_error_message_and_details_mirror_mismatches_are_unknown(self):
         error_mismatch = _submit_payload(
@@ -196,6 +239,7 @@ class SubmissionResultNormalizerTests(unittest.TestCase):
         )
 
         self.assertEqual("runtime-generated", normalized["status"]["request_id"])
+        self.assertEqual("runtime-generated", normalized["request_id"])
         self.assertEqual("accepted", normalized["status"]["status"])
 
     def _assert_unknown(self, payload):
@@ -204,6 +248,10 @@ class SubmissionResultNormalizerTests(unittest.TestCase):
             expected_request_id="request-1",
         )
         self.assertFalse(normalized["ok"])
+        self.assertEqual(
+            normalized["request_id"],
+            normalized["status"]["request_id"],
+        )
         self.assertEqual("unknown", normalized["status"]["status"])
         self.assertFalse(normalized["status"]["ok"])
         self.assertEqual("internal_error", normalized["status"]["error_code"])

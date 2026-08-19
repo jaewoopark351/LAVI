@@ -5,6 +5,7 @@ import adris.altoclef.tasks.container.ContainerStoredTracker;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.ItemTarget;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.diagnostics.container.store.deposit.StoreDepositDiagnostics;
 import net.minecraft.util.math.BlockPos;
 
 //20260807_kpopmodder: Observe StoreInAnyContainerTask origin and progress without changing storage behavior.
@@ -21,6 +22,7 @@ public final class StoreInAnyContainerDiagnostics {
         if (!ChatClefDiagnostics.isBoundaryEnabled()) {
             return;
         }
+        Object[] storeDepositFields = StoreDepositDiagnostics.onStoreRootStart(task, getIfNotPresent, toStore);
         ChatClefDiagnostics.logBoundary("STORE_IN_ANY_CONTAINER_START",
                 "store_in_any_container_start",
                 task,
@@ -30,7 +32,7 @@ public final class StoreInAnyContainerDiagnostics {
                                 task,
                                 getIfNotPresent,
                                 toStore,
-                                null
+                                storeDepositFields
                         )));
     }
 
@@ -41,6 +43,10 @@ public final class StoreInAnyContainerDiagnostics {
         if (!ChatClefDiagnostics.isBoundaryEnabled()) {
             return;
         }
+        Object[] storeDepositFields = StoreDepositDiagnostics.onStoreRootStopCallback(task, interruptTask);
+        Object[] stopFields = mergeFields(new Object[]{
+                "interruptTask", ChatClefDiagnostics.taskSummaryForDiagnosticLog(interruptTask)
+        }, storeDepositFields);
         ChatClefDiagnostics.logBoundary("STORE_IN_ANY_CONTAINER_STOP",
                 "store_in_any_container_stop",
                 task,
@@ -50,9 +56,7 @@ public final class StoreInAnyContainerDiagnostics {
                                 task,
                                 getIfNotPresent,
                                 toStore,
-                                new Object[]{
-                                        "interruptTask", ChatClefDiagnostics.taskSummaryForDiagnosticLog(interruptTask)
-                                }
+                                stopFields
                         )));
     }
 
@@ -146,5 +150,18 @@ public final class StoreInAnyContainerDiagnostics {
                                 decision.suppressedRepeatCount(),
                                 branchFields
                         )));
+    }
+
+    private static Object[] mergeFields(Object[] first, Object[] second) {
+        if (first == null || first.length == 0) {
+            return second == null ? new Object[0] : second;
+        }
+        if (second == null || second.length == 0) {
+            return first;
+        }
+        Object[] merged = new Object[first.length + second.length];
+        System.arraycopy(first, 0, merged, 0, first.length);
+        System.arraycopy(second, 0, merged, first.length, second.length);
+        return merged;
     }
 }

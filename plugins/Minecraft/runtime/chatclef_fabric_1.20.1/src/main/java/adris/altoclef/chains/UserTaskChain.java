@@ -8,6 +8,7 @@ import adris.altoclef.tasksystem.Task;
 import adris.altoclef.tasksystem.TaskRunner;
 import adris.altoclef.util.time.Stopwatch;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.diagnostics.container.store.deposit.StoreDepositDiagnostics;
 import lavi.minecraft.diagnostics.tasktrace.UserTaskChainDiagnostics;
 import lavi.minecraft.diagnostics.tasktrace.userchain.UserTaskChainDiagnosticLedger;
 import lavi.minecraft.diagnostics.tasktrace.userchain.UserTaskChainDiagnosticLedger.CancelInvocation;
@@ -77,6 +78,7 @@ public class UserTaskChain extends SingleTaskChain {
                         cancelInvocation.beforeStopFields()));
         if (mainTask != null && mainTask.isActive()) {
             diagnosticLedger.markCancelWillCallOnTaskFinish(cancelInvocation);
+            StoreDepositDiagnostics.markExplicitCancelCandidate(mainTask);
             ChatClefDiagnostics.logLifecycleBoundary("USER_TASK_CHAIN_CANCEL_STOP_BEGIN", "user_task_chain_cancel_stop_begin", mainTask,
                     UserTaskChainDiagnostics.withOriginAndCommandContext(mod, mainTask, null, runningIdleTask, nextTaskIdleFlag,
                             "chain", ChatClefDiagnostics.chainNameForDiagnosticLog(this),

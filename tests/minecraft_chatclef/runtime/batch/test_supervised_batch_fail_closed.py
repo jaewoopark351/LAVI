@@ -63,8 +63,22 @@ class SupervisedBatchFailClosedTests(unittest.TestCase):
 
         self.assertEqual("submission_not_accepted", result["stop_reason"])
         self.assertEqual(1, calls.execution_count)
+        self.assertEqual(0, calls.checkpoint_count)
+        self.assertEqual(0, calls.reconciliation_count)
         self.assertEqual(0, result["automatic_retry_count"])
         self.assertEqual(0, result["automatic_replay_count"])
+
+    def test_request_mismatch_stops_without_gameplay_checkpoint(self):
+        result_fixture = completed_command_result_fixture()
+        result_fixture["observation"]["terminal_request_id"] = "request-2"
+        calls = _BatchCalls(result_fixture)
+
+        result = self._run(calls)
+
+        self.assertEqual("terminal_request_id_mismatch", result["stop_reason"])
+        self.assertEqual(1, calls.execution_count)
+        self.assertEqual(0, calls.checkpoint_count)
+        self.assertEqual(0, calls.reconciliation_count)
 
     def test_malformed_submit_counts_stop_before_gameplay_checkpoint(self):
         cases = (
@@ -161,19 +175,46 @@ class SupervisedBatchFailClosedTests(unittest.TestCase):
         self.assertEqual(1, calls.execution_count)
         self.assertEqual(1, calls.reconciliation_count)
 
-    def test_failed_terminal_stops_before_gameplay_checkpoint(self):
-        result_fixture = completed_command_result_fixture()
-        observation = result_fixture["observation"]
-        observation["terminal_status"] = "failed"
-        observation["runtime_reported_completion"] = False
-        calls = _BatchCalls(result_fixture)
+    def test_non_completed_terminal_records_effects_then_stops(self):
+        checkpoint = {
+            "reason": "partial and unexpected effects observed",
+            "gameplay_observation_complete": True,
+            "gameplay_effect_observed": True,
+            "expected_gameplay_effect_verified": False,
+            "partial_gameplay_effect_observed": True,
+            "unexpected_effect_observed": True,
+            "prohibited_effect_absence_verified": False,
+        }
+        for terminal_status in (
+            "failed",
+            "cancelled",
+            "deadline_exceeded",
+            "unknown",
+        ):
+            with self.subTest(terminal_status=terminal_status):
+                result_fixture = completed_command_result_fixture()
+                observation = result_fixture["observation"]
+                observation["terminal_status"] = terminal_status
+                observation["runtime_reported_completion"] = False
+                calls = _BatchCalls(result_fixture, checkpoint=checkpoint)
 
-        result = self._run(calls)
+                result = self._run(calls)
 
-        self.assertEqual("stopped", result["status"])
-        self.assertEqual("terminal_status_not_completed", result["stop_reason"])
-        self.assertEqual(1, calls.execution_count)
-        self.assertEqual(0, calls.checkpoint_count)
+                self.assertEqual("stopped", result["status"])
+                self.assertEqual(
+                    "terminal_status_not_completed",
+                    result["stop_reason"],
+                )
+                self.assertEqual(1, calls.execution_count)
+                self.assertEqual(1, calls.checkpoint_count)
+                self.assertEqual(0, calls.reconciliation_count)
+                step = result["steps"][0]
+                self.assertIs(True, step["partial_gameplay_effect_observed"])
+                self.assertIs(True, step["unexpected_effect_observed"])
+                self.assertIs(
+                    False,
+                    step["prohibited_effect_absence_verified"],
+                )
 
     def test_non_same_snapshot_clear_stops_before_next_command(self):
         result_fixture = completed_command_result_fixture()

@@ -3,6 +3,7 @@
 <!-- 20260818_kpopmodder: Added the post-restore live-test addendum and corrected request-correlation versus environment-preflight status. -->
 <!-- 20260818_kpopmodder: Bound live status to audited baseline 4239c23 and added approval, no-replay, and end-to-end observation blockers. -->
 <!-- 20260818_kpopmodder: Added gameplay observation completeness and verified expected/partial/prohibited effect merge criteria. -->
+<!-- 20260819_kpopmodder: Recorded strict listener identity, canonical submission reconciliation, and split batch advancement gates. -->
 
 # ChatClef Korean Post-Review Merge Blockers
 
@@ -533,22 +534,36 @@ the reviewed work within LAVI-owned Python and offline tests:
 
 ```text
 P1: parse the actual Windows Python invocation and require exact entrypoint
-    provenance; bind PID/start time/executable/invocation/resolved entrypoint/
-    repository root/approved ancestor in the pre-submit identity recheck
+    provenance; bind PID/numeric UTC start time/executable/invocation/resolved
+    entrypoint/repository root/approved ancestor in the pre-submit identity
+    recheck; reject hidden pythonw and ambiguous fallback LAVI candidates
 P2: canonicalize outer and nested submit-result mirrors and convert every
-    malformed or contradictory result to UNKNOWN + reconciliation required
+    malformed or contradictory result to UNKNOWN + reconciliation required;
+    the canonical top-level and nested request IDs are always identical
 P2: exercise a real delayed asyncio send so timeout ownership, no second wire
     request, late first delivery, and clean teardown are proven
+P2: keep router-level UNKNOWN ownership latched until matching validated
+    terminal evidence is explicitly reconciled
+P2: separate terminal/checkpoint admission from batch advancement and reject
+    non-finite gameplay polling time values before any polling loop
 ```
 
-Direct `python <absolute repository root>\main.py` is the only direct script
-form approved without launcher evidence. Relative `main.py` requires exact
-approved launcher provenance. `-c`, descendant or other-checkout `main.py`, and
-`-m lavi` without a resolved module path fail closed.
+The only approved script operand is exact absolute
+`python.exe <repository root>\main.py`. Relative `main.py` remains rejected even
+when an approved launcher ancestor is visible; that ancestor is identity
+evidence, not an exemption from the exact entrypoint rule. `pythonw.exe`, `-c`,
+descendant or other-checkout `main.py`, and `-m lavi` without resolved module
+provenance fail closed. A confirmed or ambiguous second LAVI candidate in the
+fallback range also fails closed, while a structurally unrelated Python script
+does not.
 
 The default saved-target-inventory GET oracle remains intentionally incomplete.
 It stops a real batch at the first gameplay checkpoint; fixture-driven
-four-command completion is orchestration evidence only. This addendum does not
-authorize Java, ChatClef/AltoClef, DTO, wire-payload, live Minecraft, commit, or
-push changes. Passing the local offline suite closes these implementation gaps
-but does not replace a final read-only merge review.
+four-command completion is orchestration evidence only. A safely correlated
+non-completed terminal may run the bounded read-only checkpoint to record
+partial or unexpected effects, but it can never advance the batch. Submission
+UNKNOWN, request mismatch, timeout, duplicate-submit evidence, or uncleared
+active ownership stops before that checkpoint. This addendum does not authorize
+Java, ChatClef/AltoClef, DTO, wire-payload, live Minecraft, commit, or push
+changes. Passing the local offline suite closes these implementation gaps but
+does not replace a final read-only merge review.

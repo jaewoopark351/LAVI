@@ -5,6 +5,7 @@ import adris.altoclef.tasks.movement.TimeoutWanderTask;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.helpers.WorldHelper;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.diagnostics.container.store.deposit.StoreDepositDiagnostics;
 import net.minecraft.entity.Entity;
 import net.minecraft.util.math.Vec3d;
 
@@ -166,6 +167,7 @@ public abstract class AbstractDoToClosestObjectTask<T> extends Task {
 
         if (currentlyPursuing != null) {
             goalTask = getGoalTask(currentlyPursuing);
+            StoreDepositDiagnostics.logPursuitDecision(this, currentlyPursuing, checkNewClosest.orElse(null), "INVOKE_GOAL_CALLBACK");
             ChatClefDiagnostics.logEvent("CLOSEST_OBJECT", "DECISION", "return_goal_task", this,
                     "currentlyPursuing", objectSummary(mod, currentlyPursuing),
                     "goalTask", ChatClefDiagnostics.taskSummary(goalTask));
@@ -178,12 +180,14 @@ public abstract class AbstractDoToClosestObjectTask<T> extends Task {
         if (checkNewClosest.isEmpty()) {
             setDebugState("Waiting for calculations I think (wandering)");
             wasWandering = true;
+            StoreDepositDiagnostics.logPursuitDecision(this, currentlyPursuing, null, "RETURN_WANDER_TASK_NO_CANDIDATE");
             ChatClefDiagnostics.logEvent("CLOSEST_OBJECT", "DECISION", "return_wander_task_no_candidate", this,
                     "heuristicCacheSize", heuristicMap.size());
             return getWanderTask(mod);
         }
 
         setDebugState("Waiting for calculations I think (NOT wandering)");
+        StoreDepositDiagnostics.logPursuitDecision(this, currentlyPursuing, checkNewClosest.orElse(null), "RETURN_NULL_WAIT");
         ChatClefDiagnostics.logEvent("CLOSEST_OBJECT", "DECISION", "return_null_candidate_wait", this,
                 "candidate", checkNewClosest.map(candidate -> objectSummary(mod, candidate)).orElse("none"));
         return null;

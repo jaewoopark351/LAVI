@@ -4,10 +4,12 @@ from __future__ import annotations
 import ntpath
 from typing import Mapping
 
+from .process_start_time import process_start_time_utc_ticks
 from .windows_command_line import parse_windows_command_line
 
 
 APPROVED_LAUNCHERS = ("run.bat", "run_lav_dev.cmd")
+APPROVED_COMMAND_PROCESSOR_PATHS = (r"C:\Windows\System32\cmd.exe",)
 
 
 def normalize_windows_path(value: object) -> str:
@@ -21,6 +23,15 @@ def normalized_repository_root(value: object) -> str:
     return root if root and ntpath.isabs(root) else ""
 
 
+def is_approved_command_processor_path(value: object) -> bool:
+    path = normalize_windows_path(value)
+    approved = {
+        normalize_windows_path(candidate)
+        for candidate in APPROVED_COMMAND_PROCESSOR_PATHS
+    }
+    return bool(path) and path in approved
+
+
 def inspect_script_operand(operand: object, repository_root: str) -> dict[str, object]:
     if type(operand) is not str or not operand.strip():
         return _failure("script operand is missing")
@@ -32,18 +43,10 @@ def inspect_script_operand(operand: object, repository_root: str) -> dict[str, o
             return _failure("script operand is not the exact repository entrypoint")
         return {
             "ok": True,
-            "relative": False,
             "resolved_entrypoint_path": expected,
             "entrypoint_provenance": "exact_repository_script",
         }
-    if normalize_windows_path(cleaned) != "main.py":
-        return _failure("relative script operand is not main.py")
-    return {
-        "ok": True,
-        "relative": True,
-        "resolved_entrypoint_path": expected,
-        "entrypoint_provenance": "approved_launcher_relative_script",
-    }
+    return _failure("script operand is not an exact absolute repository entrypoint")
 
 
 def inspect_approved_launcher(
@@ -53,21 +56,26 @@ def inspect_approved_launcher(
     process_id = _exact_process_id(process.get("process_id"))
     parent_process_id = _exact_parent_process_id(process.get("parent_process_id"))
     creation_date = _required_text(process.get("creation_date"))
+    creation_time_utc_ticks = process_start_time_utc_ticks(process)
     executable_path = normalize_windows_path(process.get("executable_path"))
     if (
         process_id <= 0
         or parent_process_id < 0
         or not creation_date
+        or creation_time_utc_ticks is None
         or not executable_path
         or not ntpath.isabs(executable_path)
-        or ntpath.basename(executable_path).lower() not in {"cmd", "cmd.exe"}
+        or not is_approved_command_processor_path(executable_path)
     ):
         return _failure("launcher process identity is incomplete")
     arguments = parse_windows_command_line(process.get("command_line"))
-    if not arguments or ntpath.basename(arguments[0]).lower() not in {"cmd", "cmd.exe"}:
+    if (
+        not arguments
+        or normalize_windows_path(arguments[0]) != executable_path
+    ):
         return _failure("launcher command line is unavailable or malformed")
     command_index = _cmd_command_index(arguments)
-    if command_index < 0 or command_index >= len(arguments):
+    if command_index < 0 or command_index != len(arguments) - 1:
         return _failure("launcher is not the cmd command operand")
     launcher_path = normalize_windows_path(arguments[command_index])
     approved_paths = {
@@ -81,6 +89,7 @@ def inspect_approved_launcher(
             "process_id": process_id,
             "parent_process_id": parent_process_id,
             "creation_date": creation_date,
+            "creation_time_utc_ticks": creation_time_utc_ticks,
             "executable_path": executable_path,
             "invocation_mode": "cmd_launcher",
             "resolved_entrypoint_path": launcher_path,

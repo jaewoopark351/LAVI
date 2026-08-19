@@ -1,7 +1,9 @@
 #20260818_kpopmodder: Lock fail-closed router status checks and the single-pass submit boundary.
 #20260819_kpopmodder: Prove contradictory result mirrors remain unknown without resubmission.
+#20260819_kpopmodder: Prove UNKNOWN latching and matching terminal reconciliation.
 from __future__ import annotations
 
+import threading
 import unittest
 
 from plugins.Minecraft.fabric.chatclef.input import MinecraftChatClefInputRouter
@@ -154,6 +156,177 @@ class RouterSubmissionPrecheckTests(unittest.TestCase):
         self.assertTrue(decision.result["details"]["reconciliation_required"])
         self.assertEqual(1, len(extension.submitted))
 
+    def test_malformed_or_raising_submit_latches_before_a_second_route(self):
+        extensions = {
+            "malformed": _MalformedSubmitResultExtension(
+                status_behavior=_bridge_status()
+            ),
+            "exception": _SubmitExceptionExtension(
+                status_behavior=_bridge_status()
+            ),
+        }
+
+        for name, extension in extensions.items():
+            with self.subTest(name=name):
+                router = MinecraftChatClefInputRouter(
+                    extension=extension,
+                    log_callback=lambda _message: None,
+                )
+
+                first = router.route("다이아몬드 캐줘")
+                second = router.route("석탄 1개 캐와줘")
+
+                self.assertEqual(
+                    "minecraft_submission_outcome_unknown",
+                    first.reason,
+                )
+                self.assertEqual(
+                    "minecraft_submission_outcome_unknown",
+                    second.reason,
+                )
+                self.assertEqual(1, len(extension.submitted))
+                self.assertEqual(1, extension.translate_calls)
+                self.assertEqual(
+                    first.result["request_id"],
+                    first.result["status"]["request_id"],
+                )
+                self.assertEqual(
+                    first.result["request_id"],
+                    second.result["request_id"],
+                )
+
+    def test_only_matching_terminal_reconciliation_clears_unknown_latch(self):
+        extension = _MalformedSubmitResultExtension(
+            status_behavior=_bridge_status()
+        )
+        router = MinecraftChatClefInputRouter(
+            extension=extension,
+            log_callback=lambda _message: None,
+        )
+        first = router.route("다이아몬드 캐줘")
+        request_id = first.result["request_id"]
+        self.assertEqual(
+            request_id,
+            router.submission_reconciliation.pending_request_id,
+        )
+
+        accepted = _submit_result_payload(
+            request_id=request_id,
+            status="accepted",
+            ok=True,
+        )
+        mismatched_terminal = _submit_result_payload(
+            request_id="different-request",
+            status="completed",
+            ok=True,
+        )
+
+        extension.status_behavior = _bridge_status(
+            commands={
+                "active_request_id": None,
+                "last_result": accepted["status"],
+            }
+        )
+        self.assertFalse(router.submission_reconciliation.reconcile())
+        extension.status_behavior = _bridge_status(
+            commands={
+                "active_request_id": request_id,
+                "last_result": _submit_result_payload(
+                    request_id=request_id,
+                    status="completed",
+                    ok=True,
+                )["status"],
+            }
+        )
+        self.assertFalse(router.submission_reconciliation.reconcile())
+        extension.status_behavior = _bridge_status(
+            commands={
+                "active_request_id": None,
+                "last_result": mismatched_terminal["status"],
+            }
+        )
+        self.assertFalse(router.submission_reconciliation.reconcile())
+        blocked = router.route("석탄 1개 캐와줘")
+        self.assertEqual("minecraft_submission_outcome_unknown", blocked.reason)
+        self.assertEqual(1, len(extension.submitted))
+        self.assertEqual(
+            request_id,
+            router.submission_reconciliation.pending_request_id,
+        )
+
+        completed = _submit_result_payload(
+            request_id=request_id,
+            status="completed",
+            ok=True,
+        )
+        extension.status_behavior = _bridge_status(
+            commands={
+                "active_request_id": None,
+                "last_result": completed["status"],
+            }
+        )
+        reconciliation = router.route("석탄 1개 캐와줘")
+        self.assertEqual(
+            "minecraft_submission_reconciled_command_not_submitted",
+            reconciliation.reason,
+        )
+        self.assertFalse(
+            reconciliation.result["details"]["current_command_submitted"]
+        )
+        self.assertEqual(1, len(extension.submitted))
+        self.assertEqual(1, extension.translate_calls)
+        self.assertIsNone(
+            router.submission_reconciliation.pending_request_id
+        )
+
+        router.route("석탄 1개 캐와줘")
+        self.assertEqual(2, len(extension.submitted))
+        self.assertEqual(2, extension.translate_calls)
+
+    def test_concurrent_second_route_cannot_cross_unknown_retention(self):
+        intent_gate = _ConcurrentIntentGate()
+        extension = _BlockingMalformedSubmitResultExtension(
+            status_behavior=_bridge_status()
+        )
+        router = MinecraftChatClefInputRouter(
+            extension=extension,
+            intent_gate=intent_gate,
+            log_callback=lambda _message: None,
+        )
+        decisions = []
+
+        first_thread = threading.Thread(
+            target=lambda: decisions.append(
+                router.route("다이아몬드 캐줘")
+            )
+        )
+        second_thread = threading.Thread(
+            target=lambda: decisions.append(
+                router.route("석탄 1개 캐와줘")
+            )
+        )
+        first_thread.start()
+        self.assertTrue(extension.first_submit_entered.wait(timeout=1.0))
+        second_thread.start()
+        self.assertTrue(intent_gate.second_route_entered.wait(timeout=1.0))
+
+        self.assertEqual(1, len(extension.submitted))
+        self.assertEqual(1, extension.translate_calls)
+
+        extension.release_first_submit.set()
+        first_thread.join(timeout=1.0)
+        second_thread.join(timeout=1.0)
+
+        self.assertFalse(first_thread.is_alive())
+        self.assertFalse(second_thread.is_alive())
+        self.assertEqual(1, len(extension.submitted))
+        self.assertEqual(1, extension.translate_calls)
+        self.assertEqual(2, len(decisions))
+        self.assertEqual(
+            {"minecraft_submission_outcome_unknown"},
+            {decision.reason for decision in decisions},
+        )
+
 
 _NO_STATUS_READER = object()
 _DEFAULT_COMMANDS = object()
@@ -163,8 +336,10 @@ class _StatusExtension:
     def __init__(self, *, status_behavior):
         self.status_behavior = status_behavior
         self.submitted = []
+        self.translate_calls = 0
 
     def translate_natural_language_command(self, _text):
+        self.translate_calls += 1
         return _validated_translation()
 
     def submit_translated_command(self, request, translation):
@@ -207,6 +382,41 @@ class _MalformedSubmitResultExtension(_StatusExtension):
         return None
 
 
+class _SubmitExceptionExtension(_StatusExtension):
+    def submit_translated_command(self, request, translation):
+        self.submitted.append((dict(request), dict(translation)))
+        raise TimeoutError("submit response timed out")
+
+
+class _BlockingMalformedSubmitResultExtension(_StatusExtension):
+    def __init__(self, *, status_behavior):
+        super().__init__(status_behavior=status_behavior)
+        self.first_submit_entered = threading.Event()
+        self.release_first_submit = threading.Event()
+
+    def submit_translated_command(self, request, translation):
+        self.submitted.append((dict(request), dict(translation)))
+        if len(self.submitted) == 1:
+            self.first_submit_entered.set()
+            if not self.release_first_submit.wait(timeout=1.0):
+                raise TimeoutError("test did not release the first submit")
+        return None
+
+
+class _ConcurrentIntentGate:
+    def __init__(self):
+        self._call_count = 0
+        self._lock = threading.Lock()
+        self.second_route_entered = threading.Event()
+
+    def should_consider(self, _text):
+        with self._lock:
+            self._call_count += 1
+            if self._call_count == 2:
+                self.second_route_entered.set()
+        return True
+
+
 class _ContradictorySubmitResultExtension(_StatusExtension):
     def submit_translated_command(self, request, translation):
         self.submitted.append((dict(request), dict(translation)))
@@ -241,6 +451,29 @@ def _validated_translation() -> dict[str, object]:
         "reason_code": "validated",
         "message": "translated",
         "data": {},
+    }
+
+
+def _submit_result_payload(
+    *,
+    request_id: str,
+    status: str,
+    ok: bool,
+) -> dict[str, object]:
+    message = status
+    return {
+        "ok": ok,
+        "status": {
+            "request_id": request_id,
+            "ok": ok,
+            "status": status,
+            "error_code": None,
+            "message": message,
+            "data": {},
+        },
+        "error": None,
+        "message": message,
+        "details": {},
     }
 
 

@@ -1,4 +1,5 @@
 #20260818_kpopmodder: Render Fabric ChatClef routing outcomes into the existing LAVI decision contract.
+#20260819_kpopmodder: Report verified reconciliation without submitting the triggering command.
 from __future__ import annotations
 
 from typing import Any, Mapping
@@ -11,6 +12,31 @@ from .submission_readiness import MinecraftChatClefSubmissionReadiness
 
 
 class MinecraftChatClefRouteDecisionFactory:
+    def reconciled_without_submission(
+        self,
+        request_id: str,
+    ) -> MinecraftChatClefInputRouteDecision:
+        message = (
+            "The previous Fabric ChatClef request reached a matching terminal "
+            "result. The current command was not submitted; send it again as "
+            "a fresh explicit command if it is still wanted."
+        )
+        result = {
+            "ok": False,
+            "request_id": request_id,
+            "error": "current_command_not_submitted",
+            "message": message,
+            "details": {
+                "reconciliation_completed": True,
+                "current_command_submitted": False,
+            },
+        }
+        return MinecraftChatClefInputRouteDecision.handled_result(
+            reason="minecraft_submission_reconciled_command_not_submitted",
+            response_text=f"[Minecraft] {message}",
+            result=result,
+        )
+
     def precheck_rejection(
         self,
         readiness: MinecraftChatClefSubmissionReadiness,

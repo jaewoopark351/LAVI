@@ -6,6 +6,11 @@ from typing import Mapping
 
 from .listener_probe_evidence import listener_entries, process_map
 from .listener_topology_identity import owners_for_port, target_owner
+from .process_identity.lavi_process_candidate import (
+    AMBIGUOUS_PROCESS,
+    LAVI_PROCESS_CANDIDATE,
+    classify_lavi_process_candidate,
+)
 from .process_identity.process_ancestry import inspect_approved_process_identity
 
 
@@ -62,13 +67,17 @@ def validate_listener_probe_payload(
         for process_id in owners_for_port(entries, port):
             if process_id == gradio_pid:
                 continue
-            candidate = inspect_approved_process_identity(
+            candidate_classification = classify_lavi_process_candidate(
                 process_id,
                 processes_by_id,
                 repository_root,
             )
-            if candidate.get("ok"):
+            if candidate_classification == LAVI_PROCESS_CANDIDATE:
                 return _failure("a second LAVI Gradio candidate is listening")
+            if candidate_classification == AMBIGUOUS_PROCESS:
+                return _failure(
+                    "a fallback listener owner has ambiguous process identity"
+                )
     process_observed = process_identity.get("observed")
     if not isinstance(process_observed, Mapping):
         return _failure("listener owner process identity evidence is unavailable")

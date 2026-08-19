@@ -12,6 +12,7 @@ import adris.altoclef.util.helpers.ItemHelper;
 import adris.altoclef.util.helpers.WorldHelper;
 import adris.altoclef.util.progresscheck.MovementProgressChecker;
 import lavi.minecraft.diagnostics.container.store.StoreInAnyContainerDiagnostics;
+import lavi.minecraft.diagnostics.container.store.deposit.StoreDepositDiagnostics;
 import net.minecraft.block.Block;
 import net.minecraft.block.Blocks;
 import net.minecraft.item.Items;
@@ -47,6 +48,7 @@ public class StoreInAnyContainerTask extends Task {
     @Override
     protected void onStart() {
         StoreInAnyContainerDiagnostics.logStart(this, _getIfNotPresent, _toStore);
+        StoreDepositDiagnostics.bindRootTracker(this, _storedItems);
         _storedItems.startTracking();
         _dungeonChests.clear();
         _nonDungeonChests.clear();
@@ -130,6 +132,16 @@ public class StoreInAnyContainerTask extends Task {
             setDebugState("Going to container and depositing items");
 
             boolean progressCheckOk = _progressChecker.check(mod);
+            StoreDepositDiagnostics.logParentCandidateDecision(
+                    this,
+                    "OPEN_EXISTING",
+                    closest.get(),
+                    closestWithinRange,
+                    currentTryWithinExtraRange,
+                    _currentChestTry,
+                    notStored,
+                    "progressCheckOk", progressCheckOk,
+                    "progressFailureWillRequestUnreachable", !progressCheckOk && _currentChestTry != null);
             StoreInAnyContainerDiagnostics.logBranch("return_open_existing_container",
                     mod,
                     this,
@@ -156,9 +168,18 @@ public class StoreInAnyContainerTask extends Task {
 
             return new DoToClosestBlockTask(
                     blockPos -> {
-                        if (_currentChestTry != blockPos) {
+                        BlockPos currentChestTryBefore = _currentChestTry;
+                        boolean sameReference = _currentChestTry == blockPos;
+                        if (!sameReference) {
                             _progressChecker.reset();
                         }
+                        StoreDepositDiagnostics.logTargetCallbackDecision(
+                                this,
+                                blockPos,
+                                currentChestTryBefore,
+                                sameReference,
+                                !sameReference,
+                                notStored);
                         _currentChestTry = blockPos;
                         return new StoreInContainerTask(blockPos, _getIfNotPresent, notStored);
                     },
@@ -171,6 +192,15 @@ public class StoreInAnyContainerTask extends Task {
         for (Block couldPlace : StoreInContainerTask.CONTAINER_BLOCKS) {
             boolean hasContainerBlockItem = mod.getItemStorage().hasItem(couldPlace.asItem());
             if (hasContainerBlockItem) {
+                StoreDepositDiagnostics.logParentCandidateDecision(
+                        this,
+                        "PLACE_CONTAINER_NEARBY",
+                        null,
+                        false,
+                        false,
+                        _currentChestTry,
+                        notStored,
+                        "containerBlockItem", couldPlace.asItem());
                 StoreInAnyContainerDiagnostics.logBranch("return_place_container_nearby",
                         mod,
                         this,
@@ -197,6 +227,16 @@ public class StoreInAnyContainerTask extends Task {
             }
         }
         setDebugState("Obtaining a chest item (by default)");
+        StoreDepositDiagnostics.logParentCandidateDecision(
+                this,
+                "OBTAIN_CHEST",
+                null,
+                false,
+                false,
+                _currentChestTry,
+                notStored,
+                "requestedItem", Items.CHEST,
+                "requestedCount", 1);
         StoreInAnyContainerDiagnostics.logBranch("return_obtain_chest_item",
                 mod,
                 this,

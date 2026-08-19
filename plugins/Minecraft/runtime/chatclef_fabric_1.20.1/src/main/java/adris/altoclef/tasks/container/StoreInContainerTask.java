@@ -9,6 +9,7 @@ import adris.altoclef.util.ItemTarget;
 import adris.altoclef.util.helpers.ItemHelper;
 import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.slots.Slot;
+import lavi.minecraft.diagnostics.container.store.deposit.StoreDepositDiagnostics;
 import net.minecraft.block.Block;
 import net.minecraft.block.Blocks;
 import net.minecraft.item.ItemStack;
@@ -50,9 +51,12 @@ public class StoreInContainerTask extends AbstractDoToStorageContainerTask {
             // Only consider transfers to the container we wish
             storedItems = new ContainerStoredTracker(slot -> {
                 Optional<BlockPos> openContainer = AltoClef.getInstance().getItemStorage().getLastBlockPosInteraction();
-                return openContainer.isPresent() && openContainer.get().equals(targetContainer);
+                boolean accepted = openContainer.isPresent() && openContainer.get().equals(targetContainer);
+                StoreDepositDiagnostics.observeTargetContainerPredicate(this.storedItems, slot, targetContainer, openContainer, accepted);
+                return accepted;
             });
         }
+        StoreDepositDiagnostics.bindTargetTracker(this, storedItems, targetContainer);
         storedItems.startTracking();
     }
 
@@ -79,7 +83,8 @@ public class StoreInContainerTask extends AbstractDoToStorageContainerTask {
     @Override
     protected Task onContainerOpenSubtask(AltoClef mod, ContainerCache containerCache) {
         // Move all items that aren't in the container
-        for (ItemTarget target : storedItems.getUnstoredItemTargetsYouCanStore(mod, toStore)) {
+        ItemTarget[] unstoredTargets = storedItems.getUnstoredItemTargetsYouCanStore(mod, toStore);
+        for (ItemTarget target : unstoredTargets) {
             setDebugState("Dumping " + target);
             // Grab the item from the current chest that most closely matches our requirements
             List<Slot> potentials = mod.getItemStorage().getSlotsWithItemPlayerInventory(false, target.getMatches());
@@ -96,13 +101,17 @@ public class StoreInContainerTask extends AbstractDoToStorageContainerTask {
                 Optional<Slot> toMoveTo = mod.getItemStorage().getSlotThatCanFitInOpenContainer(stackIn, false);
                 if (toMoveTo.isEmpty()) {
                     setDebugState("CONTAINER FULL!");
+                    StoreDepositDiagnostics.logTransferDecision(this, targetContainer, target, potentials.size(), true, true, false, "DESTINATION_FULL");
                     return null;
                 }
                 setDebugState("Moving to slot...");
+                StoreDepositDiagnostics.logTransferDecision(this, targetContainer, target, potentials.size(), true, true, true, "MOVE_TASK_SELECTED");
                 return new MoveItemToSlotFromInventoryTask(target, toMoveTo.get());
             }
+            StoreDepositDiagnostics.logTransferDecision(this, targetContainer, target, potentials.size(), false, false, false, "NO_SOURCE_SLOT");
             setDebugState("SHOULD NOT HAPPEN! No valid items detected.");
         }
+        StoreDepositDiagnostics.logTransferDecision(this, targetContainer, null, 0, false, false, false, unstoredTargets.length == 0 ? "NO_TARGET_REMAINING" : "NO_TRANSFER_CANDIDATE_FOUND");
         setDebugState("SHOULD NOT HAPPEN! All items stored but we're still trying.");
         return null;
     }

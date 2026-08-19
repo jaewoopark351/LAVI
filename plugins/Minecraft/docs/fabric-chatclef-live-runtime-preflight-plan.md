@@ -3,10 +3,11 @@
 <!-- 20260818_kpopmodder: Reconciled the live-test contract after restoration and separated terminal lifecycle observation from gameplay success. -->
 <!-- 20260818_kpopmodder: Fixed audited-baseline terminology, deterministic fail-closed gates, explicit one-shot approval, and preflight/live-result separation. -->
 <!-- 20260818_chatgpt: Added explicit expected/partial/prohibited gameplay-effect fields and evidence-complete E2E semantics. -->
+<!-- 20260819_kpopmodder: Closed exact Python invocation, numeric start-time chronology, launcher provenance, and ambiguous fallback-candidate gates. -->
 
 # Fabric ChatClef Live Runtime Preflight Plan
 
-상태: 문서 전용 test-only 구현 계획.
+상태: fail-closed 계약과 LAVI-owned test harness 구현 기록. Live 실행 승인이 아님.
 
 이 문서는 Fabric ChatClef live mutating test가 잘못된 LAVI, backend, Minecraft
 instance 또는 world에 command를 보내지 않도록 read-only preflight 계약을
@@ -309,11 +310,12 @@ Audited baseline 4239c23 상태: `[absent; historical dirty-tree implementation 
 - Fabric port `4316` listener PID
 - `LAVI_GRADIO_URL`의 실제 listener PID
 - effective Gradio fallback range의 listener PID
-- candidate process의 Name, PID, PPID, CreationDate, ExecutablePath, CommandLine
+- candidate process의 Name, PID, PPID, CreationDate, numeric UTC start ticks,
+  ExecutablePath, CommandLine
 - candidate의 ancestor chain
 - candidate의 parsed invocation mode와 primary operand
 - exact resolved entrypoint와 repository provenance
-- 승인 launcher가 필요한 경우 launcher PID, CreationDate, ExecutablePath,
+- 관찰된 승인 launcher의 PID, numeric UTC start ticks, exact ExecutablePath,
   resolved path
 - read-only runtime status
 
@@ -321,13 +323,12 @@ Production app은 repository `main.py`, `python -m lavi`, `python -m lavi app`,
 `run.bat`, `run_lav_dev.cmd`를 통해 시작될 수 있다. 그러나 mutating preflight의
 승인은 실제 probe가 provenance를 증명한 실행 형식으로 더 좁게 제한한다.
 
-Mutating preflight에서 승인되는 app entrypoint:
-
-- Python의 primary script operand가 exact absolute
-  `<repository_root>\main.py`인 direct invocation
-- primary script operand가 relative `main.py`이고 exact repository
-  `run.bat` 또는 `run_lav_dev.cmd` ancestor가 working-root provenance를
-  증명하며 그 launcher identity까지 같은 observation에 결합된 invocation
+Mutating preflight에서 승인되는 app entrypoint는 Python process `Name`, 실제
+`ExecutablePath`, argv0가 모두 `python.exe`로 일관되고, option이나 trailing
+argument 없이 primary script operand가 exact absolute
+`<repository_root>\main.py`인 invocation뿐이다. 승인된 launcher ancestor가
+관찰되면 같은 identity에 결합하지만, relative operand를 허용하는 예외로
+사용하지 않는다.
 
 `python -c ... main.py`의 trailing argument, repository descendant의 다른
 `tmp\main.py`, 다른 checkout의 `main.py`, 임의 argv 위치의 launcher 이름은
@@ -340,7 +341,8 @@ module provenance 구현 전까지 mutating preflight에서 fail closed한다.
 1. `4316`과 selected Gradio endpoint를 같은 검증된 LAVI process가 소유한다.
 2. candidate argv와 repository/venv/ancestor evidence가 승인 entrypoint와 맞는다.
 3. selected Gradio URL의 runtime status가 `backend_id=fabric_chatclef`를 반환한다.
-4. effective fallback 범위에 별도 LAVI candidate가 없다.
+4. effective fallback 범위에 별도 LAVI candidate나 process evidence가 불완전한
+   ambiguous listener owner가 없다.
 
 다음은 단독 실패 조건이 아니다.
 
@@ -811,13 +813,17 @@ allowlist 밖의 arbitrary user command를 diagnostics에 그대로 저장하지
 - AVG/권한 차단 뒤 승인된 elevated read-only 재시도 1회
 - elevated 재시도도 차단됨 -> fail, 추가 재시도 없음
 - exact absolute repository `main.py` primary operand -> 통과 후보
-- relative `main.py`인데 approved launcher provenance 없음 -> fail
+- relative `main.py` -> approved launcher provenance 유무와 관계없이 fail
 - `python -c "..." main.py` -> fail
 - repository descendant `tmp\main.py` -> fail
 - 다른 checkout의 `main.py` -> fail
 - `main.py` 또는 launcher path가 trailing argument일 뿐임 -> fail
 - resolved module provenance 없는 `-m lavi`, `-m lavi app` -> fail
-- exact approved launcher ancestor + relative primary `main.py` -> 통과 후보
+- exact approved launcher ancestor + exact absolute primary `main.py` -> 통과 후보
+- `pythonw.exe`, process Name/ExecutablePath/argv0 mismatch -> fail
+- Python option 또는 script 뒤 trailing argument -> fail
+- fallback listener owner process가 사라졌거나 identity가 불완전함 -> fail
+- ancestor가 child보다 늦게 시작했거나 chain evidence가 불완전함 -> fail
 - 같은 PID/CreationDate라도 executable, invocation mode, resolved entrypoint,
   repository root 또는 launcher provenance가 바뀜 -> fail
 - required structured identity field가 누락됨 -> fail
@@ -967,3 +973,46 @@ LAVI, Minecraft, Python 또는 Java process를 종료하지 않는다.
   숨기지 않는다.
 - test가 process를 자동 종료하거나 Minecraft Java process를 건드리지 않는다.
 - production DTO, Java payload와 WebSocket protocol은 변경하지 않는다.
+
+## 19. 2026-08-19 strict listener identity closure
+
+The mutating preflight implementation now treats invocation parsing, exact
+entrypoint provenance, launcher ancestry, process chronology, fallback candidate
+classification, and final policy as separate responsibilities.
+
+The accepted direct Python form is restricted to:
+
+```text
+python.exe C:\Vtuber_Souorce_Code\LAVI\main.py
+```
+
+The following fail closed:
+
+```text
+python.exe main.py
+python.exe -c "print(1)" main.py
+pythonw.exe C:\Vtuber_Souorce_Code\LAVI\main.py
+python.exe C:\Vtuber_Souorce_Code\LAVI\tmp\main.py
+python.exe <another checkout>\main.py
+python.exe -m lavi without resolved module provenance
+```
+
+An approved launcher ancestor is still bound into the identity fingerprint, but
+does not authorize a relative `main.py` operand. The Windows probe emits a
+strict positive UTC tick value for every observed process. Each ancestor must
+start no later than its child; unavailable or reversed chronology fails closed.
+The approved command processor is matched by its exact normalized absolute path,
+not only by basename. Its exact repository launcher must also be the sole and
+final `/c` or `/k` command operand; trailing argv and compound commands fail.
+
+Fallback-range screening deliberately uses a tri-state candidate classifier
+instead of the approval verifier. Repository Python, `-m lavi`, any `main.py`
+script form, `pythonw`, or an approved repository launcher ancestor classifies
+as LAVI. Missing, vanished, inconsistent, inaccessible, or malformed process
+evidence classifies as ambiguous. Both LAVI and ambiguous block; only a complete,
+well-formed unrelated process identity remains unrelated.
+
+These checks are read-only. They neither prove that a console window is visible
+nor authorize a live command. Visible foreground operation remains a supervised
+manual precondition, and the complete identity is revalidated immediately before
+the one permitted submission.

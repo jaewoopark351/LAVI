@@ -3,6 +3,7 @@
 <!-- 20260818_kpopmodder: Reconciled the post-restore live lifecycle test, existing request correlation, and missing fail-closed preflight. -->
 <!-- 20260818_kpopmodder: Fixed audited-baseline live semantics, no-replay handling, and terminal/runtime/gameplay success separation. -->
 <!-- 20260818_kpopmodder: Aligned gameplay observation completeness and expected/partial/prohibited effect semantics with the final-reviewed preflight schema. -->
+<!-- 20260819_kpopmodder: Added canonical submission, reconciliation latch, and split terminal/checkpoint/advancement regression contracts. -->
 
 # ChatClef Korean Test Strategy
 
@@ -2522,9 +2523,40 @@ incomplete observation never converts "prohibited effect not seen" into verified
 mutating live tests do not end at ACCEPTED only without teardown or terminal observation
 ```
 
-## ChatGPT Handoff Summary
+## 2026-08-19 Offline Regression Closure
 
-Use this when asking ChatGPT to continue reviewing the test plan:
+The current LAVI-owned Python regression scope additionally locks these
+boundaries:
+
+```text
+the exact approved Korean batch inputs compile to prefixless GET commands
+natural-language translation occurs once before the same validated result is submitted
+canonical submit output always contains matching top-level and nested request_id
+only exact bool values are accepted for mirrored ok fields
+malformed or contradictory submit results become UNKNOWN with reconciliation required
+router UNKNOWN ownership blocks later Minecraft translation and submission
+only matching validated terminal evidence clears that router ownership latch
+the command that triggers successful reconciliation is still not submitted and
+  must be sent again explicitly as a fresh command
+submission timeout, request mismatch, duplicate evidence, or uncleared active ownership
+  stops before a gameplay checkpoint
+a safely correlated non-completed terminal may run a read-only gameplay checkpoint
+  to preserve partial and unexpected-effect evidence, but never advances
+batch advancement requires completed plus runtime completion plus a complete positive oracle
+gameplay timing rejects bool, NaN, positive infinity, and negative infinity
+```
+
+The default saved-player target-inventory observer is still not a complete
+gameplay or prohibited-effect oracle. Therefore, an offline fixture may prove
+four-step ordering, but an actual live run must stop at its first incomplete
+checkpoint. A four-command live success claim requires a separately approved,
+command-correlated multi-surface oracle.
+
+## Historical 2026-08-18 ChatGPT Handoff Summary
+
+This block is retained for audited-baseline provenance. Its implementation
+status predates the 2026-08-19 offline regression closure above and must not be
+read as the current worktree status.
 
 ```text
 Codex/ChatGPT reconciled the Korean ChatClef test strategy in:

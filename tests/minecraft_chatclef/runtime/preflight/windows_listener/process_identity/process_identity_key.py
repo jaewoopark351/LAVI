@@ -6,7 +6,10 @@ import json
 import ntpath
 from typing import Mapping
 
-from .entrypoint_provenance import normalize_windows_path
+from .entrypoint_provenance import (
+    is_approved_command_processor_path,
+    normalize_windows_path,
+)
 
 
 def process_identity_fingerprint(evidence: Mapping[str, object]) -> str:
@@ -40,6 +43,9 @@ def _canonical_process_identity(
         evidence.get("intended_lavi_parent_process_id")
     )
     creation_date = _required_text(evidence.get("intended_lavi_creation_date"))
+    creation_time_utc_ticks = _positive_int(
+        evidence.get("intended_lavi_creation_time_utc_ticks")
+    )
     executable_path = _absolute_path(evidence.get("intended_lavi_executable_path"))
     invocation_mode = _required_text(evidence.get("process_invocation_mode"))
     process_entrypoint = _required_text(evidence.get("process_entrypoint"))
@@ -52,27 +58,30 @@ def _canonical_process_identity(
         process_id <= 0
         or parent_process_id < 0
         or not creation_date
+        or creation_time_utc_ticks <= 0
         or not executable_path
-        or ntpath.basename(executable_path).lower()
-        not in {"python", "python.exe", "pythonw", "pythonw.exe"}
+        or ntpath.basename(executable_path).lower() != "python.exe"
         or invocation_mode != "python_script"
         or process_entrypoint != "main.py"
         or not resolved_entrypoint_path
         or not repository_root
         or resolved_entrypoint_path != ntpath.join(repository_root, "main.py")
-        or provenance
-        not in {"exact_repository_script", "approved_launcher_relative_script"}
+        or provenance != "exact_repository_script"
     ):
         return None
     ancestor = _canonical_ancestor(evidence.get("approved_ancestor"), repository_root)
-    if provenance == "approved_launcher_relative_script" and ancestor is None:
-        return None
     if evidence.get("approved_ancestor") is not None and ancestor is None:
+        return None
+    if (
+        ancestor is not None
+        and int(ancestor["creation_time_utc_ticks"]) > creation_time_utc_ticks
+    ):
         return None
     return {
         "approved_ancestor": ancestor,
         "entrypoint_provenance": provenance,
         "intended_lavi_creation_date": creation_date,
+        "intended_lavi_creation_time_utc_ticks": creation_time_utc_ticks,
         "intended_lavi_executable_path": executable_path,
         "intended_lavi_parent_process_id": parent_process_id,
         "intended_lavi_pid": process_id,
@@ -94,6 +103,7 @@ def _canonical_ancestor(
     process_id = _positive_int(value.get("process_id"))
     parent_process_id = _nonnegative_int(value.get("parent_process_id"))
     creation_date = _required_text(value.get("creation_date"))
+    creation_time_utc_ticks = _positive_int(value.get("creation_time_utc_ticks"))
     executable_path = _absolute_path(value.get("executable_path"))
     invocation_mode = _required_text(value.get("invocation_mode"))
     resolved_entrypoint_path = _absolute_path(value.get("resolved_entrypoint_path"))
@@ -102,8 +112,9 @@ def _canonical_ancestor(
         process_id <= 0
         or parent_process_id < 0
         or not creation_date
+        or creation_time_utc_ticks <= 0
         or not executable_path
-        or ntpath.basename(executable_path).lower() not in {"cmd", "cmd.exe"}
+        or not is_approved_command_processor_path(executable_path)
         or invocation_mode != "cmd_launcher"
         or not resolved_entrypoint_path
         or resolved_entrypoint_path
@@ -116,6 +127,7 @@ def _canonical_ancestor(
         return None
     return {
         "creation_date": creation_date,
+        "creation_time_utc_ticks": creation_time_utc_ticks,
         "entrypoint_provenance": provenance,
         "executable_path": executable_path,
         "invocation_mode": invocation_mode,
