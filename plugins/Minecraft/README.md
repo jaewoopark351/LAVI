@@ -205,6 +205,13 @@ plugins/Minecraft/docs/chatclef-resource-target-retry-thrashing-analysis.md
     2026-08-08 resource target/path retry thrashing that eventually completed
 ```
 
+For the bounded diagnostics-only design for the next bare deposit
+reproduction, read:
+
+```text
+plugins/Minecraft/docs/chatclef-bare-deposit-diagnostics-plan.md
+```
+
 For payload typing and map-shape stability, read:
 
 ```text
@@ -270,6 +277,9 @@ Runtime integration runbook:
 Diagnostic runbooks:
   chatclef-task-lifecycle-diagnostics.md
   chatclef-baritone-cache-troubleshooting.md
+
+Diagnostics-only plans:
+  chatclef-bare-deposit-diagnostics-plan.md
 
 Policy and investigation direction:
   chatclef-carryon-integration-direction.md

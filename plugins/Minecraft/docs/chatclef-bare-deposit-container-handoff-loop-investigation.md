@@ -50,6 +50,7 @@ bounded StoreInAnyContainer diagnostics
 ```text
 plugins/Minecraft/docs/chatclef-post-completion-store-loop-investigation.md
 plugins/Minecraft/docs/chatclef-task-lifecycle-diagnostics.md
+plugins/Minecraft/docs/chatclef-bare-deposit-diagnostics-plan.md
 plugins/Minecraft/docs/chatclef-baritone-cache-troubleshooting.md
 plugins/Minecraft/docs/chatclef-resource-target-retry-thrashing-analysis.md
 plugins/Minecraft/docs/chatclef-carryon-integration-direction.md
@@ -748,6 +749,15 @@ If existing logs can answer a question, do not add source diagnostics for it.
 
 No diagnostics change is approved by this document.
 
+The canonical bounded diagnostics-only design for a future reproduction is:
+
+```text
+plugins/Minecraft/docs/chatclef-bare-deposit-diagnostics-plan.md
+```
+
+That plan is `DOCUMENTED_NOT_IMPLEMENTED`; it does not authorize source edits,
+build, runtime reproduction, commit, or push.
+
 If a later read-only analysis leaves the candidate handoff materially
 unobservable, the smallest useful diagnostic would capture values already
 computed by the behavior path:
@@ -756,17 +766,41 @@ computed by the behavior path:
 STORE_CONTAINER_PARENT_CANDIDATE_DECISION
     raw candidate local value
     branch-local range predicates
-    currentChestTry identity/equality
+    currentChestTry value relation as auxiliary correlation
 
-STORE_CONTAINER_FILTERED_CANDIDATE_DECISION
+STORE_TASK_LIFECYCLE_BOUNDARY
+    root versus descendant
+    true stop versus temporary interrupt/resume
+
+STORE_TASK_CHILD_RECONCILIATION (ROOT_ROUTE)
+    Store root route/acquisition candidate and active child
+
+STORE_CONTAINER_FILTERED_SEARCH_RESULT
     child search result
     accepted/rejected candidate
     rejection reason
-    active pursuit before/after
+
+STORE_CONTAINER_PURSUIT_DECISION
+    active pursuit before/after and next callback/wander/null action
+
+STORE_CONTAINER_TARGET_CALLBACK_DECISION
+    actual filtered blockPos versus currentChestTry reference comparison
+    existing progress-reset/current-try assignment outcome
+
+STORE_TASK_CHILD_RECONCILIATION (TARGET_ACTION or SEARCH_FALLBACK)
+    route child's target-action/fallback candidate and active child
+
+CONTAINER_OPEN_ATTEMPT_OBSERVED / CONTAINER_OPEN_RETURN_OBSERVED
+    existing interaction attempt and return correlated to the Store operation
+
+STORE_CONTAINER_ACCESS_DECISION
+    screen-handler and container-cache boundary
+
+STORE_CONTAINER_TRANSFER_DECISION
+    already-computed source/destination selection outcome
+    unavailable rejection/capacity breakdown stated as a coverage gap
 
 STORE_CONTAINER_EFFECT_OBSERVATION
-    interaction target
-    GUI transition
     slot delta
     ContainerStoredTracker delta
 ```

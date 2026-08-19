@@ -1159,7 +1159,12 @@ proves the DepositCommand origin and is documented here:
 
 ```text
 plugins/Minecraft/docs/chatclef-bare-deposit-container-handoff-loop-investigation.md
+plugins/Minecraft/docs/chatclef-bare-deposit-diagnostics-plan.md
 ```
+
+The first file is the finalized incident evidence record; the exact root cause
+remains unverified. The second is the bounded diagnostics-only design for a
+future reproduction and remains unimplemented.
 
 Do not assume Carry On is the primary cause when carry state is
 `AVAILABLE_NOT_CARRYING` and no click attempt or Carry On state transition
@@ -1968,6 +1973,10 @@ chatclef-post-completion-store-loop-investigation.md
 chatclef-bare-deposit-container-handoff-loop-investigation.md
     2026-08-19 bare deposit evidence, corrected Store progress-field
     interpretation, and the container branch/lifecycle coordination boundary.
+
+chatclef-bare-deposit-diagnostics-plan.md
+    Proposed bounded operation correlation, cap-independent aggregates, and
+    terminal summaries for a future bare deposit reproduction.
 
 chatclef-carryon-integration-direction.md
     Engine boundary, ownership, diagnostics-only, and root-cause patch gates.
