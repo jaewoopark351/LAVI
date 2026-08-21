@@ -226,11 +226,47 @@ plugins/Minecraft/docs/chatclef-command-payload-map-audit.md
 ```
 
 For Python-only command replies, Korean mining phrases, transport result
-events, and inventory preflight cleanup planning, read:
+events, stale active-command reconciliation, and inventory preflight cleanup
+planning, read:
 
 ```text
 plugins/Minecraft/docs/chatclef-python-command-orchestration-plan.md
 ```
+
+The orchestration plan owns stale-active UNKNOWN reconciliation and
+active-ownership release. Releasing active ownership never proves command
+completion or gameplay success.
+
+For the stale active-command terminal reconciliation gap, Java should publish
+additive nonterminal lifecycle evidence through the existing
+`command_result` channel with `status=running`. Python may store that validated
+running result as `details.commands.last_result`, but active ownership remains
+held until a terminal result or a separately approved Python-local
+`RECONCILED_UNKNOWN` compare-and-release path runs.
+
+`RECONCILED_UNKNOWN` is a Python-local action, not a new bridge status. The
+wire/DTO result remains `status=unknown`, `ok=false`, with
+`gameplay_effect=UNVERIFIED`. A Python release does not prove Java
+`FabricChatClefCommandQueue.active` has retired, so new command admission must
+remain quarantined until authoritative evidence proves Java queue and lifecycle
+retirement. A late terminal, connection-generation replacement, or recovery
+completion may clear that gate only when its source contract and tests prove it
+establishes Java retirement; otherwise it is supporting evidence only.
+The next implementation plan must define the monotonic lifecycle
+`evidence_sequence` acceptance rules, authoritative transport admission gate,
+and reconnect/restart fail-closed strategy before any code change.
+
+2026-08-21 review update: the Python stale-active direction is
+`CONDITIONAL PASS / PRODUCTION ON BLOCKED`. A default-OFF shadow classifier and
+test-injected guarded mutation path may be implemented, but production config
+must not enable release unless a separate runtime readiness gate proves
+authoritative Java retirement evidence or restart-safe quarantine capability.
+Python-local reconciliation state must be split away from Java-facing wire
+status snapshots: synthetic UNKNOWN, tombstones, and admission quarantine must
+not appear in `handshake_ack` or `status_snapshot` payloads sent to Java. The
+phrase `다이아 곡괭이 만들어줘` already validates to `get diamond_pickaxe 1`; this
+incident remains classified as stale active-command admission blocking, not a
+Korean compiler gap.
 
 For the full 20-command Korean registry, command-by-command lifecycle
 classification, safety tiers, confirmation modes, resolver domains, and public
@@ -380,6 +416,7 @@ client-tick dispatch
 command root binding
 terminal observation
 command_result envelope sending
+nonterminal status=running lifecycle evidence publication
 ```
 
 ChatClef / AltoClef owns:

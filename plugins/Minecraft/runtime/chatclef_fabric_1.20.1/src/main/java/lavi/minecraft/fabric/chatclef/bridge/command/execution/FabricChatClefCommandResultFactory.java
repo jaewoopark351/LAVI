@@ -3,7 +3,11 @@ package lavi.minecraft.fabric.chatclef.bridge.command.execution;
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandRequest;
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandResult;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandDeadlinePayload;
+import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandResultFidelity;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandTerminationObservation;
+import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.evidence.FabricChatClefNonterminalLifecycleEvidencePayload;
+import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.evidence.FabricChatClefStableRequestQuiescenceObservation;
+import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskSnapshot;
 import lavi.minecraft.fabric.chatclef.bridge.command.result.FabricChatClefCommandResultDataPayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.result.FabricChatClefCommandResultPayload;
 
@@ -23,11 +27,40 @@ final class FabricChatClefCommandResultFactory {
         );
     }
 
+    FabricChatClefCommandResultPayload runningLifecycleEvidenceResult(
+            String stage,
+            int evidenceSequence,
+            String waitingReason,
+            FabricChatClefTaskSnapshot currentRootTask,
+            FabricChatClefStableRequestQuiescenceObservation quiescence
+    ) {
+        return FabricChatClefCommandResult.running(
+                request().requestId,
+                "Fabric ChatClef command lifecycle evidence observed.",
+                FabricChatClefNonterminalLifecycleEvidencePayload.of(
+                        data(stage),
+                        stage,
+                        evidenceSequence,
+                        waitingReason,
+                        currentRootTask,
+                        quiescence
+                )
+        );
+    }
+
     FabricChatClefCommandResultPayload unknownAfterFinish() {
         return FabricChatClefCommandResult.unknown(
                 request().requestId,
                 "Fabric ChatClef command callback finished, but Minecraft goal success was not verified.",
                 data("finish_callback_without_verified_success")
+        );
+    }
+
+    FabricChatClefCommandResultPayload unknownFromPreexistingUnchangedIdleRoot() {
+        return FabricChatClefCommandResult.unknown(
+                request().requestId,
+                "Fabric ChatClef command callback finished, but Minecraft goal success was not verified.",
+                data("finish_callback_without_new_command_owned_root")
         );
     }
 
@@ -131,8 +164,30 @@ final class FabricChatClefCommandResultFactory {
                 state.taskAfterDispatch(),
                 state.terminalTask(),
                 state.boundRootTask(),
+                fidelityFor(resultReason),
                 observation
         );
+    }
+
+    private FabricChatClefCommandResultFidelity fidelityFor(String resultReason) {
+        return switch (resultReason) {
+            case "dispatch_started" -> FabricChatClefCommandResultFidelity.DISPATCH_STARTED_ONLY;
+            case "finish_callback_without_new_command_owned_root",
+                 "finish_callback_without_verified_success" ->
+                    FabricChatClefCommandResultFidelity.CALLBACK_WITHOUT_MATCHING_USER_TASK_EVENT;
+            case "callback_completed_without_user_task" ->
+                    FabricChatClefCommandResultFidelity.CALLBACK_WITHOUT_USER_TASK;
+            case "matching_task_finished",
+                 "matching_task_stopped",
+                 "task_observation_unclassified" ->
+                    FabricChatClefCommandResultFidelity.CALLBACK_PLUS_MATCHING_USER_TASK_EVENT;
+            case "task_identity_mismatch" ->
+                    FabricChatClefCommandResultFidelity.CALLBACK_PLUS_NONMATCHING_USER_TASK_EVENT;
+            case "command_exception" -> FabricChatClefCommandResultFidelity.COMMAND_EXCEPTION_OBSERVED;
+            case "dispatch_exception" -> FabricChatClefCommandResultFidelity.DISPATCH_EXCEPTION_OBSERVED;
+            case "deadline_exceeded" -> FabricChatClefCommandResultFidelity.DEADLINE_WITHOUT_VERIFIED_TERMINAL;
+            default -> FabricChatClefCommandResultFidelity.UNKNOWN;
+        };
     }
 
     private FabricChatClefCommandRequest request() {

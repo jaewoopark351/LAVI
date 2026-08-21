@@ -12,6 +12,7 @@ class MinecraftChatClefSubmissionReadiness:
     error: str = ""
     message: str = ""
     status: dict[str, Any] = field(default_factory=dict)
+    details: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def accepted(
@@ -32,6 +33,7 @@ class MinecraftChatClefSubmissionReadiness:
         error: str,
         message: str,
         status: Mapping[str, Any] | None = None,
+        details: Mapping[str, Any] | None = None,
     ) -> "MinecraftChatClefSubmissionReadiness":
         return cls(
             ready=False,
@@ -39,4 +41,5 @@ class MinecraftChatClefSubmissionReadiness:
             error=str(error or "status_unavailable"),
             message=str(message or "Fabric ChatClef status is unavailable."),
             status=dict(status or {}),
+            details=dict(details or {}),
         )

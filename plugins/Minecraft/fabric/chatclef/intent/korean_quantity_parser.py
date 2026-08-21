@@ -5,7 +5,7 @@ import re
 
 
 class KoreanQuantityParser:
-    _DIGIT_RE = re.compile(r"(?<![A-Za-z0-9_])([+-]?\d+)\s*(개|만큼)?")
+    _DIGIT_RE = re.compile(r"(?<![A-Za-z0-9_])([+-]?\d+)\s*(개|만큼)")
     _KOREAN_NUMBERS = {
         "하나": 1,
         "한": 1,
@@ -18,12 +18,18 @@ class KoreanQuantityParser:
     }
 
     def parse(self, text: str, default: int = 1) -> int:
+        parsed = self.parse_optional(text)
+        if parsed is None:
+            return default
+        return parsed
+
+    def parse_optional(self, text: str) -> int | None:
         match = self._DIGIT_RE.search(text)
         if match is not None:
             return int(match.group(1))
         korean_match = self._korean_match(text)
         if korean_match is None:
-            return default
+            return None
         return self._KOREAN_NUMBERS[korean_match.group(1)]
 
     def strip_quantity(self, text: str) -> str:

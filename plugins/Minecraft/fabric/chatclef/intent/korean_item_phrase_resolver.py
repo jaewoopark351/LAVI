@@ -44,8 +44,6 @@ class KoreanItemPhraseResolver:
             return self._result(ChatClefIntentStatus.UNKNOWN, "empty_item_phrase")
         if compact in self._UNKNOWN_PHRASES:
             return self._result(ChatClefIntentStatus.UNKNOWN, "unknown_item_phrase")
-        if self._has_ambiguous_phrase(compact):
-            return self._result(ChatClefIntentStatus.AMBIGUOUS, "ambiguous_item_phrase")
         equipment_result = self._resolve_equipment(normalized, compact)
         if equipment_result is not None:
             return equipment_result
@@ -55,6 +53,8 @@ class KoreanItemPhraseResolver:
         catalog_result = self._resolve_direct_catalog_target(normalized, compact)
         if catalog_result is not None:
             return catalog_result
+        if self._has_ambiguous_phrase(compact):
+            return self._result(ChatClefIntentStatus.AMBIGUOUS, "ambiguous_item_phrase")
         if self._has_unsupported_material(compact):
             return self._result(ChatClefIntentStatus.UNSUPPORTED, "unsupported_material")
         return self._result(ChatClefIntentStatus.UNKNOWN, "unknown_item_phrase")
@@ -101,7 +101,8 @@ class KoreanItemPhraseResolver:
         compact: str,
     ) -> dict[str, object] | None:
         for alias, target in self._aliases.sorted_aliases(self._aliases.fixed_item_aliases):
-            if alias.replace(" ", "") == compact:
+            alias_compact = self._normalizer.normalize(alias).replace(" ", "")
+            if alias_compact == compact:
                 return self._result(
                     ChatClefIntentStatus.VALIDATED,
                     "resolved_fixed_alias",
@@ -135,6 +136,7 @@ class KoreanItemPhraseResolver:
     def _cleanup(self, text: str) -> str:
         text = re.sub(r"\b(?:좀|제발|please)\b", " ", text)
         text = re.sub(r"\s+", " ", text).strip()
+        text = re.sub(r"(?<=[가-힣A-Za-z0-9_])(?:을|를)$", "", text)
         return text
 
     def _has_ambiguous_phrase(self, compact: str) -> bool:

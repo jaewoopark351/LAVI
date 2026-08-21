@@ -2,6 +2,9 @@
 <!-- 20260819_kpopmodder: Recorded the implemented single-pass canonical submission and reconciliation boundary. -->
 <!-- 20260819_kpopmodder: Bound Korean response and cleanup planning to reviewed archive e08af639 and split inventory cleanup into its own fail-closed contract. -->
 <!-- 20260820_kpopmodder: Linked command orchestration to the full Korean command registry lifecycle axes. -->
+<!-- 20260820_kpopmodder: Documented stale-active-command reconciliation for callback-without-TaskFinishedEvent false-busy states. -->
+<!-- 20260820_kpopmodder: Added implementation-plan boundaries for monotonic lifecycle evidence, release-trigger purity, and restart-safe admission quarantine. -->
+<!-- 20260821_kpopmodder: Added conditional-pass v2 guardrails for wire/local snapshots, source-contract proof, runtime readiness gating, and immutable state-swap CAS. -->
 
 # ChatClef Python Command Orchestration Plan
 
@@ -87,6 +90,326 @@ are owned by:
 
 ```text
 plugins/Minecraft/docs/chatclef-python-inventory-cleanup-preflight-contract.md
+```
+
+## 2026-08-21 Conditional-Pass V2 Guardrails
+
+The stale active-command reconciliation design is conditionally approved only
+for a Python-local, default-disabled implementation. The current production
+state is still:
+
+```text
+default-OFF shadow classifier implementation: allowed
+test-injected guarded mutation implementation: allowed
+production config True -> mutation: forbidden
+production ON readiness: blocked
+Java, DTO, and v1 protocol mutation: forbidden
+Korean compiler change for "다이아 곡괭이 만들어줘": not needed
+```
+
+The immediate user-visible failure for "다이아 곡괭이 만들어줘" is classified as
+stale active-command admission blocking, not Korean compiler failure and not
+Minecraft crafting execution failure. The uploaded baseline already validates
+that phrase as:
+
+```text
+input=다이아 곡괭이 만들어줘
+status=validated
+command=get diamond_pickaxe 1
+intent=get_item
+```
+
+Do not add a dedicated craft compiler path for this stale-active patch. Add
+only regression coverage proving that the phrase translates before precheck,
+does not submit while busy or quarantined, and submits `get diamond_pickaxe 1`
+when the bridge is idle.
+
+### Wire/Local Snapshot Separation
+
+The current status snapshot is used by more than Python UI. It may be embedded
+in `handshake_ack` and `status_snapshot` WebSocket payloads sent to Java.
+Therefore Python-local reconciliation state must not be written into the
+shared wire snapshot.
+
+The next implementation must split command state views explicitly:
+
+```text
+wire_snapshot:
+  Java-facing status payload
+  contains only actual Java-originated command result state
+  excludes synthetic UNKNOWN
+  excludes tombstones
+  excludes admission quarantine
+
+local_admission_snapshot:
+  Python router/UI/admission view
+  may expose local_effective_result
+  may expose process-lifetime quarantine
+  never sent to Java
+
+audit_snapshot:
+  bounded Python diagnostics view
+  may include reconciliation decisions, tombstones, and candidate state
+  never sent to Java
+```
+
+The command result model must distinguish:
+
+```text
+last_java_result:
+  the latest actual Java command_result accepted by Python
+  eligible for wire status exposure
+
+local_effective_result:
+  Python's local lifecycle interpretation
+  may be synthetic status=unknown with RECONCILED_UNKNOWN
+  forbidden from handshake/status WebSocket payloads sent to Java
+```
+
+Any older wording in this document that refers to storing synthetic UNKNOWN in
+`details.commands.last_result` or exposing quarantine through a generic status
+snapshot is superseded by this separation. Synthetic UNKNOWN and quarantine may
+appear only in Python-local admission or audit snapshots.
+
+Required wire/local leakage tests:
+
+```text
+test_wire_status_snapshot_excludes_python_reconciliation_state
+test_handshake_ack_does_not_echo_synthetic_unknown
+test_status_response_does_not_include_quarantine
+test_local_status_snapshot_exposes_effective_unknown_and_quarantine
+```
+
+### Evidence Source Contract Blocker
+
+The production mutation path is blocked until the exact Java producer contract
+is fixed to the same source/build identity as the logs under review. Before any
+non-test mutation can be enabled, capture and preserve:
+
+```text
+sequence=1 raw command_result envelope
+sequence=2 raw command_result envelope
+Java source commit that produced both envelopes
+runtime JAR/source/build identity that produced the log evidence
+```
+
+If the current repository baseline does not contain the producer for
+`evidence_sequence`, `lifecycle_evidence.version`,
+`lifecycle_evidence.stage`, `stable_request_quiescence`,
+`same_session_generation`, and `request_root_reappeared`, then only these work
+items are allowed:
+
+```text
+strict parser/classifier
+feature-OFF shadow audit
+synthetic fixture-based unit tests
+test-injected guarded mutation
+```
+
+Production mutation remains blocked until the source contract and runtime
+identity are reconciled.
+
+### Identity, Fingerprint, And Cursor Split
+
+Do not treat `evidence_sequence` as part of the stable lifecycle fingerprint.
+The model must be split into three concepts:
+
+```text
+active_identity_key:
+  websocket object identity
+  request_id
+  session_id
+  connection_generation
+  command_message_id / envelope.correlation_id
+  active command
+  active source
+
+stable_evidence_fingerprint:
+  lifecycle_evidence.version
+  lifecycle_evidence.stage
+  dispatch_returned
+  finish_callback_received
+  task_finished_event_received
+  waiting_reason
+  classification
+  terminal_status
+  gameplay_effect
+  normalized bound-root task projection
+  normalized current-root task projection
+  stable_request_quiescence.qualified
+  same_session_generation
+  request_root_reappeared
+
+progression_cursor:
+  previous_sequence
+  current_sequence
+  previous_envelope_message_id
+  current_envelope_message_id
+```
+
+The first behavior patch should require a narrow progression:
+
+```text
+first accepted sequence == 1
+second accepted sequence == 2
+same stable evidence fingerprint
+same expected active object
+different nonblank envelope.message_id
+no intervening contradictory or nonqualifying running evidence
+```
+
+Raw envelope typing must be checked before a result can qualify:
+
+```text
+type(payload.request_id) is str
+type(payload.ok) is bool and payload.ok is True
+payload.status == "running"
+payload.data is Mapping
+type(evidence_sequence) is int
+type(dispatch_returned) is bool
+type(finish_callback_received) is bool
+type(task_finished_event_received) is bool
+```
+
+Do not accept string booleans, numeric booleans, float sequences, string
+sequences, or `bool` as an integer evidence sequence.
+
+### Effective Feature Gate
+
+The feature flag name for the requested patch is:
+
+```text
+reconcile_stale_deposit_to_unknown_enabled
+```
+
+The default is `False`. However, default OFF is not enough by itself. The
+implementation must compute:
+
+```text
+requested_enabled = config.reconcile_stale_deposit_to_unknown_enabled
+runtime_ready = authoritative Java retirement acknowledgement available
+                or restart-safe quarantine capability available
+effective_enabled = requested_enabled and runtime_ready
+```
+
+Current production composition must keep:
+
+```text
+runtime_ready=false
+effective_enabled=false
+blocked_reason=java_retirement_evidence_unavailable
+```
+
+If config requests the feature while `runtime_ready=false`, the system must
+remain in shadow audit mode and must not release active ownership. The risky
+flag should use a strict boolean parser for this setting only. Do not reuse a
+permissive truthiness parser that accepts arbitrary non-empty objects as true.
+
+### Reconciliation Collaborators And Atomic State Swap
+
+Parsing, classification, policy, tombstone retention, quarantine policy, and
+audit outcome construction should live in focused reconciliation collaborators.
+The command ownership/state owner should perform only exact identity validation
+and one lock-protected atomic compare-and-commit.
+
+Recommended ownership shape:
+
+```text
+ActiveCommandReconciliationCoordinator:
+  parses raw payload evidence
+  classifies deposit-only stable evidence
+  prepares immutable decision/outcome
+
+CommandLifecycleStateStore:
+  owns one immutable command-state aggregate
+  compares active object identity
+  swaps the entire state reference on commit
+```
+
+Rollback after partially mutating multiple stores is discouraged. Instead,
+prepare an immutable `next_state` containing:
+
+```text
+active_command=None
+last_java_result unchanged or updated only from actual Java result
+local_effective_result=synthetic UNKNOWN
+bounded tombstone inserted
+process-lifetime admission quarantine active
+candidate sequence state cleared
+```
+
+Then, while holding the command lock:
+
+```text
+if current_state.active_command is not expected_active:
+  return cas_failed
+
+command_state = next_state
+```
+
+No post-release state may expose an idle active slot without the corresponding
+local UNKNOWN and quarantine in the Python-local admission snapshot.
+
+### Quarantine Lifetime
+
+The first patch may implement process-lifetime quarantine only. It must not
+claim restart fail-closed behavior.
+
+```text
+process-lifetime quarantine: allowed
+restart-persistent quarantine: not implemented
+restart fail-closed: not satisfied
+production ON readiness: blocked
+```
+
+The following are not Java retirement evidence and must not clear quarantine:
+
+```text
+WebSocket disconnect
+new handshake
+connection generation change
+server stop/start
+status refresh
+tombstone expiry
+tombstone eviction
+```
+
+Current patch scope must not add a dormant quarantine journal placeholder.
+Durable quarantine journaling is a separate persistence task that needs its own
+crash-consistency, startup-recovery, corruption-handling, and approval plan.
+
+### Additional Required Test Names
+
+Add these tests to the implementation checklist before approval:
+
+```text
+test_sequence_two_without_sequence_one_does_not_release
+test_duplicate_envelope_message_id_does_not_advance_evidence
+test_duplicate_sequence_does_not_advance_evidence
+test_out_of_order_sequence_does_not_release
+test_bool_evidence_sequence_is_rejected
+test_float_or_string_evidence_sequence_is_rejected
+test_raw_top_level_ok_string_does_not_qualify
+test_unknown_evidence_version_does_not_release
+test_unknown_evidence_stage_does_not_release
+test_fingerprint_change_between_sequence_one_and_two_does_not_release
+test_intervening_nonqualifying_running_result_resets_candidate
+test_precheck_accept_then_transport_quarantine_blocks
+test_disconnect_does_not_clear_quarantine
+test_new_handshake_does_not_clear_quarantine
+test_generation_replacement_does_not_clear_quarantine
+test_server_stop_start_does_not_clear_process_lifetime_quarantine
+test_wire_status_excludes_local_effective_unknown
+test_wire_status_excludes_quarantine
+test_handshake_ack_does_not_echo_reconciliation_state
+test_local_status_includes_last_java_result_and_effective_result_separately
+test_invalid_reconciliation_flag_value_is_rejected
+test_requested_true_without_runtime_readiness_does_not_mutate
+test_requested_true_with_test_readiness_allows_guarded_mutation
+test_feature_off_observation_does_not_seed_later_enabled_instance
+test_late_running_matching_tombstone_is_audit_only
+test_tombstone_eviction_does_not_clear_quarantine
+test_quarantined_diamond_pickaxe_make_phrase_translates_but_does_not_submit
 ```
 
 ## Command Registry Lifecycle Boundary
@@ -326,6 +649,959 @@ results, and wrong-correlation results must not advance a workflow.
 
 There is currently no Python event publisher that lets a higher-level
 orchestrator subscribe to accepted command results or disconnect events.
+
+### Stale Active Command Reconciliation Gap
+
+The Python command lifecycle must distinguish command success from active-state
+release. A request can become stale when Java observes a command callback but
+the Python bridge never receives a matching `TaskFinishedEvent`.
+
+The 2026-08-20 live log case is classified as:
+
+```text
+stale active command
++ terminal reconciliation gap
++ gameplay outcome UNKNOWN
+```
+
+The observed shape was:
+
+```text
+request_id=lavi-input-ko-afe485ac0e334f4cbd2717f1d889af11
+source=lavi_chat_mic_router
+normalized_command=@deposit diamond 2
+finish_callback_received=true
+task_finished_event_received=false
+waiting_reason=waiting_for_task_finished_event
+current/bound root task=adris.altoclef.tasks.movement.IdleTask
+StopCommand observed=false
+USER_TASK_CHAIN_CANCEL_REQUESTED observed=false
+gameplay effect verified=false
+```
+
+A later 2026-08-20 live replay confirmed the same boundary with a newer
+request:
+
+```text
+request_id=lavi-input-ko-8532b405be0d4b0e844e89dfe6d822bf
+correlation_id=lavi-ba66cd0a1ad34e66b76b16b5fe18dab4
+session_id=fabric-chatclef-885d3046163e4588be274270eb55935c
+connection_generation=1
+request_command=deposit diamond 2
+
+Java latest.log:
+  finish_callback_received=true
+  dispatch_returned=true
+  task_finished_event_received=false
+  waiting_reason=waiting_for_task_finished_event
+  current/bound/terminal task=adris.altoclef.tasks.movement.IdleTask
+  terminal_result_sent observed=false
+
+Python LAVI log:
+  accepted command_result count=1
+  last_result.status=running
+  last_result.result_reason=dispatch_started
+  last_result.finish_callback_received=false
+  later route blocked with minecraft_command_busy
+```
+
+This proves that Java-local lifecycle logs alone are not sufficient input for
+Python reconciliation. Python needs the latest nonterminal lifecycle evidence
+to arrive through a validated bridge result or another explicitly documented
+Python-readable evidence channel before it can even dry-run the release rule
+accurately.
+
+A diagnostics-only positive live reproduction then proved the full dry-run
+predicate:
+
+```text
+request_id=lavi-input-ko-a110c614c1c347dda0035f6d98cfa519
+session_id=fabric-chatclef-ebcd88b36d004b1bb19ae020c7b2adf4
+connection_generation=1
+command_message_id/correlation_id=lavi-3e702bbd25674b548505a8a722557a98
+command=deposit diamond 2
+
+identity_quality=EXACT
+command_profile=deposit
+dispatch_returned=true
+finish_callback_received=true
+task_finished_event_received=false
+lifecycle_evidence_stage=stable_request_quiescence_observed
+waiting_reason=waiting_for_task_finished_event
+stable_request_quiescence.satisfied=true
+stable_request_quiescence.consecutive_neutral_snapshots=12
+stable_request_quiescence.neutral_duration_ms=543
+latest accepted status=running
+latest accepted result_reason=stable_request_quiescence_observed
+stronger_terminal_result_present=false
+would_reconcile_to_unknown=true
+active_release_performed=false
+```
+
+This is enough evidence for a separately approved, deposit-only, feature-gated
+Python compare-and-release implementation. It is not evidence of gameplay
+success and not evidence that Java is ready for another command.
+
+This must not be classified as `COMPLETED`, `SUCCESS`, `FAILED`, or
+`CANCELLED`. The safe terminal classification is:
+
+```text
+status=unknown
+ok=false
+result_reason=terminal_reconciliation_gap
+detail_reason=finish_callback_without_task_finished_event_after_stable_idle
+reconciliation_action=RECONCILED_UNKNOWN
+gameplay_effect=UNVERIFIED
+```
+
+`RECONCILED_UNKNOWN` is a Python-local reconciliation action or classification.
+It is not a new v1 wire status, not a new Java `CommandResultStatus`, and not a
+Java terminal result. The DTO keeps the existing `status=unknown` value.
+
+Active command release and gameplay success are separate facts:
+
+```text
+active_request_id cleared
+  != command completed
+  != deposit succeeded
+  != inventory effect confirmed
+```
+
+The Python lifecycle reconciler may release the active command only after all
+identity, command-profile, and request-quiescence requirements are satisfied.
+Identity quality is explicit:
+
+```text
+EXACT:
+  expected request_id, session_id, and connection_generation are present and
+  match
+  expected correlation_id matches when the submission carried one
+  expected invocation_id or lifecycle generation matches when present
+
+PARTIAL:
+  at least one expected identity field is missing, but no explicit mismatch is
+  observed
+
+MISMATCH:
+  at least one expected identity field is present and does not match
+```
+
+Automatic UNKNOWN release is allowed only for `identity_quality=EXACT`.
+`PARTIAL` and `MISMATCH` must remain `RECONCILIATION_BLOCKED`; they must not
+release active ownership automatically. `normalized_command` may be logged as a
+diagnostic hint, but it must not be used as an identity key because equivalent
+commands can repeat.
+
+Root ownership observations must be separated:
+
+```text
+initial_request_owned_root:
+  the first root task proven to belong to this request
+
+bound_root_recorded_for_request:
+  the bridge lifecycle binding recorded for this request
+
+current_runtime_root:
+  the fresh runtime root observed during reconciliation
+```
+
+The request-owned root observation state is:
+
+```text
+OBSERVED_AND_GONE:
+  a request-owned root was observed and later disappeared or changed to an
+  approved neutral root
+
+NEVER_OBSERVED:
+  no request-owned root was ever observed
+
+STILL_PRESENT:
+  a request-owned root is still present
+
+UNKNOWN:
+  the root evidence is missing, stale, or ambiguous
+```
+
+Default automatic release is permitted only for `OBSERVED_AND_GONE`. `STILL_PRESENT`
+and `UNKNOWN` block release. `NEVER_OBSERVED` also blocks release for ordinary
+task-producing commands unless the command registry explicitly defines a
+callback-without-bound-task reconciliation profile.
+
+Neutral-root evidence is command-specific. `IdleTask` by itself is not enough,
+a timeout by itself is not enough, and a finish callback by itself is not
+enough. The decision requires exact request identity plus a command profile that
+allows the observed root to count as request quiescence.
+
+The command registry must expose reconciliation fields before public use of
+this release path:
+
+```text
+reconciliation_profile
+expected_terminal_evidence
+task_binding_expected
+neutral_root_classes
+neutral_root_is_release_eligible
+persistent_command
+auto_reconcile_to_unknown_allowed
+```
+
+Example profiles:
+
+```text
+deposit:
+  lifecycle_kind=FINITE_TASK
+  task_binding_expected=true
+  neutral_root_classes=[adris.altoclef.tasks.movement.IdleTask]
+  auto_reconcile_to_unknown_allowed=true
+
+idle:
+  lifecycle_kind=PERSISTENT_TASK
+  neutral_root_classes=[]
+  auto_reconcile_to_unknown_allowed=false
+```
+
+Quiescence evidence may authorize only active-ownership release to UNKNOWN. It
+must never contribute positive evidence toward `COMPLETED`, `SUCCESS`, runtime
+completion, or gameplay-effect verification.
+
+Request quiescence requires all of:
+
+```text
+elapsed_since_callback >= configured_grace_ms
+consecutive_neutral_snapshot_count >= configured_min_neutral_snapshots
+neutral_observation_duration_ms >= configured_min_neutral_duration_ms
+every snapshot age <= configured_max_snapshot_age_ms
+all snapshots use the same session, connection generation, and runtime epoch
+request-owned root did not reappear
+```
+
+The policy metadata must be logged:
+
+```text
+reconciliation_policy_version
+grace_source
+configured_grace_ms
+configured_min_neutral_snapshots
+configured_min_neutral_duration_ms
+configured_max_snapshot_age_ms
+```
+
+If these values have not been evidence-backed or configured, automatic
+reconciliation release remains disabled.
+
+Terminal precedence is:
+
+```text
+1. matching explicit terminal completed/failed/cancelled
+   -> existing terminal path
+
+2. connection lost, session replaced, or generation replaced
+   -> ownership-loss path
+   -> old active request released as ABORTED or UNKNOWN_CONNECTION_LOST
+   -> old request must not carry into the new session
+
+3. callback + missing TaskFinishedEvent + stable request quiescence
+   -> Python-local RECONCILED_UNKNOWN action
+   -> synthetic status=unknown, ok=false result
+   -> Python active ownership release only
+
+4. insufficient identity or quiescence evidence
+   -> RECONCILIATION_BLOCKED
+   -> automatic release forbidden
+```
+
+Recommended state transition:
+
+```text
+transport ownership lifecycle:
+ACTIVE
+  -> CALLBACK_GRACE
+  -> RECONCILIATION_REQUIRED
+  -> RECONCILED_UNKNOWN_TOMBSTONE
+  -> RELEASED
+
+operation orchestrator lifecycle:
+WAITING_CLEANUP_TERMINAL
+  -> TERMINATED_UNKNOWN_BEFORE_PRIMARY
+  -> primary submit count = 0
+
+WAITING_PRIMARY_TERMINAL
+  -> TERMINATED_UNKNOWN
+  -> replay count = 0
+```
+
+`TERMINATED_UNKNOWN` is terminal for the Python operation:
+`operation_active=false`, `python_active_request_id=null`, and
+`automatic_follow_up=false`. Do not collapse it into `FAILED`; failure implies
+evidence that the command failed, while this path means the lifecycle result is
+unresolved.
+
+Python operation closure is not the same thing as bridge command admission.
+After a Python-local UNKNOWN release, `new_command_admission_allowed` remains
+false until authoritative evidence proves that the prior Java command queue and
+lifecycle context are retired. A matching late terminal, connection-generation
+replacement, or recovery/reset completion may be used as retirement evidence
+only when the implementation invariant and tests prove that the signal occurs
+after Java context retirement. Otherwise it is supporting evidence only and the
+admission quarantine remains active.
+
+The reconciler must keep this fail-closed:
+
+```text
+retry_count=0
+replay_count=0
+stop_submit_count=0
+automatic_follow_up=blocked
+new_command_admission_allowed=false until Java retirement is verified
+```
+
+The active release must be an atomic compare-and-set against the expected
+ownership token:
+
+```text
+release_active_if_matches(expected_active_token, reconciled_outcome)
+
+expected_active_token:
+  request_id
+  session_id
+  connection_generation
+  command_message_id/correlation_id when expected
+  invocation_id or lifecycle generation when expected
+
+expected_latest_evidence:
+  accepted_evidence_sequence
+  last_result.status=running
+  last_result.result_reason=stable_request_quiescence_observed
+  dispatch_returned=true
+  lifecycle_evidence_stage=stable_request_quiescence_observed
+  waiting_reason=waiting_for_task_finished_event
+  terminal_decision_observed=false
+  terminal_result_send_started=false
+  terminal_result_sent=false
+```
+
+Actual reconciliation evaluation and commit may start only immediately after
+`accept_result` accepts exact-identity additive lifecycle evidence whose
+`status=running` and `result_reason=stable_request_quiescence_observed`. It
+must run in the same ownership transaction or in a dedicated ownership method
+that holds the same Python command lock.
+
+These paths are read-only for reconciliation and must never create a synthetic
+UNKNOWN or release active ownership:
+
+```text
+status snapshot read
+UI refresh
+busy-command rejection
+new command submission attempt
+router precheck
+polling
+```
+
+The synthetic UNKNOWN is Python-local state. Do not create a fake Java envelope,
+do not recursively call `accept_result()`, and do not send the synthetic result
+through the Java transport path.
+
+Inside the ownership lock, the implementation must verify that the active owner
+still matches the expected token, verify that no stronger matching terminal
+evidence was accepted first, recheck the latest accepted evidence sequence,
+recheck the latest accepted nonterminal status and reconciliation predicate,
+write the synthetic UNKNOWN result, write the reconciliation tombstone, activate
+admission quarantine, and clear active ownership only if the same token is still
+current. If the token or evidence changed, record:
+
+```text
+active_release_performed=false
+reason=active_owner_or_evidence_changed_before_release
+```
+
+The synthetic result must be prepared before the active owner is cleared so
+that the post-lock Python-local admission snapshot is internally consistent.
+The successful local post-lock state is:
+
+```text
+active_request_id=null
+last_java_result=<latest actual Java result, not synthetic>
+local_effective_result.status=unknown
+local_effective_result.ok=false
+local_effective_result.result_reason=terminal_reconciliation_gap
+local_effective_result.data.reconciliation_action=RECONCILED_UNKNOWN
+local_effective_result.data.gameplay_effect=UNVERIFIED
+reconciliation_tombstone_present=true
+admission_quarantine.active=true
+admission_quarantine.java_context_retirement_verified=false
+```
+
+The commit must be exception-safe, not merely lock-protected. Before mutating
+ownership state, construct all replacement values needed for the commit. The
+implementation must then use one of these equivalent safety strategies:
+
+```text
+replace one immutable ownership-state object in one assignment
+or
+perform only in-lock assignments that cannot raise after mutation starts
+or
+restore every prior value before releasing the lock if any commit step fails
+```
+
+A failed or stale compare-and-release attempt must leave all of these
+unchanged:
+
+```text
+active command ownership
+last_result
+reconciliation tombstones
+admission quarantine
+```
+
+Logging, callback publication, and user-facing response formatting should use
+an immutable post-commit snapshot outside the ownership lock. They must not
+submit a command, stop a task, or perform a second ownership mutation inline.
+
+Do not automatically send `stop`, replay the same command, resend `deposit`,
+continue a cleanup workflow, or advance a primary command from this state. A
+late matching event after UNKNOWN release should be recorded as
+`late_terminal_after_reconciliation`; it must not rewrite a user-visible success
+or resurrect the active request.
+
+Reconciliation tombstones must be Python-local, process-local,
+non-persistent, and bounded by both an explicit maximum count and an explicit
+TTL. The implementation plan must name finite `max_entries` and
+`retention_ms` values before code is approved. Expiration should remove expired
+entries first and then evict the oldest `reconciled_at_ms` entry when the count
+limit is exceeded. Tombstone eviction removes audit memory only; it must not by
+itself clear admission quarantine or prove Java retirement.
+
+Late events must not clear the currently active request, mutate the current
+`last_result`, publish a normal accepted terminal event, or advance any current
+operation. They may only update a matching bounded tombstone:
+
+```text
+request_id
+command_message_id/correlation_id
+session_id
+connection_generation
+invocation_id
+original_command
+reconciled_outcome
+reconciled_at_ms
+late_event_count
+expires_at
+```
+
+The tombstone must also retain the accepted evidence sequence used by the CAS,
+reconciliation time, synthetic UNKNOWN reason, profile, and bounded late-result
+audit metadata. The evidence sequence is commit provenance; it is not required
+from a later terminal envelope unless that envelope already carries the same
+additive field.
+
+A terminal result whose full identity still matches the current active command
+must take the normal terminal acceptance path. Tombstone lookup is only for a
+terminal result that does not match any current active command. A single result
+must not be processed both as the current terminal result and as late tombstone
+evidence.
+
+After a synthetic UNKNOWN commit, any later result that matches the tombstone
+identity is audit-only, whether it is late running, late accepted, late
+terminal, duplicate late terminal, or malformed late result. It must not mutate
+`last_java_result`, `local_effective_result`, a current or newer active command,
+admission quarantine, retry/replay/cleanup/follow-up state, or the tombstone
+identity key.
+
+If a matching terminal result arrives after release, the audit event should use
+the tombstone and must not affect a newer active command:
+
+```text
+event=late_terminal_after_reconciled_unknown
+matched_tombstone=true
+newer_active_command_mutated=false
+active_release_performed=false
+```
+
+After `RECONCILED_UNKNOWN` is committed, a later terminal result may be
+associated with the tombstone only when the same full transport identity
+matches exactly. If the late result also carries evidence-lineage data, any
+mismatch must block association. In this implementation stage that late
+terminal is audit evidence only. It must not:
+
+```text
+replace the committed synthetic UNKNOWN last_result
+clear or overwrite a current or newer active command
+repeat active-command release
+change gameplay_effect from UNVERIFIED
+trigger retry, replay, StopCommand, cleanup, recovery, or a follow-up command
+open new-command admission by itself
+```
+
+A late result with a stale session, stale generation, wrong request ID, wrong
+correlation ID, or nonmatching evidence lineage must not attach to the
+tombstone and must not mutate ownership state.
+
+`RECONCILED_UNKNOWN` is a Python-local lifecycle outcome. It must not fabricate
+any Java `TaskFinishedEvent`, Java `command_result`, `CommandResultDTO(status=completed)`,
+or gameplay-effect result. Keep the facts separate:
+
+```text
+last_transport_result:
+  only results actually received from the bridge
+
+last_reconciled_outcome:
+  Python-local stale ownership closure
+```
+
+User-facing wording should stay deliberately limited:
+
+```text
+I could not verify the Minecraft command result. I did not mark it complete and
+I did not retry it automatically. I only cleared the stale waiting state.
+```
+
+This is a Python submission/lifecycle reconciliation responsibility. Do not
+solve this in the Korean alias resolver, item catalog, cleanup policy, Java
+`DepositCommand`, ChatClef task engine, common DTOs, or wire payload schema.
+
+### Java Queue Retirement Boundary
+
+Python-local `RECONCILED_UNKNOWN` releases only Python's stale active ownership.
+It does not automatically clear Java `FabricChatClefCommandQueue.active` or the
+Java lifecycle execution. In the current boundary, Java retires its command
+context only through the existing terminal send/complete path or detach
+handling.
+
+Therefore a first behavior patch must not assume that a Python release makes
+the bridge ready for another command. The safe post-release state is:
+
+```text
+Python:
+  active_request_id=null
+  last_java_result=<latest actual Java result, not synthetic>
+  local_effective_result.status=unknown
+  reconciled_unknown_tombstone=<full identity>
+  admission_quarantine.active=true
+  admission_quarantine.reason=java_command_context_retirement_unverified
+  admission_quarantine.java_context_retirement_verified=false
+  admission_quarantine.retirement_evidence_kind=none
+
+Java:
+  old commandQueue.active may still be present
+  old lifecycle execution may still be present
+```
+
+The authoritative quarantine check must live at the common Python transport
+command-admission boundary that every command submission caller must pass. It
+must run before:
+
+```text
+active ownership creation
+active token allocation
+command envelope send
+```
+
+Router, UI, and busy prechecks may read the same quarantine state to produce a
+clear user-facing block reason, but they are not the authoritative enforcement
+point. Quarantine rejection is side-effect-free:
+
+```text
+active command created=false
+envelope_sent=false
+retry_performed=false
+replay_performed=false
+stop_submitted=false
+cleanup_or_follow_up_submitted=false
+```
+
+New command admission remains blocked until authoritative evidence proves that
+the prior Java command queue and lifecycle context have been retired. These
+signals may count only when their source contract and tests prove Java context
+retirement:
+
+```text
+matching late terminal result after proven Java clear ordering
+trusted Java evidence says the active command context is absent
+connection_generation replacement after proven old-context retirement
+separately approved Java context retirement completion
+verified completion of an explicit recovery/reset path
+```
+
+Merely requesting recovery/reset is not sufficient. Quarantine clearing changes
+only whether a new command may be admitted; it must not revise the committed
+UNKNOWN into success, completion, failure, or verified gameplay effect.
+
+The following are not Java retirement evidence by themselves:
+
+```text
+Python process restart
+generic disconnect
+reconnect
+connection generation change
+ordinary ownership clear
+tombstone expiration or eviction
+tombstone missing because tombstones are non-persistent
+```
+
+The implementation plan must state whether admission quarantine persists across
+or is reconstructed after reconnect and Python process restart. If Python can
+restart while Minecraft/Java remains alive and no persisted quarantine marker or
+authoritative reconnect-time Java retirement proof exists, the release feature
+must remain disabled outside controlled tests.
+
+Python-local admission/audit snapshots and busy diagnostics should expose at
+least:
+
+```text
+admission_quarantine.active
+admission_quarantine.reason
+admission_quarantine.released_identity
+admission_quarantine.java_context_retirement_verified
+admission_quarantine.retirement_evidence_kind
+admission_quarantine.activated_at_ms
+```
+
+Java-facing `handshake_ack` and `status_snapshot` payloads must not expose
+admission quarantine, reconciliation tombstones, or Python-local synthetic
+UNKNOWN state.
+
+This keeps the initial behavior patch scoped to Python stale-ownership
+reconciliation. Java-side retirement, automatic connection reset, and immediate
+post-release command admission are separate approval targets.
+
+### Java Running Lifecycle Evidence Publication
+
+The safest diagnostics-only Java/Python boundary is for Java to publish
+additive nonterminal lifecycle evidence through the existing
+`command_result` channel with `status=running`.
+
+Do not add a new message type, new public status, Java-originated status
+snapshot channel, or terminal outbox path for this evidence. Java already uses
+`command_result` for accepted command updates, and Python already validates
+websocket, session, generation, request, and correlation before accepting a
+result. An accepted `running` update may refresh
+`details.commands.last_result` while preserving active command ownership.
+
+Recommended nonterminal stages:
+
+```text
+finish_callback_observed_nonterminal:
+  status=running
+  finish_callback_received=true
+  task_finished_event_received=false
+  lifecycle_evidence.quiescence.qualified=false
+  gameplay_effect=UNVERIFIED
+
+stable_request_quiescence_observed:
+  status=running
+  finish_callback_received=true
+  task_finished_event_received=false
+  lifecycle_evidence.quiescence.qualified=true
+  gameplay_effect=UNVERIFIED
+```
+
+The first stage proves that the Java finish callback evidence crossed the
+transport boundary. The second stage proves that Java observed a stable
+nonterminal quiescence window. Python dry-run reconciliation may treat only the
+second stage as an UNKNOWN-release candidate input, and only after Python's own
+EXACT identity and command-profile checks pass.
+
+Stable quiescence must not mean "IdleTask was seen once" or "status was polled
+multiple times." Java evidence should include a bounded observation window:
+
+```text
+first_client_tick_id
+last_client_tick_id
+first_observed_at_ms
+last_observed_at_ms
+observation_count
+stable_duration_ms
+signature_version
+evidence_sequence
+```
+
+The stable signature should cover the command identity and runtime ownership
+that Java can observe:
+
+```text
+dispatch_returned=true
+finish_callback_received=true
+task_finished_event_received=false
+waiting_reason=waiting_for_task_finished_event
+active execution/context unchanged
+terminal decision absent
+terminal send not started
+runtime observation available
+current task is an approved neutral root
+root assignment/generation unchanged
+selected chain identity/class unchanged
+selected_chain_task_path unchanged
+observations happened on distinct client ticks
+```
+
+Python must accept additive lifecycle evidence monotonically for one exact
+active identity:
+
+```text
+lower evidence_sequence than latest accepted
+  -> reject
+  -> do not regress last_result
+
+same evidence_sequence + same lifecycle fingerprint
+  -> idempotent no-op
+
+same evidence_sequence + conflicting lifecycle fingerprint
+  -> reject
+  -> emit conflict diagnostic
+
+higher evidence_sequence
+  -> accept only after websocket, session, generation, request, and correlation
+     validation
+```
+
+The implementation plan must define the lifecycle fingerprint fields before
+code approval. A terminal result that passes exact identity is stronger than
+nonterminal lifecycle evidence even when it does not carry an
+`evidence_sequence`. A future `RECONCILED_UNKNOWN` CAS must fail closed if the
+qualifying stable evidence has no accepted sequence, if that sequence regresses,
+or if it changes between eligibility evaluation and commit.
+
+If the task, root assignment, chain, session, generation, request, correlation,
+or runtime observation availability changes, Java must reset or withhold the
+qualified quiescence evidence. False negatives are acceptable; false positives
+can release a live command and are not acceptable.
+
+Java must report raw facts only. These fields and meanings are forbidden in the
+Java evidence payload:
+
+```text
+identity_quality=EXACT
+safe_to_release=true
+command_completed
+terminal_candidate_confirmed
+gameplay_success
+task_success
+```
+
+EXACT identity is Python-owned because Python compares the accepted envelope
+against active command ownership. Java evidence must keep:
+
+```text
+classification=nonterminal_diagnostic
+status=running
+gameplay_effect=UNVERIFIED
+```
+
+Diagnostics-only work may stop at:
+
+```text
+would_reconcile_to_unknown=true
+active_release_performed=false
+terminal_status=NONE
+gameplay_effect=UNVERIFIED
+```
+
+Actual `RECONCILED_UNKNOWN` creation and active release are a later Python
+behavior change. The first implementation must be default-disabled,
+feature-gated, deposit-profile-only, and Python-only. It must happen under
+`FabricChatClefConnectionOwnership`'s command lock as one exception-safe
+compare-and-release operation that rechecks full active identity, latest
+evidence sequence, `status=running`, command-profile allowance,
+profile-specific snapshot/duration thresholds, supported signature version,
+`dispatch_returned=true`,
+`lifecycle_evidence_stage=stable_request_quiescence_observed`,
+`waiting_reason=waiting_for_task_finished_event`, and absence of a stronger
+matching terminal result or in-flight terminal send. The same commit must write
+the synthetic UNKNOWN result, bounded tombstone, and admission quarantine before
+clearing Python active ownership.
+
+Future diagnostics for this boundary should record, in Python-local lifecycle
+logs:
+
+```text
+request_id, correlation_id, session_id, connection_generation
+command_generation or invocation_id
+submitted_at, accepted_at, finish_callback_received_at
+task_finished_event_received_at
+reconciliation_started_at, grace_deadline_at
+neutral_state_first_observed_at, neutral_state_last_observed_at
+terminal_decided_at, active_released_at
+identity_quality
+initial_bound_root_task_id/class/description/generation
+bound_root_recorded_for_request
+current_root_task_id/class/description/generation
+request_root_observation_state
+current_task_snapshot_age_ms
+root_transition_count
+same_neutral_root_consecutive_count
+returned_to_request_owned_root_after_callback
+reconciliation_profile
+auto_reconcile_to_unknown_allowed
+terminal evidence bitset
+identity_match_result and mismatch reason
+reconciliation_attempt_id, decision, decision_rule_version
+grace_elapsed_ms, neutral_snapshot_count
+neutral_observation_duration_ms
+submit_count, retry_count, replay_count, stop_submit_count
+effect_oracle_available, effect_verification_status
+```
+
+Before code approval, the implementation plan must name:
+
+```text
+audited branch or commit
+Python files, classes, and methods to modify
+Java, DTO, and protocol files intentionally left unchanged
+feature flag exact name and default OFF behavior
+canonical deposit profile predicate
+lifecycle fingerprint fields
+tombstone max_entries
+tombstone retention_ms
+quarantine persistence or reconnect/restart fail-closed strategy
+immutable CAS state representation or rollback strategy
+authoritative transport admission gate location
+exact late-terminal dispatch ordering
+Java retirement evidence source contract
+unit and race test files and test case names
+```
+
+Minimum implementation tests for this path:
+
+```text
+deposit + EXACT identity + callback + stable approved IdleTask
+  + no TaskFinishedEvent
+  + deposit profile thresholds satisfied
+  -> status=unknown, reconciliation_action=RECONCILED_UNKNOWN
+  -> Python active release count 1
+  -> success/retry/replay/stop/follow-up count 0
+  -> new command admission remains blocked until Java retirement evidence
+
+idle command + IdleTask
+  -> neutral evidence not accepted
+  -> automatic release count 0
+
+single IdleTask snapshot
+  -> release count 0
+
+stale snapshot
+  -> release count 0
+
+identity PARTIAL
+  -> release count 0
+
+identity MISMATCH
+  -> release count 0
+
+request-owned root reappears or is still present
+  -> release count 0
+
+ordinary task-producing command with request-owned root NEVER_OBSERVED
+  -> release count 0
+
+matching TaskFinishedEvent arrives during grace
+  -> ordinary terminal path
+  -> reconciled UNKNOWN count 0
+
+terminal send already started or in flight
+  -> reconciled UNKNOWN count 0
+  -> active release count 0
+
+lower evidence_sequence after newer evidence accepted
+  -> last_result unchanged
+  -> active release count 0
+
+same evidence_sequence + same lifecycle fingerprint
+  -> idempotent no-op
+  -> duplicate accepted result count 0
+
+same evidence_sequence + conflicting lifecycle fingerprint
+  -> conflict diagnostic count 1
+  -> active release count 0
+
+qualifying stable evidence without accepted evidence_sequence
+  -> active release count 0
+
+status snapshot read after qualifying evidence
+  -> active release count 0
+
+busy-command rejection after qualifying evidence
+  -> active release count 0
+
+new command submission attempt while quarantined
+  -> active command created false
+  -> envelope sent false
+  -> retry/replay/stop/cleanup/follow-up count 0
+
+disconnect or session replacement
+  -> ownership-loss path
+  -> stale-quiescence rule not used
+
+late old event after a new request is active
+  -> current active request unchanged
+  -> accepted event publication count 0
+  -> tombstone late_event_count +1
+  -> newer active command mutated count 0
+
+two reconciler workers race
+  -> CAS active release count 1
+  -> user terminal response count 1
+
+exception during synthetic UNKNOWN commit
+  -> active command ownership unchanged
+  -> last_result unchanged
+  -> tombstones unchanged
+  -> admission quarantine unchanged
+
+stale active token after eligibility evaluation
+  -> active release count 0
+  -> synthetic UNKNOWN count 0
+
+stale accepted_evidence_sequence after eligibility evaluation
+  -> active release count 0
+  -> synthetic UNKNOWN count 0
+
+terminal accepted before CAS commit
+  -> ordinary terminal path wins
+  -> reconciled UNKNOWN count 0
+
+terminal arrives after CAS commit with exact tombstone identity
+  -> late_terminal_after_reconciled_unknown audit count 1
+  -> committed synthetic UNKNOWN unchanged
+  -> active release count 0
+  -> new command admission remains blocked unless Java retirement is proven
+
+terminal arrives after CAS commit with wrong session/generation/request/correlation
+  -> tombstone association count 0
+  -> ownership mutation count 0
+
+tombstone TTL expires
+  -> tombstone audit memory evicted
+  -> admission quarantine unchanged
+  -> Java retirement not inferred
+
+tombstone max_entries exceeded
+  -> expired entries evicted first
+  -> otherwise oldest reconciled_at_ms evicted
+  -> admission quarantine unchanged
+
+authoritative Java retirement evidence arrives
+  -> admission quarantine may clear
+  -> synthetic UNKNOWN remains UNKNOWN
+
+matching late terminal without proven Java retirement invariant
+  -> admission quarantine remains active
+
+connection generation replacement without proven old-context retirement
+  -> admission quarantine remains active
+
+verified recovery/reset completion
+  -> admission quarantine may clear
+  -> synthetic UNKNOWN remains UNKNOWN
+
+Python restart while Java may still be alive and quarantine cannot be restored
+  -> feature remains disabled outside controlled tests
+  -> new command admission remains fail-closed
+
+ordinary reconnect or connection generation change without retirement proof
+  -> Java retirement not inferred
+  -> admission quarantine remains active
+```
 
 ### Inventory Snapshot Gap
 

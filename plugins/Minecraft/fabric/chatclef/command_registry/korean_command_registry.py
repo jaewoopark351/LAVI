@@ -34,18 +34,17 @@ class KoreanChatClefCommandRegistry:
         {
             "deposit",
             "equip",
-            "follow",
             "food",
             "get",
             "give",
             "goto",
-            "idle",
             "meat",
-            "stop",
         }
     )
-    _PARSER_READY_COMMANDS = _PUBLIC_KOREAN_COMMANDS | frozenset({"idle"})
-    _PYTHON_ADMISSION_READY_COMMANDS = _PUBLIC_KOREAN_COMMANDS | frozenset({"idle"})
+    _PARSER_READY_COMMANDS = _PUBLIC_KOREAN_COMMANDS | frozenset(
+        {"follow", "idle", "stop"}
+    )
+    _PYTHON_ADMISSION_READY_COMMANDS = _PUBLIC_KOREAN_COMMANDS
     _BRIDGE_LIFECYCLE_READY_COMMANDS = frozenset(
         {"deposit", "equip", "food", "get", "give", "goto", "meat", "stop"}
     )
@@ -158,6 +157,8 @@ class KoreanChatClefCommandRegistry:
     def _allowed_input_sources(self, command: str) -> tuple[str, ...]:
         if command in self._PUBLIC_KOREAN_COMMANDS:
             return ("lavi_chat_mic_router", "direct_typed")
+        if command == "stop":
+            return ("direct_typed",)
         if self._SAFETY_TIERS[command] in {"R3", "R4"}:
             return ("direct_typed_only",)
         return ()

@@ -3,6 +3,10 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
+from plugins.Minecraft.fabric.chatclef.transport.reconciliation import (
+    ActiveCommandReconciliationDiagnosticBuilder,
+)
+
 from .bridge_status_selector import MinecraftChatClefBridgeStatusSelector
 from .submission_readiness import MinecraftChatClefSubmissionReadiness
 
@@ -13,9 +17,16 @@ class MinecraftChatClefSubmissionPrecheck:
     def __init__(
         self,
         bridge_status_selector: MinecraftChatClefBridgeStatusSelector | None = None,
+        reconciliation_diagnostics: (
+            ActiveCommandReconciliationDiagnosticBuilder | None
+        ) = None,
     ):
         self._bridge_status_selector = (
             bridge_status_selector or MinecraftChatClefBridgeStatusSelector()
+        )
+        self._reconciliation_diagnostics = (
+            reconciliation_diagnostics
+            or ActiveCommandReconciliationDiagnosticBuilder()
         )
 
     def inspect(self, extension: Any) -> MinecraftChatClefSubmissionReadiness:
@@ -93,6 +104,18 @@ class MinecraftChatClefSubmissionPrecheck:
                 "Fabric ChatClef command status is incomplete.",
                 bridge,
             )
+        quarantine = self._active_quarantine(commands)
+        if quarantine is not None:
+            return MinecraftChatClefSubmissionReadiness.rejected(
+                reason="minecraft_command_quarantined",
+                error="java_retirement_unverified",
+                message=(
+                    "Fabric ChatClef command admission is quarantined until "
+                    "Java command retirement is verified."
+                ),
+                status=bridge,
+                details={"quarantine": quarantine},
+            )
         active_request_id = commands.get("active_request_id")
         if active_request_id is None:
             return MinecraftChatClefSubmissionReadiness.accepted(bridge)
@@ -116,6 +139,11 @@ class MinecraftChatClefSubmissionPrecheck:
             error="active_command",
             message=message,
             status=bridge,
+            details={
+                "active_command_reconciliation": (
+                    self._reconciliation_diagnostics.build(commands)
+                ),
+            },
         )
 
     def _command_status(
@@ -127,6 +155,17 @@ class MinecraftChatClefSubmissionPrecheck:
             return None
         commands = details.get("commands")
         return dict(commands) if isinstance(commands, Mapping) else None
+
+    def _active_quarantine(
+        self,
+        commands: Mapping[str, Any],
+    ) -> dict[str, Any] | None:
+        quarantine = commands.get("admission_quarantine")
+        if not isinstance(quarantine, Mapping):
+            return None
+        if quarantine.get("active") is not True:
+            return None
+        return dict(quarantine)
 
     def _disconnected(
         self,

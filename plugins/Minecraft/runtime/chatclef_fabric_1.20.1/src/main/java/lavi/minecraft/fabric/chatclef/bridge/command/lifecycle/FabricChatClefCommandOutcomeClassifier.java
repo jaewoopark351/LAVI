@@ -12,6 +12,10 @@ public final class FabricChatClefCommandOutcomeClassifier {
         if (!execution.dispatchReturned()) {
             return FabricChatClefCommandTerminalDecision.waiting("dispatch_not_returned");
         }
+        if (execution.rootOwnershipClassification()
+                == FabricChatClefRootOwnershipClassification.PREEXISTING_UNCHANGED_IDLE_ROOT) {
+            return classifyPreexistingUnchangedIdleRoot(execution);
+        }
         if (!execution.hasBoundRootTask()) {
             return classifyCommandWithoutUserTask(execution, observation);
         }
@@ -61,6 +65,27 @@ public final class FabricChatClefCommandOutcomeClassifier {
         return FabricChatClefCommandTerminalDecision.terminal(
                 "callback_completed_without_user_task",
                 execution.completedWithoutUserTask()
+        );
+    }
+
+    private FabricChatClefCommandTerminalDecision classifyPreexistingUnchangedIdleRoot(
+            FabricChatClefCommandExecution execution
+    ) {
+        if (!execution.finishCallbackReceived()) {
+            return FabricChatClefCommandTerminalDecision.waiting("waiting_for_command_callback");
+        }
+        if (!execution.finishCallbackFirstObservedBeforeDispatchReturn()) {
+            return FabricChatClefCommandTerminalDecision.waiting("finish_callback_not_synchronous");
+        }
+        if (execution.taskFinishedObservation() != null) {
+            return FabricChatClefCommandTerminalDecision.waiting("task_finished_event_attached_before_idle_root_classification");
+        }
+        if (!execution.preexistingIdleRootStabilityQualified()) {
+            return FabricChatClefCommandTerminalDecision.waiting("waiting_for_preexisting_idle_root_stability");
+        }
+        return FabricChatClefCommandTerminalDecision.terminal(
+                "preexisting_unchanged_idle_root_without_command_owned_root",
+                execution.unknownFromPreexistingUnchangedIdleRoot()
         );
     }
 }

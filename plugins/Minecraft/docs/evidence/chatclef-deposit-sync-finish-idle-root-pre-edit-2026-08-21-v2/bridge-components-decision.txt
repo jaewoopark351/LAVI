@@ -1,0 +1,6 @@
+﻿FabricChatClefBridgeComponents.java decision
+decision: keep byte-identical in the first edit-only implementation pass
+reason: production wiring can use existing constructors/default collaborators; package-private seams may be used for tests
+if implementation proves production object-graph wiring is unavoidable: stop and report before changing this file
+current file SHA-256: 
+169A6F0B31DDE43DFF29B85D9639D514A7E2E997716F7F978FCBA69AD525D396

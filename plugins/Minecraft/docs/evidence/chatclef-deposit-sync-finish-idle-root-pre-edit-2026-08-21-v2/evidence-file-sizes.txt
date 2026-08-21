@@ -1,0 +1,16 @@
+﻿
+Name                                                       Length
+----                                                       ------
+bridge-components-decision.txt                                452
+dirty-files-intentionally-excluded-from-implementation.txt 114186
+evidence-payload-sha256.txt                                  2838
+git-diff-name-status.txt                                     9466
+git-status-short-untracked-all.txt                         115683
+implementation-plan-alignment.txt                             608
+junit-dependency-decision.txt                                 400
+planned-existing-file-path-scoped-diffs.patch               61278
+planned-existing-file-sha256-before.txt                     10451
+planned-new-files-baseline.txt                               3581
+
+
+

@@ -44,6 +44,7 @@ KOREAN_INPUT_TO_COMMAND_CASES = [
     ("철 흉갑 입어줘", "equip iron_chestplate"),
     ("다이아몬드 2개 상자에 넣어줘", "deposit diamond 2"),
     ("Steve에게 다이아몬드 3개 줘", "give Steve diamond 3"),
+    ("참나무 원목 2개 가져와줘", "get oak_log 2"),
     ("oak_log 2개 가져와줘", "get oak_log 2"),
     ("다이아몬드 곡괭이 하나 가져와", "get diamond_pickaxe 1"),
 ]
@@ -137,9 +138,44 @@ class KoreanInputToChatClefSubmissionPathTests(unittest.TestCase):
 
         decision = router.route("잡템 상자에 넣어줘")
 
-        self.assertFalse(decision.handled)
-        self.assertIn(decision.reason, {"unknown_intent", "ambiguous_intent"})
+        self.assertNotEqual("minecraft_command_routed", decision.reason)
+        self.assertNotEqual("bare_deposit", decision.translation.get("command"))
+        self.assertIsNone(decision.translation.get("command"))
         self.assertEqual([], adapter.requests)
+
+    def test_specific_deposit_requires_explicit_quantity(self):
+        adapter = _RecordingAdapter()
+        extension = MinecraftFabricChatClefExtension(adapter=adapter)
+        router = MinecraftChatClefInputRouter(
+            extension=extension,
+            log_callback=lambda _message: None,
+        )
+
+        decision = router.route("다이아몬드 상자에 넣어줘")
+
+        self.assertNotEqual("minecraft_command_routed", decision.reason)
+        self.assertEqual("minecraft_translation_rejected", decision.reason)
+        self.assertEqual("missing_deposit_quantity", decision.result.get("error"))
+        self.assertIsNone(decision.translation.get("command"))
+        self.assertEqual([], adapter.requests)
+
+    def test_parse_ready_non_public_commands_do_not_reach_adapter(self):
+        for text in ["Steve 따라가", "가만히 있어", "멈춰"]:
+            with self.subTest(text=text):
+                adapter = _RecordingAdapter()
+                extension = MinecraftFabricChatClefExtension(adapter=adapter)
+                router = MinecraftChatClefInputRouter(
+                    extension=extension,
+                    log_callback=lambda _message: None,
+                )
+
+                decision = router.route(text)
+
+                self.assertTrue(decision.handled)
+                self.assertEqual("minecraft_command_rejected", decision.reason)
+                self.assertEqual("invalid_request", decision.result.get("error"))
+                self.assertFalse(decision.result["details"]["public_korean_enabled"])
+                self.assertEqual([], adapter.requests)
 
     def test_connected_precheck_blocks_disconnected_adapter_submission(self):
         adapter = _RecordingAdapter(connected=False)

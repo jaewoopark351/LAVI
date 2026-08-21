@@ -144,6 +144,18 @@ public final class FabricChatClefTaskOwnershipSnapshot {
         );
     }
 
+    public boolean available() {
+        return available;
+    }
+
+    public long capturedAtMs() {
+        return capturedAtMs;
+    }
+
+    public long capturedClientTick() {
+        return capturedClientTick;
+    }
+
     public String userTaskRootIdentity() {
         return userTaskRootIdentity;
     }
@@ -162,6 +174,30 @@ public final class FabricChatClefTaskOwnershipSnapshot {
 
     public boolean userTaskRunningIdle() {
         return userTaskRunningIdle;
+    }
+
+    public boolean nextTaskIdleFlag() {
+        return nextTaskIdleFlag;
+    }
+
+    public boolean taskRunnerActive() {
+        return taskRunnerActive;
+    }
+
+    public String selectedChainClass() {
+        return selectedChainClass;
+    }
+
+    public String selectedChainIdentity() {
+        return selectedChainIdentity;
+    }
+
+    public boolean selectedChainIsUserTaskChain() {
+        return selectedChainIsUserTaskChain;
+    }
+
+    public String selectedChainTaskPath() {
+        return selectedChainTaskPath;
     }
 
     public Map<String, Object> toMap() {

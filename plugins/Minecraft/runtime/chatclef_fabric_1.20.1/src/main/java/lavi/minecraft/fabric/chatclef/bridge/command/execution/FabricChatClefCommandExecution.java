@@ -2,8 +2,12 @@ package lavi.minecraft.fabric.chatclef.bridge.command.execution;
 
 import adris.altoclef.tasksystem.Task;
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandContext;
+import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefRootOwnershipClassification;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandTerminationObservation;
+import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.evidence.FabricChatClefStableRequestQuiescenceObservation;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefBoundRootTaskRelationshipPayload;
+import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefFinishCallbackObservation;
+import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskOwnershipEvidence;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskSnapshot;
 import lavi.minecraft.fabric.chatclef.bridge.command.result.FabricChatClefCommandResultDataPayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.result.FabricChatClefCommandResultPayload;
@@ -16,9 +20,9 @@ public final class FabricChatClefCommandExecution {
     public FabricChatClefCommandExecution(
             FabricChatClefCommandContext context,
             String normalizedCommand,
-            FabricChatClefTaskSnapshot taskBeforeDispatch
+            FabricChatClefTaskOwnershipEvidence taskBeforeDispatchEvidence
     ) {
-        this.state = new FabricChatClefCommandExecutionState(context, normalizedCommand, taskBeforeDispatch);
+        this.state = new FabricChatClefCommandExecutionState(context, normalizedCommand, taskBeforeDispatchEvidence);
         this.resultFactory = new FabricChatClefCommandResultFactory(state);
     }
 
@@ -26,8 +30,20 @@ public final class FabricChatClefCommandExecution {
         return resultFactory.runningResult();
     }
 
-    public void markFinishCallbackReceived(FabricChatClefTaskSnapshot taskAtFinish) {
-        state.markFinishCallbackReceived(taskAtFinish);
+    public FabricChatClefCommandResultPayload runningLifecycleEvidenceResult(
+            String stage,
+            int evidenceSequence,
+            String waitingReason,
+            FabricChatClefTaskSnapshot currentRootTask,
+            FabricChatClefStableRequestQuiescenceObservation quiescence
+    ) {
+        return resultFactory.runningLifecycleEvidenceResult(
+                stage,
+                evidenceSequence,
+                waitingReason,
+                currentRootTask,
+                quiescence
+        );
     }
 
     public void markFinishCallbackReceived(Task taskAtFinish) {
@@ -35,7 +51,6 @@ public final class FabricChatClefCommandExecution {
     }
 
     public FabricChatClefCommandResultPayload unknownAfterFinish(FabricChatClefTaskSnapshot taskAtFinish) {
-        markFinishCallbackReceived(taskAtFinish);
         return resultFactory.unknownAfterFinish();
     }
 
@@ -49,8 +64,19 @@ public final class FabricChatClefCommandExecution {
         return resultFactory.failedFromDispatchException();
     }
 
-    public void markDispatchReturned(Task boundRootTask, FabricChatClefTaskSnapshot taskAfterDispatch) {
-        state.markDispatchReturned(boundRootTask, taskAfterDispatch);
+    public void openExecutorExecuteInvocation() {
+        state.openExecutorExecuteInvocation();
+    }
+
+    public void closeExecutorExecuteInvocation() {
+        state.closeExecutorExecuteInvocation();
+    }
+
+    public void markDispatchReturned(
+            FabricChatClefTaskOwnershipEvidence taskAfterDispatchEvidence,
+            FabricChatClefRootOwnershipClassification rootOwnershipClassification
+    ) {
+        state.markDispatchReturned(taskAfterDispatchEvidence, rootOwnershipClassification);
     }
 
     public void markTaskFinishedObservation(FabricChatClefCommandTerminationObservation observation) {
@@ -63,6 +89,22 @@ public final class FabricChatClefCommandExecution {
 
     public boolean finishCallbackReceived() {
         return state.finishCallbackReceived();
+    }
+
+    public long finishCallbackReceivedAtMs() {
+        return state.finishCallbackReceivedAtMs();
+    }
+
+    public FabricChatClefFinishCallbackObservation firstFinishCallbackObservation() {
+        return state.firstFinishCallbackObservation();
+    }
+
+    public int finishCallbackDuplicateCount() {
+        return state.finishCallbackDuplicateCount();
+    }
+
+    public boolean finishCallbackFirstObservedBeforeDispatchReturn() {
+        return state.finishCallbackFirstObservedBeforeDispatchReturn();
     }
 
     public boolean hasBoundRootTask() {
@@ -100,6 +142,10 @@ public final class FabricChatClefCommandExecution {
         return resultFactory.completedWithoutUserTask();
     }
 
+    public FabricChatClefCommandResultPayload unknownFromPreexistingUnchangedIdleRoot() {
+        return resultFactory.unknownFromPreexistingUnchangedIdleRoot();
+    }
+
     public FabricChatClefCommandResultPayload failedFromStoppedTask(FabricChatClefCommandTerminationObservation observation) {
         return resultFactory.failedFromStoppedTask(observation);
     }
@@ -122,6 +168,32 @@ public final class FabricChatClefCommandExecution {
 
     public FabricChatClefCommandContext context() {
         return state.context();
+    }
+
+    public FabricChatClefTaskOwnershipEvidence taskBeforeDispatchEvidence() {
+        return state.taskBeforeDispatchEvidence();
+    }
+
+    public FabricChatClefTaskOwnershipEvidence taskAfterDispatchEvidence() {
+        return state.taskAfterDispatchEvidence();
+    }
+
+    public FabricChatClefRootOwnershipClassification rootOwnershipClassification() {
+        return state.rootOwnershipClassification();
+    }
+
+    public void markPreexistingIdleRootStabilityObservation(
+            FabricChatClefStableRequestQuiescenceObservation observation
+    ) {
+        state.markPreexistingIdleRootStabilityObservation(observation);
+    }
+
+    public FabricChatClefStableRequestQuiescenceObservation preexistingIdleRootStabilityObservation() {
+        return state.preexistingIdleRootStabilityObservation();
+    }
+
+    public boolean preexistingIdleRootStabilityQualified() {
+        return state.preexistingIdleRootStabilityQualified();
     }
 
     public FabricChatClefCommandResultDataPayload duplicateTerminalPayload(String reason) {

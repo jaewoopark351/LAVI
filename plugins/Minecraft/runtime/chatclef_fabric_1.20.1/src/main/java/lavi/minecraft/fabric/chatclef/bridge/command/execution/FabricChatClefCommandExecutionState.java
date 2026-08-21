@@ -3,8 +3,12 @@ package lavi.minecraft.fabric.chatclef.bridge.command.execution;
 import adris.altoclef.tasksystem.Task;
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandContext;
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandRequest;
+import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefRootOwnershipClassification;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandTerminationObservation;
+import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.evidence.FabricChatClefStableRequestQuiescenceObservation;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefBoundRootTaskRelationshipPayload;
+import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefFinishCallbackObservation;
+import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskOwnershipEvidence;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskSnapshot;
 
 //20260804_kpopmodder: Keep mutable ChatClef command execution state out of result orchestration.
@@ -14,12 +18,21 @@ final class FabricChatClefCommandExecutionState {
     private final String normalizedCommand;
     private final long dispatchStartedMs;
     private final String dispatchThreadName;
+    private final FabricChatClefTaskOwnershipEvidence taskBeforeDispatchEvidence;
     private final FabricChatClefTaskSnapshot taskBeforeDispatch;
+    private volatile boolean executorExecuteInvocationOpen;
     private volatile boolean dispatchReturned;
     private volatile boolean finishCallbackReceived;
+    private volatile long finishCallbackReceivedAtMs;
+    private volatile FabricChatClefFinishCallbackObservation firstFinishCallbackObservation;
+    private volatile int finishCallbackDuplicateCount;
     private volatile String failureType = "";
     private volatile String failureMessage = "";
     private volatile Task boundRootTask;
+    private volatile FabricChatClefTaskOwnershipEvidence taskAfterDispatchEvidence;
+    private volatile FabricChatClefRootOwnershipClassification rootOwnershipClassification =
+            FabricChatClefRootOwnershipClassification.OWNERSHIP_UNKNOWN;
+    private volatile FabricChatClefStableRequestQuiescenceObservation preexistingIdleRootStabilityObservation;
     private volatile FabricChatClefTaskSnapshot taskAfterDispatch;
     private volatile FabricChatClefTaskSnapshot terminalTask;
     private volatile FabricChatClefCommandTerminationObservation taskFinishedObservation;
@@ -27,26 +40,43 @@ final class FabricChatClefCommandExecutionState {
     FabricChatClefCommandExecutionState(
             FabricChatClefCommandContext context,
             String normalizedCommand,
-            FabricChatClefTaskSnapshot taskBeforeDispatch
+            FabricChatClefTaskOwnershipEvidence taskBeforeDispatchEvidence
     ) {
         this.context = context;
         this.request = context.request();
         this.normalizedCommand = normalizedCommand;
-        this.taskBeforeDispatch = taskBeforeDispatch;
+        this.taskBeforeDispatchEvidence = taskBeforeDispatchEvidence == null
+                ? FabricChatClefTaskOwnershipEvidence.empty()
+                : taskBeforeDispatchEvidence;
+        this.taskBeforeDispatch = this.taskBeforeDispatchEvidence.rootTaskSnapshot();
         this.dispatchStartedMs = System.currentTimeMillis();
         this.dispatchThreadName = Thread.currentThread().getName();
+        this.taskAfterDispatchEvidence = FabricChatClefTaskOwnershipEvidence.empty();
         this.taskAfterDispatch = FabricChatClefTaskSnapshot.capture(null);
         this.terminalTask = FabricChatClefTaskSnapshot.capture(null);
     }
 
-    void markFinishCallbackReceived(FabricChatClefTaskSnapshot taskAtFinish) {
-        finishCallbackReceived = true;
-        terminalTask = taskAtFinish;
+    synchronized void openExecutorExecuteInvocation() {
+        executorExecuteInvocationOpen = true;
     }
 
-    void markFinishCallbackReceived(Task taskAtFinish) {
+    synchronized void closeExecutorExecuteInvocation() {
+        executorExecuteInvocationOpen = false;
+    }
+
+    synchronized void markFinishCallbackReceived(Task taskAtFinish) {
+        if (finishCallbackReceived) {
+            finishCallbackDuplicateCount++;
+            return;
+        }
+        FabricChatClefFinishCallbackObservation observation =
+                FabricChatClefFinishCallbackObservation.capture(taskAtFinish, executorExecuteInvocationOpen);
+        firstFinishCallbackObservation = observation;
         finishCallbackReceived = true;
-        terminalTask = FabricChatClefTaskSnapshot.capture(taskAtFinish);
+        if (finishCallbackReceivedAtMs == 0L) {
+            finishCallbackReceivedAtMs = System.currentTimeMillis();
+        }
+        terminalTask = observation.taskSnapshot();
     }
 
     void markFailure(Throwable exception, FabricChatClefTaskSnapshot taskAtFailure) {
@@ -55,10 +85,22 @@ final class FabricChatClefCommandExecutionState {
         terminalTask = taskAtFailure;
     }
 
-    void markDispatchReturned(Task boundRootTask, FabricChatClefTaskSnapshot taskAfterDispatch) {
+    void markDispatchReturned(
+            FabricChatClefTaskOwnershipEvidence taskAfterDispatchEvidence,
+            FabricChatClefRootOwnershipClassification rootOwnershipClassification
+    ) {
         dispatchReturned = true;
-        this.boundRootTask = boundRootTask;
-        this.taskAfterDispatch = taskAfterDispatch;
+        this.taskAfterDispatchEvidence = taskAfterDispatchEvidence == null
+                ? FabricChatClefTaskOwnershipEvidence.empty()
+                : taskAfterDispatchEvidence;
+        this.rootOwnershipClassification = rootOwnershipClassification == null
+                ? FabricChatClefRootOwnershipClassification.OWNERSHIP_UNKNOWN
+                : rootOwnershipClassification;
+        this.boundRootTask = this.rootOwnershipClassification
+                == FabricChatClefRootOwnershipClassification.COMMAND_OWNED_ROOT
+                ? this.taskAfterDispatchEvidence.rootTask()
+                : null;
+        this.taskAfterDispatch = this.taskAfterDispatchEvidence.rootTaskSnapshot();
     }
 
     void markTaskFinishedObservation(FabricChatClefCommandTerminationObservation observation) {
@@ -74,6 +116,23 @@ final class FabricChatClefCommandExecutionState {
 
     boolean finishCallbackReceived() {
         return finishCallbackReceived;
+    }
+
+    long finishCallbackReceivedAtMs() {
+        return finishCallbackReceivedAtMs;
+    }
+
+    FabricChatClefFinishCallbackObservation firstFinishCallbackObservation() {
+        return firstFinishCallbackObservation;
+    }
+
+    int finishCallbackDuplicateCount() {
+        return finishCallbackDuplicateCount;
+    }
+
+    boolean finishCallbackFirstObservedBeforeDispatchReturn() {
+        return firstFinishCallbackObservation != null
+                && firstFinishCallbackObservation.observedBeforeDispatchReturn();
     }
 
     boolean hasBoundRootTask() {
@@ -121,6 +180,33 @@ final class FabricChatClefCommandExecutionState {
 
     FabricChatClefCommandTerminationObservation taskFinishedObservation() {
         return taskFinishedObservation;
+    }
+
+    FabricChatClefTaskOwnershipEvidence taskBeforeDispatchEvidence() {
+        return taskBeforeDispatchEvidence;
+    }
+
+    FabricChatClefTaskOwnershipEvidence taskAfterDispatchEvidence() {
+        return taskAfterDispatchEvidence;
+    }
+
+    FabricChatClefRootOwnershipClassification rootOwnershipClassification() {
+        return rootOwnershipClassification;
+    }
+
+    void markPreexistingIdleRootStabilityObservation(
+            FabricChatClefStableRequestQuiescenceObservation observation
+    ) {
+        preexistingIdleRootStabilityObservation = observation;
+    }
+
+    FabricChatClefStableRequestQuiescenceObservation preexistingIdleRootStabilityObservation() {
+        return preexistingIdleRootStabilityObservation;
+    }
+
+    boolean preexistingIdleRootStabilityQualified() {
+        return preexistingIdleRootStabilityObservation != null
+                && preexistingIdleRootStabilityObservation.qualified();
     }
 
     FabricChatClefCommandRequest request() {

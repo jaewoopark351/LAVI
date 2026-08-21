@@ -4,13 +4,16 @@ import lavi.minecraft.fabric.chatclef.bridge.command.diagnostics.FabricChatClefC
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.details.FabricChatClefEmptyDetailsPayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.details.FabricChatClefExceptionDetailsPayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.details.FabricChatClefFinishCallbackDetailsPayload;
+import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.details.FabricChatClefPreexistingIdleRootDetailsPayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.details.FabricChatClefQueueContextMismatchDetailsPayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.details.FabricChatClefReplacedActiveDetailsPayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.details.FabricChatClefTerminalDecisionDetailsPayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.details.FabricChatClefTerminalResultDetailsPayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.details.FabricChatClefWaitingForTerminalConditionDetailsPayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefBoundRootTaskRelationshipPayload;
+import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefFinishCallbackObservation;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskRuntimeObservationPayload;
+import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.evidence.FabricChatClefStableRequestQuiescenceObservation;
 
 //20260805_kpopmodder: Keep command lifecycle detail fields typed until the Map edge.
 public interface FabricChatClefLifecycleDetailsPayload extends FabricChatClefCommandDiagnosticDetailsPayload {
@@ -35,6 +38,22 @@ public interface FabricChatClefLifecycleDetailsPayload extends FabricChatClefCom
 
     static FabricChatClefLifecycleDetailsPayload terminalResult(boolean terminalSent, boolean lifecycleCleared) {
         return new FabricChatClefTerminalResultDetailsPayload(terminalSent, lifecycleCleared);
+    }
+
+    static FabricChatClefLifecycleDetailsPayload preexistingIdleRoot(
+            FabricChatClefRootOwnershipClassification classification,
+            FabricChatClefFinishCallbackObservation finishCallbackObservation,
+            int finishCallbackDuplicateCount,
+            FabricChatClefStableRequestQuiescenceObservation stableObservation,
+            String taskFinishedEventAssociation
+    ) {
+        return new FabricChatClefPreexistingIdleRootDetailsPayload(
+                classification,
+                finishCallbackObservation,
+                finishCallbackDuplicateCount,
+                stableObservation,
+                taskFinishedEventAssociation
+        );
     }
 
     static FabricChatClefLifecycleDetailsPayload queueContextMismatch(

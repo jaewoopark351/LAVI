@@ -60,6 +60,11 @@ class ChatClefIntentSchemaValidator:
             if not intent.item_phrase.strip():
                 return False, "missing_item_phrase", "item action requires item_phrase"
             if (
+                intent.intent_type is ChatClefIntentType.DEPOSIT_ITEM
+                and intent.quantity is None
+            ):
+                return False, "missing_deposit_quantity", "deposit_item requires explicit quantity"
+            if (
                 intent.quantity is None
                 or intent.quantity < 1
                 or intent.quantity > JAVA_INT_MAX

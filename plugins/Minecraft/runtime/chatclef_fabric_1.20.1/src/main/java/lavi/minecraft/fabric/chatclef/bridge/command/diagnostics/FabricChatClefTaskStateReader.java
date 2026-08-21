@@ -3,6 +3,7 @@ package lavi.minecraft.fabric.chatclef.bridge.command.diagnostics;
 import adris.altoclef.AltoClef;
 import adris.altoclef.tasksystem.Task;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskOwnershipEvidence;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskRuntimeObservationPayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskOwnershipSnapshot;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskSnapshot;
@@ -40,6 +41,10 @@ public final class FabricChatClefTaskStateReader {
 
     public FabricChatClefTaskOwnershipSnapshot ownershipSnapshot() {
         return ownershipSnapshotReader.ownershipSnapshot();
+    }
+
+    public FabricChatClefTaskOwnershipEvidence ownershipEvidence() {
+        return ownershipSnapshotReader.ownershipEvidence();
     }
 
     private Task currentTaskOrThrow() {

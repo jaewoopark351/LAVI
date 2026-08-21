@@ -1,8 +1,10 @@
 #20260815_kpopmodder: Lock Korean alias generation and runtime alias contracts.
 from __future__ import annotations
 
+import json
 import re
 import unittest
+from pathlib import Path
 
 from plugins.Minecraft.fabric.chatclef.intent.chatclef_alias_repository import (
     ChatClefKoreanAliasRepository,
@@ -22,6 +24,15 @@ PSEUDO_TARGETS = {
 }
 TARGET_RE = re.compile(r"^[a-z0-9_]+$")
 DANGEROUS_SLOT_RE = re.compile(r"[;#\r\n\"'@]|[\x00-\x1f\x7f]")
+RESOURCE_DIR = (
+    Path(__file__).resolve().parents[1]
+    / "plugins"
+    / "Minecraft"
+    / "fabric"
+    / "chatclef"
+    / "intent"
+    / "resources"
+)
 
 
 class MinecraftChatClefKoreanAliasGenerationContractTests(unittest.TestCase):
@@ -94,6 +105,50 @@ class MinecraftChatClefKoreanAliasGenerationContractTests(unittest.TestCase):
         self.assertEqual("log", aliases.fixed_item_aliases["나무"])
         self.assertEqual("log", aliases.fixed_item_aliases["원목"])
         self.assertEqual("log", aliases.fixed_item_aliases["통나무"])
+
+    def test_official_korean_item_aliases_cover_direct_catalog_targets(self):
+        aliases = ChatClefKoreanAliasRepository()
+
+        self.assertEqual("oak_log", aliases.fixed_item_aliases["참나무 원목"])
+        self.assertEqual("emerald", aliases.fixed_item_aliases["에메랄드"])
+        self.assertEqual("torch", aliases.fixed_item_aliases["횃불"])
+        self.assertEqual("brick", aliases.fixed_item_aliases["벽돌 아이템"])
+        self.assertEqual("bricks", aliases.fixed_item_aliases["벽돌 블록"])
+        self.assertNotIn("벽돌", aliases.fixed_item_aliases)
+
+    def test_target_policy_classifies_every_chatclef_catalog_target(self):
+        catalog = ChatClefTargetCatalog()
+        policy = _load_json("chatclef_item_command_target_policy.json")
+        target_policy = policy["targets"]
+
+        self.assertEqual(591, policy["catalog_target_count"])
+        self.assertEqual(591, len(target_policy))
+        self.assertEqual(set(catalog.targets), set(target_policy))
+        self.assertNotIn("UNRESOLVED", policy["classification_counts"])
+        self.assertEqual(
+            591,
+            sum(int(value) for value in policy["classification_counts"].values()),
+        )
+        self.assertEqual(
+            "60664E7CCFE4588950CD65CBA961CCCD2FE0B575086759DB4AAF689224FDFAAE",
+            policy["source"]["official_korean_lang_sha256"],
+        )
+
+    def test_display_name_resource_has_one_entry_per_catalog_target(self):
+        catalog = ChatClefTargetCatalog()
+        display_names = _load_json("korean_item_display_names.json")
+
+        self.assertEqual(set(catalog.targets), set(display_names))
+        self.assertEqual("참나무 원목", display_names["oak_log"])
+        self.assertEqual("철 흉갑", display_names["iron_chestplate"])
+
+
+def _load_json(file_name: str) -> dict[str, object]:
+    with (RESOURCE_DIR / file_name).open("r", encoding="utf-8") as handle:
+        payload = json.load(handle)
+    if not isinstance(payload, dict):
+        raise TypeError(f"{file_name} must contain a JSON object")
+    return payload
 
 
 if __name__ == "__main__":

@@ -10,6 +10,7 @@ class FabricChatClefConfig:
     host: str = "127.0.0.1"
     port: int = 4316
     startup_timeout_sec: float = 3.0
+    reconcile_stale_deposit_to_unknown_enabled: bool = False
 
     @property
     def endpoint(self) -> str:

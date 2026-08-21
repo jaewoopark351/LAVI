@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, Mapping
 
 from plugins.Minecraft.common.dto.command_result_dto import CommandResultDTO
 
@@ -14,8 +14,11 @@ class FabricChatClefCommandResultHandler:
         self._diagnostics = diagnostics
 
     def handle(self, websocket: Any, envelope: Any) -> None:
+        raw_payload = (
+            dict(envelope.payload) if isinstance(envelope.payload, Mapping) else {}
+        )
         try:
-            result = CommandResultDTO.from_mapping(envelope.payload)
+            result = CommandResultDTO.from_mapping(raw_payload)
         except Exception as error:
             self._diagnostics.warning(
                 "ignored malformed command result "
@@ -23,37 +26,24 @@ class FabricChatClefCommandResultHandler:
             )
             return
         with self._command_lock:
-            before_status = self._connection_ownership.snapshot()
-        self._diagnostics.info(
-            "command result received "
-            f"request={result.request_id} "
-            f"status={result.status.value} "
-            f"ok={result.ok} "
-            f"error_code={result.error_code} "
-            f"message={result.message} "
-            f"session={envelope.session_id} "
-            f"correlation={envelope.correlation_id} "
-            f"before={_compact_json(before_status)} "
-            f"data={_compact_json(result.data)}"
-        )
-        with self._command_lock:
-            accepted, reason = self._connection_ownership.accept_result(
+            outcome = self._connection_ownership.accept_result_and_reconcile(
                 websocket=websocket,
                 envelope=envelope,
                 result=result,
+                raw_payload=raw_payload,
             )
-            after_status = self._connection_ownership.snapshot()
-        if not accepted:
+        if not outcome.accepted:
             self._diagnostics.warning(
                 "ignored command result "
                 f"request={result.request_id} "
                 f"status={result.status.value} "
-                f"reason={reason} "
+                f"reason={outcome.reason} "
                 f"session={envelope.session_id} "
                 f"correlation={envelope.correlation_id} "
-                f"before={_compact_json(before_status)} "
-                f"after={_compact_json(after_status)} "
+                f"before={_compact_json(outcome.before_snapshot)} "
+                f"after={_compact_json(outcome.after_snapshot)} "
                 f"data={_compact_json(result.data)}"
+                f" audit={_compact_json(outcome.audit)}"
             )
             return
         self._diagnostics.info(
@@ -61,9 +51,10 @@ class FabricChatClefCommandResultHandler:
             f"request={result.request_id} status={result.status.value} ok={result.ok} "
             f"error_code={result.error_code} "
             f"message={result.message} "
-            f"before={_compact_json(before_status)} "
-            f"after={_compact_json(after_status)} "
+            f"before={_compact_json(outcome.before_snapshot)} "
+            f"after={_compact_json(outcome.after_snapshot)} "
             f"data={_compact_json(result.data)}"
+            f" audit={_compact_json(outcome.audit)}"
         )
 
 

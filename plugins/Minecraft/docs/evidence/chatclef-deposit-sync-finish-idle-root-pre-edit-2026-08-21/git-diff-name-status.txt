@@ -1,0 +1,69 @@
+﻿warning: in the working copy of 'plugins/Minecraft/README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plugins/Minecraft/docs/chatclef-command-lifecycle-and-threading.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plugins/Minecraft/docs/chatclef-python-command-orchestration-plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plugins/Minecraft/docs/fabric-chatclef-bridge-protocol-v1.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plugins/Minecraft/fabric/chatclef/command_registry/korean_command_registry.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plugins/Minecraft/fabric/chatclef/config/fabric_chatclef_config.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plugins/Minecraft/fabric/chatclef/config/fabric_chatclef_config_loader.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plugins/Minecraft/fabric/chatclef/extension/minecraft_fabric_chatclef_extension.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plugins/Minecraft/fabric/chatclef/input/minecraft_chatclef_input_router.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plugins/Minecraft/fabric/chatclef/input/routing/route_decision_factory.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plugins/Minecraft/fabric/chatclef/input/routing/submission_precheck.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plugins/Minecraft/fabric/chatclef/input/routing/submission_readiness.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plugins/Minecraft/fabric/chatclef/intent/chatclef_intent_schema_validator.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plugins/Minecraft/fabric/chatclef/intent/korean_acquisition_verb_matcher.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plugins/Minecraft/fabric/chatclef/intent/korean_item_action_rule_parser.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plugins/Minecraft/fabric/chatclef/intent/korean_item_phrase_resolver.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plugins/Minecraft/fabric/chatclef/intent/korean_quantity_parser.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plugins/Minecraft/fabric/chatclef/transport/command_submission/fabric_chatclef_command_admission.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plugins/Minecraft/fabric/chatclef/transport/command_submission/fabric_chatclef_command_result_handler.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plugins/Minecraft/fabric/chatclef/transport/fabric_chatclef_connection_ownership.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plugins/Minecraft/fabric/chatclef/transport/server/fabric_chatclef_status_snapshot_builder.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plugins/Minecraft/fabric/chatclef/transport/server/fabric_chatclef_websocket_server_runtime.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/execution/FabricChatClefCommandExecution.java', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/execution/FabricChatClefCommandExecutionState.java', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/execution/FabricChatClefCommandResultFactory.java', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/lifecycle/FabricChatClefCommandLifecycleCoordinator.java', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/observation/FabricChatClefTaskOwnershipSnapshot.java', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/runtime/FabricChatClefBridgeComponents.java', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/minecraft_chatclef/catalog_coverage/runtime_alias_catalog_coverage.snapshot.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/minecraft_chatclef/command_catalog/test_python_korean_command_registry.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/minecraft_chatclef/korean_translation/test_korean_command_support_matrix.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/minecraft_chatclef/lavi_input/test_korean_input_to_chatclef_submission_path.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/test_minecraft_chatclef_input_router.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/test_minecraft_chatclef_korean_alias_generation_contract.py', LF will be replaced by CRLF the next time Git touches it
+M	plugins/Minecraft/README.md
+M	plugins/Minecraft/docs/chatclef-command-lifecycle-and-threading.md
+M	plugins/Minecraft/docs/chatclef-python-command-orchestration-plan.md
+M	plugins/Minecraft/docs/fabric-chatclef-bridge-protocol-v1.md
+M	plugins/Minecraft/fabric/chatclef/command_registry/korean_command_registry.py
+M	plugins/Minecraft/fabric/chatclef/config/fabric_chatclef_config.py
+M	plugins/Minecraft/fabric/chatclef/config/fabric_chatclef_config_loader.py
+M	plugins/Minecraft/fabric/chatclef/extension/minecraft_fabric_chatclef_extension.py
+M	plugins/Minecraft/fabric/chatclef/input/minecraft_chatclef_input_router.py
+M	plugins/Minecraft/fabric/chatclef/input/routing/route_decision_factory.py
+M	plugins/Minecraft/fabric/chatclef/input/routing/submission_precheck.py
+M	plugins/Minecraft/fabric/chatclef/input/routing/submission_readiness.py
+M	plugins/Minecraft/fabric/chatclef/intent/chatclef_intent_schema_validator.py
+M	plugins/Minecraft/fabric/chatclef/intent/korean_item_action_rule_parser.py
+M	plugins/Minecraft/fabric/chatclef/intent/korean_item_phrase_resolver.py
+M	plugins/Minecraft/fabric/chatclef/intent/korean_quantity_parser.py
+M	plugins/Minecraft/fabric/chatclef/intent/resources/korean_item_aliases.json
+M	plugins/Minecraft/fabric/chatclef/intent/resources/korean_item_display_names.json
+M	plugins/Minecraft/fabric/chatclef/transport/command_submission/fabric_chatclef_command_admission.py
+M	plugins/Minecraft/fabric/chatclef/transport/command_submission/fabric_chatclef_command_result_handler.py
+M	plugins/Minecraft/fabric/chatclef/transport/fabric_chatclef_connection_ownership.py
+M	plugins/Minecraft/fabric/chatclef/transport/server/fabric_chatclef_status_snapshot_builder.py
+M	plugins/Minecraft/fabric/chatclef/transport/server/fabric_chatclef_websocket_server_runtime.py
+M	plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/execution/FabricChatClefCommandExecution.java
+M	plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/execution/FabricChatClefCommandExecutionState.java
+M	plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/execution/FabricChatClefCommandResultFactory.java
+M	plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/lifecycle/FabricChatClefCommandLifecycleCoordinator.java
+M	plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/observation/FabricChatClefTaskOwnershipSnapshot.java
+M	plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/runtime/FabricChatClefBridgeComponents.java
+M	tests/minecraft_chatclef/catalog_coverage/runtime_alias_catalog_coverage.snapshot.json
+M	tests/minecraft_chatclef/command_catalog/test_python_korean_command_registry.py
+M	tests/minecraft_chatclef/korean_translation/test_korean_command_support_matrix.py
+M	tests/minecraft_chatclef/lavi_input/test_korean_input_to_chatclef_submission_path.py
+M	tests/test_minecraft_chatclef_input_router.py
+M	tests/test_minecraft_chatclef_korean_alias_generation_contract.py

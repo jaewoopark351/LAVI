@@ -34,6 +34,7 @@ SUPPORTED_KOREAN_TRANSLATION_CASES = {
         ("철헬멧 만들어줘", "get iron_helmet 1"),
         ("에메랄드 캐줘", "get emerald 1"),
         ("횃불 만들어줘", "get torch 1"),
+        ("참나무 원목 2개 가져와줘", "get oak_log 2"),
         ("oak_log 2개 가져와줘", "get oak_log 2"),
         ("다이아몬드 곡괭이 하나 가져와", "get diamond_pickaxe 1"),
     ],
@@ -72,6 +73,7 @@ SUPPORTED_KOREAN_TRANSLATION_CASES = {
 
 UNSUPPORTED_OR_PLANNED_KOREAN_CASES = {
     "deposit_bare_junk": "잡템 상자에 넣어줘",
+    "deposit_missing_quantity": "다이아몬드 상자에 넣어줘",
     "attack": "좀비 2마리 공격해",
     "gamma": "감마 1로 설정해",
     "hero": "주변 몬스터 처리해",

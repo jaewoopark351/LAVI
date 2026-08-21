@@ -70,7 +70,7 @@ class MinecraftChatClefInputRouterTests(unittest.TestCase):
         self.assertTrue(decision.handled)
         self.assertEqual("minecraft_command_routed", decision.reason)
         self.assertEqual(
-            "[Minecraft] 금괴 8개 수집 명령을 제출했어요.",
+            "[Minecraft] 금 주괴 8개 수집 명령을 제출했어요.",
             decision.response_text,
         )
         self.assertEqual(["금괴 8개 구해"], extension.translated)

@@ -20,6 +20,10 @@ class FabricChatClefConfigLoader:
                 payload.get("startup_timeout_sec"),
                 3.0,
             ),
+            reconcile_stale_deposit_to_unknown_enabled=self._feature_bool(
+                payload.get("reconcile_stale_deposit_to_unknown_enabled"),
+                False,
+            ),
         )
 
     def _section_payload(self, value: Any) -> dict[str, Any]:
@@ -54,3 +58,18 @@ class FabricChatClefConfigLoader:
         if isinstance(value, str):
             return value.strip().lower() in {"1", "true", "yes", "on"}
         return bool(value)
+
+    def _feature_bool(self, value: Any, default: bool) -> bool:
+        if isinstance(value, bool):
+            return value
+        if value is None:
+            return default
+        if isinstance(value, str):
+            text = value.strip().lower()
+            if text == "true":
+                return True
+            if text == "false":
+                return False
+        raise ValueError(
+            "reconcile_stale_deposit_to_unknown_enabled must be true or false"
+        )

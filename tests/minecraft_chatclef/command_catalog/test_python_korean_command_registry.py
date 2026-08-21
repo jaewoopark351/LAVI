@@ -56,8 +56,10 @@ class PythonKoreanCommandRegistryTests(unittest.TestCase):
         for command in {
             "attack",
             "chatclef",
+            "follow",
             "gamer",
             "hero",
+            "idle",
             "reload_settings",
             "resetmemory",
         }:
@@ -71,6 +73,25 @@ class PythonKoreanCommandRegistryTests(unittest.TestCase):
                     "direct_typed_confirmation_required",
                     spec.confirmation_mode,
                 )
+
+    def test_control_or_lifecycle_open_commands_are_parse_ready_but_not_public(self):
+        registry = KoreanChatClefCommandRegistry()
+
+        expectations = {
+            "follow": ("direct_typed_confirmation_required", ("direct_typed_only",)),
+            "idle": ("direct_typed_confirmation_required", ("direct_typed_only",)),
+            "stop": ("none", ("direct_typed",)),
+        }
+        for command, (confirmation_mode, allowed_sources) in expectations.items():
+            with self.subTest(command=command):
+                spec = registry.spec(command)
+
+                self.assertTrue(spec.readiness_axes.source_registered)
+                self.assertTrue(spec.readiness_axes.korean_parse_compile_ready)
+                self.assertFalse(spec.readiness_axes.python_admission_ready)
+                self.assertFalse(spec.readiness_axes.public_korean_enabled)
+                self.assertEqual(confirmation_mode, spec.confirmation_mode)
+                self.assertEqual(allowed_sources, spec.allowed_input_sources)
 
 
 if __name__ == "__main__":

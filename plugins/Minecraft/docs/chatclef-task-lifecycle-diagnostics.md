@@ -1993,3 +1993,25 @@ chatclef-carryon-integration-direction.md
 fabric-chatclef-bridge-protocol-v1.md
     Stable bridge request/result wire protocol.
 ```
+
+## 2026-08-22 Sync-Finish Idle-Root Diagnostics
+
+For the incident branch, diagnostics remain under the existing lifecycle log
+`details` boundary rather than expanding `command_result.data` beyond the
+approved `result_reason` and `result_fidelity` fields.
+
+Relevant diagnostic fields:
+
+```text
+root_ownership_classification
+finish_callback_first_observation
+finish_callback_duplicate_count
+stable_idle_root_observation
+task_finished_event_association
+```
+
+`stable_idle_root_observation` proves only a bounded race buffer: at least three
+distinct `END_CLIENT_TICK` observations, at least 500 ms of monotonic stability,
+and newest ownership evidence no older than 1000 ms. It does not prove gameplay
+success, global engine quiescence, Baritone idleness, input cleanup, or absence
+of later work.

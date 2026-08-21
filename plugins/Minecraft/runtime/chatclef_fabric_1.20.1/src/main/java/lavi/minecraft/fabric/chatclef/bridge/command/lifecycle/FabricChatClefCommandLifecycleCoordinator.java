@@ -2,12 +2,16 @@ package lavi.minecraft.fabric.chatclef.bridge.command.lifecycle;
 
 import adris.altoclef.tasksystem.Task;
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandContext;
+import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandResultSender;
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandResult;
 import lavi.minecraft.fabric.chatclef.bridge.command.diagnostics.FabricChatClefCommandDiagnostics;
 import lavi.minecraft.fabric.chatclef.bridge.command.diagnostics.FabricChatClefTaskStateReader;
 import lavi.minecraft.fabric.chatclef.bridge.command.execution.FabricChatClefCommandExecution;
+import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.evidence.FabricChatClefNonterminalLifecycleEvidencePublisher;
+import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.evidence.FabricChatClefStableRequestQuiescenceObservation;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.details.FabricChatClefTaskFinishedEventDetailsPayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskSnapshot;
+import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskOwnershipEvidence;
 import lavi.minecraft.fabric.chatclef.bridge.command.result.FabricChatClefCommandResultDataPayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.result.FabricChatClefCommandResultPayload;
 import lavi.minecraft.fabric.chatclef.bridge.diagnostics.FabricChatClefBridgeDiagnostics;
@@ -22,10 +26,14 @@ public final class FabricChatClefCommandLifecycleCoordinator {
 
     private final FabricChatClefUserTaskFinishedObserver taskFinishedObserver;
     private final FabricChatClefCommandOutcomeClassifier outcomeClassifier;
+    private final FabricChatClefRootOwnershipClassifier rootOwnershipClassifier = new FabricChatClefRootOwnershipClassifier();
+    private final FabricChatClefPreexistingIdleRootStabilityGate preexistingIdleRootStabilityGate =
+            new FabricChatClefPreexistingIdleRootStabilityGate();
     private final FabricChatClefCommandResultOutbox resultOutbox;
     private final FabricChatClefBridgeDiagnostics diagnostics;
     private final FabricChatClefCommandDiagnostics commandDiagnostics;
     private final FabricChatClefTaskStateReader taskStateReader;
+    private final FabricChatClefNonterminalLifecycleEvidencePublisher nonterminalEvidencePublisher;
     private final AtomicReference<FabricChatClefCommandExecution> activeExecution = new AtomicReference<>();
     private volatile String lastWaitingDecisionKey = "";
     private volatile long lastWaitingDecisionLoggedAtMs = 0L;
@@ -34,6 +42,7 @@ public final class FabricChatClefCommandLifecycleCoordinator {
             FabricChatClefUserTaskFinishedObserver taskFinishedObserver,
             FabricChatClefCommandOutcomeClassifier outcomeClassifier,
             FabricChatClefCommandResultOutbox resultOutbox,
+            FabricChatClefCommandResultSender resultSender,
             FabricChatClefBridgeDiagnostics diagnostics,
             FabricChatClefTaskStateReader taskStateReader
     ) {
@@ -43,6 +52,11 @@ public final class FabricChatClefCommandLifecycleCoordinator {
         this.diagnostics = diagnostics;
         this.commandDiagnostics = new FabricChatClefCommandDiagnostics(diagnostics);
         this.taskStateReader = taskStateReader;
+        this.nonterminalEvidencePublisher = new FabricChatClefNonterminalLifecycleEvidencePublisher(
+                resultSender,
+                taskStateReader,
+                diagnostics
+        );
     }
 
     public void beginExecution(FabricChatClefCommandExecution execution) {
@@ -62,13 +76,22 @@ public final class FabricChatClefCommandLifecycleCoordinator {
             activeExecution.set(execution);
         }
         lastWaitingDecisionKey = "";
+        nonterminalEvidencePublisher.reset();
+        preexistingIdleRootStabilityGate.reset();
         commandDiagnostics.info("begin_execution", execution);
     }
 
-    public void markDispatchReturned(FabricChatClefCommandExecution execution, Task boundRootTask) {
-        execution.markDispatchReturned(boundRootTask, FabricChatClefTaskSnapshot.capture(boundRootTask));
+    public void markDispatchReturned(
+            FabricChatClefCommandExecution execution,
+            FabricChatClefTaskOwnershipEvidence taskAfterDispatch
+    ) {
+        FabricChatClefRootOwnershipClassification classification = rootOwnershipClassifier.classify(
+                execution.taskBeforeDispatchEvidence(),
+                taskAfterDispatch
+        );
+        execution.markDispatchReturned(taskAfterDispatch, classification);
         commandDiagnostics.info("dispatch_returned", execution);
-        tryComplete(execution);
+        tryComplete(execution, false);
     }
 
     public void markCommandFinish(
@@ -84,7 +107,7 @@ public final class FabricChatClefCommandLifecycleCoordinator {
                         taskStateReader.runtimePayload()
                 )
         );
-        tryComplete(execution);
+        tryComplete(execution, false);
     }
 
     public void completeCommandException(
@@ -121,12 +144,14 @@ public final class FabricChatClefCommandLifecycleCoordinator {
                     FabricChatClefLifecycleDetailsPayload.terminalResult(true, true)
             );
             lastWaitingDecisionKey = "";
+            nonterminalEvidencePublisher.reset();
+            preexistingIdleRootStabilityGate.reset();
         }
         syncActiveContext(activeContext);
         drainObservations();
         FabricChatClefCommandExecution execution = activeExecution.get();
         if (execution != null) {
-            tryComplete(execution);
+            tryComplete(execution, true);
         }
     }
 
@@ -217,6 +242,23 @@ public final class FabricChatClefCommandLifecycleCoordinator {
             );
             return;
         }
+        if (execution.rootOwnershipClassification()
+                == FabricChatClefRootOwnershipClassification.PREEXISTING_UNCHANGED_IDLE_ROOT
+                && !execution.hasBoundRootTask()) {
+            preexistingIdleRootStabilityGate.reset();
+            commandDiagnostics.info(
+                    "task_finished_event_unbound_audit",
+                    execution,
+                    FabricChatClefLifecycleDetailsPayload.preexistingIdleRoot(
+                            execution.rootOwnershipClassification(),
+                            execution.firstFinishCallbackObservation(),
+                            execution.finishCallbackDuplicateCount(),
+                            execution.preexistingIdleRootStabilityObservation(),
+                            "unbound_audit_only"
+                    )
+            );
+            return;
+        }
         execution.markTaskFinishedObservation(observation);
         FabricChatClefTaskFinishedEventDetailsPayload details = FabricChatClefTaskFinishedEventDetailsPayload.of(
                 observation,
@@ -227,16 +269,22 @@ public final class FabricChatClefCommandLifecycleCoordinator {
                 taskStateReader.runtimePayload()
         );
         commandDiagnostics.info("task_finished_event_received", execution, details);
-        tryComplete(execution);
+        tryComplete(execution, false);
     }
 
-    private void tryComplete(FabricChatClefCommandExecution execution) {
+    private void tryComplete(FabricChatClefCommandExecution execution, boolean publishNonterminalEvidence) {
         if (activeExecution.get() != execution) {
             return;
+        }
+        if (publishNonterminalEvidence) {
+            updatePreexistingIdleRootStability(execution);
         }
         FabricChatClefCommandTerminalDecision decision = outcomeClassifier.classify(execution);
         if (!decision.terminal()) {
             logWaitingDecision(execution, decision.reason());
+            if (publishNonterminalEvidence) {
+                nonterminalEvidencePublisher.publishIfEligible(execution, decision.reason());
+            }
             return;
         }
         if (!execution.context().terminalSendReady(System.currentTimeMillis())) {
@@ -245,8 +293,12 @@ public final class FabricChatClefCommandLifecycleCoordinator {
         commandDiagnostics.info(
                 "terminal_decision",
                 execution,
-                FabricChatClefLifecycleDetailsPayload.terminalDecision(decision.reason())
+                terminalDecisionDetails(execution, decision.reason())
         );
+        if (execution.rootOwnershipClassification()
+                == FabricChatClefRootOwnershipClassification.PREEXISTING_UNCHANGED_IDLE_ROOT) {
+            preexistingIdleRootStabilityGate.reset();
+        }
         completeTerminal(execution, decision::result);
         diagnostics.info(
                 "terminal command decision request="
@@ -286,6 +338,8 @@ public final class FabricChatClefCommandLifecycleCoordinator {
         );
         if (cleared) {
             lastWaitingDecisionKey = "";
+            nonterminalEvidencePublisher.reset();
+            preexistingIdleRootStabilityGate.reset();
         }
         return cleared;
     }
@@ -311,6 +365,42 @@ public final class FabricChatClefCommandLifecycleCoordinator {
                 )
         );
         activeExecution.compareAndSet(execution, null);
+        nonterminalEvidencePublisher.reset();
+        preexistingIdleRootStabilityGate.reset();
+    }
+
+    private void updatePreexistingIdleRootStability(FabricChatClefCommandExecution execution) {
+        if (execution.rootOwnershipClassification()
+                != FabricChatClefRootOwnershipClassification.PREEXISTING_UNCHANGED_IDLE_ROOT) {
+            return;
+        }
+        long nowMs = System.currentTimeMillis();
+        FabricChatClefStableRequestQuiescenceObservation observation =
+                preexistingIdleRootStabilityGate.observe(
+                        execution,
+                        taskStateReader.ownershipEvidence(),
+                        nowMs,
+                        System.nanoTime(),
+                        lavi.minecraft.diagnostics.ChatClefDiagnostics.currentClientTickId()
+                );
+        execution.markPreexistingIdleRootStabilityObservation(observation);
+    }
+
+    private FabricChatClefLifecycleDetailsPayload terminalDecisionDetails(
+            FabricChatClefCommandExecution execution,
+            String decisionReason
+    ) {
+        if (execution.rootOwnershipClassification()
+                != FabricChatClefRootOwnershipClassification.PREEXISTING_UNCHANGED_IDLE_ROOT) {
+            return FabricChatClefLifecycleDetailsPayload.terminalDecision(decisionReason);
+        }
+        return FabricChatClefLifecycleDetailsPayload.preexistingIdleRoot(
+                execution.rootOwnershipClassification(),
+                execution.firstFinishCallbackObservation(),
+                execution.finishCallbackDuplicateCount(),
+                execution.preexistingIdleRootStabilityObservation(),
+                "terminal_decision:" + decisionReason
+        );
     }
 
     private void logWaitingDecision(FabricChatClefCommandExecution execution, String reason) {

@@ -9,6 +9,7 @@ import lavi.minecraft.fabric.chatclef.bridge.command.diagnostics.FabricChatClefC
 import lavi.minecraft.fabric.chatclef.bridge.command.diagnostics.FabricChatClefTaskStateReader;
 import lavi.minecraft.fabric.chatclef.bridge.command.execution.FabricChatClefCommandExecution;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandLifecycleCoordinator;
+import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskOwnershipEvidence;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskOwnershipSnapshot;
 import lavi.minecraft.fabric.chatclef.bridge.command.queue.FabricChatClefCommandQueueCompletion;
 import lavi.minecraft.fabric.chatclef.bridge.command.result.send.FabricChatClefCommandResultSendSubmission;
@@ -194,10 +195,11 @@ public final class FabricChatClefCommandDispatcher {
         FabricChatClefCommandRequest request = context.request();
         CommandExecutor executor = AltoClef.getCommandExecutor();
         String command = normalizeCommand(executor, request.command);
+        FabricChatClefTaskOwnershipEvidence taskBeforeDispatch = taskStateReader.ownershipEvidence();
         FabricChatClefCommandExecution execution = new FabricChatClefCommandExecution(
                 context,
                 command,
-                taskStateReader.captureCurrentTaskSnapshot()
+                taskBeforeDispatch
         );
         lifecycleCoordinator.beginExecution(execution);
         diagnostics.info(
@@ -221,6 +223,7 @@ public final class FabricChatClefCommandDispatcher {
             );
         }
         try {
+            execution.openExecutorExecuteInvocation();
             executor.execute(
                     command,
                     () -> lifecycleCoordinator.markCommandFinish(
@@ -233,8 +236,10 @@ public final class FabricChatClefCommandDispatcher {
                             taskStateReader.captureCurrentTaskSnapshot()
                     )
             );
-            lifecycleCoordinator.markDispatchReturned(execution, taskStateReader.currentTaskOrNull());
+            execution.closeExecutorExecuteInvocation();
+            lifecycleCoordinator.markDispatchReturned(execution, taskStateReader.ownershipEvidence());
         } catch (Throwable error) {
+            execution.closeExecutorExecuteInvocation();
             lifecycleCoordinator.completeDispatchException(
                     execution,
                     error,

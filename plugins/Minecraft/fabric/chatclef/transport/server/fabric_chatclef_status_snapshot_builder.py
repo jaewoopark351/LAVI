@@ -23,10 +23,15 @@ class FabricChatClefStatusSnapshotBuilder:
         endpoint: str,
         bound_host: str,
         bound_port: int,
+        commands_view: str = "local",
     ) -> StatusSnapshotDTO:
         with self._command_lock:
             connected = self._connection_ownership.is_connected()
-            commands = self._connection_ownership.snapshot()
+            commands = (
+                self._connection_ownership.wire_snapshot()
+                if commands_view == "wire"
+                else self._connection_ownership.local_admission_snapshot()
+            )
         if not enabled:
             state = BridgeLifecycleState.DISABLED
             detail = "Fabric ChatClef bridge is disabled."

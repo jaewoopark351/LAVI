@@ -53,7 +53,11 @@ class FabricChatClefWebSocketServer:
         self._bound_port = config.port
         self._stopping = False
         self._command_lock = threading.RLock()
-        self._connection_ownership = FabricChatClefConnectionOwnership()
+        self._connection_ownership = FabricChatClefConnectionOwnership(
+            reconcile_stale_deposit_to_unknown_requested=(
+                config.reconcile_stale_deposit_to_unknown_enabled
+            ),
+        )
         envelope_transport = FabricChatClefEnvelopeTransport(
             message_id_factory=self._new_message_id,
             now_ms=self._now_ms,
@@ -75,7 +79,9 @@ class FabricChatClefWebSocketServer:
             diagnostics=diagnostics,
             envelope_transport=envelope_transport,
             command_result_handler=result_handler,
-            status_provider=lambda: self.status_snapshot(enabled=True).to_dict(),
+            status_provider=lambda: self.wire_status_snapshot(
+                enabled=True
+            ).to_dict(),
             stopping_provider=lambda: self._stopping,
             last_error_reporter=self._record_client_error,
             now_ms=self._now_ms,
@@ -144,6 +150,9 @@ class FabricChatClefWebSocketServer:
         self._stopping = False
 
     def status_snapshot(self, *, enabled: bool) -> StatusSnapshotDTO:
+        return self.local_status_snapshot(enabled=enabled)
+
+    def local_status_snapshot(self, *, enabled: bool) -> StatusSnapshotDTO:
         return self._status_builder.build(
             enabled=enabled,
             last_error=self._last_error,
@@ -151,6 +160,18 @@ class FabricChatClefWebSocketServer:
             endpoint=self.endpoint,
             bound_host=self._bound_host,
             bound_port=self._bound_port,
+            commands_view="local",
+        )
+
+    def wire_status_snapshot(self, *, enabled: bool) -> StatusSnapshotDTO:
+        return self._status_builder.build(
+            enabled=enabled,
+            last_error=self._last_error,
+            is_running=self.is_running,
+            endpoint=self.endpoint,
+            bound_host=self._bound_host,
+            bound_port=self._bound_port,
+            commands_view="wire",
         )
 
     def submit_command(self, request: CommandRequestDTO) -> CommandResultDTO:

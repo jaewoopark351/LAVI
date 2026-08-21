@@ -2,6 +2,7 @@
 #20260819_kpopmodder: Block later Minecraft routes while submission reconciliation is pending.
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from core.logger import log_print
@@ -119,6 +120,7 @@ class MinecraftChatClefInputRouter:
                 f"reason={readiness.reason} error={readiness.error} "
                 f"message={readiness.message}"
             )
+            self._log_active_command_reconciliation(readiness.details)
             return self._decision_factory.precheck_rejection(readiness)
 
         try:
@@ -164,3 +166,27 @@ class MinecraftChatClefInputRouter:
             self.log_callback(f"[MinecraftChatClefInputRouter] {message}")
         except Exception:
             pass
+
+    def _log_active_command_reconciliation(
+        self,
+        details: dict[str, Any],
+    ) -> None:
+        diagnostic = details.get("active_command_reconciliation")
+        if not isinstance(diagnostic, dict):
+            return
+        self._log(
+            "active command reconciliation diagnostic "
+            f"{_compact_json(diagnostic)}"
+        )
+
+
+def _compact_json(payload: Any) -> str:
+    try:
+        return json.dumps(
+            payload,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+    except Exception as error:
+        return f"<json failed {type(error).__name__}: {error}>"

@@ -1,0 +1,15 @@
+﻿
+Algorithm Hash                                                             Path                                                                                                                                                                                
+--------- ----                                                             ----                                                                                                                                                                                
+SHA256    D366F462F986728BD9F953AF9EEE49774E51F5A3C716D792E363451994DFF02E C:\Vtuber_Souorce_Code\LAVI\plugins\Minecraft\docs\evidence\chatclef-deposit-sync-finish-idle-root-pre-edit-2026-08-21-v2\bridge-components-decision.txt                            
+SHA256    6C01470520634EC7545AEAF1B6275B1E5770AF430ADA7316B8356D9795595B9E C:\Vtuber_Souorce_Code\LAVI\plugins\Minecraft\docs\evidence\chatclef-deposit-sync-finish-idle-root-pre-edit-2026-08-21-v2\dirty-files-intentionally-excluded-from-implementation.txt
+SHA256    B9936B3DD94DB8E8DCFDBA6DD95C8AE187001EA19D91D4C6720B5E763812C77E C:\Vtuber_Souorce_Code\LAVI\plugins\Minecraft\docs\evidence\chatclef-deposit-sync-finish-idle-root-pre-edit-2026-08-21-v2\git-diff-name-status.txt                                  
+SHA256    4D95775A38E48C7E208143C39B162149350EB7D157529CA72EDE9195D8DD934D C:\Vtuber_Souorce_Code\LAVI\plugins\Minecraft\docs\evidence\chatclef-deposit-sync-finish-idle-root-pre-edit-2026-08-21-v2\git-status-short-untracked-all.txt                        
+SHA256    DF3D467753636DA0C822881EB261863B3870E6B1DDF2A1F88180D827AF7E0302 C:\Vtuber_Souorce_Code\LAVI\plugins\Minecraft\docs\evidence\chatclef-deposit-sync-finish-idle-root-pre-edit-2026-08-21-v2\implementation-plan-alignment.txt                         
+SHA256    3E5A56042604035434D7F006371DB405CD8233566870E8515EC985BCC5AB97A0 C:\Vtuber_Souorce_Code\LAVI\plugins\Minecraft\docs\evidence\chatclef-deposit-sync-finish-idle-root-pre-edit-2026-08-21-v2\junit-dependency-decision.txt                             
+SHA256    998F542AC16F07262A10A335FDFD485EDAFF746B451A67EFFABFAEA90A771963 C:\Vtuber_Souorce_Code\LAVI\plugins\Minecraft\docs\evidence\chatclef-deposit-sync-finish-idle-root-pre-edit-2026-08-21-v2\planned-existing-file-path-scoped-diffs.patch             
+SHA256    099975A397DB23E30CAB02B6AECC5B66E4F2929D9BB726A97CE4A2D5272D78AF C:\Vtuber_Souorce_Code\LAVI\plugins\Minecraft\docs\evidence\chatclef-deposit-sync-finish-idle-root-pre-edit-2026-08-21-v2\planned-existing-file-sha256-before.txt                   
+SHA256    F69494DCFB88CF245663BDA03D0A3F8409FF07F6BA58B10840BA65F2A9471AFF C:\Vtuber_Souorce_Code\LAVI\plugins\Minecraft\docs\evidence\chatclef-deposit-sync-finish-idle-root-pre-edit-2026-08-21-v2\planned-new-files-baseline.txt                            
+
+
+

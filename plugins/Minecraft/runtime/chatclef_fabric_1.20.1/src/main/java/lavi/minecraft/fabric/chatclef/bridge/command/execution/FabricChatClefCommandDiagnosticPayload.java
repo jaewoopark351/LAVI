@@ -3,6 +3,7 @@ package lavi.minecraft.fabric.chatclef.bridge.command.execution;
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandContext;
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandRequest;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandLifecyclePayload;
+import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandResultFidelity;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandTerminationObservation;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskSnapshot;
 import lavi.minecraft.fabric.chatclef.bridge.command.result.FabricChatClefCommandResultDataPayload;
@@ -26,6 +27,7 @@ public final class FabricChatClefCommandDiagnosticPayload {
             FabricChatClefTaskSnapshot taskAfterDispatch,
             FabricChatClefTaskSnapshot terminalTask,
             FabricChatClefTaskSnapshot boundRootTask,
+            FabricChatClefCommandResultFidelity resultFidelity,
             FabricChatClefCommandTerminationObservation observation
     ) {
         return FabricChatClefCommandLifecyclePayload.of(
@@ -42,6 +44,7 @@ public final class FabricChatClefCommandDiagnosticPayload {
                 taskAfterDispatch,
                 terminalTask,
                 boundRootTask,
+                resultFidelity,
                 observation
         );
     }

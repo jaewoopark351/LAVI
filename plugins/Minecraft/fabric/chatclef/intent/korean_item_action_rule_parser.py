@@ -47,7 +47,7 @@ class KoreanItemActionRuleParser:
             return self._intent(
                 ChatClefIntentType.DEPOSIT_ITEM,
                 original,
-                quantity=self._quantity_parser.parse(normalized),
+                quantity=self._quantity_parser.parse_optional(normalized),
                 item_phrase=self._deposit_item_phrase(normalized),
             )
         if self._looks_like_equip(normalized):

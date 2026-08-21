@@ -23,6 +23,7 @@ public final class FabricChatClefCommandLifecyclePayload implements FabricChatCl
     private final FabricChatClefTaskSnapshot taskAfterDispatch;
     private final FabricChatClefTaskSnapshot terminalTask;
     private final FabricChatClefTaskSnapshot boundRootTask;
+    private final FabricChatClefCommandResultFidelity resultFidelity;
     private final FabricChatClefTaskFinishedObservationPayload taskFinishedObservation;
 
     private FabricChatClefCommandLifecyclePayload(
@@ -39,6 +40,7 @@ public final class FabricChatClefCommandLifecyclePayload implements FabricChatCl
             FabricChatClefTaskSnapshot taskAfterDispatch,
             FabricChatClefTaskSnapshot terminalTask,
             FabricChatClefTaskSnapshot boundRootTask,
+            FabricChatClefCommandResultFidelity resultFidelity,
             FabricChatClefCommandTerminationObservation observation
     ) {
         this.resultReason = resultReason;
@@ -54,6 +56,7 @@ public final class FabricChatClefCommandLifecyclePayload implements FabricChatCl
         this.taskAfterDispatch = taskAfterDispatch;
         this.terminalTask = terminalTask;
         this.boundRootTask = boundRootTask;
+        this.resultFidelity = resultFidelity == null ? FabricChatClefCommandResultFidelity.UNKNOWN : resultFidelity;
         this.taskFinishedObservation = FabricChatClefTaskFinishedObservationPayload.from(observation);
     }
 
@@ -71,6 +74,7 @@ public final class FabricChatClefCommandLifecyclePayload implements FabricChatCl
             FabricChatClefTaskSnapshot taskAfterDispatch,
             FabricChatClefTaskSnapshot terminalTask,
             FabricChatClefTaskSnapshot boundRootTask,
+            FabricChatClefCommandResultFidelity resultFidelity,
             FabricChatClefCommandTerminationObservation observation
     ) {
         return new FabricChatClefCommandLifecyclePayload(
@@ -87,6 +91,7 @@ public final class FabricChatClefCommandLifecyclePayload implements FabricChatCl
                 taskAfterDispatch,
                 terminalTask,
                 boundRootTask,
+                resultFidelity,
                 observation
         );
     }
@@ -107,6 +112,7 @@ public final class FabricChatClefCommandLifecyclePayload implements FabricChatCl
                 taskAfterDispatch,
                 terminalTask,
                 boundRootTask,
+                resultFidelity,
                 taskFinishedObservation
         );
     }

@@ -6,6 +6,7 @@ import adris.altoclef.tasksystem.Task;
 import adris.altoclef.tasksystem.TaskChain;
 import adris.altoclef.tasksystem.TaskRunner;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskOwnershipEvidence;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskOwnershipSnapshot;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskSnapshot;
 
@@ -15,17 +16,26 @@ import java.util.StringJoiner;
 //20260808_kpopmodder: Read UserTaskChain ownership state separately from command lifecycle decisions.
 public final class FabricChatClefTaskOwnershipSnapshotReader {
     public FabricChatClefTaskOwnershipSnapshot ownershipSnapshot() {
+        return ownershipEvidence().ownershipSnapshot();
+    }
+
+    public FabricChatClefTaskOwnershipEvidence ownershipEvidence() {
         try {
+            long capturedAtMs = System.currentTimeMillis();
+            long capturedAtNanos = System.nanoTime();
+            long capturedClientTick = ChatClefDiagnostics.currentClientTickId();
+            String captureThread = Thread.currentThread().getName();
             AltoClef mod = AltoClef.getInstance();
             UserTaskChain userTaskChain = mod == null ? null : mod.getUserTaskChain();
             TaskRunner taskRunner = mod == null ? null : mod.getTaskRunner();
             Task userRoot = userTaskChain == null ? null : userTaskChain.getCurrentTask();
             TaskChain selectedChain = taskRunner == null ? null : taskRunner.getCurrentTaskChain();
-            return FabricChatClefTaskOwnershipSnapshot.of(
-                    System.currentTimeMillis(),
-                    ChatClefDiagnostics.currentClientTickId(),
-                    Thread.currentThread().getName(),
-                    FabricChatClefTaskSnapshot.capture(userRoot),
+            FabricChatClefTaskSnapshot rootSnapshot = FabricChatClefTaskSnapshot.capture(userRoot);
+            FabricChatClefTaskOwnershipSnapshot ownershipSnapshot = FabricChatClefTaskOwnershipSnapshot.of(
+                    capturedAtMs,
+                    capturedClientTick,
+                    captureThread,
+                    rootSnapshot,
                     ChatClefDiagnostics.className(userRoot),
                     taskIdentity(userRoot),
                     userTaskChain == null ? "unavailable" : userTaskChain.diagnosticRootAssignmentId(),
@@ -38,8 +48,17 @@ public final class FabricChatClefTaskOwnershipSnapshotReader {
                     selectedChain instanceof UserTaskChain,
                     selectedChainTaskPath(selectedChain)
             );
+            return FabricChatClefTaskOwnershipEvidence.of(
+                    userRoot,
+                    rootSnapshot,
+                    ownershipSnapshot,
+                    capturedAtMs,
+                    capturedAtNanos,
+                    capturedClientTick,
+                    captureThread
+            );
         } catch (Throwable error) {
-            return FabricChatClefTaskOwnershipSnapshot.unavailable(error);
+            return FabricChatClefTaskOwnershipEvidence.unavailable(error);
         }
     }
 

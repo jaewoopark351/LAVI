@@ -1,6 +1,7 @@
 package lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.payload;
 
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandContext;
+import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandResultFidelity;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.observation.FabricChatClefTaskFinishedObservationPayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskSnapshot;
 
@@ -10,7 +11,6 @@ import java.util.Map;
 //20260807_kpopmodder: Folderized command lifecycle Map serialization without changing emitted diagnostic fields.
 public final class FabricChatClefCommandLifecyclePayloadMap {
     private static final String RESULT_FIDELITY = "result_fidelity";
-    private static final String RESULT_FIDELITY_VALUE = "callback_plus_matching_user_task_event";
     private static final String RESULT_REASON = "result_reason";
     private static final String DISPATCH_STARTED_MS = "dispatch_started_ms";
     private static final String DISPATCH_RETURNED = "dispatch_returned";
@@ -44,12 +44,13 @@ public final class FabricChatClefCommandLifecyclePayloadMap {
             FabricChatClefTaskSnapshot taskAfterDispatch,
             FabricChatClefTaskSnapshot terminalTask,
             FabricChatClefTaskSnapshot boundRootTask,
+            FabricChatClefCommandResultFidelity resultFidelity,
             FabricChatClefTaskFinishedObservationPayload taskFinishedObservation
     ) {
         FabricChatClefTaskFinishedObservationPayload normalizedTaskFinishedObservation =
                 FabricChatClefTaskFinishedObservationPayload.orEmpty(taskFinishedObservation);
         Map<String, Object> payload = new HashMap<>();
-        payload.put(RESULT_FIDELITY, RESULT_FIDELITY_VALUE);
+        payload.put(RESULT_FIDELITY, normalizedFidelity(resultFidelity));
         payload.put(RESULT_REASON, resultReason);
         payload.put(DISPATCH_STARTED_MS, dispatchStartedMs);
         payload.put(DISPATCH_RETURNED, dispatchReturned);
@@ -66,5 +67,11 @@ public final class FabricChatClefCommandLifecyclePayloadMap {
         payload.put(TASK_FINISHED_EVENT_RECEIVED, normalizedTaskFinishedObservation.received());
         payload.put(TASK_FINISHED_OBSERVATION, normalizedTaskFinishedObservation.toMap());
         return payload;
+    }
+
+    private static String normalizedFidelity(FabricChatClefCommandResultFidelity resultFidelity) {
+        return resultFidelity == null
+                ? FabricChatClefCommandResultFidelity.UNKNOWN.wireValue()
+                : resultFidelity.wireValue();
     }
 }

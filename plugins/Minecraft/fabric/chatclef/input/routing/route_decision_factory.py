@@ -53,6 +53,7 @@ class MinecraftChatClefRouteDecisionFactory:
             "error": readiness.error,
             "message": readiness.message,
             "status": dict(readiness.status),
+            "details": dict(readiness.details),
         }
         return MinecraftChatClefInputRouteDecision.handled_result(
             reason=readiness.reason,

@@ -1,0 +1,6 @@
+﻿JUnit dependency decision for future edit-only implementation
+coordinate: org.junit.jupiter:junit-jupiter:5.10.2
+Gradle hunk: add testImplementation("org.junit.jupiter:junit-jupiter:5.10.2") inside dependencies
+Gradle hunk: configure Test tasks to useJUnitPlatform()
+Mockito or additional mocking framework: not planned
+test execution: not approved by this document

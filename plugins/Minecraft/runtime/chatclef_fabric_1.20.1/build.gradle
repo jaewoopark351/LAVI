@@ -111,6 +111,7 @@ dependencies {
 
     // Nether pathfinder
     implementation 'dev.babbaj:nether-pathfinder:1.5'
+    testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
 
     // PSA: Some older mods, compiled on Loom 0.2.1, might have outdated Maven POMs.
     // You may need to force-disable transitiveness on them.
@@ -170,6 +171,10 @@ processResources {
 // see http://yodaconditions.net/blog/fix-for-java-file-encoding-problems-with-gradle.html
 tasks.withType(JavaCompile) {
     options.encoding = "UTF-8"
+}
+
+tasks.withType(Test).configureEach {
+    useJUnitPlatform()
 }
 
 // Loom will automatically attach sourcesJar to a RemapSourcesJar task and to the "build" task

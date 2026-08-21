@@ -65,6 +65,7 @@ public final class FabricChatClefBridgeComponents {
                 taskFinishedObserver,
                 new FabricChatClefCommandOutcomeClassifier(),
                 commandResultOutbox,
+                bridgeClient,
                 diagnostics,
                 taskStateReader
         );

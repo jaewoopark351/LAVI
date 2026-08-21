@@ -873,3 +873,33 @@ plugins/Minecraft/fabric/chatclef/extension/minecraft_fabric_chatclef_extension.
 plugins/Minecraft/fabric/chatclef/ui/fabric_chatclef_command_controller.py
 plugins/Minecraft/fabric/chatclef/ui/fabric_chatclef_status_presenter.py
 ```
+
+## 2026-08-22 Result Fidelity Matrix Update
+
+`command_result.data.result_fidelity` is no longer a fixed
+`callback_plus_matching_user_task_event` value. The Java result factory must
+emit a value that matches the evidence behind each lifecycle result.
+
+Current Java lifecycle mapping:
+
+```text
+dispatch_started -> dispatch_started_only
+finish_callback_without_new_command_owned_root -> callback_without_matching_user_task_event
+finish_callback_without_verified_success -> callback_without_matching_user_task_event
+callback_completed_without_user_task -> callback_without_user_task
+matching_task_finished -> callback_plus_matching_user_task_event
+matching_task_stopped -> callback_plus_matching_user_task_event
+task_observation_unclassified -> callback_plus_matching_user_task_event
+task_identity_mismatch -> callback_plus_nonmatching_user_task_event
+command_exception -> command_exception_observed
+dispatch_exception -> dispatch_exception_observed
+deadline_exceeded -> deadline_without_verified_terminal
+unmapped diagnostic or duplicate payload -> unknown
+```
+
+The deposit sync-finish idle-root incident must use:
+
+```text
+result_reason = finish_callback_without_new_command_owned_root
+result_fidelity = callback_without_matching_user_task_event
+```

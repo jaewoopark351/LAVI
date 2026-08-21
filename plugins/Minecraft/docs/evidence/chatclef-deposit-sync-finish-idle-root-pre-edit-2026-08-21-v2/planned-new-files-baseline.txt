@@ -1,0 +1,21 @@
+﻿
+Path                                                                                                                                                                                           Baseline Sha256  
+----                                                                                                                                                                                           -------- ------  
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/lifecycle/FabricChatClefRootOwnershipClassification.java                          absent   <absent>
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/lifecycle/FabricChatClefRootOwnershipClassifier.java                              absent   <absent>
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/lifecycle/FabricChatClefPreexistingIdleRootStabilityGate.java                     absent   <absent>
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/lifecycle/FabricChatClefCommandResultFidelity.java                                absent   <absent>
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/observation/FabricChatClefTaskOwnershipEvidence.java                              absent   <absent>
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/observation/FabricChatClefFinishCallbackObservation.java                          absent   <absent>
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/lifecycle/details/FabricChatClefPreexistingIdleRootDetailsPayload.java            absent   <absent>
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/lavi/minecraft/fabric/chatclef/bridge/command/lifecycle/details/payload/FabricChatClefPreexistingIdleRootDetailsPayloadMap.java absent   <absent>
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/test/java/lavi/minecraft/fabric/chatclef/bridge/command/FabricChatClefRootOwnershipClassifierTest.java                                    absent   <absent>
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/test/java/lavi/minecraft/fabric/chatclef/bridge/command/FabricChatClefFinishCallbackObservationTest.java                                  absent   <absent>
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/test/java/lavi/minecraft/fabric/chatclef/bridge/command/FabricChatClefPreexistingIdleRootStabilityGateTest.java                           absent   <absent>
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/test/java/lavi/minecraft/fabric/chatclef/bridge/command/FabricChatClefCommandOutcomeClassifierTest.java                                   absent   <absent>
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/test/java/lavi/minecraft/fabric/chatclef/bridge/command/FabricChatClefCommandResultFidelityTest.java                                      absent   <absent>
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/test/java/lavi/minecraft/fabric/chatclef/bridge/command/FabricChatClefTaskFinishedEventAssociationTest.java                               absent   <absent>
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/test/java/lavi/minecraft/fabric/chatclef/bridge/command/FabricChatClefBoundRootDetachOwnershipTest.java                                   absent   <absent>
+
+
+
