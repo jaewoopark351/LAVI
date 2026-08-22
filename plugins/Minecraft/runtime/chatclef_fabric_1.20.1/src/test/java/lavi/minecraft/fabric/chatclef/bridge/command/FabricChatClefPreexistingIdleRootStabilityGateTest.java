@@ -24,9 +24,9 @@ class FabricChatClefPreexistingIdleRootStabilityGateTest {
         FabricChatClefCommandExecution execution = executionFor(idle);
         FabricChatClefPreexistingIdleRootStabilityGate gate = new FabricChatClefPreexistingIdleRootStabilityGate();
 
-        assertFalse(gate.observe(execution, evidence(idle, 1L), 1000L, 1_000_000_000L, 1L).qualified());
-        assertFalse(gate.observe(execution, evidence(idle, 1L), 1600L, 1_600_000_000L, 1L).qualified());
-        assertFalse(gate.observe(execution, evidence(idle, 1L), 1700L, 1_700_000_000L, 1L).qualified());
+        assertFalse(gate.observe(execution, evidence(idle, 1L), 1000L, 1_000_000_000L, 1L, execution.context()).qualified());
+        assertFalse(gate.observe(execution, evidence(idle, 1L), 1600L, 1_600_000_000L, 1L, execution.context()).qualified());
+        assertFalse(gate.observe(execution, evidence(idle, 1L), 1700L, 1_700_000_000L, 1L, execution.context()).qualified());
     }
 
     @Test
@@ -35,10 +35,10 @@ class FabricChatClefPreexistingIdleRootStabilityGateTest {
         FabricChatClefCommandExecution execution = executionFor(idle);
         FabricChatClefPreexistingIdleRootStabilityGate gate = new FabricChatClefPreexistingIdleRootStabilityGate();
 
-        gate.observe(execution, evidence(idle, 1L), 1000L, 1_000_000_000L, 1L);
-        gate.observe(execution, evidence(idle, 2L), 1200L, 1_200_000_000L, 2L);
+        gate.observe(execution, evidence(idle, 1L), 1000L, 1_000_000_000L, 1L, execution.context());
+        gate.observe(execution, evidence(idle, 2L), 1200L, 1_200_000_000L, 2L, execution.context());
         FabricChatClefStableRequestQuiescenceObservation observation =
-                gate.observe(execution, evidence(idle, 3L), 1600L, 1_600_000_000L, 3L);
+                gate.observe(execution, evidence(idle, 3L), 1600L, 1_600_000_000L, 3L, execution.context());
 
         assertTrue(observation.qualified());
     }
@@ -49,10 +49,10 @@ class FabricChatClefPreexistingIdleRootStabilityGateTest {
         FabricChatClefCommandExecution execution = executionFor(idle);
         FabricChatClefPreexistingIdleRootStabilityGate gate = new FabricChatClefPreexistingIdleRootStabilityGate();
 
-        gate.observe(execution, evidence(idle, 1L), 1000L, 1_000_000_000L, 1L);
-        gate.observe(execution, evidence(idle, 2L), 1200L, 1_200_000_000L, 2L);
+        gate.observe(execution, evidence(idle, 1L), 1000L, 1_000_000_000L, 1L, execution.context());
+        gate.observe(execution, evidence(idle, 2L), 1200L, 1_200_000_000L, 2L, execution.context());
         FabricChatClefStableRequestQuiescenceObservation observation =
-                gate.observe(execution, evidence(new IdleTask(), 3L), 1600L, 1_600_000_000L, 3L);
+                gate.observe(execution, evidence(new IdleTask(), 3L), 1600L, 1_600_000_000L, 3L, execution.context());
 
         assertFalse(observation.qualified());
         assertEquals("current_root_changed", observation.toMap().get("reset_reason"));
@@ -66,13 +66,34 @@ class FabricChatClefPreexistingIdleRootStabilityGateTest {
         FabricChatClefCommandExecution firstExecution = executionFor(idle);
         FabricChatClefCommandExecution secondExecution = executionFor(idle);
 
-        gate.observe(firstExecution, evidence(idle, 1L), 1000L, 1_000_000_000L, 1L);
-        gate.observe(firstExecution, evidence(idle, 2L), 1200L, 1_200_000_000L, 2L);
+        gate.observe(firstExecution, evidence(idle, 1L), 1000L, 1_000_000_000L, 1L, firstExecution.context());
+        gate.observe(firstExecution, evidence(idle, 2L), 1200L, 1_200_000_000L, 2L, firstExecution.context());
         FabricChatClefStableRequestQuiescenceObservation observation =
-                gate.observe(secondExecution, evidence(idle, 3L), 1600L, 1_600_000_000L, 3L);
+                gate.observe(secondExecution, evidence(idle, 3L), 1600L, 1_600_000_000L, 3L, secondExecution.context());
 
         assertFalse(observation.qualified());
         assertEquals(1, observation.toMap().get("distinct_tick_count"));
+    }
+
+    @Test
+    void activeContextMustBeExactExecutionContextObject() {
+        IdleTask idle = new IdleTask();
+        FabricChatClefCommandExecution execution = executionFor(idle);
+        FabricChatClefPreexistingIdleRootStabilityGate gate = new FabricChatClefPreexistingIdleRootStabilityGate();
+
+        FabricChatClefStableRequestQuiescenceObservation observation = gate.observe(
+                execution,
+                evidence(idle, 1L),
+                1000L,
+                1_000_000_000L,
+                1L,
+                context()
+        );
+        Map<String, Object> payload = observation.toMap();
+
+        assertFalse(observation.qualified());
+        assertEquals("active_context_identity_mismatch", payload.get("reset_reason"));
+        assertEquals(false, payload.get("same_session_generation"));
     }
 
     @Test
@@ -81,11 +102,11 @@ class FabricChatClefPreexistingIdleRootStabilityGateTest {
         FabricChatClefCommandExecution execution = executionFor(idle);
         FabricChatClefPreexistingIdleRootStabilityGate gate = new FabricChatClefPreexistingIdleRootStabilityGate();
 
-        gate.observe(execution, evidence(idle, 1L), 1000L, 1_000_000_000L, 1L);
-        gate.observe(execution, evidence(idle, 2L), 1200L, 1_200_000_000L, 2L);
+        gate.observe(execution, evidence(idle, 1L), 1000L, 1_000_000_000L, 1L, execution.context());
+        gate.observe(execution, evidence(idle, 2L), 1200L, 1_200_000_000L, 2L, execution.context());
         gate.reset();
         FabricChatClefStableRequestQuiescenceObservation observation =
-                gate.observe(execution, evidence(idle, 3L), 1600L, 1_600_000_000L, 3L);
+                gate.observe(execution, evidence(idle, 3L), 1600L, 1_600_000_000L, 3L, execution.context());
 
         assertFalse(observation.qualified());
         assertEquals(1, observation.toMap().get("distinct_tick_count"));
@@ -97,9 +118,9 @@ class FabricChatClefPreexistingIdleRootStabilityGateTest {
         FabricChatClefCommandExecution execution = executionFor(idle);
         FabricChatClefPreexistingIdleRootStabilityGate gate = new FabricChatClefPreexistingIdleRootStabilityGate();
 
-        gate.observe(execution, evidence(idle, 1L), 1000L, 1_000_000_000L, 1L);
+        gate.observe(execution, evidence(idle, 1L), 1000L, 1_000_000_000L, 1L, execution.context());
         FabricChatClefStableRequestQuiescenceObservation observation =
-                gate.observe(execution, evidence(idle, 2L, "user-root-2", 1L, false), 1200L, 1_200_000_000L, 2L);
+                gate.observe(execution, evidence(idle, 2L, "user-root-2", 1L, false), 1200L, 1_200_000_000L, 2L, execution.context());
 
         assertFalse(observation.qualified());
         assertEquals("assignment_or_generation_changed", observation.toMap().get("reset_reason"));
@@ -112,9 +133,9 @@ class FabricChatClefPreexistingIdleRootStabilityGateTest {
         FabricChatClefCommandExecution execution = executionFor(idle);
         FabricChatClefPreexistingIdleRootStabilityGate gate = new FabricChatClefPreexistingIdleRootStabilityGate();
 
-        gate.observe(execution, evidence(idle, 1L), 1000L, 1_000_000_000L, 1L);
+        gate.observe(execution, evidence(idle, 1L), 1000L, 1_000_000_000L, 1L, execution.context());
         FabricChatClefStableRequestQuiescenceObservation observation =
-                gate.observe(execution, evidence(idle, 2L, "user-root-1", 2L, false), 1200L, 1_200_000_000L, 2L);
+                gate.observe(execution, evidence(idle, 2L, "user-root-1", 2L, false), 1200L, 1_200_000_000L, 2L, execution.context());
 
         assertFalse(observation.qualified());
         assertEquals("assignment_or_generation_changed", observation.toMap().get("reset_reason"));
@@ -127,9 +148,9 @@ class FabricChatClefPreexistingIdleRootStabilityGateTest {
         FabricChatClefCommandExecution execution = executionFor(idle);
         FabricChatClefPreexistingIdleRootStabilityGate gate = new FabricChatClefPreexistingIdleRootStabilityGate();
 
-        gate.observe(execution, evidence(idle, 1L), 1000L, 1_000_000_000L, 1L);
+        gate.observe(execution, evidence(idle, 1L), 1000L, 1_000_000_000L, 1L, execution.context());
         FabricChatClefStableRequestQuiescenceObservation observation =
-                gate.observe(execution, evidence(idle, 2L, "user-root-1", 1L, true), 1200L, 1_200_000_000L, 2L);
+                gate.observe(execution, evidence(idle, 2L, "user-root-1", 1L, true), 1200L, 1_200_000_000L, 2L, execution.context());
 
         assertFalse(observation.qualified());
         assertEquals("next_task_idle_flag_true", observation.toMap().get("reset_reason"));
@@ -143,7 +164,7 @@ class FabricChatClefPreexistingIdleRootStabilityGateTest {
         FabricChatClefPreexistingIdleRootStabilityGate gate = new FabricChatClefPreexistingIdleRootStabilityGate();
 
         FabricChatClefStableRequestQuiescenceObservation observation =
-                gate.observe(execution, evidence(idle, 1L, 1_000_000_000L), 2500L, 2_500_000_000L, 1L);
+                gate.observe(execution, evidence(idle, 1L, 1_000_000_000L), 2500L, 2_500_000_000L, 1L, execution.context());
         Map<String, Object> payload = observation.toMap();
 
         assertFalse(observation.qualified());
@@ -159,7 +180,7 @@ class FabricChatClefPreexistingIdleRootStabilityGateTest {
         FabricChatClefPreexistingIdleRootStabilityGate gate = new FabricChatClefPreexistingIdleRootStabilityGate();
 
         FabricChatClefStableRequestQuiescenceObservation observation =
-                gate.observe(execution, evidence(idle, 1L), 1000L, 1_000_000_000L, 1L);
+                gate.observe(execution, evidence(idle, 1L), 1000L, 1_000_000_000L, 1L, execution.context());
         Map<String, Object> payload = observation.toMap();
 
         assertEquals(payload.get("observation_count"), payload.get("distinct_tick_count"));
@@ -174,9 +195,9 @@ class FabricChatClefPreexistingIdleRootStabilityGateTest {
         FabricChatClefCommandExecution execution = executionFor(idle);
         FabricChatClefPreexistingIdleRootStabilityGate gate = new FabricChatClefPreexistingIdleRootStabilityGate();
 
-        gate.observe(execution, evidence(idle, 1L), 1000L, 1_000_000_000L, 1L);
-        gate.observe(execution, evidence(idle, 2L), 1200L, 1_200_000_000L, 2L);
-        Map<String, Object> payload = gate.observe(execution, evidence(idle, 3L), 1600L, 1_600_000_000L, 3L).toMap();
+        gate.observe(execution, evidence(idle, 1L), 1000L, 1_000_000_000L, 1L, execution.context());
+        gate.observe(execution, evidence(idle, 2L), 1200L, 1_200_000_000L, 2L, execution.context());
+        Map<String, Object> payload = gate.observe(execution, evidence(idle, 3L), 1600L, 1_600_000_000L, 3L, execution.context()).toMap();
 
         assertEquals("none", payload.get("blocked_reason"));
         assertEquals(600L, payload.get("stable_duration_ms"));

@@ -1,5 +1,6 @@
 package lavi.minecraft.fabric.chatclef.bridge.command.lifecycle;
 
+import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandContext;
 import lavi.minecraft.fabric.chatclef.bridge.command.execution.FabricChatClefCommandExecution;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.evidence.FabricChatClefStableRequestQuiescenceObservation;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskOwnershipEvidence;
@@ -32,16 +33,28 @@ public final class FabricChatClefPreexistingIdleRootStabilityGate {
             FabricChatClefTaskOwnershipEvidence currentEvidence,
             long nowMs,
             long nowNanos,
-            long clientTickId
+            long clientTickId,
+            FabricChatClefCommandContext activeContext
     ) {
         if (execution != trackedExecution) {
             reset();
             trackedExecution = execution;
         }
-        String blockedReason = blockedReason(execution, currentEvidence, nowNanos);
+        long snapshotAgeMs = snapshotAgeMs(currentEvidence, nowNanos);
+        String blockedReason = blockedReason(execution, currentEvidence, snapshotAgeMs, activeContext);
         if (!blockedReason.isEmpty()) {
             resetWindow();
-            return observation(false, blockedReason, currentEvidence, nowMs, nowNanos, clientTickId, execution);
+            return observation(
+                    false,
+                    blockedReason,
+                    currentEvidence,
+                    nowMs,
+                    nowNanos,
+                    clientTickId,
+                    execution,
+                    snapshotAgeMs,
+                    activeContext
+            );
         }
         String signature = signature(execution, currentEvidence);
         if (!signature.equals(trackedSignature)) {
@@ -67,14 +80,17 @@ public final class FabricChatClefPreexistingIdleRootStabilityGate {
                 nowMs,
                 nowNanos,
                 clientTickId,
-                execution
+                execution,
+                snapshotAgeMs,
+                activeContext
         );
     }
 
     private String blockedReason(
             FabricChatClefCommandExecution execution,
             FabricChatClefTaskOwnershipEvidence currentEvidence,
-            long nowNanos
+            long snapshotAgeMs,
+            FabricChatClefCommandContext activeContext
     ) {
         if (execution == null) {
             return "missing_execution";
@@ -82,6 +98,9 @@ public final class FabricChatClefPreexistingIdleRootStabilityGate {
         if (execution.rootOwnershipClassification()
                 != FabricChatClefRootOwnershipClassification.PREEXISTING_UNCHANGED_IDLE_ROOT) {
             return "root_ownership_not_preexisting_idle";
+        }
+        if (!sameSessionGeneration(execution, activeContext)) {
+            return "active_context_identity_mismatch";
         }
         if (!execution.finishCallbackFirstObservedBeforeDispatchReturn()) {
             return "finish_callback_not_synchronous";
@@ -92,7 +111,7 @@ public final class FabricChatClefPreexistingIdleRootStabilityGate {
         if (currentEvidence == null || !currentEvidence.available()) {
             return "current_ownership_unavailable";
         }
-        if (snapshotAgeMs(currentEvidence, nowNanos) > MAX_NEWEST_EVIDENCE_AGE_MS) {
+        if (snapshotAgeMs > MAX_NEWEST_EVIDENCE_AGE_MS) {
             return "current_ownership_stale";
         }
         FabricChatClefTaskOwnershipEvidence before = execution.taskBeforeDispatchEvidence();
@@ -156,7 +175,9 @@ public final class FabricChatClefPreexistingIdleRootStabilityGate {
             long nowMs,
             long nowNanos,
             long clientTickId,
-            FabricChatClefCommandExecution execution
+            FabricChatClefCommandExecution execution,
+            long snapshotAgeMs,
+            FabricChatClefCommandContext activeContext
     ) {
         long firstMs = firstObservedAtMs == 0L ? nowMs : firstObservedAtMs;
         long lastMs = lastObservedAtMs == 0L ? nowMs : lastObservedAtMs;
@@ -173,8 +194,8 @@ public final class FabricChatClefPreexistingIdleRootStabilityGate {
                 clientTickId,
                 stableDurationMs,
                 finishAt <= 0L ? -1L : Math.max(0L, nowMs - finishAt),
-                snapshotAgeMs(currentEvidence, nowNanos),
-                sameSessionGeneration(execution),
+                snapshotAgeMs,
+                sameSessionGeneration(execution, activeContext),
                 requestRootReappeared(execution, currentEvidence),
                 "NEVER_OBSERVED",
                 SIGNATURE_VERSION,
@@ -195,11 +216,21 @@ public final class FabricChatClefPreexistingIdleRootStabilityGate {
         return (nowNanos - currentEvidence.capturedAtNanos()) / 1_000_000L;
     }
 
-    private boolean sameSessionGeneration(FabricChatClefCommandExecution execution) {
-        return execution != null
-                && execution == trackedExecution
-                && !nullToEmpty(execution.context().sessionId()).isBlank()
-                && execution.context().connectionGeneration() >= 0L;
+    private boolean sameSessionGeneration(
+            FabricChatClefCommandExecution execution,
+            FabricChatClefCommandContext activeContext
+    ) {
+        if (execution == null || activeContext == null || execution != trackedExecution) {
+            return false;
+        }
+        FabricChatClefCommandContext executionContext = execution.context();
+        return executionContext == activeContext
+                && !nullToEmpty(executionContext.sessionId()).isBlank()
+                && !nullToEmpty(activeContext.sessionId()).isBlank()
+                && nullToEmpty(executionContext.sessionId()).equals(nullToEmpty(activeContext.sessionId()))
+                && executionContext.connectionGeneration() >= 0L
+                && activeContext.connectionGeneration() >= 0L
+                && executionContext.connectionGeneration() == activeContext.connectionGeneration();
     }
 
     private boolean requestRootReappeared(

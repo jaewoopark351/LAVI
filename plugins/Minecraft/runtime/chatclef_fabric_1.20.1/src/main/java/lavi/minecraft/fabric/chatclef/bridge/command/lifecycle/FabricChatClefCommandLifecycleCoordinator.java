@@ -91,7 +91,7 @@ public final class FabricChatClefCommandLifecycleCoordinator {
         );
         execution.markDispatchReturned(taskAfterDispatch, classification);
         commandDiagnostics.info("dispatch_returned", execution);
-        tryComplete(execution, false);
+        tryComplete(execution, false, null);
     }
 
     public void markCommandFinish(
@@ -107,7 +107,7 @@ public final class FabricChatClefCommandLifecycleCoordinator {
                         taskStateReader.runtimePayload()
                 )
         );
-        tryComplete(execution, false);
+        tryComplete(execution, false, null);
     }
 
     public void completeCommandException(
@@ -151,7 +151,7 @@ public final class FabricChatClefCommandLifecycleCoordinator {
         drainObservations();
         FabricChatClefCommandExecution execution = activeExecution.get();
         if (execution != null) {
-            tryComplete(execution, true);
+            tryComplete(execution, true, activeContext.orElse(null));
         }
     }
 
@@ -286,7 +286,7 @@ public final class FabricChatClefCommandLifecycleCoordinator {
                 taskStateReader.runtimePayload()
         );
         commandDiagnostics.info("task_finished_event_received", execution, details);
-        tryComplete(execution, false);
+        tryComplete(execution, false, null);
     }
 
     private void logUnboundTaskFinishedEventAudit(
@@ -308,18 +308,22 @@ public final class FabricChatClefCommandLifecycleCoordinator {
         );
     }
 
-    private void tryComplete(FabricChatClefCommandExecution execution, boolean publishNonterminalEvidence) {
+    private void tryComplete(
+            FabricChatClefCommandExecution execution,
+            boolean publishNonterminalEvidence,
+            FabricChatClefCommandContext activeContext
+    ) {
         if (activeExecution.get() != execution) {
             return;
         }
         if (publishNonterminalEvidence) {
-            updatePreexistingIdleRootStability(execution);
+            updatePreexistingIdleRootStability(execution, activeContext);
         }
         FabricChatClefCommandTerminalDecision decision = outcomeClassifier.classify(execution);
         if (!decision.terminal()) {
             logWaitingDecision(execution, decision.reason());
             if (publishNonterminalEvidence) {
-                nonterminalEvidencePublisher.publishIfEligible(execution, decision.reason());
+                nonterminalEvidencePublisher.publishIfEligible(execution, decision.reason(), activeContext);
             }
             return;
         }
@@ -405,19 +409,25 @@ public final class FabricChatClefCommandLifecycleCoordinator {
         preexistingIdleRootStabilityGate.reset();
     }
 
-    private void updatePreexistingIdleRootStability(FabricChatClefCommandExecution execution) {
+    private void updatePreexistingIdleRootStability(
+            FabricChatClefCommandExecution execution,
+            FabricChatClefCommandContext activeContext
+    ) {
         if (execution.rootOwnershipClassification()
                 != FabricChatClefRootOwnershipClassification.PREEXISTING_UNCHANGED_IDLE_ROOT) {
             return;
         }
+        FabricChatClefTaskOwnershipEvidence currentEvidence = taskStateReader.ownershipEvidence();
+        long nowNanos = System.nanoTime();
         long nowMs = System.currentTimeMillis();
         FabricChatClefStableRequestQuiescenceObservation observation =
                 preexistingIdleRootStabilityGate.observe(
                         execution,
-                        taskStateReader.ownershipEvidence(),
+                        currentEvidence,
                         nowMs,
-                        System.nanoTime(),
-                        lavi.minecraft.diagnostics.ChatClefDiagnostics.currentClientTickId()
+                        nowNanos,
+                        lavi.minecraft.diagnostics.ChatClefDiagnostics.currentClientTickId(),
+                        activeContext
                 );
         execution.markPreexistingIdleRootStabilityObservation(observation);
     }

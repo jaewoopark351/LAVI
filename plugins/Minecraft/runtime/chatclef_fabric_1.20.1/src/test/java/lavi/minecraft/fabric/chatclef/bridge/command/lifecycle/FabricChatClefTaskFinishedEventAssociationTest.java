@@ -139,7 +139,7 @@ class FabricChatClefTaskFinishedEventAssociationTest {
                 0L,
                 true,
                 false,
-                "OBSERVED_NEUTRAL_ROOT_STABLE",
+                "NEVER_OBSERVED",
                 "test",
                 "test",
                 3,

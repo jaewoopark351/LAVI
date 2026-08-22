@@ -2,6 +2,7 @@ package lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.evidence;
 
 import adris.altoclef.tasksystem.Task;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandContext;
 import lavi.minecraft.fabric.chatclef.bridge.command.execution.FabricChatClefCommandExecution;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskOwnershipEvidence;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskOwnershipSnapshot;
@@ -43,7 +44,8 @@ public final class FabricChatClefStableRequestQuiescenceTracker {
             String waitingReason,
             long nowMs,
             long nowNanos,
-            long clientTickId
+            long clientTickId,
+            FabricChatClefCommandContext activeContext
     ) {
         if (execution != trackedExecution) {
             reset();
@@ -53,18 +55,34 @@ public final class FabricChatClefStableRequestQuiescenceTracker {
         FabricChatClefTaskOwnershipSnapshot ownership = currentEvidence == null
                 ? null
                 : currentEvidence.ownershipSnapshot();
-        String requestRootState = requestRootObservationState(execution, currentTask);
+        long snapshotAgeMs = snapshotAgeMs(currentEvidence, nowNanos);
+        String requestRootState = requestRootObservationState(execution, currentTask, currentEvidence, snapshotAgeMs);
+        if ("STILL_PRESENT".equals(requestRootState)) {
+            requestRootReappeared = true;
+        }
         String blockedReason = preconditionBlockReason(
                 execution,
                 currentTask,
                 currentEvidence,
                 ownership,
                 waitingReason,
-                nowNanos
+                snapshotAgeMs,
+                activeContext
         );
         if (!blockedReason.isEmpty()) {
             resetWindow();
-            return observation(false, blockedReason, requestRootState, currentEvidence, nowMs, nowNanos, clientTickId, execution);
+            return observation(
+                    false,
+                    blockedReason,
+                    requestRootState,
+                    currentEvidence,
+                    nowMs,
+                    nowNanos,
+                    clientTickId,
+                    execution,
+                    snapshotAgeMs,
+                    activeContext
+            );
         }
         String signature = signature(execution, currentTask, ownership, waitingReason);
         if (!signature.equals(trackedSignature)) {
@@ -73,29 +91,33 @@ public final class FabricChatClefStableRequestQuiescenceTracker {
             firstObservedAtMs = nowMs;
             firstClientTickId = clientTickId;
             observationCount = 0;
-            requestRootReappeared = false;
+            lastClientTickId = Long.MIN_VALUE;
         }
         if (clientTickId != lastClientTickId) {
             observationCount++;
             lastClientTickId = clientTickId;
         }
         lastObservedAtMs = nowMs;
-        if ("STILL_PRESENT".equals(requestRootState)) {
-            requestRootReappeared = true;
-        }
         long stableDurationMs = stableDurationMs(nowNanos);
         boolean qualified = observationCount >= MIN_NEUTRAL_SNAPSHOTS
                 && stableDurationMs >= MIN_NEUTRAL_DURATION_MS
                 && !requestRootReappeared;
+        String qualificationBlockReason = qualified
+                ? "none"
+                : requestRootReappeared
+                        ? "request_root_reappeared"
+                        : "stable_window_not_satisfied";
         return observation(
                 qualified,
-                qualified ? "none" : "stable_window_not_satisfied",
+                qualificationBlockReason,
                 requestRootState,
                 currentEvidence,
                 nowMs,
                 nowNanos,
                 clientTickId,
-                execution
+                execution,
+                snapshotAgeMs,
+                activeContext
         );
     }
 
@@ -105,10 +127,14 @@ public final class FabricChatClefStableRequestQuiescenceTracker {
             FabricChatClefTaskOwnershipEvidence currentEvidence,
             FabricChatClefTaskOwnershipSnapshot ownership,
             String waitingReason,
-            long nowNanos
+            long snapshotAgeMs,
+            FabricChatClefCommandContext activeContext
     ) {
         if (execution == null) {
             return "missing_execution";
+        }
+        if (!sameSessionGeneration(execution, activeContext)) {
+            return "active_context_identity_mismatch";
         }
         if (!execution.dispatchReturned()) {
             return "dispatch_not_returned";
@@ -125,7 +151,7 @@ public final class FabricChatClefStableRequestQuiescenceTracker {
         if (currentEvidence == null || !currentEvidence.available()) {
             return "current_ownership_unavailable";
         }
-        if (snapshotAgeMs(currentEvidence, nowNanos) > MAX_SNAPSHOT_AGE_MS) {
+        if (snapshotAgeMs > MAX_SNAPSHOT_AGE_MS) {
             return "current_ownership_stale";
         }
         if (currentTask == null) {
@@ -142,15 +168,21 @@ public final class FabricChatClefStableRequestQuiescenceTracker {
 
     private String requestRootObservationState(
             FabricChatClefCommandExecution execution,
-            Task currentTask
+            Task currentTask,
+            FabricChatClefTaskOwnershipEvidence currentEvidence,
+            long snapshotAgeMs
     ) {
-        if (execution == null || !execution.hasBoundRootTask()) {
+        if (execution == null) {
+            return "UNKNOWN";
+        }
+        if (!execution.hasBoundRootTask()) {
             return "NEVER_OBSERVED";
         }
-        if (execution.matchesBoundRootTask(currentTask)
-                && currentTask != null
-                && NEUTRAL_ROOT_CLASS.equals(currentTask.getClass().getName())) {
-            return "OBSERVED_NEUTRAL_ROOT_STABLE";
+        if (currentEvidence == null
+                || !currentEvidence.available()
+                || snapshotAgeMs > MAX_SNAPSHOT_AGE_MS
+                || currentTask == null) {
+            return "UNKNOWN";
         }
         if (execution.matchesBoundRootTask(currentTask)) {
             return "STILL_PRESENT";
@@ -200,7 +232,9 @@ public final class FabricChatClefStableRequestQuiescenceTracker {
             long nowMs,
             long nowNanos,
             long clientTickId,
-            FabricChatClefCommandExecution execution
+            FabricChatClefCommandExecution execution,
+            long snapshotAgeMs,
+            FabricChatClefCommandContext activeContext
     ) {
         long lastObserved = lastObservedAtMs == 0L ? nowMs : lastObservedAtMs;
         long firstObserved = firstObservedAtMs == 0L ? nowMs : firstObservedAtMs;
@@ -216,8 +250,8 @@ public final class FabricChatClefStableRequestQuiescenceTracker {
                 clientTickId,
                 stableDurationMs(nowNanos),
                 finishAt <= 0L ? -1L : Math.max(0L, nowMs - finishAt),
-                snapshotAgeMs(currentEvidence, nowNanos),
-                sameSessionGeneration(execution),
+                snapshotAgeMs,
+                sameSessionGeneration(execution, activeContext),
                 requestRootReappeared,
                 requestRootState,
                 SIGNATURE_VERSION,
@@ -238,11 +272,21 @@ public final class FabricChatClefStableRequestQuiescenceTracker {
         return (nowNanos - currentEvidence.capturedAtNanos()) / 1_000_000L;
     }
 
-    private boolean sameSessionGeneration(FabricChatClefCommandExecution execution) {
-        return execution != null
-                && execution == trackedExecution
-                && !nullToEmpty(execution.context().sessionId()).isBlank()
-                && execution.context().connectionGeneration() >= 0L;
+    private boolean sameSessionGeneration(
+            FabricChatClefCommandExecution execution,
+            FabricChatClefCommandContext activeContext
+    ) {
+        if (execution == null || activeContext == null || execution != trackedExecution) {
+            return false;
+        }
+        FabricChatClefCommandContext executionContext = execution.context();
+        return executionContext == activeContext
+                && !nullToEmpty(executionContext.sessionId()).isBlank()
+                && !nullToEmpty(activeContext.sessionId()).isBlank()
+                && nullToEmpty(executionContext.sessionId()).equals(nullToEmpty(activeContext.sessionId()))
+                && executionContext.connectionGeneration() >= 0L
+                && activeContext.connectionGeneration() >= 0L
+                && executionContext.connectionGeneration() == activeContext.connectionGeneration();
     }
 
     private long stableDurationMs(long nowNanos) {
@@ -260,7 +304,6 @@ public final class FabricChatClefStableRequestQuiescenceTracker {
         firstClientTickId = 0L;
         lastClientTickId = Long.MIN_VALUE;
         observationCount = 0;
-        requestRootReappeared = false;
     }
 
     private static String taskIdentity(Task task) {
