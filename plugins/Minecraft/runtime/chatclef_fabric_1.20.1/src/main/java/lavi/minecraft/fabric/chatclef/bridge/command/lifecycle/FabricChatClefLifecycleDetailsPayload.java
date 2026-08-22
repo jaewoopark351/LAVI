@@ -45,14 +45,16 @@ public interface FabricChatClefLifecycleDetailsPayload extends FabricChatClefCom
             FabricChatClefFinishCallbackObservation finishCallbackObservation,
             int finishCallbackDuplicateCount,
             FabricChatClefStableRequestQuiescenceObservation stableObservation,
-            String taskFinishedEventAssociation
+            String taskFinishedEventAssociation,
+            FabricChatClefCommandTerminationObservation unboundTaskFinishedObservation
     ) {
         return new FabricChatClefPreexistingIdleRootDetailsPayload(
                 classification,
                 finishCallbackObservation,
                 finishCallbackDuplicateCount,
                 stableObservation,
-                taskFinishedEventAssociation
+                taskFinishedEventAssociation,
+                unboundTaskFinishedObservation
         );
     }
 

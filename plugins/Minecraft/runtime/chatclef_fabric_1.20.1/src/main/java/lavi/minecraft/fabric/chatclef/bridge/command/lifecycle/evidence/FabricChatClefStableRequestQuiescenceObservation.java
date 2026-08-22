@@ -115,7 +115,9 @@ public final class FabricChatClefStableRequestQuiescenceObservation {
         payload.put("qualified", qualified);
         payload.put("satisfied", qualified);
         payload.put("blocked_reason", blockedReason);
+        payload.put("reset_reason", blockedReason);
         payload.put("observation_count", observationCount);
+        payload.put("distinct_tick_count", observationCount);
         payload.put("consecutive_neutral_snapshots", observationCount);
         payload.put("first_observed_at_ms", firstObservedAtMs);
         payload.put("last_observed_at_ms", lastObservedAtMs);

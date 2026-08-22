@@ -223,6 +223,29 @@ public final class FabricChatClefCommandLifecycleCoordinator {
         return execution.boundRootMatchReason(candidateTask);
     }
 
+    public String boundRootOwnershipForDetach(FabricChatClefCommandContext context, Task candidateTask) {
+        FabricChatClefCommandExecution execution = activeExecution.get();
+        if (execution == null || execution.context() != context) {
+            return "no_matching_lifecycle_execution";
+        }
+        return classificationName(execution) + ":" + execution.boundRootMatchReason(candidateTask);
+    }
+
+    public String detachCancelAction(FabricChatClefCommandContext context, Task candidateTask) {
+        FabricChatClefCommandExecution execution = activeExecution.get();
+        if (execution == null || execution.context() != context) {
+            return "skip_not_owned";
+        }
+        if (execution.matchesBoundRootTask(candidateTask)) {
+            return "cancel_owned_root";
+        }
+        if (execution.rootOwnershipClassification()
+                == FabricChatClefRootOwnershipClassification.PREEXISTING_UNCHANGED_IDLE_ROOT) {
+            return "skip_preexisting_root";
+        }
+        return "skip_not_owned";
+    }
+
     private void drainObservations() {
         for (int index = 0; index < MAX_OBSERVATIONS_PER_TICK; index++) {
             FabricChatClefCommandTerminationObservation observation = taskFinishedObserver.poll();
@@ -242,21 +265,15 @@ public final class FabricChatClefCommandLifecycleCoordinator {
             );
             return;
         }
-        if (execution.rootOwnershipClassification()
-                == FabricChatClefRootOwnershipClassification.PREEXISTING_UNCHANGED_IDLE_ROOT
+        FabricChatClefRootOwnershipClassification classification = execution.rootOwnershipClassification();
+        if (classification == FabricChatClefRootOwnershipClassification.PREEXISTING_UNCHANGED_IDLE_ROOT
                 && !execution.hasBoundRootTask()) {
             preexistingIdleRootStabilityGate.reset();
-            commandDiagnostics.info(
-                    "task_finished_event_unbound_audit",
-                    execution,
-                    FabricChatClefLifecycleDetailsPayload.preexistingIdleRoot(
-                            execution.rootOwnershipClassification(),
-                            execution.firstFinishCallbackObservation(),
-                            execution.finishCallbackDuplicateCount(),
-                            execution.preexistingIdleRootStabilityObservation(),
-                            "unbound_audit_only"
-                    )
-            );
+            logUnboundTaskFinishedEventAudit(execution, observation, "unbound_audit_only");
+            return;
+        }
+        if (classification == FabricChatClefRootOwnershipClassification.OWNERSHIP_UNKNOWN) {
+            logUnboundTaskFinishedEventAudit(execution, observation, "ownership_unknown_audit_only");
             return;
         }
         execution.markTaskFinishedObservation(observation);
@@ -270,6 +287,25 @@ public final class FabricChatClefCommandLifecycleCoordinator {
         );
         commandDiagnostics.info("task_finished_event_received", execution, details);
         tryComplete(execution, false);
+    }
+
+    private void logUnboundTaskFinishedEventAudit(
+            FabricChatClefCommandExecution execution,
+            FabricChatClefCommandTerminationObservation observation,
+            String association
+    ) {
+        commandDiagnostics.info(
+                "task_finished_event_unbound_audit",
+                execution,
+                FabricChatClefLifecycleDetailsPayload.preexistingIdleRoot(
+                        execution.rootOwnershipClassification(),
+                        execution.firstFinishCallbackObservation(),
+                        execution.finishCallbackDuplicateCount(),
+                        execution.preexistingIdleRootStabilityObservation(),
+                        association,
+                        observation
+                )
+        );
     }
 
     private void tryComplete(FabricChatClefCommandExecution execution, boolean publishNonterminalEvidence) {
@@ -399,7 +435,8 @@ public final class FabricChatClefCommandLifecycleCoordinator {
                 execution.firstFinishCallbackObservation(),
                 execution.finishCallbackDuplicateCount(),
                 execution.preexistingIdleRootStabilityObservation(),
-                "terminal_decision:" + decisionReason
+                "terminal_decision:" + decisionReason,
+                null
         );
     }
 
@@ -430,5 +467,10 @@ public final class FabricChatClefCommandLifecycleCoordinator {
 
     private FabricChatClefCommandResultDataPayload deadlineData(FabricChatClefCommandContext context) {
         return FabricChatClefCommandDeadlinePayload.markTaskMayStillBeRunning(context.ownershipPayload());
+    }
+
+    private static String classificationName(FabricChatClefCommandExecution execution) {
+        FabricChatClefRootOwnershipClassification classification = execution.rootOwnershipClassification();
+        return classification == null ? "OWNERSHIP_UNKNOWN" : classification.name();
     }
 }

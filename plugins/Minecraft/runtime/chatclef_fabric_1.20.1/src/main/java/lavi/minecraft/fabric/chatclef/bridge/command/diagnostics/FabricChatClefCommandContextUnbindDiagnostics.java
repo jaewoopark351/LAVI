@@ -25,6 +25,30 @@ public final class FabricChatClefCommandContextUnbindDiagnostics {
             FabricChatClefTaskOwnershipSnapshot ownershipBefore,
             FabricChatClefTaskOwnershipSnapshot ownershipAfter
     ) {
+        logBoundary(
+                unbindReason,
+                context,
+                activeBefore,
+                activeAfter,
+                mutationApplied,
+                ownershipBefore,
+                ownershipAfter,
+                "",
+                ""
+        );
+    }
+
+    public static void logBoundary(
+            String unbindReason,
+            FabricChatClefCommandContext context,
+            FabricChatClefCommandContext activeBefore,
+            FabricChatClefCommandContext activeAfter,
+            boolean mutationApplied,
+            FabricChatClefTaskOwnershipSnapshot ownershipBefore,
+            FabricChatClefTaskOwnershipSnapshot ownershipAfter,
+            String boundRootOwnershipForDetach,
+            String detachCancelAction
+    ) {
         ChatClefDiagnostics.logLifecycleBoundary(
                 "COMMAND_CONTEXT_UNBIND_BOUNDARY",
                 "command_context_unbind_boundary",
@@ -48,6 +72,8 @@ public final class FabricChatClefCommandContextUnbindDiagnostics {
                 "user_root_after_unbind_running_idle", ownershipAfter.userTaskRunningIdle(),
                 "ownership_before_unbind", ownershipBefore.toMap(),
                 "ownership_after_unbind", ownershipAfter.toMap(),
+                "bound_root_ownership_for_detach", nullToEmpty(boundRootOwnershipForDetach),
+                "detach_cancel_action", nullToEmpty(detachCancelAction),
                 "unbind_at_ms", System.currentTimeMillis(),
                 "unbind_client_tick", ChatClefDiagnostics.currentClientTickId(),
                 "behavior_effect", "none"
@@ -64,5 +90,9 @@ public final class FabricChatClefCommandContextUnbindDiagnostics {
 
     private static long connectionGeneration(FabricChatClefCommandContext context) {
         return context == null ? -1L : context.connectionGeneration();
+    }
+
+    private static String nullToEmpty(String value) {
+        return value == null ? "" : value;
     }
 }

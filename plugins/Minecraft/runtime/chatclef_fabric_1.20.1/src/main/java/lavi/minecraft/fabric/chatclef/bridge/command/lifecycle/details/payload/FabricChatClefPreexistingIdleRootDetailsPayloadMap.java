@@ -1,6 +1,7 @@
 package lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.details.payload;
 
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefRootOwnershipClassification;
+import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandTerminationObservation;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.evidence.FabricChatClefStableRequestQuiescenceObservation;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefFinishCallbackObservation;
 
@@ -17,7 +18,8 @@ public final class FabricChatClefPreexistingIdleRootDetailsPayloadMap {
             FabricChatClefFinishCallbackObservation finishCallbackObservation,
             int finishCallbackDuplicateCount,
             FabricChatClefStableRequestQuiescenceObservation stableObservation,
-            String taskFinishedEventAssociation
+            String taskFinishedEventAssociation,
+            FabricChatClefCommandTerminationObservation unboundTaskFinishedObservation
     ) {
         Map<String, Object> payload = new HashMap<>();
         payload.put("root_ownership_classification", classification == null ? "OWNERSHIP_UNKNOWN" : classification.name());
@@ -31,6 +33,10 @@ public final class FabricChatClefPreexistingIdleRootDetailsPayloadMap {
                 stableObservation == null ? Map.of() : stableObservation.toMap()
         );
         payload.put("task_finished_event_association", taskFinishedEventAssociation == null ? "" : taskFinishedEventAssociation);
+        payload.put(
+                "unbound_task_finished_event",
+                unboundTaskFinishedObservation == null ? Map.of() : unboundTaskFinishedObservation.toMap()
+        );
         return payload;
     }
 }

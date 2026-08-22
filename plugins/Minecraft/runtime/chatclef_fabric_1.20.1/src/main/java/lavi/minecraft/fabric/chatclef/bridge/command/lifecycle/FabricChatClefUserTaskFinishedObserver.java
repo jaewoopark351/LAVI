@@ -47,6 +47,12 @@ public final class FabricChatClefUserTaskFinishedObserver {
         );
     }
 
+    void enqueueForTest(FabricChatClefCommandTerminationObservation observation) {
+        if (observation != null) {
+            observations.offer(observation);
+        }
+    }
+
     private void onTaskFinished(TaskFinishedEvent event) {
         try {
             int queueDepthBefore = observations.size();

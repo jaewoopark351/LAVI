@@ -25,6 +25,8 @@ public final class FabricChatClefCommandDispatcher {
     private final FabricChatClefCommandLifecycleCoordinator lifecycleCoordinator;
     private final FabricChatClefBridgeDiagnostics diagnostics;
     private final FabricChatClefTaskStateReader taskStateReader;
+    private volatile String lastBoundRootOwnershipForDetach = "";
+    private volatile String lastDetachCancelAction = "";
 
     public FabricChatClefCommandDispatcher(
             FabricChatClefCommandQueue commandQueue,
@@ -82,6 +84,10 @@ public final class FabricChatClefCommandDispatcher {
     }
 
     private boolean handleConnectionDetached(FabricChatClefConnectionDetachedEvent event) {
+        return handleConnectionDetached(event, taskStateReader.currentTaskOrNull());
+    }
+
+    boolean handleConnectionDetached(FabricChatClefConnectionDetachedEvent event, Task currentTask) {
         FabricChatClefTaskOwnershipSnapshot ownershipBefore =
                 FabricChatClefCommandContextUnbindDiagnostics.captureOwnershipSnapshot();
         FabricChatClefConnectionDetachResult detachResult = commandQueue.markConnectionDetached(event);
@@ -107,8 +113,11 @@ public final class FabricChatClefCommandDispatcher {
             }
             return true;
         }
-        Task currentTask = taskStateReader.currentTaskOrNull();
         String rootMatchReason = lifecycleCoordinator.boundRootMatchReason(context, currentTask);
+        String boundRootOwnershipForDetach = lifecycleCoordinator.boundRootOwnershipForDetach(context, currentTask);
+        String detachCancelAction = lifecycleCoordinator.detachCancelAction(context, currentTask);
+        lastBoundRootOwnershipForDetach = boundRootOwnershipForDetach;
+        lastDetachCancelAction = detachCancelAction;
         boolean ownsCurrentTask = lifecycleCoordinator.matchesBoundRootTask(context, currentTask);
         diagnostics.warn(
                 "connection detached with active command request="
@@ -119,6 +128,10 @@ public final class FabricChatClefCommandDispatcher {
                         + event.reason()
                         + " bound_root_match_reason="
                         + rootMatchReason
+                        + " bound_root_ownership_for_detach="
+                        + boundRootOwnershipForDetach
+                        + " detach_cancel_action="
+                        + detachCancelAction
         );
         if (ownsCurrentTask) {
             cancelUserTaskForDetachedCommand(rootMatchReason);
@@ -128,6 +141,10 @@ public final class FabricChatClefCommandDispatcher {
                             + context.requestId()
                             + " bound_root_match_reason="
                             + rootMatchReason
+                            + " bound_root_ownership_for_detach="
+                            + boundRootOwnershipForDetach
+                            + " detach_cancel_action="
+                            + detachCancelAction
             );
         }
         lifecycleCoordinator.onEndClientTick(commandQueue.activeContext());
@@ -136,7 +153,7 @@ public final class FabricChatClefCommandDispatcher {
                 context,
                 ownsCurrentTask ? "connection_detached_task_cancelled" : "connection_detached_task_not_owned"
         );
-        logQueueCompletion(completion, ownershipBefore);
+        logQueueCompletion(completion, ownershipBefore, boundRootOwnershipForDetach, detachCancelAction);
         return false;
     }
 
@@ -160,7 +177,9 @@ public final class FabricChatClefCommandDispatcher {
 
     private void logQueueCompletion(
             FabricChatClefCommandQueueCompletion completion,
-            FabricChatClefTaskOwnershipSnapshot ownershipBefore
+            FabricChatClefTaskOwnershipSnapshot ownershipBefore,
+            String boundRootOwnershipForDetach,
+            String detachCancelAction
     ) {
         FabricChatClefCommandContextUnbindDiagnostics.logBoundary(
                 completion.reason(),
@@ -169,8 +188,18 @@ public final class FabricChatClefCommandDispatcher {
                 completion.activeAfter(),
                 completion.mutationApplied(),
                 ownershipBefore,
-                FabricChatClefCommandContextUnbindDiagnostics.captureOwnershipSnapshot()
+                FabricChatClefCommandContextUnbindDiagnostics.captureOwnershipSnapshot(),
+                boundRootOwnershipForDetach,
+                detachCancelAction
         );
+    }
+
+    String lastBoundRootOwnershipForDetach() {
+        return lastBoundRootOwnershipForDetach;
+    }
+
+    String lastDetachCancelAction() {
+        return lastDetachCancelAction;
     }
 
     private void cancelUserTaskForDetachedCommand(String rootMatchReason) {

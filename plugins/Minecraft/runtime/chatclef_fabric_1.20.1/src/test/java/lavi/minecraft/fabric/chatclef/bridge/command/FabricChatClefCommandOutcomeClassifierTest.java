@@ -49,6 +49,49 @@ class FabricChatClefCommandOutcomeClassifierTest {
         assertEquals("waiting_for_preexisting_idle_root_stability", decision.reason());
     }
 
+    @Test
+    void ownershipUnknownWithSynchronousCallbackRemainsNonterminal() {
+        IdleTask idle = new IdleTask();
+        FabricChatClefCommandExecution execution = new FabricChatClefCommandExecution(
+                context(),
+                "@deposit diamond 2",
+                FabricChatClefTaskOwnershipEvidence.empty()
+        );
+        execution.openExecutorExecuteInvocation();
+        execution.markFinishCallbackReceived(idle);
+        execution.closeExecutorExecuteInvocation();
+        execution.markDispatchReturned(
+                FabricChatClefTaskOwnershipEvidence.empty(),
+                FabricChatClefRootOwnershipClassification.OWNERSHIP_UNKNOWN
+        );
+
+        FabricChatClefCommandTerminalDecision decision =
+                new FabricChatClefCommandOutcomeClassifier().classify(execution);
+
+        assertFalse(decision.terminal());
+        assertEquals("root_ownership_unknown", decision.reason());
+    }
+
+    @Test
+    void commandOwnedRootWithoutBoundTaskDoesNotUseNoRootCompletion() {
+        FabricChatClefCommandExecution execution = new FabricChatClefCommandExecution(
+                context(),
+                "@deposit diamond 2",
+                FabricChatClefTaskOwnershipEvidence.empty()
+        );
+        execution.markFinishCallbackReceived(null);
+        execution.markDispatchReturned(
+                FabricChatClefTaskOwnershipEvidence.empty(),
+                FabricChatClefRootOwnershipClassification.COMMAND_OWNED_ROOT
+        );
+
+        FabricChatClefCommandTerminalDecision decision =
+                new FabricChatClefCommandOutcomeClassifier().classify(execution);
+
+        assertFalse(decision.terminal());
+        assertEquals("command_owned_root_missing_bound_task", decision.reason());
+    }
+
     private static FabricChatClefCommandExecution executionFor(IdleTask idle) {
         FabricChatClefCommandExecution execution = new FabricChatClefCommandExecution(
                 context(),

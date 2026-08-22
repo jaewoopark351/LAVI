@@ -12,12 +12,24 @@ public final class FabricChatClefCommandOutcomeClassifier {
         if (!execution.dispatchReturned()) {
             return FabricChatClefCommandTerminalDecision.waiting("dispatch_not_returned");
         }
-        if (execution.rootOwnershipClassification()
-                == FabricChatClefRootOwnershipClassification.PREEXISTING_UNCHANGED_IDLE_ROOT) {
-            return classifyPreexistingUnchangedIdleRoot(execution);
+        FabricChatClefRootOwnershipClassification classification = execution.rootOwnershipClassification();
+        if (classification == null) {
+            return FabricChatClefCommandTerminalDecision.waiting("root_ownership_unknown");
         }
-        if (!execution.hasBoundRootTask()) {
-            return classifyCommandWithoutUserTask(execution, observation);
+        switch (classification) {
+            case PREEXISTING_UNCHANGED_IDLE_ROOT:
+                return classifyPreexistingUnchangedIdleRoot(execution);
+            case OWNERSHIP_UNKNOWN:
+                return FabricChatClefCommandTerminalDecision.waiting("root_ownership_unknown");
+            case NO_ROOT_VISIBLE:
+                return classifyCommandWithoutUserTask(execution, observation);
+            case COMMAND_OWNED_ROOT:
+                if (!execution.hasBoundRootTask()) {
+                    return FabricChatClefCommandTerminalDecision.waiting("command_owned_root_missing_bound_task");
+                }
+                break;
+            default:
+                return FabricChatClefCommandTerminalDecision.waiting("root_ownership_unclassified");
         }
         if (observation == null) {
             return FabricChatClefCommandTerminalDecision.waiting("waiting_for_task_finished_event");
