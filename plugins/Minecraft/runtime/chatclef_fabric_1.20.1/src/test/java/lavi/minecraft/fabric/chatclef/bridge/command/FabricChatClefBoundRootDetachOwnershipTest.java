@@ -18,6 +18,8 @@ import lavi.minecraft.fabric.chatclef.bridge.command.result.send.FabricChatClefC
 import lavi.minecraft.fabric.chatclef.bridge.diagnostics.FabricChatClefBridgeDiagnostics;
 import org.junit.jupiter.api.Test;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
@@ -29,6 +31,7 @@ class FabricChatClefBoundRootDetachOwnershipTest {
 
         harness.dispatcher.handleConnectionDetached(FabricChatClefConnectionDetachedEvent.of(1L, "test"), idle);
 
+        assertEquals(0, harness.cancellationActionCount.get());
         assertEquals("skip_preexisting_root", harness.dispatcher.lastDetachCancelAction());
         assertEquals(
                 "PREEXISTING_UNCHANGED_IDLE_ROOT:no_bound_root_task",
@@ -44,11 +47,58 @@ class FabricChatClefBoundRootDetachOwnershipTest {
 
         harness.dispatcher.handleConnectionDetached(FabricChatClefConnectionDetachedEvent.of(1L, "test"), idle);
 
+        assertEquals(1, harness.cancellationActionCount.get());
         assertEquals("cancel_owned_root", harness.dispatcher.lastDetachCancelAction());
         assertEquals(
                 "COMMAND_OWNED_ROOT:same_task_instance",
                 harness.dispatcher.lastBoundRootOwnershipForDetach()
         );
+        assertFalse(harness.queue.hasActive());
+    }
+
+    @Test
+    void dispatcherDetachSkipsCommandOwnedDifferentRootCancellationAction() {
+        IdleTask boundRoot = new IdleTask();
+        IdleTask currentRoot = new IdleTask();
+        Harness harness = harness(boundRoot, FabricChatClefRootOwnershipClassification.COMMAND_OWNED_ROOT);
+
+        harness.dispatcher.handleConnectionDetached(FabricChatClefConnectionDetachedEvent.of(1L, "test"), currentRoot);
+
+        assertEquals(0, harness.cancellationActionCount.get());
+        assertEquals("skip_not_owned", harness.dispatcher.lastDetachCancelAction());
+        assertEquals(
+                "COMMAND_OWNED_ROOT:same_task_class_different_instance",
+                harness.dispatcher.lastBoundRootOwnershipForDetach()
+        );
+        assertFalse(harness.queue.hasActive());
+    }
+
+    @Test
+    void dispatcherDetachSkipsUnknownOwnershipCancellationAction() {
+        IdleTask idle = new IdleTask();
+        Harness harness = harness(idle, FabricChatClefRootOwnershipClassification.OWNERSHIP_UNKNOWN);
+
+        harness.dispatcher.handleConnectionDetached(FabricChatClefConnectionDetachedEvent.of(1L, "test"), idle);
+
+        assertEquals(0, harness.cancellationActionCount.get());
+        assertEquals("skip_not_owned", harness.dispatcher.lastDetachCancelAction());
+        assertEquals(
+                "OWNERSHIP_UNKNOWN:no_bound_root_task",
+                harness.dispatcher.lastBoundRootOwnershipForDetach()
+        );
+        assertFalse(harness.queue.hasActive());
+    }
+
+    @Test
+    void dispatcherDetachSkipsCancellationActionWithoutMatchingLifecycle() {
+        IdleTask idle = new IdleTask();
+        Harness harness = harnessWithoutLifecycle();
+
+        harness.dispatcher.handleConnectionDetached(FabricChatClefConnectionDetachedEvent.of(1L, "test"), idle);
+
+        assertEquals(0, harness.cancellationActionCount.get());
+        assertEquals("skip_not_owned", harness.dispatcher.lastDetachCancelAction());
+        assertEquals("no_matching_lifecycle_execution", harness.dispatcher.lastBoundRootOwnershipForDetach());
         assertFalse(harness.queue.hasActive());
     }
 
@@ -80,14 +130,46 @@ class FabricChatClefBoundRootDetachOwnershipTest {
         );
         coordinator.beginExecution(execution);
         execution.markDispatchReturned(evidence(idle), classification);
+        CancellationCounter cancelCounter = new CancellationCounter();
         FabricChatClefCommandDispatcher dispatcher = new FabricChatClefCommandDispatcher(
                 queue,
                 sender,
                 coordinator,
                 diagnostics,
+                taskStateReader,
+                cancelCounter::accept
+        );
+        return new Harness(queue, dispatcher, cancelCounter.count);
+    }
+
+    private static Harness harnessWithoutLifecycle() {
+        FabricChatClefBridgeDiagnostics diagnostics = new FabricChatClefBridgeDiagnostics();
+        TestResultSender sender = new TestResultSender();
+        FabricChatClefTaskStateReader taskStateReader = new FabricChatClefTaskStateReader();
+        FabricChatClefCommandQueue queue = new FabricChatClefCommandQueue();
+        FabricChatClefCommandContext context = context();
+        queue.offer(context);
+        queue.pollForDispatch();
+        FabricChatClefUserTaskFinishedObserver observer =
+                new FabricChatClefUserTaskFinishedObserver(diagnostics, taskStateReader);
+        FabricChatClefCommandLifecycleCoordinator coordinator = new FabricChatClefCommandLifecycleCoordinator(
+                observer,
+                new FabricChatClefCommandOutcomeClassifier(),
+                new FabricChatClefCommandResultOutbox(queue, sender, diagnostics),
+                sender,
+                diagnostics,
                 taskStateReader
         );
-        return new Harness(queue, dispatcher);
+        CancellationCounter cancelCounter = new CancellationCounter();
+        FabricChatClefCommandDispatcher dispatcher = new FabricChatClefCommandDispatcher(
+                queue,
+                sender,
+                coordinator,
+                diagnostics,
+                taskStateReader,
+                cancelCounter::accept
+        );
+        return new Harness(queue, dispatcher, cancelCounter.count);
     }
 
     private static FabricChatClefTaskOwnershipEvidence evidence(Task root) {
@@ -123,10 +205,24 @@ class FabricChatClefBoundRootDetachOwnershipTest {
     private static final class Harness {
         private final FabricChatClefCommandQueue queue;
         private final FabricChatClefCommandDispatcher dispatcher;
+        private final AtomicInteger cancellationActionCount;
 
-        private Harness(FabricChatClefCommandQueue queue, FabricChatClefCommandDispatcher dispatcher) {
+        private Harness(
+                FabricChatClefCommandQueue queue,
+                FabricChatClefCommandDispatcher dispatcher,
+                AtomicInteger cancellationActionCount
+        ) {
             this.queue = queue;
             this.dispatcher = dispatcher;
+            this.cancellationActionCount = cancellationActionCount;
+        }
+    }
+
+    private static final class CancellationCounter {
+        private final AtomicInteger count = new AtomicInteger();
+
+        private void accept(String rootMatchReason) {
+            count.incrementAndGet();
         }
     }
 

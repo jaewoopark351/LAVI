@@ -5,6 +5,7 @@ import adris.altoclef.tasks.movement.IdleTask;
 import lavi.minecraft.fabric.chatclef.bridge.command.execution.FabricChatClefCommandExecution;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandTerminationObservation;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefRootOwnershipClassification;
+import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.evidence.FabricChatClefStableRequestQuiescenceObservation;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskOwnershipEvidence;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskSnapshot;
 import org.junit.jupiter.api.Test;
@@ -128,10 +129,54 @@ class FabricChatClefCommandResultFidelityTest {
     }
 
     @Test
+    void finishCallbackObservedNonterminalUsesCallbackWithoutMatchingEventFidelity() {
+        Map<?, ?> data = data(execution().runningLifecycleEvidenceResult(
+                "finish_callback_observed_nonterminal",
+                1,
+                "waiting_for_task_finished_event",
+                FabricChatClefTaskSnapshot.capture(null),
+                quiescence(false)
+        ).toMap());
+
+        assertEquals("finish_callback_observed_nonterminal", data.get("result_reason"));
+        assertEquals("callback_without_matching_user_task_event", data.get("result_fidelity"));
+    }
+
+    @Test
+    void stableRequestQuiescenceObservedUsesCallbackWithoutMatchingEventFidelity() {
+        Map<?, ?> data = data(execution().runningLifecycleEvidenceResult(
+                "stable_request_quiescence_observed",
+                2,
+                "waiting_for_task_finished_event",
+                FabricChatClefTaskSnapshot.capture(null),
+                quiescence(true)
+        ).toMap());
+
+        assertEquals("stable_request_quiescence_observed", data.get("result_reason"));
+        assertEquals("callback_without_matching_user_task_event", data.get("result_fidelity"));
+    }
+
+    @Test
     void unmappedDuplicateDiagnosticReasonUsesUnknownFidelity() {
         Map<?, ?> data = execution().duplicateTerminalPayload("duplicate_terminal_result").toMap();
 
         assertEquals("duplicate_terminal_result", data.get("result_reason"));
+        assertEquals("unknown", data.get("result_fidelity"));
+    }
+
+    @Test
+    void knownDiagnosticPayloadReasonUsesExplicitUnknownFidelity() {
+        Map<?, ?> data = execution().diagnosticPayload("deadline_exceeded").toMap();
+
+        assertEquals("deadline_exceeded", data.get("result_reason"));
+        assertEquals("unknown", data.get("result_fidelity"));
+    }
+
+    @Test
+    void arbitraryDiagnosticPayloadReasonUsesExplicitUnknownFidelity() {
+        Map<?, ?> data = execution().diagnosticPayload("diagnostic_reason_from_test").toMap();
+
+        assertEquals("diagnostic_reason_from_test", data.get("result_reason"));
         assertEquals("unknown", data.get("result_fidelity"));
     }
 
@@ -142,6 +187,29 @@ class FabricChatClefCommandResultFidelityTest {
     private static FabricChatClefCommandTerminationObservation observation(IdleTask task) {
         return FabricChatClefCommandTerminationObservation.fromTaskFinishedEvent(
                 new TaskFinishedEvent(0.25, task)
+        );
+    }
+
+    private static FabricChatClefStableRequestQuiescenceObservation quiescence(boolean qualified) {
+        return FabricChatClefStableRequestQuiescenceObservation.of(
+                qualified,
+                qualified ? "none" : "stable_window_not_satisfied",
+                qualified ? 3 : 1,
+                1000L,
+                qualified ? 1600L : 1000L,
+                1L,
+                qualified ? 3L : 1L,
+                qualified ? 600L : 0L,
+                100L,
+                25L,
+                true,
+                false,
+                "NEVER_OBSERVED",
+                "test-signature",
+                "test-policy",
+                3L,
+                500L,
+                1000L
         );
     }
 

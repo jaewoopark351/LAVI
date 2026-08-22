@@ -1,11 +1,10 @@
 package lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.evidence;
 
-import adris.altoclef.tasksystem.Task;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandResultSender;
 import lavi.minecraft.fabric.chatclef.bridge.command.diagnostics.FabricChatClefTaskStateReader;
 import lavi.minecraft.fabric.chatclef.bridge.command.execution.FabricChatClefCommandExecution;
-import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskOwnershipSnapshot;
+import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskOwnershipEvidence;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskSnapshot;
 import lavi.minecraft.fabric.chatclef.bridge.command.result.send.FabricChatClefCommandResultSendSubmission;
 import lavi.minecraft.fabric.chatclef.bridge.diagnostics.FabricChatClefBridgeDiagnostics;
@@ -59,17 +58,22 @@ public final class FabricChatClefNonterminalLifecycleEvidencePublisher {
             return;
         }
         long nowMs = System.currentTimeMillis();
-        long clientTickId = ChatClefDiagnostics.currentClientTickId();
-        Task currentTask = taskStateReader.currentTaskOrNull();
-        FabricChatClefTaskSnapshot currentTaskSnapshot = FabricChatClefTaskSnapshot.capture(currentTask);
-        FabricChatClefTaskOwnershipSnapshot ownership = taskStateReader.ownershipSnapshot();
+        long nowNanos = System.nanoTime();
+        FabricChatClefTaskOwnershipEvidence currentEvidence = taskStateReader.ownershipEvidence();
+        if (currentEvidence == null) {
+            currentEvidence = FabricChatClefTaskOwnershipEvidence.empty();
+        }
+        long clientTickId = currentEvidence.available()
+                ? currentEvidence.capturedClientTick()
+                : ChatClefDiagnostics.currentClientTickId();
+        FabricChatClefTaskSnapshot currentTaskSnapshot = currentEvidence.rootTaskSnapshot();
         FabricChatClefStableRequestQuiescenceObservation quiescence =
                 quiescenceTracker.observe(
                         execution,
-                        currentTask,
-                        ownership,
+                        currentEvidence,
                         waitingReason,
                         nowMs,
+                        nowNanos,
                         clientTickId
                 );
         if (!finishEvidenceSent) {

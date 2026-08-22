@@ -38,10 +38,10 @@ public final class FabricChatClefPreexistingIdleRootStabilityGate {
             reset();
             trackedExecution = execution;
         }
-        String blockedReason = blockedReason(execution, currentEvidence, nowMs);
+        String blockedReason = blockedReason(execution, currentEvidence, nowNanos);
         if (!blockedReason.isEmpty()) {
             resetWindow();
-            return observation(false, blockedReason, nowMs, clientTickId, execution);
+            return observation(false, blockedReason, currentEvidence, nowMs, nowNanos, clientTickId, execution);
         }
         String signature = signature(execution, currentEvidence);
         if (!signature.equals(trackedSignature)) {
@@ -57,12 +57,15 @@ public final class FabricChatClefPreexistingIdleRootStabilityGate {
             lastClientTickId = clientTickId;
         }
         lastObservedAtMs = nowMs;
+        long stableDurationMs = stableDurationMs(nowNanos);
         boolean qualified = distinctTickCount >= MIN_DISTINCT_CLIENT_TICKS
-                && stableDurationMs(nowNanos) >= MIN_STABLE_DURATION_MS;
+                && stableDurationMs >= MIN_STABLE_DURATION_MS;
         return observation(
                 qualified,
                 qualified ? "none" : "stable_window_not_satisfied",
+                currentEvidence,
                 nowMs,
+                nowNanos,
                 clientTickId,
                 execution
         );
@@ -71,7 +74,7 @@ public final class FabricChatClefPreexistingIdleRootStabilityGate {
     private String blockedReason(
             FabricChatClefCommandExecution execution,
             FabricChatClefTaskOwnershipEvidence currentEvidence,
-            long nowMs
+            long nowNanos
     ) {
         if (execution == null) {
             return "missing_execution";
@@ -89,7 +92,7 @@ public final class FabricChatClefPreexistingIdleRootStabilityGate {
         if (currentEvidence == null || !currentEvidence.available()) {
             return "current_ownership_unavailable";
         }
-        if (nowMs - currentEvidence.capturedAtMs() > MAX_NEWEST_EVIDENCE_AGE_MS) {
+        if (snapshotAgeMs(currentEvidence, nowNanos) > MAX_NEWEST_EVIDENCE_AGE_MS) {
             return "current_ownership_stale";
         }
         FabricChatClefTaskOwnershipEvidence before = execution.taskBeforeDispatchEvidence();
@@ -149,7 +152,9 @@ public final class FabricChatClefPreexistingIdleRootStabilityGate {
     private FabricChatClefStableRequestQuiescenceObservation observation(
             boolean qualified,
             String blockedReason,
+            FabricChatClefTaskOwnershipEvidence currentEvidence,
             long nowMs,
+            long nowNanos,
             long clientTickId,
             FabricChatClefCommandExecution execution
     ) {
@@ -157,6 +162,7 @@ public final class FabricChatClefPreexistingIdleRootStabilityGate {
         long lastMs = lastObservedAtMs == 0L ? nowMs : lastObservedAtMs;
         long firstTick = firstClientTickId == 0L ? clientTickId : firstClientTickId;
         long finishAt = execution == null ? 0L : execution.finishCallbackReceivedAtMs();
+        long stableDurationMs = stableDurationMs(nowNanos);
         return FabricChatClefStableRequestQuiescenceObservation.of(
                 qualified,
                 blockedReason,
@@ -165,18 +171,46 @@ public final class FabricChatClefPreexistingIdleRootStabilityGate {
                 lastMs,
                 firstTick,
                 clientTickId,
-                Math.max(0L, lastMs - firstMs),
+                stableDurationMs,
                 finishAt <= 0L ? -1L : Math.max(0L, nowMs - finishAt),
-                0L,
-                execution != null,
-                false,
-                "OBSERVED_NEUTRAL_ROOT_STABLE",
+                snapshotAgeMs(currentEvidence, nowNanos),
+                sameSessionGeneration(execution),
+                requestRootReappeared(execution, currentEvidence),
+                "NEVER_OBSERVED",
                 SIGNATURE_VERSION,
                 POLICY_VERSION,
                 MIN_DISTINCT_CLIENT_TICKS,
                 MIN_STABLE_DURATION_MS,
                 MAX_NEWEST_EVIDENCE_AGE_MS
         );
+    }
+
+    private long snapshotAgeMs(FabricChatClefTaskOwnershipEvidence currentEvidence, long nowNanos) {
+        if (currentEvidence == null || currentEvidence.capturedAtNanos() <= 0L) {
+            return Long.MAX_VALUE;
+        }
+        if (nowNanos < currentEvidence.capturedAtNanos()) {
+            return Long.MAX_VALUE;
+        }
+        return (nowNanos - currentEvidence.capturedAtNanos()) / 1_000_000L;
+    }
+
+    private boolean sameSessionGeneration(FabricChatClefCommandExecution execution) {
+        return execution != null
+                && execution == trackedExecution
+                && !nullToEmpty(execution.context().sessionId()).isBlank()
+                && execution.context().connectionGeneration() >= 0L;
+    }
+
+    private boolean requestRootReappeared(
+            FabricChatClefCommandExecution execution,
+            FabricChatClefTaskOwnershipEvidence currentEvidence
+    ) {
+        return execution != null
+                && currentEvidence != null
+                && currentEvidence.rootTaskPresent()
+                && execution.hasBoundRootTask()
+                && execution.matchesBoundRootTask(currentEvidence.rootTask());
     }
 
     private long stableDurationMs(long nowNanos) {

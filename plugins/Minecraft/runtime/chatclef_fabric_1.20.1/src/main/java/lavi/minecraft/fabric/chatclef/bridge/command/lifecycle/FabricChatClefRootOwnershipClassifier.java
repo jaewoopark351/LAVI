@@ -12,6 +12,11 @@ public final class FabricChatClefRootOwnershipClassifier {
         if (before == null || after == null || !before.available() || !after.available()) {
             return FabricChatClefRootOwnershipClassification.OWNERSHIP_UNKNOWN;
         }
+        if (!sameCaptureBoundary(before, after)
+                || !evidenceInternallyConsistent(before)
+                || !evidenceInternallyConsistent(after)) {
+            return FabricChatClefRootOwnershipClassification.OWNERSHIP_UNKNOWN;
+        }
         if (!after.rootTaskPresent()) {
             return FabricChatClefRootOwnershipClassification.NO_ROOT_VISIBLE;
         }
@@ -40,6 +45,25 @@ public final class FabricChatClefRootOwnershipClassifier {
                 && after.userTaskRunningIdle()
                 && !before.nextTaskIdleFlag()
                 && !after.nextTaskIdleFlag();
+    }
+
+    private boolean sameCaptureBoundary(
+            FabricChatClefTaskOwnershipEvidence before,
+            FabricChatClefTaskOwnershipEvidence after
+    ) {
+        return before.capturedClientTick() == after.capturedClientTick()
+                && !nullToEmpty(before.captureThread()).isBlank()
+                && !nullToEmpty(after.captureThread()).isBlank()
+                && stringEquals(before.captureThread(), after.captureThread());
+    }
+
+    private boolean evidenceInternallyConsistent(FabricChatClefTaskOwnershipEvidence evidence) {
+        if (!evidence.rootTaskPresent()) {
+            return true;
+        }
+        String snapshotClass = evidence.userTaskRootClass();
+        return !nullToEmpty(snapshotClass).isBlank()
+                && stringEquals(snapshotClass, evidence.rootTask().getClass().getName());
     }
 
     private boolean isCommandOwnedRoot(

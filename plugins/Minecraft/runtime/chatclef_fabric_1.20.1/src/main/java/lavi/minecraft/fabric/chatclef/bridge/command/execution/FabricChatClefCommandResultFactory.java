@@ -138,7 +138,7 @@ final class FabricChatClefCommandResultFactory {
                 request(),
                 state.normalizedCommand(),
                 state.elapsedMs(),
-                data(diagnosticReason)
+                data(diagnosticReason, FabricChatClefCommandResultFidelity.UNKNOWN)
         );
     }
 
@@ -148,6 +148,21 @@ final class FabricChatClefCommandResultFactory {
 
     private FabricChatClefCommandResultDataPayload data(
             String resultReason,
+            FabricChatClefCommandTerminationObservation observation
+    ) {
+        return data(resultReason, fidelityFor(resultReason), observation);
+    }
+
+    private FabricChatClefCommandResultDataPayload data(
+            String resultReason,
+            FabricChatClefCommandResultFidelity resultFidelity
+    ) {
+        return data(resultReason, resultFidelity, state.taskFinishedObservation());
+    }
+
+    private FabricChatClefCommandResultDataPayload data(
+            String resultReason,
+            FabricChatClefCommandResultFidelity resultFidelity,
             FabricChatClefCommandTerminationObservation observation
     ) {
         return FabricChatClefCommandDiagnosticPayload.commandData(
@@ -164,7 +179,7 @@ final class FabricChatClefCommandResultFactory {
                 state.taskAfterDispatch(),
                 state.terminalTask(),
                 state.boundRootTask(),
-                fidelityFor(resultReason),
+                resultFidelity,
                 observation
         );
     }
@@ -173,7 +188,9 @@ final class FabricChatClefCommandResultFactory {
         return switch (resultReason) {
             case "dispatch_started" -> FabricChatClefCommandResultFidelity.DISPATCH_STARTED_ONLY;
             case "finish_callback_without_new_command_owned_root",
-                 "finish_callback_without_verified_success" ->
+                 "finish_callback_without_verified_success",
+                 "finish_callback_observed_nonterminal",
+                 "stable_request_quiescence_observed" ->
                     FabricChatClefCommandResultFidelity.CALLBACK_WITHOUT_MATCHING_USER_TASK_EVENT;
             case "callback_completed_without_user_task" ->
                     FabricChatClefCommandResultFidelity.CALLBACK_WITHOUT_USER_TASK;

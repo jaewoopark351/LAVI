@@ -17,6 +17,7 @@ import lavi.minecraft.fabric.chatclef.bridge.diagnostics.FabricChatClefBridgeDia
 import net.minecraft.client.MinecraftClient;
 
 import java.util.Optional;
+import java.util.function.Consumer;
 
 //20260801_kpopmodder: Dispatch LAVI Fabric ChatClef commands only from the client tick.
 public final class FabricChatClefCommandDispatcher {
@@ -25,6 +26,7 @@ public final class FabricChatClefCommandDispatcher {
     private final FabricChatClefCommandLifecycleCoordinator lifecycleCoordinator;
     private final FabricChatClefBridgeDiagnostics diagnostics;
     private final FabricChatClefTaskStateReader taskStateReader;
+    private final Consumer<String> detachedCommandCancellationAction;
     private volatile String lastBoundRootOwnershipForDetach = "";
     private volatile String lastDetachCancelAction = "";
 
@@ -35,11 +37,25 @@ public final class FabricChatClefCommandDispatcher {
             FabricChatClefBridgeDiagnostics diagnostics,
             FabricChatClefTaskStateReader taskStateReader
     ) {
+        this(commandQueue, resultSender, lifecycleCoordinator, diagnostics, taskStateReader, null);
+    }
+
+    FabricChatClefCommandDispatcher(
+            FabricChatClefCommandQueue commandQueue,
+            FabricChatClefCommandResultSender resultSender,
+            FabricChatClefCommandLifecycleCoordinator lifecycleCoordinator,
+            FabricChatClefBridgeDiagnostics diagnostics,
+            FabricChatClefTaskStateReader taskStateReader,
+            Consumer<String> detachedCommandCancellationAction
+    ) {
         this.commandQueue = commandQueue;
         this.resultSender = resultSender;
         this.lifecycleCoordinator = lifecycleCoordinator;
         this.diagnostics = diagnostics;
         this.taskStateReader = taskStateReader;
+        this.detachedCommandCancellationAction = detachedCommandCancellationAction == null
+                ? this::cancelUserTaskForDetachedCommand
+                : detachedCommandCancellationAction;
     }
 
     public void onEndClientTick(MinecraftClient client) {
@@ -134,7 +150,7 @@ public final class FabricChatClefCommandDispatcher {
                         + detachCancelAction
         );
         if (ownsCurrentTask) {
-            cancelUserTaskForDetachedCommand(rootMatchReason);
+            detachedCommandCancellationAction.accept(rootMatchReason);
         } else {
             diagnostics.warn(
                     "connection detach cancel skipped because current user task is not owned by request="

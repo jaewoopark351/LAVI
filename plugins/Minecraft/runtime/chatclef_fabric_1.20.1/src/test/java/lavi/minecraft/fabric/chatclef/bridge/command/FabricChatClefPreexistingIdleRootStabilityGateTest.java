@@ -56,6 +56,7 @@ class FabricChatClefPreexistingIdleRootStabilityGateTest {
 
         assertFalse(observation.qualified());
         assertEquals("current_root_changed", observation.toMap().get("reset_reason"));
+        assertEquals("NEVER_OBSERVED", observation.toMap().get("request_root_observation_state"));
     }
 
     @Test
@@ -102,6 +103,7 @@ class FabricChatClefPreexistingIdleRootStabilityGateTest {
 
         assertFalse(observation.qualified());
         assertEquals("assignment_or_generation_changed", observation.toMap().get("reset_reason"));
+        assertEquals("NEVER_OBSERVED", observation.toMap().get("request_root_observation_state"));
     }
 
     @Test
@@ -116,6 +118,7 @@ class FabricChatClefPreexistingIdleRootStabilityGateTest {
 
         assertFalse(observation.qualified());
         assertEquals("assignment_or_generation_changed", observation.toMap().get("reset_reason"));
+        assertEquals("NEVER_OBSERVED", observation.toMap().get("request_root_observation_state"));
     }
 
     @Test
@@ -130,6 +133,23 @@ class FabricChatClefPreexistingIdleRootStabilityGateTest {
 
         assertFalse(observation.qualified());
         assertEquals("next_task_idle_flag_true", observation.toMap().get("reset_reason"));
+        assertEquals("NEVER_OBSERVED", observation.toMap().get("request_root_observation_state"));
+    }
+
+    @Test
+    void staleCurrentOwnershipUsesSameSnapshotAgeInPayloadAndPredicate() {
+        IdleTask idle = new IdleTask();
+        FabricChatClefCommandExecution execution = executionFor(idle);
+        FabricChatClefPreexistingIdleRootStabilityGate gate = new FabricChatClefPreexistingIdleRootStabilityGate();
+
+        FabricChatClefStableRequestQuiescenceObservation observation =
+                gate.observe(execution, evidence(idle, 1L, 1_000_000_000L), 2500L, 2_500_000_000L, 1L);
+        Map<String, Object> payload = observation.toMap();
+
+        assertFalse(observation.qualified());
+        assertEquals("current_ownership_stale", payload.get("reset_reason"));
+        assertEquals(1500L, payload.get("snapshot_age_ms"));
+        assertEquals("NEVER_OBSERVED", payload.get("request_root_observation_state"));
     }
 
     @Test
@@ -144,6 +164,25 @@ class FabricChatClefPreexistingIdleRootStabilityGateTest {
 
         assertEquals(payload.get("observation_count"), payload.get("distinct_tick_count"));
         assertEquals(payload.get("blocked_reason"), payload.get("reset_reason"));
+        assertEquals(25L, payload.get("snapshot_age_ms"));
+        assertEquals("NEVER_OBSERVED", payload.get("request_root_observation_state"));
+    }
+
+    @Test
+    void qualifiedObservationUsesMonotonicStableDurationAndNoBoundRootState() {
+        IdleTask idle = new IdleTask();
+        FabricChatClefCommandExecution execution = executionFor(idle);
+        FabricChatClefPreexistingIdleRootStabilityGate gate = new FabricChatClefPreexistingIdleRootStabilityGate();
+
+        gate.observe(execution, evidence(idle, 1L), 1000L, 1_000_000_000L, 1L);
+        gate.observe(execution, evidence(idle, 2L), 1200L, 1_200_000_000L, 2L);
+        Map<String, Object> payload = gate.observe(execution, evidence(idle, 3L), 1600L, 1_600_000_000L, 3L).toMap();
+
+        assertEquals("none", payload.get("blocked_reason"));
+        assertEquals(600L, payload.get("stable_duration_ms"));
+        assertEquals("NEVER_OBSERVED", payload.get("request_root_observation_state"));
+        assertEquals(false, payload.get("request_root_reappeared"));
+        assertEquals(true, payload.get("same_session_generation"));
     }
 
     private static FabricChatClefCommandExecution executionFor(IdleTask idle) {
@@ -170,9 +209,36 @@ class FabricChatClefPreexistingIdleRootStabilityGateTest {
             long generation,
             boolean nextTaskIdle
     ) {
+        return evidence(
+                root,
+                clientTick,
+                assignmentId,
+                generation,
+                nextTaskIdle,
+                capturedAtNanosForTick(clientTick)
+        );
+    }
+
+    private static FabricChatClefTaskOwnershipEvidence evidence(
+            Task root,
+            long clientTick,
+            long capturedAtNanos
+    ) {
+        return evidence(root, clientTick, "user-root-1", 1L, false, capturedAtNanos);
+    }
+
+    private static FabricChatClefTaskOwnershipEvidence evidence(
+            Task root,
+            long clientTick,
+            String assignmentId,
+            long generation,
+            boolean nextTaskIdle,
+            long capturedAtNanos
+    ) {
         FabricChatClefTaskSnapshot rootSnapshot = FabricChatClefTaskSnapshot.capture(root);
+        long capturedAtMs = capturedAtNanos / 1_000_000L;
         FabricChatClefTaskOwnershipSnapshot ownership = FabricChatClefTaskOwnershipSnapshot.of(
-                1000L,
+                capturedAtMs,
                 clientTick,
                 "test",
                 rootSnapshot,
@@ -188,7 +254,19 @@ class FabricChatClefPreexistingIdleRootStabilityGateTest {
                 false,
                 ""
         );
-        return FabricChatClefTaskOwnershipEvidence.of(root, rootSnapshot, ownership, 1000L, 1000L, clientTick, "test");
+        return FabricChatClefTaskOwnershipEvidence.of(
+                root,
+                rootSnapshot,
+                ownership,
+                capturedAtMs,
+                capturedAtNanos,
+                clientTick,
+                "test"
+        );
+    }
+
+    private static long capturedAtNanosForTick(long clientTick) {
+        return 1_000_000_000L + ((clientTick - 1L) * 200_000_000L) - 25_000_000L;
     }
 
     private static FabricChatClefCommandContext context() {
