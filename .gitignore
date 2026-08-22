@@ -95,6 +95,8 @@ trollya.pth
 logs/
 voices/ref.wav
 voices/ref.txt
+voices/hinggu.wav
+voices/hinggu.txt
 
 logs/*
 

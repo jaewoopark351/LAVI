@@ -58,6 +58,11 @@ class GPTSoVITSTTS:#20260615_kpopmodder
             "이 방송 이후로 1년이 지났지만 여전히 최고의 기억입니다."
         )
 
+        self.prompt_text = self._load_prompt_text(
+            self.config.default_prompt_text_path,
+            self.prompt_text,
+        )
+
         self.ref_audio_path = self.config.default_ref_audio_path
 
         self.config_manager = GPTSoVITSConfigManager(
@@ -80,6 +85,14 @@ class GPTSoVITSTTS:#20260615_kpopmodder
             current_module_directory=self.current_module_directory,
             gpt_sovits_url=self._gpt_sovits_url
         )
+
+    @staticmethod
+    def _load_prompt_text(path, fallback):
+        if not path or not os.path.exists(path):
+            return fallback
+        with open(path, "r", encoding="utf-8") as file:
+            prompt_text = file.read().strip()
+        return prompt_text or fallback
 
     @property
     def gpt_sovits_url(self):

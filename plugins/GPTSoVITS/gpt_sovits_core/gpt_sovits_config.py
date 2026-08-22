@@ -33,7 +33,12 @@ class GPTSoVITSConfig:
         self.default_ref_audio_path = os.path.join(
             self.base_dir,
             "voices",
-            "ref.wav",
+            "hinggu.wav",
+        )
+        self.default_prompt_text_path = os.path.join(
+            self.base_dir,
+            "voices",
+            "hinggu.txt",
         )
 
     def to_dict(self):
@@ -46,5 +51,6 @@ class GPTSoVITSConfig:
             "gpt_sovits_model_dir": self.gpt_sovits_model_dir,
             "default_api_url": self.default_api_url,
             "default_ref_audio_path": self.default_ref_audio_path,
+            "default_prompt_text_path": self.default_prompt_text_path,
             "default_config": dict(self.default_config),
         }

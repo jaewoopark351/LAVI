@@ -65,6 +65,20 @@ class GPTSoVITSImportTests(unittest.TestCase):
         self.assertIsInstance(tts.api_client, GPTSoVITSClient)
         self.assertIsInstance(tts.api_client, GPTSoVITSApiClient)
         self.assertEqual(tts.server_manager.cuda_visible_devices, "1")
+        self.assertEqual("hinggu.wav", Path(tts.ref_audio_path).name)
+        self.assertEqual("hinggu.txt", Path(tts.config.default_prompt_text_path).name)
+
+    def test_prompt_text_can_load_from_default_voice_text_file(self):
+        temp_path = make_test_temp_dir()
+        prompt_path = temp_path / "hinggu.txt"
+        prompt_path.write_text("hello prompt", encoding="utf-8")
+
+        prompt_text = GPTSoVITSTTS._load_prompt_text(
+            str(prompt_path),
+            "fallback",
+        )
+
+        self.assertEqual("hello prompt", prompt_text)
 
     def test_legacy_server_manager_name_wraps_process_manager(self):
         manager = GPTSoVITSServerManager(
