@@ -1,26 +1,34 @@
 package lavi.minecraft.task.container.deposit.auto;
 
+import lavi.minecraft.task.container.deposit.auto.policy.AutoDepositDecisionFingerprint;
+
 import java.util.Objects;
 
 //20260826_kpopmodder: Added one-shot threshold crossing and rearm ownership for automatic deposit_all.
 public final class DepositAllInventoryPressureStateMachine {
     private DepositAllInventoryPressureState state = DepositAllInventoryPressureState.ARMED;
     private boolean thresholdPending;
+    private AutoDepositDecisionFingerprint noSafeFingerprint;
 
     public DepositAllInventoryPressureSignal observe(DepositAllInventoryPressureSnapshot snapshot) {
         Objects.requireNonNull(snapshot, "snapshot");
-        boolean thresholdReached = snapshot.isAtOrAboveThreshold();
+        boolean lowWaterReached = snapshot.isAtOrBelowLowWater();
 
-        if (state == DepositAllInventoryPressureState.WAIT_FOR_REARM && !thresholdReached) {
+        if ((state == DepositAllInventoryPressureState.WAIT_FOR_REARM
+                || state == DepositAllInventoryPressureState.NO_SAFE_SURPLUS_WAIT)
+                && lowWaterReached) {
             state = DepositAllInventoryPressureState.ARMED;
             thresholdPending = false;
+            noSafeFingerprint = null;
             return DepositAllInventoryPressureSignal.REARMED;
         }
-        if (state == DepositAllInventoryPressureState.ARMED && !thresholdReached) {
+        if (state == DepositAllInventoryPressureState.ARMED && !snapshot.isAtOrAboveThreshold()) {
             thresholdPending = false;
             return DepositAllInventoryPressureSignal.NONE;
         }
-        if (state == DepositAllInventoryPressureState.ARMED && thresholdReached && !thresholdPending) {
+        if (state == DepositAllInventoryPressureState.ARMED
+                && snapshot.isAtOrAboveThreshold()
+                && !thresholdPending) {
             thresholdPending = true;
             return DepositAllInventoryPressureSignal.THRESHOLD_REACHED;
         }
@@ -32,6 +40,7 @@ public final class DepositAllInventoryPressureStateMachine {
         requireThresholdPending("start");
         thresholdPending = false;
         state = DepositAllInventoryPressureState.RUNNING;
+        noSafeFingerprint = null;
     }
 
     public void markThresholdSuppressed() {
@@ -39,12 +48,35 @@ public final class DepositAllInventoryPressureStateMachine {
         requireThresholdPending("suppress");
         thresholdPending = false;
         state = DepositAllInventoryPressureState.WAIT_FOR_REARM;
+        noSafeFingerprint = null;
+    }
+
+    public void markNoSafeSurplus(AutoDepositDecisionFingerprint fingerprint) {
+        requireState(DepositAllInventoryPressureState.ARMED, "latch no-safe-surplus");
+        requireThresholdPending("latch no-safe-surplus");
+        thresholdPending = false;
+        noSafeFingerprint = Objects.requireNonNull(fingerprint, "fingerprint");
+        state = DepositAllInventoryPressureState.NO_SAFE_SURPLUS_WAIT;
+    }
+
+    public DepositAllInventoryPressureSignal observeMeaningfulChange(
+            AutoDepositDecisionFingerprint currentFingerprint) {
+        Objects.requireNonNull(currentFingerprint, "currentFingerprint");
+        if (state != DepositAllInventoryPressureState.NO_SAFE_SURPLUS_WAIT
+                || Objects.equals(noSafeFingerprint, currentFingerprint)) {
+            return DepositAllInventoryPressureSignal.NONE;
+        }
+        noSafeFingerprint = null;
+        thresholdPending = false;
+        state = DepositAllInventoryPressureState.ARMED;
+        return DepositAllInventoryPressureSignal.MEANINGFUL_CHANGE;
     }
 
     public void markRunTerminated() {
         requireState(DepositAllInventoryPressureState.RUNNING, "terminate");
         thresholdPending = false;
         state = DepositAllInventoryPressureState.WAIT_FOR_REARM;
+        noSafeFingerprint = null;
     }
 
     public DepositAllInventoryPressureState state() {

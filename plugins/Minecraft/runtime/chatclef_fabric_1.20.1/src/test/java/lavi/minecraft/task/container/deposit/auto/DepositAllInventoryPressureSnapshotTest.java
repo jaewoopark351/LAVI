@@ -3,6 +3,7 @@ package lavi.minecraft.task.container.deposit.auto;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -10,10 +11,23 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class DepositAllInventoryPressureSnapshotTest {
 
     @Test
-    void reachesFourFifthsAtTwentyNineOfThirtySixOccupiedSlots() {
-        assertFalse(new DepositAllInventoryPressureSnapshot(28, 36).isAtOrAboveThreshold());
-        assertTrue(new DepositAllInventoryPressureSnapshot(29, 36).isAtOrAboveThreshold());
+    void reachesNineTenthsAtThirtyThreeOfThirtySixOccupiedSlots() {
+        assertFalse(new DepositAllInventoryPressureSnapshot(32, 36).isAtOrAboveThreshold());
+        assertTrue(new DepositAllInventoryPressureSnapshot(33, 36).isAtOrAboveThreshold());
         assertTrue(new DepositAllInventoryPressureSnapshot(36, 36).isAtOrAboveThreshold());
+    }
+
+    @Test
+    void reachesLowWaterAtTwentyEightOfThirtySixOccupiedSlots() {
+        assertTrue(new DepositAllInventoryPressureSnapshot(28, 36).isAtOrBelowLowWater());
+        assertFalse(new DepositAllInventoryPressureSnapshot(29, 36).isAtOrBelowLowWater());
+        assertFalse(new DepositAllInventoryPressureSnapshot(32, 36).isAtOrBelowLowWater());
+    }
+
+    @Test
+    void targetsFiveToEightFreedSlotsAtHighWater() {
+        assertEquals(5, new DepositAllInventoryPressureSnapshot(33, 36).requiredReliefSlots());
+        assertEquals(8, new DepositAllInventoryPressureSnapshot(36, 36).requiredReliefSlots());
     }
 
     @Test

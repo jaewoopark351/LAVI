@@ -52,7 +52,7 @@ class DepositAllInventoryPressureChainLifecycleTest {
         DepositAllInventoryPressureStateMachine machine = stateMachine(chain);
         assertEquals(
                 DepositAllInventoryPressureSignal.THRESHOLD_REACHED,
-                machine.observe(new DepositAllInventoryPressureSnapshot(29, 36))
+                machine.observe(new DepositAllInventoryPressureSnapshot(33, 36))
         );
         machine.markRunStarted();
     }

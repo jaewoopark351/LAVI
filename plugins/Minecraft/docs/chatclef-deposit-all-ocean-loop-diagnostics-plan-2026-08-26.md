@@ -1,3 +1,4 @@
+<!-- 20260826_openai: Reviewed section 26.10 automatic-deposit item classification and resource JSON policy ownership. -->
 <!-- 20260826_kpopmodder: Documented a bounded diagnostics-only plan for the deposit_all ocean loop. -->
 <!-- 20260826_kpopmodder: Recorded D0-D4 runtime evidence and the next bounded diagnostics-only slices. -->
 <!-- 20260826_kpopmodder: Closed the diagnostic phase with D7-D9 runtime evidence and the candidate-consistency direction. -->
@@ -3024,3 +3025,616 @@ Focused source tests were added for reservation arithmetic, crafting-input and p
 requirements, conservative alternative matching, surplus bounds, snapshot immutability, and
 confirmed manifest accounting. No Gradle command, clean build, JAR deployment, Minecraft launch,
 commit, or push was performed as part of this implementation step.
+
+### 26.10 자동 deposit 상시 보호, reserve와 신뢰 저장소 정책 계약
+
+<!-- 20260826_kpopmodder: Recorded the canonical automatic-deposit retention policy after runtime evidence showed valuables, equipment, logs, and fuel entering the surplus plan. -->
+
+이 절은 `get ladder 1` 중 자동 저장 대상에 `diamond`, `diamond_chestplate`,
+`dark_oak_log`, `coal` 등이 포함된 runtime 관측을 바탕으로 자동 저장의 다음 정책 경계를
+확정한다. 현재 working-set만 기준으로 보면 이 결과는 구현 오류가 아니라 정책의 결과다.
+그러나 자동 저장의 목적은 수동 명령과 다르므로, 작업에 당장 필요하지 않다는 이유만으로
+장비, 고유 스택, 상시 휴대 자원과 귀중품까지 임의의 상자에 넣는 것은 허용하지 않는다.
+
+이 절이 26.9의 canonical 후속 계약이다. 같은 내용을 별도 설계 문서로 복제하거나
+반복적인 docs-only 재검수 문서를 만들지 않는다. 이후 source 구현, test, build와 runtime
+증거도 방향이 바뀌지 않는 한 이 26절에만 이어서 기록한다.
+
+#### 26.10.1 수동 명령과 자동 안전장치의 의미 분리
+
+두 진입점의 계약은 다음처럼 고정한다.
+
+```text
+manual @deposit_all
+    -> 사용자가 명시적으로 요청한 광범위한 저장
+    -> 기존 DepositAllInventoryTargetSelector 의미 유지
+
+automatic deposit
+    -> 현재 작업을 망치지 않으면서 inventory pressure를 완화하는 안전장치
+    -> active 또는 idle UserTask 여부와 관계없이 자동 전용 보호 정책 적용
+```
+
+자동 경로는 다음 세 보호 계층과 목적지 제약을 합성한다.
+
+```text
+stack-level hard protection
+current working-set reservation
+category reserve lower bound
+conditional destination policy for fungible valuables
+```
+
+일반적인 수량형 아이템의 보호량은 합산이 아니라 최댓값이다.
+
+```text
+protectedCount(item) = min(
+    currentInventoryCount(item),
+    max(currentWorkingSetCount(item), categoryReserveAllocation(item))
+)
+
+depositableCount(item) = max(
+    0,
+    currentInventoryCount(item) - protectedCount(item)
+)
+```
+
+예를 들어 작업이 원목 16개를 요구하고 원목 category reserve도 16개이면 32개가 아니라
+16개를 보호한다. Reserve는 작업이 소비하지 못하는 영구 재고가 아니며, 자동 저장이
+침범하지 않는 하한선이다. 보유량이 reserve보다 적어도 자동 저장이 새 자원을 제작하거나
+채집해서 reserve를 채우지 않는다.
+
+Hard-protected stack은 위 수량 계산보다 먼저 제외한다. 귀중품은 별도의 신뢰 목적지
+조건까지 만족할 때만 depositable이 된다.
+
+#### 26.10.2 문서화 시점의 현재 source 사실
+
+이 절을 기록한 시점의 로컬 working tree는 다음 상태다.
+
+```text
+DepositAllInventoryPressureSnapshot threshold:  9 / 10
+36-slot trigger boundary:                        33 occupied slots
+rearm implementation:                            동일 threshold 아래, 즉 32 이하
+active UserTask automatic policy:                Item별 working-set reservation
+idle automatic policy:                           manual full-deposit selector로 fallback
+inventory snapshot granularity:                  Map<Item, Integer>
+automatic surplus exclusion:                     ToolItem 전체
+BotBehaviour protection:                         Item별 보유 수량 reserve
+NO_SAFE_SURPLUS behavior:                        changed-only defer log, state latch 없음
+trusted destination registry:                    없음
+success metric:                                  저장 ItemTarget 중심, 확보 슬롯 목표 없음
+```
+
+`DepositAllInventoryPressureSnapshot.java`와 관련 테스트의 9/10 변경은 현재 수정된 working
+tree에서 확인했다. 26.9의 4/5와 `29 / 36` 표현은 당시 구현 및 검수의 역사적 기록으로
+남긴다. 이 절 이후의 목표 정책은 `33 / 36` high-water trigger를 기준으로 한다.
+
+현재 `PlayerInventorySnapshotReader`는 동일 `Item`의 여러 stack을 총수량으로 합치고,
+`AutoDepositSurplusTargetSelector`는 `ItemTarget`을 만든다. 따라서 평범한
+`diamond_chestplate`와 이름 또는 인챈트가 있는 `diamond_chestplate`를 현재 plan만으로는
+구분할 수 없다.
+
+또한 `StoreInContainerTask`는 `ItemTarget` match로 source slot을 고르므로 같은 Item의
+보호 stack과 저장 가능 stack이 함께 있을 때 aggregate target만 전달하면 보호 stack을
+고르지 않는다고 증명할 수 없다. Stack-level 보호를 구현했다고 판정하려면 planning뿐
+아니라 실제 transfer source 선택까지 같은 stack disposition을 강제해야 한다.
+
+이 절의 새 정책은 아직 source에 구현되지 않았다. 위 현재 사실과 아래 목표 계약을
+혼동하지 않는다.
+
+#### 26.10.3 immutable automatic deposit plan
+
+자동 chain은 threshold를 소비하거나 UserTask를 선점하기 전에 immutable plan을 완성한다.
+Plan의 판정 순서는 다음과 같다.
+
+```text
+1. inventory stack/slot snapshot과 context identity 고정
+2. hard-protected stack 분류
+3. current UserTask working-set 요구량 계산
+4. automatic deposit 자체의 최소 운영 working-set 계산
+5. category reserve를 가능한 최소 stack 수에 배정
+6. 귀중품 destination eligibility 판정
+7. exact deposit source와 목표 free-slot 수 산출
+8. context와 stack 상태 재검증 후 operation 시작
+```
+
+Plan은 최소한 다음 disposition을 구분한다.
+
+```text
+HARD_PROTECTED
+WORKING_SET_RESERVED
+CATEGORY_RESERVED
+CONDITIONAL_VALUABLE
+DEPOSITABLE_SURPLUS
+UNCLASSIFIED_CONSERVATIVE
+```
+
+한 stack이 여러 조건에 해당하면 가장 보수적인 disposition을 사용한다. 지원하지 않는 Task,
+불완전한 recipe requirement, context 변경, stack 재검증 실패는 보호 항목 없음으로 해석하지
+않고 fail-closed한다. Canonical ID, Minecraft tag/runtime category 또는 별도 automatic policy로
+안전하게 분류할 수 없는 vanilla/modded item도 일반 surplus로 추정하지 않고
+`UNCLASSIFIED_CONSERVATIVE`로 자동 저장에서 제외한다.
+
+활성 UserTask working-set 외에도 자동 저장 자신이 필요한 최소 운영 자원을 포함한다.
+사용 가능한 destination이 없어 상자를 제작하고 배치해야 한다면 상자 1개 또는 이를 만들
+최소 목재를 같은 operation에서 먼저 저장하지 않도록 보호한다.
+
+같은 UserTask epoch에서 방금 저장했다가 recovery 또는 일반 Task로 다시 얻은 item은 같은
+epoch의 다음 자동 plan에서 즉시 다시 저장하지 않는다. Recovery가 반복되면 정상 복구로
+간주하지 않고 surplus 분류 오류로 판정한다.
+
+#### 26.10.4 stack-level hard protection
+
+Hard protection은 Item 종류 전체가 아니라 개별 stack과 slot 상태를 먼저 판정한다.
+
+기본 hard-protected 대상은 다음과 같다.
+
+```text
+현재 장착 중인 모든 방어구
+현재 offhand stack
+현재 선택된 main-hand/hotbar stack
+기능별 주력 도구 1개: pickaxe, axe, shovel
+주력 근접 무기 1개
+현재 사용 대상으로 선택된 shield, bow, crossbow 또는 trident
+현재 사용 대상으로 선택된 각 방어구 slot의 주력 장비 1개
+BotBehaviour.isProtected(item)에 해당하는 보유 stack
+사용자가 명시적으로 pin한 stack
+보존 가치가 있는 이름, enchantment, lore, custom attribute 또는 CustomModelData stack
+작성된 책, 위치 정보가 있는 지도, 내용물이 있는 portable container
+```
+
+NBT나 이름이 없어도 희소하거나 회수 비용이 큰 기능성 품목은 별도 rare-item policy로
+분류한다. 예를 들어 `elytra`, `totem_of_undying`, `netherite_upgrade_smithing_template`,
+`enchanted_golden_apple` 같은 품목은 현재 장착, 선택 또는 pin 상태이면 `HARD_PROTECTED`,
+그 외의 평범한 예비품이면 trusted destination 전용으로 둔다.
+
+모든 `ToolItem`이나 모든 방어구를 무조건 보호하지 않는다. 기능별로 가장 적합하고 사용
+가능한 주력품 한 개를 보호하고, 평범한 중복품은 다른 조건이 없으면 surplus가 될 수 있다.
+
+`diamond_chestplate`의 예시는 다음과 같다.
+
+```text
+현재 장착, 유일한 주력품 또는 가장 좋은 주력품  -> HARD_PROTECTED
+이름, enchantment 또는 특별 속성 존재            -> HARD_PROTECTED
+평범한 중복 예비품                                 -> trusted destination에 저장 가능
+```
+
+단순 `hasNbt()`는 hard protection의 충분조건으로 사용하지 않는다. Damage, 표준 potion
+state 등 정상 게임 상태도 NBT/component로 표현될 수 있으므로 고유성과 보존 가치가 있는
+metadata를 구분해야 한다.
+
+Stack-level transfer를 바로 제공할 수 없는 첫 safe slice에서는 동일 Item 종류에
+hard-protected stack과 일반 stack이 섞여 있으면 그 Item 종류 전체를 자동 저장에서
+제외한다. Aggregate `ItemTarget`만으로 평범한 stack만 옮긴다고 추정하지 않는다.
+향후 exact stack-aware transfer가 필요하면 자동 전용 LAVI-owned 경계에 두며 shared
+`StoreInContainerTask`의 generic 의미를 변경하지 않는다.
+
+#### 26.10.5 category reserve 기본 계약
+
+Reserve는 개별 item ID마다 반복 적용하지 않고 category 전체에 배정한다. 여러 원목과
+여러 음식 종류가 각각 slot을 차지하도록 보호하지 않으며, 가능한 한 적은 종류와 stack에
+집중한다.
+
+V1 초기 정책 기준은 다음과 같다.
+
+| Category | 기본 reserve | 조건 |
+| --- | ---: | --- |
+| 안전한 건축 블록 | 64 | 조약돌, 흙, 네더랙 등 한 종류 우선. 모래와 자갈 같은 낙하 블록 제외 |
+| 원목 계열 | 16 | 한 원목 종류를 우선하고, 보유량이 부족해도 reserve를 채우기 위해 새로 채집하지 않음 |
+| 판자 | 원목이 없을 때 32 | 원목 reserve와 합산하지 않는 fallback. 원목 16과 판자 32를 등가량이라고 해석하지 않음 |
+| 막대기 | 0 | 현재 제작 working-set이 요구할 때만 보호 |
+| 석탄과 목탄 | 합계 16 | 종류별 16이 아니라 category 합계 |
+| 횃불 | 32 | 탐사와 안전용 한 stack 우선 |
+| 안전한 조리 음식 | 합계 16 | 여러 종류를 조금씩 남기지 않고 가장 적합한 종류 우선 |
+| 물 양동이 | 1 | 이미 보유 중일 때만 보호하고 새로 만들지 않음 |
+| 빈 상자 또는 통 | 1 | 자동 저장이 새 destination을 필요로 할 때만 선택적으로 보호 |
+| 화살 | 32 | 보호된 bow 또는 crossbow가 있을 때만 |
+| 폭죽 | 32 | elytra를 사용하거나 보호하고 있을 때만 |
+| 엔더 진주 | 4 | 탐사 profile에서만 선택적으로 보호 |
+| 철, 금, 레드스톤, 청금석 | 0 | working-set 필요량 외에는 저장 가능 |
+| diamond, emerald, netherite 계열 | 0 | reserve 대신 26.10.6의 trusted destination 적용 |
+
+일반 reserve는 대략 5~7 slots 안에 모이는 것을 목표로 한다. Reserve 적용 뒤 수량만
+줄고 occupied slot이 그대로이면 자동 저장의 목적을 달성하지 못한 것이다. Category의
+구체적인 대표 item 선택과 수량은 설정 가능하게 만들 수 있지만, 설정이 없다는 이유로
+수동 full-deposit 정책으로 fallback하지 않는다.
+
+#### 26.10.6 fungible valuables와 trusted destination
+
+`diamond`, `diamond_block`, `diamond_ore`, `deepslate_diamond_ore`, `emerald`,
+`emerald_block`, `emerald_ore`, `deepslate_emerald_ore`, `ancient_debris`, `netherite_scrap`,
+`netherite_ingot`, `netherite_block` 같은 교환 가능한 귀중품 형태와 평범한 high-tier 중복
+장비는 hard-protected도 아니고 일반 destination으로 갈 수 있는 평범한 surplus도 아니다.
+이 목록은 command alias catalog의 포함 여부가 아니라 별도 automatic policy의 canonical ID,
+tag 또는 명시 predicate를 기준으로 완전하게 관리한다.
+
+기본 정책은 다음과 같다.
+
+```text
+working-set이 요구하는 수량
+    -> inventory에 보호
+
+working-set 초과 수량 + trusted destination 존재
+    -> trusted destination에만 자동 저장 가능
+
+trusted destination 없음
+    -> 현재 inventory에 유지
+    -> NO_TRUSTED_DESTINATION 또는 다른 surplus도 없으면 NO_SAFE_SURPLUS
+```
+
+Trusted destination은 최소한 다음 조건을 만족해야 한다.
+
+```text
+사용자가 지정한 기지 또는 창고이거나 명시적으로 trusted로 등록됨
+world, dimension과 BlockPos가 지속적으로 기록됨
+나중에 다시 찾을 수 있음
+던전 loot container나 우연히 발견한 임의 container가 아님
+현재 접근 가능성과 충분한 용량이 GUI 기준으로 확인됨
+임시 배치 container라면 session 뒤에도 위치 기록이 보존됨
+```
+
+26.9의 `AutoDepositDestinationManifest`는 operation-local recovery 증거이며 trusted storage
+registry가 아니다. 가장 가까운 상자, 현재 cache에 있는 상자 또는 자동 operation이 방금
+배치한 상자를 자동으로 trusted로 승격하지 않는다.
+
+이름 또는 enchantment가 있는 diamond 장비는 귀중품 목적지 정책보다 hard protection이
+우선한다. 평범한 중복 diamond 장비만 trusted destination 후보가 될 수 있다.
+
+Trusted destination 기능이 구현되기 전의 안전한 기본값은 귀중품을 자동 저장에서
+제외하는 것이다. 임의의 주변 상자에 넣은 뒤 위치를 잃는 동작으로 fallback하지 않는다.
+
+#### 26.10.7 idle automatic entry 계약
+
+활성 UserTask가 없다는 이유로 automatic deposit이 manual `@deposit_all` 정책으로
+fallback하지 않는다.
+
+Idle 자동 진입은 다음처럼 계산한다.
+
+```text
+working-set:       empty
+hard protection:  enabled
+category reserve: enabled
+valuable policy:  enabled
+```
+
+따라서 `DepositAllInventoryPressureChain.startFullDeposit()`이 현재 manual selector를
+사용하는 경로는 목표 정책과 일치하지 않는다. 변경 시 manual selector 자체를 수정하지
+않고 idle을 포함한 모든 automatic entry가 같은 immutable auto policy plan을 사용하게
+한다.
+
+#### 26.10.8 NO_SAFE_SURPLUS latch와 threshold hysteresis
+
+안전하게 저장할 surplus가 없으면 hard protection, working-set 또는 reserve를 자동으로
+깨지 않는다.
+
+```text
+safe plan 없음
+    -> NO_SAFE_SURPLUS
+    -> 기존 UserTask 즉시 재개
+    -> current decision fingerprint 저장
+    -> 의미 있는 상태 변화 전까지 같은 fingerprint 재평가 금지
+```
+
+현재 `deferChanged("no_safe_surplus", ...)`는 중복 로그만 억제하며 매 tick resolver와
+selector 계산을 막는 상태 latch가 아니다. 구현 시 명시적인 waiting state 또는 동등한
+state-machine 소유 latch가 필요하다. 단순 cooldown만으로 같은 상태의 느린 반복을 만들지
+않는다.
+
+Decision fingerprint는 최소한 다음 의미 상태를 포함한다.
+
+```text
+world와 dimension identity
+UserTask root identity와 working-set epoch
+policy-relevant inventory fingerprint: stack identity/metadata, disposition,
+reserve/working-set boundary와 새로 비울 수 있는 source slot
+equipped loadout와 BotBehaviour protection revision
+reserve policy revision
+trusted destination revision와 capacity state
+```
+
+재평가는 다음 사건 중 하나가 발생했을 때만 허용한다.
+
+```text
+occupied slots가 low-water mark 아래로 내려감
+UserTask root 또는 working-set 변경
+새 stack 생성/소멸, disposition 변경, reserve/working-set 경계 통과 또는
+새로 비울 수 있는 surplus slot 발생
+장착품 또는 주력 loadout 변경
+BotBehaviour protection 또는 reserve 설정 변경
+trusted destination의 지정, 발견 또는 capacity 변경
+world 또는 dimension 변경
+사용자의 명시적 retry 요청
+```
+
+보호된 stack의 단순 count 증가처럼 disposition과 예상 free-slot 결과를 바꾸지 않는 변화는
+fingerprint를 바꾸지 않는다. 매번의 pickup을 의미 있는 rearm 사건으로 취급해 느린
+`NO_SAFE_SURPLUS` 반복을 만들지 않는다.
+
+현재 의도한 `9 / 10` high-water trigger는 36-slot main inventory에서 `33 / 36`이다.
+Rearm은 같은 threshold 바로 아래가 아니라 별도 low-water mark를 사용한다.
+
+```text
+trigger:                 occupied >= 33 / 36
+normal rearm target:     occupied <= 28 / 36
+operation success goal:  가능하면 28 이하 또는 최소 5~8 free slots 확보
+```
+
+`33 -> 32 -> item 1개 획득 -> 33` 진동을 허용하지 않는다. Time passage만으로 latch를
+해제하지 않으며 cooldown은 의미 있는 상태 변화 뒤의 burst 억제에만 사용할 수 있다.
+
+보호 정책 때문에 UserTask도 inventory space 부족으로 진행할 수 없으면 자동으로 hard
+protection을 완화하지 않고 typed terminal `INVENTORY_POLICY_BLOCKED`를 사용한다. 사용자는
+수동 `@deposit_all`, reserve 축소, 보호 해제 또는 trusted destination 지정 중 하나를
+선택할 수 있다. 향후 opt-in `EMERGENCY_TRIM`을 도입하더라도 category reserve만 단계적으로
+낮출 수 있고 hard protection과 current working-set은 침범하지 않는다.
+
+#### 26.10.9 성공 판정은 저장 수량이 아니라 확보 slots
+
+자동 저장의 1차 성공 기준은 몇 개의 item을 이동했는지가 아니라 실제로 몇 개의 inventory
+slot을 비웠는지다.
+
+Plan은 다음 순서를 우선한다.
+
+```text
+전체 stack을 옮겨 즉시 비울 수 있는 slot
+동일 destination stack에 merge돼 source slot을 비울 수 있는 품목
+reserve category를 최소 종류와 stack 수로 통합한 뒤의 surplus
+부분 수량 이동만 일어나 occupied slot이 그대로인 후보는 후순위
+```
+
+완료 뒤 occupied slot delta를 검증하고 high-water에서 충분히 멀어졌는지 확인한다.
+Item count 감소만 확인하고 성공으로 분류하지 않는다. 목표 free-slot 수를 만들 수 없지만
+일부 안전한 surplus는 저장한 경우 partial relief와 full success를 구분한다.
+
+#### 26.10.10 책임 분리와 구현 경계
+
+기존 auto package의 working-set, maintenance와 recovery 책임은 유지한다. 새 정책은 다음
+LAVI-owned 경계로 분리하는 방향을 사용한다.
+
+```text
+lavi/minecraft/task/container/deposit/auto/policy/
+    AutoDepositStackSnapshot
+        -> slot, stack metadata와 immutable content fingerprint
+
+    AutoDepositHardProtectionPolicy
+        -> equipped, primary loadout, BotBehaviour, pin과 unique metadata 판정
+
+    AutoDepositCategoryReservePolicy
+        -> category별 lower bound와 최소-stack allocation
+
+    AutoDepositValuableDestinationPolicy
+        -> fungible valuable 분류와 trusted destination eligibility
+
+    AutoDepositPlan
+        -> exact dispositions, depositable quantities와 free-slot goal
+
+    AutoDepositDecisionFingerprint
+        -> NO_SAFE_SURPLUS latch 재평가 경계
+```
+
+기존 책임과의 연결은 다음과 같다.
+
+```text
+ActiveTaskWorkingSetResolver
+    -> current UserTask requirement만 제공
+
+automatic policy layer
+    -> stack hard protection + working-set + reserve + destination 합성
+
+DepositAllInventoryPressureChain
+    -> active와 idle 모두 같은 automatic plan 사용
+    -> threshold와 latch state 소유
+
+AutoDepositMaintenanceTask
+    -> 승인된 plan의 단방향 실행과 postcondition 검증
+```
+
+현재 aggregate `ItemTarget` 경로가 stack disposition을 보존하지 못하면 다음 순서를
+사용한다.
+
+```text
+first safe slice:
+    mixed protected/unprotected Item 종류 전체를 자동 저장에서 제외
+
+later exact slice, only if required:
+    auto-only slot-aware transfer owner 추가
+    click 전 stack fingerprint 재검증
+    shared StoreInContainerTask 의미는 변경하지 않음
+```
+
+다음 경계는 계속 변경하지 않는다.
+
+```text
+manual @deposit_all selector와 명령 의미
+DepositCommand.java
+StoreInAnyContainerTask.java
+StoreInContainerTask.java and StoreInContainerTask.isEqual()
+ResourceTask.allowContainers == false
+TaskCatalogue and ordinary @get behavior
+Task, TaskRunner, UserTaskChain and Baritone
+```
+
+Trusted storage registry는 operation-local destination manifest와 별도 책임이다. 좌표와
+차원 persistence, user designation과 capacity revalidation을 한 클래스에 섞지 않는다.
+
+#### 26.10.11 주요 되먹임과 실패 위험
+
+| 위험 | 차단 계약 |
+| --- | --- |
+| 저장 직후 다음 recipe 단계가 같은 재료를 다시 채집 | 지원되지 않는 working-set은 fail-closed하고 중간재와 연료 포함. 같은 UserTask epoch 재획득품 재저장 금지 |
+| 이름 또는 enchantment stack 손실 | Item 합산 전 stack-level 판정. Mixed Item은 exact transfer 전까지 전체 제외 |
+| reserve가 여러 종류에 흩어져 slot을 비우지 못함 | category 합계와 대표 stack 우선. 성공을 free-slot delta로 판정 |
+| 자동 deposit이 상자 제작용 목재를 스스로 저장 | automatic operation working-set에 최소 container resource 포함 |
+| 33과 32 사이 threshold 진동 | 33 high-water와 28 low-water 분리 |
+| 귀중품이 여러 임시 상자로 분산 | trusted destination 전용. 미등록 시 inventory 유지 |
+| 모든 도구와 모든 NBT stack 과보호 | 현재 장착품, 기능별 주력 1개와 실제 고유 metadata를 구분 |
+| recovery가 매번 발생해 정상 경로가 됨 | 반복 recovery를 surplus policy defect로 terminal 분류 |
+
+#### 26.10.12 필수 검증 계약
+
+정책 구현 뒤에는 최소한 다음 focused 검증을 통과해야 한다.
+
+1. 같은 Item인 평범한 흉갑과 이름 또는 enchantment 흉갑이 함께 있을 때 특별 stack은
+   이동하지 않는다.
+2. 장착품, offhand, selected hotbar와 기능별 주력 도구는 유지되고 평범한 중복품만
+   destination policy에 따라 저장된다.
+3. BotBehaviour-protected Item은 보유량 전체가 자동 저장에서 제외된다.
+4. `working-set=16`, `reserve=16`이면 보호량은 32가 아니라 16이다.
+5. 여러 원목, 음식, 석탄과 목탄 reserve가 item별이 아니라 category 합계로 계산된다.
+6. reserve 미달 상태가 새로운 crafting, mining 또는 collection Task를 시작하지 않는다.
+7. active UserTask와 idle 상태 모두 같은 automatic policy를 사용하고 수동 selector로
+   fallback하지 않는다.
+8. trusted destination이 없으면 diamond를 임의의 nearby container에 저장하지 않는다.
+9. trusted destination은 world, dimension, position과 capacity가 모두 일치할 때만 사용된다.
+10. `NO_SAFE_SURPLUS` 뒤 동일 fingerprint에서는 resolver와 selector를 매 tick 다시
+    실행하지 않는다.
+11. `33 / 36`에서 한 번 실행하고 `32 / 36`만으로 rearm하지 않으며 `28 / 36` 이하 또는
+    명시된 의미 상태 변화에서만 재평가한다.
+12. 완료 판정은 실제 free-slot delta를 포함하고 item count만 감소한 결과와 구분한다.
+13. 자동 operation이 새 상자를 필요로 할 때 최소 상자 또는 목재 working-set을 먼저
+    저장하지 않는다.
+14. recovery가 같은 UserTask epoch에서 반복되면 정상 성공이 아니라 policy defect로
+    분류한다.
+15. 수동 `@deposit_all`, 기존 `@deposit`, 일반 `@get`, shared Task와 Baritone 동작은
+    기존 상태를 유지한다.
+
+Runtime 관측은 한 automatic operation ID로 다음 경계를 연결하되 bounded logging 정책을
+유지한다.
+
+```text
+pressure snapshot and high-water decision
+-> stack classification summary
+-> working-set and category reserve allocation
+-> trusted destination decision
+-> planned free slots
+-> exact transfer or conservative refusal
+-> actual free-slot delta
+-> NO_SAFE_SURPLUS latch or terminal result
+-> original UserTask resume
+```
+
+#### 26.10.13 현재 상태와 다음 gate
+
+```text
+manual/automatic semantic split:                 ACCEPTED
+stack hard protection direction:                 IMPLEMENTED IN DIRTY WORKTREE
+working-set plus category reserve max rule:       IMPLEMENTED IN DIRTY WORKTREE
+fungible valuables trusted-only policy:           IMPLEMENTED IN DIRTY WORKTREE
+idle automatic policy unification:                IMPLEMENTED IN DIRTY WORKTREE
+NO_SAFE_SURPLUS state latch:                      IMPLEMENTED IN DIRTY WORKTREE
+9/10 high-water source constants:                 IMPLEMENTED, 33 / 36
+separate low-water rearm:                         IMPLEMENTED, 28 / 36
+free-slot success metric:                         IMPLEMENTED IN DIRTY WORKTREE
+trusted destination registry:                    IMPLEMENTED AS INSTANCE-OWNED JSON STORE
+resource JSON reuse boundary:                     ACCEPTED, DOCUMENTED
+unclassified vanilla/modded item default:          FAIL_CLOSED, DOCUMENTED
+rare functional item destination policy:           DOCUMENTED
+source or test changes for section 26.10:         PRESENT, STATIC REVIEW ONLY
+build, deployment and Minecraft reproduction:     NOT RUN FOR THIS SECTION
+```
+
+구현된 자동 경로는 `lavi/automatic-deposit-policy.json`을 전용 정책 자료로 사용하고,
+trusted destination은 Fabric config 아래
+`lavi/automatic-deposit-trusted-destinations.json`에 world, dimension, position과 enabled 상태를
+명시적으로 저장한다. 발견한 상자나 operation-local manifest를 자동으로 trusted로 승격하지 않는다.
+
+```json
+{
+  "schemaVersion": 1,
+  "destinations": [
+    {
+      "worldKey": "singleplayer:World Name",
+      "dimension": "OVERWORLD",
+      "x": 0,
+      "y": 64,
+      "z": 0,
+      "enabled": true
+    }
+  ]
+}
+```
+
+멀티플레이 world key는 `multiplayer:<lowercase server address>` 형식이며, 실제 값은 automatic policy
+plan 진단의 `persistentWorldKey` 필드로 확인한다. JSON 변경은 repository revision으로 감지하지만,
+등록되지 않은 발견 상자는 귀중품 목적지로 사용하지 않는다.
+
+공용 `StoreInContainerTask`가 aggregate ItemTarget만 받는 첫 safe slice에서는 mixed protected/plain
+Item 종류 전체를 제외한다. 같은 일반 Item의 여러 stack은 64를 넘는 하나의 목표로 합치지 않고,
+보호 수량을 침범하지 않으면서 통째로 비울 수 있는 stack별 step으로 나눈다. 계획은 일반 surplus를
+먼저 배정하고 목표 relief가 부족할 때만 trusted-only step을 추가한다. Trusted step이 실제로 필요하면
+예약한 trusted 용량을 일반 저장이 먼저 점유하지 않도록 trusted step을 실행한 뒤 일반 step을 실행한다. 이 source 상태는 focused
+테스트가 추가된 상태지만 Gradle 실행, 다중 버전 preprocess/compile, JAR 배포와 Minecraft runtime
+검증 전에는 완료 판정이나 커밋 판정을 내리지 않는다.
+
+다음 구현 요청이 있을 때는 새 정책 검수 문서를 다시 만들지 않고 이 절의 계약을 기준으로
+focused source 범위를 먼저 확정한다. Stack-level transfer enforcement, trusted storage와
+state-machine hysteresis는 서로 다른 lifecycle 책임이므로 한 번에 shared engine 경계를
+넓히지 않는다. 각 slice는 기존 automatic package 안의 LAVI-owned composition으로 구현하고
+수동 명령과 upstream-derived shared Task는 보존한다.
+
+#### 26.10.14 resource JSON과 automatic deposit policy data 경계
+
+현재 첨부 resource JSON은 한국어 명령 해석과 canonical target 연결에는 재사용할 수 있지만,
+automatic deposit의 보호, reserve 또는 trusted-destination 의미를 소유하지 않는다.
+
+```text
+korean_item_aliases.json
+    -> 한국어 item 이름을 알려진 canonical target에 연결
+
+korean_item_display_names.json
+    -> canonical target의 한국어 표시 이름 제공
+
+chatclef_target_canonicalization.json
+    -> legacy target 이름을 현재 canonical target으로 정규화
+
+korean_equipment_aliases.json / korean_material_aliases.json
+    -> "다이아 곡괭이" 같은 언어 조합 해석 보조
+
+chatclef_item_command_target_policy.json
+    -> DIRECT_ITEM, DIRECT_BLOCK, GENERIC_GROUP, UNSUPPORTED 같은 command-target 지원 상태
+```
+
+위 자료에서 재사용할 수 있는 것은 canonical ID 정규화, 표시 이름과 명령 alias다. Alias가
+존재하거나 `DIRECT_ITEM` 또는 `DIRECT_BLOCK`으로 분류됐다는 사실은 gameplay 안전성,
+희소성, reserve 수량 또는 저장 목적지 신뢰도를 뜻하지 않는다.
+
+현재 catalog-driven resource set은 591 target 중심이며 유효한 Minecraft 1.20.1 품목 중
+`firework_rocket`, `trident`, `elytra`, `totem_of_undying`, `netherite_scrap`, `written_book`,
+`filled_map` 등 일부를 automatic policy의 완전한 근거로 제공하지 않는다. 따라서 catalog에
+없는 품목을 일반 surplus로 추정하지 않는다.
+
+Automatic policy의 판정 자료는 다음처럼 분리한다.
+
+```text
+canonical exact ID 또는 별도 policy list
+    -> valuables, rare functional items, exact water bucket/torch/firework rules
+
+Minecraft tag 또는 runtime item/block category
+    -> logs, planks, coals, arrows, armor/tool/weapon role,
+       FoodComponent, BlockItem과 safe-building property
+
+runtime ItemStack state
+    -> equipped slot, selected/offhand, custom name, enchantment, lore,
+       armor trim, custom attributes/model data, map identity,
+       portable-container contents와 stack fingerprint
+
+runtime task/behaviour state
+    -> BotBehaviour protection, current working-set, crafting intermediate,
+       smelting input/fuel과 automatic operation working-set
+```
+
+별도 automatic-deposit policy data는 canonical ID, Minecraft tag와 제한된 runtime predicate를
+키로 사용해 최소한 다음 의미를 소유한다.
+
+```text
+hard-protected rare/common exception
+trusted-destination-only valuable and rare item
+category reserve membership and default quantity
+safe-building allow/deny policy
+food suitability and harmful/special-food exclusion
+known general-surplus allow policy
+unknown/modded fail-closed default
+```
+
+한국어 alias와 내부 정책은 분리한다. 번역 또는 별칭 추가, 동의어 충돌, command catalog
+coverage 변화가 inventory 안전 정책을 바꾸면 안 된다. 내부 policy는 canonical ID와 runtime
+상태를 기준으로 결정하고, 한국어 resource는 사용자 입력과 표시를 그 canonical ID에 연결하는
+경계로만 유지한다.

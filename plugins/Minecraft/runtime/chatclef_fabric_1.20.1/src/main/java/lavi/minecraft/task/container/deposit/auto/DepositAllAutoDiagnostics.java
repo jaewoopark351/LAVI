@@ -2,7 +2,9 @@ package lavi.minecraft.task.container.deposit.auto;
 
 import adris.altoclef.tasksystem.Task;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.task.container.deposit.auto.maintenance.AutoDepositMaintenanceOutcome;
 import lavi.minecraft.task.container.deposit.auto.maintenance.AutoDepositMaintenancePhase;
+import lavi.minecraft.task.container.deposit.auto.policy.AutoDepositPlan;
 import lavi.minecraft.task.container.deposit.auto.recovery.AutoDepositRecoveryCandidate;
 import lavi.minecraft.task.container.deposit.auto.working.WorkingSetSnapshot;
 
@@ -37,21 +39,22 @@ public final class DepositAllAutoDiagnostics {
                 "nextState", nextState,
                 "occupiedSlots", snapshot == null ? -1 : snapshot.occupiedSlots(),
                 "totalSlots", snapshot == null ? -1 : snapshot.totalSlots(),
-                "thresholdReached", snapshot != null && snapshot.isAtOrAboveThreshold()
+                "thresholdReached", snapshot != null && snapshot.isAtOrAboveThreshold(),
+                "lowWaterReached", snapshot != null && snapshot.isAtOrBelowLowWater()
         );
     }
 
     public static void logTrigger(DepositAllInventoryPressureSnapshot snapshot,
-                                  int targetTypeCount,
+                                  int targetStepCount,
                                   Task task) {
         ChatClefDiagnostics.logEvent(
                 CATEGORY,
                 "TRIGGERED",
-                "four_fifths_threshold_crossed",
+                "high_water_threshold_crossed",
                 task,
                 "occupiedSlots", snapshot.occupiedSlots(),
                 "totalSlots", snapshot.totalSlots(),
-                "targetTypeCount", targetTypeCount
+                "targetStepCount", targetStepCount
         );
     }
 
@@ -98,6 +101,50 @@ public final class DepositAllAutoDiagnostics {
         );
     }
 
+    public static void logPolicyPlan(AutoDepositPlan plan, Task task) {
+        ChatClefDiagnostics.logEvent(
+                CATEGORY,
+                "POLICY_PLAN",
+                "immutable_automatic_plan_created",
+                task,
+                "operationEpoch", plan.context().epoch(),
+                "activeUserTask", plan.context().activeUserTask(),
+                "persistentWorldKey", plan.context().persistentWorldKey(),
+                "generalStepCount", plan.generalTargets().length,
+                "trustedStepCount", plan.trustedTargets().length,
+                "trustedDestination", plan.trustedDestination().map(Object::toString).orElse("none"),
+                "protectedItemTypes", plan.protectedCounts().size(),
+                "targetReliefSlots", plan.targetReliefSlots(),
+                "expectedFreedSlots", plan.expectedFreedSlots(),
+                "startingOccupiedSlots", plan.startingOccupiedSlots()
+        );
+    }
+
+    public static void logNoSafeSurplus(String reason,
+                                        DepositAllInventoryPressureSnapshot pressure,
+                                        Task userTaskRoot) {
+        ChatClefDiagnostics.logEvent(
+                CATEGORY,
+                "NO_SAFE_SURPLUS_LATCHED",
+                reason,
+                userTaskRoot,
+                "occupiedSlots", pressure == null ? -1 : pressure.occupiedSlots(),
+                "totalSlots", pressure == null ? -1 : pressure.totalSlots()
+        );
+    }
+
+    public static void logMeaningfulReevaluation(DepositAllInventoryPressureSnapshot pressure,
+                                                 Task userTaskRoot) {
+        ChatClefDiagnostics.logEvent(
+                CATEGORY,
+                "NO_SAFE_SURPLUS_RELEASED",
+                "semantic_fingerprint_changed",
+                userTaskRoot,
+                "occupiedSlots", pressure == null ? -1 : pressure.occupiedSlots(),
+                "totalSlots", pressure == null ? -1 : pressure.totalSlots()
+        );
+    }
+
     public static void logMaintenanceTransition(long operationEpoch,
                                                 AutoDepositMaintenancePhase previous,
                                                 AutoDepositMaintenancePhase next,
@@ -113,6 +160,25 @@ public final class DepositAllAutoDiagnostics {
                 "previousPhase", previous,
                 "nextPhase", next,
                 "deficitTypeCount", deficitTypes
+        );
+    }
+
+    public static void logFreeSlotOutcome(long operationEpoch,
+                                          int startingOccupiedSlots,
+                                          int endingOccupiedSlots,
+                                          int expectedFreedSlots,
+                                          AutoDepositMaintenanceOutcome outcome,
+                                          Task task) {
+        ChatClefDiagnostics.logEvent(
+                CATEGORY,
+                "FREE_SLOT_POSTCONDITION",
+                outcome.name(),
+                task,
+                "operationEpoch", operationEpoch,
+                "startingOccupiedSlots", startingOccupiedSlots,
+                "endingOccupiedSlots", endingOccupiedSlots,
+                "actualFreedSlots", Math.max(0, startingOccupiedSlots - endingOccupiedSlots),
+                "expectedFreedSlots", expectedFreedSlots
         );
     }
 

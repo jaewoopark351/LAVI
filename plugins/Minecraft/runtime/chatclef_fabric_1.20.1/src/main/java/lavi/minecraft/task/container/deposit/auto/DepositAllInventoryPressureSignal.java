@@ -4,5 +4,6 @@ package lavi.minecraft.task.container.deposit.auto;
 public enum DepositAllInventoryPressureSignal {
     NONE,
     THRESHOLD_REACHED,
-    REARMED
+    REARMED,
+    MEANINGFUL_CHANGE
 }

@@ -1,22 +1,29 @@
 package lavi.minecraft.task.container.deposit.auto;
 
+import adris.altoclef.util.Dimension;
+import lavi.minecraft.task.container.deposit.auto.policy.AutoDepositDecisionFingerprint;
 import org.junit.jupiter.api.Test;
+
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 //20260826_kpopmodder: Verify one-shot automatic deposit_all execution and below-threshold rearming.
 class DepositAllInventoryPressureStateMachineTest {
-    private static final DepositAllInventoryPressureSnapshot BELOW_THRESHOLD =
+    private static final Object WORLD = new Object();
+    private static final DepositAllInventoryPressureSnapshot BETWEEN_WATER_MARKS =
+            new DepositAllInventoryPressureSnapshot(32, 36);
+    private static final DepositAllInventoryPressureSnapshot AT_LOW_WATER =
             new DepositAllInventoryPressureSnapshot(28, 36);
     private static final DepositAllInventoryPressureSnapshot AT_THRESHOLD =
-            new DepositAllInventoryPressureSnapshot(29, 36);
+            new DepositAllInventoryPressureSnapshot(33, 36);
 
     @Test
     void startsOnlyOnceAndRequiresABelowThresholdObservationBeforeAnotherRun() {
         DepositAllInventoryPressureStateMachine machine = new DepositAllInventoryPressureStateMachine();
 
-        assertEquals(DepositAllInventoryPressureSignal.NONE, machine.observe(BELOW_THRESHOLD));
+        assertEquals(DepositAllInventoryPressureSignal.NONE, machine.observe(BETWEEN_WATER_MARKS));
         assertEquals(DepositAllInventoryPressureSignal.THRESHOLD_REACHED, machine.observe(AT_THRESHOLD));
         assertEquals(DepositAllInventoryPressureSignal.NONE, machine.observe(AT_THRESHOLD));
 
@@ -27,7 +34,8 @@ class DepositAllInventoryPressureStateMachineTest {
         machine.markRunTerminated();
         assertEquals(DepositAllInventoryPressureState.WAIT_FOR_REARM, machine.state());
         assertEquals(DepositAllInventoryPressureSignal.NONE, machine.observe(AT_THRESHOLD));
-        assertEquals(DepositAllInventoryPressureSignal.REARMED, machine.observe(BELOW_THRESHOLD));
+        assertEquals(DepositAllInventoryPressureSignal.NONE, machine.observe(BETWEEN_WATER_MARKS));
+        assertEquals(DepositAllInventoryPressureSignal.REARMED, machine.observe(AT_LOW_WATER));
         assertEquals(DepositAllInventoryPressureState.ARMED, machine.state());
         assertEquals(DepositAllInventoryPressureSignal.THRESHOLD_REACHED, machine.observe(AT_THRESHOLD));
     }
@@ -41,7 +49,27 @@ class DepositAllInventoryPressureStateMachineTest {
 
         assertEquals(DepositAllInventoryPressureState.WAIT_FOR_REARM, machine.state());
         assertEquals(DepositAllInventoryPressureSignal.NONE, machine.observe(AT_THRESHOLD));
-        assertEquals(DepositAllInventoryPressureSignal.REARMED, machine.observe(BELOW_THRESHOLD));
+        assertEquals(DepositAllInventoryPressureSignal.NONE, machine.observe(BETWEEN_WATER_MARKS));
+        assertEquals(DepositAllInventoryPressureSignal.REARMED, machine.observe(AT_LOW_WATER));
+    }
+
+    @Test
+    void noSafeSurplusRetriesOnlyAfterSemanticFingerprintChanges() {
+        DepositAllInventoryPressureStateMachine machine = new DepositAllInventoryPressureStateMachine();
+        AutoDepositDecisionFingerprint first = fingerprint("first");
+
+        assertEquals(DepositAllInventoryPressureSignal.THRESHOLD_REACHED, machine.observe(AT_THRESHOLD));
+        machine.markNoSafeSurplus(first);
+
+        assertEquals(DepositAllInventoryPressureState.NO_SAFE_SURPLUS_WAIT, machine.state());
+        assertEquals(DepositAllInventoryPressureSignal.NONE, machine.observeMeaningfulChange(first));
+        assertEquals(DepositAllInventoryPressureSignal.NONE, machine.observe(BETWEEN_WATER_MARKS));
+        assertEquals(
+                DepositAllInventoryPressureSignal.MEANINGFUL_CHANGE,
+                machine.observeMeaningfulChange(fingerprint("changed"))
+        );
+        assertEquals(DepositAllInventoryPressureState.ARMED, machine.state());
+        assertEquals(DepositAllInventoryPressureSignal.THRESHOLD_REACHED, machine.observe(AT_THRESHOLD));
     }
 
     @Test
@@ -56,5 +84,18 @@ class DepositAllInventoryPressureStateMachineTest {
         machine.markRunStarted();
         assertThrows(IllegalStateException.class, machine::markRunStarted);
         assertThrows(IllegalStateException.class, machine::markThresholdSuppressed);
+    }
+
+    private static AutoDepositDecisionFingerprint fingerprint(String semantic) {
+        return new AutoDepositDecisionFingerprint(
+                WORLD,
+                null,
+                Dimension.OVERWORLD,
+                "test-world",
+                1,
+                1L,
+                "none",
+                List.of(semantic)
+        );
     }
 }

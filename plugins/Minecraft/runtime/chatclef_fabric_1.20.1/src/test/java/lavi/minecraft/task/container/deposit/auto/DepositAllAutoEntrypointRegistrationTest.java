@@ -5,6 +5,7 @@ import adris.altoclef.tasksystem.TaskChain;
 import adris.altoclef.tasksystem.TaskRunner;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lavi.minecraft.task.container.deposit.auto.policy.AutoDepositPolicyEngine;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -53,7 +54,9 @@ class DepositAllAutoEntrypointRegistrationTest {
             mod.runner = runner;
             set(instanceField, null, mod);
 
-            DepositAllAutoEntrypoint entrypoint = new DepositAllAutoEntrypoint();
+            DepositAllAutoEntrypoint entrypoint = new DepositAllAutoEntrypoint(
+                    AutoDepositPolicyEngine::inMemoryDefault
+            );
             invokeRegisterIfReady(entrypoint);
             DepositAllInventoryPressureChain firstChain = registeredChain(entrypoint);
             invokeRegisterIfReady(entrypoint);
