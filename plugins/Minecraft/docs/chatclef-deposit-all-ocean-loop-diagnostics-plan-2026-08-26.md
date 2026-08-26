@@ -4,6 +4,7 @@
 <!-- 20260826_kpopmodder: Recorded the implemented B0.1 candidate-consistency source boundary. -->
 <!-- 20260826_kpopmodder: Recorded post-commit runtime evidence and the same-target child lifecycle review failure. -->
 <!-- 20260826_kpopmodder: Recorded lifecycle closure and the focused automatic deposit_all implementation. -->
+<!-- 20260826_kpopmodder: Recorded that generic ResourceTask container pickup is currently source-disabled. -->
 
 # ChatClef @deposit_all Ocean Loop Diagnostics Plan
 
@@ -2300,3 +2301,28 @@ rollback 절차는 `chatclef-engine-divergence-record.md`에 유지하며, 실�
 이 26절이 재검수와 다음 수정 방향의 최종 canonical record다. 같은 내용을 다시
 검수하는 새 문서, 새 진단 계획서 또는 대규모 설계 문서를 만들지 않는다. 이후에는
 이 절의 status, test, build, runtime 결과만 갱신한다.
+
+### 26.7 상자에 저장된 재료 활용의 현재 상태
+
+현재 `ResourceTask`에는 이미 열어 캐시한 컨테이너에서 필요한 아이템을 찾고
+`PickupFromContainerTask`로 회수하는 분기가 존재한다. 그러나 이 분기의 진입 조건인
+`allowContainers`의 기본값은 `false`이며, 현재 source 전체에 이를 `true`로 설정하는
+활성 호출은 없다. `CollectSticksTask`에는 `false`를 명시하는 호출만 존재한다.
+
+따라서 현재 상태는 다음과 같이 기록한다.
+
+```text
+container cache and pickup implementation: SOURCE_PRESENT
+ResourceTask allowContainers default:       false
+active setAllowContainers(true) call:       NONE
+generic resource chest pickup route:        SOURCE_DISABLED
+resourceChestLocateRange effect on route:   INACTIVE_WHILE_DISABLED
+```
+
+`resourceChestLocateRange`의 기본값이 `500`인 것은 이 분기를 활성화하지 않는다.
+현재 ChatClef가 컨테이너 내용을 캐시할 수 있다는 사실과, 일반 자원 획득 Task가 그
+캐시에서 재료를 가져온다는 것은 별개의 상태다.
+
+이 항목은 현재 비활성 상태만 기록한다. `allowContainers`의 변경, 전역 활성화,
+새 컨테이너 활용 코드, 동작 수정, 테스트, 빌드, 배포, 커밋 또는 푸시를 승인하거나
+계획하지 않는다.
