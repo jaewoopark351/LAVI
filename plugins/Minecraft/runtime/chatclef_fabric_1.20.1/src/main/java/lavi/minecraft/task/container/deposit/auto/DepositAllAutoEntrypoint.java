@@ -25,6 +25,9 @@ public final class DepositAllAutoEntrypoint implements ModInitializer {
     }
 
     private void registerIfReady() {
+        if (chain != null) {
+            return;
+        }
         AltoClef mod = AltoClef.getInstance();
         TaskRunner runner = mod == null ? null : mod.getTaskRunner();
         if (runner == null) {

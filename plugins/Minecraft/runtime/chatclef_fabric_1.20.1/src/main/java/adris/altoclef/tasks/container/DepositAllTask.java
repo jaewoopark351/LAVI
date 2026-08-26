@@ -59,7 +59,6 @@ public class DepositAllTask extends Task {
         _storedItems.startTracking();
         _containerEligibility.reset();
         _targetState.clear();
-        _storeTaskGeneration.clear();
         _progressChecker.reset();
     }
 
@@ -401,7 +400,6 @@ public class DepositAllTask extends Task {
         StoreInAnyContainerDiagnostics.logStop(this, interruptTask, _getIfNotPresent, _toStore);
         _storedItems.stopTracking();
         _targetState.clear();
-        _storeTaskGeneration.clear();
         _containerEligibility.reset();
         _progressChecker.reset();
     }

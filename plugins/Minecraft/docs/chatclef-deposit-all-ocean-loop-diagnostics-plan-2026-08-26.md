@@ -2326,3 +2326,221 @@ resourceChestLocateRange effect on route:   INACTIVE_WHILE_DISABLED
 이 항목은 현재 비활성 상태만 기록한다. `allowContainers`의 변경, 전역 활성화,
 새 컨테이너 활용 코드, 동작 수정, 테스트, 빌드, 배포, 커밋 또는 푸시를 승인하거나
 계획하지 않는다.
+
+### 26.8 ZIP (48) focused lifecycle 재검수 판정
+
+이 절은 업로드된 ZIP (48)을 기준으로 전달받은 focused 재검수 결과를 기록한다.
+공개 브랜치는 보조 대조에만 사용됐다. 기존 26.6의 clean build와 Minecraft
+`NATURAL_FINISH` 기록은 보존하지만, 그 실행은 safety-chain interruption/resume과
+automatic natural-finish cleanup을 검증하지 않았다. 따라서 release와 자동 4/5 trigger
+배포에 관한 최신 판정은 이 절을 따른다.
+
+```text
+평상시 same-target progress 안정화:        PASS
+stable notStored snapshot 소유:            PASS
+shared Task 경계 무변경:                   PASS
+
+수동 @deposit_all interrupt/resume:         FAIL
+자동 trigger NATURAL_FINISH cleanup:        FAIL
+실제 generic reconciliation 테스트:        FAIL
+현재 ZIP 전체 release 승인:                REJECT
+```
+
+#### 26.8.1 Blocker 1: 수동 interrupt/resume generation ownership
+
+현재 `DepositAllTask.onStart()`와 `DepositAllTask.onStop(Task interruptTask)`는
+`_storeTaskGeneration.clear()`를 무조건 호출한다. 그러나 AltoClef의 `Task.onStop()`은
+terminal stop뿐 아니라 chain의 일시 interruption에도 호출된다.
+
+```text
+helper active child = A
+Task.sub actual child = A
+
+safety chain이 UserTaskChain을 선점
+    -> DepositAllTask.interrupt()
+    -> onStop()에서 helper generation clear
+    -> Task.sub와 interrupted child A는 보존
+
+UserTaskChain 재개
+    -> DepositAllTask.reset()
+    -> Task.reset()은 Task.sub를 보존
+    -> onStart()에서 helper generation clear
+    -> helper가 같은 target과 snapshot으로 child B 생성
+```
+
+저장 progress 전에 이 경로가 발생하면 production `StoreInContainerTask.isEqual()`은
+동일한 target, flag, snapshot을 가진 A와 B를 값 기준으로 같다고 판정한다. generic
+reconciliation은 기존 A를 계속 실행하지만 helper는 실행되지 않은 B를 active
+generation으로 소유한다.
+
+```text
+실제로 Task.sub에서 실행되는 child: A
+generation helper가 소유하는 child: B
+결과: scheduler child와 helper child identity 분리
+```
+
+이 상태가 항상 즉시 무한 루프를 만든다고 단정하지 않는다. 그러나 다음 lifecycle
+불일치는 정적으로 확정된다.
+
+1. `generationId`와 `storeGenerationCreated`가 실제 실행 child를 가리키지 않을 수 있다.
+2. `clearIfFinishedWithRemainingWork()`가 실제 A 대신 실행되지 않은 B를 검사한다.
+3. 실행되지 않은 B의 `storedItems`는 대개 `null`이므로 remaining-work refresh가 막힐 수 있다.
+4. chain preemption 뒤 parent가 active child generation을 소유한다는 불변조건이 깨진다.
+
+focused 후속 수정의 최소 범위는 `DepositAllTask` lifecycle에서 start/stop 시 무조건
+generation을 지우지 않고 temporary interruption 동안 같은 generation을 보존하는 것이다.
+generation clear는 다음 명시적 route 경계에서만 수행한다.
+
+```text
+selected target 변경 또는 무효화
+outside-70
+fallback 전환
+finished child + verified remaining work
+```
+
+`interruptTask == null`은 terminal stop과 interruption의 구분 근거로 사용하지 않는다.
+`SingleTaskChain.onInterrupt()`도 `mainTask.interrupt(null)`을 호출하기 때문이다.
+
+#### 26.8.2 Blocker 2: 자동 NATURAL_FINISH cleanup
+
+현재 `DepositAllInventoryPressureChain.onTaskFinish()`는 finished root의 참조를
+`mainTask = null`로 직접 버린다. 이 경로는 root `Task.stop()`을 호출하지 않으므로
+다음 cleanup이 생략된다.
+
+```text
+DepositAllTask.onStop()
+    -> root ContainerStoredTracker.stopTracking()
+    -> target, generation, progress cleanup
+
+Task.stop()의 recursive child stop
+    -> StoreInContainerTask.onStop()
+    -> child ContainerStoredTracker.stopTracking()
+    -> active descendant cleanup
+```
+
+`ContainerStoredTracker.startTracking()`은 전역 EventBus subscription을 등록하고,
+`stopTracking()`에서만 해제한다. 따라서 자동 실행이 자연 완료할 때 root와 child의
+stale listener가 남고, 재무장 후 반복 실행에서 누적될 수 있다.
+
+focused 후속 수정은 `onTaskFinish()`에서 직접 `mainTask = null`을 쓰는 대신 기존
+`SingleTaskChain.setTask(null)` 또는 동등한 root-only stop-and-clear 경계를 사용하는
+것이다. 이 경계는 자동 chain이 소유한 root와 descendant만 종료해야 한다.
+
+다음 전역 정리는 추가하지 않는다.
+
+```text
+TaskRunner.disable()
+Baritone global cancel
+전역 input clear
+UserTaskChain 중단
+전역 goal 또는 path cleanup
+```
+
+#### 26.8.3 현재 테스트 공백과 필수 검증
+
+현재 `DepositAllTaskStoreGenerationTest`는
+`storeTaskForSelectedTarget(...)` helper를 직접 호출하므로 다음 production lifecycle을
+통과하지 않는다.
+
+```text
+DepositAllTask.onStart() / onStop()
+Task.interrupt() / reset() / tick()
+Task.sub reconciliation
+previous child stop
+actual child replacement
+```
+
+또한 test double의 `isEqual()`은 identity 비교지만 production
+`StoreInContainerTask.isEqual()`은 target, flag, snapshot의 값 동등성을 사용한다.
+따라서 서로 다른 A/B instance가 production equality에서 같아지는 이번 결함을 현재
+테스트로 재현할 수 없다.
+
+수동 경로의 필수 generic reconciliation 테스트:
+
+1. same-target child A를 시작한다.
+2. deposit progress 전에 parent를 interrupt한다.
+3. parent를 reset하고 resume한다.
+4. helper active child와 실제 `Task.sub`가 모두 A인지 확인한다.
+5. phantom child B 생성과 generation ID 증가가 없는지 확인한다.
+6. previous child replacement와 stop이 모두 0인지 확인한다.
+7. resume 뒤 실제 child terminal과 root remaining-work refresh가 정상인지 확인한다.
+
+자동 경로의 필수 chain 테스트:
+
+1. automatic root가 자연 완료한다.
+2. root `onStop()`이 정확히 한 번 호출된다.
+3. active child stop이 정확히 한 번 호출된다.
+4. root와 child tracking subscription이 해제된다.
+5. `mainTask`가 `null`이고 상태가 `WAIT_FOR_REARM`인지 확인한다.
+6. TaskRunner와 전역 Baritone cleanup이 호출되지 않았는지 확인한다.
+
+기존 자동 테스트가 확인한 28/36, 29/36 threshold와
+`ARMED -> RUNNING -> WAIT_FOR_REARM`, 고점 중복 trigger 방지, 저점 rearm은 유효하다.
+그러나 natural-finish cleanup, safety-chain interruption, UserTaskChain resume, conflict
+guard, entrypoint 단일 등록은 아직 release 증거가 아니다.
+
+#### 26.8.4 보존 경계와 release gate
+
+이번 재검수에서 다음 방향은 통과했다.
+
+1. 정상 same-target progress에서 같은 `StoreInContainerTask` instance를 재사용한다.
+2. target 채택 당시 `notStored`를 복사해 stable snapshot으로 고정한다.
+3. target 변경, 무효화, fallback, finished child와 remaining work를 generation 교체 경계로 둔다.
+4. bare `@deposit_all`과 자동 실행이 `DepositAllInventoryTargetSelector`를 공유한다.
+5. `occupied * 5 >= total * 4`와 29/36 trigger 경계가 정확하다.
+6. safety chain 선점 시 자동 chain이 `stopOwnedRun()`으로 자기 root만 중단한다.
+
+다음 shared 경계는 수정하지 않는다.
+
+```text
+Task.java
+StoreInContainerTask.java and StoreInContainerTask.isEqual()
+StoreInAnyContainerTask.java
+DepositCommand.java
+DoToClosestBlockTask.java
+TaskRunner and Baritone
+UserTaskChain
+```
+
+기존 `9785e17b`와 `673d21de`는 force rewrite하지 않는다. interruption 수정은 focused
+follow-up으로 분리한다. 위 두 blocker와 orchestration test가 닫히기 전까지 자동 4/5
+trigger 변경은 commit, clean forced build, JAR 배포 또는 Minecraft release 대상으로
+승인하지 않는다.
+
+이 절은 새 동작 수정, 테스트 실행, 빌드, 배포, 커밋 또는 푸시를 승인하지 않는다.
+새 검수 문서나 새 로그 계획서를 만들지 않고 이후 판정과 증거도 이 canonical 26절만
+갱신한다.
+
+#### 26.8.5 focused lifecycle follow-up source 상태
+
+사용자 승인에 따라 두 blocker의 focused source 수정과 검증 source를 현재 worktree에
+적용했다. shared Task lifecycle과 기존 `@deposit` 경계는 변경하지 않았다.
+
+```text
+DepositAllTask start/stop generation preservation:      IMPLEMENTED
+automatic NATURAL_FINISH root stop-and-clear:           IMPLEMENTED
+automatic entrypoint duplicate-registration guard:     IMPLEMENTED
+production-value-equality helper test double:           UPDATED
+generic interrupt/reset/reconciliation test:            ADDED, NOT RUN
+automatic natural-finish cleanup test:                  ADDED, NOT RUN
+automatic conflict-guard test:                          ADDED, NOT RUN
+automatic entrypoint single-registration test:          ADDED, NOT RUN
+clean forced build:                                     NOT RUN
+JAR deployment and Minecraft reproduction:              NOT RUN
+release verdict:                                        REJECT UNTIL VERIFIED
+ResourceTask allowContainers:                           false, UNCHANGED
+```
+
+`DepositAllTask`는 lifecycle `onStart()`와 `onStop()`에서 generation을 무조건
+clear하지 않는다. target 무효화, fallback, outside-70, finished child와 verified
+remaining work 같은 기존 explicit route 경계의 clear는 유지한다.
+
+`DepositAllInventoryPressureChain.onTaskFinish()`는 finished root 참조를 보관한 뒤
+`setTask(null)`을 호출해 root와 active descendant를 기존 scheduler 경계로 정리하고,
+그 다음 `WAIT_FOR_REARM`으로 전이한다. TaskRunner, Baritone, 전역 input, goal 또는 path
+cleanup은 추가하지 않았다.
+
+검증 source는 helper와 orchestration 책임을 분리한다. generic reconciliation 테스트는
+실제 `Task.tick()`, `interrupt()`, `reset()`과 retained `Task.sub`를 통과하며, automatic
+chain 테스트는 자연 완료 시 root와 child stop 및 tracker cleanup을 확인하도록 작성했다.
+테스트 실행과 clean forced build는 별도 승인 전까지 수행하지 않는다.

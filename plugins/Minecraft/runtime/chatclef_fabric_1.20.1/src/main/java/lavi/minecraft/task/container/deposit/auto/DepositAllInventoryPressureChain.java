@@ -117,7 +117,7 @@ public final class DepositAllInventoryPressureChain extends SingleTaskChain {
     @Override
     protected void onTaskFinish(AltoClef mod) {
         Task finishedTask = mainTask;
-        mainTask = null;
+        setTask(null);
         transitionRunToWaiting("automatic_task_terminal", currentSnapshot(), finishedTask);
     }
 

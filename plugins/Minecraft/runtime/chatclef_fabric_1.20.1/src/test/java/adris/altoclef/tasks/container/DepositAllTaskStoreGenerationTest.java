@@ -9,6 +9,7 @@ import sun.misc.Unsafe;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -81,7 +82,7 @@ class DepositAllTaskStoreGenerationTest {
         private final List<TestTask> createdTasks = new ArrayList<>();
         private final DepositAllStoreTaskGeneration generation = new DepositAllStoreTaskGeneration(
                 (target, getIfNotPresent, snapshot) -> {
-                    TestTask task = new TestTask(target, snapshot);
+                    TestTask task = new TestTask(target, getIfNotPresent, snapshot);
                     createdTasks.add(task);
                     return task;
                 },
@@ -91,12 +92,14 @@ class DepositAllTaskStoreGenerationTest {
 
     private static final class TestTask extends Task {
         private final BlockPos target;
+        private final boolean getIfNotPresent;
         private final ItemTarget[] snapshot;
         private boolean stopped;
 
-        private TestTask(BlockPos target, ItemTarget[] snapshot) {
+        private TestTask(BlockPos target, boolean getIfNotPresent, ItemTarget[] snapshot) {
             this.target = target;
-            this.snapshot = snapshot;
+            this.getIfNotPresent = getIfNotPresent;
+            this.snapshot = Arrays.copyOf(snapshot, snapshot.length);
         }
 
         @Override
@@ -115,12 +118,16 @@ class DepositAllTaskStoreGenerationTest {
 
         @Override
         protected boolean isEqual(Task other) {
-            return this == other;
+            return other instanceof TestTask task
+                    && target.equals(task.target)
+                    && getIfNotPresent == task.getIfNotPresent
+                    && Arrays.equals(snapshot, task.snapshot);
         }
 
         @Override
         protected String toDebugString() {
-            return "deposit_all parent store generation test " + target + " " + snapshot.length;
+            return "deposit_all parent store generation test " + target + " "
+                    + getIfNotPresent + " " + snapshot.length;
         }
     }
 }

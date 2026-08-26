@@ -14,10 +14,16 @@ public final class DepositAllAutoConflictGuard {
     public boolean hasExistingDepositTask(AltoClef mod) {
         Objects.requireNonNull(mod, "mod");
         Task userTask = mod.getUserTaskChain().getCurrentTask();
-        return userTask != null && userTask.thisOrChildSatisfies(task ->
-                task instanceof DepositAllTask
-                        || task instanceof StoreInAnyContainerTask
-                        || task instanceof StoreInContainerTask
-        );
+        return userTask != null && userTask.thisOrChildSatisfies(this::isDepositRoute);
+    }
+
+    boolean isDepositRoute(Task task) {
+        return task != null && isDepositRouteClass(task.getClass());
+    }
+
+    boolean isDepositRouteClass(Class<? extends Task> taskClass) {
+        return DepositAllTask.class.isAssignableFrom(taskClass)
+                || StoreInAnyContainerTask.class.isAssignableFrom(taskClass)
+                || StoreInContainerTask.class.isAssignableFrom(taskClass);
     }
 }
