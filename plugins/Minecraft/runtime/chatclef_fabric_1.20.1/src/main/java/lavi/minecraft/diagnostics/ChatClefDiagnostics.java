@@ -8,6 +8,7 @@ import adris.altoclef.util.slots.Slot;
 import baritone.api.utils.input.Input;
 import lavi.minecraft.diagnostics.command.DiagnosticCommandContextProvider;
 import lavi.minecraft.diagnostics.command.DiagnosticCommandContextRegistry;
+import lavi.minecraft.diagnostics.container.store.deposit.interaction.StoreDepositInteractionObserver;
 import lavi.minecraft.diagnostics.formatting.DiagnosticFormatterFacade;
 import lavi.minecraft.diagnostics.interaction.BlockInteractionObserver;
 import lavi.minecraft.diagnostics.mode.DiagnosticModeController;
@@ -51,6 +52,10 @@ public final class ChatClefDiagnostics {
             ChatClefDiagnostics::nextOperationId,
             COMMAND_CONTEXTS
     );
+
+    static {
+        BLOCK_INTERACTIONS.registerObserver(new StoreDepositInteractionObserver());
+    }
 
     private ChatClefDiagnostics() {
     }
@@ -118,17 +123,21 @@ public final class ChatClefDiagnostics {
     }
 
     public static void enterTask(Task task) {
-        if (!MODE.isVerboseEnabled()) {
+        if (MODE.isOff()) {
             return;
         }
         TASKS.enterTask(task);
     }
 
     public static void exitTask(Task task) {
-        if (!MODE.isVerboseEnabled()) {
+        if (MODE.isOff()) {
             return;
         }
         TASKS.exitTask(task);
+    }
+
+    public static Task currentTaskForDiagnostics() {
+        return MODE.isOff() ? null : TASKS.currentTask();
     }
 
     public static void beginTaskRun(Task task, TaskChain parentChain) {

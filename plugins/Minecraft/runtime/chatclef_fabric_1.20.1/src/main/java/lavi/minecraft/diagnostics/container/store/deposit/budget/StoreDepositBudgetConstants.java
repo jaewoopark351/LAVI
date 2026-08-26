@@ -4,7 +4,8 @@ public final class StoreDepositBudgetConstants {
     public static final int TOTAL_SESSION_CAP = 5000;
     public static final int CRITICAL_RESERVE_CAP = 64;
     public static final int NONCRITICAL_DETAIL_CAP = TOTAL_SESSION_CAP - CRITICAL_RESERVE_CAP;
-    public static final int MAX_DETAIL_KEYS_PER_EVENT = 256;
+    public static final int OPERATION_DETAIL_CAP = 256;
+    public static final int MAX_ACTIVE_OPERATION_BUDGETS = 16;
     public static final int MAX_EXCEPTION_SIGNATURES = 16;
     public static final int MAX_TERMINAL_GROUPS = 8;
     public static final int TERMINAL_GROUP_EVENT_COUNT = 4;

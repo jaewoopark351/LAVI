@@ -60,7 +60,20 @@ public class DoToClosestBlockTask extends AbstractDoToClosestObjectTask<BlockPos
         if (getClosest != null) {
             result = getClosest.apply(pos);
         } else {
-            result = mod.getBlockScanner().getNearestBlock(pos, isValid, targetBlocks);
+            //20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
+            //20260826_kpopmodder: Bound one existing filtered scan to bounded deposit_all diagnostics.
+            StoreDepositDiagnostics.beginFilteredSearchObservation(this);
+            boolean scannerCallCompletedNormally = false;
+            try {
+                result = mod.getBlockScanner().getNearestBlock(pos, isValid, targetBlocks);
+                scannerCallCompletedNormally = true;
+            } finally {
+                StoreDepositDiagnostics.endFilteredSearchObservation(
+                        this,
+                        scannerCallCompletedNormally,
+                        targetBlocks
+                );
+            }
         }
         ChatClefDiagnostics.logEvent("CLOSEST_BLOCK", "GET_CLOSEST", "closest_block_result", this,
                 "origin", pos,

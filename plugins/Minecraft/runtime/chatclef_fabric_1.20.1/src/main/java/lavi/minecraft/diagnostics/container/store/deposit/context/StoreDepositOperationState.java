@@ -1,6 +1,8 @@
 package lavi.minecraft.diagnostics.container.store.deposit.context;
 
+import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.ItemTarget;
+import lavi.minecraft.diagnostics.container.store.deposit.candidate.StoreContainerRouteState;
 import net.minecraft.item.Item;
 
 import java.util.Arrays;
@@ -12,6 +14,7 @@ public final class StoreDepositOperationState {
     private static final int MAX_TRACKER_BINDINGS_PER_OPERATION = 128;
 
     private final StoreDepositOperationContext context;
+    private final StoreContainerRouteState routeState;
     private final long startNanos;
     private ItemTarget[] requestedTargets = new ItemTarget[0];
     private int activationCount;
@@ -41,6 +44,8 @@ public final class StoreDepositOperationState {
     private String lastLifecyclePhase = "none";
     private String lastActiveChildIdentity = "none";
     private String lastActiveChildClass = "none";
+    private Task lastCompletedStopTask;
+    private long lastCompletedStopTick = -1;
     private final Map<String, Integer> lifecycleCounts = new LinkedHashMap<>();
     private final Map<String, Integer> reconciliationCounts = new LinkedHashMap<>();
     private final Map<String, Integer> parentCandidateCounts = new LinkedHashMap<>();
@@ -54,11 +59,16 @@ public final class StoreDepositOperationState {
 
     public StoreDepositOperationState(StoreDepositOperationContext context) {
         this.context = context;
+        this.routeState = new StoreContainerRouteState(context == null ? 0 : context.startTick());
         this.startNanos = System.nanoTime();
     }
 
     public StoreDepositOperationContext context() {
         return context;
+    }
+
+    public StoreContainerRouteState routeState() {
+        return routeState;
     }
 
     public long elapsedMillis() {
@@ -89,7 +99,11 @@ public final class StoreDepositOperationState {
         }
     }
 
-    public void recordLifecycle(String action, String phase, boolean rootStop) {
+    public void recordLifecycle(Task task,
+                                String action,
+                                String phase,
+                                boolean rootStop,
+                                long clientTick) {
         lifecycleEventCount++;
         lastLifecycleAction = action;
         lastLifecyclePhase = phase;
@@ -99,6 +113,10 @@ public final class StoreDepositOperationState {
         }
         if (rootStop && "STOP".equals(action) && "BEGIN".equals(phase)) {
             trueStopObserved = true;
+        }
+        if ("STOP".equals(action) && "END".equals(phase)) {
+            lastCompletedStopTask = task;
+            lastCompletedStopTick = clientTick;
         }
     }
 
@@ -181,6 +199,12 @@ public final class StoreDepositOperationState {
 
     public void recordOperationEvicted() {
         evictedOperationCount++;
+    }
+
+    public boolean wasStopCompletedFor(Task task, long clientTick) {
+        return task != null
+                && lastCompletedStopTask == task
+                && lastCompletedStopTick == clientTick;
     }
 
     public boolean markTerminalFinalized() {

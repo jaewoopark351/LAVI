@@ -444,6 +444,12 @@ public final class StoreDepositEventFields {
     public static Object[] coverageSummaryFields(StoreDepositOperationState state,
                                                  String terminalTrigger,
                                                  Object[] budgetFields) {
+        boolean depositAll = state != null && state.context().isDepositAllOperation();
+        String implementedFamilies = "lifecycle,child_reconciliation,parent_candidate,filtered_search,pursuit,"
+                + "target_callback,craft_route,transfer,effect,user_block_null_input"
+                + (depositAll ? ",predicate_rejection_aggregate,branch_epoch,operation_budget,checkpoint" : "");
+        String unimplementedFamilies = "baritone_generation_context,container_access_context,durable_effect_oracle"
+                + (depositAll ? ",block_scanner_internal_filter" : "");
         return merge(merge(operationFields(state), new Object[]{
                 "diagnosticScope", "store_deposit_diagnostic_coverage",
                 "owner", "store_deposit_summary_factory",
@@ -455,8 +461,8 @@ public final class StoreDepositEventFields {
                 "payload", "flat_fields",
                 "terminal", true,
                 "behavior_effect", "none",
-                "implementedFamilies", "lifecycle,child_reconciliation,parent_candidate,filtered_search,pursuit,target_callback,craft_route,transfer,effect,user_block_null_input",
-                "unimplementedFamilies", "baritone_generation_context,container_access_context,durable_effect_oracle",
+                "implementedFamilies", implementedFamilies,
+                "unimplementedFamilies", unimplementedFamilies,
                 "lifecycleEventCount", state == null ? "unavailable" : state.lifecycleEventCount(),
                 "childReconciliationCount", state == null ? "unavailable" : state.childReconciliationCount(),
                 "parentCandidateDecisionCount", state == null ? "unavailable" : state.parentCandidateDecisionCount(),

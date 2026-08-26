@@ -34,6 +34,10 @@ public final class StoreDepositOperationContext {
         return requestSource;
     }
 
+    public boolean isDepositAllOperation() {
+        return "BARE_DEPOSIT_ALL_COMMAND".equals(requestSource);
+    }
+
     public Task rootTask() {
         return rootTask;
     }

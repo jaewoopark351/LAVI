@@ -2,6 +2,7 @@ package adris.altoclef;
 
 import adris.altoclef.commands.AttackPlayerOrMobCommand;
 import adris.altoclef.commands.DepositCommand;
+import adris.altoclef.commands.DepositAllCommand;
 import adris.altoclef.commands.EquipCommand;
 import adris.altoclef.commands.FollowCommand;
 import adris.altoclef.commands.FoodCommand;
@@ -33,6 +34,7 @@ public class AltoClefCommands {
                 new GetCommand(),
                 new EquipCommand(),
                 new DepositCommand(),
+                new DepositAllCommand(),
                 // disabled: not useful to LLM agent
                 // new StashCommand(),
                 new GotoCommand(),

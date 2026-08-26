@@ -7,17 +7,19 @@ import lavi.minecraft.integration.carryon.CarryOnCarryState;
 import lavi.minecraft.integration.carryon.CarryOnObservation;
 import net.minecraft.client.MinecraftClient;
 
-import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 //20260815_kpopmodder: Observe a bounded click-to-GUI window without retrying, delaying, or cancelling tasks.
 final class CarryOnContainerPostconditionWindow {
     private static final int[] OBSERVATION_OFFSETS = {1, 2, 5};
     private static final int MAX_WINDOW_AGE_TICKS = 20;
+    private static final int MAX_ACTIVE_WINDOWS = 64;
 
-    private final Map<Long, CarryOnContainerPostconditionWindowEntry> windows = new HashMap<>();
+    private final Map<Long, CarryOnContainerPostconditionWindowEntry> windows = new LinkedHashMap<>();
     private final CarryOnContainerInteractionLogger logger;
+    private final CarryOnContainerPostconditionClassifier classifier = new CarryOnContainerPostconditionClassifier();
 
     CarryOnContainerPostconditionWindow(CarryOnContainerInteractionLogger logger) {
         this.logger = logger;
@@ -42,13 +44,14 @@ final class CarryOnContainerPostconditionWindow {
                 "",
                 0
         );
-        CarryOnContainerPostconditionOutcome outcome = classify(context, stateBefore, returnSnapshot, true);
+        CarryOnContainerPostconditionOutcome outcome = classify(context, stateBefore, returnSnapshot, false);
         boolean terminal = outcome != CarryOnContainerPostconditionOutcome.OBSERVATION_PENDING;
         logger.logOutcomeWindow(context, interactResult, returnSnapshot, returnSnapshot,
                 "RETURN_SNAPSHOT", outcome, terminal, false);
         if (terminal) {
             return;
         }
+        evictOldestWindowIfNeeded(context.interactionId());
         windows.put(context.interactionId(), new CarryOnContainerPostconditionWindowEntry(
                 context,
                 stateBefore,
@@ -89,16 +92,16 @@ final class CarryOnContainerPostconditionWindow {
                         previousSneakStableTicks(entry)
                 );
                 CarryOnContainerPostconditionOutcome outcome = classify(entry.context(), entry.stateBefore(), snapshot, isTerminalOffset(offset));
+                boolean stateChanged = entry.recordObservation(snapshot);
                 boolean terminal = outcome != CarryOnContainerPostconditionOutcome.OBSERVATION_PENDING
                         || isTerminalOffset(offset);
                 if (terminal) {
                     logger.logOutcomeWindow(entry.context(), entry.interactResult(), entry.returnSnapshot(), snapshot,
-                            "TERMINAL_OUTCOME", terminalOutcome(entry.context(), snapshot, outcome), true, false);
+                            "TERMINAL_OUTCOME", outcome, true, false);
                     iterator.remove();
                     break;
                 }
-                if (!entry.stateChangeLogged() && stateChanged(entry.returnSnapshot(), snapshot)) {
-                    entry.markStateChangeLogged();
+                if (stateChanged) {
                     logger.logOutcomeWindow(entry.context(), entry.interactResult(), entry.returnSnapshot(), snapshot,
                             "STATE_CHANGE_SNAPSHOT", outcome, false, false);
                 }
@@ -110,48 +113,20 @@ final class CarryOnContainerPostconditionWindow {
                                                           CarryOnObservation stateBefore,
                                                           CarryOnContainerPostconditionSnapshot snapshot,
                                                           boolean terminalOffset) {
-        if (snapshot == null) {
-            return terminalOffset
-                    ? CarryOnContainerPostconditionOutcome.OBSERVATION_WINDOW_EXPIRED
-                    : CarryOnContainerPostconditionOutcome.OBSERVATION_PENDING;
-        }
-        if (CarryOnContainerExpectedGui.expectedGuiOpened(context, snapshot.screenSnapshot())) {
-            return snapshot.observationOffsetTicks() == 0
-                    ? CarryOnContainerPostconditionOutcome.GUI_OPENED
-                    : CarryOnContainerPostconditionOutcome.GUI_OPEN_DELAYED;
-        }
-        CarryOnContainerPickupEvidence evidence = CarryOnContainerPickupEvidence.classify(context, snapshot.carryObservation());
-        if (observedPickup(stateBefore, snapshot.carryObservation()) && evidence == CarryOnContainerPickupEvidence.CONFIRMED_TARGET_IDENTITY) {
-            return CarryOnContainerPostconditionOutcome.CARRY_ON_PICKUP_CONFIRMED;
-        }
-        if (observedPickup(stateBefore, snapshot.carryObservation()) && evidence == CarryOnContainerPickupEvidence.STRONG_TEMPORAL_ATTRIBUTION) {
-            return CarryOnContainerPostconditionOutcome.CARRY_ON_PICKUP_STRONGLY_ATTRIBUTED;
-        }
-        if (terminalOffset && targetRemoved(snapshot)) {
-            return CarryOnContainerPostconditionOutcome.TARGET_REMOVED_WITHOUT_GUI;
-        }
-        if (terminalOffset && targetStillMatches(context, snapshot)) {
-            return CarryOnContainerPostconditionOutcome.NO_GUI_TARGET_STILL_PRESENT;
-        }
-        if (terminalOffset) {
-            return CarryOnContainerPostconditionOutcome.OBSERVATION_WINDOW_EXPIRED;
-        }
-        return CarryOnContainerPostconditionOutcome.OBSERVATION_PENDING;
-    }
-
-    private CarryOnContainerPostconditionOutcome terminalOutcome(BlockInteractionContext context,
-                                                                 CarryOnContainerPostconditionSnapshot snapshot,
-                                                                 CarryOnContainerPostconditionOutcome outcome) {
-        if (outcome != CarryOnContainerPostconditionOutcome.OBSERVATION_PENDING) {
-            return outcome;
-        }
-        if (targetRemoved(snapshot)) {
-            return CarryOnContainerPostconditionOutcome.TARGET_REMOVED_WITHOUT_GUI;
-        }
-        if (targetStillMatches(context, snapshot)) {
-            return CarryOnContainerPostconditionOutcome.NO_GUI_TARGET_STILL_PRESENT;
-        }
-        return CarryOnContainerPostconditionOutcome.OBSERVATION_WINDOW_EXPIRED;
+        CarryOnContainerPickupEvidence evidence = CarryOnContainerPickupEvidence.classify(
+                context,
+                snapshot == null ? null : snapshot.carryObservation()
+        );
+        return classifier.classify(
+                snapshot != null,
+                snapshot == null ? -1 : snapshot.observationOffsetTicks(),
+                snapshot != null && CarryOnContainerExpectedGui.expectedGuiOpened(context, snapshot.screenSnapshot()),
+                snapshot != null && observedPickup(stateBefore, snapshot.carryObservation()),
+                evidence,
+                targetRemoved(snapshot),
+                targetStillMatches(context, snapshot),
+                terminalOffset
+        );
     }
 
     private boolean observedPickup(CarryOnObservation stateBefore, CarryOnObservation observation) {
@@ -161,15 +136,19 @@ final class CarryOnContainerPostconditionWindow {
                 && observation.state() == CarryOnCarryState.AVAILABLE_CARRYING;
     }
 
-    private boolean stateChanged(CarryOnContainerPostconditionSnapshot baseline,
-                                 CarryOnContainerPostconditionSnapshot observed) {
-        return baseline != null
-                && observed != null
-                && !baseline.fingerprint().equals(observed.fingerprint());
-    }
-
     private boolean isTerminalOffset(int offset) {
         return offset == OBSERVATION_OFFSETS[OBSERVATION_OFFSETS.length - 1];
+    }
+
+    private void evictOldestWindowIfNeeded(long interactionId) {
+        if (windows.containsKey(interactionId) || windows.size() < MAX_ACTIVE_WINDOWS) {
+            return;
+        }
+        Iterator<Long> oldest = windows.keySet().iterator();
+        if (oldest.hasNext()) {
+            oldest.next();
+            oldest.remove();
+        }
     }
 
     private boolean targetRemoved(CarryOnContainerPostconditionSnapshot snapshot) {

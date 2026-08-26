@@ -1,0 +1,61 @@
+package lavi.minecraft.diagnostics.container.store.deposit.candidate;
+
+import net.minecraft.util.math.BlockPos;
+
+public record StoreContainerCandidateObservation(boolean available,
+                                                 boolean scannerCallCompletedNormally,
+                                                 String operationId,
+                                                 String routeChildIdentity,
+                                                 long parentDecisionSequence,
+                                                 long branchEpoch,
+                                                 BlockPos parentRawClosest,
+                                                 int candidateEvaluationCount,
+                                                 int predicateAcceptedCount,
+                                                 int predicateRejectedCount,
+                                                 int rejectBlockedAboveUnbreakableCount,
+                                                 int rejectContainerCacheFullCount,
+                                                 int rejectCachedDungeonCount,
+                                                 int rejectSpawnerNearbyCount,
+                                                 int rejectUnknownCount,
+                                                  String rejectionCountsByReason,
+                                                  BlockPos firstRejectedPosition,
+                                                  String firstRejectedReason,
+                                                  BlockPos lastRejectedPosition,
+                                                  String lastRejectedReason,
+                                                  int rawCandidateObservationCount,
+                                                  int rawCandidateEvaluationOrdinal,
+                                                  String rawCandidatePredicateOutcome,
+                                                  String rawCandidateRejectionReason,
+                                                  boolean rawCandidateMatchedByValue,
+                                                  String rawCandidateCoverage) {
+    public static StoreContainerCandidateObservation unavailable() {
+        return new StoreContainerCandidateObservation(
+                false,
+                false,
+                "unavailable",
+                "unavailable",
+                0,
+                0,
+                null,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                "{}",
+                null,
+                "UNAVAILABLE",
+                null,
+                "UNAVAILABLE",
+                0,
+                0,
+                StoreContainerRawCandidateOutcome.RAW_UNAVAILABLE.name(),
+                "UNAVAILABLE",
+                false,
+                "OBSERVATION_UNAVAILABLE"
+        );
+    }
+}

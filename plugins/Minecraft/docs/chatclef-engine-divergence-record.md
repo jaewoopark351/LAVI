@@ -971,3 +971,148 @@ Rollback:
 - Do not use `git reset`, `git checkout --`, `git restore`, or broad cleanup commands as the rollback method.
 
 Upstream comparison status: UNVERIFIED
+
+## 2026-08-26 Deposit-All Filtered Scanner Observation Scope
+
+Repository HEAD at implementation baseline:
+
+```text
+c865cb3a39b70a451915140804b15e2f9439ef3d
+```
+
+Modified upstream-derived file:
+
+```text
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/adris/altoclef/tasks/DoToClosestBlockTask.java
+```
+
+Baseline Git blob:
+
+```text
+f4e3f9b2874ba52d7d0c7e3e3be50050802f21fd
+```
+
+Current file SHA-256 at static verification:
+
+```text
+064C897E63C5AB3D66B344001BA0B10E9898E51E853A1256664E96348685DDE0
+```
+
+Modified method:
+
+```text
+DoToClosestBlockTask#getClosestTo(AltoClef, Vec3d)
+```
+
+Divergence category: bounded diagnostics-only observation.
+
+Exact hunk:
+
+```text
+around the existing predicate-aware getNearestBlock(...) call only:
+    beginFilteredSearchObservation(this)
+    existing getNearestBlock(...) call, still exactly once
+    endFilteredSearchObservation(this, completedNormally, targetBlocks) in finally
+```
+
+Activation boundary:
+
+```text
+requestSource == BARE_DEPOSIT_ALL_COMMAND
+current parent branch == OPEN_EXISTING
+observed task identity == the current direct ROOT_ROUTE child
+diagnostics mode permits BOUNDARY observation
+```
+
+The LAVI-owned collector remains inactive for ordinary `@deposit`, unrelated
+`DoToClosestBlockTask` instances, and resource descendants such as wood search.
+It aggregates only outcomes already produced by the copied
+`DepositAllTask.validContainer` predicate. It does not log each candidate.
+
+Behavior preserved by inspection:
+
+```text
+scanner invocation count and arguments
+scanner return value
+predicate evaluation order and short-circuit positions
+exception propagation
+Task selection, equality, replacement, completion, and ownership
+retry, timeout, cooldown, fallback, and cleanup
+Baritone goals, paths, process ownership, and cancellation
+input, screen, container click, cursor, slot, and transfer behavior
+```
+
+Build and runtime evidence:
+
+```text
+run id: 20260826-012347
+command: .\gradlew.bat clean build --rerun-tasks --no-build-cache --no-daemon --stacktrace --offline
+result: BUILD SUCCESSFUL in 2m 51s
+Gradle exit code: 0
+tasks: 171 actionable tasks, 171 executed
+1.20.1 compileJava, compileTestJava, test, remapJar, and build: executed successfully
+1.20.1 JAR: versions\1.20.1\build\libs\chatclef-1.20.1-0.18.23.jar
+JAR bytes: 6528692
+JAR SHA-256: 5BEB70FDD6D1BFD62D32BE968A00A440FE4A7C5EE12B64F1470493821954F55E
+non-fatal warning: IdeaWin64.dll native filesystem initialization was unavailable
+final outcome: BUILD_PASSED_RUNTIME_NOT_VERIFIED
+Minecraft reproduction not run
+```
+
+Rollback unit:
+
+```text
+remove only the begin/end diagnostic scope and local completion flag from
+DoToClosestBlockTask#getClosestTo(); remove the matching LAVI-owned collector
+entry points only if the deposit-all diagnostic slice is rolled back as a unit
+do not revert unrelated diagnostics or use broad Git restoration
+```
+
+No behavior-changing fix, build, deployment, reproduction, commit, or push is
+authorized by this record.
+
+### 2026-08-26 D7 incomplete-scan extension
+
+The same existing `finally` hunk now passes the already available `targetBlocks`
+array to the LAVI-owned observer. When the existing scanner call does not return
+normally, the observer emits one bounded `FILTERED_SCAN_DID_NOT_COMPLETE`
+diagnostic from evidence already collected before the failure.
+
+This extension does not add `catch`, suppress or convert the scanner exception,
+repeat the scanner call, invoke the predicate again, or change the scanner return
+value. The earlier `20260826-012347` evidence predates this extension.
+
+Subsequent separately authorized build and runtime evidence:
+
+```text
+run id: 20260826-023409
+command: .\gradlew.bat clean build --rerun-tasks --no-build-cache --no-daemon --stacktrace --offline
+result: BUILD SUCCESSFUL in 2m 7s
+Gradle exit code: 0
+tasks: 171 actionable tasks, 171 executed
+1.20.1 JAR bytes: 6558376
+1.20.1 source JAR SHA-256: 76876A5AC793BB3090F6AE8FA7CDCC6122FB447D751CB530B62541E0896DC72C
+deployed JAR count: 1
+deployed JAR SHA-256: 76876A5AC793BB3090F6AE8FA7CDCC6122FB447D751CB530B62541E0896DC72C
+Minecraft launch: 2026-08-26 02:38:27 +09:00
+loaded mod: altoclef 1.20.1-0.18.23
+relevant Mixin, injection, descriptor or linkage failure: none observed
+new crash report: none
+```
+
+The bounded observer produced an exact D7 result for
+`storeOperationId=store-deposit-479`: the raw candidate at `-645,51,147`
+was visited and rejected as `CHEST_ABOVE_BLOCKED_UNBREAKABLE`, while the
+filtered scan selected `-527,52,125`. D9 checkpoints correlated 232 raw
+50-block crossings with 232 parent branch changes and zero transfer decisions.
+These observations proved a parent/child candidate inconsistency without
+changing scanner, predicate, Task, input, path, interaction, or cleanup behavior.
+
+Current status:
+
+```text
+DIAGNOSTICS_BUILD_PASSED_DEPLOYED_HASH_MATCHED_RUNTIME_OBSERVED
+```
+
+No behavior-changing fix, additional build, commit, or push was performed by
+the documentation update that recorded this evidence.

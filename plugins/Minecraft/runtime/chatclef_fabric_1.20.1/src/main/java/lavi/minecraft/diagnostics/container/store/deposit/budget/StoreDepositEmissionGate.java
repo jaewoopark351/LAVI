@@ -1,11 +1,11 @@
 package lavi.minecraft.diagnostics.container.store.deposit.budget;
 
 public final class StoreDepositEmissionGate {
-    private final StoreDepositDetailBudget detailBudget = new StoreDepositDetailBudget();
+    private final StoreDepositOperationDetailBudget detailBudget = new StoreDepositOperationDetailBudget();
     private final StoreDepositCriticalBudget criticalBudget = new StoreDepositCriticalBudget();
 
-    public boolean shouldEmitDetail(String eventName, String semanticKey) {
-        return detailBudget.shouldEmit(eventName, semanticKey);
+    public boolean shouldEmitDetail(String operationId, String eventName, String semanticKey) {
+        return detailBudget.shouldEmit(operationId, eventName, semanticKey);
     }
 
     public boolean shouldEmitExceptionSignature(String signature) {
@@ -24,14 +24,12 @@ public final class StoreDepositEmissionGate {
         return criticalBudget.reserveTerminalGroup(operationId);
     }
 
-    public Object[] budgetSummaryFields() {
-        return new Object[]{
+    public Object[] budgetSummaryFields(String operationId) {
+        Object[] operationFields = detailBudget.summaryFields(operationId);
+        Object[] sessionFields = new Object[]{
                 "storeBudgetTotalSessionCap", StoreDepositBudgetConstants.TOTAL_SESSION_CAP,
                 "storeBudgetNoncriticalDetailCap", StoreDepositBudgetConstants.NONCRITICAL_DETAIL_CAP,
                 "storeBudgetCriticalReserveCap", StoreDepositBudgetConstants.CRITICAL_RESERVE_CAP,
-                "storeBudgetDetailEmittedCount", detailBudget.emittedCount(),
-                "storeBudgetDetailBucketSizes", detailBudget.bucketSizes(),
-                "storeBudgetDetailSuppressedCounts", detailBudget.suppressedCounts(),
                 "storeBudgetTerminalGroupCount", criticalBudget.terminalGroupCount(),
                 "storeBudgetTerminalGroupMax", StoreDepositBudgetConstants.MAX_TERMINAL_GROUPS,
                 "storeBudgetExceptionSignatureCount", criticalBudget.exceptionSignatureCount(),
@@ -42,5 +40,13 @@ public final class StoreDepositEmissionGate {
                 "storeBudgetControlEventMax", StoreDepositBudgetConstants.MAX_CONTROL_EVENTS,
                 "storeBudgetTerminalReserveExhaustedOperations", criticalBudget.exhaustedTerminalOperationCount()
         };
+        Object[] merged = new Object[operationFields.length + sessionFields.length];
+        System.arraycopy(operationFields, 0, merged, 0, operationFields.length);
+        System.arraycopy(sessionFields, 0, merged, operationFields.length, sessionFields.length);
+        return merged;
+    }
+
+    public void purgeOperation(String operationId) {
+        detailBudget.purge(operationId);
     }
 }

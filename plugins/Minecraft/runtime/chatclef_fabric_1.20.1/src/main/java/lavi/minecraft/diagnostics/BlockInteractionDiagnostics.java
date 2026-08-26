@@ -2,6 +2,7 @@ package lavi.minecraft.diagnostics;
 
 import adris.altoclef.tasksystem.Task;
 import lavi.minecraft.diagnostics.command.DiagnosticCommandContextRegistry;
+import lavi.minecraft.diagnostics.container.store.deposit.StoreDepositDiagnostics;
 import lavi.minecraft.diagnostics.interaction.BlockInteractionContext;
 import lavi.minecraft.diagnostics.interaction.BlockInteractionDiagnosticFields;
 import lavi.minecraft.diagnostics.interaction.BlockInteractionEmissionDecision;
@@ -127,7 +128,8 @@ final class BlockInteractionDiagnostics {
                 + context.targetKind() + "|"
                 + context.targetBlockId() + "|"
                 + blockPos(context.targetPosition()) + "|"
-                + String.valueOf(result);
+                + String.valueOf(result) + "|"
+                + StoreDepositDiagnostics.interactionScopeKey(context);
         BlockInteractionEmissionDecision decision = emissionLimiter.evaluate(repeatKey, currentClientTickId.getAsLong());
         if (decision.emitCap()) {
             emitBoundary("DIAGNOSTIC_SESSION_CAP_REACHED", "block_interaction_diagnostic_cap_reached", null,
@@ -143,10 +145,16 @@ final class BlockInteractionDiagnostics {
         if (!decision.emitEvent()) {
             return;
         }
+        if (!StoreDepositDiagnostics.shouldEmitInteractionDetail(context, eventName, repeatKey)) {
+            return;
+        }
 
         emitBoundary(eventName, reason, null,
                 DiagnosticEventEmitter.mergeFields(
-                        BlockInteractionDiagnosticFields.interactionFields(context, phase, result, screenAfter, decision.suppressedRepeatCount()),
+                        DiagnosticEventEmitter.mergeFields(
+                                BlockInteractionDiagnosticFields.interactionFields(context, phase, result, screenAfter, decision.suppressedRepeatCount()),
+                                StoreDepositDiagnostics.interactionFields(context)
+                        ),
                         commandContextRegistry.fields()
                 ));
     }

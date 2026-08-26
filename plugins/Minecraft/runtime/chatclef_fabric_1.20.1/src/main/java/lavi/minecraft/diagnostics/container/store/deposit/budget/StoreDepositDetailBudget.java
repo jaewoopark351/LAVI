@@ -6,36 +6,35 @@ import java.util.Map;
 import java.util.Set;
 
 final class StoreDepositDetailBudget {
-    private final Map<String, Set<String>> emittedKeysByEvent = new LinkedHashMap<>();
+    private final Map<StoreDepositDetailFamily, Set<String>> emittedKeysByFamily = new LinkedHashMap<>();
+    private final Map<String, Integer> emittedByEvent = new LinkedHashMap<>();
     private final Map<String, Integer> suppressedByEvent = new LinkedHashMap<>();
+    private final Map<StoreDepositDetailFamily, Integer> suppressedByFamily = new LinkedHashMap<>();
     private int emittedCount;
 
     synchronized boolean shouldEmit(String eventName, String semanticKey) {
         String normalizedEvent = normalize(eventName);
         String normalizedKey = normalize(semanticKey);
-        Set<String> emitted = emittedKeysByEvent.get(normalizedEvent);
-        if (emitted != null && emitted.contains(normalizedKey)) {
+        String familyKey = normalizedEvent + "|" + normalizedKey;
+        StoreDepositDetailFamily family = StoreDepositDetailFamily.forEvent(normalizedEvent);
+        Set<String> emitted = emittedKeysByFamily.computeIfAbsent(family, ignored -> new HashSet<>());
+        if (emitted.contains(familyKey)) {
+            incrementSuppressed(normalizedEvent, family);
             return false;
         }
-        if (emittedCount >= StoreDepositBudgetConstants.NONCRITICAL_DETAIL_CAP) {
-            incrementSuppressed(normalizedEvent);
+        if (emittedCount >= StoreDepositBudgetConstants.OPERATION_DETAIL_CAP || emitted.size() >= family.cap()) {
+            incrementSuppressed(normalizedEvent, family);
             return false;
         }
-        if (emitted == null) {
-            if (emittedKeysByEvent.size() >= StoreDepositBudgetConstants.MAX_DETAIL_KEYS_PER_EVENT) {
-                incrementSuppressed(normalizedEvent);
-                return false;
-            }
-            emitted = new HashSet<>();
-            emittedKeysByEvent.put(normalizedEvent, emitted);
-        }
-        if (emitted.size() >= StoreDepositBudgetConstants.MAX_DETAIL_KEYS_PER_EVENT) {
-            incrementSuppressed(normalizedEvent);
-            return false;
-        }
-        emitted.add(normalizedKey);
+        emitted.add(familyKey);
         emittedCount++;
+        emittedByEvent.put(normalizedEvent, emittedByEvent.getOrDefault(normalizedEvent, 0) + 1);
         return true;
+    }
+
+    synchronized void recordSuppressed(String eventName) {
+        String normalizedEvent = normalize(eventName);
+        incrementSuppressed(normalizedEvent, StoreDepositDetailFamily.forEvent(normalizedEvent));
     }
 
     synchronized int emittedCount() {
@@ -46,14 +45,25 @@ final class StoreDepositDetailBudget {
         return suppressedByEvent.toString();
     }
 
-    synchronized String bucketSizes() {
+    synchronized String suppressedFamilyCounts() {
+        Map<String, Integer> counts = new LinkedHashMap<>();
+        suppressedByFamily.forEach((family, count) -> counts.put(family.name(), count));
+        return counts.toString();
+    }
+
+    synchronized String familySizes() {
         Map<String, Integer> sizes = new LinkedHashMap<>();
-        emittedKeysByEvent.forEach((event, keys) -> sizes.put(event, keys.size()));
+        emittedKeysByFamily.forEach((family, keys) -> sizes.put(family.name(), keys.size()));
         return sizes.toString();
     }
 
-    private void incrementSuppressed(String eventName) {
+    synchronized String eventSizes() {
+        return emittedByEvent.toString();
+    }
+
+    private void incrementSuppressed(String eventName, StoreDepositDetailFamily family) {
         suppressedByEvent.put(eventName, suppressedByEvent.getOrDefault(eventName, 0) + 1);
+        suppressedByFamily.put(family, suppressedByFamily.getOrDefault(family, 0) + 1);
     }
 
     static String normalize(String value) {

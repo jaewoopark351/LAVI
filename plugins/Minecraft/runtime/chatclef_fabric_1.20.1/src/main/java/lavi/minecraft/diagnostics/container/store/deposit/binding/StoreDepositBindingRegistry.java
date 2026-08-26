@@ -64,6 +64,10 @@ public final class StoreDepositBindingRegistry {
         return binding == null ? null : operations.get(binding.operationId());
     }
 
+    public synchronized StoreDepositOperationState stateForOperation(String operationId) {
+        return operationId == null ? null : operations.get(operationId);
+    }
+
     public synchronized StoreDepositOperationState lastActiveState() {
         return operations.get(lastActiveOperationId);
     }

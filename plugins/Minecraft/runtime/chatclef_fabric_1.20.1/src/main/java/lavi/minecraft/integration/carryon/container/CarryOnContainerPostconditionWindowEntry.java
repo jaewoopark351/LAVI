@@ -10,8 +10,8 @@ final class CarryOnContainerPostconditionWindowEntry {
     private final Object interactResult;
     private final long returnClientTickId;
     private final CarryOnContainerPostconditionSnapshot returnSnapshot;
+    private CarryOnContainerPostconditionSnapshot previousObservedSnapshot;
     private int nextOffsetIndex;
-    private boolean stateChangeLogged;
 
     CarryOnContainerPostconditionWindowEntry(BlockInteractionContext context,
                                              CarryOnObservation stateBefore,
@@ -23,6 +23,7 @@ final class CarryOnContainerPostconditionWindowEntry {
         this.interactResult = interactResult;
         this.returnClientTickId = returnClientTickId;
         this.returnSnapshot = returnSnapshot;
+        this.previousObservedSnapshot = returnSnapshot;
     }
 
     BlockInteractionContext context() {
@@ -53,11 +54,11 @@ final class CarryOnContainerPostconditionWindowEntry {
         nextOffsetIndex++;
     }
 
-    boolean stateChangeLogged() {
-        return stateChangeLogged;
-    }
-
-    void markStateChangeLogged() {
-        stateChangeLogged = true;
+    boolean recordObservation(CarryOnContainerPostconditionSnapshot observed) {
+        boolean changed = previousObservedSnapshot != null
+                && observed != null
+                && !previousObservedSnapshot.fingerprint().equals(observed.fingerprint());
+        previousObservedSnapshot = observed;
+        return changed;
     }
 }

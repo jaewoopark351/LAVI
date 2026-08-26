@@ -3,6 +3,7 @@ package lavi.minecraft.integration.carryon.container;
 import adris.altoclef.AltoClef;
 import baritone.api.utils.input.Input;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.diagnostics.container.store.deposit.StoreDepositDiagnostics;
 import lavi.minecraft.diagnostics.interaction.BlockInteractionContext;
 import lavi.minecraft.diagnostics.interaction.BlockInteractionScreenSnapshot;
 import lavi.minecraft.integration.carryon.CarryOnObservation;
@@ -111,6 +112,17 @@ final class CarryOnContainerInteractionLogger {
                 context,
                 observedSnapshot == null ? null : observedSnapshot.carryObservation()
         );
+        String semanticKey = StoreDepositDiagnostics.interactionScopeKey(context)
+                + "|" + windowEvent
+                + "|" + (observedSnapshot == null ? "unavailable" : observedSnapshot.observationOffsetTicks())
+                + "|" + outcome;
+        if (!StoreDepositDiagnostics.shouldEmitInteractionDetail(
+                context,
+                "CONTAINER_OPEN_INTERACTION_OUTCOME_WINDOW",
+                semanticKey
+        )) {
+            return;
+        }
         ChatClefDiagnostics.logBoundary(
                 "CONTAINER_OPEN_INTERACTION_OUTCOME_WINDOW",
                 "carry_on_container_open_interaction_outcome_window",
@@ -120,6 +132,18 @@ final class CarryOnContainerInteractionLogger {
                         runtimeFields(),
                         postconditionSnapshotFields("return", returnSnapshot, context),
                         postconditionSnapshotFields("observed", observedSnapshot, context),
+                        "screenHandlerAtReturn", returnSnapshot == null || returnSnapshot.screenSnapshot() == null
+                                ? "unavailable"
+                                : returnSnapshot.screenSnapshot().screenHandlerName(),
+                        "screenHandlerSyncIdAtReturn", returnSnapshot == null || returnSnapshot.screenSnapshot() == null
+                                ? "unavailable"
+                                : returnSnapshot.screenSnapshot().screenHandlerSyncId(),
+                        "screenHandlerAtObservation", observedSnapshot == null || observedSnapshot.screenSnapshot() == null
+                                ? "unavailable"
+                                : observedSnapshot.screenSnapshot().screenHandlerName(),
+                        "screenHandlerSyncIdAtObservation", observedSnapshot == null || observedSnapshot.screenSnapshot() == null
+                                ? "unavailable"
+                                : observedSnapshot.screenSnapshot().screenHandlerSyncId(),
                         "windowEvent", windowEvent,
                         "observationOffsetTicks", observedSnapshot == null ? "unavailable" : observedSnapshot.observationOffsetTicks(),
                         "expectedScreenHandler", CarryOnContainerExpectedGui.expectedScreenHandler(context),
@@ -184,23 +208,26 @@ final class CarryOnContainerInteractionLogger {
     }
 
     private Object[] contextFields(BlockInteractionContext context) {
-        return new Object[]{
-                "interactionId", context == null ? "unavailable" : context.interactionId(),
-                "postPlaceOperationId", postPlaceOperationId(context),
-                "interactionStartClientTick", context == null ? "unavailable" : context.startClientTickId(),
-                "matchedHead", context != null && context.matchedHead(),
-                "targetKind", context == null ? "unavailable" : context.targetKind(),
-                "targetBlockId", context == null ? "unavailable" : context.targetBlockId(),
-                "targetBlockDescription", context == null ? "unavailable" : context.targetBlockDescription(),
-                "targetBlockState", context == null ? "unavailable" : context.targetBlockState(),
-                "targetPosition", context == null ? "unavailable" : ChatClefDiagnostics.blockPos(context.targetPosition()),
-                "hand", context == null ? "unavailable" : context.hand(),
-                "hitSide", context == null ? "unavailable" : context.hitSide(),
-                "hitType", context == null ? "unavailable" : context.hitType(),
-                "screenNameBefore", screenBefore(context).screenName(),
-                "screenHandlerBefore", screenBefore(context).screenHandlerName(),
-                "screenHandlerSyncIdBefore", screenBefore(context).screenHandlerSyncId()
-        };
+        return fields(
+                new Object[]{
+                        "interactionId", context == null ? "unavailable" : context.interactionId(),
+                        "postPlaceOperationId", postPlaceOperationId(context),
+                        "interactionStartClientTick", context == null ? "unavailable" : context.startClientTickId(),
+                        "matchedHead", context != null && context.matchedHead(),
+                        "targetKind", context == null ? "unavailable" : context.targetKind(),
+                        "targetBlockId", context == null ? "unavailable" : context.targetBlockId(),
+                        "targetBlockDescription", context == null ? "unavailable" : context.targetBlockDescription(),
+                        "targetBlockState", context == null ? "unavailable" : context.targetBlockState(),
+                        "targetPosition", context == null ? "unavailable" : ChatClefDiagnostics.blockPos(context.targetPosition()),
+                        "hand", context == null ? "unavailable" : context.hand(),
+                        "hitSide", context == null ? "unavailable" : context.hitSide(),
+                        "hitType", context == null ? "unavailable" : context.hitType(),
+                        "screenNameBefore", screenBefore(context).screenName(),
+                        "screenHandlerBefore", screenBefore(context).screenHandlerName(),
+                        "screenHandlerSyncIdBefore", screenBefore(context).screenHandlerSyncId()
+                },
+                StoreDepositDiagnostics.interactionFields(context)
+        );
     }
 
     private Object[] postconditionSnapshotFields(String prefix,
