@@ -6,15 +6,12 @@ import adris.altoclef.tasks.container.DepositAllTask;
 import adris.altoclef.tasks.container.StoreInContainerTask;
 import adris.altoclef.util.ItemTarget;
 import adris.altoclef.util.helpers.ItemHelper;
-import adris.altoclef.util.helpers.StorageHelper;
-import adris.altoclef.util.slots.PlayerSlot;
 import lavi.minecraft.diagnostics.command.deposit.DepositCommandDiagnostics;
 import lavi.minecraft.diagnostics.command.deposit.DepositCommandVariant;
+import lavi.minecraft.task.container.deposit.DepositAllInventoryTargetSelector;
 import net.minecraft.block.Block;
 import net.minecraft.block.Blocks;
-import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
-import net.minecraft.item.ToolItem;
 import net.minecraft.util.math.BlockPos;
 
 import java.util.Arrays;
@@ -23,8 +20,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
 
-import org.apache.commons.lang3.ArrayUtils;
-
 //20260826_kpopmodder: Added an independent deposit_all command as a behavior-preserving copy of DepositCommand.
 public class DepositAllCommand extends Command {
 
@@ -32,24 +27,14 @@ public class DepositAllCommand extends Command {
     private static final int NEARBY_RANGE = 20;
 
     private static final Block[] VALID_CONTAINERS = Stream.concat(Arrays.stream(new Block[]{Blocks.CHEST, Blocks.TRAPPED_CHEST, Blocks.BARREL}), Arrays.stream(ItemHelper.itemsToBlocks(ItemHelper.SHULKER_BOXES))).toArray(Block[]::new);
+    private static final DepositAllInventoryTargetSelector INVENTORY_TARGET_SELECTOR = new DepositAllInventoryTargetSelector();
 
     public DepositAllCommand() throws CommandException {
         super("deposit_all", "Deposit our items to a nearby chest, making a chest if one doesn't exist. Pass no arguments to depisot ALL items. Examples: `deposit_all` deposits ALL items, `deposit_all diamond 2` deposits 2 diamonds.", new Arg(ItemList.class, "items (empty for ALL non gear items)", null, 0, false));
     }
 
     public static ItemTarget[] getAllNonEquippedOrToolItemsAsTarget(AltoClef mod) {
-        return StorageHelper.getAllInventoryItemsAsTargets(slot -> {
-            // Ignore armor
-            if (ArrayUtils.contains(PlayerSlot.ARMOR_SLOTS, slot))
-                return false;
-            ItemStack stack = StorageHelper.getItemStackInSlot(slot);
-            // Ignore tools
-            if (!stack.isEmpty()) {
-                Item item = stack.getItem();
-                return !(item instanceof ToolItem);
-            }
-            return false;
-        });
+        return INVENTORY_TARGET_SELECTOR.select(mod);
     }
 
     @Override

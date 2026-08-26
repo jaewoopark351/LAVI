@@ -23,6 +23,7 @@
       "lavi.minecraft.integration.toolselect.ToolSavePolicyEntrypoint",
       "lavi.minecraft.integration.carryon.CarryOnDiagnosticEntrypoint",
       "lavi.minecraft.overlay.OverlayEntrypoint",
+      "lavi.minecraft.task.container.deposit.auto.DepositAllAutoEntrypoint",
       "lavi.minecraft.fabric.chatclef.bridge.FabricChatClefBridgeEntrypoint"
     ]
   },

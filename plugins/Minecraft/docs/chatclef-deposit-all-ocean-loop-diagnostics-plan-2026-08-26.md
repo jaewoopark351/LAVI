@@ -3,10 +3,11 @@
 <!-- 20260826_kpopmodder: Closed the diagnostic phase with D7-D9 runtime evidence and the candidate-consistency direction. -->
 <!-- 20260826_kpopmodder: Recorded the implemented B0.1 candidate-consistency source boundary. -->
 <!-- 20260826_kpopmodder: Recorded post-commit runtime evidence and the same-target child lifecycle review failure. -->
+<!-- 20260826_kpopmodder: Recorded lifecycle closure and the focused automatic deposit_all implementation. -->
 
 # ChatClef @deposit_all Ocean Loop Diagnostics Plan
 
-문서 상태: `B0_1_RUNTIME_OBSERVED_SAME_TARGET_CHILD_LIFECYCLE_FIX_REQUIRED_RELEASE_BLOCKED`
+문서 상태: `B0_1_LIFECYCLE_RUNTIME_OBSERVED_AUTO_TRIGGER_SOURCE_IMPLEMENTED_BUILD_PENDING`
 
 작성 기준일: 2026-08-26
 
@@ -2193,12 +2194,103 @@ focused test와 clean forced build 뒤에는 Minecraft에서 다중 아이템 fi
 ### 26.6 자동 실행과 문서 범위 gate
 
 인벤토리 4/5 조건에서 자동으로 같은 `DepositAllTask`를 실행하는 chain은 이 lifecycle
-수정과 검증이 끝날 때까지 구현하지 않는다. 불안정한 child generation을 자동 trigger에
-연결하면 수동 실행의 재상호작용을 반복 호출 정책까지 확대할 수 있다.
+수정과 검증이 끝날 때까지 구현하지 않는 것이 기존 gate였다. 이 gate는 후속 focused
+commit과 Minecraft runtime 증거로 해제됐다.
+
+```text
+lifecycle fix commit:                  673d21de Fix deposit_all store task generation stability
+clean forced build:                    PASS, 96 tests, zero failures/errors/skips
+build log:                             .codex-build/logs/admin-build-1.20.1-20260826-153221.log
+1.20.1 JAR SHA-256:                    7327DCB083462C6EA759C2A6D224A1C13B62E02D58D0D88E4E553EC7C9E3A92C
+Minecraft operation:                  store-deposit-39819
+Minecraft terminal:                   NATURAL_FINISH, 53471 ms
+same-target generation reuse:         observed
+storeGenerationCreated=false:         120 observations
+storeGenerationCreated=true:          3 observations across target epochs
+old OPEN_EXISTING/OBTAIN oscillation:  not observed
+durable storage effect oracle:        still not verified; effectVerified=false
+```
+
+자동 실행은 다음 LAVI-owned 경계로 구현한다.
+
+```text
+lavi/minecraft/task/container/deposit/
+    DepositAllInventoryTargetSelector
+        -> bare @deposit_all과 자동 실행이 같은 아이템 선택 정책을 사용
+
+lavi/minecraft/task/container/deposit/auto/
+    DepositAllInventoryPressureSnapshot
+        -> 메인 인벤토리 36칸의 occupied slot snapshot과 4/5 판정
+    DepositAllInventoryPressureReader
+        -> client thread에서 occupied slot 수 관찰
+    DepositAllInventoryPressureStateMachine
+        -> ARMED -> RUNNING -> WAIT_FOR_REARM 전이
+    DepositAllAutoConflictGuard
+        -> 기존 수동 deposit route가 있을 때 중복 자동 Task 생성 차단
+    DepositAllInventoryPressureChain
+        -> 한 번의 DepositAllTask root 생성과 terminal/interruption 소유
+    DepositAllAutoEntrypoint
+        -> chain을 정확히 한 번 등록하고 runner 밖에서 4/5 경계를 관찰
+    DepositAllAutoDiagnostics
+        -> 등록, trigger, 상태 전이만 bounded logging
+```
+
+정확한 trigger 경계는 occupied main-inventory slot `29 / 36`이다. 계산은 부동소수점
+비교가 아니라 `occupied * 5 >= total * 4`로 수행한다.
+
+```text
+below 4/5
+    -> ARMED
+
+ARMED + first observation at or above 4/5
+    -> existing manual deposit route 확인
+    -> bare deposit_all과 동일한 depositable target 계산
+    -> target이 있으면 같은 DepositAllTask를 직접 한 번 생성
+    -> RUNNING
+
+RUNNING
+    -> 같은 root Task instance 유지
+    -> command string 실행 없음
+    -> 중복 Task 생성 없음
+
+task terminal 또는 chain interruption
+    -> WAIT_FOR_REARM
+
+WAIT_FOR_REARM + still at or above 4/5
+    -> 아무 작업도 생성하지 않음
+
+WAIT_FOR_REARM + below 4/5
+    -> ARMED
+```
+
+chain priority는 `51`이다. 기존 `UserTaskChain` priority `50`의 작업은 자동 저장 동안
+일시 중단됐다가 기존 scheduler lifecycle로 재개되고, food/unstuck/player-defense 등
+`55+` safety chain은 자동 저장을 선점한다. safety chain이 선점하면 자동 저장은 자기
+root만 중단하고 `WAIT_FOR_REARM`으로 이동한다. TaskRunner, Baritone, 전역 input, goal,
+path를 직접 중단하거나 정리하지 않는다.
+
+4/5 관찰은 Fabric end-client-tick에서 수행하므로 평상시 TaskRunner가 꺼져 있어도
+threshold crossing을 놓치지 않는다. ChatClef가 켜져 있고 자동 Task를 시작해야 할 때
+runner가 꺼져 있으면 기존 `TaskRunner.enable()` 경계로 한 번 활성화한다. 자동 chain은
+완료나 중단 시 TaskRunner, Baritone, 전역 input, goal 또는 path를 직접 중단하거나
+정리하지 않는다. ChatClef가 꺼져 있으면 새 자동 Task를 시작하지 않으며, 월드 이탈은
+현재 자동 root만 종료하고 `WAIT_FOR_REARM`으로 이동한다.
+
+현재 source 상태:
+
+```text
+automatic chain source:               implemented in current worktree
+focused state-machine tests:           added, not run in this change
+automatic diagnostic-source test:      added, not run in this change
+clean forced build for auto change:    NOT RUN; separate authorization required
+JAR deployment for auto change:        NOT RUN
+Minecraft 4/5 trigger reproduction:    NOT RUN
+```
 
 `9785e17b`는 원래 후보 불일치를 제거하고 runtime 증거를 만든 중간 checkpoint로
-보존한다. force rewrite나 broad revert를 하지 않고, lifecycle 수정과 orchestration
-test만 focused follow-up commit으로 추가한다.
+보존한다. lifecycle 수정은 focused follow-up `673d21de`로 닫혔고, 자동 실행 source와
+focused test는 현재 별도 worktree 변경으로 유지한다. force rewrite나 broad revert는
+하지 않는다.
 
 이 커밋은 behavior, diagnostics, tests, docs를 54개 파일에 함께 담아 Git commit 자체는
 atomic rollback 단위가 아니다. 기존 `DoToClosestBlockTask` diagnostics hunk의 논리적
