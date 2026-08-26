@@ -1116,3 +1116,25 @@ DIAGNOSTICS_BUILD_PASSED_DEPLOYED_HASH_MATCHED_RUNTIME_OBSERVED
 
 No behavior-changing fix, additional build, commit, or push was performed by
 the documentation update that recorded this evidence.
+
+### 2026-08-26 commit packaging clarification
+
+The preceding no-commit statement describes the state at the time that specific
+documentation update was made. The diagnostics hunk was later included in:
+
+```text
+9785e17b feat(minecraft): add stable deposit_all container targeting
+54 files changed, +6878 / -198
+remote state at clarification: HEAD == origin/minecraft-plugin-fix/alto-clef-infinite-loop
+```
+
+That commit also contains behavior, LAVI-owned diagnostics, tests, and documents,
+so the Git commit is not the atomic rollback unit for this upstream divergence.
+The hunk-level `Rollback unit` procedure above remains authoritative: remove
+only the bounded `DoToClosestBlockTask#getClosestTo()` observer scope and
+its matching LAVI-owned entry points when that diagnostic slice is intentionally
+retired. Do not use a broad commit revert to remove this one upstream hunk.
+
+This clarification changes provenance only. It does not reclassify the hunk as
+behavior-changing and does not authorize source edits, build, deployment,
+runtime reproduction, commit, or push.

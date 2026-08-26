@@ -1,6 +1,8 @@
+<!-- 20260826_kpopmodder: Pointed the historical B0 baseline to the canonical B0.1 runtime and lifecycle status. -->
+
 # ChatClef @deposit_all B0 복붙 패리티 계획
 
-문서 상태: B0_CLEAN_BUILD_PASSED_RUNTIME_NOT_VERIFIED
+문서 상태: B0_BASELINE_RECORDED_B0_1_STATUS_MOVED_TO_CANONICAL_RUNTIME_RECORD
 
 작성 기준일: 2026-08-26
 
@@ -16,6 +18,13 @@ c865cb3a39b70a451915140804b15e2f9439ef3d
 2026-08-26 사용자 결정으로 DepositAllTask의 복제 원본은
 StoreInAnyContainerTask 전체로 확정되었다. 같은 날 B0 Java 복제와 명령
 등록만 승인되었으며, 빌드와 Minecraft 실행은 승인되지 않았다.
+
+현재 상태 안내: 이 문서는 `c865cb3a` 시점의 B0 전체 복제 패리티 기준을 보존하는
+historical record다. 이후 B0.1 구현, clean build, 배포, Minecraft runtime,
+`9785e17b` 커밋과 푸시, 그리고 same-target child lifecycle `FAIL` 판정은
+`chatclef-deposit-all-ocean-loop-diagnostics-plan-2026-08-26.md` 26절에서만 관리한다.
+현재 B0.1은 후보 좌표 일관성은 통과했지만 active child 안정성 수정 전까지 release와
+자동 `@deposit_all` trigger가 차단된 상태다. 같은 상태를 이 문서에 중복 갱신하지 않는다.
 
 ## 1. 목표
 
@@ -450,7 +459,8 @@ logs/build/chatclef-fabric-clean-build-20260826-001928.log
 logs/build/chatclef-fabric-clean-build-20260826-001928.result.json
 ~~~
 
-이 결과는 clean forced build와 JAR 패키징 성공만 증명한다. CurseForge
+이 B0 clean run 결과는 build와 JAR 패키징 성공만 증명했다. 당시에는 CurseForge
 인스턴스 배포, Minecraft 실행, 런타임 Mixin 확인, @deposit 회귀 확인,
-@deposit_all 런타임 패리티 확인은 수행하지 않았다. 따라서 현재 판정은
-`BUILD_PASSED_RUNTIME_NOT_VERIFIED`다.
+@deposit_all 런타임 패리티 확인을 수행하지 않았으므로 해당 시점의 판정은
+`BUILD_PASSED_RUNTIME_NOT_VERIFIED`였다. 이후 상태는 문서 상단에서 연결한 canonical
+runtime record를 따른다.

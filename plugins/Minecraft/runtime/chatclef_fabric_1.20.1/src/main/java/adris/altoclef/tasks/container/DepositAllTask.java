@@ -12,12 +12,14 @@ import lavi.minecraft.diagnostics.container.store.StoreInAnyContainerDiagnostics
 import lavi.minecraft.diagnostics.container.store.deposit.StoreDepositDiagnostics;
 import lavi.minecraft.task.container.deposit.DepositAllContainerEligibility;
 import lavi.minecraft.task.container.deposit.DepositAllContainerSelector;
+import lavi.minecraft.task.container.deposit.DepositAllStoreTaskGeneration;
 import lavi.minecraft.task.container.deposit.DepositAllContainerTargetState;
 import net.minecraft.block.Block;
 import net.minecraft.item.Items;
 import net.minecraft.util.math.BlockPos;
 
 import java.util.Arrays;
+import java.util.Objects;
 import java.util.Optional;
 
 //20260826_kpopmodder: Added an independent deposit_all task as a behavior-preserving copy of StoreInAnyContainerTask.
@@ -34,12 +36,20 @@ public class DepositAllTask extends Task {
     private final DepositAllContainerEligibility _containerEligibility = new DepositAllContainerEligibility();
     private final DepositAllContainerSelector _containerSelector = new DepositAllContainerSelector();
     private final DepositAllContainerTargetState _targetState = new DepositAllContainerTargetState();
+    private final DepositAllStoreTaskGeneration _storeTaskGeneration;
     private final MovementProgressChecker _progressChecker = new MovementProgressChecker();
     private final ContainerStoredTracker _storedItems = new ContainerStoredTracker(slot -> true);
 
     public DepositAllTask(boolean getIfNotPresent, ItemTarget... toStore) {
+        this(getIfNotPresent, new DepositAllStoreTaskGeneration(), toStore);
+    }
+
+    DepositAllTask(boolean getIfNotPresent,
+                   DepositAllStoreTaskGeneration storeTaskGeneration,
+                   ItemTarget... toStore) {
         _getIfNotPresent = getIfNotPresent;
         _toStore = toStore;
+        _storeTaskGeneration = Objects.requireNonNull(storeTaskGeneration, "storeTaskGeneration");
     }
 
     @Override
@@ -49,6 +59,7 @@ public class DepositAllTask extends Task {
         _storedItems.startTracking();
         _containerEligibility.reset();
         _targetState.clear();
+        _storeTaskGeneration.clear();
         _progressChecker.reset();
     }
 
@@ -128,6 +139,7 @@ public class DepositAllTask extends Task {
 
             if (!"NONE".equals(targetInvalidationReason)) {
                 _targetState.clear();
+                _storeTaskGeneration.clear();
                 _progressChecker.reset();
             }
         }
@@ -184,6 +196,13 @@ public class DepositAllTask extends Task {
                 TOO_FAR_RANGE_EXTRA);
         if (selectedTarget.isPresent()) {
             BlockPos fixedTarget = selectedTarget.get();
+            boolean refreshedFinishedGeneration = _storeTaskGeneration.clearIfFinishedWithRemainingWork(
+                    fixedTarget,
+                    notStored
+            );
+            int storeGenerationBefore = _storeTaskGeneration.generationId();
+            Task storeTask = storeTaskForSelectedTarget(fixedTarget, notStored);
+            boolean createdStoreGeneration = _storeTaskGeneration.generationId() != storeGenerationBefore;
             String candidateDecisionOutcome = selectedNewTarget
                     ? "FILTERED_TARGET_WITHIN_50"
                     : "SELECTED_TARGET_WITHIN_70";
@@ -210,7 +229,10 @@ public class DepositAllTask extends Task {
                     "targetInvalidationReason", targetInvalidationReason,
                     "progressCheckEvaluated", progressCheckEvaluated,
                     "progressCheckOk", progressCheckOk,
-                    "progressFailureWillRequestUnreachable", progressCheckEvaluated && !progressCheckOk);
+                    "progressFailureWillRequestUnreachable", progressCheckEvaluated && !progressCheckOk,
+                    "storeGenerationId", _storeTaskGeneration.generationId(),
+                    "storeGenerationCreated", createdStoreGeneration,
+                    "storeGenerationRefreshReason", refreshedFinishedGeneration ? "CHILD_FINISHED_REMAINING_WORK" : "NONE");
             if (filteredSearchPerformed) {
                 StoreDepositDiagnostics.logFilteredSearchResult(
                         this,
@@ -244,11 +266,15 @@ public class DepositAllTask extends Task {
                     "targetInvalidationReason", targetInvalidationReason,
                     "progressCheckEvaluated", progressCheckEvaluated,
                     "progressCheckOk", progressCheckOk,
-                    "childTaskClass", StoreInContainerTask.class.getName());
-            return new StoreInContainerTask(fixedTarget, _getIfNotPresent, notStored);
+                    "childTaskClass", StoreInContainerTask.class.getName(),
+                    "storeGenerationId", _storeTaskGeneration.generationId(),
+                    "storeGenerationCreated", createdStoreGeneration,
+                    "storeGenerationRefreshReason", refreshedFinishedGeneration ? "CHILD_FINISHED_REMAINING_WORK" : "NONE");
+            return storeTask;
         }
 
         _progressChecker.reset();
+        _storeTaskGeneration.clear();
         String fallbackDecisionOutcome = filteredCandidate.isEmpty()
                 ? "NO_FILTERED_TARGET"
                 : "FILTERED_TARGET_OUTSIDE_50";
@@ -375,6 +401,7 @@ public class DepositAllTask extends Task {
         StoreInAnyContainerDiagnostics.logStop(this, interruptTask, _getIfNotPresent, _toStore);
         _storedItems.stopTracking();
         _targetState.clear();
+        _storeTaskGeneration.clear();
         _containerEligibility.reset();
         _progressChecker.reset();
     }
@@ -385,6 +412,10 @@ public class DepositAllTask extends Task {
             return task._getIfNotPresent == _getIfNotPresent && Arrays.equals(task._toStore, _toStore);
         }
         return false;
+    }
+
+    Task storeTaskForSelectedTarget(BlockPos fixedTarget, ItemTarget[] notStored) {
+        return _storeTaskGeneration.getOrCreate(fixedTarget, _getIfNotPresent, notStored);
     }
 
     @Override

@@ -2,10 +2,11 @@
 <!-- 20260826_kpopmodder: Recorded D0-D4 runtime evidence and the next bounded diagnostics-only slices. -->
 <!-- 20260826_kpopmodder: Closed the diagnostic phase with D7-D9 runtime evidence and the candidate-consistency direction. -->
 <!-- 20260826_kpopmodder: Recorded the implemented B0.1 candidate-consistency source boundary. -->
+<!-- 20260826_kpopmodder: Recorded post-commit runtime evidence and the same-target child lifecycle review failure. -->
 
 # ChatClef @deposit_all Ocean Loop Diagnostics Plan
 
-문서 상태: `ROOT_CAUSE_PROVEN_CANDIDATE_CONSISTENCY_FIX_IMPLEMENTED_BUILD_PASSED_RUNTIME_NOT_VERIFIED`
+문서 상태: `B0_1_RUNTIME_OBSERVED_SAME_TARGET_CHILD_LIFECYCLE_FIX_REQUIRED_RELEASE_BLOCKED`
 
 작성 기준일: 2026-08-26
 
@@ -18,8 +19,10 @@ D7-D9 runtime 증거로 확정한 root cause와 최소 동작 수정 방향을 �
 diagnostics-only 구현, clean forced build, 활성 인스턴스 JAR SHA-256 확인과 Minecraft
 runtime 로그 확인이 수행됐다. 이번 갱신에는 사용자가 승인한 B0.1 동작 소스와 focused
 test source 구현 결과를 포함한다. 이후 별도 사용자 승인으로 clean forced build와
-focused test를 완료했다. CurseForge 재배포, Minecraft 재현, 커밋 및 푸시는 수행하지
-않았다.
+focused test, CurseForge 배포, Minecraft 재현, 커밋 및 푸시를 완료했다. 현재 문서는
+그 runtime 결과와 후속 lifecycle 재검수의 `FAIL` 판정을 함께 기록한다. 이번 문서
+갱신은 Java 수정, 추가 빌드, 재배포, Minecraft 실행, 커밋 또는 푸시를 수행하거나
+승인하지 않는다.
 
 ## 1. 관련 기준 문서
 
@@ -1950,18 +1953,26 @@ root cause:                           proven
 additional pre-fix logging:           not required
 B0.1 direction:                       implemented
 B0.1 behavior source:                 implemented
-B0.1 focused test source:             implemented and passed across 11 versions
+B0.1 helper test source:              implemented and passed across 11 versions
+B0.1 orchestration test coverage:     missing
 B0.1 clean forced build:              passed, run 20260826-132308
 B0.1 Gradle command:                  clean build --rerun-tasks --no-build-cache --no-daemon --stacktrace --offline
 B0.1 Gradle result:                   BUILD SUCCESSFUL in 2m 27s, 171 tasks executed
 B0.1 1.20.1 JAR bytes:               6569479
 B0.1 1.20.1 JAR SHA-256:             FA3F30A1C6B2121DC41958B3DFBDFE7A4D6CA9F789658ED374439A9553FD3D6B
-B0.1 deployment and runtime:          not performed
+B0.1 deployed JAR hash:               matched active CurseForge instance
+B0.1 Minecraft runtime:               two NATURAL_FINISH operations observed
+raw 50-block crossing after B0.1:     zero in both recorded operations
+same-target active child stability:   failed; root route child replaced during progress
+durable storage effect oracle:        not verified; effectVerified=false
 DepositCommand.java SHA-256:          D4D598C6D1F2F3465A18F0A150B8294F621F3248C35DBCD97896AC75209F09B5
 StoreInAnyContainerTask.java SHA-256:  7F54FE3FACE7DE1D5DFE8D45B9330A97B3B0AD80A47A7071EF4F1CBEDBC612BC
 static diff check:                    passed
 original @deposit runtime parity:     not tested in this fixture
-commit and push:                      not performed
+commit:                               9785e17b
+push:                                 origin/minecraft-plugin-fix/alto-clef-infinite-loop aligned
+release or merge approval:            rejected pending focused lifecycle fix and review
+automatic deposit_all trigger:        blocked by the same-target child lifecycle defect
 ```
 
 첫 clean run `20260826-132103`은 제품 소스가 아니라 selector test fixture가 Minecraft
@@ -1980,9 +1991,220 @@ logs/build/chatclef-fabric-clean-build-20260826-132308.result.json
 구현 결과 `DepositAllTask`가 selected target과 branch를 소유한다. 목표가 유효하고
 70-block 범위 안이면 filtered scan 없이 유지하고, 목표가 없을 때만 한 번의 filtered
 scan을 수행한다. 새 후보는 50-block 안에서만 채택하며 같은 좌표는 value equality로
-유지한다. `OPEN_EXISTING` child는 동일 좌표의 `StoreInContainerTask`다. raw candidate는
-계속 진단에 기록하지만 행동 분기에는 사용하지 않는다.
+유지한다. `OPEN_EXISTING` child의 target 좌표도 selected target과 일치한다. raw
+candidate는 계속 진단에 기록하지만 행동 분기에는 사용하지 않는다.
 
-이 절이 현재 방향과 구현 결과의 canonical decision record다. 같은 내용을 다시
+다만 target 좌표의 안정성과 active child lifecycle의 안정성은 별개다. 현재
+`DepositAllTask`는 같은 target에서도 root `notStored` 변화에 따라 새
+`StoreInContainerTask`를 만들며, runtime에서 실제 root route child 교체가 관측됐다.
+따라서 B0.1은 원래 후보 불일치를 해결한 중간 checkpoint로 보존하되 release 승인
+상태로 분류하지 않는다. 상세 판정과 다음 최소 수정 범위는 26절이 canonical record다.
+
+이 25절은 B0.1 후보 일관성 구현과 build 결과의 기록으로 유지한다. 같은 내용을 다시
 정리하는 별도 계획서, 문서 재검수 문서 또는 추가 로그 계획서를 만들지 않는다.
-향후 build/runtime 증거도 새 문서를 만들지 않고 이 절의 상태와 결과만 갱신한다.
+후속 lifecycle 판정과 build/runtime 증거는 아래 26절만 갱신한다.
+
+## 26. B0.1 post-commit child lifecycle 재검수
+
+### 26.1 판정과 증거 범위
+
+검수 기준 커밋은 다음과 같다.
+
+```text
+commit: 9785e17b feat(minecraft): add stable deposit_all container targeting
+branch: minecraft-plugin-fix/alto-clef-infinite-loop
+remote state at documentation update: HEAD == origin branch
+commit scope: 54 files, +6878 / -198
+```
+
+외부 재검수의 ZIP 환경에서는 Gradle 배포판과 build/runtime 산출물을 독립 확인하지
+못했지만, 이는 그 검수 환경의 `NOT RUN`이다. 실제 작업 PC에서는 B0.1 JAR hash가
+활성 CurseForge 인스턴스와 일치했고, 아래 두 Minecraft operation이 자연 완료됐다.
+따라서 이 문서의 runtime 상태는 `NOT VERIFIED`가 아니라 `OBSERVED`다.
+
+그러나 자연 완료는 active child 안정성을 증명하지 않는다. 정적 코드와 같은
+operation의 bounded lifecycle counter가 모두 같은-target child 교체를 가리키므로
+최종 판정은 다음과 같다.
+
+```text
+original raw/filtered root cause:      PASS
+filtered candidate unification:       PASS
+50/70 selected-target retention:      PASS
+B0.1 clean forced build:              PASS
+B0.1 deployed JAR hash:               MATCHED
+B0.1 Minecraft natural finish:        OBSERVED
+same-target active child stability:   FAIL
+DepositAllTask orchestration tests:   MISSING
+release or merge approval:            REJECT_PENDING_FOCUSED_FIX
+```
+
+### 26.2 확정된 lifecycle 결함
+
+현재 `DepositAllTask.onTick()`은 매 tick root tracker에서 `notStored`를 다시 계산하고,
+selected target이 같더라도 새 child를 반환한다.
+
+```java
+ItemTarget[] notStored =
+        _storedItems.getUnstoredItemTargetsYouCanStore(mod, _toStore);
+
+return new StoreInContainerTask(
+        fixedTarget,
+        _getIfNotPresent,
+        notStored
+);
+```
+
+공용 `StoreInContainerTask.isEqual()`은 좌표와 flag뿐 아니라
+`Arrays.equals(task.toStore, toStore)`도 비교한다. 정상 전송으로 root tracker의
+미저장 수량이나 배열 구성만 바뀌어도 새 child와 active child는 unequal이 된다.
+generic Task lifecycle은 이전 child를 중단하고 같은 좌표의 새 child를 시작한다.
+
+```text
+same selected target
+    -> successful transfer changes root notStored
+    -> new StoreInContainerTask with a different item snapshot
+    -> StoreInContainerTask.isEqual() == false
+    -> previous child STOP
+    -> new same-target child START
+```
+
+새 child는 container-local 상태를 처음부터 시작하므로 이미 열린 GUI를 이어받는다고
+가정할 수 없다. 전송 뒤 tracker 해제와 재등록, slot child 중단, GUI 닫기와 재상호작용이
+반복될 수 있다. 정적 코드만으로 항상 무한 루프라고 단정하지는 않지만, 성공적인
+progress가 child replacement를 일으키는 lifecycle 결함 자체는 확정됐다.
+
+### 26.3 B0.1 runtime 상관관계
+
+활성 JAR:
+
+```text
+bytes:   6569479
+SHA-256: FA3F30A1C6B2121DC41958B3DFBDFE7A4D6CA9F789658ED374439A9553FD3D6B
+```
+
+관련 로그:
+
+```text
+C:\Users\jaewo\curseforge\minecraft\Instances\LAVI_TEST_Fabric01\logs\latest.log
+C:\Users\jaewo\curseforge\minecraft\Instances\LAVI_TEST_Fabric01\logs\stdout-logs.txt
+```
+
+```text
+operation:                         store-deposit-42437
+terminal:                          NATURAL_FINISH, 52354 ms
+final selected target:             -770,66,125
+transferDecisionCount:             28
+rootRouteChildReplacementCount:    10
+childReplacementCount:             43
+totalRaw50CrossingCount:           0
+same-target GUI sync IDs observed: 3, 4, 5
+
+operation:                         store-deposit-76554
+terminal:                          NATURAL_FINISH, 12841 ms
+final selected target:             -756,2,182
+transferDecisionCount:             149
+rootRouteChildReplacementCount:    17
+childReplacementCount:             81
+totalRaw50CrossingCount:           0
+same-target GUI sync IDs observed: 9 through 19
+```
+
+상세 reconciliation event에도 같은-target 교체가 직접 남아 있다.
+
+```text
+operation:                 store-deposit-42437
+candidateDecisionSequence: 966
+branchEpoch:               6
+branch:                    OPEN_EXISTING -> OPEN_EXISTING
+selected target:           -770,66,125 -> -770,66,125
+active child:              StoreInContainerTask instance 307
+candidate/next child:      StoreInContainerTask instance 308
+subTasksEqual:             false
+previousChildStopCalled:   true
+range crossing:            none
+```
+
+두 operation 모두 raw 50-block crossing 없이 끝났으므로 이전
+`OPEN_EXISTING <-> OBTAIN_CHEST` 거리 진동이 제거된 증거다. 동시에 같은 target에서
+root route child가 여러 번 교체되고 GUI sync ID가 증가했으므로, target 좌표만
+sticky이고 child generation은 sticky하지 않다는 증거다. `effectVerified=false`이므로
+이 자료를 durable slot-delta 검증으로 확대 해석하지 않는다.
+
+### 26.4 다음 최소 동작 수정
+
+수정 책임은 `DepositAllTask` 또는 그 Task가 단독 소유하는 좁은 LAVI helper에 둔다.
+selected target별로 다음 한 generation을 함께 소유한다.
+
+```text
+activeStoreTarget
+activeStoreTask
+activeStoreSnapshot
+```
+
+새 filtered target을 채택할 때 당시의 `notStored`를 stable snapshot으로 고정하고
+`StoreInContainerTask`를 한 번만 만든다. selected target이 계속 유효하고 70-block
+continuation 범위 안이면 root `notStored`가 변해도 같은 child instance를 반환한다.
+
+active generation 교체는 다음 경계에서만 허용한다.
+
+1. selected target 좌표가 변경됐다.
+2. target이 파괴, blocked, full, dungeon 또는 unsupported 판정으로 무효화됐다.
+3. 기존 progress checker가 unreachable 또는 progress failure를 확정했다.
+4. target이 70-block continuation 범위를 벗어났다.
+5. child가 terminal이고 root tracker로 remaining work가 검증됐다.
+6. owning `DepositAllTask`가 중단됐다.
+
+child replacement와 stop은 기존 generic scheduler lifecycle을 따른다. 부모가 같은
+child를 수동 중단하거나 shared TaskRunner 상태를 직접 정리하는 방식을 추가하지 않는다.
+
+의도적으로 수정하지 않을 경계:
+
+```text
+Task.java
+StoreInContainerTask.java and StoreInContainerTask.isEqual()
+StoreInAnyContainerTask.java
+DepositCommand.java
+DoToClosestBlockTask.java
+TaskRunner and Baritone
+```
+
+특히 공용 `StoreInContainerTask.isEqual()`에서 `toStore` 비교를 제거하지 않는다.
+결함의 소유자는 shared child equality가 아니라 매 tick 다른 child 계획을 만드는
+`DepositAllTask`다.
+
+### 26.5 필수 orchestration 검증
+
+helper 단위 테스트만으로는 이 결함을 닫을 수 없다. 수정 후 실제 parent orchestration과
+generic child reconciliation을 통과하는 다음 검증을 추가한다.
+
+1. 같은 target에서 root deposit progress가 발생해도 active child identity가 같다.
+2. 위 경로에서 previous child stop count와 replacement count가 모두 0이다.
+3. 다중 아이템과 다중 스택을 저장하는 동안 StoreInContainerTask generation이 하나다.
+4. 기존 ocean fixture에서 invalid raw가 50 안이고 valid filtered가 70 밖이면 fallback이 유지된다.
+5. valid filtered가 50 안이면 parent selected target과 child target이 같다.
+6. 50-70 구간에서는 같은 target과 같은 child generation을 유지한다.
+7. full, blocked, unreachable 또는 outside-70 무효화는 stale child stop과 reselection을 각각 한 번만 만든다.
+8. `DepositCommand.java`, `StoreInAnyContainerTask.java`, 기존 `@deposit` 경계에 behavior diff가 없다.
+
+focused test와 clean forced build 뒤에는 Minecraft에서 다중 아이템 fixture를 재현하고
+동일 target epoch의 `rootRouteChildReplacementCount=0`, 불필요한 GUI 재진입 없음,
+자연 완료를 함께 확인해야 한다. 기존 `effectVerified=false` 한계는 결과 해석에 남긴다.
+
+### 26.6 자동 실행과 문서 범위 gate
+
+인벤토리 4/5 조건에서 자동으로 같은 `DepositAllTask`를 실행하는 chain은 이 lifecycle
+수정과 검증이 끝날 때까지 구현하지 않는다. 불안정한 child generation을 자동 trigger에
+연결하면 수동 실행의 재상호작용을 반복 호출 정책까지 확대할 수 있다.
+
+`9785e17b`는 원래 후보 불일치를 제거하고 runtime 증거를 만든 중간 checkpoint로
+보존한다. force rewrite나 broad revert를 하지 않고, lifecycle 수정과 orchestration
+test만 focused follow-up commit으로 추가한다.
+
+이 커밋은 behavior, diagnostics, tests, docs를 54개 파일에 함께 담아 Git commit 자체는
+atomic rollback 단위가 아니다. 기존 `DoToClosestBlockTask` diagnostics hunk의 논리적
+rollback 절차는 `chatclef-engine-divergence-record.md`에 유지하며, 실제 rollback 시에는
+해당 hunk만 명시적으로 되돌린다.
+
+이 26절이 재검수와 다음 수정 방향의 최종 canonical record다. 같은 내용을 다시
+검수하는 새 문서, 새 진단 계획서 또는 대규모 설계 문서를 만들지 않는다. 이후에는
+이 절의 status, test, build, runtime 결과만 갱신한다.
