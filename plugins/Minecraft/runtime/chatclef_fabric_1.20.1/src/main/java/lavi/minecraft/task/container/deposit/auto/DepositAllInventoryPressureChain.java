@@ -1,6 +1,7 @@
 package lavi.minecraft.task.container.deposit.auto;
 
 import adris.altoclef.AltoClef;
+import adris.altoclef.chains.UserTaskChain;
 import adris.altoclef.chains.SingleTaskChain;
 import adris.altoclef.tasks.container.DepositAllTask;
 import adris.altoclef.tasksystem.Task;
@@ -9,7 +10,13 @@ import adris.altoclef.tasksystem.TaskRunner;
 import adris.altoclef.util.ItemTarget;
 import lavi.minecraft.diagnostics.container.store.deposit.StoreDepositDiagnostics;
 import lavi.minecraft.task.container.deposit.DepositAllInventoryTargetSelector;
+import lavi.minecraft.task.container.deposit.auto.maintenance.AutoDepositMaintenanceTask;
+import lavi.minecraft.task.container.deposit.auto.working.ActiveTaskWorkingSetResolver;
+import lavi.minecraft.task.container.deposit.auto.working.AutoDepositSurplusTargetSelector;
+import lavi.minecraft.task.container.deposit.auto.working.WorkingSetResolution;
+import lavi.minecraft.task.container.deposit.auto.working.WorkingSetSnapshot;
 
+import java.util.Arrays;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -23,6 +30,10 @@ public final class DepositAllInventoryPressureChain extends SingleTaskChain {
     private final DepositAllInventoryPressureStateMachine stateMachine;
     private final DepositAllInventoryTargetSelector targetSelector;
     private final DepositAllAutoConflictGuard conflictGuard;
+    private final ActiveTaskWorkingSetResolver workingSetResolver;
+    private final AutoDepositSurplusTargetSelector surplusTargetSelector;
+    private String lastDeferredReason;
+    private Task lastDeferredRoot;
 
     public DepositAllInventoryPressureChain(TaskRunner runner) {
         super(Objects.requireNonNull(runner, "runner"));
@@ -32,6 +43,8 @@ public final class DepositAllInventoryPressureChain extends SingleTaskChain {
         stateMachine = new DepositAllInventoryPressureStateMachine();
         targetSelector = new DepositAllInventoryTargetSelector();
         conflictGuard = new DepositAllAutoConflictGuard();
+        workingSetResolver = new ActiveTaskWorkingSetResolver();
+        surplusTargetSelector = new AutoDepositSurplusTargetSelector();
     }
 
     @Override
@@ -61,6 +74,43 @@ public final class DepositAllInventoryPressureChain extends SingleTaskChain {
         }
 
         DepositAllInventoryPressureSnapshot snapshot = snapshotOptional.get();
+        if (!snapshot.isAtOrAboveThreshold()) {
+            clearDeferredFingerprint();
+            observeBelowThreshold(snapshot);
+            return;
+        }
+        if (stateMachine.state() != DepositAllInventoryPressureState.ARMED) {
+            return;
+        }
+
+        UserTaskChain userTaskChain = mod.getUserTaskChain();
+        boolean activeUserTask = userTaskChain != null
+                && userTaskChain.isActive()
+                && !userTaskChain.isRunningIdleTask();
+        Task userTaskRoot = activeUserTask ? userTaskChain.getCurrentTask() : null;
+
+        if (activeUserTask && runner.getCurrentTaskChain() != userTaskChain) {
+            deferChanged("user_task_chain_not_selected", snapshot, userTaskRoot);
+            return;
+        }
+
+        if (conflictGuard.hasExistingDepositTask(mod)) {
+            DepositAllInventoryPressureSignal signal = stateMachine.observe(snapshot);
+            if (signal == DepositAllInventoryPressureSignal.THRESHOLD_REACHED) {
+                transitionArmedToWaiting("existing_deposit_task", snapshot, userTaskRoot);
+            }
+            return;
+        }
+
+        if (activeUserTask) {
+            startWorkingSetMaintenance(snapshot, userTaskRoot);
+            return;
+        }
+
+        startFullDeposit(snapshot);
+    }
+
+    private void observeBelowThreshold(DepositAllInventoryPressureSnapshot snapshot) {
         DepositAllInventoryPressureState previousState = stateMachine.state();
         DepositAllInventoryPressureSignal signal = stateMachine.observe(snapshot);
         if (signal == DepositAllInventoryPressureSignal.REARMED) {
@@ -71,14 +121,41 @@ public final class DepositAllInventoryPressureChain extends SingleTaskChain {
                     snapshot,
                     null
             );
+        }
+    }
+
+    private void startWorkingSetMaintenance(DepositAllInventoryPressureSnapshot pressure,
+                                            Task userTaskRoot) {
+        WorkingSetResolution resolution = workingSetResolver.resolve(mod);
+        if (resolution.status() != WorkingSetResolution.Status.SUPPORTED) {
+            deferChanged(resolution.reason(), pressure, userTaskRoot);
             return;
         }
+        WorkingSetSnapshot workingSet = resolution.snapshot();
+        ItemTarget[] targets = surplusTargetSelector.select(workingSet);
+        if (targets.length == 0) {
+            deferChanged("no_safe_surplus", pressure, userTaskRoot);
+            return;
+        }
+        DepositAllInventoryPressureSignal signal = stateMachine.observe(pressure);
         if (signal != DepositAllInventoryPressureSignal.THRESHOLD_REACHED) {
             return;
         }
 
-        if (conflictGuard.hasExistingDepositTask(mod)) {
-            transitionArmedToWaiting("existing_deposit_task", snapshot, null);
+        AutoDepositMaintenanceTask task = new AutoDepositMaintenanceTask(workingSet, targets);
+        clearDeferredFingerprint();
+        DepositAllAutoDiagnostics.logWorkingSetPlan(
+                workingSet,
+                targets.length,
+                Arrays.stream(targets).mapToInt(ItemTarget::getTargetCount).sum(),
+                task
+        );
+        startTask(pressure, targets, task, task.depositTask());
+    }
+
+    private void startFullDeposit(DepositAllInventoryPressureSnapshot snapshot) {
+        DepositAllInventoryPressureSignal signal = stateMachine.observe(snapshot);
+        if (signal != DepositAllInventoryPressureSignal.THRESHOLD_REACHED) {
             return;
         }
 
@@ -89,28 +166,35 @@ public final class DepositAllInventoryPressureChain extends SingleTaskChain {
         }
 
         DepositAllTask task = new DepositAllTask(false, targets);
+        startTask(snapshot, targets, task, task);
+    }
+
+    private void startTask(DepositAllInventoryPressureSnapshot snapshot,
+                           ItemTarget[] targets,
+                           Task chainTask,
+                           Task diagnosticDepositTask) {
         boolean runnerWasActive = runner.isActive();
         StoreDepositDiagnostics.registerBareDepositInvocation(
                 mod,
                 false,
                 targets,
-                task,
+                diagnosticDepositTask,
                 "AUTO_DEPOSIT_ALL_CHAIN"
         );
-        setTask(task);
-        previousState = stateMachine.state();
+        setTask(chainTask);
+        DepositAllInventoryPressureState previousState = stateMachine.state();
         stateMachine.markRunStarted();
         DepositAllAutoDiagnostics.logTransition(
                 previousState,
                 stateMachine.state(),
                 "automatic_task_started",
                 snapshot,
-                task
+                chainTask
         );
-        DepositAllAutoDiagnostics.logTrigger(snapshot, targets.length, task);
+        DepositAllAutoDiagnostics.logTrigger(snapshot, targets.length, chainTask);
         if (!runnerWasActive) {
             runner.enable();
-            DepositAllAutoDiagnostics.logRunnerActivated(snapshot, task);
+            DepositAllAutoDiagnostics.logRunnerActivated(snapshot, chainTask);
         }
     }
 
@@ -180,5 +264,20 @@ public final class DepositAllInventoryPressureChain extends SingleTaskChain {
 
     private DepositAllInventoryPressureSnapshot currentSnapshot() {
         return pressureReader.read(mod).orElse(null);
+    }
+
+    private void deferChanged(String reason,
+                              DepositAllInventoryPressureSnapshot snapshot,
+                              Task userTaskRoot) {
+        if (!Objects.equals(lastDeferredReason, reason) || lastDeferredRoot != userTaskRoot) {
+            DepositAllAutoDiagnostics.logDeferred(reason, snapshot, userTaskRoot);
+            lastDeferredReason = reason;
+            lastDeferredRoot = userTaskRoot;
+        }
+    }
+
+    private void clearDeferredFingerprint() {
+        lastDeferredReason = null;
+        lastDeferredRoot = null;
     }
 }

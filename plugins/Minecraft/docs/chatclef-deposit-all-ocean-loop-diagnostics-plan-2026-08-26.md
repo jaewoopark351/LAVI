@@ -2544,3 +2544,483 @@ cleanup은 추가하지 않았다.
 실제 `Task.tick()`, `interrupt()`, `reset()`과 retained `Task.sub`를 통과하며, automatic
 chain 테스트는 자연 완료 시 root와 child stop 및 tracker cleanup을 확인하도록 작성했다.
 테스트 실행과 clean forced build는 별도 승인 전까지 수행하지 않는다.
+
+### 26.9 자동 저장 working-set 보존과 bounded recovery 구현 계약
+
+<!-- 20260826_kpopmodder: Recorded the canonical implementation direction for preserving an active user task's working set during automatic deposit. -->
+
+이 절은 인벤토리 4/5 자동 저장이 활성 사용자 Task의 작업 재료를 함께 저장한 뒤 같은
+재료를 처음부터 다시 채집하는 문제의 canonical 구현 방향이다. 치명적인 방향 오류는
+없으며 별도의 새 설계 문서나 반복적인 docs-only 재검수는 만들지 않는다. 이후 구현,
+테스트, build 및 runtime 결과는 이 26절에만 이어서 기록한다.
+
+현재 root cause는 다음과 같이 확정한다.
+
+```text
+automatic chain priority:                 51
+UserTaskChain priority:                   50
+current automatic target policy:          armor slots와 ToolItem만 제외
+active UserTask working-set reservation:  없음
+
+결과:
+automatic deposit_all이 활성 UserTask를 선점
+    -> 다이아몬드, 원목, 판자, 음식과 제작 중간재까지 저장
+    -> 동일 UserTask root가 재개돼도 필요한 재료가 사라짐
+    -> 기존 자원 수집 fallback이 처음부터 다시 실행됨
+```
+
+따라서 근본 수정은 주변 상자를 먼저 뒤지는 기능이 아니라 자동 저장이 활성 UserTask의
+working set을 침범하지 않게 하는 것이다. 상자 회수는 reservation 누락, 작업 단계 전환,
+또는 저장 후 검증에서 확인된 부족분만 보완하는 후순위 경로다.
+
+#### 26.9.1 단계별 적용 순서
+
+구현은 다음 순서를 고정한다.
+
+```text
+Phase 1: active non-idle UserTask 중 destructive full deposit 보류
+Phase 2: immutable working-set reservation 계산 후 surplus만 저장
+Phase 3: destination manifest -> cache -> 실제 상자 순회로 부족분 회수
+```
+
+Phase 1은 안전 차단책이다. 활성 사용자 작업 중 자동 `DepositAllTask`를 만들지 않으므로
+현재 작업 재료를 모두 잃는 회귀를 즉시 막는다. 다만 인벤토리가 `36 / 36`까지 찰 수
+있으므로 최종 동작은 아니며, Phase 2에서 안전하게 저장 가능한 surplus만 선택해 공간을
+확보한다.
+
+Phase 3은 일반 자원 계획기를 새로 만드는 단계가 아니다. 우선 이번 자동 operation 때문에
+발생한 부족분만 복구한다. snapshot 시점부터 이미 부족했던 자원까지 회수하는 확장은 이
+경로가 안정화된 뒤 별도로 평가하며, 회수 실패 시 기존 UserTask의 일반 채집 및 제작
+fallback을 그대로 사용한다.
+
+#### 26.9.2 threshold 신호를 소비하지 않는 defer 규칙
+
+현재 `DepositAllInventoryPressureStateMachine`은 `WAIT_FOR_REARM`에서 인벤토리가 임계치
+아래로 내려가야만 `ARMED`로 돌아간다. 활성 Task를 이유로
+`markThresholdSuppressed()` 또는 `transitionArmedToWaiting()`을 호출하면, 그 Task가
+끝난 뒤에도 인벤토리가 계속 4/5 이상인 경우 자동 저장이 다시 실행되지 않을 수 있다.
+
+따라서 인벤토리가 임계치 이상이고 아직 안전한 자동 저장 plan을 만들 수 없으면
+`observe()`보다 먼저 defer한다.
+
+```text
+snapshot = pressureReader.read(...)
+
+snapshot < 4/5
+    -> active Task 여부와 관계없이 stateMachine.observe(snapshot)
+    -> WAIT_FOR_REARM의 정상 rearm 허용
+
+snapshot >= 4/5 + active non-idle UserTask + Phase 1
+    -> log DEFERRED_ACTIVE_USER_TASK
+    -> observe() 호출 없음
+    -> threshold 신호 소비 없음
+
+snapshot >= 4/5 + Phase 2 safe plan 생성 성공
+    -> stateMachine.observe(snapshot)
+    -> THRESHOLD_REACHED일 때만 operation 시작
+```
+
+Phase 2에서도 다음 상태는 모두 fail-closed defer이며 threshold 신호를 소비하지 않는다.
+
+```text
+current selected chain != UserTaskChain
+UserTask root 또는 실행 경로 snapshot 불일치
+지원하지 않는 active Task 포함
+안전하게 저장할 surplus 없음
+working-set 계산 중 월드, 차원 또는 root identity 변경
+```
+
+수동 `@deposit_all`, 기존 manual deposit conflict 처리, 저점 rearm 및 한 번 실행 후
+`WAIT_FOR_REARM` 전이는 이 defer 규칙과 별개로 유지한다.
+
+#### 26.9.3 immutable WorkingSetSnapshot
+
+정확한 reservation 단위는 단순한 active root의 `ItemTarget`이 아니라 자동 operation
+전용 immutable `WorkingSetSnapshot`이다. 자동 chain이 UserTask를 선점하기 전, 다음
+조건이 참일 때만 snapshot을 만든다.
+
+```text
+runner.getCurrentTaskChain() == userTaskChain
+```
+
+snapshot은 다음 값을 즉시 복사해 소유한다.
+
+```text
+UserTask root object identity
+List.copyOf(userTaskChain.getTasks())로 복사한 root-to-leaf 실행 경로
+world와 dimension identity
+snapshot epoch
+현재 인벤토리의 concrete Item별 수량
+현재 BotBehaviour.isProtected(item) 결과
+활성 Task들의 명시적 목표 수량
+현재 제작, 제련 및 수집 경로의 입력 재료와 중간재 수량
+resolver support 결과: SUPPORTED 또는 UNSUPPORTED
+```
+
+`TaskChain.getTasks()`는 tick마다 비워지고 다시 채워지는 실행 캐시이므로 live 참조를
+보관하지 않는다. 다른 고우선순위 chain이 이미 선택된 상태에서는 실행 경로와 보호
+정보가 낡았을 수 있으므로 snapshot을 추정하지 않고 defer한다.
+
+전역 `Task` 또는 `ResourceTask` interface는 변경하지 않는다. LAVI-owned resolver가
+concrete Task adapter를 통해 이미 노출된 정보를 읽는다.
+
+```text
+ResourceTask
+    -> getItemTargets()
+
+CraftInTableTask
+    -> getRecipeTargets(), 남은 제작 횟수와 입력 재료
+
+SmeltInFurnaceTask / SmeltInSmokerTask / SmeltInBlastFurnaceTask
+    -> getTargets(), 입력 재료와 연료
+
+명시적으로 지원한 특수 Task
+    -> 해당 adapter의 보수적 requirement
+
+지원하지 않는 Task
+    -> reserve none이 아니라 UNSUPPORTED
+    -> 자동 저장 defer
+```
+
+root의 최종 결과물만 보는 것은 허용하지 않는다. 예를 들어 갑옷 제작 Task의 최종
+`ItemTarget`만으로는 현재 필요한 다이아몬드, 판자, 원목 또는 crafting intermediate를
+보존할 수 없다. root 목표와 현재 active leaf까지의 즉시 입력을 함께 합산한다.
+
+현재 `BotBehaviour`가 보호하는 concrete Item은 현재 보유 수량 전체를 예약한다. 여러
+`ItemTarget`의 match 범위가 겹칠 때 V1은 과소 예약보다 보수적인 과다 예약을 허용한다.
+공간 최적화보다 작업 재료 보존을 우선한다.
+
+각 concrete Item의 기본 수량 계약은 다음과 같다.
+
+```text
+reservedCount = min(preDepositInventoryCount, requiredWorkingSetCount)
+surplusCount  = max(0, currentInventoryCount - reservedCount)
+
+depositCount <= surplusCount
+```
+
+#### 26.9.4 수동 full-deposit과 자동 surplus 선택 분리
+
+현재 `DepositAllInventoryTargetSelector`에 reservation을 넣지 않는다. 이 selector를
+수정하면 수동 `@deposit_all`의 기존 full-deposit 의미까지 바뀐다.
+
+새 LAVI-owned 책임은 다음처럼 분리한다.
+
+```text
+lavi/minecraft/task/container/deposit/auto/working/
+    WorkingSetSnapshot
+        -> immutable root, path, inventory, requirement와 reservation 결과
+
+    ActiveTaskWorkingSetResolver
+        -> concrete Task adapter를 조합하고 SUPPORTED/UNSUPPORTED 판정
+
+    AutoDepositSurplusTargetSelector
+        -> WorkingSetSnapshot의 reserved count를 제외한 surplus ItemTarget 생성
+
+    adapter/
+        -> ResourceTask, crafting, smelting 등 지원 Task별 requirement 해석
+```
+
+기존 selector와 새 selector의 계약은 다음과 같다.
+
+```text
+DepositAllInventoryTargetSelector
+    -> 수동 @deposit_all의 기존 full-deposit 정책 유지
+
+AutoDepositSurplusTargetSelector
+    -> 활성 UserTask가 있는 자동 operation에서 surplus만 선택
+```
+
+지원하지 않는 Task, snapshot 불일치 또는 surplus 0개를 기존 full-deposit selector로
+fallback하지 않는다. 해당 tick의 자동 저장을 defer한다.
+
+#### 26.9.5 단방향 자동 maintenance operation
+
+Phase 2부터 자동 chain은 한 번의 operation을 소유하는 LAVI-owned parent Task를 사용한다.
+
+```text
+lavi/minecraft/task/container/deposit/auto/maintenance/
+    AutoDepositMaintenanceTask
+    AutoDepositMaintenancePhase
+
+SNAPSHOT
+    -> DEPOSIT_SURPLUS
+    -> VERIFY_WORKING_SET
+    -> deficit == 0: DONE
+    -> deficit > 0: RECOVER
+    -> DONE
+```
+
+`DEPOSIT_SURPLUS`는 기존 `DepositAllTask`에 surplus `ItemTarget[]`만 전달해 재사용한다.
+명령 문자열을 다시 실행하거나 새로운 UserTask root를 만들지 않는다.
+
+phase는 단방향이며 다음 전이를 금지한다.
+
+```text
+RECOVER -> DEPOSIT_SURPLUS
+RECOVER -> 새 automatic operation
+동일 후보 무제한 재방문
+```
+
+회수한 품목은 동일 auto epoch에서 다시 deposit 대상이 될 수 없다. `RECOVER` 진입과
+동시에 deposit phase는 영구적으로 닫힌다.
+
+#### 26.9.6 confirmed destination manifest
+
+기존 `ContainerStoredTracker`는 실제 slot delta를 품목별 총량으로 추적하지만 destination
+좌표는 보존하지 않는다. 자동 operation은 별도의 LAVI-owned manifest tracker를 사용해
+실제로 저장이 확인된 항목만 기록한다.
+
+```text
+lavi/minecraft/task/container/deposit/auto/recovery/
+    AutoDepositDestinationManifest
+    AutoDepositDestinationManifestTracker
+
+manifest entry:
+    world/dimension
+    container BlockPos
+    concrete Item
+    confirmed positive slot delta
+    automatic operation epoch
+```
+
+manifest는 클릭 요청, GUI open 요청 또는 캐시 예상값만으로 만들지 않는다. 실제 target
+container에서 확인된 positive slot delta만 기록한다. `StoreInContainerTask.isEqual()`을
+변경하지 않으며, operation-local tracker가 이미 선택된 target 좌표와 slot-change event를
+상관시킨다.
+
+#### 26.9.7 Container Tooltips 없는 bounded recovery
+
+회수 후보의 방문 우선순위는 다음과 같다.
+
+```text
+1. 이번 automatic operation의 confirmed destination manifest
+2. 기존 ContainerCache가 요청 품목을 가진다고 주장하는 현재 차원 위치
+3. BlockScanner에서 발견한 제한 거리 내의 나머지 컨테이너
+```
+
+이 순서는 신뢰 순서가 아니라 방문 우선순위다. manifest와 cache도 실제 현재 수량의
+권위 있는 증거가 아니다. 모든 후보는 물리적으로 이동해 열고, 서버가 보낸 GUI slot을
+확인한 뒤에만 회수한다. 따라서 Container Tooltips 또는 다른 서버 모드가 필요하지 않다.
+
+후보 정책은 다음을 보장한다.
+
+```text
+현재 world와 dimension만 사용
+설정된 제한 거리 안의 지원 컨테이너만 사용
+tier 사이 동일 BlockPos deduplicate
+보호 대상 및 접근 불가능 후보 제외
+GUI 미수신, stale cache, 실제 수량 부족은 bounded retry 후 blacklist
+blacklist는 operation-local
+world 또는 dimension 변경 시 operation, queue와 blacklist 폐기
+```
+
+기존 `PickupFromContainerTask`는 특정 좌표의 컨테이너를 열고 GUI slot에서 품목을
+회수하므로 재사용할 수 있다. 다만 target count는 이번에 가져올 delta가 아니라 회수 뒤
+인벤토리에 있어야 할 절대 수량으로 전달한다.
+
+```text
+pickupTargetCount = currentInventoryCount + currentWorkingSetDeficit
+withdrawCount <= currentWorkingSetDeficit
+```
+
+destination manifest 후보에는 다음 상한도 적용한다.
+
+```text
+withdrawCountAtDestination <= confirmedDepositedCountAtDestination
+```
+
+cache 또는 새로 발견한 컨테이너에는 manifest 상한이 없지만 GUI에서 확인한 실제 수량과
+현재 부족분보다 많이 가져오지 않는다.
+
+회수 lifecycle은 별도 Task가 소유한다.
+
+```text
+lavi/minecraft/task/container/deposit/auto/recovery/
+    RecoverReservedItemsTask
+        -> immutable WorkingSetSnapshot
+        -> remaining deficits
+        -> ordered and deduplicated candidate queue
+        -> current candidate
+        -> stable open/pickup child
+        -> per-candidate retry와 timeout
+        -> operation-local blacklist
+        -> SATISFIED / EXHAUSTED / CANCELLED
+```
+
+후보 queue는 operation 시작 또는 tier 전환 시 한 번만 만든다. 현재 후보의 child는 성공
+또는 terminal failure까지 같은 instance를 유지한다. 실패한 후보를 blacklist한 뒤 다음
+후보로 단방향 이동하며, 모든 후보가 끝나면 `EXHAUSTED`로 종료하고 기존 UserTask가 자체
+채집 fallback을 계속한다.
+
+#### 26.9.8 interruption과 원래 UserTask 재개 계약
+
+automatic operation 시작 전 UserTask root object identity를 snapshot한다. 자동 저장을
+위해 명령을 다시 실행하거나 `runUserTask()`로 새 root를 만들지 않는다.
+
+현재 ChatClef interruption은 진정한 freeze/resume가 아니다.
+
+```text
+higher-priority chain selected
+    -> UserTaskChain.onInterrupt()
+    -> 동일 root와 child에 interrupt()
+    -> onStop()
+
+UserTaskChain selected again
+    -> 동일 root object reset()
+    -> 다음 tick에 onStart()
+```
+
+따라서 검증 계약은 다음과 같다.
+
+```text
+UserTask root identity:                 MUST PRESERVE
+command/callback ownership:             MUST PRESERVE
+command re-execution:                    MUST NOT OCCUR
+new UserTask root creation:              MUST NOT OCCUR
+child identity and open GUI progress:    NOT GUARANTEED
+onStop/onStart re-entry:                 EXPECTED ENGINE SEMANTICS
+```
+
+working-set snapshot은 반드시 interrupt 전에 외부 immutable 객체로 완성한다. safety chain
+등 더 높은 priority가 automatic maintenance를 중단하면 V1은 부분 operation을 재개하지
+않는다. 현재 automatic root, manifest, queue와 blacklist를 terminal abort하고 원래
+UserTask에 fallback한다. TaskRunner, UserTaskChain, Baritone, 전역 input, goal 또는 path를
+직접 취소하거나 정리하지 않는다.
+
+#### 26.9.9 보호 경계
+
+다음 shared 또는 upstream-derived 경계는 이 구현에서 변경하지 않는다.
+
+```text
+ResourceTask.allowContainers == false
+TaskCatalogue
+CollectRecipeCataloguedResourcesTask
+CollectPlanksTask and MineAndCollectTask
+DepositCommand.java
+StoreInAnyContainerTask.java
+StoreInContainerTask.java and StoreInContainerTask.isEqual()
+Task.java
+TaskRunner and UserTaskChain
+DoToClosestBlockTask.java
+Baritone
+```
+
+전역 `allowContainers=true`, static/global resource policy, 전체 `@get` 의미 변경 또는
+Container Tooltips hard dependency를 추가하지 않는다. 새 책임은 LAVI-owned automatic
+deposit package 안에서 composition으로 분리한다.
+
+수동 `@deposit_all`은 기존 full-deposit 의미를 유지한다. 일반 `@get`과 기존 `@deposit`
+동작도 변경하지 않는다.
+
+#### 26.9.10 필수 검증 계약
+
+Phase 1:
+
+1. non-idle `@get` 실행 중 occupied slot이 `29 / 36` 이상이어도 자동
+   `DepositAllTask` 생성 수가 0이다.
+2. UserTask root identity가 유지되고 command가 다시 실행되지 않는다.
+3. state가 잘못 `WAIT_FOR_REARM`으로 이동하지 않고 threshold 신호가 보존된다.
+4. UserTask 종료 후에도 `29 / 36` 이상이면 다음 tick에 자동 저장을 시작한다.
+
+Phase 2:
+
+1. 인벤토리 `36 / 36`에서 active recipe의 원목, 판자, 입력 재료와 중간재는 예약량
+   이하로 저장되지 않는다.
+2. junk surplus만 저장하고 최소 한 slot을 확보한다.
+3. unsupported Task, stale snapshot 또는 surplus 없음은 full deposit으로 fallback하지 않는다.
+4. `depositCount(item) <= inventoryCount(item) - reservedCount(item)`을 모든 품목에 대해
+   만족한다.
+5. protected item의 손실이 0이고 수동 `@deposit_all` 결과는 기존과 같다.
+
+Phase 3:
+
+1. destination manifest가 실제 좌표와 confirmed positive delta만 기록한다.
+2. 보호되거나 접근 불가능한 manifest 후보는 bounded retry 뒤 blacklist한다.
+3. stale cache 후보를 연 뒤 GUI 불일치를 확인하면 다음 후보로 한 번만 이동한다.
+4. 다음 미확인 컨테이너의 실제 GUI에서 품목을 찾으면 정확한 부족분만 회수한다.
+5. manifest, cache와 주변 후보가 모두 실패하면 `EXHAUSTED`로 종료하고 동일 UserTask
+   root가 기존 채집 fallback을 계속한다.
+6. 같은 좌표를 반복 방문하지 않고 동일 auto epoch에서 회수 품목을 다시 저장하지 않는다.
+7. `ResourceTask.allowContainers`는 `false`, 일반 `@get` 동작은 기존 상태를 유지한다.
+
+runtime 검증에서는 다음 경계를 하나의 auto operation epoch로 연결한다.
+
+```text
+threshold observed or deferred
+-> working-set snapshot result
+-> surplus plan
+-> DepositAllTask start and terminal
+-> post-deposit deficit verification
+-> manifest/cache/scanner candidate tier
+-> GUI revalidation
+-> exact inventory increase or candidate failure
+-> recovery terminal reason
+-> original UserTask root resume
+```
+
+로그는 기존 bounded diagnostics 정책을 따르며 후보별 매 tick 출력이나 무제한 slot dump를
+추가하지 않는다.
+
+#### 26.9.11 현재 상태와 다음 작업 gate
+
+```text
+root-cause direction:                              ACCEPTED
+threshold-latch defer rule:                       DOCUMENTED
+WorkingSetSnapshot and surplus contract:          DOCUMENTED
+bounded physical container recovery:              DOCUMENTED
+Container Tooltips dependency:                    NOT REQUIRED
+ResourceTask.allowContainers global true:         REJECTED
+runtime source implementation for this section:   IMPLEMENTED, NOT BUILT
+focused tests for this section:                   ADDED, NOT RUN
+clean forced build and Minecraft reproduction:    NOT RUN
+```
+
+이 절은 구현 방향을 확정하지만 source 수정, 테스트 실행, build, JAR 배포, Minecraft 실행,
+commit 또는 push 자체를 승인하지 않는다. 사용자가 구현을 별도로 요청하면 추가 설계 문서나
+동일 내용의 재검수 문서를 만들지 않고 다음 focused 순서로 진행한다.
+
+```text
+1. active non-idle + threshold high: 신호를 소비하지 않고 defer
+2. auto-only working-set resolver와 surplus selector
+3. immutable AutoDepositMaintenanceTask: DEPOSIT_SURPLUS -> VERIFY
+4. confirmed destination manifest
+5. manifest -> cache -> physical traversal bounded recovery
+```
+
+### 26.9.12 2026-08-26 implementation record
+
+The implementation is contained in the existing LAVI-owned automatic deposit boundary.
+
+```text
+lavi/minecraft/task/container/deposit/auto/working/
+    -> immutable working-set resolution and concrete-item surplus selection
+
+lavi/minecraft/task/container/deposit/auto/maintenance/
+    -> one-way DEPOSIT_SURPLUS -> VERIFY_WORKING_SET -> RECOVER lifecycle
+
+lavi/minecraft/task/container/deposit/auto/recovery/
+    -> confirmed destination manifest, current-dimension bounded candidates,
+       physical GUI revalidation, exact deficit withdrawal, and operation-local exhaustion
+```
+
+`DepositAllInventoryPressureChain` now defers before `stateMachine.observe()` when an active
+non-idle user task cannot produce a supported, stable working-set plan or has no safe surplus.
+When a plan is available, the chain passes only the surplus targets to
+`AutoDepositMaintenanceTask`. Recovery never transitions back to deposit in the same operation.
+
+The following boundaries remain unchanged by this implementation:
+
+```text
+ResourceTask.allowContainers == false
+manual @deposit_all target selection
+DepositCommand and StoreInAnyContainerTask
+TaskCatalogue and ordinary @get behavior
+StoreInContainerTask and StoreInContainerTask.isEqual()
+Task, TaskRunner, UserTaskChain, DoToClosestBlockTask, and Baritone
+```
+
+Focused source tests were added for reservation arithmetic, crafting-input and protected-item
+requirements, conservative alternative matching, surplus bounds, snapshot immutability, and
+confirmed manifest accounting. No Gradle command, clean build, JAR deployment, Minecraft launch,
+commit, or push was performed as part of this implementation step.
