@@ -5175,6 +5175,531 @@ The goal is to make absence explicit, validate it at the correct boundary, prese
 
 ---
 
+## 30.2 Global, Static, Shared Mutable State, and JavaScript `this` Safety Rule
+
+<!-- 20260826_kpopmodder: Added a hard rule against implicit global `this` and mutable static/global state bypassing explicit DTO and ownership boundaries. -->
+
+This section applies to LAVI-owned production code in every language.
+
+It is subordinate to the scoped upstream, vendored, generated, and third-party preservation rules in Section 0. Do not broadly rewrite upstream-derived code merely to enforce this section. New LAVI-owned code and every LAVI-owned behavior change must comply.
+
+### Core Principle
+
+The primary prohibited pattern is not `static` by itself. It is shared mutable state whose owner, writers, lifetime, and data flow are hidden.
+
+Use this rule:
+
+```text
+stateless static function                         -> allowed
+compile-time or recursively immutable constant   -> allowed
+instance-owned mutable state                      -> allowed when ownership is explicit
+composition-root-owned long-lived instance        -> allowed when explicitly injected and lifecycle-owned
+implicit/static process-wide mutable state         -> exception gate and explicit approval required
+public or implicitly shared mutable state         -> prohibited
+static/global state used to bypass DTOs           -> prohibited
+implicit JavaScript `this` falling back to global -> prohibited
+```
+
+The following are all forms of shared or global state for this rule:
+
+```text
+JavaScript/TypeScript globalThis, window, self, global, or custom process properties
+JavaScript/TypeScript exported mutable module objects
+JavaScript/TypeScript mutable static class fields
+Python mutable module globals and mutable singleton objects
+Java, Kotlin, C#, C, or C++ mutable static fields or variables
+mutable singleton registries, service locators, and global context bags
+process-wide current-user, current-task, current-request, or current-session holders
+statically or implicitly reachable shared caches, counters, flags, collections, or registries that influence behavior
+```
+
+A value being process-local does not make it safe. A Node.js or browser global is not the Windows operating system itself, but it is still shared by code executing in that JavaScript runtime or realm and can silently couple unrelated operations.
+
+A long-lived mutable service instance created by the composition root and passed explicitly through typed constructors or interfaces is instance-owned state, not implicit global state. It does not require the exception gate solely because its lifetime matches the process when all of the following are explicit:
+
+* one component owns construction and disposal
+* dependencies receive the instance through an explicit contract
+* no static, global, singleton, or service-locator access path exists
+* readers, writers, mutation methods, reset behavior, and shutdown behavior are defined
+
+### Allowed Static and Shared Values
+
+The following are allowed by default when their contract is truthful:
+
+* pure or stateless static functions
+* compile-time constants
+* immutable primitive values
+* immutable enums and identifiers
+* immutable configuration snapshots created and validated at startup
+* read-only value objects whose nested data cannot be mutated through an exposed reference
+* narrowly scoped diagnostic-only counters, fingerprints, or suppression bookkeeping already authorized by a higher-priority diagnostics policy, provided they affect only log emission and never application behavior
+
+Examples:
+
+```typescript
+class MathFunctions {
+  public static add(left: number, right: number): number {
+    return left + right
+  }
+}
+
+class Limits {
+  public static readonly MAX_RETRY_COUNT = 3
+}
+```
+
+```java
+public final class Limits {
+    public static final int MAX_RETRY_COUNT = 3;
+
+    private Limits() {
+    }
+}
+```
+
+`const`, `final`, and `readonly` do not automatically make an object graph deeply immutable.
+
+Do not claim that a shared object is immutable merely because its binding cannot be reassigned:
+
+```typescript
+const runtimeState = {
+  activeTask: null as string | null,
+}
+
+runtimeState.activeTask = "mine" // still mutable
+```
+
+`Object.freeze()` and TypeScript `readonly` are shallow unless the nested structure is also made immutable. Do not expose mutable arrays, maps, sets, dictionaries, lists, or nested objects through a shared constant.
+
+### Forbidden Shared Mutable State
+
+Do not introduce or retain a LAVI-owned public mutable static or global field for application coordination.
+
+Forbidden examples include:
+
+```typescript
+class RuntimeState {
+  public static currentTask: Task | null = null
+  public static currentUser: User | null = null
+}
+```
+
+```typescript
+export const sharedState = {
+  activeRequestId: null as string | null,
+  retryCount: 0,
+}
+```
+
+```java
+public final class GlobalContext {
+    public static Task currentTask;
+    public static User currentUser;
+}
+```
+
+```python
+current_task = None
+current_user = None
+shared_result = {}
+```
+
+Do not create generic mutable containers named like:
+
+```text
+GlobalState
+GlobalContext
+SharedState
+RuntimeState
+AppState
+CurrentContext
+SingletonManager
+ServiceLocator
+CommonData
+TemporaryState
+```
+
+A name change does not make the pattern safe. Judge the actual ownership and mutation behavior.
+
+Do not use shared mutable state as an emergency shortcut when the intended DTO, interface, event, callback, return value, dependency, or state owner feels difficult to implement.
+
+Do not add a static field merely because:
+
+* the value is needed by several classes
+* passing a DTO requires changing method signatures
+* the current call chain is difficult to understand
+* a callback does not currently expose the needed value
+* dependency injection feels verbose
+* an asynchronous result is difficult to return
+* a Task must resume later
+* a test needs convenient access
+* the implementation deadline is near
+* the developer cannot immediately determine the correct owner
+
+Difficulty locating the correct owner is evidence that ownership must be clarified. It is not permission to create a hidden global owner.
+
+### DTO, Interface, Event, and Call-Boundary Rule
+
+Data crossing a component, plugin, Task, thread, worker, process, transport, or lifecycle boundary must use an explicit contract.
+
+Preferred mechanisms include:
+
+```text
+typed function or constructor parameters
+DTOs and immutable command or result objects
+explicit return values or typed result objects
+interfaces, protocols, and abstract contracts
+events with defined payloads and ownership
+callbacks with typed parameters
+queue or transport messages
+request-scoped context objects passed explicitly
+dependency injection from the composition root
+owner-controlled repositories or state stores with narrow APIs
+```
+
+Do not bypass these mechanisms through a static or global side channel.
+
+The visible signature must describe the actual inputs that influence behavior.
+
+Avoid this hidden dependency:
+
+```typescript
+function execute(command: CommandDto): Result {
+  const user = GlobalContext.currentUser
+  const task = GlobalContext.currentTask
+  // command is not the real complete input
+}
+```
+
+Prefer this explicit dependency:
+
+```typescript
+interface ExecutionContextDto {
+  readonly userId: string
+  readonly taskId: string
+}
+
+function execute(
+  command: CommandDto,
+  context: ExecutionContextDto,
+): Result {
+  // all operation-specific inputs are explicit
+}
+```
+
+A DTO is not merely a container. It defines which data is allowed to cross a boundary, makes call sites reviewable, and prevents unrelated code from silently changing the current operation.
+
+Do not store any of the following as mutable static or global state merely to avoid an explicit boundary:
+
+```text
+current request or correlation id
+current user or session
+current command or Task
+current item, target, path, or goal
+current model response
+current inventory or container state
+current UI selection
+current retry count or timeout state
+current plugin or backend selection
+current transport response
+current error or terminal result
+```
+
+Operation-specific values must remain local to the operation owner or travel through an explicit typed contract.
+
+### JavaScript and TypeScript `this` Rules
+
+Using `this` inside an actual class instance is allowed.
+
+Do not rely on `this` in a plain function to resolve to a global object or another implicit caller-selected receiver.
+
+Do not introduce constructor-function code for a new class-like LAVI-owned application model when a class or explicit factory can express the same contract, such as:
+
+```javascript
+function User(name) {
+  this.name = name
+}
+```
+
+Use a class with an explicit constructor:
+
+```typescript
+class User {
+  public constructor(public readonly name: string) {
+  }
+}
+```
+
+An existing framework, library, wire-compatibility boundary, or interop contract may require a constructor function. In that case, keep it inside the smallest adapter boundary, require explicit `new` semantics when the contract is constructable, run in strict mode, and do not read or write global state through `this`. Do not rewrite upstream, vendored, generated, or compatibility code solely to convert established constructor-function syntax.
+
+Do not call class-like behavior without `new`.
+
+Do not use top-level `this` as application storage.
+
+Do not assign application state to:
+
+```text
+globalThis
+window
+self
+global
+custom properties on process
+Function.prototype
+Object.prototype
+Array.prototype
+another built-in prototype
+```
+
+Do not create an implicit global by assigning to an undeclared identifier.
+
+Unsafe:
+
+```javascript
+activeTask = "mine"
+```
+
+New or modified LAVI-owned JavaScript and TypeScript must execute in strict mode through ES modules or the existing strict build configuration. Do not change the module system solely to satisfy this rule without evaluating compatibility.
+
+For TypeScript, preserve or enable the strict compiler protections supported by the component:
+
+```json
+{
+  "compilerOptions": {
+    "strict": true,
+    "alwaysStrict": true,
+    "noImplicitAny": true,
+    "noImplicitThis": true,
+    "strictNullChecks": true
+  }
+}
+```
+
+Do not disable a strict compiler option, add `any`, add an unsafe cast, or add a non-null assertion merely to silence a `this`, global-state, or ownership error.
+
+For a function that must not use a receiver, declare that contract when practical:
+
+```typescript
+function normalizeName(this: void, value: string): string {
+  return value.trim()
+}
+```
+
+When a callback must retain the owning instance, use an explicit bound method or lexical arrow function rather than depending on the caller to supply `this`:
+
+```typescript
+class Controller {
+  public readonly handle = (event: Event): void => {
+    this.process(event)
+  }
+
+  private process(event: Event): void {
+    // instance-owned behavior
+  }
+}
+```
+
+Do not detach a method that depends on `this` and call it unbound:
+
+```typescript
+const handler = controller.handleRequest
+handler() // unsafe when handleRequest requires controller as `this`
+```
+
+Use an arrow property, `.bind(controller)`, or a wrapper whose receiver contract is explicit.
+
+TypeScript type checking does not make explicit `globalThis` mutation safe. The following remains prohibited even if it compiles:
+
+```typescript
+(globalThis as any).currentTask = task
+```
+
+### Language-Specific Mutable Static Rules
+
+Python:
+
+* Do not use mutable module globals to carry request, plugin, Task, UI, model, queue, or runtime state between calls.
+* Do not use a module-level dictionary or list as an undocumented service locator or shared context.
+* Module-level immutable constants are allowed.
+* A module-level cache requires the exception gate below when it can affect behavior, ordering, resource ownership, or correctness.
+
+Java, Kotlin, and C#:
+
+* Do not expose public writable static fields.
+* Prefer `static final`, `const`, or `static readonly` only for immutable values.
+* Do not use a static field to avoid constructor injection, DTO propagation, event payloads, or explicit lifecycle ownership.
+* Do not use a singleton as a hidden global context.
+
+C and C++:
+
+* File-local `static` functions and immutable constants are allowed.
+* Do not use mutable global or file-static variables to carry operation state across unrelated calls.
+* Do not use mutable static locals as hidden caches or initialization flags without the exception gate.
+* Thread-local storage is not a substitute for explicit ownership and does not make cross-call state safe.
+
+JavaScript and TypeScript:
+
+* Do not export mutable objects as shared application state.
+* Do not use mutable static class properties for current-operation state.
+* Do not monkey-patch the global object or built-in prototypes.
+* Do not treat `const` as deep immutability.
+
+### Mutable Cache, Registry, Counter, and Singleton Gate
+
+A cache, registry, counter, singleton, or process-wide service is not automatically prohibited merely because it has a long lifetime. It is prohibited by default when it is mutable and can influence behavior without an explicit owner and contract.
+
+An explicitly instance-owned long-lived service described in `Core Principle` does not enter this gate solely because it lives for the process lifetime. The gate applies if the service later gains static access, singleton lookup, a service-locator path, implicit current-operation state, or another shared side channel.
+
+Before introducing any LAVI-owned mutable static, global, singleton, or module-level state, or any process-wide mutable state reachable through implicit or shared access, Codex must report all of the following and stop for explicit user approval:
+
+```text
+Proposed shared state:
+Exact file and symbol:
+Why the state is inherently process-wide:
+Why instance ownership or explicit propagation is insufficient:
+DTO, event, return-value, callback, repository, and dependency-injection alternatives evaluated:
+Single owning component:
+All readers:
+All writers:
+Mutation API:
+Initialization boundary:
+Lifetime and shutdown boundary:
+Reset and test-isolation behavior:
+Reload and reconnect behavior:
+Thread, async, callback, worker, and reentrancy model:
+Synchronization or atomicity mechanism when applicable:
+Failure behavior during partial update:
+Serialization or persistence behavior:
+Whether stale state can affect a later operation:
+Whether the state changes application behavior or only diagnostics:
+Exact tests required:
+Explicit user approval required:
+```
+
+If any reader, writer, lifecycle transition, reset path, or concurrency model cannot be identified, reject the shared-state proposal.
+
+Even after explicit approval:
+
+* keep the state private to one owning component
+* expose narrow intent-based methods rather than writable fields
+* prohibit direct writes from unrelated components
+* do not use a generic global context bag
+* document initialization, mutation, invalidation, reset, and disposal
+* preserve operation correlation and ownership
+* provide deterministic test reset without leaking into production behavior
+* prevent a failed operation from leaving stale state for the next operation
+
+Public writable static or global fields remain prohibited. Approval may authorize an encapsulated owner, not unrestricted mutation.
+
+### Concurrency, Async, Reload, and Test-Isolation Rules
+
+A single JavaScript event loop does not make shared mutable state safe. Asynchronous callbacks, reentrant event handlers, queued work, timers, promises, workers, and lifecycle callbacks may still observe stale or overwritten operation state.
+
+Do not assume that:
+
+* one operation finishes before another starts
+* callbacks execute in the same logical request order
+* a global value still belongs to the operation that wrote it
+* a test-created singleton has been reset
+* a reload replaced every stale reference
+* worker or subprocess state is shared with the parent
+* thread-local state is visible across threads
+* process-wide state is automatically synchronized
+
+For any approved shared mutable owner, tests must cover the smallest applicable cases:
+
+```text
+two sequential operations with different values
+two overlapping or reentrant operations
+failure before state cleanup
+cancellation and timeout
+reload or reconnect
+shutdown followed by a late callback
+test order independence
+explicit reset between tests
+stale state from a previous Task or request
+worker, thread, or process boundary when applicable
+```
+
+Do not make tests pass by resetting hidden global state from unrelated test fixtures. The production owner must expose a deliberate lifecycle or test seam.
+
+### Required Review During Code Changes
+
+When modifying LAVI-owned code, inspect for hidden state flow when any affected code contains or introduces:
+
+```text
+static mutable fields
+globalThis, window, self, or global writes
+custom properties on process
+module-level mutable collections or objects
+singleton state
+service locators
+current-user, current-task, current-request, or current-session holders
+unbound methods using this
+constructor functions using this
+callbacks whose receiver is implicit
+DTO or interface values re-read from a global location
+mutable exported objects
+```
+
+Search results are not sufficient by themselves. Read each material caller and writer used in the conclusion.
+
+If hidden shared state already exists in LAVI-owned code touched by the current task:
+
+1. Identify the exact owner, readers, writers, and lifecycle.
+2. Determine whether it is an immutable constant, diagnostics-only state, an approved encapsulated owner, or prohibited shared mutable state.
+3. Do not add another reader or writer to a prohibited state.
+4. Replace the hidden data flow with the smallest explicit DTO, parameter, return value, event, callback, repository, or injected owner that preserves behavior.
+5. Keep the refactor limited to the directly affected component.
+6. Add tests for stale-state leakage and overlapping operations.
+
+Do not perform a repository-wide rewrite solely because one prohibited global is found. Contain and remove the directly affected hidden dependency without creating another global compatibility layer.
+
+### Required Completion Report
+
+For any change involving static, global, singleton, module-level, or `this`-dependent behavior, report:
+
+```text
+Affected files and symbols:
+Shared values found:
+Classification for each value: immutable / instance-owned / diagnostics-only / approved process-wide / prohibited
+Readers and writers:
+DTO, interface, event, callback, or injection boundary used:
+Implicit `this` or unbound-method risk found:
+Global-object or prototype writes found:
+Mutable static/global state removed or rejected:
+Strict TypeScript or JavaScript protections preserved:
+Concurrency and lifecycle behavior:
+Tests added or run:
+Remaining runtime risk:
+```
+
+### Forbidden Patterns
+
+Do not:
+
+* use mutable static or global state to make data available without changing a DTO or method signature
+* use a global context object as an undocumented parameter list
+* store current-operation state in a singleton
+* expose a public writable static field
+* export a mutable object as a cross-component state bus
+* rely on plain-function `this` resolving to `globalThis`, `window`, or Node.js `global`
+* use top-level `this` for application state
+* create implicit globals
+* use `as any`, `any`, unsafe casts, non-null assertions, or compiler-option weakening to bypass ownership errors
+* treat `const`, `final`, or `readonly` as proof of deep immutability
+* mutate built-in prototypes for application coordination
+* use a cache, registry, counter, or singleton without a single owner, invalidation rule, lifecycle, and tests
+* let a failed, cancelled, timed-out, or interrupted operation leave shared state for the next operation
+* use shared mutable state because the correct architecture is temporarily difficult to understand
+* hide a global-state dependency behind a generic manager, utility, service locator, facade, or compatibility wrapper
+* claim that TypeScript alone prevents explicit global mutation
+
+The goal is not to prohibit classes, instance `this`, static utility functions, constants, caches, or long-lived services.
+
+The goal is to prohibit hidden mutable data flow, preserve explicit ownership and DTO boundaries, prevent stale cross-operation state, and make every behavior-affecting dependency visible in code, tests, and logs.
+
+---
+
 ## 31. Security Rules
 
 Do not commit secrets.
