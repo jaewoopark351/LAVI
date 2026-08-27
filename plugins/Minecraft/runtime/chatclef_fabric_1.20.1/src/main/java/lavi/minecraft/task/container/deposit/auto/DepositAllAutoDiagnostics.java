@@ -6,6 +6,7 @@ import lavi.minecraft.task.container.deposit.auto.maintenance.AutoDepositMainten
 import lavi.minecraft.task.container.deposit.auto.maintenance.AutoDepositMaintenancePhase;
 import lavi.minecraft.task.container.deposit.auto.policy.AutoDepositPlan;
 import lavi.minecraft.task.container.deposit.auto.recovery.AutoDepositRecoveryCandidate;
+import lavi.minecraft.task.container.deposit.auto.trusted.AutoDepositTrustedDestinationCandidate;
 import lavi.minecraft.task.container.deposit.auto.working.WorkingSetSnapshot;
 
 //20260826_kpopmodder: Added bounded state-transition diagnostics for automatic deposit_all orchestration.
@@ -113,6 +114,7 @@ public final class DepositAllAutoDiagnostics {
                 "generalStepCount", plan.generalTargets().length,
                 "trustedStepCount", plan.trustedTargets().length,
                 "trustedDestination", plan.trustedDestination().map(Object::toString).orElse("none"),
+                "trustedCandidateCount", plan.trustedCandidates().size(),
                 "protectedItemTypes", plan.protectedCounts().size(),
                 "targetReliefSlots", plan.targetReliefSlots(),
                 "expectedFreedSlots", plan.expectedFreedSlots(),
@@ -224,6 +226,82 @@ public final class DepositAllAutoDiagnostics {
                 "candidateTier", candidate == null ? "none" : candidate.tier(),
                 "candidatePosition", candidate == null ? "none" : candidate.position(),
                 "remainingDeficitTypeCount", remainingDeficitTypes
+        );
+    }
+
+    public static void logTrustedCandidateSelected(
+            long operationEpoch,
+            AutoDepositTrustedDestinationCandidate candidate,
+            int remainingTargetTypes,
+            int remainingCandidates) {
+        ChatClefDiagnostics.logEvent(
+                CATEGORY,
+                "TRUSTED_CANDIDATE_SELECTED",
+                "live_container_validation_started",
+                null,
+                "operationEpoch", operationEpoch,
+                "destinationId", candidate.destinationId(),
+                "candidatePosition", candidate.position(),
+                "cachedEmptySlotsHint", candidate.cachedEmptySlots(),
+                "observedStateHint", candidate.observedState(),
+                "remainingTargetTypes", remainingTargetTypes,
+                "remainingCandidates", remainingCandidates
+        );
+    }
+
+    public static void logTrustedCandidateTerminal(
+            long operationEpoch,
+            AutoDepositTrustedDestinationCandidate candidate,
+            String result,
+            int remainingTargetTypes,
+            int remainingCandidates) {
+        ChatClefDiagnostics.logEvent(
+                CATEGORY,
+                "TRUSTED_CANDIDATE_TERMINAL",
+                result,
+                null,
+                "operationEpoch", operationEpoch,
+                "destinationId", candidate == null ? "none" : candidate.destinationId(),
+                "candidatePosition", candidate == null ? "none" : candidate.position(),
+                "remainingTargetTypes", remainingTargetTypes,
+                "remainingCandidates", remainingCandidates
+        );
+    }
+
+    //20260827_kpopmodder: Log only live acceptance and confirmed transfer boundaries.
+    public static void logTrustedCandidateAccepted(
+            long operationEpoch,
+            AutoDepositTrustedDestinationCandidate candidate,
+            int remainingTargetTypes) {
+        ChatClefDiagnostics.logEvent(
+                CATEGORY,
+                "TRUSTED_CANDIDATE_LIVE_ACCEPTED",
+                "exact_open_gui_capacity_confirmed",
+                null,
+                "operationEpoch", operationEpoch,
+                "destinationId", candidate.destinationId(),
+                "candidatePosition", candidate.position(),
+                "remainingTargetTypes", remainingTargetTypes
+        );
+    }
+
+    public static void logTrustedTransferProgress(
+            long operationEpoch,
+            AutoDepositTrustedDestinationCandidate candidate,
+            int confirmedDelta,
+            int confirmedTotal,
+            int remainingTargetTypes) {
+        ChatClefDiagnostics.logEvent(
+                CATEGORY,
+                "TRUSTED_TRANSFER_PROGRESS",
+                "paired_inventory_and_container_delta_confirmed",
+                null,
+                "operationEpoch", operationEpoch,
+                "destinationId", candidate == null ? "none" : candidate.destinationId(),
+                "candidatePosition", candidate == null ? "none" : candidate.position(),
+                "confirmedDelta", confirmedDelta,
+                "confirmedTotal", confirmedTotal,
+                "remainingTargetTypes", remainingTargetTypes
         );
     }
 }

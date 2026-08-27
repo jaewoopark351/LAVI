@@ -1,6 +1,9 @@
 package lavi.minecraft.task.container.deposit.auto.policy;
 
 import adris.altoclef.util.ItemTarget;
+import adris.altoclef.util.Dimension;
+import lavi.minecraft.task.container.deposit.auto.trusted.AutoDepositTrustedDestination;
+import lavi.minecraft.task.container.deposit.auto.trusted.AutoDepositTrustedDestinationCandidate;
 import net.minecraft.item.Item;
 import net.minecraft.util.math.BlockPos;
 
@@ -116,27 +119,40 @@ public final class AutoDepositPlanBuilder {
                                   Optional<BlockPos> trustedDestination,
                                   long trustedRevision,
                                   String trustedCapacityState) {
-        Objects.requireNonNull(draft, "draft");
         Objects.requireNonNull(trustedDestination, "trustedDestination");
+        List<AutoDepositTrustedDestinationCandidate> candidates = trustedDestination.isPresent()
+                ? List.of(legacyCandidate(draft, trustedDestination.get()))
+                : List.of();
+        return finish(draft, candidates, trustedRevision, trustedCapacityState);
+    }
+
+    //20260827_kpopmodder: Route trusted-only targets only when a bounded candidate snapshot exists.
+    public AutoDepositPlan finish(
+            AutoDepositPlanDraft draft,
+            List<AutoDepositTrustedDestinationCandidate> trustedCandidates,
+            long trustedRevision,
+            String trustedCapacityState) {
+        Objects.requireNonNull(draft, "draft");
+        Objects.requireNonNull(trustedCandidates, "trustedCandidates");
         Objects.requireNonNull(trustedCapacityState, "trustedCapacityState");
 
         List<AutoDepositPlannedItem> selectedGeneral = take(
                 draft.generalItems(), draft.targetReliefSlots()
         );
         int remainingRelief = Math.max(0, draft.targetReliefSlots() - selectedGeneral.size());
-        List<AutoDepositPlannedItem> selectedTrusted = trustedDestination.isPresent()
+        List<AutoDepositPlannedItem> selectedTrusted = !trustedCandidates.isEmpty()
                 ? take(draft.conditionalItems(), remainingRelief)
                 : List.of();
         ItemTarget[] generalTargets = toTargets(selectedGeneral);
         ItemTarget[] trustedTargets = toTargets(selectedTrusted);
         int expectedFreedSlots = selectedGeneral.size() + selectedTrusted.size();
-        Optional<BlockPos> effectiveTrustedDestination = selectedTrusted.isEmpty()
-                ? Optional.empty()
-                : trustedDestination;
+        List<AutoDepositTrustedDestinationCandidate> effectiveTrustedCandidates =
+                selectedTrusted.isEmpty() ? List.of() : List.copyOf(trustedCandidates);
 
         List<String> semantics = new ArrayList<>(draft.semanticEntries());
-        semantics.add("trustedSelected="
-                + effectiveTrustedDestination.map(BlockPos::toShortString).orElse("none"));
+        semantics.add("trustedCandidates=" + effectiveTrustedCandidates.stream()
+                .map(candidate -> candidate.destinationId() + ":" + candidate.observedState())
+                .reduce("none", (left, right) -> left.equals("none") ? right : left + "," + right));
         semantics.add("targetReliefSlots=" + draft.targetReliefSlots());
         semantics.add("expectedFreedSlots=" + expectedFreedSlots);
         AutoDepositContextSnapshot context = draft.context();
@@ -154,13 +170,29 @@ public final class AutoDepositPlanBuilder {
                 context,
                 generalTargets,
                 trustedTargets,
-                effectiveTrustedDestination.orElse(null),
+                effectiveTrustedCandidates,
                 draft.protectedCounts(),
                 draft.dispositions(),
                 draft.startingOccupiedSlots(),
                 draft.targetReliefSlots(),
                 expectedFreedSlots,
                 fingerprint
+        );
+    }
+
+    private static AutoDepositTrustedDestinationCandidate legacyCandidate(
+            AutoDepositPlanDraft draft,
+            BlockPos position) {
+        AutoDepositContextSnapshot context = draft.context();
+        Dimension dimension = context.dimension();
+        AutoDepositTrustedDestination destination = new AutoDepositTrustedDestination(
+                context.persistentWorldKey(),
+                dimension,
+                position,
+                true
+        );
+        return new AutoDepositTrustedDestinationCandidate(
+                destination, 0, 0.0, "legacy_explicit_candidate"
         );
     }
 

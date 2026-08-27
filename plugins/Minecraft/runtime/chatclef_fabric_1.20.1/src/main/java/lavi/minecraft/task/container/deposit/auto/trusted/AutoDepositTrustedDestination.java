@@ -37,7 +37,16 @@ public final class AutoDepositTrustedDestination {
         return enabled;
     }
 
+    //20260827_kpopmodder: Keep trusted identity stable across reloads and command output.
     public String key() {
-        return worldKey + ":" + dimension + ":" + position.toShortString();
+        return worldKey
+                + "|" + dimension.name()
+                + "|" + position.getX()
+                + "|" + position.getY()
+                + "|" + position.getZ();
+    }
+
+    public String destinationId() {
+        return AutoDepositTrustedDestinationId.fromCanonicalIdentity(key());
     }
 }

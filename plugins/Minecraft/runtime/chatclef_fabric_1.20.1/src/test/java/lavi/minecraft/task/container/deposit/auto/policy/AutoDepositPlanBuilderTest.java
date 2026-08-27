@@ -4,6 +4,9 @@ import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.Dimension;
 import lavi.minecraft.task.container.deposit.auto.maintenance.AutoDepositMaintenancePhase;
 import lavi.minecraft.task.container.deposit.auto.maintenance.AutoDepositMaintenanceTask;
+import lavi.minecraft.task.container.deposit.auto.trusted.AutoDepositTrustedDestination;
+import lavi.minecraft.task.container.deposit.auto.trusted.AutoDepositTrustedDestinationCandidate;
+import lavi.minecraft.task.container.deposit.auto.trusted.AutoDepositTrustedDestinationRepository;
 import lavi.minecraft.task.container.deposit.auto.working.WorkingSetSnapshot;
 import lavi.minecraft.testsupport.TestItems;
 import net.minecraft.item.Item;
@@ -115,8 +118,20 @@ class AutoDepositPlanBuilderTest {
         AutoDepositPlanDraft draft = builder.prepare(idleContext(), stacks, hard, Map.of(), 2, 1);
 
         AutoDepositPlan withoutTrust = builder.finish(draft, Optional.empty(), 1L, "none");
+        AutoDepositTrustedDestinationCandidate candidate =
+                new AutoDepositTrustedDestinationCandidate(
+                        new AutoDepositTrustedDestination(
+                                "test-world",
+                                Dimension.OVERWORLD,
+                                new BlockPos(10, 64, 10),
+                                true
+                        ),
+                        0,
+                        100.0,
+                        "capacity_unverified"
+                );
         AutoDepositPlan withTrust = builder.finish(
-                draft, Optional.of(new BlockPos(10, 64, 10)), 2L, "eligible"
+                draft, List.of(candidate), 2L, "capacity_unverified"
         );
 
         assertFalse(withoutTrust.hasTargets());
@@ -125,6 +140,9 @@ class AutoDepositPlanBuilderTest {
         assertEquals(AutoDepositDisposition.UNCLASSIFIED_CONSERVATIVE,
                 withTrust.dispositions().get(unknown));
         assertTrue(withTrust.trustedDestination().isPresent());
+        assertEquals(1, withTrust.trustedCandidates().size());
+        assertEquals(candidate.destinationId(),
+                withTrust.trustedCandidates().get(0).destinationId());
     }
 
     @Test
@@ -216,7 +234,11 @@ class AutoDepositPlanBuilderTest {
                 draft, Optional.of(new BlockPos(10, 64, 10)), 2L, "eligible"
         );
 
-        AutoDepositMaintenanceTask maintenance = new AutoDepositMaintenanceTask(plan);
+        AutoDepositTrustedDestinationRepository repository =
+                AutoDepositTrustedDestinationRepository.inMemoryEmpty();
+        plan.trustedCandidates().forEach(candidate ->
+                repository.register(candidate.destination()));
+        AutoDepositMaintenanceTask maintenance = new AutoDepositMaintenanceTask(plan, repository);
 
         assertEquals(1, plan.generalTargets().length);
         assertEquals(1, plan.trustedTargets().length);

@@ -15,7 +15,9 @@ import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 
-public final class AutoDepositTrustedDestinationStore {
+//20260827_kpopmodder: Expose file persistence through the instance-owned trusted repository boundary.
+public final class AutoDepositTrustedDestinationStore
+        implements AutoDepositTrustedDestinationPersistence {
     private final Path path;
     private final ObjectMapper mapper = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
 
@@ -23,6 +25,7 @@ public final class AutoDepositTrustedDestinationStore {
         this.path = path.toAbsolutePath().normalize();
     }
 
+    @Override
     public List<AutoDepositTrustedDestination> load() throws IOException {
         if (!Files.exists(path)) {
             return List.of();
@@ -59,6 +62,7 @@ public final class AutoDepositTrustedDestinationStore {
         return List.copyOf(result);
     }
 
+    @Override
     public void save(List<AutoDepositTrustedDestination> destinations) throws IOException {
         Path parent = path.getParent();
         if (parent != null) {
@@ -86,6 +90,7 @@ public final class AutoDepositTrustedDestinationStore {
         }
     }
 
+    @Override
     public long modifiedTime() {
         try {
             return Files.exists(path) ? Files.getLastModifiedTime(path).toMillis() : -1L;

@@ -54,6 +54,24 @@ class DepositAllInventoryPressureStateMachineTest {
     }
 
     @Test
+    void explicitTrustedPolicyChangeRearmsACompletedRunExactlyOnce() {
+        DepositAllInventoryPressureStateMachine machine = new DepositAllInventoryPressureStateMachine();
+
+        assertEquals(DepositAllInventoryPressureSignal.THRESHOLD_REACHED,
+                machine.observe(AT_THRESHOLD));
+        machine.markRunStarted();
+        machine.markRunTerminated();
+
+        assertEquals(DepositAllInventoryPressureSignal.MEANINGFUL_CHANGE,
+                machine.observeExplicitPolicyChange());
+        assertEquals(DepositAllInventoryPressureState.ARMED, machine.state());
+        assertEquals(DepositAllInventoryPressureSignal.NONE,
+                machine.observeExplicitPolicyChange());
+        assertEquals(DepositAllInventoryPressureSignal.THRESHOLD_REACHED,
+                machine.observe(AT_THRESHOLD));
+    }
+
+    @Test
     void noSafeSurplusRetriesOnlyAfterSemanticFingerprintChanges() {
         DepositAllInventoryPressureStateMachine machine = new DepositAllInventoryPressureStateMachine();
         AutoDepositDecisionFingerprint first = fingerprint("first");

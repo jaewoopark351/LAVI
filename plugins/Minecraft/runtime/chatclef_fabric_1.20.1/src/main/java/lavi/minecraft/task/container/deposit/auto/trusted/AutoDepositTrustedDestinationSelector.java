@@ -8,7 +8,10 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 
+//20260827_kpopmodder: Snapshot all eligible trusted candidates in deterministic distance order.
 public final class AutoDepositTrustedDestinationSelector {
+    private static final int MAX_FINGERPRINT_STATES = 64;
+    private static final int MAX_OPERATION_CANDIDATES = 64;
     private final AutoDepositTrustedDestinationRepository repository;
     private final int maximumDistance;
     private final AutoDepositTrustedDestinationEvaluator evaluator;
@@ -33,10 +36,12 @@ public final class AutoDepositTrustedDestinationSelector {
         repository.reloadIfChanged();
         long revision = repository.revision();
         if (worldKey == null || worldKey.equals("unavailable") || dimension == null) {
-            return new AutoDepositTrustedDestinationInspection(null, revision, "world_key_unavailable");
+            return new AutoDepositTrustedDestinationInspection(
+                    List.of(), revision, "world_key_unavailable"
+            );
         }
 
-        List<Candidate> candidates = new ArrayList<>();
+        List<AutoDepositTrustedDestinationCandidate> candidates = new ArrayList<>();
         List<String> states = new ArrayList<>();
         for (AutoDepositTrustedDestination destination : repository.destinations()) {
             if (!destination.enabled()
@@ -47,36 +52,41 @@ public final class AutoDepositTrustedDestinationSelector {
             AutoDepositTrustedDestinationEvaluation evaluation = evaluator.evaluate(
                     mod, destination, Math.max(1, requiredEmptySlots), maximumDistance
             );
-            Candidate candidate = new Candidate(destination, evaluation);
-            candidates.add(candidate);
-            states.add(destination.position().toShortString() + "=" + candidate.state);
+            if (evaluation.eligible()) {
+                candidates.add(new AutoDepositTrustedDestinationCandidate(
+                        destination,
+                        evaluation.emptySlots(),
+                        evaluation.distanceSquared(),
+                        evaluation.state()
+                ));
+            }
+            states.add(destination.destinationId() + "=" + evaluation.state());
         }
-        candidates.sort(Comparator.comparingDouble(candidate -> candidate.distanceSquared));
-        Candidate selected = candidates.stream().filter(candidate -> candidate.eligible).findFirst().orElse(null);
-        String capacityState = states.isEmpty() ? "no_matching_registration" : String.join("|", states);
+        candidates.sort(Comparator
+                .comparingDouble(AutoDepositTrustedDestinationCandidate::distanceSquared)
+                .thenComparing(Comparator.comparingInt(
+                        AutoDepositTrustedDestinationCandidate::cachedEmptySlots).reversed())
+                .thenComparing(AutoDepositTrustedDestinationCandidate::destinationId));
+        states.sort(String::compareTo);
+        String capacityState = boundedState(states);
+        List<AutoDepositTrustedDestinationCandidate> boundedCandidates = List.copyOf(
+                candidates.subList(0, Math.min(MAX_OPERATION_CANDIDATES, candidates.size()))
+        );
         return new AutoDepositTrustedDestinationInspection(
-                selected == null ? null : new AutoDepositTrustedDestinationSelection(
-                        selected.destination.position(), selected.emptySlots
-                ),
+                boundedCandidates,
                 revision,
                 capacityState
         );
     }
 
-    private static final class Candidate {
-        private final AutoDepositTrustedDestination destination;
-        private final boolean eligible;
-        private final int emptySlots;
-        private final double distanceSquared;
-        private final String state;
-
-        private Candidate(AutoDepositTrustedDestination destination,
-                          AutoDepositTrustedDestinationEvaluation evaluation) {
-            this.destination = destination;
-            eligible = evaluation.eligible();
-            emptySlots = evaluation.emptySlots();
-            distanceSquared = evaluation.distanceSquared();
-            state = evaluation.state();
+    private static String boundedState(List<String> states) {
+        if (states.isEmpty()) {
+            return "no_matching_registration";
         }
+        int included = Math.min(MAX_FINGERPRINT_STATES, states.size());
+        String result = String.join("|", states.subList(0, included));
+        return included == states.size()
+                ? result
+                : result + "|truncated=" + (states.size() - included);
     }
 }

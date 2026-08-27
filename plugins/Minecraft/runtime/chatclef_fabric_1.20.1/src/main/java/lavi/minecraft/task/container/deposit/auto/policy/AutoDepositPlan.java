@@ -1,6 +1,7 @@
 package lavi.minecraft.task.container.deposit.auto.policy;
 
 import adris.altoclef.util.ItemTarget;
+import lavi.minecraft.task.container.deposit.auto.trusted.AutoDepositTrustedDestinationCandidate;
 import net.minecraft.item.Item;
 import net.minecraft.util.math.BlockPos;
 
@@ -15,7 +16,8 @@ public final class AutoDepositPlan {
     private final AutoDepositContextSnapshot context;
     private final ItemTarget[] generalTargets;
     private final ItemTarget[] trustedTargets;
-    private final BlockPos trustedDestination;
+    //20260827_kpopmodder: Preserve the ordered trusted candidate snapshot for one operation.
+    private final List<AutoDepositTrustedDestinationCandidate> trustedCandidates;
     private final Map<Item, Integer> protectedCounts;
     private final Map<Item, AutoDepositDisposition> dispositions;
     private final int startingOccupiedSlots;
@@ -26,7 +28,7 @@ public final class AutoDepositPlan {
     AutoDepositPlan(AutoDepositContextSnapshot context,
                     ItemTarget[] generalTargets,
                     ItemTarget[] trustedTargets,
-                    BlockPos trustedDestination,
+                    List<AutoDepositTrustedDestinationCandidate> trustedCandidates,
                     Map<Item, Integer> protectedCounts,
                     Map<Item, AutoDepositDisposition> dispositions,
                     int startingOccupiedSlots,
@@ -36,7 +38,7 @@ public final class AutoDepositPlan {
         this.context = context;
         this.generalTargets = generalTargets.clone();
         this.trustedTargets = trustedTargets.clone();
-        this.trustedDestination = trustedDestination == null ? null : trustedDestination.toImmutable();
+        this.trustedCandidates = List.copyOf(trustedCandidates);
         this.protectedCounts = Collections.unmodifiableMap(new LinkedHashMap<>(protectedCounts));
         this.dispositions = Collections.unmodifiableMap(new LinkedHashMap<>(dispositions));
         this.startingOccupiedSlots = startingOccupiedSlots;
@@ -58,7 +60,12 @@ public final class AutoDepositPlan {
     }
 
     public Optional<BlockPos> trustedDestination() {
-        return Optional.ofNullable(trustedDestination);
+        return trustedCandidates.stream().findFirst()
+                .map(AutoDepositTrustedDestinationCandidate::position);
+    }
+
+    public List<AutoDepositTrustedDestinationCandidate> trustedCandidates() {
+        return trustedCandidates;
     }
 
     public ItemTarget[] allTargets() {

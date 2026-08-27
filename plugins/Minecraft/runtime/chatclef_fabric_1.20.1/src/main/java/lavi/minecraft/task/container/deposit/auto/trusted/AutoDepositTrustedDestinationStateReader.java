@@ -11,6 +11,7 @@ import java.util.Optional;
 
 //20260827_kpopmodder: Read a cheap trusted-cache fingerprint without selecting a destination.
 public final class AutoDepositTrustedDestinationStateReader {
+    private static final int MAX_FINGERPRINT_STATES = 64;
     private final AutoDepositTrustedDestinationRepository repository;
     private final int maximumDistance;
 
@@ -53,9 +54,13 @@ public final class AutoDepositTrustedDestinationStateReader {
                             + cache.map(value -> "empty:" + value.getEmptySlotCount())
                             .orElse("uncached"));
                 });
-        return new AutoDepositTrustedDestinationState(
-                revision,
-                states.isEmpty() ? "no_matching_registration" : String.join("|", states)
-        );
+        int included = Math.min(MAX_FINGERPRINT_STATES, states.size());
+        String capacityState = states.isEmpty()
+                ? "no_matching_registration"
+                : String.join("|", states.subList(0, included));
+        if (included < states.size()) {
+            capacityState += "|truncated=" + (states.size() - included);
+        }
+        return new AutoDepositTrustedDestinationState(revision, capacityState);
     }
 }

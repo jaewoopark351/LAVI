@@ -14,7 +14,6 @@ import lavi.minecraft.task.container.deposit.auto.trusted.AutoDepositTrustedDest
 import lavi.minecraft.task.container.deposit.auto.trusted.AutoDepositWorldKeyReader;
 import lavi.minecraft.task.container.deposit.auto.working.WorkingSetSnapshot;
 import net.minecraft.item.Item;
-import net.minecraft.util.math.BlockPos;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -30,6 +29,7 @@ public final class AutoDepositPolicyEngine {
     private final AutoDepositHardProtectionPolicy hardProtectionPolicy;
     private final AutoDepositCategoryReservePolicy reservePolicy;
     private final AutoDepositPlanBuilder planBuilder;
+    private final AutoDepositTrustedDestinationRepository trustedRepository;
     private final AutoDepositTrustedDestinationSelector trustedSelector;
     private final AutoDepositTrustedDestinationStateReader trustedStateReader;
     private final AutoDepositWorldKeyReader worldKeyReader;
@@ -45,12 +45,13 @@ public final class AutoDepositPolicyEngine {
         hardProtectionPolicy = new AutoDepositHardProtectionPolicy(definition);
         reservePolicy = new AutoDepositCategoryReservePolicy(definition, classification);
         planBuilder = new AutoDepositPlanBuilder(definition, classification);
+        this.trustedRepository = Objects.requireNonNull(trustedRepository, "trustedRepository");
         trustedSelector = new AutoDepositTrustedDestinationSelector(
-                Objects.requireNonNull(trustedRepository, "trustedRepository"),
+                this.trustedRepository,
                 definition.trustedMaximumDistance()
         );
         trustedStateReader = new AutoDepositTrustedDestinationStateReader(
-                trustedRepository, definition.trustedMaximumDistance()
+                this.trustedRepository, definition.trustedMaximumDistance()
         );
         worldKeyReader = new AutoDepositWorldKeyReader();
         destinationProbe = new AutoDepositGeneralDestinationProbe();
@@ -61,6 +62,10 @@ public final class AutoDepositPolicyEngine {
                 new AutoDepositPolicyLoader().loadOrFailClosed(),
                 AutoDepositTrustedDestinationRepository.inMemoryEmpty()
         );
+    }
+
+    public AutoDepositTrustedDestinationRepository trustedRepository() {
+        return trustedRepository;
     }
 
     public AutoDepositPlanningResult plan(AltoClef mod,
@@ -186,12 +191,9 @@ public final class AutoDepositPolicyEngine {
                         trustedSlotsRequired
                 )
                 : AutoDepositTrustedDestinationInspection.notRequired();
-        Optional<BlockPos> trustedPosition = draft.conditionalItems().isEmpty()
-                ? Optional.empty()
-                : trusted.selection().map(selection -> selection.position());
         return planBuilder.finish(
                 draft,
-                trustedPosition,
+                draft.conditionalItems().isEmpty() ? List.of() : trusted.candidates(),
                 trusted.repositoryRevision(),
                 trusted.capacityState()
         );

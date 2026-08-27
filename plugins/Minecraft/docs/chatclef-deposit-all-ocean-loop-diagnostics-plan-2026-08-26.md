@@ -13,6 +13,10 @@
 
 작성 기준일: 2026-08-26
 
+> 2026-08-27 방향 안내: 사용자가 명시적으로 요청했을 때만 trusted destination에
+> inventory를 정리하는 `STORE_HOME`은 이 automatic-deposit 기록과 분리한다.
+> 해당 기능에는 [Manual Trusted Home Storage Direction](chatclef-manual-trusted-home-storage-direction-2026-08-27.md)이 우선한다.
+
 이 문서는 바다에서 bare `@deposit_all`이 저장 단계로 수렴하지 않았지만 육지와
 나무가 있는 곳에서는 정상 완료된 재현을 바탕으로 진단 범위를 고정했고, 이후
 D7-D9 runtime 증거로 확정한 root cause와 최소 동작 수정 방향을 기록한다.
@@ -3524,6 +3528,8 @@ NO_SAFE_SURPLUS state latch:                      IMPLEMENTED IN DIRTY WORKTREE
 separate low-water rearm:                         IMPLEMENTED, 28 / 36
 free-slot success metric:                         IMPLEMENTED IN DIRTY WORKTREE
 trusted destination registry:                    IMPLEMENTED AS INSTANCE-OWNED JSON STORE
+trusted destination in-game registration command: IMPLEMENTED IN DIRTY WORKTREE, NOT BUILT
+trusted sequential live-container execution:      IMPLEMENTED IN DIRTY WORKTREE, NOT BUILT
 resource JSON reuse boundary:                     ACCEPTED, DOCUMENTED
 unclassified vanilla/modded item default:          FAIL_CLOSED, DOCUMENTED
 rare functional item destination policy:           DOCUMENTED
@@ -3535,6 +3541,11 @@ build, deployment and Minecraft reproduction:     NOT RUN FOR THIS SECTION
 trusted destination은 Fabric config 아래
 `lavi/automatic-deposit-trusted-destinations.json`에 world, dimension, position과 enabled 상태를
 명시적으로 저장한다. 발견한 상자나 operation-local manifest를 자동으로 trusted로 승격하지 않는다.
+현재 dirty worktree에는 이 JSON store를 게임 안에서 갱신하는 `@auto_deposit_trust`,
+`@auto_deposit_untrust [destinationId]`, `@auto_deposit_trusted_list` command가 구현되어 있다.
+동일한 composition root가 만든 repository 인스턴스를 automatic policy, command registrar와 trusted
+저장 실행 Task에 주입한다. 이 상태는 아직 Gradle build와 Minecraft runtime 검증을 거치지 않았으므로
+배포 완료 상태로 판정하지 않는다.
 
 ```json
 {
@@ -3569,6 +3580,142 @@ focused source 범위를 먼저 확정한다. Stack-level transfer enforcement, 
 state-machine hysteresis는 서로 다른 lifecycle 책임이므로 한 번에 shared engine 경계를
 넓히지 않는다. 각 slice는 기존 automatic package 안의 LAVI-owned composition으로 구현하고
 수동 명령과 upstream-derived shared Task는 보존한다.
+
+##### 26.10.13.1 trusted destination 등록 명령 방향
+
+<!-- 20260827_openai: Recorded the reviewed exact-container registration direction for trusted automatic-deposit destinations. -->
+
+방향성 검수 결과, 첫 구현은 집이나 기지의 영역 전체가 아니라 사용자가 명시적으로 지정한
+개별 container 좌표를 trusted destination으로 등록한다. Trusted destination은 편의상 발견된
+상자 목록이 아니라 귀중품의 저장 허용 경계다. 따라서 영역 내부의 새 container, scanner가
+발견한 container, cache에 남은 container 또는 operation-local destination manifest를 자동으로
+trusted로 승격하지 않는다.
+
+게임 내 첫 명령 surface는 다음 세 가지로 제한한다.
+
+```text
+@auto_deposit_trust
+    -> 현재 열린 screen이 지원되는 block container이고 현재 world/dimension의 exact BlockPos와
+       결합할 수 있으면 그 container를 우선 등록
+    -> 위 조건을 만족하는 열린 container가 없으면 사용자가 바라보는 지원 block container를 등록
+
+@auto_deposit_untrust [destinationId]
+    -> 인자가 없으면 trust와 같은 exact-target 규칙으로 열린 container를 우선하고,
+       없으면 바라보는 등록 container를 해제
+    -> destinationId가 있으면 파괴되었거나 접근할 수 없는 등록도 직접 해제
+
+@auto_deposit_trusted_list
+    -> stable destinationId, worldKey, dimension, BlockPos, enabled와 관측 상태 출력
+```
+
+등록과 해제 결과에는 최소한 `destinationId`, `worldKey`, `dimension`, `BlockPos`를 출력한다.
+목록 순번은 정렬에 따라 달라질 수 있으므로 영속적인 해제 식별자로 사용하지 않는다.
+`destinationId`는 world identity, dimension과 좌표에서 결정적으로 만들고 같은 container를
+반복 등록해도 중복 entry를 만들지 않는다.
+
+등록 시점에는 현재 대상이 지원되는 실제 block container인지 확인하지만, 등록 시점의 남은 용량을
+영구적인 사실로 저장하지 않는다. 열린 screen을 등록 대상으로 사용할 때는 현재 interaction과
+exact BlockPos의 결합이 증명된 경우만 허용하며, last-opened 위치, cache 또는 nearest-container
+추정으로 trusted 좌표를 만들지 않는다. Minecraft client의 cache는 열어 본 시점의 관측일 뿐이며,
+열지 않았거나 이후 내용이 바뀐 container의 현재 용량을 증명하지 못한다. 목록 상태도 이 한계를
+숨기지 않고 다음처럼 구분한다.
+
+```text
+KNOWN_AVAILABLE
+KNOWN_FULL
+MISSING
+KNOWN_UNREACHABLE
+UNKNOWN_OR_STALE
+```
+
+`KNOWN_AVAILABLE`과 `KNOWN_FULL`도 관측 시점과 함께 표시할 수 있는 cache 상태이며, 실제 저장
+직전에는 서버가 제공한 열린 container GUI slot을 기준으로 용량을 다시 검증한다. 접근 가능성도
+사전 추정만으로 성공 처리하지 않는다.
+
+여러 trusted destination은 사전 후보 ordering과 실제 저장 acceptance를 분리한다.
+
+```text
+사전 후보 gate:
+    same worldKey
+    -> same dimension
+    -> enabled registration
+    -> supported container가 관측됐거나 아직 실제 검증 가능한 상태
+    -> operation-local failure blacklist에 없음
+
+사전 시도 순서:
+    가까운 거리 우선
+    -> 거리가 같은 경우 최근에 확인된 남은 용량을 hint로 사용
+
+선택한 후보의 실제 acceptance:
+    등록된 exact BlockPos의 지원 container인지 재검증
+    -> 실제로 열기
+    -> 서버가 제공한 container GUI slot으로 필요한 수용 가능량 재검증
+    -> 실패하면 operation-local blacklist에 넣고 다음 후보 시도
+```
+
+Cache상 capacity와 accessibility는 사전 ordering의 hint일 뿐 최종 성공 증거가 아니다. 모든 trusted
+container를 먼저 열어 전역 용량 순위를 만드는 동작도 요구하지 않는다. 선택한 상자를 열었을 때
+가득 찼거나 사라졌거나 접근할 수 없으면 해당 automatic operation에서만 제외하고 다음 trusted
+destination을 시도한다. 같은 실패 후보를 무제한 재선택하지 않는다.
+
+사용 가능한 trusted destination이 없으면 trusted-only 귀중품을 일반 container로 fallback하지
+않는다. 일반 surplus만 처리하고 귀중품은 inventory에 유지한 채 보호 상태로 정상 대기한다.
+재시도는 trusted registry revision, 유효한 capacity 관측 또는 다른 기존 decision fingerprint
+변화가 있을 때만 허용한다.
+
+집 또는 기지 영역 등록은 첫 구현 범위에서 제외한다. 이후 필요하면 기존 exact-container
+provider를 대체하지 않고 별도의 `trusted area` destination provider로 추가한다. 영역 내부에
+있다는 사실만으로 새 container를 자동 신뢰할지 여부도 그 후속 기능에서 별도로 승인해야 한다.
+
+현재 dirty worktree 구현은 기존 instance-owned repository와 selector를 재사용하며 다음 경계로
+책임을 분리한다.
+
+```text
+AutoDepositRuntime
+    -> policy, command와 execution에 동일 repository instance 주입
+
+trusted/command/
+    -> trust / untrust / trusted_list
+    -> exact binding이 없고 ChatScreen 외 화면이 열려 있으면 stale crosshair fallback 거부
+
+trusted/interaction/
+    -> block interaction과 열린 screen의 exact position binding 계약
+    -> command target과 trusted execution의 live acceptance에 동일 증거 제공
+
+trusted/execution/
+    -> 거리순 immutable candidate queue
+    -> operation-local rejection map
+    -> exact-open 전에는 후보별 고정 InteractWithBlockTask만 실행
+    -> exact-open 이후에만 후보별 고정 StoreInContainerTask 실행
+    -> exact-open 좌표에서만 player inventory net loss와 container net gain의 교집합으로 transfer 확인
+    -> 실제 GUI에 whole-stack 수용 공간이 없거나 진행이 없으면 다음 후보로 단방향 이동
+```
+
+열린 screen 등록은 같은 world/dimension의 지원 container block interaction이 20 client tick 안에
+해당 screen handler와 결합된 경우만 허용한다. 결합을 증명하지 못하면 열린 container GUI를
+last-opened, cache 또는 nearest-container로 추정하지 않는다. 화면이 닫혀 있거나 명령 입력용
+`ChatScreen`인 상태에서만 현재 crosshair의 지원 container를 등록 대상으로 사용한다. 다른 화면은
+crosshair가 stale일 수 있으므로 fallback을 거부한다.
+
+Trusted 저장 실행도 같은 exact-open binding을 주입받는다. 실제 GUI 수용량 확인과 transfer delta는
+활성 후보 좌표가 이 binding과 일치할 때만 인정하며, upstream `ContainerSubTracker`의
+`getLastBlockPosInteraction()` fallback은 trusted 성공 증거로 사용하지 않는다.
+
+후보 snapshot에는 uncached 또는 cached-full 상태도 hint와 함께 남겨 실제 GUI 검증 기회를 준다.
+로드된 좌표에서 container가 사라졌거나 기존 안전 eligibility를 통과하지 못한 경우만 사전 제외한다.
+한 operation의 immutable 후보 snapshot은 거리순 최대 64개로 제한한다.
+실행 중 등록이 해제되거나 container가 사라지거나 unreachable로 판정되면 해당 operation에서만
+제외하고 다음 후보로 이동한다. 모든 후보가 실패하면 trusted-only 귀중품은 inventory에 남고,
+일반 surplus 단계만 계속한다. 후보별 2400 tick, 열린 GUI 무진행 200 tick과 trusted operation 전체
+6000 tick 상한을 적용하며, 상한 종료도 일반 container fallback 성공으로 바꾸지 않는다.
+완료 후 `WAIT_FOR_REARM` 상태에서는 같은 등록과 시간 경과로 재시도하지 않는다. 실제 trusted
+repository revision이 바뀐 경우에만 명시적 policy-change 신호로 한 번 재무장하여, 인벤토리가
+계속 high-water 이상이어도 새 등록 또는 해제를 반영한 plan을 다시 계산한다.
+
+전역 `ResourceTask.allowContainers=true`, 수동 `@deposit_all`, 기존 `@deposit`, 일반 `@get`,
+shared `StoreInContainerTask`, `Task`, `TaskRunner` 또는 Baritone 동작은 변경하지 않는다. 현재 상태는
+focused source와 test가 존재하는 static-review 단계이며, clean forced build, JAR 배포와 Minecraft
+runtime 재현 전에는 완료 또는 커밋 가능 판정을 내리지 않는다.
 
 #### 26.10.14 resource JSON과 automatic deposit policy data 경계
 
@@ -3638,3 +3785,32 @@ unknown/modded fail-closed default
 coverage 변화가 inventory 안전 정책을 바꾸면 안 된다. 내부 policy는 canonical ID와 runtime
 상태를 기준으로 결정하고, 한국어 resource는 사용자 입력과 표시를 그 canonical ID에 연결하는
 경계로만 유지한다.
+
+## 27. 2026-08-27 manual trusted home storage 방향 분리
+
+<!-- 20260827_openai: Linked the explicit-request-only manual home storage direction without rewriting the automatic-deposit evidence history. -->
+
+사용자가 명시적으로 요청했을 때 집의 trusted destination에 inventory를 정리하는 새 기능은
+이 문서의 inventory-pressure automatic operation과 분리한다.
+
+새 기능의 canonical 설계 문서는 다음이다.
+
+- [Manual Trusted Home Storage Direction](chatclef-manual-trusted-home-storage-direction-2026-08-27.md)
+
+`STORE_HOME`에 대해서는 다음 불변조건이 이 문서의 automatic policy보다 우선한다.
+
+```text
+사용자 요청 없음
+    -> inventory가 가득 차도 storage Task를 시작하지 않음
+
+사용자 명시 요청
+    -> manual StoreHome UserTask만 시작
+    -> exact trusted destination만 사용
+    -> 일반 container fallback 없음
+    -> loadout/reserve 외 모든 안전하게 식별 가능한 exact stack 저장
+```
+
+기존 automatic source와 diagnostics 기록은 조사와 rollback 근거로 보존할 수 있지만,
+manual V1의 activation path가 아니다. 이 방향 변경은 현재 Java behavior가 이미 변경됐다는
+뜻이 아니며, automatic entrypoint 비활성화, `@store_home`, exact-slot executor, build와
+runtime 검증은 모두 별도 구현 및 승인 대상이다.

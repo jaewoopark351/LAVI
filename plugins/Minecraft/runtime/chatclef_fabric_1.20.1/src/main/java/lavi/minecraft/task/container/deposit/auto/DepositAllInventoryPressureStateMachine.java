@@ -72,6 +72,17 @@ public final class DepositAllInventoryPressureStateMachine {
         return DepositAllInventoryPressureSignal.MEANINGFUL_CHANGE;
     }
 
+    //20260827_kpopmodder: Rearm once when the injected trusted registry actually changes.
+    public DepositAllInventoryPressureSignal observeExplicitPolicyChange() {
+        if (state != DepositAllInventoryPressureState.WAIT_FOR_REARM) {
+            return DepositAllInventoryPressureSignal.NONE;
+        }
+        noSafeFingerprint = null;
+        thresholdPending = false;
+        state = DepositAllInventoryPressureState.ARMED;
+        return DepositAllInventoryPressureSignal.MEANINGFUL_CHANGE;
+    }
+
     public void markRunTerminated() {
         requireState(DepositAllInventoryPressureState.RUNNING, "terminate");
         thresholdPending = false;

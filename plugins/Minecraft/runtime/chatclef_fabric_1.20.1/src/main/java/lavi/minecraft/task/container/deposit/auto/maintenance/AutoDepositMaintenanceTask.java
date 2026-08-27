@@ -2,7 +2,6 @@ package lavi.minecraft.task.container.deposit.auto.maintenance;
 
 import adris.altoclef.AltoClef;
 import adris.altoclef.tasks.container.DepositAllTask;
-import adris.altoclef.tasks.container.StoreInContainerTask;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.ItemTarget;
 import lavi.minecraft.task.container.deposit.auto.DepositAllAutoDiagnostics;
@@ -12,6 +11,9 @@ import lavi.minecraft.task.container.deposit.auto.policy.AutoDepositPlan;
 import lavi.minecraft.task.container.deposit.auto.recovery.AutoDepositDestinationManifest;
 import lavi.minecraft.task.container.deposit.auto.recovery.AutoDepositDestinationManifestTracker;
 import lavi.minecraft.task.container.deposit.auto.recovery.RecoverReservedItemsTask;
+import lavi.minecraft.task.container.deposit.auto.trusted.AutoDepositTrustedDestinationRepository;
+import lavi.minecraft.task.container.deposit.auto.trusted.execution.AutoDepositTrustedStoreTask;
+import lavi.minecraft.task.container.deposit.auto.trusted.interaction.AutoDepositExactOpenContainerBinding;
 import lavi.minecraft.task.container.deposit.auto.working.PlayerInventorySnapshotReader;
 import lavi.minecraft.task.container.deposit.auto.working.WorkingSetSnapshot;
 import net.minecraft.item.Item;
@@ -25,8 +27,10 @@ import java.util.Objects;
 public final class AutoDepositMaintenanceTask extends Task {
     private final AutoDepositPlan plan;
     private final WorkingSetSnapshot workingSet;
+    private final AutoDepositTrustedDestinationRepository trustedRepository;
+    private final AutoDepositExactOpenContainerBinding exactOpenContainerBinding;
     private List<DepositAllTask> generalTasks;
-    private List<StoreInContainerTask> trustedTasks;
+    private AutoDepositTrustedStoreTask trustedTask;
     private final AutoDepositDestinationManifest manifest;
     private final PlayerInventorySnapshotReader inventoryReader = new PlayerInventorySnapshotReader();
     private final DepositAllInventoryPressureReader pressureReader = new DepositAllInventoryPressureReader();
@@ -36,10 +40,27 @@ public final class AutoDepositMaintenanceTask extends Task {
     private AutoDepositMaintenancePhase phase;
     private AutoDepositMaintenanceOutcome outcome = AutoDepositMaintenanceOutcome.PENDING;
     private int generalTaskIndex;
-    private int trustedTaskIndex;
 
-    public AutoDepositMaintenanceTask(AutoDepositPlan plan) {
+    public AutoDepositMaintenanceTask(
+            AutoDepositPlan plan,
+            AutoDepositTrustedDestinationRepository trustedRepository) {
+        this(
+                plan,
+                trustedRepository,
+                AutoDepositExactOpenContainerBinding.UNAVAILABLE
+        );
+    }
+
+    public AutoDepositMaintenanceTask(
+            AutoDepositPlan plan,
+            AutoDepositTrustedDestinationRepository trustedRepository,
+            AutoDepositExactOpenContainerBinding exactOpenContainerBinding) {
         this.plan = Objects.requireNonNull(plan, "plan");
+        this.trustedRepository = Objects.requireNonNull(trustedRepository, "trustedRepository");
+        this.exactOpenContainerBinding = Objects.requireNonNull(
+                exactOpenContainerBinding,
+                "exactOpenContainerBinding"
+        );
         if (!plan.hasTargets()) {
             throw new IllegalArgumentException("automatic deposit plan must contain at least one target");
         }
@@ -72,8 +93,8 @@ public final class AutoDepositMaintenanceTask extends Task {
 
         switch (phase) {
             case DEPOSIT_TRUSTED -> {
-                StoreInContainerTask trustedTask = currentTrustedTask();
-                if (trustedTask == null) {
+                AutoDepositTrustedStoreTask trustedStore = trustedTask();
+                if (trustedStore == null) {
                     if (!hasGeneralSteps()) {
                         finishDepositSteps("trusted_steps_complete");
                     } else {
@@ -82,22 +103,16 @@ public final class AutoDepositMaintenanceTask extends Task {
                     }
                     return null;
                 }
-                if (trustedTask.isFinished() || trustedTask.stopped()) {
-                    trustedTaskIndex++;
-                    if (currentTrustedTask() == null) {
-                        if (!hasGeneralSteps()) {
-                            finishDepositSteps("trusted_steps_complete");
-                        } else {
-                            transition(AutoDepositMaintenancePhase.DEPOSIT_GENERAL,
-                                    "trusted_steps_complete", 0);
-                        }
+                if (trustedStore.isFinished() || trustedStore.stopped()) {
+                    if (!hasGeneralSteps()) {
+                        finishDepositSteps("trusted_steps_complete");
                     } else {
-                        transition(AutoDepositMaintenancePhase.DEPOSIT_TRUSTED,
-                                "trusted_step_terminal", 0);
+                        transition(AutoDepositMaintenancePhase.DEPOSIT_GENERAL,
+                                "trusted_steps_complete", 0);
                     }
                     return null;
                 }
-                return trustedTask;
+                return trustedStore;
             }
             case DEPOSIT_GENERAL -> {
                 DepositAllTask generalTask = currentGeneralTask();
@@ -209,11 +224,6 @@ public final class AutoDepositMaintenanceTask extends Task {
         return generalTaskIndex < tasks.size() ? tasks.get(generalTaskIndex) : null;
     }
 
-    private StoreInContainerTask currentTrustedTask() {
-        List<StoreInContainerTask> tasks = trustedTasks();
-        return trustedTaskIndex < tasks.size() ? tasks.get(trustedTaskIndex) : null;
-    }
-
     private static List<DepositAllTask> createGeneralTasks(AutoDepositPlan plan) {
         List<DepositAllTask> result = new ArrayList<>();
         for (ItemTarget target : plan.generalTargets()) {
@@ -229,25 +239,22 @@ public final class AutoDepositMaintenanceTask extends Task {
         return generalTasks;
     }
 
-    private List<StoreInContainerTask> trustedTasks() {
-        if (trustedTasks == null) {
-            trustedTasks = createTrustedTasks(plan);
+    private AutoDepositTrustedStoreTask trustedTask() {
+        if (trustedTask == null && plan.trustedTargets().length > 0
+                && !plan.trustedCandidates().isEmpty()) {
+            trustedTask = new AutoDepositTrustedStoreTask(
+                    plan.context(),
+                    trustedRepository,
+                    plan.trustedCandidates(),
+                    exactOpenContainerBinding,
+                    plan.trustedTargets()
+            );
         }
-        return trustedTasks;
+        return trustedTask;
     }
 
     private boolean hasGeneralSteps() {
         return plan.generalTargets().length > 0;
-    }
-
-    private static List<StoreInContainerTask> createTrustedTasks(AutoDepositPlan plan) {
-        List<StoreInContainerTask> result = new ArrayList<>();
-        plan.trustedDestination().ifPresent(position -> {
-            for (ItemTarget target : plan.trustedTargets()) {
-                result.add(new StoreInContainerTask(position, false, target));
-            }
-        });
-        return List.copyOf(result);
     }
 
     @Override
@@ -286,8 +293,7 @@ public final class AutoDepositMaintenanceTask extends Task {
 
     public Task primaryDepositTask() {
         if (plan.trustedTargets().length > 0) {
-            List<StoreInContainerTask> tasks = trustedTasks();
-            return tasks.isEmpty() ? null : tasks.get(0);
+            return trustedTask();
         }
         return depositTask();
     }

@@ -1,26 +1,25 @@
 package lavi.minecraft.task.container.deposit.auto;
 
 import adris.altoclef.AltoClef;
-import adris.altoclef.tasksystem.TaskRunner;
 import lavi.minecraft.task.container.deposit.auto.policy.AutoDepositPolicyCompositionRoot;
-import lavi.minecraft.task.container.deposit.auto.policy.AutoDepositPolicyEngine;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 
 import java.util.Objects;
-import java.util.function.Supplier;
+import java.util.function.Function;
 
 //20260826_kpopmodder: Register and drive the LAVI-owned automatic deposit_all chain after AltoClef initialization.
+//20260827_kpopmodder: Disable that pressure chain while keeping the manual trusted-storage runtime alive.
 public final class DepositAllAutoEntrypoint implements ModInitializer {
-    private final Supplier<AutoDepositPolicyEngine> policyEngineFactory;
-    private DepositAllInventoryPressureChain chain;
+    private final Function<AltoClef, AutoDepositRuntime> runtimeFactory;
+    private AutoDepositRuntime runtime;
 
     public DepositAllAutoEntrypoint() {
-        this(() -> new AutoDepositPolicyCompositionRoot().createEngine());
+        this(mod -> new AutoDepositPolicyCompositionRoot().createRuntime(mod));
     }
 
-    DepositAllAutoEntrypoint(Supplier<AutoDepositPolicyEngine> policyEngineFactory) {
-        this.policyEngineFactory = Objects.requireNonNull(policyEngineFactory, "policyEngineFactory");
+    DepositAllAutoEntrypoint(Function<AltoClef, AutoDepositRuntime> runtimeFactory) {
+        this.runtimeFactory = Objects.requireNonNull(runtimeFactory, "runtimeFactory");
     }
 
     @Override
@@ -29,26 +28,28 @@ public final class DepositAllAutoEntrypoint implements ModInitializer {
     }
 
     private void onEndClientTick() {
-        if (chain == null) {
+        if (runtime == null) {
             registerIfReady();
         }
-        if (chain == null) {
-            return;
+        if (runtime != null) {
+            runtime.onEndClientTick();
         }
-        chain.onEndClientTick();
     }
 
     private void registerIfReady() {
-        if (chain != null) {
+        if (runtime != null) {
             return;
         }
         AltoClef mod = AltoClef.getInstance();
-        TaskRunner runner = mod == null ? null : mod.getTaskRunner();
-        if (runner == null) {
+        if (mod == null || mod.getTaskRunner() == null) {
             return;
         }
 
-        chain = new DepositAllInventoryPressureChain(runner, policyEngineFactory.get());
-        DepositAllAutoDiagnostics.logRegistered(DepositAllInventoryPressureChain.PRIORITY);
+        AutoDepositRuntime createdRuntime = Objects.requireNonNull(
+                runtimeFactory.apply(mod),
+                "runtimeFactory returned null"
+        );
+        createdRuntime.registerCommands(mod);
+        runtime = createdRuntime;
     }
 }

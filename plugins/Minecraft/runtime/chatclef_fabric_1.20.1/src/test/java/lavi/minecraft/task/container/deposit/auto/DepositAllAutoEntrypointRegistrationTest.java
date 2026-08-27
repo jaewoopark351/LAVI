@@ -5,7 +5,7 @@ import adris.altoclef.tasksystem.TaskChain;
 import adris.altoclef.tasksystem.TaskRunner;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lavi.minecraft.task.container.deposit.auto.policy.AutoDepositPolicyEngine;
+import lavi.minecraft.task.container.deposit.auto.trusted.AutoDepositTrustedDestinationRepository;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -45,7 +45,7 @@ class DepositAllAutoEntrypointRegistrationTest {
     }
 
     @Test
-    void lazyRegistrationAddsOnlyOneAutomaticChainToTheRunner() {
+    void lazyRegistrationCreatesOneRuntimeAndNoAutomaticPressureChain() {
         Field instanceField = field(AltoClef.class, "instance");
         Object previousInstance = get(instanceField, null);
         try {
@@ -53,16 +53,19 @@ class DepositAllAutoEntrypointRegistrationTest {
             TaskRunner runner = new TaskRunner(mod);
             mod.runner = runner;
             set(instanceField, null, mod);
+            AutoDepositTrustedDestinationRepository repository =
+                    AutoDepositTrustedDestinationRepository.inMemoryEmpty();
 
             DepositAllAutoEntrypoint entrypoint = new DepositAllAutoEntrypoint(
-                    AutoDepositPolicyEngine::inMemoryDefault
+                    ignored -> AutoDepositRuntime.create(mod, repository)
             );
             invokeRegisterIfReady(entrypoint);
-            DepositAllInventoryPressureChain firstChain = registeredChain(entrypoint);
+            AutoDepositRuntime firstRuntime = registeredRuntime(entrypoint);
             invokeRegisterIfReady(entrypoint);
 
-            assertSame(firstChain, registeredChain(entrypoint));
-            assertEquals(1, registeredChains(runner).stream()
+            assertSame(firstRuntime, registeredRuntime(entrypoint));
+            assertSame(repository, firstRuntime.trustedRepository());
+            assertEquals(0, registeredChains(runner).stream()
                     .filter(DepositAllInventoryPressureChain.class::isInstance)
                     .count());
         } finally {
@@ -82,9 +85,9 @@ class DepositAllAutoEntrypointRegistrationTest {
         }
     }
 
-    private static DepositAllInventoryPressureChain registeredChain(DepositAllAutoEntrypoint entrypoint) {
-        return (DepositAllInventoryPressureChain) get(
-                field(DepositAllAutoEntrypoint.class, "chain"),
+    private static AutoDepositRuntime registeredRuntime(DepositAllAutoEntrypoint entrypoint) {
+        return (AutoDepositRuntime) get(
+                field(DepositAllAutoEntrypoint.class, "runtime"),
                 entrypoint
         );
     }
