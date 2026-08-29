@@ -4,6 +4,9 @@
 <!-- 20260818_kpopmodder: Fixed audited-baseline live semantics, no-replay handling, and terminal/runtime/gameplay success separation. -->
 <!-- 20260818_kpopmodder: Aligned gameplay observation completeness and expected/partial/prohibited effect semantics with the final-reviewed preflight schema. -->
 <!-- 20260819_kpopmodder: Added canonical submission, reconciliation latch, and split terminal/checkpoint/advancement regression contracts. -->
+<!-- 20260829_openai: Versioned the registered-command count and kept current pass/fail ownership in the merge-blocker document. -->
+<!-- 20260829_openai: Added the current deposit_all exact-set gate and topology-correct STORE_HOME decision-order and identity test contracts. -->
+<!-- 20260829_openai: Recorded the final focused registry synchronization result without promoting runtime evidence. -->
 
 # ChatClef Korean Test Strategy
 
@@ -35,8 +38,11 @@ plugins/Minecraft/docs/fabric-chatclef-live-runtime-preflight-plan.md
 plugins/Minecraft/docs/fabric-chatclef-live-runtime-process-lifecycle-plan.md
 ```
 
-The Python Korean command registry plan owns the 20-command snapshot,
-command-by-command resolver domains, lifecycle kinds, safety tiers,
+The Python Korean command registry plan owns the source-backed Java
+registered-command snapshot: 20 commands at its reviewed baseline and 22 in the
+current Java surface, with production Python metadata still at 21 until
+`deposit_all` synchronization. It also owns command-by-command resolver domains,
+lifecycle kinds, safety tiers,
 confirmation modes, allowed input sources, and public enablement axes. The alias
 v2 plan owns item/action design, command-specific Korean UX policy, canonical
 aliases, display wording, capability gates, and phased item/action
@@ -1186,6 +1192,7 @@ Command owner values:
 ```text
 chatclef_java
 lavi_overlay
+lavi_store_home
 ```
 
 Source kind values:
@@ -1637,8 +1644,8 @@ do not use regex-only extraction over raw source text as the command authority
 commented or disabled code must not produce registered commands
 active command registration must produce a snapshot entry
 snapshot command name must equal the command constructor or name constant
-effective command names must be globally unique across chatclef_java and
-  lavi_overlay owners
+effective command names must be globally unique across chatclef_java,
+  lavi_overlay, and lavi_store_home owners
 duplicate effective command name -> contract failure
 ```
 
@@ -1648,7 +1655,7 @@ Required extractor regressions:
 active new GetCommand() -> snapshot contains get
 commented // new StashCommand() -> snapshot does not contain stash
 constructor name "get" -> snapshot name is get
-same effective name in chatclef_java and lavi_overlay -> contract failure
+same effective name across any registered owners -> contract failure
 ```
 
 Prefer a deterministic Python parser or AST-based source extractor for the
@@ -2810,7 +2817,7 @@ Key frozen contracts:
 10. Current source-backed Java contracts remain separate from planned Python
     multi-item GET, EQUIP, DEPOSIT, and GIVE work.
 
-Current implementation status remains not green:
+Historical implementation status at that 2026-08-18 handoff remained not green:
 
 - reported focused suite: 98 passed, 9 failed, 2 skipped, 258 subtests passed
 - the 9 failures are Java source-hash subtests
@@ -2829,3 +2836,153 @@ Current implementation status remains not green:
 No Java, DTO, wire payload, ChatClef engine, Forge MineMind, live Minecraft
 behavior, or test execution was changed by this documentation revision.
 ```
+
+## 2026-08-29 Current Registered-Command And STORE_HOME Direct-Test Gate
+
+This addendum supersedes historical current-status wording above where the
+dates conflict. It augments, rather than replaces, the broader Phase 0 and CI
+gate.
+
+The current command-catalog and focused-suite evidence is:
+
+```text
+Java registered-command snapshot: 22
+support-matrix rows:              22
+production Python registry names: 21
+missing production row:           deposit_all
+
+focused subset:
+  collected: 37
+  passed:    36
+  failed:     1
+
+failure:
+  PythonKoreanCommandRegistryTests::
+  test_registry_contains_exactly_the_registered_chatclef_commands
+```
+
+The exact-set test is correct. Do not weaken it, delete
+`DepositAllCommand` from source-backed evidence, or mark `deposit_all` public
+merely to obtain green output. The canonical row is raw-only catalog metadata:
+
+```text
+source_registered=true
+exposure=raw_only
+lifecycle_kind=task
+safety_tier=R2
+slot_schema=items?
+resolver_domain=command_specific
+confirmation_mode=none
+allowed_input_sources=[]
+all Korean/parser/admission/bridge/gameplay/public readiness axes=false
+```
+
+The exact Python values are `slot_schema=("items?",)` and
+`allowed_input_sources=()`. `items?` uses the existing optional-slot suffix
+convention and is not an unresolved marker. `exposure` is derived from source
+registration and readiness rather than stored as a separate
+`ChatClefCommandSpec` field. The current snapshot and support-matrix schema do
+not carry `slot_schema`; their obligation is exact command identity and support
+classification. A dedicated production-registry spec test owns the exact slot
+and readiness values without expanding either artifact schema.
+
+The latest supplied STORE_HOME evidence separately proves a clean Gradle build,
+243 JUnit tests with zero failure/error and 14 skipped, matching built/deployed
+JAR file identity, an observed runtime code-source path, and two completed
+STORE_HOME operations with zero candidate/operation timeout decisions.
+Operation 225 directly proves exact activation after 7,726 active ticks;
+operation 30351 is a repeat completion/no-timeout observation. This does not
+prove complete source-to-runtime provenance, so
+`artifactParity=PARITY_UNPROVEN` remains required.
+
+Before commit, focused Java coverage must directly prove the following actual
+production contracts.
+
+```text
+StoreHomeTaskLifecycleController decision order:
+  emergency hard cap remains before behavior
+  pending ownership, context, and cursor guards retain their current precedence
+  active candidate + no session + no pending may consume the current position
+    sample and exact activation before operation no-progress is re-evaluated
+  that narrow no-progress boundary does not run a full navigation/session step
+  after an allowed normal navigation/session step, operation no-progress is
+    evaluated before candidate timeout
+  pending transfer retains TRANSFER_UNCONFIRMED precedence
+  every activation, rejection, and terminal transition is applied exactly once
+
+StoreHomeTask shared object-graph wiring:
+  assertSame the StoreHomeExecutionState used by the root facade,
+    StoreHomeTaskLifecycleController, and StoreHomeTaskView
+  assertSame the StoreHomeTimeoutLifecycle used by the root facade,
+    lifecycle controller, and timeout collaborators
+
+Command lifecycle identity integration:
+  assertSame(submittedRootTask, terminationObservation.task())
+  verify FabricChatClefStoreHomeResultProjector reads the typed outcome from
+    that observation task
+```
+
+`StoreHomeTaskAssembly` does not create or store the root Task. The controller
+and view do not own a Task back-reference, and the projector reads
+`terminationObservation.task()`. Therefore a fictional
+`lifecycleController.task()`/`resultProjector.task()` assertion is prohibited;
+it would require production back-references solely to satisfy a test and would
+weaken the thin-facade ownership boundary.
+
+Current closure requires:
+
+```text
+registered-command exact set is 22 across the Java snapshot, support matrix,
+  production Python registry, and expected-count assertion
+deposit_all remains raw-only with empty allowed sources and every Korean/parser/
+  admission/bridge/gameplay/public readiness axis false
+StoreHomeTaskLifecycleController decision-order coverage passes
+StoreHomeTask shared-state/shared-timeout identity wiring coverage passes
+submitted-root/termination-observation/projector identity integration passes
+focused suite is rerun without deselection or retry and has 0 failures
+all broader Phase 0, offline CI, artifact-provenance, and live-safety gates above
+  remain in force
+```
+
+## 2026-08-29 Final Focused Registry Verification
+
+This addendum supersedes only the earlier 2026-08-29 current-status values of
+21 production registry names and 36 passed / 1 failed. It does not rewrite the
+historical failing runs or the broader Phase 0, CI, live-safety, and STORE_HOME
+direct Java coverage gates.
+
+```text
+registered-command snapshot: 22
+support-matrix rows:          22
+production registry names:   22
+expected-count assertion:    22
+exact command-name sets:      equal
+
+deposit_all production spec:
+  raw-only shadow metadata
+  slot_schema=("items?",)
+  resolver_domain=command_specific
+  lifecycle_kind=task
+  safety_tier=R2
+  confirmation_mode=none
+  allowed_input_sources=()
+  source_registered=true
+  Korean/parser/admission/bridge/gameplay/public readiness=false
+
+focused exact selection:
+  passed: 38
+  subtests passed: 179
+  failed: 0
+  deselection: none
+  automatic retry: none
+```
+
+The dedicated production-registry test verifies the exact metadata and keeps
+`deposit_all` absent from public Korean enablement. The snapshot and support
+matrix remain on their existing schemas and continue to own command identity
+and support classification rather than slot metadata.
+
+No runtime-manifest provenance or runtime behavior follows from this focused
+result. Runtime manifest Git/source/build-input/runtime SHA provenance remains
+`UNVERIFIED`, and `artifactParity=PARITY_UNPROVEN` remains unchanged. This
+addendum records no commit or push.

@@ -1,4 +1,7 @@
 <!-- 20260820_kpopmodder: Split the full Korean ChatClef command registry plan from item-action alias planning. -->
+<!-- 20260829_openai: Versioned the historical 20-command baseline against the current 22-command Java surface and recorded the deposit_all Python registry drift. -->
+<!-- 20260829_openai: Clarified deposit_all's exact Python encoding, derived raw-only status, artifact authority, and zero-failure closure gate. -->
+<!-- 20260829_openai: Recorded final 22-command registry parity and focused verification. -->
 
 # ChatClef Python Korean Command Registry Plan
 
@@ -18,7 +21,8 @@ or public exposure of a command family.
 This plan owns the Korean command registry contract:
 
 ```text
-20 registered command snapshot
+source-backed Java registered command snapshot: 20 at the reviewed baseline, 22 in the current Java surface
+production Python registry metadata: 21 until the deposit_all shadow row is synchronized
 command-by-command Korean intent grammar
 Python slot schema
 slot domain
@@ -76,7 +80,7 @@ complete as a Korean public feature.
 
 ## Registered Command Snapshot Contract
 
-The current registered command count is `20`:
+The reviewed `e08af639` baseline registered command count is `20`:
 
 | Command | Owner | Registration source | Initial registry status |
 | --- | --- | --- | --- |
@@ -105,6 +109,103 @@ The registry snapshot must prove actual registration. Do not infer command
 support by scanning all Java `Command` subclasses. Commented or unregistered
 classes, including `StashCommand` and other unregistered helper commands, are
 not part of the registered Korean command surface.
+
+### 2026-08-29 current-source reconciliation
+
+Two commands were registered after the reviewed 20-command baseline. The
+source-extracted current Java command surface is therefore `22`, not `20`.
+This does not yet mean every production Python metadata row is synchronized;
+the current Python registry remains at `21` until `deposit_all` is added:
+
+| Command | Owner | Registration source | Current registry status |
+| --- | --- | --- | --- |
+| `deposit_all` | `chatclef_java` | `AltoClefCommands` | source-registered raw-only finite inventory task; not public Korean |
+| `store_home` | `lavi_store_home` | `StoreHomeCommandRegistrar` | implemented public Korean task under the separately reviewed STORE_HOME contract |
+
+The canonical `deposit_all` Python registry metadata is:
+
+```text
+command_name: deposit_all
+source_registered: true
+exposure: raw_only
+slot_schema: items?
+resolver_domain: command_specific
+lifecycle_kind: task
+safety_tier: R2
+confirmation_mode: none
+allowed_input_sources: []
+serializer_id: prefixless_deposit_all
+
+SOURCE_REGISTERED: true
+KOREAN_PARSE_COMPILE_READY: false
+PYTHON_ADMISSION_READY: false
+BRIDGE_LIFECYCLE_READY: false
+GAMEPLAY_EFFECT_VERIFIABLE: false
+PUBLIC_KOREAN_ENABLED: false
+```
+
+The exact Python in-memory encoding is `slot_schema=("items?",)` and
+`allowed_input_sources=()`. The `?` suffix follows the registry's existing
+optional-slot convention, such as `count?`; `items?` is not a question, TODO,
+or unresolved schema marker. `DepositAllCommand` accepts an optional item-list
+argument, so this slot remains optional.
+
+`exposure=raw_only` is a derived catalog classification, not a new
+`ChatClefCommandSpec` field. It follows from source registration combined with
+all Korean/parser/admission/bridge/gameplay/public readiness axes remaining
+false. Likewise, `prefixless_deposit_all` is the registry's existing inert
+identifier convention; it does not add a Korean serializer, compiler, admission
+source, bridge route, or public command.
+
+The current snapshot and support-matrix schema record command identity,
+ownership, and support classification; they do not contain `slot_schema`.
+Therefore this synchronization must not silently expand those artifact schemas.
+Exact command-name parity remains a snapshot/matrix obligation, while the exact
+`deposit_all` slot, lifecycle, safety, source, and readiness metadata is frozen
+by this plan, the production registry, and a dedicated registry-spec test.
+
+Adding this metadata must not add `deposit_all` to public, parser-ready,
+admission-ready, bridge-ready, gameplay-verifiable, or ordinary chat/microphone
+sets. It reconciles the source catalog only; it does not expose a new Korean
+command or change Java/Minecraft behavior.
+
+The 2026-08-29 commit-readiness test sequence exposed the drift in two stages:
+
+```text
+run 1: 36 passed, 1 failed
+  active Java set contained DepositAllCommand but the snapshot did not
+
+test-artifact reconciliation:
+  snapshot and support matrix updated to 22 rows
+  deposit_all classified RAW_ONLY / java_only_task_command
+
+run 2: 36 passed, 1 failed
+  snapshot contained deposit_all but KoreanChatClefCommandRegistry contained 21 commands
+```
+
+The remaining failing test is
+`PythonKoreanCommandRegistryTests.test_registry_contains_exactly_the_registered_chatclef_commands`.
+A test-only workaround is prohibited: production registry metadata and the
+expected count must be synchronized to 22, then the focused suite must be run
+again. At the time of this documentation update, production Python source has
+not been changed and the merge/commit gate remains closed.
+
+Closure requires all of the following without weakening the existing exact-set
+comparison:
+
+```text
+source-extracted registered-command snapshot count: 22
+support-matrix row count: 22
+production KoreanChatClefCommandRegistry count: 22
+exact command-name sets: equal
+deposit_all source_registered: true
+deposit_all Korean/parser/admission/bridge/gameplay/public readiness: all false
+focused suite: 0 failures, without deselection or automatic retry
+```
+
+Removing `DepositAllCommand` from source-backed evidence, deleting
+`deposit_all` from the expected set, weakening exact equality, or marking it
+public merely to obtain green output is prohibited.
 
 ## Status Axes
 
@@ -344,7 +445,9 @@ Recommended implementation order when code changes are later approved:
 Command registry:
 
 ```text
-active registered command count is exactly 20
+active registered command count matches source extraction: 20 at the reviewed baseline, 22 in the current Java surface
+current production registry reaches 22 only after deposit_all metadata synchronization
+deposit_all exact spec preserves items?, task, R2, command_specific, none, empty input sources, and all Korean readiness axes false
 overlay is included from OverlayCommandRegistrar
 commented StashCommand is excluded
 unregistered command subclasses are excluded
@@ -422,7 +525,7 @@ modify Java, ChatClef, AltoClef, Baritone, DTOs, protocol, schema, or wire paylo
 move the Python intent model into common DTOs
 let an LLM generate raw ChatClef DSL
 emit @ from the Python compiler
-use one generic string serializer for all 20 commands without slot validation
+use one generic string serializer for all registered commands without slot validation
 count Java class existence as command registration
 reuse the 591 item catalog as block/entity/structure/player resolver authority
 force a public alias onto every raw catalog target
@@ -439,3 +542,50 @@ submit the primary command based only on cleanup completed
 automatically retry, replay, rerun, or resubmit
 claim gameplay success from terminal completed alone
 ```
+
+## 2026-08-29 Final Registry Synchronization Verification
+
+This addendum supersedes earlier 2026-08-29 current-status wording that reports
+the production registry at 21 commands. The recorded run 1 and run 2 results of
+36 passed and 1 failed remain historical evidence of the drift sequence.
+
+The final source and focused-test result is:
+
+```text
+source-extracted registered-command snapshot: 22
+support-matrix rows:                           22
+production KoreanChatClefCommandRegistry:      22
+exact registered-command sets:                 equal
+
+deposit_all:
+  exposure: raw_only shadow metadata
+  slot_schema: items?
+  resolver_domain: command_specific
+  lifecycle_kind: task
+  safety_tier: R2
+  confirmation_mode: none
+  allowed_input_sources: []
+  SOURCE_REGISTERED: true
+  KOREAN_PARSE_COMPILE_READY: false
+  PYTHON_ADMISSION_READY: false
+  BRIDGE_LIFECYCLE_READY: false
+  GAMEPLAY_EFFECT_VERIFIABLE: false
+  PUBLIC_KOREAN_ENABLED: false
+
+focused exact selection:
+  passed: 38
+  subtests passed: 179
+  failed: 0
+  deselection: none
+  automatic retry: none
+```
+
+The exact Python encodings remain `slot_schema=("items?",)` and
+`allowed_input_sources=()`. This synchronization does not add a public Korean
+alias, parser/compiler path, admission source, bridge route, gameplay-readiness
+claim, or artifact-schema field for `deposit_all`.
+
+This source and focused-test verification does not establish runtime manifest
+Git/source/build-input/runtime SHA provenance. That provenance remains
+`UNVERIFIED`, and `artifactParity=PARITY_UNPROVEN` remains unchanged. It does
+not authorize or claim a runtime run, commit, or push.

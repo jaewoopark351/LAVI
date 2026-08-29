@@ -1,4 +1,6 @@
 <!-- 20260807_kpopmodder: Documented clean, forced, artifact-aware runtime build verification for Fabric ChatClef 1.20.1. -->
+<!-- 20260827_openai: Clarified the Temurin 21 build SDK and Java 17 target/runtime boundary for Minecraft 1.20.1. -->
+<!-- 20260827_openai: Clarified Temurin 21 as the controlled reference SDK rather than a Java 21 game-runtime requirement. -->
 
 # Fabric ChatClef 1.20.1 Build Verification
 
@@ -22,6 +24,43 @@ The runtime is a multi-version Gradle project that uses preprocess, Loom remap,
 resource filtering, Mixin configuration, and a remapped runtime jar. The
 verification target in this document is the Minecraft 1.20.1 artifact and the
 actual CurseForge instance that loads it.
+
+## Build JDK And Runtime Target
+
+The project README records Temurin 21 as the development SDK used to run the
+multi-version Gradle project. It does not declare Temurin 21 to be the only
+permitted JDK. This runbook uses it as the controlled reference build SDK for
+artifact comparison. This is distinct from the bytecode target and game runtime
+of each Minecraft version. The checked-in Gradle wrapper uses Gradle 8.8.
+
+The root Gradle configuration selects the Java target by Minecraft version:
+
+```text
+Minecraft 1.20.1 through 1.20.5: source/target/release 17
+Minecraft 1.20.6 and later:      source/target/release 21
+```
+
+The controlled 1.20.1 reference boundary is therefore:
+
+```text
+Temurin JDK 21 runs Gradle and the multi-version build
+    -> the 1.20.1 artifact is compiled with --release 17
+    -> Minecraft 1.20.1 runs that artifact on Java 17
+```
+
+Do not interpret a full multi-version build failure under JDK 17 as evidence
+that the 1.20.1 artifact requires Java 21 at runtime. Newer project targets need
+Java 21 to compile even though the 1.20.1 output remains Java 17 compatible.
+
+For an artifact A/B comparison, keep the build JDK vendor and exact patch,
+Gradle wrapper, build command, and build inputs fixed. Do not silently replace a
+preserved crash-run artifact with a fresh rebuild. Treat that rebuild as a
+separate reproducibility artifact with its own SHA-256.
+
+Before a verification build, record both `java -version` and the JVM reported
+by Gradle. Do not change a global `JAVA_HOME`, system environment variable, IDE
+SDK, Minecraft runtime, or project Java target merely to run the verification.
+Use a process-local build JDK when a separately authorized build requires one.
 
 ## Canonical Verification Build
 
@@ -235,7 +274,10 @@ A build-verification report must include:
 repository root
 runtime working directory
 exact Gradle command
+build JDK vendor and full version
+Gradle JVM vendor and full version
 Gradle exit code
+1.20.1 compile release target
 1.20.1 source jar path
 source jar SHA-256
 deployed CurseForge jar path

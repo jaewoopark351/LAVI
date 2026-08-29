@@ -5,6 +5,7 @@
 <!-- 20260819_chatgpt: Reconciled e08af source classification, cross-document authority, and safe junk-deposit policy. -->
 <!-- 20260820_kpopmodder: Split full Korean command registry authority from item-action alias planning. -->
 <!-- 20260820_chatgpt: Clarified full-registry authority, docs-only provenance, readiness gates, and handoff synchronization. -->
+<!-- 20260829_openai: Reconciled the historical 20-command baseline with the current 22-command Java surface without expanding item-action aliases. -->
 
 # ChatClef Korean Item Action Alias V2 Plan
 
@@ -75,9 +76,10 @@ this plan:
   command-capability boundaries, and item-action phase order
 
 Python Korean command registry plan:
-  20 registered command snapshot, per-command lifecycle kind, resolver domain,
-  safety tier, confirmation mode, allowed input source, and public enablement
-  axes
+  versioned registered-command snapshot: 20 at the reviewed historical baseline
+  and 22 in the current Java surface, plus per-command lifecycle kind,
+  resolver domain, safety tier, confirmation mode, allowed input source, and
+  public enablement axes
 
 Python command orchestration plan:
   evidence-bounded Korean responses, operation context, lifecycle sequencing,
@@ -110,7 +112,8 @@ live-runtime process lifecycle index:
 
 When wording conflicts, this plan controls Korean item/action language, alias
 policy, and item-target capability. The command registry plan controls the full
-20-command registration taxonomy and each command's lifecycle kind, resolver
+versioned registration taxonomy (20 at the reviewed historical baseline and 22
+in the current Java surface) and each command's lifecycle kind, resolver
 domain, safety tier, confirmation mode, allowed input source, readiness axes,
 and public enablement. The orchestration plan controls user-response evidence
 and operation sequencing; the cleanup contract controls automatic or
@@ -122,6 +125,11 @@ For the 2026-08-19 authority migration, the seven user-listed documents were one
 docs-only change unit. Later changes must update and commit every directly
 affected normative document together. Linked live-runtime documents need an
 update only when their live-run contract actually changes.
+
+The current 22-command Java surface includes raw-only `deposit_all` and the
+separately governed `store_home`. Neither expands this item/action alias plan.
+This plan adds no `deposit_all` Korean alias, parser/compiler branch, admission
+source, bridge route, gameplay claim, or public exposure.
 
 For the 2026-08-20 command-registry split, the current docs-only change unit is:
 
@@ -1477,7 +1485,8 @@ extraction are Layer 1 action/context policy, not flat concrete item aliases.
 
 Recommended order when code changes are later approved:
 
-0. Registry Phase 0 prerequisite - close the 20-command registration,
+0. Registry Phase 0 prerequisite - close the versioned registration contract
+   (20 at the reviewed historical baseline and 22 in the current Java surface),
    lifecycle, resolver-domain, safety, confirmation, allowed-source, readiness,
    and public-enablement contracts in
    `chatclef-python-korean-command-registry-plan.md`. This is a hard gate: no
@@ -1919,8 +1928,9 @@ Authority split:
 
 - this plan owns Korean item/action language, aliases, canonical display,
   capability boundaries, and item-action phase order
-- chatclef-python-korean-command-registry-plan.md owns the full 20-command
-  registration snapshot, lifecycle kind, resolver domain, safety tier,
+- chatclef-python-korean-command-registry-plan.md owns the versioned registration
+  snapshot (20 at the reviewed historical baseline and 22 in the current Java
+  surface), lifecycle kind, resolver domain, safety tier,
   confirmation mode, allowed input source, readiness axes, and public enablement
 - chatclef-python-command-orchestration-plan.md owns evidence-bounded Korean
   responses, lifecycle sequencing, and exactly-once primary submission
