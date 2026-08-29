@@ -19,7 +19,8 @@ import java.util.Optional;
 
 //20260827_kpopmodder: Bind an open container only to the exact preceding block interaction.
 public final class AutoDepositOpenContainerBindingTracker
-        implements AutoDepositExactOpenContainerBinding {
+        implements AutoDepositExactOpenContainerBinding,
+        AutoDepositExactOpenContainerBindingDiagnosticView {
     private static final long MAX_PENDING_TICKS = 20L;
 
     private final AltoClef mod;
@@ -65,6 +66,15 @@ public final class AutoDepositOpenContainerBindingTracker
     public Optional<BlockPos> currentExactPosition() {
         if (binding == null || !binding.matchesCurrent(mod)) {
             binding = null;
+            return Optional.empty();
+        }
+        return Optional.of(binding.position);
+    }
+
+    //20260828_kpopmodder: Observe exact binding validity without clearing behavior-owned state.
+    @Override
+    public Optional<BlockPos> peekCurrentExactPositionForDiagnostics() {
+        if (binding == null || !binding.matchesCurrent(mod)) {
             return Optional.empty();
         }
         return Optional.of(binding.position);

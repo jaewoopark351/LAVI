@@ -15,6 +15,12 @@
       "path": "adris/altoclef/commands/DepositCommand.java"
     },
     {
+      "class_name": "DepositAllCommand",
+      "command": "deposit_all",
+      "owner": "chatclef_java",
+      "path": "adris/altoclef/commands/DepositAllCommand.java"
+    },
+    {
       "class_name": "EquipCommand",
       "command": "equip",
       "owner": "chatclef_java",
@@ -121,6 +127,12 @@
       "command": "overlay",
       "owner": "lavi_overlay",
       "path": "lavi/minecraft/overlay/command/OverlayCommand.java"
+    },
+    {
+      "class_name": "StoreHomeCommand",
+      "command": "store_home",
+      "owner": "lavi_store_home",
+      "path": "lavi/minecraft/task/container/home/command/StoreHomeCommand.java"
     }
   ]
 }

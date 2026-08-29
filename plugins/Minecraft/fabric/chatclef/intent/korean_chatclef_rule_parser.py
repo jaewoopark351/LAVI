@@ -1,4 +1,6 @@
 #20260803_kpopmodder: Added deterministic Korean rule parsing for ChatClef intents.
+#20260827_kpopmodder: Resolve STORE_HOME before generic item deposit rules.
+#20260828_kpopmodder: Pass raw text to STORE_HOME so question punctuation remains observable.
 from __future__ import annotations
 
 import re
@@ -21,6 +23,10 @@ from plugins.Minecraft.fabric.chatclef.intent.korean_item_action_rule_parser imp
 from plugins.Minecraft.fabric.chatclef.intent.korean_text_normalizer import (
     KoreanTextNormalizer,
 )
+from plugins.Minecraft.fabric.chatclef.intent.store_home import (
+    KoreanStoreHomeIntentClassifier,
+    StoreHomeIntentClassification,
+)
 
 
 class KoreanChatClefRuleParser:
@@ -38,6 +44,7 @@ class KoreanChatClefRuleParser:
         quantity_parser: KoreanQuantityParser | None = None,
         acquisition_verbs: KoreanAcquisitionVerbMatcher | None = None,
         item_actions: KoreanItemActionRuleParser | None = None,
+        store_home: KoreanStoreHomeIntentClassifier | None = None,
     ):
         self._normalizer = normalizer or KoreanTextNormalizer()
         self._quantity_parser = quantity_parser or KoreanQuantityParser()
@@ -48,6 +55,9 @@ class KoreanChatClefRuleParser:
             self._normalizer,
             self._quantity_parser,
         )
+        self._store_home = store_home or KoreanStoreHomeIntentClassifier(
+            self._normalizer
+        )
 
     def parse(self, text: object) -> ChatClefIntentDTO:
         original = self._normalizer.normalize(text, lowercase_english=False)
@@ -56,6 +66,9 @@ class KoreanChatClefRuleParser:
             return self._intent(ChatClefIntentType.STOP, original)
         if self._is_idle(normalized):
             return self._intent(ChatClefIntentType.IDLE, original)
+        store_home = self._store_home.classify(text)
+        if store_home.candidate:
+            return self._store_home_intent(original, store_home)
         goto_match = self._GOTO_RE.search(normalized)
         if goto_match is not None:
             return self._intent(
@@ -88,6 +101,25 @@ class KoreanChatClefRuleParser:
                 item_phrase=item_phrase,
             )
         return self._intent(ChatClefIntentType.UNKNOWN, original)
+
+    def _store_home_intent(
+        self,
+        original: str,
+        classification: StoreHomeIntentClassification,
+    ) -> ChatClefIntentDTO:
+        if classification.executable:
+            return ChatClefIntentDTO(
+                intent_type=ChatClefIntentType.STORE_HOME,
+                original_text=original,
+                source="rule",
+                slots={},
+            )
+        return ChatClefIntentDTO(
+            intent_type=ChatClefIntentType.UNKNOWN,
+            original_text=original,
+            source=StoreHomeIntentClassification.GUARD_SOURCE,
+            slots=classification.to_guard_slots(),
+        )
 
     def _food_or_meat_intent(
         self,

@@ -2,6 +2,8 @@ package lavi.minecraft.diagnostics;
 
 import adris.altoclef.Debug;
 import adris.altoclef.tasksystem.Task;
+import lavi.minecraft.diagnostics.formatting.DiagnosticBoundedEventFormatter;
+import lavi.minecraft.diagnostics.formatting.DiagnosticBoundedEventText;
 import lavi.minecraft.diagnostics.formatting.DiagnosticValueFormatter;
 
 import java.util.StringJoiner;
@@ -84,6 +86,43 @@ final class DiagnosticEventEmitter {
             } else {
                 System.out.println("ALTO CLEF: " + prefix + " " + log);
             }
+        } catch (RuntimeException | LinkageError ignored) {
+        }
+    }
+
+    void emitBoundedBoundaryEvent(String prefix,
+                                  String eventName,
+                                  String reason,
+                                  Task task,
+                                  int maxUtf8Bytes,
+                                  Object[] requiredFields,
+                                  Object[] optionalFields) {
+        try {
+            DiagnosticEventIdentity eventIdentity = traceState.nextEventIdentity(false);
+            long taskInstanceId = task == null ? -1 : tasks.instanceId(task);
+            long taskRunId = task == null ? -1 : tasks.existingRunId(task);
+            long parentTaskRunId = task == null ? -1 : tasks.parentRunId(task);
+            Object[] baseFields = new Object[]{
+                    "traceId", eventIdentity.traceId(),
+                    "clientTickId", eventIdentity.clientTickId(),
+                    "eventSequence", eventIdentity.eventSequence(),
+                    "taskInstanceId", DiagnosticTaskRegistry.idLabel(taskInstanceId),
+                    "taskRunId", DiagnosticTaskRegistry.idLabel(taskRunId),
+                    "parentTaskRunId", DiagnosticTaskRegistry.idLabel(parentTaskRunId),
+                    "threadName", Thread.currentThread().getName(),
+                    "level", "BOUNDARY",
+                    "event", eventName,
+                    "reason", reason,
+                    "taskClass", taskName(task)
+            };
+            DiagnosticBoundedEventText encoded = DiagnosticBoundedEventFormatter.format(
+                    "ALTO CLEF: " + prefix + " ",
+                    baseFields,
+                    requiredFields,
+                    optionalFields,
+                    maxUtf8Bytes
+            );
+            System.out.println(encoded.text());
         } catch (RuntimeException | LinkageError ignored) {
         }
     }

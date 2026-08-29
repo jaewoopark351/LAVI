@@ -1,5 +1,7 @@
 package lavi.minecraft.task.container.home.execution;
 
+import lavi.minecraft.task.container.home.execution.transfer.delta.HomeStorageTransferDeltaStatus;
+import lavi.minecraft.task.container.home.execution.transfer.delta.HomeStorageTransferDeltaVerification;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -11,22 +13,22 @@ class HomeStorageTransferDeltaVerifierTest {
 
     @Test
     void confirmsOnlyEqualSourceLossAndDestinationGain() {
-        HomeStorageTransferDeltaVerifier.Verification result = verifier.verify(
+        HomeStorageTransferDeltaVerification result = verifier.verify(
                 64, 20, 10, 54
         );
 
-        assertEquals(HomeStorageTransferDeltaVerifier.Status.CONFIRMED, result.status());
+        assertEquals(HomeStorageTransferDeltaStatus.CONFIRMED, result.status());
         assertEquals(44, result.sourceDelta());
         assertEquals(44, result.destinationDelta());
     }
 
     @Test
     void keepsOneSidedUpdateWaitingAndRejectsMismatchOrReverse() {
-        assertEquals(HomeStorageTransferDeltaVerifier.Status.WAITING,
+        assertEquals(HomeStorageTransferDeltaStatus.WAITING,
                 verifier.verify(64, 20, 10, 10).status());
-        assertEquals(HomeStorageTransferDeltaVerifier.Status.MISMATCH,
+        assertEquals(HomeStorageTransferDeltaStatus.MISMATCH,
                 verifier.verify(64, 20, 10, 40).status());
-        assertEquals(HomeStorageTransferDeltaVerifier.Status.REVERSED,
+        assertEquals(HomeStorageTransferDeltaStatus.REVERSED,
                 verifier.verify(20, 21, 10, 10).status());
     }
 }

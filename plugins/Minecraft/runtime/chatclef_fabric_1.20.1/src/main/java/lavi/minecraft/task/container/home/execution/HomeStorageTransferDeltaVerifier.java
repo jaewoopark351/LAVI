@@ -1,8 +1,11 @@
 package lavi.minecraft.task.container.home.execution;
 
+import lavi.minecraft.task.container.home.execution.transfer.delta.HomeStorageTransferDeltaStatus;
+import lavi.minecraft.task.container.home.execution.transfer.delta.HomeStorageTransferDeltaVerification;
+
 //20260827_kpopmodder: Verify paired source loss and trusted-container gain without issuing clicks.
 public final class HomeStorageTransferDeltaVerifier {
-    public Verification verify(
+    public HomeStorageTransferDeltaVerification verify(
             int sourceBefore,
             int sourceAfter,
             int destinationBefore,
@@ -10,25 +13,25 @@ public final class HomeStorageTransferDeltaVerifier {
         int sourceDelta = sourceBefore - sourceAfter;
         int destinationDelta = destinationAfter - destinationBefore;
         if (sourceDelta < 0 || destinationDelta < 0) {
-            return new Verification(Status.REVERSED, sourceDelta, destinationDelta);
-        }
-        if (sourceDelta > 0 && destinationDelta > 0) {
-            return new Verification(
-                    sourceDelta == destinationDelta ? Status.CONFIRMED : Status.MISMATCH,
+            return new HomeStorageTransferDeltaVerification(
+                    HomeStorageTransferDeltaStatus.REVERSED,
                     sourceDelta,
                     destinationDelta
             );
         }
-        return new Verification(Status.WAITING, sourceDelta, destinationDelta);
-    }
-
-    public enum Status {
-        WAITING,
-        CONFIRMED,
-        MISMATCH,
-        REVERSED
-    }
-
-    public record Verification(Status status, int sourceDelta, int destinationDelta) {
+        if (sourceDelta > 0 && destinationDelta > 0) {
+            return new HomeStorageTransferDeltaVerification(
+                    sourceDelta == destinationDelta
+                            ? HomeStorageTransferDeltaStatus.CONFIRMED
+                            : HomeStorageTransferDeltaStatus.MISMATCH,
+                    sourceDelta,
+                    destinationDelta
+            );
+        }
+        return new HomeStorageTransferDeltaVerification(
+                HomeStorageTransferDeltaStatus.WAITING,
+                sourceDelta,
+                destinationDelta
+        );
     }
 }

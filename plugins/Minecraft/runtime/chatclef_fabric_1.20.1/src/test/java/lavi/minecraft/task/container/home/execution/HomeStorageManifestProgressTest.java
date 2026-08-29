@@ -29,14 +29,14 @@ class HomeStorageManifestProgressTest {
                 new HomeStorageManifest(7L, List.of(step))
         );
 
-        progress.confirm(step, 20, 44);
+        progress = progress.confirmed(step, 20, 44);
 
         assertEquals(44, progress.expectedCount(step));
         assertEquals(20, progress.confirmedItemCount());
         assertEquals(1, progress.touchedStackCount());
         assertFalse(progress.complete());
 
-        progress.confirm(step, 44, 0);
+        progress = progress.confirmed(step, 44, 0);
         assertTrue(progress.complete());
         assertEquals(1, progress.touchedStackCount());
     }

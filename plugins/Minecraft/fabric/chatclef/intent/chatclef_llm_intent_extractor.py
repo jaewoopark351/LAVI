@@ -1,4 +1,5 @@
 #20260803_kpopmodder: Added optional LLM extraction isolated from ChatClef execution.
+#20260827_kpopmodder: Deny LLM authority to create STORE_HOME.
 from __future__ import annotations
 
 import json
@@ -48,6 +49,8 @@ class ChatClefLLMIntentExtractor:
                     "message": f"{type(error).__name__}: {error}",
                 },
             )
+        if isinstance(payload, dict) and payload.get("intent_type") == "store_home":
+            return self._store_home_rejection(text)
         valid, reason_code, message = self._validator.validate(payload)
         if not valid:
             return ChatClefIntentDTO(
@@ -57,4 +60,19 @@ class ChatClefLLMIntentExtractor:
                 confidence=0.0,
                 slots={"reason_code": reason_code, "message": message},
             )
-        return ChatClefIntentDTO.from_mapping(payload)
+        intent = ChatClefIntentDTO.from_mapping(payload)
+        if intent.intent_type is ChatClefIntentType.STORE_HOME:
+            return self._store_home_rejection(text)
+        return intent
+
+    def _store_home_rejection(self, text: str) -> ChatClefIntentDTO:
+        return ChatClefIntentDTO(
+            intent_type=ChatClefIntentType.UNKNOWN,
+            original_text=text,
+            source="llm_invalid",
+            confidence=0.0,
+            slots={
+                "reason_code": "llm_store_home_not_authorized",
+                "message": "LLM extraction cannot authorize STORE_HOME.",
+            },
+        )

@@ -1,5 +1,6 @@
 package lavi.minecraft.task.container.home.execution;
 
+import lavi.minecraft.task.container.home.execution.slot.HomeStorageScreenSlotView;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -14,11 +15,11 @@ class HomeStorageScreenSlotResolverTest {
 
     @Test
     void resolvesLogicalPlayerSlotWithoutAssumingContainerOffset() {
-        List<HomeStorageScreenSlotResolver.SlotView> slots = List.of(
-                new HomeStorageScreenSlotResolver.SlotView(0, false, 0),
-                new HomeStorageScreenSlotResolver.SlotView(26, false, 26),
-                new HomeStorageScreenSlotResolver.SlotView(54, true, 9),
-                new HomeStorageScreenSlotResolver.SlotView(81, true, 0)
+        List<HomeStorageScreenSlotView> slots = List.of(
+                new HomeStorageScreenSlotView(0, false, 0),
+                new HomeStorageScreenSlotView(26, false, 26),
+                new HomeStorageScreenSlotView(54, true, 9),
+                new HomeStorageScreenSlotView(81, true, 0)
         );
 
         assertEquals(81, resolver.findUnique(slots, 0).orElseThrow());
@@ -27,9 +28,9 @@ class HomeStorageScreenSlotResolverTest {
 
     @Test
     void refusesMissingOrAmbiguousLogicalMapping() {
-        List<HomeStorageScreenSlotResolver.SlotView> duplicate = List.of(
-                new HomeStorageScreenSlotResolver.SlotView(27, true, 0),
-                new HomeStorageScreenSlotResolver.SlotView(63, true, 0)
+        List<HomeStorageScreenSlotView> duplicate = List.of(
+                new HomeStorageScreenSlotView(27, true, 0),
+                new HomeStorageScreenSlotView(63, true, 0)
         );
 
         assertTrue(resolver.findUnique(duplicate, 0).isEmpty());

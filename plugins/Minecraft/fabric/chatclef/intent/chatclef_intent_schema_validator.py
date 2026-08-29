@@ -1,4 +1,5 @@
 #20260803_kpopmodder: Added strict intent validation before DSL compilation.
+#20260827_kpopmodder: Enforce the STORE_HOME zero-slot contract.
 from __future__ import annotations
 
 import re
@@ -52,6 +53,31 @@ class ChatClefIntentSchemaValidator:
     def _validate_intent(self, intent: ChatClefIntentDTO) -> tuple[bool, str, str]:
         if intent.intent_type is ChatClefIntentType.UNKNOWN:
             return True, "validated_unknown_intent", "unknown intent is non-executable"
+        if intent.intent_type is ChatClefIntentType.STORE_HOME:
+            if intent.source != "rule":
+                return (
+                    False,
+                    "store_home_requires_rule_source",
+                    "store_home can only be authorized by deterministic rules",
+                )
+            if any(
+                (
+                    intent.quantity is not None,
+                    bool(intent.item_phrase.strip()),
+                    intent.food_units is not None,
+                    intent.x is not None,
+                    intent.y is not None,
+                    intent.z is not None,
+                    bool(intent.player_name.strip()),
+                    bool(intent.slots),
+                )
+            ):
+                return (
+                    False,
+                    "store_home_requires_zero_slots",
+                    "store_home does not accept item, quantity, player, coordinate, or extra slots",
+                )
+            return True, "validated_intent", "intent schema is valid"
         if intent.intent_type in {
             ChatClefIntentType.GET_ITEM,
             ChatClefIntentType.DEPOSIT_ITEM,

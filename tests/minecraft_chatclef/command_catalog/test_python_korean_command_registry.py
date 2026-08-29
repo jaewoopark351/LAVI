@@ -1,4 +1,5 @@
 #20260820_kpopmodder: Lock Python Korean command registry axes against ChatClef command drift.
+#20260829_openai: Lock raw-only deposit_all metadata and 22-command parity.
 from __future__ import annotations
 
 import json
@@ -27,7 +28,51 @@ class PythonKoreanCommandRegistryTests(unittest.TestCase):
         }
 
         self.assertEqual(expected, set(registry.command_names()))
-        self.assertEqual(20, len(registry.command_names()))
+        self.assertEqual(22, len(registry.command_names()))
+
+    def test_deposit_all_is_raw_only_shadow_metadata(self):
+        registry = KoreanChatClefCommandRegistry()
+        spec = registry.spec("deposit_all")
+
+        self.assertEqual(("items?",), spec.slot_schema)
+        self.assertEqual("command_specific", spec.resolver_domain)
+        self.assertEqual("task", spec.lifecycle_kind)
+        self.assertEqual("R2", spec.safety_tier)
+        self.assertEqual("none", spec.confirmation_mode)
+        self.assertEqual((), spec.allowed_input_sources)
+        self.assertEqual("prefixless_deposit_all", spec.serializer_id)
+        self.assertEqual(
+            {
+                "SOURCE_REGISTERED": True,
+                "KOREAN_PARSE_COMPILE_READY": False,
+                "PYTHON_ADMISSION_READY": False,
+                "BRIDGE_LIFECYCLE_READY": False,
+                "GAMEPLAY_EFFECT_VERIFIABLE": False,
+                "PUBLIC_KOREAN_ENABLED": False,
+            },
+            spec.readiness_axes.to_dict(),
+        )
+        self.assertNotIn("deposit_all", registry.public_korean_command_names())
+
+    def test_store_home_is_ready_for_public_korean_submission(self):
+        spec = KoreanChatClefCommandRegistry().spec("store_home")
+
+        self.assertEqual((), spec.slot_schema)
+        self.assertEqual("command_specific", spec.resolver_domain)
+        self.assertEqual("task", spec.lifecycle_kind)
+        self.assertEqual("R2", spec.safety_tier)
+        self.assertEqual("none", spec.confirmation_mode)
+        self.assertEqual(
+            ("lavi_chat_mic_router", "direct_typed"),
+            spec.allowed_input_sources,
+        )
+        self.assertEqual("prefixless_store_home", spec.serializer_id)
+        self.assertTrue(spec.readiness_axes.source_registered)
+        self.assertTrue(spec.readiness_axes.korean_parse_compile_ready)
+        self.assertTrue(spec.readiness_axes.python_admission_ready)
+        self.assertTrue(spec.readiness_axes.bridge_lifecycle_ready)
+        self.assertTrue(spec.readiness_axes.gameplay_effect_verifiable)
+        self.assertTrue(spec.readiness_axes.public_korean_enabled)
 
     def test_item_action_commands_are_public_but_have_command_specific_slots(self):
         registry = KoreanChatClefCommandRegistry()

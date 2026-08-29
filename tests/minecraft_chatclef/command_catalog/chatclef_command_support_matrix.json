@@ -5,6 +5,7 @@
     { "command": "attack", "owner": "chatclef_java", "natural_language_status": "RAW_ONLY", "support_status": "java_only_task_command" },
     { "command": "chatclef", "owner": "chatclef_java", "natural_language_status": "RAW_ONLY", "support_status": "java_only_user_or_dev_command" },
     { "command": "deposit", "owner": "chatclef_java", "natural_language_status": "IMPLEMENTED", "support_status": "supported_korean" },
+    { "command": "deposit_all", "owner": "chatclef_java", "natural_language_status": "RAW_ONLY", "support_status": "java_only_task_command" },
     { "command": "equip", "owner": "chatclef_java", "natural_language_status": "IMPLEMENTED", "support_status": "supported_korean" },
     { "command": "follow", "owner": "chatclef_java", "natural_language_status": "IMPLEMENTED", "support_status": "supported_korean" },
     { "command": "food", "owner": "chatclef_java", "natural_language_status": "IMPLEMENTED", "support_status": "supported_korean" },
@@ -21,6 +22,7 @@
     { "command": "reload_settings", "owner": "chatclef_java", "natural_language_status": "RAW_ONLY", "support_status": "java_only_user_or_dev_command" },
     { "command": "resetmemory", "owner": "chatclef_java", "natural_language_status": "RAW_ONLY", "support_status": "java_only_user_or_dev_command" },
     { "command": "scan", "owner": "chatclef_java", "natural_language_status": "RAW_ONLY", "support_status": "java_only_task_command" },
-    { "command": "stop", "owner": "chatclef_java", "natural_language_status": "IMPLEMENTED", "support_status": "supported_korean" }
+    { "command": "stop", "owner": "chatclef_java", "natural_language_status": "IMPLEMENTED", "support_status": "supported_korean" },
+    { "command": "store_home", "owner": "lavi_store_home", "natural_language_status": "IMPLEMENTED", "support_status": "supported_korean" }
   ]
 }

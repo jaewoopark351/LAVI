@@ -1,4 +1,5 @@
 #20260803_kpopmodder: Added Korean natural-language orchestration before ChatClef command submission.
+#20260827_kpopmodder: Consume guarded STORE_HOME candidates without LLM fallback or submission.
 from __future__ import annotations
 
 from plugins.Minecraft.fabric.chatclef.intent.chatclef_command_compiler import (
@@ -27,6 +28,9 @@ from plugins.Minecraft.fabric.chatclef.intent.composite_chatclef_intent_extracto
 )
 from plugins.Minecraft.fabric.chatclef.intent.korean_item_phrase_resolver import (
     KoreanItemPhraseResolver,
+)
+from plugins.Minecraft.fabric.chatclef.intent.store_home import (
+    StoreHomeIntentClassification,
 )
 
 
@@ -75,6 +79,17 @@ class ChatClefNaturalLanguageService:
                     reason_code,
                     message,
                     intent,
+                )
+            store_home_rejection = StoreHomeIntentClassification.guarded_from_intent(
+                intent
+            )
+            if store_home_rejection is not None:
+                return self._reject(
+                    ChatClefIntentStatus.INVALID,
+                    store_home_rejection.reason_code,
+                    store_home_rejection.message,
+                    intent,
+                    {"store_home_decision": store_home_rejection.decision.value},
                 )
             if intent.intent_type is ChatClefIntentType.UNKNOWN:
                 return self._reject(

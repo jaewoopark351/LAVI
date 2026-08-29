@@ -4,7 +4,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-//20260827_kpopmodder: Own one immutable exact-slot transfer manifest for an operation.
+//20260827_kpopmodder: Own one immutable exact-slot transfer manifest for a trusted-container session.
 public record HomeStorageManifest(long revision, List<HomeStorageManifestStep> steps) {
     public HomeStorageManifest {
         steps = List.copyOf(steps);

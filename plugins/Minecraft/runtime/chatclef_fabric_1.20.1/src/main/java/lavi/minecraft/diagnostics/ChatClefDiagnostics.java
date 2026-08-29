@@ -242,6 +242,27 @@ public final class ChatClefDiagnostics {
         emitEvent("BOUNDARY", "[LAVI ChatClefBoundary]", eventName, reason, task, fields, false);
     }
 
+    public static void logBoundedBoundary(
+            String eventName,
+            String reason,
+            Task task,
+            int maxUtf8Bytes,
+            Object[] requiredFields,
+            Object[] optionalFields) {
+        if (MODE.isOff()) {
+            return;
+        }
+        EVENTS.emitBoundedBoundaryEvent(
+                "[LAVI ChatClefBoundary]",
+                eventName,
+                reason,
+                task,
+                maxUtf8Bytes,
+                requiredFields,
+                optionalFields
+        );
+    }
+
     //20260803_kpopmodder: Keep command lifecycle diagnostics visible even when broad diagnostics are disabled.
     public static void logLifecycleBoundary(String eventName, String reason, Task task, Object... fields) {
         emitEvent("BOUNDARY", "[LAVI ChatClefLifecycle]", eventName, reason, task, fields, false);

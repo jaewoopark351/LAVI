@@ -1,10 +1,14 @@
 #20260819_kpopmodder: Render Korean ChatClef route replies from verified Python evidence only.
+#20260827_kpopmodder: Delegate STORE_HOME terminal wording to its typed renderer.
 from __future__ import annotations
 
 from typing import Any, Mapping
 
 from plugins.Minecraft.fabric.chatclef.intent.chatclef_korean_display_name_repository import (
     ChatClefKoreanDisplayNameRepository,
+)
+from plugins.Minecraft.fabric.chatclef.response.store_home import (
+    StoreHomeCommandResponseRenderer,
 )
 
 
@@ -14,12 +18,15 @@ class ChatClefCommandResponseRenderer:
         display_names: ChatClefKoreanDisplayNameRepository | None = None,
     ):
         self._display_names = display_names or ChatClefKoreanDisplayNameRepository()
+        self._store_home = StoreHomeCommandResponseRenderer()
 
     def render_submitted(
         self,
         translation: Mapping[str, Any],
         result: Mapping[str, Any],
     ) -> str:
+        if self._store_home.matches_translation(translation):
+            return self._store_home.render_submitted(result)
         result_status = self._result_status(result)
         message = self._text(result.get("message"))
         command_label = self._command_label(translation)
@@ -48,6 +55,8 @@ class ChatClefCommandResponseRenderer:
         self,
         translation: Mapping[str, Any],
     ) -> str:
+        if self._store_home.matches_rejection(translation):
+            return self._store_home.render_rejection(translation)
         reason = self._text(
             translation.get("reason_code")
             or translation.get("status")

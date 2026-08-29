@@ -1,6 +1,7 @@
 package lavi.minecraft.task.container.home.execution;
 
 import adris.altoclef.AltoClef;
+import lavi.minecraft.task.container.home.execution.slot.HomeStorageScreenSlotView;
 import net.minecraft.screen.ScreenHandler;
 
 import java.util.ArrayList;
@@ -18,10 +19,10 @@ public final class HomeStorageScreenSlotResolver {
         if (handler == null) {
             return OptionalInt.empty();
         }
-        List<SlotView> slots = new ArrayList<>(handler.slots.size());
+        List<HomeStorageScreenSlotView> slots = new ArrayList<>(handler.slots.size());
         for (int windowSlot = 0; windowSlot < handler.slots.size(); windowSlot++) {
             net.minecraft.screen.slot.Slot slot = handler.slots.get(windowSlot);
-            slots.add(new SlotView(
+            slots.add(new HomeStorageScreenSlotView(
                     windowSlot,
                     slot.inventory == mod.getPlayer().getInventory(),
                     slot.getIndex()
@@ -30,9 +31,11 @@ public final class HomeStorageScreenSlotResolver {
         return findUnique(slots, logicalPlayerSlot);
     }
 
-    public OptionalInt findUnique(List<SlotView> slots, int logicalPlayerSlot) {
+    public OptionalInt findUnique(
+            List<HomeStorageScreenSlotView> slots,
+            int logicalPlayerSlot) {
         int match = -1;
-        for (SlotView slot : slots) {
+        for (HomeStorageScreenSlotView slot : slots) {
             if (!slot.playerInventory() || slot.logicalSlot() != logicalPlayerSlot) {
                 continue;
             }
@@ -42,8 +45,5 @@ public final class HomeStorageScreenSlotResolver {
             match = slot.windowSlot();
         }
         return match < 0 ? OptionalInt.empty() : OptionalInt.of(match);
-    }
-
-    public record SlotView(int windowSlot, boolean playerInventory, int logicalSlot) {
     }
 }

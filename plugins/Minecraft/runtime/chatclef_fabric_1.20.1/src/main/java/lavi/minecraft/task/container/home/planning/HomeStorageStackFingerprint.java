@@ -58,6 +58,10 @@ public final class HomeStorageStackFingerprint {
         return damage;
     }
 
+    public ItemStack exactStackCopy() {
+        return exactStack == null ? null : exactStack.copy();
+    }
+
     public String summary() {
         return itemId + ":" + damage + ":" + Integer.toHexString(hashCode());
     }

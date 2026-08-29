@@ -1,4 +1,5 @@
 #20260803_kpopmodder: Added strict ChatClef DSL compilation from validated intents.
+#20260827_kpopmodder: Compile zero-slot STORE_HOME to one prefixless command.
 from __future__ import annotations
 
 import re
@@ -34,6 +35,8 @@ class ChatClefCommandCompiler:
             target_text = self._target(target)
             quantity = self._positive_int(intent.quantity, "quantity")
             return f"deposit {target_text} {quantity}"
+        if intent.intent_type is ChatClefIntentType.STORE_HOME:
+            return "store_home"
         if intent.intent_type is ChatClefIntentType.GIVE_ITEM:
             player_name = intent.player_name
             self.reject_dangerous_text(player_name)

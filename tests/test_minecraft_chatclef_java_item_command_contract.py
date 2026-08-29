@@ -22,7 +22,8 @@ JAVA_SOURCE_ROOT = (
     "plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java"
 )
 JAVA_ROOT = REPO_ROOT / Path(JAVA_SOURCE_ROOT)
-REVIEWED_SOURCE_COMMIT = "cfc170ac024a46ea943bffcaf289a91ff6bc5ee7"
+#20260829_openai: Rebaseline the reviewed dispatcher after its ownership-gate hardening.
+REVIEWED_SOURCE_COMMIT = "03d4e93b36ffdde4936da274eab72632569ea5b0"
 
 JAVA_CONTRACT_HASHES = {
     "adris/altoclef/commands/GetCommand.java": "4f3b86aabd4d94eab1a97b11d8225e2852ea4407c216bab5848b542894dc461d",
@@ -33,7 +34,7 @@ JAVA_CONTRACT_HASHES = {
     "adris/altoclef/commandsystem/ArgParser.java": "d2fcd9aaa8c6f59d2958545319e0c0543940f2e62875c46e2460f1ef60347cc8",
     "adris/altoclef/commandsystem/CommandExecutor.java": "17ef21bf10e5841b4fd2c5fe0190eda1b6d9ce2e9825a5cf059fdf44b47e7136",
     "adris/altoclef/commandsystem/ItemList.java": "38c442cc01a700a91c2b3af2dadb86a32ca4316a81cbbec2f7d311d6f30783ef",
-    "lavi/minecraft/fabric/chatclef/bridge/command/FabricChatClefCommandDispatcher.java": "957b76e4515edca4b5ed12d76b3dc27833488da41294a19495be73a6391d7f77",
+    "lavi/minecraft/fabric/chatclef/bridge/command/FabricChatClefCommandDispatcher.java": "5afbb6d923a453f7888efb46957920bf3e665ad415f3f492af8980d2a764d8fc",
 }
 
 

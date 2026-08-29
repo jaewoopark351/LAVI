@@ -69,6 +69,9 @@ SUPPORTED_KOREAN_TRANSLATION_CASES = {
     "stop": [
         ("멈춰", "stop"),
     ],
+    "store_home": [
+        ("인벤토리 전부 집에 보관해", "store_home"),
+    ],
 }
 
 UNSUPPORTED_OR_PLANNED_KOREAN_CASES = {
@@ -114,6 +117,7 @@ class KoreanCommandSupportMatrixTests(unittest.TestCase):
                 "idle",
                 "meat",
                 "stop",
+                "store_home",
             },
             set(SUPPORTED_KOREAN_TRANSLATION_CASES),
         )

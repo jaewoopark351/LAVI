@@ -1,4 +1,5 @@
 #20260803_kpopmodder: Added deterministic-first intent extraction with optional LLM fallback.
+#20260827_kpopmodder: Keep deterministic STORE_HOME refusals out of the LLM fallback.
 from __future__ import annotations
 
 from plugins.Minecraft.fabric.chatclef.intent.chatclef_intent_dto import (
@@ -12,6 +13,9 @@ from plugins.Minecraft.fabric.chatclef.intent.chatclef_llm_intent_extractor impo
 )
 from plugins.Minecraft.fabric.chatclef.intent.korean_chatclef_rule_parser import (
     KoreanChatClefRuleParser,
+)
+from plugins.Minecraft.fabric.chatclef.intent.store_home import (
+    StoreHomeIntentClassification,
 )
 
 
@@ -27,6 +31,8 @@ class CompositeChatClefIntentExtractor:
     def extract(self, text: str) -> ChatClefIntentDTO:
         intent = self._rule_parser.parse(text)
         if intent.intent_type is not ChatClefIntentType.UNKNOWN:
+            return intent
+        if StoreHomeIntentClassification.guarded_from_intent(intent) is not None:
             return intent
         if self._llm_extractor is None:
             return intent

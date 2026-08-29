@@ -102,6 +102,7 @@ class JavaChatClefCommandCatalogContractTests(unittest.TestCase):
                 "idle",
                 "meat",
                 "stop",
+                "store_home",
             },
             supported,
         )

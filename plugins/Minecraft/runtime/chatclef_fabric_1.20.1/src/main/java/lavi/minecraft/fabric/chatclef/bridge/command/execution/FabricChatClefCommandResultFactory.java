@@ -10,13 +10,17 @@ import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.evidence.FabricCh
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskSnapshot;
 import lavi.minecraft.fabric.chatclef.bridge.command.result.FabricChatClefCommandResultDataPayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.result.FabricChatClefCommandResultPayload;
+import lavi.minecraft.fabric.chatclef.bridge.command.result.storehome.FabricChatClefStoreHomeResultProjector;
 
 //20260804_kpopmodder: Separate command result map construction from mutable command execution state.
+//20260827_kpopmodder: Attach typed STORE_HOME outcomes without changing generic lifecycle classification.
 final class FabricChatClefCommandResultFactory {
     private final FabricChatClefCommandExecutionState state;
+    private final FabricChatClefStoreHomeResultProjector storeHomeResultProjector;
 
     FabricChatClefCommandResultFactory(FabricChatClefCommandExecutionState state) {
         this.state = state;
+        this.storeHomeResultProjector = new FabricChatClefStoreHomeResultProjector();
     }
 
     FabricChatClefCommandResultPayload runningResult() {
@@ -60,7 +64,10 @@ final class FabricChatClefCommandResultFactory {
         return FabricChatClefCommandResult.unknown(
                 request().requestId,
                 "Fabric ChatClef command callback finished, but Minecraft goal success was not verified.",
-                data("finish_callback_without_new_command_owned_root")
+                storeHomeResultProjector.fromCommandWithoutUserTask(
+                        data("finish_callback_without_new_command_owned_root"),
+                        state.normalizedCommand()
+                )
         );
     }
 
@@ -84,7 +91,11 @@ final class FabricChatClefCommandResultFactory {
         return FabricChatClefCommandResult.completed(
                 request().requestId,
                 "ChatClef user task reached natural completion.",
-                data("matching_task_finished", observation)
+                storeHomeResultProjector.fromMatchingTask(
+                        data("matching_task_finished", observation),
+                        state.normalizedCommand(),
+                        observation
+                )
         );
     }
 
@@ -92,7 +103,10 @@ final class FabricChatClefCommandResultFactory {
         return FabricChatClefCommandResult.completed(
                 request().requestId,
                 "ChatClef command completed without starting a user task.",
-                data("callback_completed_without_user_task")
+                storeHomeResultProjector.fromCommandWithoutUserTask(
+                        data("callback_completed_without_user_task"),
+                        state.normalizedCommand()
+                )
         );
     }
 
@@ -100,7 +114,11 @@ final class FabricChatClefCommandResultFactory {
         return FabricChatClefCommandResult.failed(
                 request().requestId,
                 "ChatClef user task stopped before natural completion.",
-                data("matching_task_stopped", observation)
+                storeHomeResultProjector.fromMatchingTask(
+                        data("matching_task_stopped", observation),
+                        state.normalizedCommand(),
+                        observation
+                )
         );
     }
 
@@ -108,7 +126,11 @@ final class FabricChatClefCommandResultFactory {
         return FabricChatClefCommandResult.unknown(
                 request().requestId,
                 "ChatClef user task completion could not be safely classified.",
-                data("task_observation_unclassified", observation)
+                storeHomeResultProjector.fromMatchingTask(
+                        data("task_observation_unclassified", observation),
+                        state.normalizedCommand(),
+                        observation
+                )
         );
     }
 

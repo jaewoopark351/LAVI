@@ -1,10 +1,14 @@
 #20260803_kpopmodder: Gate Korean Minecraft-like input before ChatClef translation.
+#20260827_kpopmodder: Reuse the STORE_HOME rule owner for candidate detection only.
 from __future__ import annotations
 
 import re
 
 from plugins.Minecraft.fabric.chatclef.intent.korean_acquisition_verb_matcher import (
     KoreanAcquisitionVerbMatcher,
+)
+from plugins.Minecraft.fabric.chatclef.intent.store_home import (
+    KoreanStoreHomeIntentClassifier,
 )
 
 
@@ -38,13 +42,17 @@ class MinecraftChatClefInputIntentGate:
     def __init__(
         self,
         acquisition_verbs: KoreanAcquisitionVerbMatcher | None = None,
+        store_home: KoreanStoreHomeIntentClassifier | None = None,
     ):
         self._acquisition_verbs = acquisition_verbs or KoreanAcquisitionVerbMatcher()
+        self._store_home = store_home or KoreanStoreHomeIntentClassifier()
 
     def should_consider(self, text: object) -> bool:
         normalized = self._normalize(text)
         if not normalized:
             return False
+        if self._store_home.is_candidate(text):
+            return True
         if self._acquisition_verbs.matches(text):
             return True
         return any(

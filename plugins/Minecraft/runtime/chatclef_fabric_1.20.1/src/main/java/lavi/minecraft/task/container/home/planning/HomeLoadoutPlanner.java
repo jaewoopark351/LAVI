@@ -1,7 +1,6 @@
 package lavi.minecraft.task.container.home.planning;
 
 import lavi.minecraft.task.container.deposit.auto.policy.AutoDepositItemRole;
-
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -14,6 +13,11 @@ public final class HomeLoadoutPlanner {
     private static final int TORCH_RESERVE = 32;
     private static final int ARROW_RESERVE = 32;
     private long nextRevision = 1L;
+
+    //20260828_kpopmodder: Plan from the occupied view of the authoritative activation capture.
+    public HomeStoragePlan plan(HomeStorageInventorySnapshot snapshot) {
+        return plan(snapshot.occupiedStacks());
+    }
 
     public HomeStoragePlan plan(List<HomeStorageStackSnapshot> input) {
         List<HomeStorageStackSnapshot> snapshots = List.copyOf(input);

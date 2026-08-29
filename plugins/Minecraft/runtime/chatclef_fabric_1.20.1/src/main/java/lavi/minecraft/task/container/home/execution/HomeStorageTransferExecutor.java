@@ -1,275 +1,284 @@
 package lavi.minecraft.task.container.home.execution;
 
 import adris.altoclef.AltoClef;
-import adris.altoclef.trackers.storage.ContainerType;
-import lavi.minecraft.task.container.deposit.auto.trusted.AutoDepositTrustedContainerSupport;
 import lavi.minecraft.task.container.deposit.auto.trusted.AutoDepositTrustedDestination;
 import lavi.minecraft.task.container.deposit.auto.trusted.interaction.AutoDepositExactOpenContainerBinding;
+import lavi.minecraft.task.container.home.execution.transfer.HomeStoragePendingTransferObservation;
+import lavi.minecraft.task.container.home.execution.transfer.HomeStorageTransferResult;
+import lavi.minecraft.task.container.home.execution.transfer.HomeStorageTransferStatus;
+import lavi.minecraft.task.container.home.execution.transfer.click.HomeStorageQuickMoveIssuer;
+import lavi.minecraft.task.container.home.execution.transfer.click.HomeStorageQuickMoveOutcome;
+import lavi.minecraft.task.container.home.execution.transfer.click.HomeStorageQuickMoveReadiness;
+import lavi.minecraft.task.container.home.execution.transfer.click.HomeStorageQuickMoveReadinessChecker;
+import lavi.minecraft.task.container.home.execution.transfer.container.HomeStorageContainerInventoryCalculator;
+import lavi.minecraft.task.container.home.execution.transfer.container.HomeStorageLiveContainerInspector;
+import lavi.minecraft.task.container.home.execution.transfer.container.HomeStorageLiveContainerSnapshot;
+import lavi.minecraft.task.container.home.execution.transfer.failure.HomeStorageTransferFailureObservation;
+import lavi.minecraft.task.container.home.execution.transfer.failure.HomeStorageTransferFailureStage;
+import lavi.minecraft.task.container.home.execution.transfer.pending.HomeStoragePendingTransferState;
+import lavi.minecraft.task.container.home.execution.transfer.pending.HomeStoragePendingTransferStatus;
+import lavi.minecraft.task.container.home.execution.transfer.pending.HomeStoragePendingTransferTracker;
+import lavi.minecraft.task.container.home.execution.transfer.pending.HomeStoragePendingTransferVerification;
+import lavi.minecraft.task.container.home.execution.transfer.pending.HomeStoragePendingTransferVerifier;
 import lavi.minecraft.task.container.home.planning.HomeStorageManifestStep;
-import lavi.minecraft.task.container.home.planning.HomeStorageStackFingerprint;
-import net.minecraft.block.Block;
-import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.item.ItemStack;
-import net.minecraft.screen.ScreenHandler;
-import net.minecraft.screen.slot.SlotActionType;
 
 import java.util.Objects;
+import java.util.Optional;
 import java.util.OptionalInt;
 
-//20260827_kpopmodder: Execute and verify one exact-slot QUICK_MOVE against the bound trusted GUI.
+//20260829_kpopmodder: Orchestrate one exact transfer through focused behavior-owned collaborators.
 public final class HomeStorageTransferExecutor {
     private static final int MAX_UNCONFIRMED_TICKS = 40;
 
     private final HomeStorageScreenSlotResolver slotResolver;
-    private final HomeStorageTransferDeltaVerifier deltaVerifier =
-            new HomeStorageTransferDeltaVerifier();
-    private PendingTransfer pending;
+    private final HomeStorageLiveContainerInspector containerInspector =
+            new HomeStorageLiveContainerInspector();
+    private final HomeStorageContainerInventoryCalculator inventoryCalculator =
+            new HomeStorageContainerInventoryCalculator();
+    private final HomeStorageQuickMoveReadinessChecker readinessChecker =
+            new HomeStorageQuickMoveReadinessChecker();
+    private final HomeStorageQuickMoveIssuer quickMoveIssuer =
+            new HomeStorageQuickMoveIssuer();
+    private final HomeStoragePendingTransferTracker pendingTracker =
+            new HomeStoragePendingTransferTracker();
+    private final HomeStoragePendingTransferVerifier pendingVerifier =
+            new HomeStoragePendingTransferVerifier();
 
     public HomeStorageTransferExecutor(HomeStorageScreenSlotResolver slotResolver) {
         this.slotResolver = Objects.requireNonNull(slotResolver, "slotResolver");
     }
 
-    public Result tick(
+    //20260829_kpopmodder: Preserve the original transfer entry point for existing callers.
+    public HomeStorageTransferResult tick(
             AltoClef mod,
             AutoDepositTrustedDestination destination,
             AutoDepositExactOpenContainerBinding binding,
             HomeStorageManifestStep step,
             int expectedSourceCount) {
-        LiveContainer live = inspectLiveContainer(mod, destination, binding);
+        return tick(
+                mod,
+                destination,
+                binding,
+                step,
+                expectedSourceCount,
+                -1
+        );
+    }
+
+    public HomeStorageTransferResult tick(
+            AltoClef mod,
+            AutoDepositTrustedDestination destination,
+            AutoDepositExactOpenContainerBinding binding,
+            HomeStorageManifestStep step,
+            int expectedSourceCount,
+            int manifestStepIndex) {
+        HomeStorageLiveContainerSnapshot live = containerInspector.inspect(
+                mod, destination, binding
+        );
         if (!live.open()) {
-            return Result.of(Status.CONTAINER_NOT_OPEN, live.reason());
+            return HomeStorageTransferResult.of(
+                    HomeStorageTransferStatus.CONTAINER_NOT_OPEN,
+                    live.reason()
+            );
         }
-        if (!cursorEmpty(live.handler())) {
-            return Result.of(Status.CURSOR_NOT_EMPTY, "cursor_not_empty");
+        if (readinessChecker.cursor(live.handler())
+                == HomeStorageQuickMoveReadiness.CURSOR_NOT_EMPTY) {
+            return HomeStorageTransferResult.of(
+                    HomeStorageTransferStatus.CURSOR_NOT_EMPTY,
+                    "cursor_not_empty"
+            );
         }
 
-        OptionalInt resolved = slotResolver.resolve(mod, step.logicalPlayerInventorySlot());
+        OptionalInt resolved = slotResolver.resolve(
+                mod, step.logicalPlayerInventorySlot()
+        );
         if (resolved.isEmpty()) {
-            return Result.of(Status.MANIFEST_STALE, "logical_slot_mapping_unavailable");
+            return stale(
+                    "logical_slot_mapping_unavailable",
+                    HomeStorageTransferFailureStage.SLOT_RESOLUTION,
+                    expectedSourceCount,
+                    manifestStepIndex,
+                    null,
+                    false,
+                    "player_main_inventory_after_mapping_failure"
+            );
         }
         int sourceWindowSlot = resolved.getAsInt();
         ItemStack source = live.handler().slots.get(sourceWindowSlot).getStack();
 
-        if (pending != null) {
-            return verifyPending(live, destination, step, sourceWindowSlot, source);
+        if (pendingTracker.hasPending()) {
+            return verifyPending(
+                    live,
+                    destination,
+                    step,
+                    manifestStepIndex,
+                    sourceWindowSlot,
+                    source
+            );
         }
+        boolean fingerprintMatched = source != null
+                && !source.isEmpty()
+                && step.fingerprint().matches(source);
         if (source == null || source.isEmpty()
-                || !step.fingerprint().matches(source)
+                || !fingerprintMatched
                 || source.getCount() != expectedSourceCount) {
-            return Result.of(Status.MANIFEST_STALE, "exact_source_changed_before_click");
+            return stale(
+                    "exact_source_changed_before_click",
+                    HomeStorageTransferFailureStage.PRE_CLICK_SOURCE_VALIDATION,
+                    expectedSourceCount,
+                    manifestStepIndex,
+                    source,
+                    fingerprintMatched,
+                    "resolved_handler_source_slot"
+            );
         }
 
-        int capacity = availableCapacity(live, step.fingerprint(), source);
-        if (capacity <= 0) {
-            return Result.of(Status.NO_CAPACITY, "trusted_gui_has_no_capacity");
+        if (inventoryCalculator.availableCapacity(
+                live, step.fingerprint(), source
+        ) <= 0) {
+            return HomeStorageTransferResult.of(
+                    HomeStorageTransferStatus.NO_CAPACITY,
+                    "trusted_gui_has_no_capacity"
+            );
         }
-        if (mod.getSlotHandler() == null || mod.getController() == null
-                || !mod.getSlotHandler().canDoSlotAction()) {
-            return Result.of(Status.WAITING, "slot_action_delay");
+        if (readinessChecker.slotAction(mod)
+                == HomeStorageQuickMoveReadiness.SLOT_ACTION_DELAY) {
+            return HomeStorageTransferResult.of(
+                    HomeStorageTransferStatus.WAITING,
+                    "slot_action_delay"
+            );
         }
 
-        pending = new PendingTransfer(
+        pendingTracker.begin(
                 destination.key(),
                 step.logicalPlayerInventorySlot(),
                 sourceWindowSlot,
                 source.getCount(),
-                countInContainer(live, step.fingerprint()),
-                0
+                inventoryCalculator.count(live, step.fingerprint())
         );
-        try {
-            mod.getSlotHandler().registerSlotAction();
-            mod.getController().clickSlot(
-                    live.handler().syncId,
-                    sourceWindowSlot,
-                    0,
-                    SlotActionType.QUICK_MOVE,
-                    mod.getPlayer()
-            );
-        } catch (RuntimeException exception) {
-            pending = null;
+        HomeStorageQuickMoveOutcome issued = quickMoveIssuer.issue(
+                mod, live.handler(), sourceWindowSlot
+        );
+        if (!issued.issued()) {
+            pendingTracker.clear();
             mod.logWarning("Store-home exact slot click failed: "
-                    + exception.getClass().getSimpleName());
-            return Result.of(Status.NO_PROGRESS, "slot_click_exception");
+                    + issued.exceptionClass());
+            return HomeStorageTransferResult.of(
+                    HomeStorageTransferStatus.TRANSFER_UNCONFIRMED,
+                    issued.reason()
+            );
         }
-        return Result.of(Status.CLICK_REQUESTED, "quick_move_requested");
+        return HomeStorageTransferResult.of(
+                HomeStorageTransferStatus.CLICK_REQUESTED,
+                issued.reason()
+        );
     }
 
     public OptionalInt pendingLogicalSlot() {
-        return pending == null
-                ? OptionalInt.empty()
-                : OptionalInt.of(pending.logicalSlot());
+        return pendingTracker.logicalSlot();
     }
 
     public boolean hasPending() {
-        return pending != null;
+        return pendingTracker.hasPending();
     }
 
     public void clearPending() {
-        pending = null;
+        pendingTracker.clear();
     }
 
-    private Result verifyPending(
-            LiveContainer live,
+    public Optional<HomeStoragePendingTransferObservation> pendingObservation() {
+        return pendingTracker.observation();
+    }
+
+    private HomeStorageTransferResult verifyPending(
+            HomeStorageLiveContainerSnapshot live,
             AutoDepositTrustedDestination destination,
             HomeStorageManifestStep step,
+            int manifestStepIndex,
             int sourceWindowSlot,
             ItemStack source) {
-        if (!pending.destinationKey().equals(destination.key())
-                || pending.logicalSlot() != step.logicalPlayerInventorySlot()
-                || pending.sourceWindowSlot() != sourceWindowSlot) {
-            return terminal(Status.TRANSFER_UNCONFIRMED, "pending_transfer_context_changed");
-        }
-        if (source != null && !source.isEmpty() && !step.fingerprint().matches(source)) {
-            return terminal(Status.MANIFEST_STALE, "source_fingerprint_changed_after_click");
-        }
-
-        int sourceAfter = source == null || source.isEmpty() ? 0 : source.getCount();
-        int destinationAfter = countInContainer(live, step.fingerprint());
-        HomeStorageTransferDeltaVerifier.Verification verification = deltaVerifier.verify(
-                pending.sourceCountBefore(),
-                sourceAfter,
-                pending.destinationCountBefore(),
-                destinationAfter
+        HomeStoragePendingTransferState pending = pendingTracker.current()
+                .orElseThrow(() -> new IllegalStateException(
+                        "pending transfer disappeared during verification"
+                ));
+        HomeStoragePendingTransferVerification verification = pendingVerifier.verify(
+                pending,
+                destination.key(),
+                step.logicalPlayerInventorySlot(),
+                sourceWindowSlot,
+                source,
+                step.fingerprint(),
+                () -> inventoryCalculator.count(live, step.fingerprint()),
+                MAX_UNCONFIRMED_TICKS
         );
-        if (verification.status() == HomeStorageTransferDeltaVerifier.Status.CONFIRMED) {
-            Result result = new Result(
-                    Status.TRANSFERRED,
-                    verification.sourceDelta(),
-                    sourceAfter,
-                    "paired_delta_confirmed"
+        if (verification.status()
+                == HomeStoragePendingTransferStatus.FINGERPRINT_CHANGED) {
+            HomeStorageTransferResult result = stale(
+                    verification.reason(),
+                    HomeStorageTransferFailureStage.POST_CLICK_SOURCE_VALIDATION,
+                    pending.sourceCountBefore(),
+                    manifestStepIndex,
+                    source,
+                    false,
+                    "resolved_handler_source_slot_after_click"
             );
-            pending = null;
+            pendingTracker.clear();
             return result;
         }
-        if (verification.status() == HomeStorageTransferDeltaVerifier.Status.MISMATCH) {
-            return terminal(Status.TRANSFER_UNCONFIRMED, "paired_delta_mismatch");
+        if (verification.status() == HomeStoragePendingTransferStatus.CONFIRMED) {
+            HomeStorageTransferResult result = new HomeStorageTransferResult(
+                    HomeStorageTransferStatus.TRANSFERRED,
+                    verification.transferredCount(),
+                    verification.sourceCountAfter(),
+                    verification.reason(),
+                    null
+            );
+            pendingTracker.clear();
+            return result;
         }
-        if (verification.status() == HomeStorageTransferDeltaVerifier.Status.REVERSED) {
-            return terminal(Status.TRANSFER_UNCONFIRMED, "paired_delta_reversed");
-        }
-
-        pending = pending.nextTick();
-        if (pending.elapsedTicks() >= MAX_UNCONFIRMED_TICKS) {
-            Status status = verification.sourceDelta() == 0
-                    && verification.destinationDelta() == 0
-                    ? Status.NO_PROGRESS
-                    : Status.TRANSFER_UNCONFIRMED;
-            return terminal(status, "paired_delta_timeout");
-        }
-        return Result.of(Status.WAITING, "awaiting_paired_delta");
-    }
-
-    private Result terminal(Status status, String reason) {
-        pending = null;
-        return Result.of(status, reason);
-    }
-
-    private static LiveContainer inspectLiveContainer(
-            AltoClef mod,
-            AutoDepositTrustedDestination destination,
-            AutoDepositExactOpenContainerBinding binding) {
-        if (mod == null || mod.getWorld() == null || mod.getPlayer() == null
-                || !binding.matches(destination.position())) {
-            return new LiveContainer(null, null, false, "exact_trusted_gui_not_open");
-        }
-        Block block = mod.getWorld().getBlockState(destination.position()).getBlock();
-        ScreenHandler handler = mod.getPlayer().currentScreenHandler;
-        if (!AutoDepositTrustedContainerSupport.isSupported(block)
-                || handler == null
-                || !ContainerType.screenHandlerMatches(ContainerType.getFromBlock(block), handler)) {
-            return new LiveContainer(null, null, false, "bound_container_invalid");
-        }
-        return new LiveContainer(handler, mod.getPlayer().getInventory(), true, "open");
-    }
-
-    private static boolean cursorEmpty(ScreenHandler handler) {
-        ItemStack cursor = handler == null ? ItemStack.EMPTY : handler.getCursorStack();
-        return cursor == null || cursor.isEmpty();
-    }
-
-    private static int countInContainer(
-            LiveContainer live,
-            HomeStorageStackFingerprint fingerprint) {
-        int count = 0;
-        for (net.minecraft.screen.slot.Slot slot : live.handler().slots) {
-            if (slot.inventory == live.playerInventory()) {
-                continue;
-            }
-            ItemStack stack = slot.getStack();
-            if (stack != null && !stack.isEmpty() && fingerprint.matches(stack)) {
-                count = saturatingAdd(count, stack.getCount());
-            }
-        }
-        return count;
-    }
-
-    private static int availableCapacity(
-            LiveContainer live,
-            HomeStorageStackFingerprint fingerprint,
-            ItemStack source) {
-        int capacity = 0;
-        for (net.minecraft.screen.slot.Slot slot : live.handler().slots) {
-            if (slot.inventory == live.playerInventory() || !slot.canInsert(source)) {
-                continue;
-            }
-            ItemStack current = slot.getStack();
-            int maximum = Math.min(source.getMaxCount(), slot.getMaxItemCount(source));
-            if (current == null || current.isEmpty()) {
-                capacity = saturatingAdd(capacity, maximum);
-            } else if (fingerprint.matches(current)) {
-                capacity = saturatingAdd(capacity, Math.max(0, maximum - current.getCount()));
-            }
-        }
-        return capacity;
-    }
-
-    private static int saturatingAdd(int left, int right) {
-        long sum = (long) left + right;
-        return sum > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) sum;
-    }
-
-    public enum Status {
-        WAITING,
-        CLICK_REQUESTED,
-        TRANSFERRED,
-        CONTAINER_NOT_OPEN,
-        NO_CAPACITY,
-        NO_PROGRESS,
-        MANIFEST_STALE,
-        CURSOR_NOT_EMPTY,
-        TRANSFER_UNCONFIRMED
-    }
-
-    public record Result(Status status, int transferredCount, int sourceCountAfter, String reason) {
-        public static Result of(Status status, String reason) {
-            return new Result(status, 0, -1, reason);
-        }
-    }
-
-    private record LiveContainer(
-            ScreenHandler handler,
-            PlayerInventory playerInventory,
-            boolean open,
-            String reason) {
-    }
-
-    private record PendingTransfer(
-            String destinationKey,
-            int logicalSlot,
-            int sourceWindowSlot,
-            int sourceCountBefore,
-            int destinationCountBefore,
-            int elapsedTicks) {
-
-        private PendingTransfer nextTick() {
-            return new PendingTransfer(
-                    destinationKey,
-                    logicalSlot,
-                    sourceWindowSlot,
-                    sourceCountBefore,
-                    destinationCountBefore,
-                    elapsedTicks + 1
+        if (verification.status() == HomeStoragePendingTransferStatus.WAITING) {
+            pendingTracker.advanceTick();
+            return HomeStorageTransferResult.of(
+                    HomeStorageTransferStatus.WAITING,
+                    verification.reason()
             );
         }
+        if (verification.status() == HomeStoragePendingTransferStatus.TIMEOUT) {
+            pendingTracker.advanceTick();
+        }
+        return terminal(
+                HomeStorageTransferStatus.TRANSFER_UNCONFIRMED,
+                verification.reason()
+        );
+    }
+
+    private HomeStorageTransferResult stale(
+            String reason,
+            HomeStorageTransferFailureStage stage,
+            int expectedSourceCount,
+            int manifestStepIndex,
+            ItemStack actual,
+            boolean fingerprintMatched,
+            String observationSource) {
+        return HomeStorageTransferResult.stale(
+                reason,
+                new HomeStorageTransferFailureObservation(
+                        stage,
+                        expectedSourceCount,
+                        manifestStepIndex,
+                        actual,
+                        fingerprintMatched,
+                        observationSource,
+                        pendingObservation()
+                )
+        );
+    }
+
+    private HomeStorageTransferResult terminal(
+            HomeStorageTransferStatus status,
+            String reason) {
+        pendingTracker.clear();
+        return HomeStorageTransferResult.of(status, reason);
     }
 }

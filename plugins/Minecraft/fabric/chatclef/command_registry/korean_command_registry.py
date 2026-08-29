@@ -1,4 +1,7 @@
 #20260820_kpopmodder: Keep full ChatClef command registry metadata separate from compilers.
+#20260827_kpopmodder: Register private-rollout STORE_HOME readiness and source policy.
+#20260828_kpopmodder: Public-enable STORE_HOME for user-approved live chat and microphone validation.
+#20260829_openai: Register deposit_all as raw-only shadow metadata without Korean readiness.
 from __future__ import annotations
 
 from plugins.Minecraft.fabric.chatclef.command_registry.korean_command_registry_model import (
@@ -12,6 +15,7 @@ class KoreanChatClefCommandRegistry:
         "attack",
         "chatclef",
         "deposit",
+        "deposit_all",
         "equip",
         "follow",
         "food",
@@ -29,6 +33,7 @@ class KoreanChatClefCommandRegistry:
         "resetmemory",
         "scan",
         "stop",
+        "store_home",
     )
     _PUBLIC_KOREAN_COMMANDS = frozenset(
         {
@@ -39,20 +44,34 @@ class KoreanChatClefCommandRegistry:
             "give",
             "goto",
             "meat",
+            "store_home",
         }
     )
     _PARSER_READY_COMMANDS = _PUBLIC_KOREAN_COMMANDS | frozenset(
-        {"follow", "idle", "stop"}
+        {"follow", "idle", "stop", "store_home"}
     )
-    _PYTHON_ADMISSION_READY_COMMANDS = _PUBLIC_KOREAN_COMMANDS
+    _PYTHON_ADMISSION_READY_COMMANDS = _PUBLIC_KOREAN_COMMANDS | frozenset(
+        {"store_home"}
+    )
     _BRIDGE_LIFECYCLE_READY_COMMANDS = frozenset(
-        {"deposit", "equip", "food", "get", "give", "goto", "meat", "stop"}
+        {
+            "deposit",
+            "equip",
+            "food",
+            "get",
+            "give",
+            "goto",
+            "meat",
+            "stop",
+            "store_home",
+        }
     )
-    _GAMEPLAY_VERIFIABLE_COMMANDS = frozenset({"get"})
+    _GAMEPLAY_VERIFIABLE_COMMANDS = frozenset({"get", "store_home"})
     _SAFETY_TIERS = {
         "attack": "R3",
         "chatclef": "R4",
         "deposit": "R2",
+        "deposit_all": "R2",
         "equip": "R1",
         "follow": "R3",
         "food": "R1",
@@ -70,6 +89,7 @@ class KoreanChatClefCommandRegistry:
         "resetmemory": "R4",
         "scan": "R0",
         "stop": "R0",
+        "store_home": "R2",
     }
     _RESOLVER_DOMAINS = {
         "deposit": "item_target",
@@ -81,6 +101,7 @@ class KoreanChatClefCommandRegistry:
         "attack": ("target", "count?"),
         "chatclef": ("state",),
         "deposit": ("item", "count"),
+        "deposit_all": ("items?",),
         "equip": ("equipment_item",),
         "follow": ("player",),
         "food": ("count",),
@@ -98,6 +119,7 @@ class KoreanChatClefCommandRegistry:
         "resetmemory": (),
         "scan": ("target",),
         "stop": (),
+        "store_home": (),
     }
 
     def commands(self) -> tuple[ChatClefCommandSpec, ...]:
@@ -140,7 +162,18 @@ class KoreanChatClefCommandRegistry:
             return "settings_or_ui"
         if command in {"stop"}:
             return "control"
-        if command in {"get", "deposit", "equip", "give", "goto", "follow", "food", "meat"}:
+        if command in {
+            "get",
+            "deposit",
+            "deposit_all",
+            "equip",
+            "give",
+            "goto",
+            "follow",
+            "food",
+            "meat",
+            "store_home",
+        }:
             return "task"
         return "raw_java_task_or_dev"
 
@@ -155,6 +188,8 @@ class KoreanChatClefCommandRegistry:
         return "none"
 
     def _allowed_input_sources(self, command: str) -> tuple[str, ...]:
+        if command == "store_home":
+            return ("lavi_chat_mic_router", "direct_typed")
         if command in self._PUBLIC_KOREAN_COMMANDS:
             return ("lavi_chat_mic_router", "direct_typed")
         if command == "stop":

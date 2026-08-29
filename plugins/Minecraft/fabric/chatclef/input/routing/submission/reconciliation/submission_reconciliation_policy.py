@@ -1,10 +1,14 @@
 #20260819_kpopmodder: Decide UNKNOWN retention and matching terminal reconciliation.
+#20260827_kpopmodder: Accept a matching typed STORE_HOME refusal as terminal evidence.
 from __future__ import annotations
 
 from typing import Any, Mapping
 
 from plugins.Minecraft.common.protocol.command_result_status import (
     CommandResultStatus,
+)
+from plugins.Minecraft.fabric.chatclef.result.store_home import (
+    StoreHomeTerminalPayload,
 )
 
 
@@ -57,6 +61,8 @@ class MinecraftChatClefSubmissionReconciliationPolicy:
         if details.get("reconciliation_required") is True:
             return False
         observed_status = status.get("status")
+        if observed_status == CommandResultStatus.UNKNOWN.value:
+            return StoreHomeTerminalPayload.from_data(details) is not None
         return (
             type(observed_status) is str
             and observed_status in self.TERMINAL_STATUSES
