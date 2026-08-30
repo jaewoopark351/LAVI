@@ -6,16 +6,26 @@
 <!-- 20260826_kpopmodder: Recorded post-commit runtime evidence and the same-target child lifecycle review failure. -->
 <!-- 20260826_kpopmodder: Recorded lifecycle closure and the focused automatic deposit_all implementation. -->
 <!-- 20260826_kpopmodder: Recorded that generic ResourceTask container pickup is currently source-disabled. -->
+<!-- 20260829_openai: Recorded the current-source automatic pressure-deposit composition regression, evidence levels, and forward-only restoration gate without authorizing source changes. -->
+<!-- 20260829_openai: Reconciled the independent review with the live source, including runtime-scoped identity, exact StoreHome root authority, initialization atomicity, runner ownership, and real TaskRunner reconciliation without authorizing implementation. -->
+<!-- 20260829_kpopmodder: Recorded the authorized forward-only production composition restoration and current focused/targeted test evidence without claiming a clean build or runtime artifact. -->
+<!-- 20260830_openai: Linked the focused transfer, movement-progress, and Carry On incident review while preserving the dated composition evidence ledger. -->
 
 # ChatClef @deposit_all Ocean Loop Diagnostics Plan
 
-문서 상태: `B0_1_LIFECYCLE_RUNTIME_OBSERVED_AUTO_TRIGGER_SOURCE_IMPLEMENTED_BUILD_PENDING`
+문서 상태: `AUTO_PRESSURE_COMPOSITION_SOURCE_RESTORED_FOCUSED_AND_TARGETED_TESTS_PASSED_CLEAN_BUILD_AND_RUNTIME_PENDING`
 
-작성 기준일: 2026-08-26
+작성 기준일: 2026-08-26, 상태 갱신일: 2026-08-29
 
 > 2026-08-27 방향 안내: 사용자가 명시적으로 요청했을 때만 trusted destination에
 > inventory를 정리하는 `STORE_HOME`은 이 automatic-deposit 기록과 분리한다.
 > 해당 기능에는 [Manual Trusted Home Storage Direction](chatclef-manual-trusted-home-storage-direction-2026-08-27.md)이 우선한다.
+>
+> 2026-08-29 최신 상태 안내: §26의 automatic policy와 §28.1-§28.13의 dormant 판정은
+> 역사적 근거로 유지한다. 사용자가 승인한 forward-only 복구 뒤의 현재 source/test 판정은
+> §28.14가 소유한다. 현재 worktree는 pressure chain을 production runtime에 정확히 한 번
+> 조립하고 exact-binding tracker 뒤에 tick한다. Clean forced build, JAR provenance와 Minecraft
+> 33/36 runtime 재현은 아직 수행하지 않았다.
 
 이 문서는 바다에서 bare `@deposit_all`이 저장 단계로 수렴하지 않았지만 육지와
 나무가 있는 곳에서는 정상 완료된 재현을 바탕으로 진단 범위를 고정했고, 이후
@@ -3801,7 +3811,8 @@ coverage 변화가 inventory 안전 정책을 바꾸면 안 된다. 내부 polic
 
 ```text
 사용자 요청 없음
-    -> inventory가 가득 차도 storage Task를 시작하지 않음
+    -> inventory가 가득 차도 STORE_HOME Task를 시작하지 않음
+    -> 별도 automatic pressure Task의 현재 상태와 복구 계약은 §28에서만 판정
 
 사용자 명시 요청
     -> manual StoreHome UserTask만 시작
@@ -3814,3 +3825,929 @@ coverage 변화가 inventory 안전 정책을 바꾸면 안 된다. 내부 polic
 manual V1의 activation path가 아니다. 이 방향 변경은 현재 Java behavior가 이미 변경됐다는
 뜻이 아니며, automatic entrypoint 비활성화, `@store_home`, exact-slot executor, build와
 runtime 검증은 모두 별도 구현 및 승인 대상이다.
+
+## 28. 2026-08-29 automatic inventory-pressure production composition 회귀 판정
+
+### 28.1 범위와 승인 상태
+
+이 절은 현재 source, `740aa616` 전후 Git 이력, 기존 테스트 source와 2026-08-29
+Minecraft 로그 점검을 대조해 automatic inventory-pressure deposit이 시작되지 않는
+이유를 고정한다. 다음 작업을 수행하거나 승인하지 않는다.
+
+```text
+Java 또는 JSON source 수정
+test source 수정 또는 실행
+Gradle build
+JAR 복사 또는 배포
+Minecraft 실행 또는 재현
+commit 또는 push
+```
+
+현재 요구사항에서 복구 대상으로 보는 것은 사용자가 직접 실행하는 `@deposit_all`이나
+`@store_home`이 아니라 다음 독립 subsystem이다.
+
+```text
+inventory occupied-slot pressure
+    -> automatic-only policy plan
+    -> AutoDepositMaintenanceTask
+    -> safe surplus / trusted-only storage
+    -> actual free-slot postcondition
+```
+
+`STORE_HOME`은 계속 explicit-request-only다. Automatic pressure subsystem을 이후 별도
+승인으로 복구하더라도 inventory pressure가 `StoreHomeTask`를 생성하거나 `STORE_HOME`
+planner, timeout, manifest 또는 terminal contract를 재사용한다는 뜻이 아니다.
+
+### 28.2 증거 기준선
+
+이번 문서 갱신의 read-only 기준선은 다음과 같다.
+
+```text
+repository root: C:\Vtuber_Souorce_Code\LAVI
+branch: minecraft-plugin-fix/alto-clef-infinite-loop
+HEAD: 14ba9b443f0bc11d6860a25d7fd3b8b916d95a04
+causal integration commit: 740aa61683ad4cab1f7b3d4dff3e2c86befec983
+commit subject: feat(chatclef): add manual trusted home storage
+commit size: 82 files changed, 5,749 insertions, 158 deletions
+```
+
+현재 working tree에는 별도의 `StoreDepositDiagnostics` 리팩토링 source와 test 변경이
+존재한다. 이 절은 그 변경을 automatic pressure 원인의 일부로 취급하지 않으며 수정,
+흡수, 되돌리기 또는 정리하지 않는다.
+
+증거 수준은 다음처럼 분리한다.
+
+| 증거 | 관찰 | 판정 |
+| --- | --- | --- |
+| 현재 `DepositAllAutoEntrypoint` | Fabric `END_CLIENT_TICK` callback 하나가 `AutoDepositRuntime`만 lazy-create하고 `runtime.onEndClientTick()`을 호출한다. | `SOURCE_CONFIRMED_DORMANT` |
+| 현재 `AutoDepositRuntime` | trusted command, `StoreHomeCommandRegistrar`, `AutoDepositOpenContainerBindingTracker`만 소유·tick한다. Pressure chain과 policy engine 필드가 없다. | `SOURCE_CONFIRMED_DORMANT` |
+| 현재 `AutoDepositPolicyCompositionRoot.createRuntime()` | repository 하나만 생성해 request-only runtime에 전달하며 automatic policy engine을 만들지 않는다. | `SOURCE_CONFIRMED_DORMANT` |
+| 현재 registration test | `lazyRegistrationCreatesOneRuntimeAndNoAutomaticPressureChain`이 runner의 pressure chain 수 `0`을 요구한다. | `TEST_SOURCE_PRESENT`; 실행 결과는 이 절에서 주장하지 않음 |
+| `740aa616` 이전 entrypoint | policy engine과 `DepositAllInventoryPressureChain`을 생성하고 매 tick `chain.onEndClientTick()`을 호출했다. | `GIT_HISTORY_CONFIRMED` |
+| `740aa616` 이후 source와 주석 | pressure chain 비활성화와 request-only runtime 분리가 명시됐다. | `GIT_HISTORY_CONFIRMED` |
+
+이 절에서 `SOURCE_CONFIRMED_DORMANT`는 automatic 관련 class는 존재하지만 production
+construction/tick이 없음을 확인했다는 뜻이다. 이후 복구 source에 production composition과
+tick이 실제 연결된 경우에만 `SOURCE_CONFIRMED_ACTIVE`를 사용한다. 두 label 모두 test,
+build, deployed artifact 또는 runtime 성공을 함의하지 않는다.
+
+2026-08-29에 읽기 전용으로 확인한 build output JAR과 active instance JAR은 다음
+file-level identity가 같았다.
+
+```text
+file: chatclef-1.20.1-0.18.23.jar
+size: 7,136,832 bytes
+sha256: E24D73C60370C265AC30A6DDDE78D22560A779B7B78883DBF33DB62CBC0D780F
+active instance log: C:\Users\jaewo\curseforge\minecraft\Instances\LAVI_TEST_Fabric01\logs\latest.log
+latest.log last observed write: 2026-08-29 20:05:55 KST
+```
+
+같은 로그에서 다음 문자열의 관찰 횟수는 모두 `0`이었다.
+
+```text
+AUTO_DEPOSIT_ALL_CHAIN=0
+automatic_chain_registered=0
+automatic_task_started=0
+automatic_surplus_plan_created=0
+immutable_automatic_plan_created=0
+high_water_threshold_crossed=0
+FREE_SLOT_POSTCONDITION=0
+Automatic Deposit All=0
+```
+
+이 결과는 현재 실행에서 automatic path가 관찰되지 않았다는 보강 증거다. 로그 부재만으로
+원인을 추정하지 않는다. 직접 원인은 현재 source graph에 chain construction과 tick call이
+없다는 것이다. Build output과 deployed JAR의 file identity는 확인됐지만 complete
+repository/source/build-input manifest provenance는 없으므로 다음 판정을 유지한다.
+
+```text
+FILE_ARTIFACT_MATCH_CONFIRMED: YES
+SOURCE_TO_ARTIFACT_COMPLETE_PROVENANCE: UNVERIFIED
+AUTOMATIC_RUNTIME_SUCCESS_PATH: NOT PROVEN
+```
+
+### 28.3 확정 원인 문장
+
+현재 source-level root cause는 다음으로 고정한다.
+
+> `740aa616`의 manual `STORE_HOME`/trusted-storage 통합 과정에서 automatic
+> inventory-pressure chain의 production composition이 의도적으로 제거됐고, 현재
+> 요구사항을 기준으로 그 설계 결정이 automatic storage 기능 회귀가 됐다.
+
+현재 production 경로는 다음 단계에 도달할 수 없다.
+
+```text
+pressure snapshot
+-> 33/36 high-water 판정
+-> working-set resolution
+-> automatic policy engine
+-> safe surplus plan
+-> AutoDepositMaintenanceTask 제출
+-> free-slot postcondition
+```
+
+따라서 정책이 cobblestone 또는 cobbled deepslate를 거절한 것이 primary cause가 아니다.
+정책 판정 자체가 호출되지 않는다. Chain 내부 로그를 먼저 더 추가해도 그 class가 호출되지
+않으므로 현재 미실행 원인을 더 좁히지 못한다.
+
+### 28.4 manual `@deposit_all`과 automatic policy 분리
+
+수동 `@deposit_all`은 automatic pressure policy가 아니다. 수동 경로의 selector와
+`DepositAllTask`에는 cobblestone/deepslate를 먼저 저장하는 명시적인 priority contract가
+없다. 이번 원인 판정과 이후 최소 복구에서 다음은 변경 대상이 아니다.
+
+```text
+DepositAllCommand
+DepositAllInventoryTargetSelector
+StorageHelper target ordering
+DepositAllTask
+StoreInContainerTask
+```
+
+Automatic policy JSON에는 `minecraft:cobblestone`, `minecraft:cobbled_deepslate`,
+`minecraft:deepslate` 등이 `safeBuildingIds`로 존재한다. `safeBuilding=64` reserve는 각
+아이템마다 64개가 아니라 safe-building category 전체에 배분되는 64개다. Allocation은
+item별 총수량 내림차순, 동률이면 item ID 순서로 결정된다.
+
+이 policy와 33/36 high-water, 28/36 low-water source가 존재한다는 사실은 production에서
+chain이 활성화됐다는 증거가 아니다.
+
+### 28.5 전체 revert와 옛 entrypoint 복사 금지
+
+`740aa616` 전체 revert는 automatic chain뿐 아니라 manual `STORE_HOME`, trusted repository,
+등록 명령, exact-container binding, planner/executor 및 관련 테스트까지 제거하므로 복구
+단위로 사용하지 않는다.
+
+커밋 이전 `DepositAllAutoEntrypoint` hunk를 현재 source에 그대로 복사하는 것도 금지한다.
+옛 구조는 별도로 만든 policy engine/repository와 binding `UNAVAILABLE` 경로를 사용할 수
+있다. 현재 StoreHome runtime과 다른 repository 또는 binding instance를 사용하면 동일
+JSON path를 읽어도 revision, in-memory state와 exact-container evidence가 분리된다.
+
+```text
+full commit revert: REJECTED
+old entrypoint wholesale copy: REJECTED
+current object graph forward restoration: DOCUMENTED, NOT AUTHORIZED
+```
+
+### 28.6 forward-only composition 계약
+
+별도 source 구현 승인이 있을 때의 최소 object graph는 다음과 같다.
+
+```text
+DepositAllAutoEntrypoint
+    -> existing Fabric END_CLIENT_TICK callback exactly one
+    -> AutoDepositRuntime lazy creation exactly one
+
+AutoDepositPolicyCompositionRoot
+    -> AutoDepositTrustedDestinationRepository exactly one
+    -> AutoDepositPolicyEngine using that exact repository
+    -> AutoDepositRuntime receiving repository + engine
+
+AutoDepositRuntime
+    -> AutoDepositOpenContainerBindingTracker exactly one
+    -> trusted command registrar
+    -> StoreHomeTaskFactory
+    -> DepositAllInventoryPressureChain exactly one
+         - mod.getTaskRunner()
+         - the same policy engine
+         - the same trusted repository
+         - the same exact-open-container binding tracker
+```
+
+Runtime tick 순서는 기존 command registration의 idempotent contract를 보존하며 다음으로
+고정하는 방향을 우선한다.
+
+```text
+trusted command registration
+-> STORE_HOME command registration
+-> exact-open-container tracker start
+-> exact-open-container tracker tick
+-> pressure chain tick
+```
+
+Tracker를 먼저 갱신해야 같은 tick의 automatic trusted execution이 가장 최근 exact binding을
+읽을 수 있다. 이 순서는 구현 전에 direct test로 고정한다.
+
+`DepositAllInventoryPressureChain`의 4-argument constructor는 policy engine의 repository와
+execution repository가 같은 객체가 아니면 거부한다. 이 identity는 편의가 아니라 현재
+source contract다.
+
+`TaskChain` constructor가 `runner.addTaskChain(this)`를 이미 수행하므로 pressure chain을
+생성한 뒤 `runner.addTaskChain(chain)`을 다시 호출하지 않는다. Fabric callback을 하나 더
+등록하거나 TaskRunner priority를 변경하지 않는다.
+
+### 28.7 `STORE_HOME` conflict 보완 계약
+
+현재 `DepositAllAutoConflictGuard`가 explicit storage conflict로 인식하는 Task는 다음
+세 종류다.
+
+```text
+DepositAllTask
+StoreInAnyContainerTask
+StoreInContainerTask
+```
+
+`StoreHomeTask`는 포함되지 않는다. 현재 decision order도 함께 고려해야 한다.
+
+```text
+active user task의 UserTaskChain selection 검사
+-> existing deposit conflict 검사
+-> working-set resolution
+```
+
+StoreHome이 현재 selected user root이면 conflict 인식 실패 뒤 working-set resolver가
+지원하지 않는 root로 처리해 `NO_SAFE_SURPLUS_WAIT`에 잘못 latch할 수 있다. Safety chain이
+StoreHome을 잠시 선점한 상태에서는 conflict guard에 도달하기 전에
+`user_task_chain_not_selected`로 latch할 수 있다. 따라서 `StoreHomeTask`를 기존 class set에
+추가하는 것만으로 모든 preemption 경계를 닫았다고 판정하지 않는다.
+
+따라서 composition 복구와 같은 최소 change unit에서 automatic side가 정확한
+`StoreHomeTask`를 user-owned storage route로 인식하고, 해당 판정이 두 generic
+`NO_SAFE_SURPLUS` 경계보다 먼저 적용되는지를 direct test로 고정해야 한다. 기존 세 deposit
+route의 decision order를 넓게 바꾸지 않는 exact StoreHome early gate 또는 동등한 좁은
+분류를 우선 검토한다.
+
+```text
+StoreHome -> automatic conflict guard dependency: 없음
+automatic chain -> StoreHomeTask conflict recognition: 필요
+InteractWithBlockTask 전체 conflict 처리: 금지
+```
+
+두 방향의 계약은 다음과 같다.
+
+```text
+A. StoreHome root가 UserTaskChain에 먼저 assigned
+   -> automatic task submission 0
+   -> NO_SAFE_SURPLUS 오분류 0
+   -> existing_store_home_task처럼 명확한 suppression reason
+   -> 기존 storage-conflict episode와 같은 WAIT_FOR_REARM 우선
+
+B. automatic maintenance가 먼저 active한 뒤 StoreHome 요청
+   -> automatic context mismatch로 automatic-owned task만 종료
+   -> 다음 runner selection에서 UserTaskChain/StoreHome 실행
+   -> 양쪽 container open/click/transfer 중첩 0
+```
+
+A는 automatic-side StoreHome conflict classification 계약이다. B는 그 guard가 아니라
+`AutoDepositMaintenanceTask.onTick()`의 첫 `plan.context().matches(mod)` 검사와
+`automatic_context_changed/CANCELLED` 전이를 사용한다. Pressure chain은 `RUNNING`일 때
+`onEndClientTick()`에서 조기 return하므로 다음 순서를 direct test로 증명해야 한다.
+
+```text
+StoreHome root submitted while automatic chain is RUNNING
+-> 더 높은 safety chain이 없으면 priority 51 automatic chain이 UserTaskChain보다 먼저 tick
+-> maintenance context mismatch observed before phase-specific child/container work
+-> automatic task becomes CANCELLED
+-> chain-owned task terminal/clear
+-> UserTaskChain selects the submitted StoreHome root
+```
+
+Safety chain이 그 사이 둘을 선점하면 `DepositAllInventoryPressureChain.onInterrupt()`가
+`stopOwnedRun()`으로 automatic-owned task만 중단하는 별도 기존 경로를 사용한다. 이때
+automatic container click은 추가로 발생하지 않고, 아직 selected되지 않은 StoreHome의
+state/timeout clock도 소비되지 않으며, safety 종료 뒤 UserTaskChain이 StoreHome을 선택하는지
+별도 direct test로 고정한다. 이 기존 contract가 성립하지 않으면 pressure-chain `RUNNING`
+early-return이나 TaskRunner priority를 추측으로 바꾸지 않고, 실제 마지막 성공/첫 실패
+boundary를 다시 관찰한다.
+
+StoreHome 실패 직후 low-water 없이 automatic policy를 즉시 재평가하려면 별도
+`DEFERRED_BY_STORAGE_TASK`와 같은 새 상태 전이가 필요하다. 이것은 composition 복구가
+아니므로 이번 최소 방향에 포함하지 않는다.
+
+Automatic chain은 자기 `AutoDepositMaintenanceTask`만 정리한다. `TaskRunner.disable()`,
+전체 Baritone cancellation 또는 다른 UserTask cleanup을 yield 수단으로 사용하지 않는다.
+
+### 28.8 diagnostics-first 적용 판정
+
+일반적인 unknown-cause 장애라면 bounded diagnostics가 behavior 변경보다 먼저다. 이번
+primary failure의 source call graph는 다음 직접 증거로 이미 확정됐다.
+
+```text
+source-reachable boundary: Fabric callback -> AutoDepositRuntime
+first missing source boundary: DepositAllInventoryPressureChain construction/registration
+causal source change: request-only runtime composition introduced by 740aa616
+automatic-operation runtime last-successful boundary: NOT APPLICABLE/NOT OBSERVED
+```
+
+따라서 unreachable chain 내부에 먼저 로그를 추가하는 것은 필수 선행 작업이 아니다.
+Runtime 복구 증거가 필요할 때는 기존 `AUTO_DEPOSIT_ALL/REGISTERED`, state transition,
+policy plan, free-slot postcondition event를 사용하고, 부족한 경우 다음 경계만 보강한다.
+
+```text
+runtime composition completed exactly once
+pressure chain registered exactly once
+StoreHome conflict suppression state change
+automatic task submission boundary
+actual free-slot terminal postcondition
+```
+
+Tick 또는 slot마다 unchanged state를 출력하지 않는다. Hot-path event는 기존 diagnostics
+mode, semantic deduplication, state-change emission, per-correlation budget와 session hard cap을
+그대로 사용해야 한다. Logging은 Task 선택, state transition, retry, timeout, input,
+Baritone, container click 또는 cleanup을 변경하지 않는다.
+
+### 28.9 필수 regression gate
+
+복구 구현 전후 테스트는 다음을 분리해 고정한다.
+
+| 영역 | 필수 검증 |
+| --- | --- |
+| Composition | Fabric entrypoint 1개, runtime 1개, pressure chain 1개 |
+| Identity | policy engine, chain, StoreHome이 같은 trusted repository 사용 |
+| Binding | trusted commands, StoreHome, automatic chain이 같은 tracker 사용 |
+| Tick order | binding tracker tick 뒤 pressure chain tick |
+| Threshold | 32/36 미제출, 33/36 armed episode당 정확히 한 번 제출 |
+| Episode latch | high-water 반복 tick에서 중복 제출 없음 |
+| Rearm | 28/36 재무장, 29/36 미재무장 |
+| StoreHome first | automatic 제출 0, NO_SAFE 오분류 0, storage suppression |
+| StoreHome safety preemption | StoreHome root가 UserTaskChain에 assigned돼 있지만 safety chain이 selected여도 automatic 제출과 NO_SAFE latch 모두 0 |
+| Automatic first | StoreHome 요청 뒤 maintenance context 검사가 child/container work보다 먼저 CANCELLED를 만들고, chain clear 뒤 UserTaskChain으로 양보 |
+| Automatic first + safety preemption | auto `onInterrupt/stopOwnedRun`이 auto-owned task만 중단하고, StoreHome clock은 소비하지 않으며, safety 종료 뒤 UserTaskChain으로 양보 |
+| Existing conflicts | 기존 세 manual/container deposit route 억제 동작 불변 |
+| NO_SAFE | 동일 fingerprint 반복 평가 없음, meaningful change에서만 한 번 재평가 |
+| Runner ownership | 기존 active runner를 automatic chain이 disable하지 않음 |
+| Preservation | manual `@deposit_all`, `@deposit`, StoreHome timeout/result/lifecycle 불변 |
+| Upstream boundary | Baritone, TaskRunner, `InteractWithBlockTask`, shared transfer Task source 변경 0 |
+
+현재 registration test는 pressure chain 수 `0`을 요구한다. 복구 시 해당 테스트를 삭제하거나
+약화하지 않고 다음 exact contract로 교체한다.
+
+```text
+lazy registration을 반복해도
+-> 같은 runtime instance 유지
+-> DepositAllInventoryPressureChain exactly one
+-> duplicate TaskChain registration 없음
+```
+
+Focused test, targeted Java test, clean forced build와 Minecraft runtime proof는 각각 실제
+실행 결과가 있을 때만 다음 evidence label로 승격한다.
+
+```text
+TEST_PASSED_CURRENT
+BUILD_PASSED_CURRENT
+FILE_ARTIFACT_MATCH_CONFIRMED
+RUNTIME_PATH_PROVEN_CURRENT
+```
+
+### 28.10 별도 plan-builder characterization
+
+다음은 현재 chain 미등록의 원인이 아니며 composition 복구와 동시에 행동 수정하지 않는다.
+
+1. `AutoDepositPlannedItem.expectedFreedSlots`는 현재 step마다 `1`이다. Comparator가
+   free-slot 내림차순을 사용해도 대부분 동률이고 실제 우선순위는 count와 item ID로
+   넘어간다.
+2. `wholeStackTransferSteps()`는 stack count를 큰 순서로 검사하며 보호량을 침범하는 첫
+   stack에서 `continue`가 아니라 `break`한다.
+3. 예를 들어 stack `[64, 32]`, `protectedCount=64`이면 32 stack은 통째로 제거 가능하지만
+   첫 64 stack에서 중단돼 plan step이 `0`이 될 수 있다.
+4. 최종 target은 physical slot identity가 아니라 `ItemTarget(item, count)`다. 따라서
+   `expectedFreedSlots=1`만으로 실제 한 slot이 비었다고 증명할 수 없다.
+
+다음 characterization을 별도 change unit의 선행 gate로 둔다.
+
+```text
+safeBuilding stacks: [64, 32]
+category protected count: 64
+policy-intended removable whole stack: 32
+
+runtime postcondition:
+occupiedSlotsBefore
+occupiedSlotsAfter
+actualFreedSlots
+plannedExpectedFreedSlots
+```
+
+현재 결과를 먼저 고정하고 정책 의도와 불일치하는지 판정한 뒤 별도 승인을 받는다. 이
+문제는 automatic chain이 production에서 호출되지 않는 primary regression을 설명하지 않는다.
+
+### 28.11 예상 source 범위와 보호 경계
+
+별도 implementation 승인 시 우선 검토할 최소 LAVI-owned source는 다음이다.
+
+```text
+DepositAllAutoEntrypoint.java
+    -> 기존 단일 callback/lazy runtime 유지, stale disabled comment만 정합화
+
+AutoDepositPolicyCompositionRoot.java
+    -> repository 하나와 그 repository를 사용하는 policy engine 조립
+
+AutoDepositRuntime.java
+    -> pressure chain instance lifecycle 및 tracker-before-chain tick 소유
+
+DepositAllAutoConflictGuard.java
+    -> exact StoreHomeTask storage conflict recognition
+
+DepositAllInventoryPressureChain.java
+    -> exact StoreHome conflict가 generic chain-selection/working-set NO_SAFE보다 먼저 적용되는
+       좁은 decision boundary; 다른 state-machine 순서는 유지
+```
+
+직접 관련 테스트 후보:
+
+```text
+DepositAllAutoEntrypointRegistrationTest.java
+DepositAllAutoConflictGuardTest.java
+DepositAllInventoryPressureChainLifecycleTest.java
+AutoDepositRuntime composition/identity/tick-order direct test
+```
+
+다음 source는 이번 forward composition 복구에서 변경하지 않는다.
+
+```text
+StoreHomeTask와 그 planner/executor/timeout/lifecycle
+DepositAllCommand와 DepositAllInventoryTargetSelector
+DepositAllTask, StoreInContainerTask, StoreInAnyContainerTask
+TaskRunner, UserTaskChain, Task, InteractWithBlockTask
+Baritone goal/path/input 소유권
+Python Korean public/parser/admission/bridge readiness
+wire protocol과 artifact schema
+```
+
+현재 package는 entrypoint, composition root, runtime, chain, policy, trusted repository,
+interaction tracker와 conflict guard를 이미 책임별 LAVI-owned type으로 분리하고 있다. 이번
+문서 범위에서는 새 manager, base class, package 이동 또는 broad folderization을 요구하지
+않는다. Composition lifecycle, conflict classification과 pressure-chain decision order는
+각각 현재 owning type에 남겨야 한다.
+
+### 28.12 현재 최종 판정
+
+```text
+SOURCE ROOT CAUSE:                         CONFIRMED
+GIT HISTORY CAUSAL CHANGE:                 CONFIRMED AT 740aa616
+POLICY REJECTION AS PRIMARY CAUSE:         REJECTED
+FULL COMMIT REVERT:                        REJECTED
+OLD ENTRYPOINT WHOLESALE COPY:             REJECTED
+FORWARD COMPOSITION RESTORATION:           DOCUMENTED, NOT IMPLEMENTED
+AUTO-SIDE STORE_HOME CONFLICT RECOGNITION: MANDATORY FOR RESTORATION
+NEW LOGGING BEFORE SOURCE FIX:              NOT REQUIRED FOR PROVEN PRIMARY CAUSE
+PLAN-BUILDER [64,32] ISSUE:                SEPARATE CHARACTERIZATION GATE
+TEST EXECUTION FOR THIS SECTION:           NOT RUN
+CLEAN BUILD FOR THIS SECTION:              NOT RUN
+POST-RESTORATION MINECRAFT RUNTIME PROOF:  NOT RUN
+PRODUCTION CODE CHANGES FOR THIS SECTION:  NONE AT REVIEW TIME; SUPERSEDED BY §28.14
+COMMIT OR PUSH FOR THIS SECTION:           NONE
+```
+
+최종 복구 완료 판정은 source가 존재하거나 unit test 하나가 통과했다는 사실만으로 내리지
+않는다. `SOURCE_CONFIRMED_ACTIVE`, current test/build evidence, deployed artifact
+identity와 actual occupied-slot 감소를 포함한 `RUNTIME_PATH_PROVEN_CURRENT`를 분리해
+보고한다.
+
+### 28.13 2026-08-29 독립 재검수 보정
+
+이 절은 독립 검토본을 현재 live source와 다시 대조한 결과다. 검토본 안의 제안은 구현
+승인이 아니라 반례와 lifecycle gate 후보로만 취급했다. 이 보정에서 Java, JSON, test,
+build, JAR, Minecraft runtime, commit과 push는 변경하거나 실행하지 않았다.
+
+#### 28.13.1 최종 판정과 용어 범위
+
+| 질문 | 재검수 판정 |
+| --- | --- |
+| root-cause 반례 | 현재 source graph와 `740aa616` diff를 뒤집는 material counterexample 없음 |
+| `regression`의 의미 | `740aa616` 당시 요구 위반이라고 단정하지 않음. 현재 다시 요구된 automatic pressure relief 기준의 source-level 회귀 |
+| 복구 방식 | 전체 revert와 옛 entrypoint 복사는 계속 거부. 현재 composition에 forward-only로 복구 |
+| StoreHome conflict | exact StoreHome root assignment를 generic selected-chain/working-set 거부보다 먼저 관찰 |
+| 추가 pre-fix gameplay log | 불필요. 복구 뒤 bounded runtime proof와 provenance는 필요 |
+| planner `[64,32]` | composition 복구와 분리된 characterization 단위 |
+
+기존 문맥의 shared identity를 `same operation graph`로 부르지 않는다. 정확한 범위는
+`same runtime composition graph`다.
+
+```text
+runtime-scoped identity
+    AutoDepositRuntime
+    AutoDepositTrustedDestinationRepository
+    AutoDepositPolicyEngine
+    AutoDepositOpenContainerBindingTracker
+    DepositAllInventoryPressureChain
+    TaskRunner
+
+automatic operation-scoped identity
+    AutoDepositContextSnapshot
+    AutoDepositPlan
+    AutoDepositMaintenanceTask
+    trusted/general candidate queue
+    destination manifest
+    free-slot postcondition evidence
+```
+
+Repository와 tracker를 automatic operation마다 다시 만들면 trusted command revision,
+StoreHome exact-open evidence와 automatic executor 관찰이 분리된다. 반대로 context, plan,
+maintenance Task와 manifest를 runtime singleton으로 승격해서도 안 된다.
+
+#### 28.13.2 StoreHome root-assignment authority
+
+Safety chain selection이나 cached child path보다 `UserTaskChain`에 현재 할당된 root object가
+권위다. 최소 behavior 판정은 다음으로 제한한다.
+
+```text
+UserTaskChain exists
+current root instanceof StoreHomeTask
+current root is not the idle task
+revalidation observes the same root object identity
+```
+
+`UserTaskChain.isActive()`는 현재 `mainTask != null`과 같은 의미이므로 별도 필수 증거가
+아니다. 특히 `StoreHomeTask.isActive()`를 요구하지 않는다. `runTask()`가 root를 할당한
+직후에는 새 Task가 아직 첫 tick을 받지 않아 inactive일 수 있기 때문이다.
+
+다음 값은 conflict identity로 사용하지 않는다.
+
+```text
+runner.getCurrentTaskChain()
+UserTaskChain.getTasks() cached path
+StoreHomeTask phase, timeout, current child or manifest
+exact-open binding presence
+diagnostic root generation
+```
+
+필요하면 한 client-tick 동안만 다음 immutable observation을 사용할 수 있다.
+
+```text
+StoreHomeConflictObservation
+    observed current world identity and dimension
+    UserTaskChain identity
+    StoreHome root reference
+    routeKind = STORE_HOME
+    selected chain and diagnostic generation  // diagnostics only
+```
+
+첫 tick 전 StoreHome이 내부에 캡처할 operation world/dimension은 현재 public behavior API로
+읽을 수 없다. 따라서 world/dimension 검증은 같은 observation tick에서 현재 context가
+바뀌지 않았는지만 확인하며, 관찰하지 못한 StoreHome-owned context를 추정하거나 behavior
+조건으로 꾸미지 않는다. Observation은 suppression 판단 후 폐기하며 여러 tick 동안 보관해
+이미 끝난 root를 계속 막지 않는다.
+
+#### 28.13.3 callback 순서와 실제 reconciliation
+
+다음 두 순서를 모두 실제 `TaskRunner.tick()`과 `SingleTaskChain` reconciliation을 거쳐
+검증한다.
+
+```text
+A. StoreHome assignment -> pressure callback
+    exact StoreHome suppression
+    automatic submission 0
+    NO_SAFE_SURPLUS latch 0
+
+B. pressure callback -> StoreHome assignment
+    automatic root가 이미 만들어졌을 수 있음
+    더 높은 safety chain이 없으면 priority 51 automatic chain이 UserTaskChain보다 먼저 tick
+    maintenance context mismatch가 child/container work 전에 CANCELLED 전이
+    이후 SingleTaskChain terminal reconciliation에서 automatic root clear
+    다음 eligible selection에서 UserTaskChain / StoreHome 실행
+```
+
+`SingleTaskChain`은 chain tick 시작 시점에 `mainTask.isFinished()`를 검사한 뒤, 미완료이면
+그 tick에서 Task를 실행한다. 따라서 maintenance Task가 실행 중 `CANCELLED`가 된 바로 같은
+tick에 chain root까지 반드시 clear된다고 가정하지 않는다. 다음 selected reconciliation
+tick에서 terminal/clear가 일어날 수 있다. Test는 고정 tick 수가 아니라 다음 ordering과
+identity를 직접 검증한다.
+
+```text
+context mismatch
+-> automatic child/container work 0
+-> automatic-owned root only terminal/clear exactly once
+-> handoff 뒤 automatic container click 0
+-> submitted StoreHome root identity 보존
+```
+
+#### 28.13.4 initialization atomicity와 orphan-chain 경계
+
+`TaskChain(TaskRunner)`는 constructor 안에서 즉시 `runner.addTaskChain(this)`를 호출하고,
+`TaskRunner.addTaskChain()`에는 deduplication이나 removal API가 없다. 따라서 chain 생성은
+단순 객체 생성이 아니라 runner mutation이다.
+
+`DepositAllInventoryPressureChain`의 최종 4-argument constructor는 `super(runner)` 뒤에
+`mod`, policy engine, repository identity와 binding을 검증한다. 이 post-registration
+검증에서 예외가 나면 constructor가 정상 반환되지 않아도 partially initialized reference가
+runner에 남을 수 있다. 다음 범위를 정확히 구분한다.
+
+```text
+runner null 또는 위임 인자 평가 중 실패
+    -> self-registration 전에 실패 가능
+
+final constructor의 super(...) 이후 dependency/identity 실패
+    -> orphan registration 위험
+```
+
+이는 현재 production에서 이미 duplicate chain이 발생했다는 판정이 아니다. 현재는 pressure
+chain construction 자체가 0이다. Forward restoration에서 새로 열리는 latent lifecycle
+위험이다.
+
+현재 entrypoint는 `runtimeFactory.apply(mod) -> registerCommands(mod) -> runtime field
+assignment` 순서다. Field assignment 전에 밖으로 전파되는 unchecked failure가 있고 callback이
+계속 실행되는 환경이라면 재시도가 가능하지만, Fabric이 반드시 다음 tick을 실행한다고
+가정하지 않는다. Registrar 내부에서 처리되는 command error와 밖으로 전파되는 실패도
+구분한다.
+
+복구 구현 전 direct test는 controlled failure/retry seam으로 다음을 증명해야 한다.
+
+```text
+fallible dependency validation completes before pressure-chain construction
+chain construction 뒤 stable runtime publication 전 escaping fallible step 0
+failure path orphan/partially initialized pressure chain 0
+successful retry 뒤 total pressure-chain registration 1
+explicit second runner.addTaskChain(chain) 0
+```
+
+이 계약을 위해 shared `TaskChain`이나 `TaskRunner`를 변경하지 않는다. LAVI-owned composition
+경계에서 검증과 publication 순서를 소유한다.
+
+#### 28.13.5 runner activation ownership
+
+현재 automatic start는 runner가 inactive일 때만 `enable()`하고 natural terminal,
+interruption과 owned stop에서 `disable()`을 호출하지 않는다. `TaskRunner.disable()`은 현재
+behavior stack을 먼저 pop한 뒤 모든 registered chain을 stop하므로 automatic operation이
+자기 종료만을 이유로 호출해서는 안 된다.
+
+```text
+runner already active
+    -> automatic terminal/interruption 뒤 global active state 변경 0
+
+runner inactive
+    -> automatic start enable exactly once
+    -> automatic terminal/interruption disable 0
+    -> global ChatClef stop/disable boundary만 release 가능한 owner
+```
+
+마지막 줄은 global stop이 곧 실행된다는 보장이 아니다. Auto가 유일한 enabler였으면 runner와
+behavior push가 terminal 뒤에도 남을 수 있다. Balanced automatic release가 새 요구라면
+별도 activation-lease 설계가 필요하며 이번 composition 복구에 포함하지 않는다.
+
+#### 28.13.6 추가 lifecycle gate와 증거 상태
+
+§28.9의 기존 표에 더해 다음 경계를 직접 검증한다.
+
+```text
+StoreHome root assigned but not first-ticked
+StoreHome root retained while safety chain selected
+StoreHome terminal/stopped but not yet cleared from UserTaskChain
+automatic root not first-ticked then safety-preempted
+automatic child active then safety-preempted
+world leave or ChatClef disable during RUNNING
+no double stop or illegal terminal transition
+StoreHome exact binding A cannot satisfy automatic candidate B
+GUI close and world/dimension change invalidate stale binding
+manual deposit under safety preserves its existing decision order
+trusted repository revision change does not duplicate one armed episode
+```
+
+StoreHome conflict를 기존 storage-conflict처럼 `WAIT_FOR_REARM`으로 보내면 StoreHome이 slot
+relief 없이 끝나도 28/36 low-water 또는 기존 meaningful-change 조건 전에는 automatic deposit이
+즉시 재평가되지 않는다. 즉시 재평가를 원하면 별도 상태와 별도 승인이 필요하다.
+
+복구 뒤에는 기존 bounded marker를 우선 사용해 registration, task start, immutable plan,
+StoreHome suppression, cancellation/interruption과 actual occupied-slot delta를 operation chronology로
+증명한다. 별도로 branch/HEAD, dirty file inventory, source diff/hash, exact clean build command,
+built/active JAR size와 SHA-256을 기록한다.
+
+```text
+INDEPENDENT ROOT-CAUSE REVIEW:              PASS
+MATERIAL COUNTEREXAMPLE:                   NONE FOUND IN INSPECTED SNAPSHOT
+FORWARD-ONLY COMPOSITION:                  PASS WITH LIFECYCLE GATES
+STORE_HOME EARLY CONFLICT:                REQUIRED
+INITIALIZATION FAILURE/RETRY CONTRACT:     REQUIRED
+RUNNER ACTIVATION OWNERSHIP TEST:          REQUIRED
+PRE-FIX GAMEPLAY LOGGING:                  NOT REQUIRED
+POST-RESTORATION RUNTIME PROOF:             REQUIRED
+PLAN-BUILDER [64,32]:                      SEPARATE CHANGE UNIT
+FORWARD COMPOSITION IMPLEMENTATION:        NOT IMPLEMENTED AT REVIEW TIME; SUPERSEDED BY §28.14
+AUTOMATIC-PRESSURE JAVA / TEST SOURCE:     UNCHANGED BY THIS REVIEW; SEE §28.14
+TEST EXECUTION / BUILD / MINECRAFT:        NOT RUN BY THIS REVIEW
+COMMIT / PUSH:                             NOT PERFORMED
+```
+
+### 28.14 2026-08-29 forward-only production composition 구현 및 현재 증거
+
+사용자가 dormant automatic pressure path의 복구를 명시적으로 승인한 뒤, 기존 policy를
+다시 작성하지 않고 현재 LAVI-owned composition graph에 연결했다. 이 절은 §28.12와
+§28.13의 구현 전 판정을 대체하되 당시 source review 자체를 삭제하지 않는다.
+
+#### 28.14.1 source graph와 initialization atomicity
+
+현재 runtime-scoped graph는 다음 identity를 유지한다.
+
+```text
+AutoDepositPolicyCompositionRoot
+    -> AutoDepositTrustedDestinationRepository exactly one
+    -> AutoDepositPolicyEngine using that exact repository
+    -> AutoDepositRuntime
+         -> AutoDepositOpenContainerBindingTracker exactly one
+         -> trusted command registrar using the same repository/tracker
+         -> StoreHomeTaskFactory using the same repository/tracker
+         -> DepositAllInventoryPressureChain exactly one
+              -> same TaskRunner
+              -> same policy engine/repository/tracker
+```
+
+`auto/composition/`의 immutable preparation records가 null, runner/mod identity와
+repository mismatch를 `TaskChain` 생성 전에 검증한다. 알려진 dependency validation과
+collaborator 생성 실패는 모두 PREPARE에 포함된다. `AutoDepositRuntime` constructor의 마지막
+statement만 standard production `TaskRunner`에 pressure chain을 COMMIT하며, 그 뒤 알려진
+fallible initialization step은 없다. 이 constructor가 반환된 뒤 entrypoint는 runtime field를
+먼저 publish하고 diagnostic registration event를 기록한다. Shared `TaskChain`/`TaskRunner`에
+removal, dedupe 또는 명시적인 두 번째 `addTaskChain` 호출은 추가하지 않았다. 이 판정은
+임의로 예외를 던지는 test subclass나 injected factory까지 절대 무오류라고 주장하지 않는다.
+
+Controlled failure/retry test의 현재 결과는 다음이다.
+
+```text
+repository mismatch failure -> registered pressure chain 0
+null exact binding failure   -> registered pressure chain 0
+controlled retry success     -> total registered pressure chain 1
+repeated entrypoint attempt  -> same runtime and same chain identity
+```
+
+#### 28.14.2 tick 및 StoreHome decision order
+
+`AutoDepositRuntimeTickSequence`는 한 tick의 핵심 순서를 다음과 같이 고정한다.
+
+```text
+AutoDepositOpenContainerBindingTracker.onEndClientTick()
+-> DepositAllInventoryPressureChain.onEndClientTick()
+```
+
+33/36 high-water의 `ARMED` 경계에서는 current `UserTaskChain` root를 한 번 캡처하고 다음
+순서를 사용한다.
+
+```text
+captured root identity revalidation
+-> exact StoreHomeTask + non-idle suppression
+-> generic selected-chain gate
+-> existing manual deposit conflict
+-> working-set resolution
+-> existing policy planning
+-> per-operation AutoDepositMaintenanceTask submission
+```
+
+StoreHome 식별에는 `StoreHomeTask.isActive()`, selected chain, cached child path, phase, timeout,
+manifest, exact binding 또는 diagnostic generation을 사용하지 않는다. 첫 tick 전 root,
+safety-selected 동안 보존된 root와 stopped/terminal이지만 아직 clear되지 않은 root도 같은
+exact identity로 suppression된다. Replacement root가 관찰되면 stale captured root는
+suppression authority를 잃는다.
+
+실제 `TaskRunner.tick()` 통합 테스트는 다음 세 경계를 고정한다.
+
+```text
+StoreHome-first
+    production pressure callback에서 automatic submission 0
+    -> WAIT_FOR_REARM
+    -> first eligible runner selection은 exact StoreHome root
+
+automatic-first
+    StoreHome root replacement
+    -> immutable context mismatch가 child/container work 전에 CANCELLED
+    -> 다음 reconciliation에서 automatic root clear
+    -> 다음 eligible selection에서 exact StoreHome root
+
+automatic-first + safety
+    automatic chain onInterrupt
+    -> active automatic-owned root/child를 각각 exactly once stop
+    -> additional automatic child tick/container click 0
+    -> StoreHome first tick/clock consumption 0 while safety owns selection
+    -> safety 종료 뒤 exact StoreHome root 선택
+```
+
+World leave와 ChatClef disable도 active automatic-owned tree만 exactly once 정리하며
+`TaskRunner.disable()`을 호출하지 않는다.
+
+#### 28.14.3 보존한 policy와 별도 deferred defect
+
+Production default는 기존 `DepositAllInventoryPressureReader`, policy engine, plan builder,
+trusted/general execution과 33/28 hysteresis를 그대로 사용한다. 테스트가 실제
+occupied-slot delta를 28/31/33으로 주입할 수 있도록 automatic-only read port를 두었지만
+production constructor는 전과 같은 reader를 생성한다.
+
+```text
+ending occupied 28 -> FULL_RELIEF
+ending occupied 31 -> PARTIAL_RELIEF
+ending occupied 33 -> NO_SLOT_RELIEF
+```
+
+다음은 이번 source change에 포함하지 않았다.
+
+```text
+planner [64,32] break/physical-slot 문제
+manual @deposit_all 또는 @deposit selector
+StoreHome planner, transfer, timeout, terminal 또는 behavior
+TaskRunner, UserTaskChain, Task, InteractWithBlockTask
+Baritone goal/path/input ownership
+automatic policy JSON과 threshold 33/36, low-water 28/36
+```
+
+#### 28.14.4 current test/build/runtime evidence
+
+2026-08-29 현재 source에서 retry 또는 실패 test의 deselection 없이 실행한 결과다. 아래
+`skipped=14`는 Gradle 결과 XML에 보고된 기존 registry-free Minecraft item fixture abort이며
+새 skip, retry 또는 테스트 약화로 만든 수치가 아니다.
+
+```text
+focused command:
+  .\gradlew.bat :1.20.1:test
+    --tests 'lavi.minecraft.task.container.deposit.auto.*'
+
+focused result:
+  BUILD SUCCESSFUL in 21s
+  26 test classes, 62 tests
+  executed 48, skipped 14, failures 0, errors 0
+
+targeted command scope:
+  automatic deposit + manual DepositAll + StoreHome command/object identity/decision order
+
+targeted result:
+  final forced test-graph execution: --rerun-tasks, no test retry
+  BUILD SUCCESSFUL in 2m 26s; 46/46 test-graph tasks executed
+  38 test classes, 93 tests
+  executed 79, skipped 14, failures 0, errors 0
+```
+
+14건의 abort는 registry-free `Item` identity를 만들 수 없는 이 JUnit runtime에서 발생한다.
+영향 범위는 hard protection, category reserve, item classification, plan builder,
+destination/recovery manifest, surplus selection과 working-set item fixture다. 따라서 이번
+결과는 새 composition, decision order, TaskRunner handoff, lifecycle cleanup과 occupied-slot
+delta의 current PASS 증거이며, 위 14개 item-dependent 정책 case를
+`TEST_PASSED_CURRENT`로 승격하는 증거는 아니다. 해당 정책 production source는 이번
+복구에서 변경하지 않았다.
+
+§28.13.6의 추가 gate 중 root-before-first-tick, safety-selected StoreHome,
+stopped-but-uncleared root, never/active automatic safety interruption, world leave/disable와
+double-stop 방지는 current direct coverage다. 다음 네 항목은 이번 composition 복구의 직접
+test coverage가 아니므로 `PARTIAL / NOT DIRECTLY COVERED`로 유지한다.
+
+```text
+StoreHome exact binding A vs automatic candidate B mismatch rejection
+GUI close and explicit cross-dimension stale-binding invalidation
+manual deposit + safety combined decision order
+trusted repository revision change + production submission-count integration
+```
+
+이 결과는 targeted Java test evidence이며 clean forced build evidence가 아니다. 이번 복구
+뒤 `clean build --rerun-tasks`, built/active JAR SHA-256, active CurseForge artifact와 Minecraft
+33/36 automatic pressure 재현은 실행하지 않았다. 따라서 현재 증거 상태는 다음과 같다.
+
+```text
+SOURCE_CONFIRMED_ACTIVE:                 YES
+TEST_SOURCE_PRESENT:                    YES
+TEST_PASSED_CURRENT:                    YES
+BUILD_PASSED_CURRENT:                   NO / NOT RUN FOR THIS RESTORATION
+FILE_ARTIFACT_MATCH_CONFIRMED:           NO / NOT RUN FOR THIS RESTORATION
+RUNTIME_PATH_PROVEN_CURRENT:             NO / NOT RUN FOR THIS RESTORATION
+artifactParity:                          PARITY_UNPROVEN
+PLAN-BUILDER [64,32]:                    DEFERRED SEPARATE CHANGE UNIT
+COMMIT / PUSH:                           NOT PERFORMED
+```
+
+## 29. 2026-08-30 transfer / movement / Carry On incident focused review
+
+2026-08-30 automatic pressure reproduction에서 관찰된 aggregate target과
+physical cursor stack, container accepted-delta observability/correlation gap,
+parent movement checker,
+candidate invalidation, 반복 chest acquisition 및 Carry On attribution은 다음
+별도 문서에서 source와 runtime evidence를 대조한다.
+
+[ChatClef Automatic Deposit Transfer / Movement / Carry On Diagnostics Review](chatclef-auto-deposit-transfer-movement-carryon-diagnostics-review-2026-08-30.md)
+
+첫 bounded diagnostics-only change unit의 identity, payload, lifecycle, stop gate 및
+`16 grouped scenarios / 24 contract assertions`는 다음 별도 문서가 소유한다.
+
+[ChatClef Automatic Deposit Slice A Diagnostics Contract](chatclef-auto-deposit-slice-a-diagnostics-contract-2026-08-30.md)
+
+이 연결 절은 section 28의 composition/history 소유권이나 section 28.14의
+2026-08-29 source/test/build/runtime ledger를 소급해 바꾸지 않는다. 이후 incident
+evidence의 보정 판정은 다음과 같다.
+
+```text
+automatic pressure runtime activation in captured incident: LOG_CONFIRMED
+aggregate target x10 -> physical cursor x64: SOURCE_CONFIRMED + LOG_CONFIRMED
+strict `roomLeft > sourceCount` exact-fit rejection mechanism: SOURCE_CONFIRMED
+runtime destination churn caused by that mechanism: UNPROVEN
+parent movement checker during child GUI transfer: SOURCE_CONFIRMED
+MOVEMENT_PROGRESS_FAILED at ticks 52877 and 53358: LOG_CONFIRMED
+check-return-false as the direct trigger of both invalidations: SOURCE_CONFIRMED + LOG_CONFIRMED
+candidate invalidation and chest reacquisition: LOG_CONFIRMED
+actual route-child stop/replacement for each invalidation: UNPROVEN
+distance/mining mode, baseline, elapsed and reset provenance: UNAVAILABLE
+GUI transfer as the exact internal cause of both false results: INFERENCE
+stored=0/10 internal cause: UNPROVEN
+notStored x9/x8 as available-and-unstored request cap: SOURCE_CONFIRMED + LOG_CONFIRMED
+Carry On exact target/action owner: UNPROVEN
+explicit final occupiedCount=28 field: UNAVAILABLE
+final automatic 33 -> 28 plus same-identity resume ledger: REVIEW_REPORTED / UNPROVEN
+automatic interval end, user-task resume and later natural completion: LOG_CONFIRMED
+FINAL_ROOT_CAUSE: UNPROVEN
+NEXT_DIRECTION: BOUNDED DIAGNOSTICS-ONLY
+IMMEDIATE_BEHAVIOR_CHANGE: NOT AUTHORIZED
+```
+
+`MOVEMENT_PROGRESS_FAILED`는 per-item `DepositAllTask` store root나 automatic
+maintenance terminal이 아니라 현재 candidate/store generation의 무효화 decision이다.
+실제 route-child stop/replacement는 이후 generic Task reconciliation에서 별도로
+관찰한다. diagnostics budget 소진도 gameplay terminal이 아니다. 향후 event model은
+slot mutation, transfer-attempt close, candidate invalidation, route-child close,
+per-item store-root close, maintenance logical terminal, pressure-chain owned-run close와
+diagnostic coverage close를 서로 다른 identity와 reason으로 유지해야 한다.
+
+이번 문서화 작업은 Java, test 또는 resource source, `@store_home`, manual
+`@deposit_all`, `@deposit`, TaskRunner, Baritone, `InteractWithBlockTask`,
+`StoreInContainerTask`, Carry On behavior를 변경하지 않았고 test, build, JAR 배포,
+Minecraft 재현, commit 또는 push를 실행하지 않았다.

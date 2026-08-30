@@ -1987,6 +1987,10 @@ chatclef-bare-deposit-diagnostics-reproduction-2026-08-19-r1.md
     where the new detail caps became blind, and which first-failure boundaries
     remain unobserved.
 
+chatclef-auto-deposit-obtain-chest-mining-diagnostics-review-2026-08-30.md
+    Corrected obtain-chest/mining observer-contamination finding, current runtime
+    evidence, and the next additive bounded diagnostics order.
+
 chatclef-carryon-integration-direction.md
     Engine boundary, ownership, diagnostics-only, and root-cause patch gates.
 

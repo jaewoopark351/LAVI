@@ -62,12 +62,14 @@ public abstract class AbstractNodeCostSearchDiagnosticMixin {
                                             long failureTimeout,
                                             CallbackInfoReturnable<PathCalculationResult> cir) {
         long elapsedNanos = lavi$calculateStartNanos <= 0 ? -1 : System.nanoTime() - lavi$calculateStartNanos;
+        //20260730_kpopmodder: Added diagnostic logging to prove the Carry On interaction failure boundary.
         BaritonePathCalculationDiagnostics.logPathfinderCalculateCompleted(
                 (AbstractNodeCostSearch) (Object) this,
                 cir.getReturnValue(),
                 elapsedNanos,
                 cancelRequested,
-                BaritonePathfinderSearchSnapshot.fields(lavi$safeMapSize(), startNode, mostRecentConsidered, bestSoFar)
+                () -> BaritonePathfinderSearchSnapshot.fields(
+                        lavi$safeMapSize(), startNode, mostRecentConsidered, bestSoFar)
         );
     }
 

@@ -21,24 +21,9 @@ final class DestroyBlockPhaseDiagnostics {
             return;
         }
         DestroyBlockDiagnosticState.State state = DestroyBlockDiagnosticState.getOrCreate(task);
-        DestroyBlockDiagnosticState.updateObservedProgress(mod, target, state);
         if (reachPresent) {
             state.reachEverPresent = true;
         }
-        SubmittedGoalDiagnosticState.SubmittedGoal submittedGoal = SubmittedGoalDiagnosticState.get(task);
-        BaritonePathDiagnosticSnapshot snapshot = BaritonePathDiagnosticSnapshot.capture(
-                mod,
-                target,
-                submittedGoal == null ? null : submittedGoal.goal,
-                SubmittedGoalDiagnosticState.matchesTarget(submittedGoal, target)
-        );
-        if (DestroyBlockDiagnosticState.isTrue(snapshot.pathPresent)) {
-            state.pathSuccessObserved = true;
-        }
-        if (DestroyBlockDiagnosticState.isTrue(snapshot.baritonePathing)) {
-            state.pathingStartedObserved = true;
-        }
-
         long tick = ChatClefDiagnostics.currentClientTickId();
         String normalizedPhase = normalize(currentPhase);
         String previousPhase = state.currentPhase == null ? "none" : state.currentPhase;
@@ -53,15 +38,29 @@ final class DestroyBlockPhaseDiagnostics {
                 ChatClefDiagnostics.blockPos(target),
                 previousPhase,
                 normalizedPhase,
-                snapshot.customGoalActive,
-                snapshot.baritonePathing,
-                snapshot.pathPresent,
-                Boolean.toString(reachPresent)
+                Boolean.toString(reachPresent),
+                Boolean.toString(isCloseToMoveBack)
         );
-        MiningDiagnosticEmitter.emit("DESTROY_BLOCK_PHASE_TRANSITION", "destroy_block_phase_transition", task,
+        MiningDiagnosticEmitter.emitLazy("DESTROY_BLOCK_PHASE_TRANSITION", "destroy_block_phase_transition", task,
                 "destroy_phase|" + System.identityHashCode(task),
                 fingerprint,
-                MiningDiagnosticEmitter.merge(new Object[]{
+                () -> {
+                    DestroyBlockDiagnosticState.updateObservedProgress(mod, target, state);
+                    SubmittedGoalDiagnosticState.SubmittedGoal submittedGoal =
+                            SubmittedGoalDiagnosticState.get(task);
+                    BaritonePathDiagnosticSnapshot snapshot = BaritonePathDiagnosticSnapshot.capture(
+                            mod,
+                            target,
+                            submittedGoal == null ? null : submittedGoal.goal,
+                            SubmittedGoalDiagnosticState.matchesTarget(submittedGoal, target)
+                    );
+                    if (DestroyBlockDiagnosticState.isTrue(snapshot.pathPresent)) {
+                        state.pathSuccessObserved = true;
+                    }
+                    if (DestroyBlockDiagnosticState.isTrue(snapshot.baritonePathing)) {
+                        state.pathingStartedObserved = true;
+                    }
+                    return MiningDiagnosticEmitter.merge(new Object[]{
                         "owner", "destroy_block_phase_observer",
                         "trigger", "phase_changed",
                         "destroyTaskRunId", state.runId,
@@ -98,7 +97,10 @@ final class DestroyBlockPhaseDiagnostics {
                         "breakEverStarted", state.breakEverStarted,
                         "maximumBreakingProgress", state.maximumBreakingProgress,
                         "blockBecameAir", state.blockBecameAir
-                }, SubmittedGoalDiagnosticState.fields(submittedGoal, target), snapshot.fields()));
+                    }, SubmittedGoalDiagnosticState.fields(submittedGoal, target), snapshot.fields(), new Object[]{
+                            "progressObservationCoverage", "PHASE_TRANSITIONS_ONLY"
+                    });
+                });
     }
 
     private static String normalize(String value) {

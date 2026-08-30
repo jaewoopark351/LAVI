@@ -5,6 +5,7 @@ import adris.altoclef.tasksystem.Task;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 import lavi.minecraft.diagnostics.container.store.deposit.context.StoreDepositOperationContext;
 import lavi.minecraft.diagnostics.container.store.deposit.context.StoreDepositOperationState;
+import lavi.minecraft.diagnostics.container.store.deposit.terminal.StoreDepositAutomaticContext;
 import net.minecraft.util.math.BlockPos;
 
 import java.util.IdentityHashMap;
@@ -21,8 +22,15 @@ public final class StoreDepositBindingRegistry {
     private String lastActiveOperationId = "none";
 
     public synchronized StoreDepositOperationState registerRoot(Task rootTask, String requestSource) {
+        return registerRoot(rootTask, requestSource, StoreDepositAutomaticContext.unavailable());
+    }
+
+    public synchronized StoreDepositOperationState registerRoot(Task rootTask,
+                                                                String requestSource,
+                                                                StoreDepositAutomaticContext automaticContext) {
         StoreDepositOperationState existing = stateFor(rootTask);
         if (existing != null) {
+            existing.attachAutomaticContext(automaticContext);
             return existing;
         }
         evictOldestOperationIfNeeded();
@@ -35,6 +43,7 @@ public final class StoreDepositBindingRegistry {
                 -1
         );
         StoreDepositOperationState state = new StoreDepositOperationState(context);
+        state.attachAutomaticContext(automaticContext);
         operations.put(operationId, state);
         if (rootTask != null) {
             taskToOperation.put(rootTask, operationId);
@@ -118,7 +127,9 @@ public final class StoreDepositBindingRegistry {
             trackerBindings.put(tracker, new TrackerBinding(
                     state.context().operationId(),
                     trackerRole,
-                    targetContainer
+                    targetContainer,
+                    existing.subscriptionGeneration(),
+                    existing.subscriptionActive()
             ));
             return;
         }
@@ -129,8 +140,42 @@ public final class StoreDepositBindingRegistry {
         trackerBindings.put(tracker, new TrackerBinding(
                 state.context().operationId(),
                 trackerRole,
-                targetContainer
+                targetContainer,
+                0L,
+                false
         ));
+    }
+
+    public synchronized TrackerBinding markTrackerSubscriptionStarted(ContainerStoredTracker tracker) {
+        TrackerBinding binding = trackerBindings.get(tracker);
+        if (binding == null) {
+            return null;
+        }
+        TrackerBinding updated = new TrackerBinding(
+                binding.operationId(),
+                binding.trackerRole(),
+                binding.targetContainer(),
+                binding.subscriptionGeneration() + 1L,
+                true
+        );
+        trackerBindings.put(tracker, updated);
+        return updated;
+    }
+
+    public synchronized TrackerBinding markTrackerSubscriptionStopped(ContainerStoredTracker tracker) {
+        TrackerBinding binding = trackerBindings.get(tracker);
+        if (binding == null) {
+            return null;
+        }
+        TrackerBinding updated = new TrackerBinding(
+                binding.operationId(),
+                binding.trackerRole(),
+                binding.targetContainer(),
+                binding.subscriptionGeneration(),
+                false
+        );
+        trackerBindings.put(tracker, updated);
+        return updated;
     }
 
     public synchronized StoreDepositOperationState markFinal(Task task) {
@@ -182,6 +227,10 @@ public final class StoreDepositBindingRegistry {
         trackerBindings.remove(first);
     }
 
-    public record TrackerBinding(String operationId, String trackerRole, BlockPos targetContainer) {
+    public record TrackerBinding(String operationId,
+                                 String trackerRole,
+                                 BlockPos targetContainer,
+                                 long subscriptionGeneration,
+                                 boolean subscriptionActive) {
     }
 }

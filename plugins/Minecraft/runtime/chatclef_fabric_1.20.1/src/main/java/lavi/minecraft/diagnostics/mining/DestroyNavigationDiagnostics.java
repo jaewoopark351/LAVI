@@ -21,26 +21,25 @@ final class DestroyNavigationDiagnostics {
         if (!ChatClefDiagnostics.isBoundaryEnabled()) {
             return;
         }
-        SubmittedGoalDiagnosticState.SubmittedGoal submittedGoal = SubmittedGoalDiagnosticState.get(task);
-        BaritonePathDiagnosticSnapshot snapshot = BaritonePathDiagnosticSnapshot.capture(
-                mod,
-                target,
-                submittedGoal == null ? null : submittedGoal.goal,
-                SubmittedGoalDiagnosticState.matchesTarget(submittedGoal, target)
-        );
         String fingerprint = MiningDiagnosticEmitter.joinFingerprint(
                 "DESTROY_NAVIGATION_STATE_TRANSITION",
                 ChatClefDiagnostics.blockPos(target),
                 navigationState,
-                snapshot.customGoalActive,
-                snapshot.baritonePathing,
-                snapshot.pathPresent,
                 Boolean.toString(reachPresent)
         );
-        MiningDiagnosticEmitter.emit("DESTROY_NAVIGATION_STATE_TRANSITION", "destroy_navigation_state_transition", task,
+        MiningDiagnosticEmitter.emitLazy("DESTROY_NAVIGATION_STATE_TRANSITION", "destroy_navigation_state_transition", task,
                 "destroy_navigation|" + System.identityHashCode(task),
                 fingerprint,
-                MiningDiagnosticEmitter.merge(new Object[]{
+                () -> {
+                    SubmittedGoalDiagnosticState.SubmittedGoal submittedGoal =
+                            SubmittedGoalDiagnosticState.get(task);
+                    BaritonePathDiagnosticSnapshot snapshot = BaritonePathDiagnosticSnapshot.capture(
+                            mod,
+                            target,
+                            submittedGoal == null ? null : submittedGoal.goal,
+                            SubmittedGoalDiagnosticState.matchesTarget(submittedGoal, target)
+                    );
+                    return MiningDiagnosticEmitter.merge(new Object[]{
                         "owner", "destroy_block_task",
                         "trigger", "navigation_state",
                         "targetPosition", ChatClefDiagnostics.blockPos(target),
@@ -48,7 +47,7 @@ final class DestroyNavigationDiagnostics {
                         "targetBlockState", ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(target)),
                         "blockStillExists", ChatClefDiagnostics.safeValue(() -> !mod.getWorld().getBlockState(target).isAir()),
                         "chunkLoaded", ChatClefDiagnostics.safeValue(() -> mod.getChunkTracker().isChunkLoaded(target)),
-                        "worldCanBreak", ChatClefDiagnostics.safeValue(() -> WorldHelper.canBreak(target)),
+                        "worldCanBreak", "NOT_CAPTURED_WITHOUT_BEHAVIOR_REEVALUATION",
                         "playerPosition", ChatClefDiagnostics.playerPosition(mod),
                         "distanceSq", ChatClefDiagnostics.safeValue(() -> BlockPosVer.getSquaredDistance(target, mod.getPlayer().getPos())),
                         "horizontalDistanceSq", ChatClefDiagnostics.safeValue(() -> horizontalDistanceSq(mod.getPlayer().getPos(), target)),
@@ -59,9 +58,10 @@ final class DestroyNavigationDiagnostics {
                         "foodChainNeedsToEat", ChatClefDiagnostics.safeValue(() -> mod.getFoodChain().needsToEat()),
                         "inNetherPortal", ChatClefDiagnostics.safeValue(WorldHelper::isInNetherPortal),
                         "navigationState", navigationState
-                }, SubmittedGoalDiagnosticState.fields(submittedGoal, target), snapshot.fields()));
-        GoalPathTransitionDiagnostics.log(mod, task, target, "PATH_STATE_CHANGED",
-                submittedGoal == null ? null : submittedGoal.goal, "destroy_navigation_state");
+                    }, SubmittedGoalDiagnosticState.fields(submittedGoal, target), snapshot.fields());
+                });
+        GoalPathTransitionDiagnostics.log(mod, task, target, "PATH_STATE_CHANGED", null,
+                "destroy_navigation_state");
     }
 
     private static double horizontalDistanceSq(Vec3d playerPosition, BlockPos target) {

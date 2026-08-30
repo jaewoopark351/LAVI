@@ -2,7 +2,6 @@ package lavi.minecraft.diagnostics.mining;
 
 import adris.altoclef.AltoClef;
 import adris.altoclef.tasks.resources.MineAndCollectTask;
-import adris.altoclef.util.helpers.WorldHelper;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 import net.minecraft.block.Block;
 import net.minecraft.entity.ItemEntity;
@@ -53,10 +52,10 @@ final class MineTargetSelectionDiagnostics {
                 selectionReason,
                 selectedBlock.map(ChatClefDiagnostics::blockPos).orElse("none")
         );
-        MiningDiagnosticEmitter.emit("MINE_TARGET_SELECTION_TRANSITION", "mine_target_selection_transition", task,
+        MiningDiagnosticEmitter.emitLazy("MINE_TARGET_SELECTION_TRANSITION", "mine_target_selection_transition", task,
                 "mine_target_selection|" + System.identityHashCode(task),
                 fingerprint,
-                new Object[]{
+                () -> new Object[]{
                         "owner", "mine_or_collect_task",
                         "trigger", "target_selection",
                         "previousPursuitPosition", previous,
@@ -76,7 +75,9 @@ final class MineTargetSelectionDiagnostics {
                         "blockStillMatchesRequestedType", selectedBlock.map(pos -> ChatClefDiagnostics.safeValue(() -> mod.getBlockScanner().isBlockAtPosition(pos, mod.getWorld().getBlockState(pos).getBlock()))).orElse("not_block"),
                         "selectedBlockMatchesAnyRequestedBlock", selectedBlock.map(pos -> ChatClefDiagnostics.safeValue(() -> blockMatchesAnyRequested(mod, pos, requestedBlocks))).orElse("not_block"),
                         "chunkLoaded", selectedBlock.map(pos -> ChatClefDiagnostics.safeValue(() -> mod.getChunkTracker().isChunkLoaded(pos))).orElse("not_block"),
-                        "worldCanBreak", selectedBlock.map(pos -> ChatClefDiagnostics.safeValue(() -> WorldHelper.canBreak(pos))).orElse("not_block"),
+                        "worldCanBreak", selectedBlock.isPresent()
+                                ? "NOT_CAPTURED_WITHOUT_BEHAVIOR_REEVALUATION"
+                                : "not_block",
                         "scannerUnreachable", selectedBlock.map(pos -> ChatClefDiagnostics.safeValue(() -> mod.getBlockScanner().isUnreachable(pos))).orElse("not_block"),
                         "localBlacklistContains", localBlacklistContains,
                         "localBlacklistSize", localBlacklistSize,

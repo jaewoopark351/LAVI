@@ -22,20 +22,19 @@ final class BlockUnreachableRequestDiagnostics {
         if (!ChatClefDiagnostics.isBoundaryEnabled()) {
             return;
         }
-        BaritonePathDiagnosticSnapshot snapshot = BaritonePathDiagnosticSnapshot.capture(mod, target, null, "unavailable");
         String fingerprint = MiningDiagnosticEmitter.joinFingerprint(
                 "BLOCK_UNREACHABLE_REQUEST",
                 requestSource,
                 ChatClefDiagnostics.blockPos(target),
-                Integer.toString(requestedAllowedFailures),
-                snapshot.customGoalActive,
-                snapshot.baritonePathing,
-                snapshot.pathPresent
+                Integer.toString(requestedAllowedFailures)
         );
-        MiningDiagnosticEmitter.emit("BLOCK_UNREACHABLE_REQUEST", "block_unreachable_request", task,
+        MiningDiagnosticEmitter.emitLazy("BLOCK_UNREACHABLE_REQUEST", "block_unreachable_request", task,
                 "block_unreachable_request|" + requestSource + "|" + ChatClefDiagnostics.blockPos(target),
                 fingerprint,
-                MiningDiagnosticEmitter.merge(new Object[]{
+                () -> {
+                    BaritonePathDiagnosticSnapshot snapshot = BaritonePathDiagnosticSnapshot.capture(
+                            mod, target, null, "unavailable");
+                    return MiningDiagnosticEmitter.merge(new Object[]{
                         "owner", "block_unreachable_request_observer",
                         "trigger", "before_request_block_unreachable",
                         "requestSource", requestSource,
@@ -49,6 +48,7 @@ final class BlockUnreachableRequestDiagnostics {
                         "currentMiningRequirement", ChatClefDiagnostics.safeValue(StorageHelper::getCurrentMiningRequirement),
                         "activeDestroyTaskInstanceId", MiningDiagnosticEmitter.instanceId(activeDestroyTask),
                         "candidateDestroyTaskInstanceId", MiningDiagnosticEmitter.instanceId(candidateDestroyTask)
-                }, snapshot.fields()));
+                    }, snapshot.fields());
+                });
     }
 }

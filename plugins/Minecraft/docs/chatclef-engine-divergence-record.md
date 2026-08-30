@@ -1138,3 +1138,356 @@ retired. Do not use a broad commit revert to remove this one upstream hunk.
 This clarification changes provenance only. It does not reclassify the hunk as
 behavior-changing and does not authorize source edits, build, deployment,
 runtime reproduction, commit, or push.
+
+## 2026-08-31 Automatic-Deposit Post-Placement One-Tick Handoff
+
+<!-- 20260831_openai: Conservatively recorded the automatic-deposit-only post-place handoff because DepositAllTask is a LAVI-created behavior-preserving copy in the upstream engine namespace. -->
+
+Pre-change repository baseline:
+
+```text
+HEAD:
+  14ba9b443f0bc11d6860a25d7fd3b8b916d95a04
+
+worktree:
+  DIRTY - preserve all pre-existing user source and diagnostics changes
+
+DepositAllTask.java pre-change SHA-256:
+  26A7E7B1FD2470DBAE5454CE9444DC8DD56AAF34CA3F0E213501CE198F9F15AA
+```
+
+Modified behavior-owning file:
+
+```text
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/
+  adris/altoclef/tasks/container/DepositAllTask.java
+```
+
+Provenance classification:
+
+```text
+introduced by:
+  9785e17b2a9bd87839e33436c2b72f416cce5dd8
+  feat(minecraft): add stable deposit_all container targeting
+
+subsequent file commits:
+  673d21de1551362760bba1f12e98fedfd06f5e8b
+  696265deb3159c7b02e743dd73f3f3c77201af53
+
+ownership:
+  LAVI-created integration file
+
+ancestry:
+  introduced as a behavior-preserving copy of the store-in-any-container flow
+
+classification:
+  conservative behavior-changing engine/integration divergence
+```
+
+`DepositAllTask` was created by LAVI, but its package and behavior ancestry are
+inside the preserved `adris.altoclef` engine surface. This record therefore does
+not use LAVI ownership to hide a lifecycle behavior change. Exact upstream
+comparison remains `UNVERIFIED`.
+
+Verified failing boundary:
+
+```text
+reproduction:
+  auto-deposit-carryon-chest-20260830-232646
+
+game tick:
+  998
+
+runtime transition:
+  actual PlaceBlockNearbyTask stop/replacement
+  -> StoreInContainerTask
+  -> InteractWithBlockTask in the same client-tick task path
+
+result:
+  interaction SUCCESS without GUI
+  -> at tick 999 Carry On NOT_CARRYING -> CARRYING
+  -> clicked chest -> air / targetRemoved=true
+  -> automatic deposit OPEN_EXISTING -> OBTAIN_CHEST
+```
+
+Installed Carry On 2.1.2.7 bytecode establishes that unbound-key reconciliation
+runs at `ClientTickEvents.END_CLIENT_TICK`, its false transition sends
+`ServerboundCarryKeyPressedPacket(false)`, and block pickup rejects
+`keyPressed=false`. ChatClef's task runner executes from the
+`MinecraftClient.tick` HEAD path. The runtime log did not directly record the
+packet; successful pickup requiring `keyPressed=true` is a necessary-condition
+deduction.
+
+Exact behavior hunk:
+
+```text
+DepositAllTask public construction seam:
+  DepositAllTask(boolean,
+                 DepositAllPlacementTaskOwner,
+                 DepositAllPostPlaceHandoff,
+                 ItemTarget...)
+
+DepositAllTask#onTick():
+  inspect the retained actual PlaceBlockNearbyTask once through
+  deferAfterCompletedPlacement()
+
+  when DepositAllPostPlaceHandoff.shouldDefer(...) accepts the completed active
+  placement transition:
+    clear the placement owner
+    return null exactly once
+
+  obtain the placement fallback child through
+  DepositAllPlacementTaskOwner#getOrCreate(...)
+
+existing constructors:
+  ephemeral placement ownership and disabled handoff
+
+injectable constructor invariant:
+  only ephemeral/disabled or retaining/enabled pairs are accepted
+
+only enabled injection point:
+  AutoDepositGeneralTaskFactory#create
+```
+
+The required marker near the exact behavior hunk is:
+
+```java
+//20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
+```
+
+Intentionally changed behavior:
+
+```text
+automatic general deposit only, after its actual placement child finishes:
+  one parent call returns null
+  existing Task.tick null-child handling stops and clears that placement child
+  no replacement store/open child is ticked in that same parent call
+  existing store/open behavior resumes on the next client tick
+```
+
+Behavior intentionally left unchanged:
+
+```text
+manual @deposit_all constructors and allocation behavior
+automatic trusted destination flow
+manual @store_home flow
+furnace DoStuffInContainerTask handoff
+PlaceBlockNearbyTask completion and cleanup code
+StoreInContainerTask and AbstractDoToStorageContainerTask
+InteractWithBlockTask and PlayerInteractionFixChain
+Task and TaskRunner scheduling implementation
+Carry On dependency, settings, key binding, and state
+retry, timeout, terminal classification, and fallback policy
+generic GUI success predicates
+global input ownership and cleanup
+Baritone goal, path, process, and cancellation ownership
+wire protocol and diagnostics defaults
+```
+
+LAVI-owned containment files:
+
+```text
+lavi/minecraft/task/container/deposit/handoff/
+  DepositAllPlacementTaskOwner.java
+  DepositAllPostPlaceHandoff.java
+
+lavi/minecraft/task/container/deposit/auto/maintenance/child/
+  AutoDepositGeneralTaskFactory.java
+```
+
+The remaining automatic-maintenance extractions recorded in the pre-change
+report are LAVI-owned responsibility separation, not additional engine
+divergences. They must preserve the existing maintenance phase, outcome,
+manifest, recovery, relief, and diagnostics behavior.
+
+Ownership impact:
+
+```text
+placement identity:
+  per-DepositAllTask owner, no static state
+
+completion:
+  unchanged PlaceBlockNearbyTask predicate
+
+one-tick deferral:
+  per-DepositAllTask handoff, enabled only by the automatic general factory
+
+input acquisition/release:
+  unchanged PlaceBlockNearbyTask ownership and onStop cleanup
+
+retry / timeout / terminal:
+  unchanged; the handoff owns none
+
+custom goal / path:
+  none added or cancelled
+
+interruption:
+  unchanged Task.tick null-child path
+
+global state:
+  none
+```
+
+Regression scope required before a runtime-success claim:
+
+```text
+retained actual placement identity versus fresh equal candidates
+one-shot null barrier and stop exactly once
+no open child in the barrier call; normal open child on the next call
+manual @deposit_all unchanged
+automatic existing-container path unchanged
+trusted/store_home paths unchanged
+furnace path unchanged
+Carry On absent class loading
+generic right-click and container opening unchanged
+Baritone ownership unchanged
+parent interruption/resume does not lose the retained actual child identity
+```
+
+Verification status when this entry was written:
+
+```text
+source implementation verification:
+  NOT PERFORMED BY THIS DOCUMENTATION PASS
+
+unit tests:
+  NOT RUN
+
+clean forced Gradle build:
+  NOT RUN / NOT AUTHORIZED
+
+JAR deployment and hash verification:
+  NOT RUN / NOT AUTHORIZED
+
+Minecraft runtime reproduction:
+  NOT RUN / NOT AUTHORIZED
+
+commit and push:
+  NOT PERFORMED / NOT AUTHORIZED
+```
+
+Rollback unit:
+
+```text
+remove only the automatic-enabled constructor injection from
+  AutoDepositGeneralTaskFactory
+
+remove only the completed-placement one-shot null branch and owner-backed
+  placement creation from DepositAllTask
+
+remove the two handoff helpers only when no remaining caller uses them
+
+preserve all pre-existing dirty diagnostics hunks and unrelated LAVI-owned
+  maintenance refactoring
+```
+
+Do not roll this divergence back with `git reset`, `git checkout --`,
+`git restore`, file replacement, or a broad commit revert.
+
+The authoritative evidence, ownership ledger, exact proposed file set, test
+matrix, and remaining gaps are in
+[ChatClef Automatic Deposit Post-Place Handoff Pre-Change Report](chatclef-auto-deposit-post-place-handoff-pre-change-report-2026-08-31.md).
+
+### 2026-08-31 source application update
+
+The automatic-general-only handoff and its LAVI-owned responsibility separation
+were subsequently applied. Static source review found one enabled production
+injection point, no Carry On or global input/Baritone dependency in the changed
+scope, no missing required source marker, no trailing whitespace, and no missing
+final newline. The injectable constructor also rejects mismatched ownership and
+handoff policies.
+
+Focused tests were added for placement identity, exact-once deferral, actual
+Task reconciliation ordering, automatic-only composition, manual defaults, and
+free-slot verdicts. At that source-application checkpoint they were not run
+because Gradle/build execution had not been authorized. Clean build, deployment,
+runtime reproduction, commit, and push were all unperformed at that checkpoint.
+The subsequent separately authorized verification is recorded below.
+
+### 2026-08-31 post-implementation verification update
+
+<!-- 20260831_openai: Recorded subsequent clean-build, deployment-hash, and captured-runtime evidence for the automatic post-place handoff divergence. -->
+
+This update supersedes only the current verification status. It does not rewrite
+the pre-change authorization boundary or the `when this entry was written`
+status above.
+
+```text
+clean forced command:
+  .\gradlew.bat clean build --rerun-tasks
+
+clean forced build:
+  PASSED
+  BUILD SUCCESSFUL in 4m 43s
+  exit code 0
+  171 actionable tasks; 171 executed
+
+Minecraft 1.20.1 tests:
+  PASSED_WITH_ONE_SKIPPED_NON_HANDOFF_TEST
+  117 suites
+  378 total; 377 passed; 0 failures; 0 errors; 1 skipped
+
+focused owner / handoff / lifecycle suites:
+  12 passed; 0 failures; 0 errors; 0 skipped
+
+automatic-general factory and free-slot verifier suites:
+  5 passed; 0 failures; 0 errors; 0 skipped
+
+built and active JAR bytes:
+  7,360,897
+
+built and active JAR SHA-256:
+  84C6634433D7402B2935ADD6E4028F43BD3782D2E4038E00D30206092E9CA839
+
+artifact deployment:
+  VERIFIED - built and active instance hashes match
+
+Minecraft runtime reproduction:
+  OBSERVED
+
+post-place handoff symptom:
+  VERIFIED_FOR_THE_CAPTURED_SCENARIO_ONLY
+
+all worlds, configurations, and container combinations:
+  NOT CLAIMED
+
+bounded diagnostics compliance:
+  NOT VERIFIED - separate high-volume and terminal-reserve findings remain
+
+commit and push:
+  NOT PERFORMED
+```
+
+The active session loaded the expected instance JAR and emitted diagnostics
+source marker `20260731_post_place_handoff_p2`. The strongest Store-correlated
+automatic-general runtime sequence was `auto-deposit-1` /
+`store-deposit-379`:
+
+```text
+tick 291  actual PlaceBlockNearbyTask STOP_BEGIN / STOP_END and child clear
+tick 292  next-tick OPEN_EXISTING and chest interaction SUCCESS
+tick 293  GUI_OPEN_DELAYED; handler changed; transfer began
+tick 299  transfer terminal
+tick 341  MAINTENANCE_LOGICAL_TERMINAL / free_slot_postcondition_observed
+```
+
+`auto-deposit-5` repeated the cleanup-only handoff, next-tick open, GUI,
+transfer, maintenance terminal, and later user-task natural completion. Its
+adjacent chest-to-air hand snapshots were not independently Store-bound and are
+treated only as supporting evidence.
+
+Carry On 2.1.2.7 remained `AVAILABLE_NOT_CARRYING` across that handoff and no
+pickup transition was observed. This verifies that the added one-tick boundary
+worked in the captured scenario. It does not prove every manual, trusted,
+Carry-On-absent, or alternative-container path.
+
+One earlier operation in the same session emitted a Baritone
+`BlockOptionalMeta.getManager/drops` resource-reload exception, after which the
+operation and session continued to completion. The exception was non-terminal in
+this capture; this verification does not classify it as fixed. It also does not
+close the separate diagnostics-volume issue: the session
+did not emit `DIAGNOSTIC_SESSION_CAP_REACHED`, emitted high-volume tool-selection
+events, and exhausted the per-store terminal-group reserve.
+
+The detailed build, artifact, tick, terminal, and limitation ledger is recorded
+in [ChatClef Automatic Deposit Post-Place Handoff Pre-Change Report](chatclef-auto-deposit-post-place-handoff-pre-change-report-2026-08-31.md#16-post-implementation-verification-update).

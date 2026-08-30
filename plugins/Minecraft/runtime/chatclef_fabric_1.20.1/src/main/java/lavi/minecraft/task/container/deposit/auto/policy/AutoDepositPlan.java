@@ -1,6 +1,7 @@
 package lavi.minecraft.task.container.deposit.auto.policy;
 
 import adris.altoclef.util.ItemTarget;
+import lavi.minecraft.task.container.deposit.auto.policy.diagnostics.AutoDepositPolicyItemSnapshot;
 import lavi.minecraft.task.container.deposit.auto.trusted.AutoDepositTrustedDestinationCandidate;
 import net.minecraft.item.Item;
 import net.minecraft.util.math.BlockPos;
@@ -20,6 +21,10 @@ public final class AutoDepositPlan {
     private final List<AutoDepositTrustedDestinationCandidate> trustedCandidates;
     private final Map<Item, Integer> protectedCounts;
     private final Map<Item, AutoDepositDisposition> dispositions;
+    private final List<AutoDepositPolicyItemSnapshot> policyItemDecisions;
+    private final String diagnosticInventoryFingerprint;
+    private final long trustedRevision;
+    private final String trustedCapacityState;
     private final int startingOccupiedSlots;
     private final int targetReliefSlots;
     private final int expectedFreedSlots;
@@ -31,6 +36,10 @@ public final class AutoDepositPlan {
                     List<AutoDepositTrustedDestinationCandidate> trustedCandidates,
                     Map<Item, Integer> protectedCounts,
                     Map<Item, AutoDepositDisposition> dispositions,
+                    List<AutoDepositPolicyItemSnapshot> policyItemDecisions,
+                    String diagnosticInventoryFingerprint,
+                    long trustedRevision,
+                    String trustedCapacityState,
                     int startingOccupiedSlots,
                     int targetReliefSlots,
                     int expectedFreedSlots,
@@ -41,6 +50,10 @@ public final class AutoDepositPlan {
         this.trustedCandidates = List.copyOf(trustedCandidates);
         this.protectedCounts = Collections.unmodifiableMap(new LinkedHashMap<>(protectedCounts));
         this.dispositions = Collections.unmodifiableMap(new LinkedHashMap<>(dispositions));
+        this.policyItemDecisions = List.copyOf(policyItemDecisions);
+        this.diagnosticInventoryFingerprint = diagnosticInventoryFingerprint;
+        this.trustedRevision = trustedRevision;
+        this.trustedCapacityState = trustedCapacityState;
         this.startingOccupiedSlots = startingOccupiedSlots;
         this.targetReliefSlots = targetReliefSlots;
         this.expectedFreedSlots = expectedFreedSlots;
@@ -85,6 +98,26 @@ public final class AutoDepositPlan {
 
     public Map<Item, AutoDepositDisposition> dispositions() {
         return dispositions;
+    }
+
+    public List<AutoDepositPolicyItemSnapshot> policyItemDecisions() {
+        return policyItemDecisions;
+    }
+
+    public String diagnosticInventoryFingerprint() {
+        return diagnosticInventoryFingerprint;
+    }
+
+    public boolean diagnosticPolicyObservationRetained() {
+        return !"UNAVAILABLE_DIAGNOSTICS_OFF".equals(diagnosticInventoryFingerprint);
+    }
+
+    public long trustedRevision() {
+        return trustedRevision;
+    }
+
+    public String trustedCapacityState() {
+        return trustedCapacityState;
     }
 
     public int startingOccupiedSlots() {

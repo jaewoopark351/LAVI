@@ -40,10 +40,10 @@ final class BlockBlacklistDiagnostics {
                 Boolean.toString(resetApplied),
                 resetReason
         );
-        MiningDiagnosticEmitter.emit("BLOCK_BLACKLIST_STATE_CHANGED", "block_blacklist_state_changed", null,
+        MiningDiagnosticEmitter.emitLazy("BLOCK_BLACKLIST_STATE_CHANGED", "block_blacklist_state_changed", null,
                 "block_blacklist|" + ChatClefDiagnostics.blockPos(target),
                 fingerprint,
-                new Object[]{
+                () -> new Object[]{
                         "owner", "block_blacklist",
                         "trigger", "blacklist_item_updated",
                         "targetPosition", ChatClefDiagnostics.blockPos(target),

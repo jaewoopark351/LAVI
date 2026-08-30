@@ -13,6 +13,8 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.util.math.BlockPos;
 
 import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Optional;
 
 public final class StoreDepositEventFields {
@@ -26,7 +28,7 @@ public final class StoreDepositEventFields {
             };
         }
         StoreDepositOperationContext context = state.context();
-        return new Object[]{
+        Object[] fields = new Object[]{
                 "storeContextAvailable", true,
                 "storeOperationId", context.operationId(),
                 "requestSource", context.requestSource(),
@@ -35,14 +37,89 @@ public final class StoreDepositEventFields {
                 "storeOperationStartTick", context.startTick(),
                 "storeOperationStartEventSequence", context.startEventSequence()
         };
+        if (!context.isAutomaticDepositOperation() || !state.automaticContext().available()) {
+            return fields;
+        }
+        long selectedCandidateGeneration = state.routeState().selectedCandidateGeneration();
+        if (selectedCandidateGeneration <= 0) {
+            selectedCandidateGeneration = state.routeState().activeRouteCandidateGeneration();
+        }
+        return merge(fields, automaticIdentityFields(
+                        state.automaticContext(),
+                        context.operationId(),
+                        candidateId(context.operationId(), selectedCandidateGeneration),
+                        storeAttemptId(
+                                context.operationId(),
+                                state.routeState().activeStoreAttemptSequence()
+                        ),
+                        routeChildId(
+                                context.operationId(),
+                                state.routeState().activeStoreAttemptRouteChildLifecycleSequence()
+                        ),
+                        "UNAVAILABLE",
+                        "UNAVAILABLE",
+                        "UNAVAILABLE"
+                ));
+    }
+
+    public static Object[] automaticIdentityFields(
+            lavi.minecraft.diagnostics.container.store.deposit.terminal.StoreDepositAutomaticContext context,
+            String storeOperationId,
+            String selectedCandidateGenerationId,
+            String storeAttemptId,
+            String routeChildLifecycleId,
+            String transferAttemptId,
+            String slotActionId,
+            String slotMutationId) {
+        Object[] automatic = context == null
+                ? lavi.minecraft.diagnostics.container.store.deposit.terminal.StoreDepositAutomaticContext
+                        .unavailable()
+                        .fields()
+                : context.fields();
+        return merge(automatic, new Object[]{
+                "storeOperationId", normalizeIdentity(storeOperationId),
+                "selectedCandidateGenerationId", normalizeIdentity(selectedCandidateGenerationId),
+                "storeAttemptId", normalizeIdentity(storeAttemptId),
+                "routeChildLifecycleId", normalizeIdentity(routeChildLifecycleId),
+                "transferAttemptId", normalizeIdentity(transferAttemptId),
+                "slotActionId", normalizeIdentity(slotActionId),
+                "slotMutationId", normalizeIdentity(slotMutationId)
+        });
+    }
+
+    public static Object[] activeRouteIdentityFields(StoreDepositOperationState state) {
+        if (state == null
+                || state.context() == null
+                || !state.context().isAutomaticDepositOperation()
+                || !state.automaticContext().available()) {
+            return new Object[0];
+        }
+        String operationId = state.context().operationId();
+        return merge(
+                operationFields(state),
+                automaticIdentityFields(
+                        state.automaticContext(),
+                        operationId,
+                        candidateId(operationId, state.routeState().activeRouteCandidateGeneration()),
+                        storeAttemptId(operationId, state.routeState().activeStoreAttemptSequence()),
+                        routeChildId(
+                                operationId,
+                                state.routeState().activeStoreAttemptRouteChildLifecycleSequence()
+                        ),
+                        "UNAVAILABLE",
+                        "UNAVAILABLE",
+                        "UNAVAILABLE"
+                )
+        );
     }
 
     public static Object[] rootActivationFields(StoreDepositOperationState state, ItemTarget[] targets) {
-        return merge(operationFields(state), new Object[]{
+        Object[] fields = merge(operationFields(state), new Object[]{
                 "storeActivationEpoch", state == null ? "unavailable" : state.activationCount(),
                 "activationKind", state == null || state.activationCount() <= 1 ? "INITIAL" : "RESUME_AFTER_INTERRUPT",
                 "requestedTargetItems", ChatClefDiagnostics.itemTargets(targets)
         });
+        return fields;
     }
 
     public static Object[] lifecycleFields(StoreDepositOperationState state,
@@ -54,7 +131,7 @@ public final class StoreDepositEventFields {
                                            boolean activeBefore,
                                            boolean terminalPending,
                                            boolean operationFinalized) {
-        return merge(operationFields(state), new Object[]{
+        Object[] fields = merge(operationFields(state), new Object[]{
                 "diagnosticScope", "store_deposit_lifecycle",
                 "owner", "store_deposit_lifecycle_observer",
                 "mode", "BOUNDARY",
@@ -76,6 +153,14 @@ public final class StoreDepositEventFields {
                 "operationFinalized", operationFinalized,
                 "taskSummary", ChatClefDiagnostics.taskSummaryForDiagnosticLog(task)
         });
+        if (state != null
+                && state.context() != null
+                && state.context().isAutomaticDepositOperation()
+                && "STOP".equals(action)
+                && state.routeState().isCurrentRouteChild(task)) {
+            return merge(fields, activeRouteIdentityFields(state));
+        }
+        return fields;
     }
 
     public static Object[] childReconciliationFields(StoreDepositOperationState state,
@@ -300,8 +385,40 @@ public final class StoreDepositEventFields {
                                                    boolean predicateLastInteractionPresent,
                                                    BlockPos predicateLastInteractionPosition,
                                                    String observationOutcome) {
+        return effectObservationFields(
+                state,
+                binding,
+                tracker,
+                slot,
+                before,
+                after,
+                playerInventorySlot,
+                acceptPredicateEvaluated,
+                acceptPredicateResult,
+                predicateMatchReason,
+                predicateLastInteractionPresent,
+                predicateLastInteractionPosition,
+                observationOutcome,
+                true
+        );
+    }
+
+    public static Object[] effectObservationFields(StoreDepositOperationState state,
+                                                   TrackerBinding binding,
+                                                   ContainerStoredTracker tracker,
+                                                   Slot slot,
+                                                   ItemStack before,
+                                                   ItemStack after,
+                                                   boolean playerInventorySlot,
+                                                   boolean acceptPredicateEvaluated,
+                                                   boolean acceptPredicateResult,
+                                                   String predicateMatchReason,
+                                                   boolean predicateLastInteractionPresent,
+                                                   BlockPos predicateLastInteractionPosition,
+                                                   String observationOutcome,
+                                                   boolean includeAutomaticSliceFields) {
         Delta delta = Delta.from(before, after);
-        return merge(operationFields(state), new Object[]{
+        Object[] fields = merge(operationFields(state), new Object[]{
                 "diagnosticScope", "store_deposit_effect",
                 "owner", "store_deposit_effect_observer",
                 "mode", "BOUNDARY",
@@ -335,6 +452,25 @@ public final class StoreDepositEventFields {
                 "deltaComponent1Amount", delta.component1Amount,
                 "deltaComponent2Item", delta.component2Item,
                 "deltaComponent2Amount", delta.component2Amount
+        });
+        if (!includeAutomaticSliceFields) {
+            return fields;
+        }
+        return merge(fields, new Object[]{
+                "trackerIdentity", identity(tracker),
+                "subscriptionGeneration", binding == null ? "UNAVAILABLE" : binding.subscriptionGeneration(),
+                "subscriptionActiveAtMutation", binding == null
+                        ? "UNAVAILABLE"
+                        : binding.subscriptionActive(),
+                "trackerTargetBinding", binding == null
+                        ? "UNAVAILABLE"
+                        : ChatClefDiagnostics.blockPos(binding.targetContainer()),
+                "lastBlockPosInteractionAtEvent", ChatClefDiagnostics.blockPos(predicateLastInteractionPosition),
+                "predicateEvaluated", acceptPredicateEvaluated,
+                "predicateResult", acceptPredicateResult,
+                "signedDelta", delta.componentCount == 1
+                        ? delta.component1Amount
+                        : delta.component1Amount + "," + delta.component2Amount
         });
     }
 
@@ -526,10 +662,44 @@ public final class StoreDepositEventFields {
         if (second == null || second.length == 0) {
             return first;
         }
-        Object[] merged = new Object[first.length + second.length];
-        System.arraycopy(first, 0, merged, 0, first.length);
-        System.arraycopy(second, 0, merged, first.length, second.length);
+        if ((first.length & 1) != 0 || (second.length & 1) != 0) {
+            Object[] concatenated = new Object[first.length + second.length];
+            System.arraycopy(first, 0, concatenated, 0, first.length);
+            System.arraycopy(second, 0, concatenated, first.length, second.length);
+            return concatenated;
+        }
+        Map<Object, Object> fields = new LinkedHashMap<>();
+        putFields(fields, first);
+        putFields(fields, second);
+        Object[] merged = new Object[fields.size() * 2];
+        int index = 0;
+        for (Map.Entry<Object, Object> entry : fields.entrySet()) {
+            merged[index++] = entry.getKey();
+            merged[index++] = entry.getValue();
+        }
         return merged;
+    }
+
+    private static void putFields(Map<Object, Object> target, Object[] fields) {
+        for (int index = 0; index + 1 < fields.length; index += 2) {
+            target.put(fields[index], fields[index + 1]);
+        }
+    }
+
+    private static String normalizeIdentity(String value) {
+        return value == null || value.isBlank() ? "UNAVAILABLE" : value;
+    }
+
+    private static String candidateId(String operationId, long generation) {
+        return generation <= 0 ? "UNAVAILABLE" : operationId + "-candidate-" + generation;
+    }
+
+    private static String storeAttemptId(String operationId, long sequence) {
+        return sequence <= 0 ? "UNAVAILABLE" : operationId + "-attempt-" + sequence;
+    }
+
+    private static String routeChildId(String operationId, long sequence) {
+        return sequence <= 0 ? "UNAVAILABLE" : operationId + "-route-child-" + sequence;
     }
 
     public static String operationId(StoreDepositOperationState state) {

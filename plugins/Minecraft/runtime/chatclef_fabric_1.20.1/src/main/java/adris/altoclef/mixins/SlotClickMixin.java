@@ -2,6 +2,9 @@ package adris.altoclef.mixins;
 
 import adris.altoclef.eventbus.EventBus;
 import adris.altoclef.eventbus.events.SlotClickChangedEvent;
+import adris.altoclef.tasksystem.Task;
+import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.diagnostics.container.store.deposit.StoreDepositDiagnostics;
 import com.google.common.collect.ImmutableList;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.player.PlayerInventory;
@@ -39,16 +42,78 @@ public abstract class SlotClickMixin {
         for (Slot slot : afterSlots) {
             beforeStacks.add(slot.getStack().copy());
         }
-        // Perform slot changes potentially
-        self.onSlotClick(slotIndex, button, actionType, player);
-        // Check for changes and alert
-        for (int i = 0; i < beforeStacks.size(); ++i) {
-            ItemStack before = beforeStacks.get(i);
-            ItemStack after = afterSlots.get(i).getStack();
-            if (!ItemStack.areEqual(before, after)) {
-                adris.altoclef.util.slots.Slot slot = adris.altoclef.util.slots.Slot.getFromCurrentScreen(i);
-                EventBus.publish(new SlotClickChangedEvent(slot, before, after));
+        Task exactDiagnosticLeaf = automaticDepositDiagnosticLeaf();
+        boolean automaticDepositDiagnostics = exactDiagnosticLeaf != null;
+        if (automaticDepositDiagnostics) {
+            StoreDepositDiagnostics.beginAutomaticSlotAction(
+                    exactDiagnosticLeaf,
+                    self,
+                    self.syncId,
+                    slotIndex,
+                    button,
+                    actionType,
+                    diagnosticCursorCopy(self)
+            );
+        }
+        try {
+            // Perform slot changes potentially
+            self.onSlotClick(slotIndex, button, actionType, player);
+            if (automaticDepositDiagnostics) {
+                StoreDepositDiagnostics.observeAutomaticSlotActionReturn(
+                        diagnosticCursorCopy(self)
+                );
             }
+            // Check for changes and alert
+            int mutationOrdinal = 0;
+            for (int i = 0; i < beforeStacks.size(); ++i) {
+                ItemStack before = beforeStacks.get(i);
+                ItemStack after = afterSlots.get(i).getStack();
+                if (!ItemStack.areEqual(before, after)) {
+                    adris.altoclef.util.slots.Slot slot = adris.altoclef.util.slots.Slot.getFromCurrentScreen(i);
+                    if (automaticDepositDiagnostics) {
+                        StoreDepositDiagnostics.beginAutomaticSlotMutation(
+                                ++mutationOrdinal,
+                                slot,
+                                before,
+                                after
+                        );
+                    }
+                    try {
+                        EventBus.publish(new SlotClickChangedEvent(slot, before, after));
+                    } finally {
+                        if (automaticDepositDiagnostics) {
+                            StoreDepositDiagnostics.endAutomaticSlotMutation();
+                        }
+                    }
+                }
+            }
+        } finally {
+            if (automaticDepositDiagnostics) {
+                StoreDepositDiagnostics.endAutomaticSlotAction();
+            }
+        }
+    }
+
+    private static Task automaticDepositDiagnosticLeaf() {
+        if (!ChatClefDiagnostics.isBoundaryEnabled()) {
+            return null;
+        }
+        try {
+            Task exactLeaf = ChatClefDiagnostics.currentTaskForDiagnostics();
+            return StoreDepositDiagnostics.hasAutomaticTaskContext(exactLeaf)
+                    ? exactLeaf
+                    : null;
+        } catch (RuntimeException | LinkageError ignored) {
+            return null;
+        }
+    }
+
+    private static ItemStack diagnosticCursorCopy(ScreenHandler handler) {
+        try {
+            ItemStack cursor = handler == null ? null : handler.getCursorStack();
+            return cursor == null ? null : cursor.copy();
+        } catch (RuntimeException | LinkageError ignored) {
+            return null;
         }
     }
     //#endif

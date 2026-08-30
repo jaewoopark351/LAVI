@@ -6,10 +6,11 @@ import java.util.Set;
 
 final class StoreDepositCriticalBudget {
     private final Set<String> terminalOperations = new LinkedHashSet<>();
-    private final Set<String> exhaustedTerminalOperations = new HashSet<>();
+    private long exhaustedTerminalOperationCount;
     private final Set<String> controlEvents = new HashSet<>();
     private final Set<String> exceptionSignatures = new HashSet<>();
     private final Set<String> lateSummaries = new HashSet<>();
+    private boolean coverageSuppressionSummaryEmitted;
 
     synchronized StoreDepositTerminalReservation reserveTerminalGroup(String operationId) {
         String normalized = StoreDepositDetailBudget.normalize(operationId);
@@ -17,7 +18,9 @@ final class StoreDepositCriticalBudget {
             return StoreDepositTerminalReservation.duplicate(normalized);
         }
         if (terminalOperations.size() >= StoreDepositBudgetConstants.MAX_TERMINAL_GROUPS) {
-            exhaustedTerminalOperations.add(normalized);
+            if (exhaustedTerminalOperationCount < Long.MAX_VALUE) {
+                exhaustedTerminalOperationCount++;
+            }
             return StoreDepositTerminalReservation.exhausted(normalized);
         }
         terminalOperations.add(normalized);
@@ -60,6 +63,14 @@ final class StoreDepositCriticalBudget {
         return true;
     }
 
+    synchronized boolean shouldEmitCoverageSuppressionSummary() {
+        if (coverageSuppressionSummaryEmitted) {
+            return false;
+        }
+        coverageSuppressionSummaryEmitted = true;
+        return true;
+    }
+
     synchronized int terminalGroupCount() {
         return terminalOperations.size();
     }
@@ -76,7 +87,11 @@ final class StoreDepositCriticalBudget {
         return lateSummaries.size();
     }
 
-    synchronized int exhaustedTerminalOperationCount() {
-        return exhaustedTerminalOperations.size();
+    synchronized int coverageSuppressionSummaryCount() {
+        return coverageSuppressionSummaryEmitted ? 1 : 0;
+    }
+
+    synchronized long exhaustedTerminalOperationCount() {
+        return exhaustedTerminalOperationCount;
     }
 }

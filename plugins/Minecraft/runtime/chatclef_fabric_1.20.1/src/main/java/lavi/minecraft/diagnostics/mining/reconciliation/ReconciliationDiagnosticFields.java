@@ -2,56 +2,33 @@ package lavi.minecraft.diagnostics.mining.reconciliation;
 
 import adris.altoclef.AltoClef;
 import adris.altoclef.tasks.resources.MineAndCollectTask;
-import adris.altoclef.tasksystem.Task;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
-import lavi.minecraft.diagnostics.mining.MiningDiagnosticEmitter;
+import lavi.minecraft.diagnostics.mining.formatting.MiningDiagnosticTaskFields;
 import net.minecraft.util.math.BlockPos;
 
-//20260814_kpopmodder: Own TASK_CHILD_RECONCILIATION field serialization without changing event semantics.
-public final class ReconciliationDiagnosticPayload {
-    private ReconciliationDiagnosticPayload() {
+//20260830_kpopmodder: Project TASK_CHILD_RECONCILIATION detail after gate admission.
+public final class ReconciliationDiagnosticFields {
+    private ReconciliationDiagnosticFields() {
     }
 
-    public static String fingerprint(Task parent,
-                                     ReconciliationTaskSnapshot activeChildBefore,
-                                     ReconciliationTaskSnapshot activeChildAfter,
-                                     ReconciliationOutcome outcome,
-                                     boolean isEqualResult,
-                                     boolean replacementApplied,
-                                     boolean candidateDiscardedBecauseEqual) {
-        return MiningDiagnosticEmitter.joinFingerprint(
-                "TASK_CHILD_RECONCILIATION",
-                taskClass(parent),
-                activeChildBefore.taskClass(),
-                activeChildBefore.targetPositionText(),
-                activeChildAfter.taskClass(),
-                activeChildAfter.targetPositionText(),
-                outcome.candidateOutcome(),
-                outcome.reconciliationClassification(),
-                Boolean.toString(isEqualResult),
-                Boolean.toString(replacementApplied),
-                Boolean.toString(candidateDiscardedBecauseEqual)
-        );
-    }
-
-    public static Object[] fields(AltoClef mod,
-                                  MineAndCollectTask.MineOrCollectTask parent,
-                                  ReconciliationTaskSnapshot activeChildBefore,
-                                  ReconciliationTaskSnapshot candidateChild,
-                                  ReconciliationTaskSnapshot activeChildAfter,
-                                  ReconciliationOutcome outcome,
-                                  boolean isEqualResult,
-                                  boolean canInterruptEvaluated,
-                                  boolean canInterruptPreviousChild,
-                                  boolean replacementApplied,
-                                  boolean previousChildStopCalled,
-                                  boolean candidateDiscardedBecauseEqual) {
+    public static Object[] capture(AltoClef mod,
+                                   MineAndCollectTask.MineOrCollectTask parent,
+                                   ReconciliationTaskSnapshot activeChildBefore,
+                                   ReconciliationTaskSnapshot candidateChild,
+                                   ReconciliationTaskSnapshot activeChildAfter,
+                                   ReconciliationOutcome outcome,
+                                   boolean isEqualResult,
+                                   boolean canInterruptEvaluated,
+                                   boolean canInterruptPreviousChild,
+                                   boolean replacementApplied,
+                                   boolean previousChildStopCalled,
+                                   boolean candidateDiscardedBecauseEqual) {
         BlockPos parentMiningPosition = parent.miningPos();
         return new Object[]{
                 "owner", "task_child_reconciliation",
                 "trigger", "child_candidate_compared",
-                "parentTaskClass", taskClass(parent),
-                "parentTaskInstanceId", taskInstanceId(parent),
+                "parentTaskClass", MiningDiagnosticTaskFields.taskClass(parent),
+                "parentTaskInstanceId", MiningDiagnosticTaskFields.instanceId(parent),
                 "parentTaskSummary", ChatClefDiagnostics.taskSummary(parent),
                 "parentMiningPositionAtReconciliation", ChatClefDiagnostics.blockPos(parentMiningPosition),
                 "parentMiningPositionScannerUnreachable", scannerUnreachable(mod, parentMiningPosition),
@@ -127,22 +104,16 @@ public final class ReconciliationDiagnosticPayload {
         };
     }
 
-    private static String taskClass(Task task) {
-        return task == null ? "none" : task.getClass().getName();
-    }
-
-    private static String taskInstanceId(Task task) {
-        return task == null ? "none" : Integer.toHexString(System.identityHashCode(task));
-    }
-
     private static String scannerUnreachable(AltoClef mod, BlockPos target) {
         if (target == null) {
             return "not_destroy_target";
         }
-        return ChatClefDiagnostics.safeValue(() -> mod == null ? "unavailable" : mod.getBlockScanner().isUnreachable(target));
+        return ChatClefDiagnostics.safeValue(() ->
+                mod == null ? "unavailable" : mod.getBlockScanner().isUnreachable(target));
     }
 
-    private static String localBlacklistContains(MineAndCollectTask.MineOrCollectTask parent, BlockPos target) {
+    private static String localBlacklistContains(MineAndCollectTask.MineOrCollectTask parent,
+                                                 BlockPos target) {
         if (target == null) {
             return "not_destroy_target";
         }

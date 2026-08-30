@@ -60,12 +60,13 @@ public abstract class AbstractDoToClosestObjectTask<T> extends Task {
         AltoClef mod = AltoClef.getInstance();
 
         //20260730_kpopmodder: Diagnostics-only LAVI log for closest-object pursuit loop investigation; no behavior change.
+        //20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
+        // Do not invoke a Task completion predicate solely to populate diagnostics.
         ChatClefDiagnostics.logEvent("CLOSEST_OBJECT", "ON_TICK", "closest_object_tick_begin", this,
                 "currentlyPursuing", objectSummary(mod, currentlyPursuing),
                 "heuristicCacheSize", heuristicMap.size(),
                 "goalTask", ChatClefDiagnostics.taskSummary(goalTask),
                 "goalTaskActive", ChatClefDiagnostics.safeValue(() -> goalTask != null && goalTask.isActive()),
-                "goalTaskFinished", ChatClefDiagnostics.safeValue(() -> goalTask != null && goalTask.isFinished()),
                 "baritonePathing", ChatClefDiagnostics.safeValue(() -> mod.getClientBaritone().getPathingBehavior().isPathing()),
                 "playerPosition", ChatClefDiagnostics.playerPosition(mod));
 

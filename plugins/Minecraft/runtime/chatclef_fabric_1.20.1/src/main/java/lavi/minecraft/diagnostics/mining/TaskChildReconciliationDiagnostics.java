@@ -5,8 +5,10 @@ import adris.altoclef.tasks.construction.DestroyBlockTask;
 import adris.altoclef.tasks.resources.MineAndCollectTask;
 import adris.altoclef.tasksystem.Task;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
-import lavi.minecraft.diagnostics.mining.reconciliation.ReconciliationDiagnosticPayload;
+import lavi.minecraft.diagnostics.mining.reconciliation.ReconciliationDiagnosticFields;
 import lavi.minecraft.diagnostics.mining.reconciliation.ReconciliationOutcome;
+import lavi.minecraft.diagnostics.mining.reconciliation.ReconciliationSemanticFingerprint;
+import lavi.minecraft.diagnostics.mining.reconciliation.ReconciliationTaskIdentity;
 import lavi.minecraft.diagnostics.mining.reconciliation.ReconciliationTaskSnapshot;
 
 //20260806_kpopmodder: Observe child candidate reconciliation without altering Task scheduling.
@@ -33,27 +35,37 @@ final class TaskChildReconciliationDiagnostics {
             return;
         }
         MineAndCollectTask.MineOrCollectTask mineParent = (MineAndCollectTask.MineOrCollectTask) parent;
-        AltoClef mod = AltoClef.getInstance();
-        ReconciliationTaskSnapshot activeBefore = ReconciliationTaskSnapshot.capture(mod, mineParent, activeChildBefore);
-        ReconciliationTaskSnapshot candidate = ReconciliationTaskSnapshot.capture(mod, mineParent, candidateChild);
-        ReconciliationTaskSnapshot activeAfter = ReconciliationTaskSnapshot.capture(mod, mineParent, activeChildAfter);
+        ReconciliationTaskIdentity activeBeforeIdentity = ReconciliationTaskIdentity.capture(activeChildBefore);
+        ReconciliationTaskIdentity candidateIdentity = ReconciliationTaskIdentity.capture(candidateChild);
+        ReconciliationTaskIdentity activeAfterIdentity = ReconciliationTaskIdentity.capture(activeChildAfter);
         ReconciliationOutcome outcome = ReconciliationOutcome.classify(
-                activeBefore,
-                candidate,
-                activeAfter,
+                activeBeforeIdentity,
+                candidateIdentity,
+                activeAfterIdentity,
                 isEqualResult,
                 canInterruptEvaluated,
                 canInterruptPreviousChild,
                 replacementApplied,
                 candidateDiscardedBecauseEqual
         );
-        String fingerprint = ReconciliationDiagnosticPayload.fingerprint(parent, activeBefore, activeAfter, outcome,
+        String fingerprint = ReconciliationSemanticFingerprint.create(
+                parent, activeBeforeIdentity, candidateIdentity, activeAfterIdentity, outcome,
                 isEqualResult, replacementApplied, candidateDiscardedBecauseEqual);
-        MiningDiagnosticEmitter.emit("TASK_CHILD_RECONCILIATION", "task_child_reconciliation", parent,
+        MiningDiagnosticEmitter.emitLazy("TASK_CHILD_RECONCILIATION", "task_child_reconciliation", parent,
                 "task_child_reconciliation|" + System.identityHashCode(parent),
                 fingerprint,
-                ReconciliationDiagnosticPayload.fields(mod, mineParent, activeBefore, candidate, activeAfter, outcome,
-                        isEqualResult, canInterruptEvaluated, canInterruptPreviousChild, replacementApplied,
-                        previousChildStopCalled, candidateDiscardedBecauseEqual));
+                () -> {
+                    AltoClef mod = AltoClef.getInstance();
+                    ReconciliationTaskSnapshot activeBefore = ReconciliationTaskSnapshot.capture(
+                            mod, mineParent, activeChildBefore);
+                    ReconciliationTaskSnapshot candidate = ReconciliationTaskSnapshot.capture(
+                            mod, mineParent, candidateChild);
+                    ReconciliationTaskSnapshot activeAfter = ReconciliationTaskSnapshot.capture(
+                            mod, mineParent, activeChildAfter);
+                    return ReconciliationDiagnosticFields.capture(mod, mineParent, activeBefore, candidate,
+                            activeAfter, outcome, isEqualResult, canInterruptEvaluated,
+                            canInterruptPreviousChild, replacementApplied, previousChildStopCalled,
+                            candidateDiscardedBecauseEqual);
+                });
     }
 }

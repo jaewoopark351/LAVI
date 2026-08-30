@@ -4,6 +4,7 @@ import adris.altoclef.tasksystem.Task;
 import lavi.minecraft.diagnostics.container.store.deposit.candidate.StoreContainerRouteState;
 import lavi.minecraft.diagnostics.container.store.deposit.context.StoreDepositOperationContext;
 import lavi.minecraft.diagnostics.container.store.deposit.context.StoreDepositOperationState;
+import lavi.minecraft.diagnostics.container.store.deposit.terminal.StoreDepositAutomaticContext;
 import lavi.minecraft.diagnostics.interaction.BlockInteractionContext;
 import net.minecraft.util.math.BlockPos;
 
@@ -24,7 +25,61 @@ public record StoreDepositInteractionContext(long interactionId,
                                              BlockPos targetPosition,
                                              String contextBindingSource,
                                              String contextBindingConfidence,
-                                             long interactionStartClientTick) {
+                                             long interactionStartClientTick,
+                                             StoreDepositAutomaticContext automaticContextAtAttempt,
+                                             String selectedCandidateGenerationIdAtAttempt) {
+    public StoreDepositInteractionContext(long interactionId,
+                                          String storeOperationId,
+                                          String storeAttemptId,
+                                          long storeAttemptSequence,
+                                          long candidateDecisionSequenceAtAttempt,
+                                          long branchEpochAtAttempt,
+                                          String branchAtAttempt,
+                                          long routeChildLifecycleIdAtAttempt,
+                                          String routeChildClassAtAttempt,
+                                          String routeChildIdentityAtAttempt,
+                                          String activeDescendantClassAtAttempt,
+                                          String activeDescendantIdentityAtAttempt,
+                                          int routeChildReplacementCountAtAttempt,
+                                          String targetRole,
+                                          BlockPos targetPosition,
+                                          String contextBindingSource,
+                                          String contextBindingConfidence,
+                                          long interactionStartClientTick) {
+        this(
+                interactionId,
+                storeOperationId,
+                storeAttemptId,
+                storeAttemptSequence,
+                candidateDecisionSequenceAtAttempt,
+                branchEpochAtAttempt,
+                branchAtAttempt,
+                routeChildLifecycleIdAtAttempt,
+                routeChildClassAtAttempt,
+                routeChildIdentityAtAttempt,
+                activeDescendantClassAtAttempt,
+                activeDescendantIdentityAtAttempt,
+                routeChildReplacementCountAtAttempt,
+                targetRole,
+                targetPosition,
+                contextBindingSource,
+                contextBindingConfidence,
+                interactionStartClientTick,
+                StoreDepositAutomaticContext.unavailable(),
+                "UNAVAILABLE"
+        );
+    }
+
+    public StoreDepositInteractionContext {
+        automaticContextAtAttempt = automaticContextAtAttempt == null
+                ? StoreDepositAutomaticContext.unavailable()
+                : automaticContextAtAttempt;
+        selectedCandidateGenerationIdAtAttempt = selectedCandidateGenerationIdAtAttempt == null
+                || selectedCandidateGenerationIdAtAttempt.isBlank()
+                ? "UNAVAILABLE"
+                : selectedCandidateGenerationIdAtAttempt;
+    }
+
     public static StoreDepositInteractionContext capture(StoreDepositOperationState state,
                                                          Task activeTask,
                                                          BlockInteractionContext interaction) {
@@ -65,8 +120,18 @@ public record StoreDepositInteractionContext(long interactionId,
                 interaction.targetPosition().toImmutable(),
                 "ACTIVE_TASK_IDENTITY_BINDING_AND_TARGET_VALUE",
                 "EXACT",
-                interaction.startClientTickId()
+                interaction.startClientTickId(),
+                state.automaticContext(),
+                candidateId(operationId, route)
         );
+    }
+
+    private static String candidateId(String operationId, StoreContainerRouteState route) {
+        long generation = route.activeRouteCandidateGeneration();
+        if (generation <= 0) {
+            generation = route.selectedCandidateGeneration();
+        }
+        return generation <= 0 ? "UNAVAILABLE" : operationId + "-candidate-" + generation;
     }
 
     private static String targetRole(BlockPos target, StoreContainerRouteState route) {

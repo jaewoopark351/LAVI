@@ -7,9 +7,9 @@ import adris.altoclef.util.ItemTarget;
 import adris.altoclef.util.slots.Slot;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 import lavi.minecraft.diagnostics.container.store.deposit.binding.StoreDepositBindingRegistry;
-import lavi.minecraft.diagnostics.container.store.deposit.binding.StoreDepositBindingRegistry.TrackerBinding;
+import lavi.minecraft.diagnostics.container.store.deposit.budget.StoreDepositBoundedEventLogger;
 import lavi.minecraft.diagnostics.container.store.deposit.budget.StoreDepositEmissionGate;
-import lavi.minecraft.diagnostics.container.store.deposit.budget.StoreDepositTerminalReservation;
+import lavi.minecraft.diagnostics.container.store.deposit.budget.StoreDepositSharedBudget;
 import lavi.minecraft.diagnostics.container.store.deposit.candidate.StoreContainerCandidateCollector;
 import lavi.minecraft.diagnostics.container.store.deposit.candidate.StoreContainerCandidateEventFields;
 import lavi.minecraft.diagnostics.container.store.deposit.candidate.StoreContainerCandidateObservation;
@@ -19,75 +19,179 @@ import lavi.minecraft.diagnostics.container.store.deposit.candidate.StoreContain
 import lavi.minecraft.diagnostics.container.store.deposit.candidate.range.StoreContainerRangeEventFields;
 import lavi.minecraft.diagnostics.container.store.deposit.context.StoreDepositOperationState;
 import lavi.minecraft.diagnostics.container.store.deposit.event.StoreDepositEventFields;
-import lavi.minecraft.diagnostics.container.store.deposit.event.StoreDepositEventFields.PredicateSnapshot;
+import lavi.minecraft.diagnostics.container.store.deposit.effect.StoreDepositEffectDiagnostics;
 import lavi.minecraft.diagnostics.container.store.deposit.interaction.StoreDepositInteractionBindingRegistry;
-import lavi.minecraft.diagnostics.container.store.deposit.interaction.StoreDepositInteractionContext;
-import lavi.minecraft.diagnostics.container.store.deposit.interaction.StoreDepositInteractionDiagnosticFields;
+import lavi.minecraft.diagnostics.container.store.deposit.interaction.StoreDepositInteractionDiagnostics;
+import lavi.minecraft.diagnostics.container.store.deposit.lifecycle.StoreDepositChildReconciliationDiagnostics;
+import lavi.minecraft.diagnostics.container.store.deposit.lifecycle.StoreDepositOperationRegistrationDiagnostics;
+import lavi.minecraft.diagnostics.container.store.deposit.lifecycle.StoreDepositRootLifecycleDiagnostics;
+import lavi.minecraft.diagnostics.container.store.deposit.lifecycle.StoreDepositTaskLifecycleDiagnostics;
+import lavi.minecraft.diagnostics.container.store.deposit.lifecycle.StoreDepositTrackerBindingDiagnostics;
+import lavi.minecraft.diagnostics.container.store.deposit.route.StoreDepositContainerRouteEventDiagnostics;
+import lavi.minecraft.diagnostics.container.store.deposit.route.StoreDepositPursuitDiagnostics;
+import lavi.minecraft.diagnostics.container.store.deposit.route.StoreDepositMovementDiagnostics;
+import lavi.minecraft.diagnostics.container.store.deposit.route.StoreDepositTargetCallbackDiagnostics;
+import lavi.minecraft.diagnostics.container.store.deposit.terminal.StoreDepositTerminalSummaryEmitter;
+import lavi.minecraft.diagnostics.container.store.deposit.terminal.StoreDepositAutomaticLifecycleLedger;
+import lavi.minecraft.diagnostics.container.store.deposit.terminal.StoreDepositAutomaticLifecycleState;
+import lavi.minecraft.diagnostics.container.store.deposit.terminal.StoreDepositAutomaticContext;
+import lavi.minecraft.diagnostics.container.store.deposit.terminal.StoreDepositAutomaticTerminalDiagnostics;
+import lavi.minecraft.diagnostics.container.store.deposit.transfer.StoreDepositTransferDiagnostics;
+import lavi.minecraft.diagnostics.container.store.deposit.transfer.StoreDepositTransferAttemptRegistry;
+import lavi.minecraft.diagnostics.container.store.deposit.transfer.StoreDepositTransferSelectionSnapshot;
+import lavi.minecraft.diagnostics.container.store.deposit.transfer.StoreDepositSlotActionDiagnostics;
+import lavi.minecraft.diagnostics.container.store.deposit.transfer.StoreDepositNotStoredDiagnostics;
+import net.minecraft.screen.slot.SlotActionType;
 import lavi.minecraft.diagnostics.interaction.BlockInteractionContext;
 import net.minecraft.block.Block;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Vec3d;
 
 import java.util.Optional;
 
 public final class StoreDepositDiagnostics {
     private static final StoreDepositBindingRegistry BINDINGS = new StoreDepositBindingRegistry();
-    private static final StoreDepositEmissionGate EMISSION_GATE = new StoreDepositEmissionGate();
-    private static final StoreDepositInteractionBindingRegistry INTERACTION_BINDINGS =
-            new StoreDepositInteractionBindingRegistry();
-    private static final ThreadLocal<PredicateSnapshot> LAST_PREDICATE_SNAPSHOT = new ThreadLocal<>();
+    private static final StoreDepositEmissionGate EMISSION_GATE = StoreDepositSharedBudget.emissionGate();
+    private static final StoreDepositAutomaticLifecycleLedger AUTOMATIC_LEDGER =
+            StoreDepositAutomaticLifecycleState.ledger();
+    private static final StoreDepositAutomaticTerminalDiagnostics AUTOMATIC_TERMINALS =
+            new StoreDepositAutomaticTerminalDiagnostics(AUTOMATIC_LEDGER, EMISSION_GATE);
+    private static final StoreDepositTerminalSummaryEmitter TERMINAL_SUMMARIES =
+            new StoreDepositTerminalSummaryEmitter(BINDINGS, EMISSION_GATE, AUTOMATIC_TERMINALS);
+    private static final StoreDepositInteractionDiagnostics INTERACTIONS =
+            new StoreDepositInteractionDiagnostics(
+                    BINDINGS,
+                    EMISSION_GATE,
+                    new StoreDepositInteractionBindingRegistry()
+            );
+    private static final StoreDepositOperationRegistrationDiagnostics OPERATION_REGISTRATION =
+            new StoreDepositOperationRegistrationDiagnostics(BINDINGS, AUTOMATIC_TERMINALS);
+    private static final StoreDepositRootLifecycleDiagnostics ROOT_LIFECYCLE =
+            new StoreDepositRootLifecycleDiagnostics(BINDINGS);
+    private static final StoreDepositTrackerBindingDiagnostics TRACKER_BINDINGS =
+            new StoreDepositTrackerBindingDiagnostics(BINDINGS);
+    private static final StoreDepositTaskLifecycleDiagnostics TASK_LIFECYCLE =
+            new StoreDepositTaskLifecycleDiagnostics(BINDINGS, EMISSION_GATE, TERMINAL_SUMMARIES);
+    private static final StoreDepositMovementDiagnostics MOVEMENTS =
+            new StoreDepositMovementDiagnostics(BINDINGS, EMISSION_GATE, AUTOMATIC_TERMINALS);
+    private static final StoreDepositTransferAttemptRegistry TRANSFER_ATTEMPTS =
+            new StoreDepositTransferAttemptRegistry(BINDINGS, AUTOMATIC_TERMINALS);
+    private static final StoreDepositSlotActionDiagnostics SLOT_ACTIONS =
+            new StoreDepositSlotActionDiagnostics(
+                    TRANSFER_ATTEMPTS,
+                    EMISSION_GATE,
+                    AUTOMATIC_TERMINALS
+            );
+    private static final StoreDepositNotStoredDiagnostics NOT_STORED =
+            new StoreDepositNotStoredDiagnostics(BINDINGS, EMISSION_GATE);
+    private static final StoreDepositTransferDiagnostics TRANSFERS =
+            new StoreDepositTransferDiagnostics(BINDINGS, EMISSION_GATE, TRANSFER_ATTEMPTS);
+    private static final StoreDepositChildReconciliationDiagnostics CHILD_RECONCILIATIONS =
+            new StoreDepositChildReconciliationDiagnostics(BINDINGS, EMISSION_GATE, MOVEMENTS, TRANSFERS);
+    private static final StoreDepositEffectDiagnostics EFFECTS =
+            new StoreDepositEffectDiagnostics(BINDINGS, EMISSION_GATE, SLOT_ACTIONS);
+    private static final StoreDepositPursuitDiagnostics PURSUITS =
+            new StoreDepositPursuitDiagnostics(BINDINGS, EMISSION_GATE);
+    private static final StoreDepositTargetCallbackDiagnostics TARGET_CALLBACKS =
+            new StoreDepositTargetCallbackDiagnostics(BINDINGS, EMISSION_GATE);
+    private static final StoreDepositContainerRouteEventDiagnostics ROUTE_EVENTS =
+            new StoreDepositContainerRouteEventDiagnostics(BINDINGS, EMISSION_GATE);
 
     private StoreDepositDiagnostics() {
     }
 
-    public static void bindInteraction(Task activeTask, BlockInteractionContext interaction) {
+    public static void beginAutomaticRun(Task maintenanceTask,
+                                         Task userTaskRoot,
+                                         long policyContextEpoch,
+                                         Task primaryChild) {
+        try {
+            AUTOMATIC_TERMINALS.beginRun(maintenanceTask, userTaskRoot, policyContextEpoch);
+            if (primaryChild != null) {
+                AUTOMATIC_TERMINALS.registerChild(maintenanceTask, primaryChild, 0);
+            }
+        } catch (RuntimeException | LinkageError ignored) {
+        }
+    }
+
+    public static void registerAutomaticMaintenanceChild(AltoClef mod,
+                                                         Task maintenanceTask,
+                                                         Task childTask,
+                                                         int childIndex,
+                                                         ItemTarget[] selectedItems) {
         if (!ChatClefDiagnostics.isBoundaryEnabled()) {
             return;
         }
         try {
-            StoreDepositInteractionContext context = StoreDepositInteractionContext.capture(
-                    BINDINGS.stateFor(activeTask),
-                    activeTask,
-                    interaction
+            StoreDepositOperationState existing = BINDINGS.stateFor(childTask);
+            if (existing != null
+                    && existing.context().isAutomaticDepositOperation()
+                    && existing.automaticContext().available()) {
+                return;
+            }
+            StoreDepositAutomaticContext automaticContext =
+                    AUTOMATIC_TERMINALS.registerChild(maintenanceTask, childTask, childIndex);
+            OPERATION_REGISTRATION.registerAutomaticChild(
+                    automaticContext,
+                    selectedItems,
+                    childTask
             );
-            INTERACTION_BINDINGS.bind(context, ChatClefDiagnostics.currentClientTickId());
         } catch (RuntimeException | LinkageError ignored) {
         }
+    }
+
+    public static void recordAutomaticMaintenanceTerminal(Task maintenanceTask,
+                                                          String terminalReason,
+                                                          String nextLifecycleState) {
+        try {
+            AUTOMATIC_TERMINALS.recordMaintenanceTerminal(
+                    maintenanceTask,
+                    terminalReason,
+                    nextLifecycleState
+            );
+        } catch (RuntimeException | LinkageError ignored) {
+        }
+    }
+
+    public static void recordAutomaticPressureRunClosed(Task maintenanceTask,
+                                                       String terminalReason,
+                                                       String nextLifecycleState) {
+        try {
+            AUTOMATIC_TERMINALS.recordPressureRunClosed(maintenanceTask, terminalReason);
+        } catch (RuntimeException | LinkageError ignored) {
+        }
+        try {
+            AUTOMATIC_TERMINALS.recordRunToWait(
+                    maintenanceTask,
+                    terminalReason,
+                    nextLifecycleState
+            );
+        } catch (RuntimeException | LinkageError ignored) {
+        }
+        try {
+            AUTOMATIC_TERMINALS.recordCoverageClosedIfNoUserTask(
+                    maintenanceTask,
+                    terminalReason
+            );
+        } catch (RuntimeException | LinkageError ignored) {
+        }
+    }
+
+    public static void bindInteraction(Task activeTask, BlockInteractionContext interaction) {
+        INTERACTIONS.bindInteraction(activeTask, interaction);
     }
 
     public static Object[] interactionFields(BlockInteractionContext interaction) {
-        if (!ChatClefDiagnostics.isBoundaryEnabled() || interaction == null) {
-            return StoreDepositInteractionDiagnosticFields.fields(null, null);
-        }
-        try {
-            StoreDepositInteractionContext context = interactionContext(interaction);
-            StoreDepositOperationState currentState = context == null
-                    ? null
-                    : BINDINGS.stateForOperation(context.storeOperationId());
-            return StoreDepositInteractionDiagnosticFields.fields(context, currentState);
-        } catch (RuntimeException | LinkageError ignored) {
-            return new Object[]{
-                    "storeContextAvailable", "unavailable#error",
-                    "storeContextCoverageReason", "DIAGNOSTIC_BINDING_LOOKUP_FAILED"
-            };
-        }
+        return INTERACTIONS.interactionFields(interaction);
     }
 
     public static String interactionScopeKey(BlockInteractionContext interaction) {
-        StoreDepositInteractionContext context = interactionContext(interaction);
-        return context == null ? "store-unbound" : context.storeAttemptId();
+        return INTERACTIONS.interactionScopeKey(interaction);
     }
 
     public static boolean shouldEmitInteractionDetail(BlockInteractionContext interaction,
                                                       String eventName,
                                                       String semanticKey) {
-        StoreDepositInteractionContext context = interactionContext(interaction);
-        return context == null || EMISSION_GATE.shouldEmitDetail(
-                context.storeOperationId(),
-                eventName,
-                context.storeAttemptId() + "|" + semanticKey
-        );
+        return INTERACTIONS.shouldEmitInteractionDetail(interaction, eventName, semanticKey);
     }
 
     public static Object[] registerBareDepositInvocation(AltoClef mod,
@@ -108,84 +212,64 @@ public final class StoreDepositDiagnostics {
                                                          ItemTarget[] selectedItems,
                                                          Task taskToRun,
                                                          String requestSource) {
-        if (!ChatClefDiagnostics.isBoundaryEnabled()) {
-            return new Object[]{"storeContextAvailable", false};
-        }
-        try {
-            String resolvedRequestSource = requestSource == null || requestSource.isBlank()
-                    ? "BARE_DEPOSIT_COMMAND"
-                    : requestSource;
-            StoreDepositOperationState state = BINDINGS.registerRoot(taskToRun, resolvedRequestSource);
-            state.recordRequestedTargets(selectedItems);
-            return StoreDepositEventFields.merge(
-                    StoreDepositEventFields.operationFields(state),
-                    new Object[]{
-                            "storeRequestSource", resolvedRequestSource,
-                            "storeExplicitItemListProvided", explicitItemListProvided,
-                            "storeSelectedItems", ChatClefDiagnostics.itemTargets(selectedItems),
-                            "storeInvocationDimension", ChatClefDiagnostics.safeValue(() -> mod == null || mod.getWorld() == null ? null : mod.getWorld().getRegistryKey().getValue())
-                    });
-        } catch (RuntimeException | LinkageError ignored) {
-            return new Object[]{"storeContextAvailable", "unavailable#error"};
-        }
+        return OPERATION_REGISTRATION.registerBareDepositInvocation(
+                mod,
+                explicitItemListProvided,
+                selectedItems,
+                taskToRun,
+                requestSource
+        );
     }
 
     public static Object[] onStoreRootStart(Task task, boolean getIfNotPresent, ItemTarget[] toStore) {
-        if (!ChatClefDiagnostics.isBoundaryEnabled()) {
-            return new Object[]{"storeContextAvailable", false};
-        }
-        try {
-            StoreDepositOperationState state = BINDINGS.activateRoot(task, "STORE_IN_ANY_CONTAINER_TASK");
-            state.recordRequestedTargets(toStore);
-            return StoreDepositEventFields.rootActivationFields(state, toStore);
-        } catch (RuntimeException | LinkageError ignored) {
-            return new Object[]{"storeContextAvailable", "unavailable#error"};
-        }
+        return ROOT_LIFECYCLE.onStoreRootStart(task, getIfNotPresent, toStore);
     }
 
     public static Object[] onStoreRootStopCallback(Task task, Task interruptTask) {
-        if (!ChatClefDiagnostics.isBoundaryEnabled()) {
-            return new Object[]{"storeContextAvailable", false};
-        }
-        try {
-            return StoreDepositEventFields.merge(
-                    StoreDepositEventFields.operationFields(BINDINGS.stateFor(task)),
-                    new Object[]{
-                            "storeStopCallbackOnly", true,
-                            "storeStopCallbackIsTerminalAuthority", false,
-                            "storeInterruptTaskInstanceId", StoreDepositEventFields.identity(interruptTask),
-                            "storeInterruptTaskClass", interruptTask == null ? "none" : interruptTask.getClass().getName()
-                    });
-        } catch (RuntimeException | LinkageError ignored) {
-            return new Object[]{"storeContextAvailable", "unavailable#error"};
-        }
+        return ROOT_LIFECYCLE.onStoreRootStopCallback(task, interruptTask);
     }
 
     public static void bindRootTracker(Task owner, ContainerStoredTracker tracker) {
-        try {
-            BINDINGS.bindTracker(owner, tracker, "ROOT_ANY_CONTAINER", null);
-        } catch (RuntimeException | LinkageError ignored) {
-        }
+        TRACKER_BINDINGS.bindRootTracker(owner, tracker);
     }
 
     public static void bindTargetTracker(Task owner, ContainerStoredTracker tracker, BlockPos targetContainer) {
+        TRACKER_BINDINGS.bindTargetTracker(owner, tracker, targetContainer);
+    }
+
+    public static void trackerSubscriptionStarted(ContainerStoredTracker tracker) {
+        TRACKER_BINDINGS.trackerSubscriptionStarted(tracker);
+    }
+
+    public static void trackerSubscriptionStopped(ContainerStoredTracker tracker) {
+        TRACKER_BINDINGS.trackerSubscriptionStopped(tracker);
+    }
+
+    public static boolean hasAutomaticTrackerContext(ContainerStoredTracker tracker) {
         try {
-            BINDINGS.bindTracker(owner, tracker, "TARGET_CONTAINER", targetContainer);
+            return EFFECTS.hasAutomaticContext(tracker);
         } catch (RuntimeException | LinkageError ignored) {
+            return false;
+        }
+    }
+
+    public static boolean hasAutomaticTaskContext(Task task) {
+        if (!ChatClefDiagnostics.isBoundaryEnabled()) {
+            return false;
+        }
+        try {
+            StoreDepositOperationState state = BINDINGS.stateFor(task);
+            return state != null
+                    && state.context() != null
+                    && state.context().isAutomaticDepositOperation()
+                    && state.automaticContext().available();
+        } catch (RuntimeException | LinkageError ignored) {
+            return false;
         }
     }
 
     public static void markExplicitCancelCandidate(Task rootTask) {
-        if (!ChatClefDiagnostics.isBoundaryEnabled()) {
-            return;
-        }
-        try {
-            StoreDepositOperationState state = BINDINGS.stateFor(rootTask);
-            if (state != null && state.context().isRoot(rootTask)) {
-                state.recordExplicitStopCorrelation();
-            }
-        } catch (RuntimeException | LinkageError ignored) {
-        }
+        ROOT_LIFECYCLE.markExplicitCancelCandidate(rootTask);
     }
 
     public static void logTaskLifecycleBoundary(Task task,
@@ -193,67 +277,21 @@ public final class StoreDepositDiagnostics {
                                                 String action,
                                                 String phase,
                                                 boolean activeBefore) {
-        if (!ChatClefDiagnostics.isBoundaryEnabled()) {
-            return;
+        TASK_LIFECYCLE.logTaskLifecycleBoundary(task, interruptTask, action, phase, activeBefore);
+        try {
+            TRANSFERS.observeTaskLifecycle(task, action, phase);
+        } catch (RuntimeException | LinkageError ignored) {
         }
         try {
-            StoreDepositOperationState state = BINDINGS.stateFor(task);
-            if (state == null) {
-                return;
-            }
-            String role = BINDINGS.roleFor(task);
-            boolean rootStop = "ROOT_STORE".equals(role) && "STOP".equals(action);
-            state.recordLifecycle(
-                    task,
-                    action,
-                    phase,
-                    rootStop,
-                    ChatClefDiagnostics.currentClientTickId()
-            );
-            boolean terminalPending = rootStop && "BEGIN".equals(phase);
-            boolean operationFinalized = rootStop && "END".equals(phase);
-            String key = state.context().isDepositAllOperation()
-                    ? StoreDepositEventFields.operationId(state)
-                            + "|" + role
-                            + "|" + className(task)
-                            + "|" + action
-                            + "|" + phase
-                    : StoreDepositEventFields.operationId(state)
-                            + "|" + StoreDepositEventFields.identity(task)
-                            + "|" + action
-                            + "|" + phase;
-            if (EMISSION_GATE.shouldEmitDetail(StoreDepositEventFields.operationId(state), "STORE_TASK_LIFECYCLE_BOUNDARY", key)) {
-                ChatClefDiagnostics.logBoundary("STORE_TASK_LIFECYCLE_BOUNDARY",
-                        "store_task_lifecycle_boundary",
-                        task,
-                        ChatClefDiagnostics.withCommandContextFields(
-                                StoreDepositEventFields.lifecycleFields(state, task, interruptTask, action, phase, role, activeBefore, terminalPending, operationFinalized)
-                        ));
-            }
-            if (operationFinalized) {
-                emitTerminalSummaryAndPurge(task, state, "ROOT_STOP_END", state.explicitStopCorrelated() ? "EXPLICIT_STOP_CORRELATED" : "UNKNOWN_STOP");
-            }
+            MOVEMENTS.observeTaskLifecycle(task, action, phase);
         } catch (RuntimeException | LinkageError ignored) {
         }
     }
 
     public static void logNaturalFinish(Task task) {
-        if (!ChatClefDiagnostics.isBoundaryEnabled()) {
-            return;
-        }
+        TASK_LIFECYCLE.logNaturalFinish(task);
         try {
-            StoreDepositOperationState state = BINDINGS.stateFor(task);
-            if (state == null || !state.context().isRoot(task)) {
-                return;
-            }
-            state.recordNaturalFinish();
-            ChatClefDiagnostics.logBoundary("STORE_TASK_LIFECYCLE_BOUNDARY",
-                    "store_task_natural_finish_observed",
-                    task,
-                    ChatClefDiagnostics.withCommandContextFields(
-                            StoreDepositEventFields.lifecycleFields(state, task, null, "NATURAL_FINISH", "OBSERVED", "ROOT_STORE", true, false, true)
-                    ));
-            emitTerminalSummaryAndPurge(task, state, "NATURAL_FINISH", "NATURAL_FINISH_OBSERVED");
+            AUTOMATIC_TERMINALS.observeUserTaskNaturalCompletion(task);
         } catch (RuntimeException | LinkageError ignored) {
         }
     }
@@ -267,99 +305,19 @@ public final class StoreDepositDiagnostics {
                                               boolean replacementApplied,
                                               boolean previousChildStopCalled,
                                               Task activeChildAfter) {
-        if (!ChatClefDiagnostics.isBoundaryEnabled()) {
-            return;
-        }
+        CHILD_RECONCILIATIONS.logChildReconciliation(
+                parent,
+                activeChildBefore,
+                candidateChild,
+                subTasksEqual,
+                canInterruptEvaluated,
+                canInterrupt,
+                replacementApplied,
+                previousChildStopCalled,
+                activeChildAfter
+        );
         try {
-            StoreDepositOperationState state = BINDINGS.stateFor(parent);
-            if (state == null) {
-                return;
-            }
-            if (activeChildAfter != null) {
-                BINDINGS.bindChild(parent, activeChildAfter);
-            }
-            if (candidateChild != null && replacementApplied) {
-                BINDINGS.bindChild(parent, candidateChild);
-            }
-            String outcome = replacementApplied
-                    && candidateChild == null
-                    ? "ACTIVE_CHILD_CLEARED"
-                    : replacementApplied
-                    ? "CHILD_REPLACED"
-                    : subTasksEqual ? "ACTIVE_CHILD_RETAINED" : candidateChild == null ? "NULL_CHILD_RESULT" : "CANDIDATE_NOT_INSTALLED";
-            String lifecycleRole = BINDINGS.roleFor(parent);
-            String reconciliationRole = reconciliationRole(parent, lifecycleRole);
-            state.recordChildReconciliation(reconciliationRole + ":" + outcome, activeChildAfter);
-            boolean previousRouteChildStopObserved = previousChildStopCalled
-                    && state.wasStopCompletedFor(
-                            activeChildBefore,
-                            ChatClefDiagnostics.currentClientTickId()
-                    );
-            boolean resourceAcquisitionInterruptedByBranchChange = false;
-            if (state.context().isDepositAllOperation()) {
-                resourceAcquisitionInterruptedByBranchChange = state.routeState().recordChildReconciliation(
-                        reconciliationRole,
-                        activeChildBefore,
-                        activeChildAfter,
-                        replacementApplied,
-                        previousRouteChildStopObserved
-                );
-            }
-            String key = state.context().isDepositAllOperation()
-                    ? StoreDepositEventFields.operationId(state)
-                            + "|" + reconciliationRole
-                            + "|" + outcome
-                            + "|" + state.routeState().currentParentDecision().previousBranch()
-                            + "|" + state.routeState().currentBranch()
-                            + "|" + state.routeState().currentRangeTransition().rawRangeCrossing()
-                            + "|" + state.routeState().currentRangeTransition().currentTryRangeCrossing()
-                            + "|" + resourceAcquisitionInterruptedByBranchChange
-                            + "|" + className(activeChildBefore)
-                            + "|" + className(candidateChild)
-                            + "|" + className(activeChildAfter)
-                    : StoreDepositEventFields.operationId(state)
-                            + "|" + StoreDepositEventFields.identity(parent)
-                            + "|" + outcome
-                            + "|" + StoreDepositEventFields.identity(activeChildAfter);
-            if (!EMISSION_GATE.shouldEmitDetail(StoreDepositEventFields.operationId(state), "STORE_TASK_CHILD_RECONCILIATION", key)) {
-                return;
-            }
-            Object[] eventFields = StoreDepositEventFields.childReconciliationFields(
-                    state,
-                    parent,
-                    activeChildBefore,
-                    candidateChild,
-                    activeChildAfter,
-                    subTasksEqual,
-                    canInterruptEvaluated,
-                    canInterrupt,
-                    replacementApplied,
-                    previousChildStopCalled,
-                    lifecycleRole,
-                    reconciliationRole
-            );
-            if (state.context().isDepositAllOperation()) {
-                eventFields = StoreDepositEventFields.merge(
-                        StoreDepositEventFields.merge(
-                                eventFields,
-                                StoreContainerCandidateEventFields.childHandoffFields(
-                                        state,
-                                        activeChildBefore,
-                                        candidateChild,
-                                        activeChildAfter
-                                )
-                        ),
-                        StoreContainerRangeEventFields.childReconciliationFields(
-                                state.routeState().currentRangeTransition(),
-                                previousRouteChildStopObserved,
-                                resourceAcquisitionInterruptedByBranchChange
-                        )
-                );
-            }
-            ChatClefDiagnostics.logBoundary("STORE_TASK_CHILD_RECONCILIATION",
-                    "store_task_child_reconciliation",
-                    parent,
-                    ChatClefDiagnostics.withCommandContextFields(eventFields));
+            AUTOMATIC_TERMINALS.observeUserTaskResume(parent);
         } catch (RuntimeException | LinkageError ignored) {
         }
     }
@@ -445,7 +403,7 @@ public final class StoreDepositDiagnostics {
                 )) {
                     return;
                 }
-                ChatClefDiagnostics.logBoundary("STORE_CONTAINER_PARENT_CANDIDATE_DECISION",
+                StoreDepositBoundedEventLogger.log("STORE_CONTAINER_PARENT_CANDIDATE_DECISION",
                         "store_container_parent_candidate_decision",
                         task,
                         ChatClefDiagnostics.withCommandContextFields(
@@ -483,7 +441,7 @@ public final class StoreDepositDiagnostics {
                     currentChestTry,
                     rangeDecisionOutcome,
                     notStoredStateHash(notStored),
-                    diagnosticPlayerPosition()
+                    null
             );
             String key = StoreDepositEventFields.operationId(state)
                     + "|" + selectedBranch
@@ -510,7 +468,7 @@ public final class StoreDepositDiagnostics {
                                 fieldValue(fields, "fallbackContainerItemPresent")
                         )
                 );
-                ChatClefDiagnostics.logBoundary("STORE_CONTAINER_PARENT_CANDIDATE_DECISION",
+                StoreDepositBoundedEventLogger.log("STORE_CONTAINER_PARENT_CANDIDATE_DECISION",
                         "store_container_parent_candidate_decision",
                         task,
                         ChatClefDiagnostics.withCommandContextFields(eventFields));
@@ -600,7 +558,7 @@ public final class StoreDepositDiagnostics {
         )) {
             return;
         }
-        ChatClefDiagnostics.logBoundary(
+        StoreDepositBoundedEventLogger.log(
                 "STORE_CONTAINER_FILTERED_SEARCH_RESULT",
                 "store_container_filtered_scan_did_not_complete",
                 task,
@@ -672,7 +630,7 @@ public final class StoreDepositDiagnostics {
                             observation
                     )
                     : StoreDepositEventFields.filteredSearchResultFields(state, task, result, targetBlocks);
-            ChatClefDiagnostics.logBoundary("STORE_CONTAINER_FILTERED_SEARCH_RESULT",
+            StoreDepositBoundedEventLogger.log("STORE_CONTAINER_FILTERED_SEARCH_RESULT",
                     "store_container_filtered_search_result",
                     task,
                     ChatClefDiagnostics.withCommandContextFields(eventFields));
@@ -684,48 +642,7 @@ public final class StoreDepositDiagnostics {
                                           Object currentPursuit,
                                           Object candidate,
                                           String returnedAction) {
-        if (!ChatClefDiagnostics.isBoundaryEnabled()) {
-            return;
-        }
-        try {
-            StoreDepositOperationState state = BINDINGS.stateFor(task);
-            if (state == null) {
-                return;
-            }
-            state.recordPursuitDecision(returnedAction);
-            if (state.context().isDepositAllOperation()) {
-                state.routeState().recordPursuit(candidate, returnedAction);
-            }
-            String key = state.context().isDepositAllOperation()
-                    ? StoreDepositEventFields.operationId(state)
-                            + "|" + returnedAction
-                            + "|" + diagnosticPosition(candidate)
-                    : StoreDepositEventFields.operationId(state)
-                            + "|" + StoreDepositEventFields.identity(task)
-                            + "|" + returnedAction
-                            + "|" + String.valueOf(candidate);
-            if (!EMISSION_GATE.shouldEmitDetail(StoreDepositEventFields.operationId(state), "STORE_CONTAINER_PURSUIT_DECISION", key)) {
-                return;
-            }
-            Object[] eventFields = StoreDepositEventFields.pursuitDecisionFields(
-                    state,
-                    task,
-                    currentPursuit,
-                    candidate,
-                    returnedAction
-            );
-            if (state.context().isDepositAllOperation()) {
-                eventFields = StoreDepositEventFields.merge(
-                        eventFields,
-                        StoreContainerCandidateEventFields.routeCorrelationFields(state)
-                );
-            }
-            ChatClefDiagnostics.logBoundary("STORE_CONTAINER_PURSUIT_DECISION",
-                    "store_container_pursuit_decision",
-                    task,
-                    ChatClefDiagnostics.withCommandContextFields(eventFields));
-        } catch (RuntimeException | LinkageError ignored) {
-        }
+        PURSUITS.logPursuitDecision(task, currentPursuit, candidate, returnedAction);
     }
 
     public static void logTargetCallbackDecision(Task rootTask,
@@ -734,79 +651,21 @@ public final class StoreDepositDiagnostics {
                                                  boolean sameReference,
                                                  boolean progressResetBecauseReferenceChanged,
                                                  ItemTarget[] boundNotStored) {
-        if (!ChatClefDiagnostics.isBoundaryEnabled()) {
-            return;
-        }
-        try {
-            StoreDepositOperationState state = BINDINGS.stateFor(rootTask);
-            if (state == null) {
-                return;
-            }
-            String outcome = progressResetBecauseReferenceChanged ? "REFERENCE_CHANGED_PROGRESS_RESET" : "REFERENCE_RETAINED";
-            state.recordTargetCallbackDecision(outcome);
-            String key = StoreDepositEventFields.operationId(state) + "|" + ChatClefDiagnostics.blockPos(callbackTarget) + "|" + outcome;
-            if (!EMISSION_GATE.shouldEmitDetail(StoreDepositEventFields.operationId(state), "STORE_CONTAINER_TARGET_CALLBACK_DECISION", key)) {
-                return;
-            }
-            Object[] eventFields = StoreDepositEventFields.targetCallbackDecisionFields(
-                    state,
-                    rootTask,
-                    callbackTarget,
-                    currentChestTryBefore,
-                    sameReference,
-                    progressResetBecauseReferenceChanged,
-                    boundNotStored
-            );
-            if (state.context().isDepositAllOperation()) {
-                eventFields = StoreDepositEventFields.merge(
-                        eventFields,
-                        StoreContainerCandidateEventFields.routeCorrelationFields(state)
-                );
-            }
-            ChatClefDiagnostics.logBoundary("STORE_CONTAINER_TARGET_CALLBACK_DECISION",
-                    "store_container_target_callback_decision",
-                    rootTask,
-                    ChatClefDiagnostics.withCommandContextFields(eventFields));
-        } catch (RuntimeException | LinkageError ignored) {
-        }
+        TARGET_CALLBACKS.logTargetCallbackDecision(
+                rootTask,
+                callbackTarget,
+                currentChestTryBefore,
+                sameReference,
+                progressResetBecauseReferenceChanged,
+                boundNotStored
+        );
     }
 
     public static void observeContainerRouteEvent(String eventName,
                                                   String reason,
                                                   Task task,
                                                   Object[] branchFields) {
-        if (!ChatClefDiagnostics.isBoundaryEnabled()) {
-            return;
-        }
-        try {
-            StoreDepositOperationState state = BINDINGS.stateFor(task);
-            if (state == null) {
-                return;
-            }
-            state.recordCraftRouteEvent(eventName, reason);
-            if (!"CONTAINER_TASK_TARGET_DECISION".equals(eventName)) {
-                return;
-            }
-            String key = state.context().isDepositAllOperation()
-                    ? StoreDepositEventFields.operationId(state)
-                            + "|" + className(task)
-                            + "|" + eventName
-                            + "|" + reason
-                    : StoreDepositEventFields.operationId(state)
-                            + "|" + StoreDepositEventFields.identity(task)
-                            + "|" + eventName
-                            + "|" + reason;
-            if (!EMISSION_GATE.shouldEmitDetail(StoreDepositEventFields.operationId(state), "STORE_CRAFT_ROUTE_EVALUATION_ENTERED", key)) {
-                return;
-            }
-            ChatClefDiagnostics.logBoundary("STORE_CRAFT_ROUTE_EVALUATION_ENTERED",
-                    "store_craft_route_evaluation_entered",
-                    task,
-                    ChatClefDiagnostics.withCommandContextFields(
-                            StoreDepositEventFields.craftRouteEventFields(state, task, eventName, reason, branchFields)
-                    ));
-        } catch (RuntimeException | LinkageError ignored) {
-        }
+        ROUTE_EVENTS.observeContainerRouteEvent(eventName, reason, task, branchFields);
     }
 
     public static void logTransferDecision(Task task,
@@ -817,44 +676,146 @@ public final class StoreDepositDiagnostics {
                                            boolean destinationEvaluated,
                                            boolean destinationPresent,
                                            String action) {
-        if (!ChatClefDiagnostics.isBoundaryEnabled()) {
-            return;
-        }
+        TRANSFERS.logTransferDecision(
+                task,
+                targetContainer,
+                target,
+                potentialSourceSlotCount,
+                bestSourcePresent,
+                destinationEvaluated,
+                destinationPresent,
+                action
+        );
+    }
+
+    public static void stageAutomaticTransferCandidate(
+            Task parent,
+            Task candidate,
+            StoreDepositTransferSelectionSnapshot selection) {
         try {
-            StoreDepositOperationState state = BINDINGS.stateFor(task);
-            if (state == null) {
-                return;
-            }
-            state.recordTransferDecision(action);
-            if (state.context().isDepositAllOperation()) {
-                state.routeState().recordTransferDecision();
-            }
-            String key = StoreDepositEventFields.operationId(state) + "|" + ChatClefDiagnostics.blockPos(targetContainer) + "|" + action + "|" + String.valueOf(target);
-            if (!EMISSION_GATE.shouldEmitDetail(StoreDepositEventFields.operationId(state), "STORE_CONTAINER_TRANSFER_DECISION", key)) {
-                return;
-            }
-            ChatClefDiagnostics.logBoundary("STORE_CONTAINER_TRANSFER_DECISION",
-                    "store_container_transfer_decision",
-                    task,
-                    ChatClefDiagnostics.withCommandContextFields(
-                            StoreDepositEventFields.transferDecisionFields(
-                                    state,
-                                    task,
-                                    targetContainer,
-                                    target,
-                                    potentialSourceSlotCount,
-                                    bestSourcePresent,
-                                    destinationEvaluated,
-                                    destinationPresent,
-                                    action
-                            )
-                    ));
+            TRANSFERS.stageTransferCandidate(parent, candidate, selection);
+        } catch (RuntimeException | LinkageError ignored) {
+        }
+    }
+
+    public static void beginAutomaticSlotAction(Task exactLeafTask,
+                                                Object handler,
+                                                int syncId,
+                                                int clickedSlotIndex,
+                                                int clickButton,
+                                                SlotActionType clickActionType,
+                                                ItemStack cursorBefore) {
+        try {
+            SLOT_ACTIONS.beginAction(
+                    exactLeafTask,
+                    handler,
+                    syncId,
+                    clickedSlotIndex,
+                    clickButton,
+                    clickActionType,
+                    cursorBefore
+            );
+        } catch (RuntimeException | LinkageError ignored) {
+        }
+    }
+
+    public static void observeAutomaticSlotActionReturn(ItemStack cursorAfter) {
+        try {
+            SLOT_ACTIONS.observeLocalClickReturn(cursorAfter);
+        } catch (RuntimeException | LinkageError ignored) {
+        }
+    }
+
+    public static void beginAutomaticSlotMutation(int ordinal,
+                                                  Slot slot,
+                                                  ItemStack before,
+                                                  ItemStack after) {
+        try {
+            SLOT_ACTIONS.beginMutation(ordinal, slot, before, after);
+        } catch (RuntimeException | LinkageError ignored) {
+        }
+    }
+
+    public static void endAutomaticSlotMutation() {
+        try {
+            SLOT_ACTIONS.endMutation();
+        } catch (RuntimeException | LinkageError ignored) {
+        }
+    }
+
+    public static void endAutomaticSlotAction() {
+        try {
+            SLOT_ACTIONS.endAction();
+        } catch (RuntimeException | LinkageError ignored) {
+        }
+    }
+
+    public static void observeAutomaticNotStoredDecision(
+            ContainerStoredTracker tracker,
+            ItemTarget input,
+            int storedCount,
+            boolean storedSatisfied,
+            boolean hasItemEvaluated,
+            boolean hasItem,
+            int firstAvailableCount,
+            boolean secondAvailableCountEvaluated,
+            int secondAvailableCount,
+            ItemTarget output) {
+        try {
+            NOT_STORED.observe(
+                    tracker,
+                    input,
+                    storedCount,
+                    storedSatisfied,
+                    hasItemEvaluated,
+                    hasItem,
+                    firstAvailableCount,
+                    secondAvailableCountEvaluated,
+                    secondAvailableCount,
+                    output
+            );
+        } catch (RuntimeException | LinkageError ignored) {
+        }
+    }
+
+    public static void observeAutomaticMovementResult(Task rootTask,
+                                                      BlockPos selectedTargetBefore,
+                                                      String invalidationReason,
+                                                      boolean progressCheckEvaluated,
+                                                      boolean progressCheckOk,
+                                                      boolean candidateResetPerformed) {
+        try {
+            MOVEMENTS.observeMovementResult(
+                    rootTask,
+                    selectedTargetBefore,
+                    invalidationReason,
+                    progressCheckEvaluated,
+                    progressCheckOk,
+                    candidateResetPerformed
+            );
+        } catch (RuntimeException | LinkageError ignored) {
+        }
+    }
+
+    public static void stageAutomaticRouteCandidate(Task rootTask,
+                                                    Task candidateTask,
+                                                    BlockPos selectedTarget,
+                                                    int behaviorGenerationId,
+                                                    boolean selectedNewTarget) {
+        try {
+            MOVEMENTS.stageRouteCandidate(
+                    rootTask,
+                    candidateTask,
+                    selectedTarget,
+                    behaviorGenerationId,
+                    selectedNewTarget
+            );
         } catch (RuntimeException | LinkageError ignored) {
         }
     }
 
     public static void clearPredicateSnapshot() {
-        LAST_PREDICATE_SNAPSHOT.remove();
+        EFFECTS.clearPredicateSnapshot();
     }
 
     public static void observeTargetContainerPredicate(ContainerStoredTracker tracker,
@@ -862,12 +823,13 @@ public final class StoreDepositDiagnostics {
                                                        BlockPos targetContainer,
                                                        Optional<BlockPos> lastInteraction,
                                                        boolean accepted) {
-        try {
-            PredicateSnapshot snapshot = PredicateSnapshot.from(lastInteraction, targetContainer, accepted);
-            LAST_PREDICATE_SNAPSHOT.set(snapshot);
-        } catch (RuntimeException | LinkageError ignored) {
-            LAST_PREDICATE_SNAPSHOT.set(PredicateSnapshot.unavailable());
-        }
+        EFFECTS.observeTargetContainerPredicate(
+                tracker,
+                slot,
+                targetContainer,
+                lastInteraction,
+                accepted
+        );
     }
 
     public static void logEffectObservation(ContainerStoredTracker tracker,
@@ -877,53 +839,37 @@ public final class StoreDepositDiagnostics {
                                             boolean playerInventorySlot,
                                             boolean acceptPredicateEvaluated,
                                             boolean acceptPredicateResult) {
-        if (!ChatClefDiagnostics.isBoundaryEnabled()) {
-            LAST_PREDICATE_SNAPSHOT.remove();
-            return;
-        }
-        try {
-            StoreDepositOperationState state = BINDINGS.stateFor(tracker);
-            TrackerBinding binding = BINDINGS.trackerBinding(tracker);
-            if (state == null) {
-                LAST_PREDICATE_SNAPSHOT.remove();
-                return;
-            }
-            PredicateSnapshot snapshot = LAST_PREDICATE_SNAPSHOT.get();
-            if (snapshot == null) {
-                snapshot = PredicateSnapshot.unavailable();
-            }
-            String outcome = effectOutcome(before, after, playerInventorySlot, acceptPredicateEvaluated, acceptPredicateResult);
-            boolean expectedPositiveEffect = "TARGET_CONTAINER".equals(binding == null ? "UNBOUND" : binding.trackerRole())
-                    && acceptPredicateResult
-                    && positiveDeltaMatchesRequested(state, before, after);
-            state.recordEffectObservation(outcome, expectedPositiveEffect);
-            String key = StoreDepositEventFields.operationId(state) + "|" + (binding == null ? "UNBOUND" : binding.trackerRole()) + "|" + outcome + "|" + ChatClefDiagnostics.slotSummary(slot);
-            if (EMISSION_GATE.shouldEmitDetail(StoreDepositEventFields.operationId(state), "STORE_CONTAINER_EFFECT_OBSERVATION", key)) {
-                ChatClefDiagnostics.logBoundary("STORE_CONTAINER_EFFECT_OBSERVATION",
-                        "store_container_effect_observation",
-                        null,
-                        ChatClefDiagnostics.withCommandContextFields(
-                                StoreDepositEventFields.effectObservationFields(
-                                        state,
-                                        binding,
-                                        tracker,
-                                        slot,
-                                        before,
-                                        after,
-                                        playerInventorySlot,
-                                        acceptPredicateEvaluated,
-                                        acceptPredicateResult,
-                                        snapshot.matchReason(),
-                                        snapshot.lastInteractionPresent(),
-                                        snapshot.lastInteractionPosition(),
-                                        outcome
-                                )
-                        ));
-            }
-        } catch (RuntimeException | LinkageError ignored) {
-        } finally {
-            LAST_PREDICATE_SNAPSHOT.remove();
-        }
+        EFFECTS.logEffectObservation(
+                tracker,
+                slot,
+                before,
+                after,
+                playerInventorySlot,
+                acceptPredicateEvaluated,
+                acceptPredicateResult
+        );
+    }
+
+    public static void logEffectObservation(ContainerStoredTracker tracker,
+                                            Slot slot,
+                                            ItemStack before,
+                                            ItemStack after,
+                                            boolean playerInventorySlot,
+                                            boolean acceptPredicateEvaluated,
+                                            boolean acceptPredicateResult,
+                                            String trackerTotalBefore,
+                                            String trackerTotalAfter) {
+        EFFECTS.logEffectObservation(
+                tracker,
+                slot,
+                before,
+                after,
+                playerInventorySlot,
+                acceptPredicateEvaluated,
+                acceptPredicateResult,
+                trackerTotalBefore,
+                trackerTotalAfter
+        );
     }
 
     public static void logUserBlockRangeNullInput(Object owner, BlockPos observedPosition) {
@@ -936,7 +882,7 @@ public final class StoreDepositDiagnostics {
             if (!EMISSION_GATE.shouldEmitExceptionSignature(signature)) {
                 return;
             }
-            ChatClefDiagnostics.logBoundary("USER_BLOCK_RANGE_NULL_INPUT_OBSERVED",
+            StoreDepositBoundedEventLogger.log("USER_BLOCK_RANGE_NULL_INPUT_OBSERVED",
                     "user_block_range_null_input_observed",
                     null,
                     ChatClefDiagnostics.withCommandContextFields(
@@ -944,71 +890,6 @@ public final class StoreDepositDiagnostics {
                     ));
         } catch (RuntimeException | LinkageError ignored) {
         }
-    }
-
-    private static void emitTerminalSummaryAndPurge(Task rootTask,
-                                                    StoreDepositOperationState state,
-                                                    String terminalTrigger,
-                                                    String diagnosticClassification) {
-        if (state == null || !state.markTerminalFinalized()) {
-            return;
-        }
-        StoreDepositTerminalReservation reservation = EMISSION_GATE.reserveTerminalGroup(StoreDepositEventFields.operationId(state));
-        if (!reservation.reserved()) {
-            if (reservation.exhausted()
-                    && EMISSION_GATE.shouldEmitControl(StoreDepositEventFields.operationId(state), "STORE_DEPOSIT_TERMINAL_GROUP_RESERVE_EXHAUSTED")) {
-                ChatClefDiagnostics.logBoundary("STORE_DEPOSIT_TERMINAL_GROUP_RESERVE_EXHAUSTED",
-                        "store_deposit_terminal_group_reserve_exhausted",
-                        rootTask,
-                        ChatClefDiagnostics.withCommandContextFields(
-                                StoreDepositEventFields.terminalReserveExhaustedFields(
-                                        state,
-                                        terminalTrigger,
-                                        EMISSION_GATE.budgetSummaryFields(StoreDepositEventFields.operationId(state))
-                                )
-                        ));
-            }
-            EMISSION_GATE.purgeOperation(StoreDepositEventFields.operationId(state));
-            BINDINGS.purgeOperation(rootTask);
-            return;
-        }
-        Object[] budgetFields = EMISSION_GATE.budgetSummaryFields(StoreDepositEventFields.operationId(state));
-        Object[] terminalFields = StoreDepositEventFields.terminalSummaryFields(
-                state,
-                terminalTrigger,
-                diagnosticClassification,
-                budgetFields
-        );
-        if (state.context().isDepositAllOperation()) {
-            terminalFields = StoreDepositEventFields.merge(
-                    terminalFields,
-                    StoreContainerCandidateEventFields.routeSummaryFields(state)
-            );
-        }
-        ChatClefDiagnostics.logBoundary("STORE_DEPOSIT_TERMINAL_SUMMARY",
-                "store_deposit_terminal_summary",
-                rootTask,
-                ChatClefDiagnostics.withCommandContextFields(terminalFields));
-        ChatClefDiagnostics.logBoundary("STORE_DEPOSIT_EFFECT_SUMMARY",
-                "store_deposit_effect_summary",
-                rootTask,
-                ChatClefDiagnostics.withCommandContextFields(
-                        StoreDepositEventFields.effectSummaryFields(state, terminalTrigger)
-                ));
-        ChatClefDiagnostics.logBoundary("STORE_BARITONE_OPERATION_SUMMARY",
-                "store_baritone_operation_summary",
-                rootTask,
-                ChatClefDiagnostics.withCommandContextFields(
-                        StoreDepositEventFields.baritoneSummaryFields(state, terminalTrigger)
-                ));
-        ChatClefDiagnostics.logBoundary("STORE_DEPOSIT_DIAGNOSTIC_COVERAGE_SUMMARY",
-                "store_deposit_diagnostic_coverage_summary",
-                rootTask,
-                ChatClefDiagnostics.withCommandContextFields(
-                        StoreDepositEventFields.coverageSummaryFields(state, terminalTrigger, budgetFields)
-                ));
-        EMISSION_GATE.purgeOperation(StoreDepositEventFields.operationId(state));
-        BINDINGS.purgeOperation(rootTask);
     }
 
     private static void emitCheckpointIfDue(Task task, StoreDepositOperationState state) {
@@ -1030,7 +911,7 @@ public final class StoreDepositDiagnostics {
         )) {
             return;
         }
-        ChatClefDiagnostics.logBoundary("STORE_DEPOSIT_CHECKPOINT_SUMMARY",
+        StoreDepositBoundedEventLogger.log("STORE_DEPOSIT_CHECKPOINT_SUMMARY",
                 "store_deposit_checkpoint_summary",
                 task,
                 ChatClefDiagnostics.withCommandContextFields(
@@ -1040,20 +921,6 @@ public final class StoreDepositDiagnostics {
                         )
                 ));
         state.routeState().acknowledgeCheckpointEmission(value.checkpointSequence());
-    }
-
-    private static StoreDepositInteractionContext interactionContext(BlockInteractionContext interaction) {
-        if (!ChatClefDiagnostics.isBoundaryEnabled() || interaction == null) {
-            return null;
-        }
-        try {
-            return INTERACTION_BINDINGS.find(
-                    interaction.interactionId(),
-                    ChatClefDiagnostics.currentClientTickId()
-            );
-        } catch (RuntimeException | LinkageError ignored) {
-            return null;
-        }
     }
 
     private static String rangeDecisionOutcome(boolean closestEvaluated,
@@ -1080,15 +947,6 @@ public final class StoreDepositDiagnostics {
 
     private static String notStoredStateHash(ItemTarget[] notStored) {
         return Integer.toHexString(ChatClefDiagnostics.itemTargets(notStored).hashCode());
-    }
-
-    private static Vec3d diagnosticPlayerPosition() {
-        try {
-            AltoClef mod = AltoClef.getInstance();
-            return mod == null || mod.getPlayer() == null ? null : mod.getPlayer().getPos();
-        } catch (RuntimeException | LinkageError ignored) {
-            return null;
-        }
     }
 
     private static Object fieldValue(Object[] fields, String key) {
@@ -1124,64 +982,4 @@ public final class StoreDepositDiagnostics {
         return retained;
     }
 
-    private static String diagnosticPosition(Object candidate) {
-        return candidate instanceof BlockPos position ? position.toShortString() : className(candidate);
-    }
-
-    private static String className(Object value) {
-        return value == null ? "none" : value.getClass().getName();
-    }
-
-    private static String reconciliationRole(Task parent, String lifecycleRole) {
-        if ("ROOT_STORE".equals(lifecycleRole)) {
-            return "ROOT_ROUTE";
-        }
-        String className = parent == null ? "" : parent.getClass().getName();
-        if (className.endsWith(".DoToClosestBlockTask")) {
-            return "TARGET_ACTION";
-        }
-        if (className.contains(".tasks.container.")) {
-            return "CRAFT_OR_TRANSFER_ROUTE";
-        }
-        return "DESCENDANT";
-    }
-
-    private static String effectOutcome(ItemStack before,
-                                        ItemStack after,
-                                        boolean playerInventorySlot,
-                                        boolean acceptPredicateEvaluated,
-                                        boolean acceptPredicateResult) {
-        if (playerInventorySlot) {
-            return "REJECT_PLAYER_INVENTORY_SLOT";
-        }
-        if (acceptPredicateEvaluated && !acceptPredicateResult) {
-            return "REJECT_TARGET_PREDICATE";
-        }
-        if (!acceptPredicateResult) {
-            return "ACCEPT_ZERO_DELTA";
-        }
-        if (before != null && after != null && before.getItem() != after.getItem()) {
-            return "ACCEPT_ITEM_REPLACEMENT";
-        }
-        int delta = (after == null ? 0 : after.getCount()) - (before == null ? 0 : before.getCount());
-        if (delta > 0) {
-            return "ACCEPT_POSITIVE_DELTA";
-        }
-        if (delta < 0) {
-            return "ACCEPT_NEGATIVE_DELTA";
-        }
-        return "ACCEPT_ZERO_DELTA";
-    }
-
-    private static boolean positiveDeltaMatchesRequested(StoreDepositOperationState state,
-                                                         ItemStack before,
-                                                         ItemStack after) {
-        if (state == null || after == null || after.isEmpty()) {
-            return false;
-        }
-        if (before != null && !before.isEmpty() && before.getItem() == after.getItem()) {
-            return after.getCount() - before.getCount() > 0 && state.matchesRequestedItem(after.getItem());
-        }
-        return after.getCount() > 0 && state.matchesRequestedItem(after.getItem());
-    }
 }

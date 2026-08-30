@@ -9,7 +9,9 @@ import adris.altoclef.util.ItemTarget;
 import adris.altoclef.util.helpers.ItemHelper;
 import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.slots.Slot;
+import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 import lavi.minecraft.diagnostics.container.store.deposit.StoreDepositDiagnostics;
+import lavi.minecraft.diagnostics.container.store.deposit.transfer.StoreDepositTransferSelectionSnapshot;
 import net.minecraft.block.Block;
 import net.minecraft.block.Blocks;
 import net.minecraft.item.ItemStack;
@@ -52,11 +54,21 @@ public class StoreInContainerTask extends AbstractDoToStorageContainerTask {
             storedItems = new ContainerStoredTracker(slot -> {
                 Optional<BlockPos> openContainer = AltoClef.getInstance().getItemStorage().getLastBlockPosInteraction();
                 boolean accepted = openContainer.isPresent() && openContainer.get().equals(targetContainer);
-                StoreDepositDiagnostics.observeTargetContainerPredicate(this.storedItems, slot, targetContainer, openContainer, accepted);
+                if (ChatClefDiagnostics.isBoundaryEnabled()) {
+                    StoreDepositDiagnostics.observeTargetContainerPredicate(
+                            this.storedItems,
+                            slot,
+                            targetContainer,
+                            openContainer,
+                            accepted
+                    );
+                }
                 return accepted;
             });
         }
-        StoreDepositDiagnostics.bindTargetTracker(this, storedItems, targetContainer);
+        if (ChatClefDiagnostics.isBoundaryEnabled()) {
+            StoreDepositDiagnostics.bindTargetTracker(this, storedItems, targetContainer);
+        }
         storedItems.startTracking();
     }
 
@@ -105,8 +117,18 @@ public class StoreInContainerTask extends AbstractDoToStorageContainerTask {
                     return null;
                 }
                 setDebugState("Moving to slot...");
+                Task transferCandidate = new MoveItemToSlotFromInventoryTask(target, toMoveTo.get());
                 StoreDepositDiagnostics.logTransferDecision(this, targetContainer, target, potentials.size(), true, true, true, "MOVE_TASK_SELECTED");
-                return new MoveItemToSlotFromInventoryTask(target, toMoveTo.get());
+                //20260730_kpopmodder: Added diagnostic logging to prove the Carry On interaction failure boundary.
+                stageAutomaticTransferCandidateDiagnostics(
+                        transferCandidate,
+                        target,
+                        bestPotential.get(),
+                        stackIn,
+                        toMoveTo.get(),
+                        potentials.size()
+                );
+                return transferCandidate;
             }
             StoreDepositDiagnostics.logTransferDecision(this, targetContainer, target, potentials.size(), false, false, false, "NO_SOURCE_SLOT");
             setDebugState("SHOULD NOT HAPPEN! No valid items detected.");
@@ -114,6 +136,32 @@ public class StoreInContainerTask extends AbstractDoToStorageContainerTask {
         StoreDepositDiagnostics.logTransferDecision(this, targetContainer, null, 0, false, false, false, unstoredTargets.length == 0 ? "NO_TARGET_REMAINING" : "NO_TRANSFER_CANDIDATE_FOUND");
         setDebugState("SHOULD NOT HAPPEN! All items stored but we're still trying.");
         return null;
+    }
+
+    private void stageAutomaticTransferCandidateDiagnostics(Task transferCandidate,
+                                                            ItemTarget target,
+                                                            Slot selectedSource,
+                                                            ItemStack selectedSourceStack,
+                                                            Slot destination,
+                                                            int potentialSourceSlotCount) {
+        try {
+            if (!StoreDepositDiagnostics.hasAutomaticTaskContext(this)) {
+                return;
+            }
+            StoreDepositDiagnostics.stageAutomaticTransferCandidate(
+                    this,
+                    transferCandidate,
+                    StoreDepositTransferSelectionSnapshot.captureWithoutDestinationStack(
+                            targetContainer,
+                            target,
+                            selectedSource,
+                            selectedSourceStack,
+                            destination,
+                            potentialSourceSlotCount
+                    )
+            );
+        } catch (RuntimeException | LinkageError ignored) {
+        }
     }
 
     @Override

@@ -8,11 +8,14 @@ import adris.altoclef.tasksystem.TaskChain;
 import adris.altoclef.tasksystem.TaskRunner;
 import adris.altoclef.util.ItemTarget;
 import lavi.minecraft.diagnostics.container.store.deposit.StoreDepositDiagnostics;
+import lavi.minecraft.task.container.deposit.auto.composition.DepositAllInventoryPressureChainPreparation;
 import lavi.minecraft.task.container.deposit.auto.maintenance.AutoDepositMaintenanceTask;
 import lavi.minecraft.task.container.deposit.auto.policy.AutoDepositDecisionFingerprint;
 import lavi.minecraft.task.container.deposit.auto.policy.AutoDepositPlan;
 import lavi.minecraft.task.container.deposit.auto.policy.AutoDepositPlanningResult;
+import lavi.minecraft.task.container.deposit.auto.policy.diagnostics.AutoDepositPolicyDiagnostics;
 import lavi.minecraft.task.container.deposit.auto.policy.AutoDepositPolicyEngine;
+import lavi.minecraft.task.container.deposit.auto.pressure.AutoDepositInventoryPressureSource;
 import lavi.minecraft.task.container.deposit.auto.trusted.AutoDepositTrustedDestinationRepository;
 import lavi.minecraft.task.container.deposit.auto.trusted.interaction.AutoDepositExactOpenContainerBinding;
 import lavi.minecraft.task.container.deposit.auto.working.ActiveTaskWorkingSetResolver;
@@ -28,7 +31,7 @@ public final class DepositAllInventoryPressureChain extends SingleTaskChain {
 
     private final AltoClef mod;
     private final TaskRunner runner;
-    private final DepositAllInventoryPressureReader pressureReader;
+    private final AutoDepositInventoryPressureSource pressureSource;
     private final DepositAllInventoryPressureStateMachine stateMachine;
     private final DepositAllAutoConflictGuard conflictGuard;
     private final ActiveTaskWorkingSetResolver workingSetResolver;
@@ -41,26 +44,30 @@ public final class DepositAllInventoryPressureChain extends SingleTaskChain {
     private long lastNoSafeEpoch;
     private long waitingTrustedRevision;
     private long activeRunTrustedRevision = -1L;
+    private Task activeDiagnosticMaintenanceTask;
 
     public DepositAllInventoryPressureChain(TaskRunner runner) {
-        this(runner, AutoDepositPolicyEngine.inMemoryDefault());
+        this(DepositAllInventoryPressureChainPreparation.prepare(
+                runner,
+                AutoDepositPolicyEngine.inMemoryDefault()
+        ));
     }
 
     public DepositAllInventoryPressureChain(TaskRunner runner,
                                             AutoDepositPolicyEngine policyEngine) {
-        this(runner, policyEngine, policyEngine.trustedRepository());
+        this(DepositAllInventoryPressureChainPreparation.prepare(runner, policyEngine));
     }
 
     public DepositAllInventoryPressureChain(
             TaskRunner runner,
             AutoDepositPolicyEngine policyEngine,
             AutoDepositTrustedDestinationRepository trustedRepository) {
-        this(
+        this(DepositAllInventoryPressureChainPreparation.prepare(
                 runner,
                 policyEngine,
                 trustedRepository,
                 AutoDepositExactOpenContainerBinding.UNAVAILABLE
-        );
+        ));
     }
 
     public DepositAllInventoryPressureChain(
@@ -68,25 +75,34 @@ public final class DepositAllInventoryPressureChain extends SingleTaskChain {
             AutoDepositPolicyEngine policyEngine,
             AutoDepositTrustedDestinationRepository trustedRepository,
             AutoDepositExactOpenContainerBinding exactOpenContainerBinding) {
-        super(Objects.requireNonNull(runner, "runner"));
-        this.runner = runner;
-        mod = Objects.requireNonNull(runner.getMod(), "mod");
-        this.policyEngine = Objects.requireNonNull(policyEngine, "policyEngine");
-        this.trustedRepository = Objects.requireNonNull(trustedRepository, "trustedRepository");
-        if (this.policyEngine.trustedRepository() != this.trustedRepository) {
-            throw new IllegalArgumentException(
-                    "automatic policy and execution must share one trusted repository"
-            );
-        }
-        this.exactOpenContainerBinding = Objects.requireNonNull(
-                exactOpenContainerBinding,
-                "exactOpenContainerBinding"
+        this(DepositAllInventoryPressureChainPreparation.prepare(
+                runner,
+                policyEngine,
+                trustedRepository,
+                exactOpenContainerBinding
+        ));
+    }
+
+    private DepositAllInventoryPressureChain(
+            DepositAllInventoryPressureChainPreparation preparation) {
+        super(preparation.runner());
+        runner = preparation.runner();
+        mod = preparation.mod();
+        pressureSource = preparation.pressureSource();
+        stateMachine = preparation.stateMachine();
+        conflictGuard = preparation.conflictGuard();
+        workingSetResolver = preparation.workingSetResolver();
+        policyEngine = preparation.policyEngine();
+        trustedRepository = preparation.trustedRepository();
+        exactOpenContainerBinding = preparation.exactOpenContainerBinding();
+        waitingTrustedRevision = preparation.initialTrustedRevision();
+    }
+
+    static DepositAllInventoryPressureChain commit(
+            DepositAllInventoryPressureChainPreparation preparation) {
+        return new DepositAllInventoryPressureChain(
+                Objects.requireNonNull(preparation, "preparation")
         );
-        pressureReader = new DepositAllInventoryPressureReader();
-        stateMachine = new DepositAllInventoryPressureStateMachine();
-        conflictGuard = new DepositAllAutoConflictGuard();
-        workingSetResolver = new ActiveTaskWorkingSetResolver();
-        waitingTrustedRevision = trustedRepository.revision();
     }
 
     @Override
@@ -105,12 +121,19 @@ public final class DepositAllInventoryPressureChain extends SingleTaskChain {
         }
         if (stateMachine.state() == DepositAllInventoryPressureState.RUNNING) {
             if (mainTask == null) {
+                if (activeDiagnosticMaintenanceTask != null) {
+                    StoreDepositDiagnostics.recordAutomaticMaintenanceTerminal(
+                            activeDiagnosticMaintenanceTask,
+                            "RUNNING_TASK_MISSING",
+                            "UNAVAILABLE_MAINTENANCE_TASK"
+                    );
+                }
                 transitionRunToWaiting("running_task_missing", currentSnapshot(), null);
             }
             return;
         }
 
-        Optional<DepositAllInventoryPressureSnapshot> snapshotOptional = pressureReader.read(mod);
+        Optional<DepositAllInventoryPressureSnapshot> snapshotOptional = pressureSource.read(mod);
         if (snapshotOptional.isEmpty()) {
             return;
         }
@@ -162,10 +185,15 @@ public final class DepositAllInventoryPressureChain extends SingleTaskChain {
         }
 
         UserTaskChain userTaskChain = mod.getUserTaskChain();
-        boolean activeUserTask = userTaskChain != null
-                && userTaskChain.isActive()
+        Task userTaskRoot = userTaskChain == null
+                ? null
+                : userTaskChain.getCurrentTask();
+        boolean activeUserTask = userTaskRoot != null
                 && !userTaskChain.isRunningIdleTask();
-        Task userTaskRoot = activeUserTask ? userTaskChain.getCurrentTask() : null;
+
+        if (suppressExistingStoreHome(snapshot, userTaskChain, userTaskRoot)) {
+            return;
+        }
 
         if (activeUserTask && runner.getCurrentTaskChain() != userTaskChain) {
             latchNoSafe(
@@ -179,7 +207,7 @@ public final class DepositAllInventoryPressureChain extends SingleTaskChain {
             return;
         }
 
-        if (conflictGuard.hasExistingDepositTask(mod)) {
+        if (conflictGuard.hasExistingDepositTask(userTaskRoot)) {
             DepositAllInventoryPressureSignal signal = stateMachine.observe(snapshot);
             if (signal == DepositAllInventoryPressureSignal.THRESHOLD_REACHED) {
                 transitionArmedToWaiting("existing_deposit_task", snapshot, userTaskRoot);
@@ -205,6 +233,15 @@ public final class DepositAllInventoryPressureChain extends SingleTaskChain {
         }
 
         AutoDepositPlanningResult planning = policyEngine.plan(mod, snapshot, workingSet);
+        if (planning.status() != AutoDepositPlanningResult.Status.READY) {
+            AutoDepositPolicyDiagnostics.log(
+                    planning.diagnosticPlan().orElse(null),
+                    snapshot,
+                    planning.status().name(),
+                    planning.reason(),
+                    userTaskRoot
+            );
+        }
         if (planning.status() == AutoDepositPlanningResult.Status.CONTEXT_CHANGED) {
             deferChanged(planning.reason(), snapshot, userTaskRoot);
             return;
@@ -229,6 +266,30 @@ public final class DepositAllInventoryPressureChain extends SingleTaskChain {
         }
 
         startPlan(snapshot, planning.plan().orElseThrow());
+    }
+
+    //20260829_kpopmodder: Suppress automatic storage from the exact StoreHome root before selected-chain admission.
+    boolean suppressExistingStoreHome(
+            DepositAllInventoryPressureSnapshot snapshot,
+            UserTaskChain userTaskChain,
+            Task capturedRoot) {
+        if (snapshot == null
+                || !snapshot.isAtOrAboveThreshold()
+                || stateMachine.state() != DepositAllInventoryPressureState.ARMED
+                || userTaskChain == null
+                || capturedRoot == null
+                || userTaskChain.isRunningIdleTask()
+                || userTaskChain.getCurrentTask() != capturedRoot
+                || !conflictGuard.isStoreHomeRoot(capturedRoot)) {
+            return false;
+        }
+        stateMachine.observe(snapshot);
+        transitionArmedToWaiting(
+                "existing_store_home_task",
+                snapshot,
+                capturedRoot
+        );
+        return true;
     }
 
     private void observeLowWater(DepositAllInventoryPressureSnapshot snapshot) {
@@ -260,22 +321,24 @@ public final class DepositAllInventoryPressureChain extends SingleTaskChain {
         activeRunTrustedRevision = trustedRepository.revision();
         clearDeferredFingerprint();
         clearNoSafeContext();
+        if (task.diagnosticAutomaticRunEnabled()) {
+            activeDiagnosticMaintenanceTask = task;
+            StoreDepositDiagnostics.beginAutomaticRun(
+                    task,
+                    plan.context().userTaskRoot(),
+                    plan.context().epoch(),
+                    null
+            );
+        }
         DepositAllAutoDiagnostics.logPolicyPlan(plan, task);
-        startTask(pressure, plan.allTargets(), task, task.primaryDepositTask());
+        AutoDepositPolicyDiagnostics.log(plan, pressure, "READY", "ready", task);
+        startTask(pressure, plan.allTargets(), task);
     }
 
     private void startTask(DepositAllInventoryPressureSnapshot snapshot,
                            ItemTarget[] targets,
-                           Task chainTask,
-                           Task diagnosticDepositTask) {
+                           Task chainTask) {
         boolean runnerWasActive = runner.isActive();
-        StoreDepositDiagnostics.registerBareDepositInvocation(
-                mod,
-                false,
-                targets,
-                diagnosticDepositTask,
-                "AUTO_DEPOSIT_ALL_CHAIN"
-        );
         setTask(chainTask);
         DepositAllInventoryPressureState previousState = stateMachine.state();
         stateMachine.markRunStarted();
@@ -365,6 +428,14 @@ public final class DepositAllInventoryPressureChain extends SingleTaskChain {
                 : trustedRepository.revision();
         activeRunTrustedRevision = -1L;
         DepositAllAutoDiagnostics.logTransition(previousState, stateMachine.state(), reason, snapshot, task);
+        if (activeDiagnosticMaintenanceTask != null) {
+            StoreDepositDiagnostics.recordAutomaticPressureRunClosed(
+                    activeDiagnosticMaintenanceTask,
+                    reason,
+                    stateMachine.state().name()
+            );
+            activeDiagnosticMaintenanceTask = null;
+        }
     }
 
     private void stopOwnedRun(String reason, Task interruptingTask) {
@@ -380,7 +451,7 @@ public final class DepositAllInventoryPressureChain extends SingleTaskChain {
     }
 
     private DepositAllInventoryPressureSnapshot currentSnapshot() {
-        return pressureReader.read(mod).orElse(null);
+        return pressureSource.read(mod).orElse(null);
     }
 
     private Task currentUserTaskRoot() {

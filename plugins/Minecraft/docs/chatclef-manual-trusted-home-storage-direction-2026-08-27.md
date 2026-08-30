@@ -21,10 +21,13 @@
 <!-- 20260829_openai: Corrected the final direct-test topology, timeout decision-order scope, and observed-runtime evidence boundary. -->
 <!-- 20260829_openai: Recorded registry parity, direct STORE_HOME semantic gates, and the new clean forced build without extending deployment or runtime claims. -->
 <!-- 20260829_openai: Reconciled the final record with the latest clean build, deployed artifact, runtime completion, and source commit evidence. -->
+<!-- 20260829_openai: Clarified that STORE_HOME remains explicit-request-only while any automatic pressure-deposit restoration is a separate, still-disabled subsystem. -->
+<!-- 20260829_openai: Reconciled the independent automatic-pressure review with STORE_HOME invariants while preserving the current disabled source status and avoiding any false restoration claim. -->
+<!-- 20260829_kpopmodder: Recorded the separately authorized automatic-pressure composition restoration while preserving STORE_HOME behavior and keeping build/runtime evidence open. -->
 
 # ChatClef Manual Trusted Home Storage Direction
 
-문서 상태: `CORE_V1_RUNTIME_VERIFIED_H6_CHAT_RUNTIME_VERIFIED_MIC_PENDING_SESSION_LOCAL_MANIFEST_RUNTIME_VERIFIED_LONG_DISTANCE_TIMEOUT_CAUSE_PROVEN_PHASE_SCOPED_TIMEOUT_OBSERVED_HAPPY_PATH_VERIFIED_PARITY_UNPROVEN_PYTHON_COMMAND_CATALOG_PARITY_VERIFIED_STORE_HOME_DIRECT_TESTS_VERIFIED_LATEST_CLEAN_BUILD_VERIFIED_SOURCE_COMMITS_CREATED`
+문서 상태: `CORE_V1_RUNTIME_VERIFIED_H6_CHAT_RUNTIME_VERIFIED_MIC_PENDING_SESSION_LOCAL_MANIFEST_RUNTIME_VERIFIED_LONG_DISTANCE_TIMEOUT_CAUSE_PROVEN_PHASE_SCOPED_TIMEOUT_OBSERVED_HAPPY_PATH_VERIFIED_PARITY_UNPROVEN_PYTHON_COMMAND_CATALOG_PARITY_VERIFIED_STORE_HOME_DIRECT_TESTS_VERIFIED_LATEST_CLEAN_BUILD_VERIFIED_SOURCE_COMMITS_CREATED_AUTO_PRESSURE_SOURCE_RESTORED_TEST_VERIFIED_BUILD_RUNTIME_PENDING`
 
 작성 기준일: 2026-08-27, 상태 갱신일: 2026-08-29
 
@@ -794,36 +797,172 @@ Operation accumulator는 `StoreHomeTask`의 좁은 필드 집합 또는 작은 L
 collaborator로 구현할 수 있다. 새 manager/service framework는 만들지 않으며 local
 manifest를 교체해도 operation 누계를 초기화하지 않는다.
 
-## 16. 기존 inventory-pressure chain 처리
+## 16. 기존 inventory-pressure chain과의 공존
 
-사용자의 explicit request-only 요구와 automatic trigger는 양립할 수 없다.
-
-권장 상태는 다음과 같다.
+`STORE_HOME`의 explicit-request-only activation과 별도의 automatic inventory-pressure
+subsystem은 공존할 수 있다. 양립할 수 없는 것은 inventory pressure가 `StoreHomeTask`를
+자동 생성하거나 StoreHome planner, manifest, timeout, exact-slot executor 또는 terminal
+contract를 automatic execution에 재사용하는 구조다.
 
 ```text
-automatic source:
-    현재 조사와 rollback을 위해 보존 가능
+STORE_HOME
+    activation: explicit user request only
+    owner: UserTaskChain / StoreHomeTask
+    destination: exact trusted destination only
+    policy: manual home loadout policy
+    timeout/result: StoreHome-owned
 
-automatic entrypoint registration:
-    disabled
-
-end-client-tick pressure observation:
-    disabled
-
-automatic Task creation:
-    explicit future enable 전에는 불가능
-
-STORE_HOME dependency on automatic chain:
-    none
+automatic inventory-pressure deposit
+    activation: occupied-slot high-water policy
+    owner: DepositAllInventoryPressureChain / AutoDepositMaintenanceTask
+    destination: automatic safe-surplus and trusted-only policy
+    success: actual free-slot postcondition
+    StoreHomeTask creation or behavior reuse: forbidden
 ```
 
-planner가 빈 결과를 반환하도록 두는 것만으로는 충분하지 않다. 사용자의 요청이
-없을 때 inventory snapshot, threshold observation과 automatic root creation 자체가
-일어나지 않는 것을 test로 고정해야 한다.
+2026-08-27의 automatic entrypoint disable은 manual V1을 고립해 구현하기 위한 당시의
+composition gate로 보존한다. 이를 `STORE_HOME`이 존재하는 동안 모든 automatic pressure
+기능이 영구 금지된다는 제품 계약으로 확대하지 않는다. 동시에 독립 subsystem이 공존
+가능하다는 설계 판정을 현재 source에서 이미 복구됐다는 완료 주장으로 바꾸지 않는다.
 
-기존 automatic source를 삭제할지는 수동 V1 구현과 분리된 후속 cleanup 결정이다.
-기존 dirty worktree의 lifecycle, diagnostics와 test 변경을 새 manual feature와 한
-diff에서 광범위하게 삭제하지 않는다.
+현재 상태는 다음과 같다.
+
+```text
+automatic pressure chain production construction: exactly 1 per AutoDepositRuntime
+automatic pressure chain tick: active after exact-binding tracker tick
+forward-only restoration contract: documented
+forward-only restoration implementation: source restored; focused/targeted tests passed
+restoration clean build / JAR / Minecraft runtime: not run
+STORE_HOME dependency on automatic chain: none
+STORE_HOME explicit-request-only behavior: preserved
+```
+
+기존 automatic source를 삭제하거나 리팩터링할지는 복구와 분리된 후속 결정이다. 현재 dirty
+worktree의 lifecycle, diagnostics와 test 변경을 이 composition 작업과 한 diff에서 삭제,
+이동 또는 흡수하지 않는다.
+
+### 16.1 2026-08-29 automatic pressure conflict 계약
+
+현재 source root cause와 forward-only 복구 게이트의 canonical owner는
+[ChatClef @deposit_all Ocean Loop Diagnostics Plan](chatclef-deposit-all-ocean-loop-diagnostics-plan-2026-08-26.md)의
+§28이다. 이 문서는 StoreHome 쪽 불변조건만 고정한다.
+
+```text
+공유하는 runtime-scoped identity
+    AutoDepositTrustedDestinationRepository
+    AutoDepositOpenContainerBindingTracker
+    TaskRunner
+
+공유하지 않는 operation behavior
+    StoreHome planner, manifest, timeout and terminal result
+    automatic pressure state machine and NO_SAFE latch
+    automatic immutable plan and maintenance phases
+    manual @deposit_all selector
+```
+
+Automatic side는 current `UserTaskChain`의 non-idle root가 exact `StoreHomeTask`이면 selected
+chain 검사나 working-set resolution보다 먼저 user-owned storage conflict로 처리한다.
+
+```text
+StoreHome root assigned
+    -> automatic task submission 0
+    -> NO_SAFE_SURPLUS 오분류 0
+    -> existing_store_home_task suppression
+    -> 기존 storage-conflict WAIT_FOR_REARM contract
+```
+
+권위는 selected chain이나 cached task path가 아니라 current UserTask root object identity다.
+`StoreHomeTask.isActive()`, phase, timeout, current child, manifest, exact binding과 diagnostic
+generation을 conflict 식별자로 사용하지 않는다. 첫 tick 전 root도 conflict이며, one-tick
+observation을 suppression 뒤 보관해 stale root를 계속 막지 않는다.
+
+Safety chain이 StoreHome을 선점해도 UserTaskChain의 root identity는 유지된다. 이 시간에는
+StoreHome candidate, operation 또는 interaction clock을 소비하지 않고, safety 종료 뒤 같은
+StoreHome root가 선택돼야 한다. Automatic chain은 StoreHome callback, result, timeout 또는
+cleanup을 소유하지 않는다.
+
+Automatic run이 먼저 시작된 뒤 StoreHome request가 제출되면 automatic maintenance의
+immutable context mismatch 또는 automatic-chain interruption 경계가 automatic-owned root만
+종료한다. Context mismatch가 발생한 tick과 `SingleTaskChain`이 terminal root를 clear하는
+reconciliation tick은 다를 수 있다. Context-mismatch 경로에서는 phase-specific
+child/container work보다 mismatch 검사가 먼저다. Safety interruption 경로에서는 mismatch
+검사 없이 `onInterrupt()/stopOwnedRun()`이 automatic-owned run을 종료한다. 두 경로 모두
+그 이후 automatic child/container work와 click은 `0`이어야 한다.
+
+StoreHome conflict를 기존 `WAIT_FOR_REARM`으로 처리하는 최소 복구에서는 StoreHome이 slot
+relief 없이 종료돼도 automatic deposit이 즉시 재평가되지 않는다. 즉시 재평가가 필요하면
+별도 상태와 승인을 요구하며 StoreHome 문서에 숨겨 추가하지 않는다.
+
+Automatic pressure composition 복구는 이 문서의 StoreHome behavior 변경 승인이 아니다.
+다음은 그대로 유지한다.
+
+```text
+StoreHome explicit-request-only
+StoreHomeTask exactly one root per accepted request
+StoreHome timeout and terminal precedence
+exact trusted-only destination
+no general-container fallback
+manual @deposit_all independence
+TaskRunner, UserTaskChain, Task and Baritone shared behavior unchanged
+```
+
+### 16.2 2026-08-29 automatic composition 복구 뒤 StoreHome 보존 증거
+
+§16.1의 별도 automatic subsystem 복구가 승인되어 production source에 적용됐다. 이 변경은
+StoreHome 쪽 planner, execution state, timeout lifecycle, exact transfer, terminal outcome 또는
+command submission source를 수정하지 않았다. Automatic side가 의존하는 StoreHome type 정보는
+current non-idle `UserTaskChain` root의 exact `instanceof StoreHomeTask` 분류 하나뿐이다.
+
+같은 runtime-scoped repository와 exact-binding tracker를 trusted commands, StoreHome factory와
+automatic chain이 공유하지만, operation-scoped context/plan/Task/manifest는 서로 공유하지 않는다.
+따라서 automatic pressure가 `StoreHomeTask`를 만들거나 StoreHome timeout과 result를 재사용하는
+경로는 열리지 않았다.
+
+현재 direct/integration evidence는 다음과 같다.
+
+```text
+StoreHome root assigned before its first tick
+    -> production automatic callback submission 0
+    -> NO_SAFE_SURPLUS latch 0
+    -> WAIT_FOR_REARM
+    -> actual TaskRunner first eligible selection preserves the exact StoreHome root
+
+StoreHome assigned during an automatic run
+    -> immutable context mismatch before automatic child/container work
+    -> automatic root reconciled and cleared
+    -> exact submitted StoreHome root selected
+
+safety preempts an active automatic run after StoreHome assignment
+    -> automatic-owned root/child stop exactly once
+    -> StoreHome remains inactive while safety owns selection
+    -> safety end hands off to the same StoreHome root
+    -> TaskRunner.disable calls 0
+```
+
+2026-08-29 current test result:
+
+```text
+automatic focused: 26 classes, 62 tests, 48 executed, 14 existing registry-free fixture aborts,
+                   failures 0, errors 0
+automatic + manual DepositAll + StoreHome targeted:
+                   38 classes, 93 tests, 79 executed, 14 existing registry-free fixture aborts,
+                   failures 0, errors 0
+final targeted test graph: 46/46 tasks executed in 2m 26s with --rerun-tasks;
+                           no per-test retry
+test weakening, failure deselection or retry: none
+```
+
+14건은 registry-free `Item` identity 생성이 불가능한 기존 fixture abort다. 이번 결과는
+automatic composition, exact StoreHome decision order와 TaskRunner handoff의 current
+실행 증거지만, item-dependent hard protection/reserve/classification/planner case가 현재
+JUnit에서 실행됐다는 뜻은 아니다. 해당 policy source는 이번 복구에서 변경하지 않았다.
+
+이 수치는 source/test evidence이며 이번 restoration의 clean forced build나 runtime artifact
+증거가 아니다. 최신 build/JAR/runtime 기록인 §26.14는 그 당시 STORE_HOME artifact의 역사적
+증거로 유지되지만, 현재 automatic source가 포함된 새 artifact provenance를 증명하지 않는다.
+따라서 이번 restoration에는 `BUILD_PASSED_CURRENT=false`,
+`RUNTIME_PATH_PROVEN_CURRENT=false`, `artifactParity=PARITY_UNPROVEN`을 적용한다. Planner
+`[64,32]` 문제도 automatic composition과 분리된 후속 change unit으로 남는다.
 
 ## 17. Terminal result
 
@@ -969,7 +1108,7 @@ summary count로 억제됐다. 상세 event/field, artifact qualifier와 runtime
 
 | Scenario | Expected |
 | --- | --- |
-| inventory 36/36, 사용자 요청 없음 | storage Task와 trusted 이동 0 |
+| inventory 36/36, 사용자 요청 없음 | STORE_HOME Task와 StoreHome-owned trusted 이동 0. 별도 automatic pressure subsystem은 §16/automatic 문서의 독립 matrix로 검증 |
 | `@store_home` 입력 | 정확히 한 manual UserTask 생성 |
 | 기존 `@get` 중 `@store_home` | 기존 UserTask 정상 교체, 자동 재개 없음 |
 | command 수락 시 cursor stack 존재 | inventory mutation 없이 `CURSOR_NOT_EMPTY` |

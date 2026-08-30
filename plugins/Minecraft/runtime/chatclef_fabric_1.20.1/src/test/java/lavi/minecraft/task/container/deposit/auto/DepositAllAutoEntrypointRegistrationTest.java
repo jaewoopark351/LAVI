@@ -5,6 +5,8 @@ import adris.altoclef.tasksystem.TaskChain;
 import adris.altoclef.tasksystem.TaskRunner;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lavi.minecraft.task.container.deposit.auto.policy.AutoDepositPolicyEngine;
+import lavi.minecraft.task.container.deposit.auto.policy.AutoDepositPolicyLoader;
 import lavi.minecraft.task.container.deposit.auto.trusted.AutoDepositTrustedDestinationRepository;
 import org.junit.jupiter.api.Test;
 
@@ -14,10 +16,13 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class DepositAllAutoEntrypointRegistrationTest {
     private static final String ENTRYPOINT_CLASS =
@@ -45,7 +50,7 @@ class DepositAllAutoEntrypointRegistrationTest {
     }
 
     @Test
-    void lazyRegistrationCreatesOneRuntimeAndNoAutomaticPressureChain() {
+    void lazyRegistrationCreatesOneRuntimeAndOneAutomaticPressureChain() {
         Field instanceField = field(AltoClef.class, "instance");
         Object previousInstance = get(instanceField, null);
         try {
@@ -55,9 +60,10 @@ class DepositAllAutoEntrypointRegistrationTest {
             set(instanceField, null, mod);
             AutoDepositTrustedDestinationRepository repository =
                     AutoDepositTrustedDestinationRepository.inMemoryEmpty();
+            AutoDepositPolicyEngine engine = engine(repository);
 
             DepositAllAutoEntrypoint entrypoint = new DepositAllAutoEntrypoint(
-                    ignored -> AutoDepositRuntime.create(mod, repository)
+                    ignored -> AutoDepositRuntime.create(mod, repository, engine)
             );
             invokeRegisterIfReady(entrypoint);
             AutoDepositRuntime firstRuntime = registeredRuntime(entrypoint);
@@ -65,12 +71,70 @@ class DepositAllAutoEntrypointRegistrationTest {
 
             assertSame(firstRuntime, registeredRuntime(entrypoint));
             assertSame(repository, firstRuntime.trustedRepository());
+            assertSame(engine, firstRuntime.policyEngine());
+            assertEquals(1, registeredChains(runner).stream()
+                    .filter(DepositAllInventoryPressureChain.class::isInstance)
+                    .count());
+            assertSame(firstRuntime.pressureChain(), registeredChains(runner).stream()
+                    .filter(DepositAllInventoryPressureChain.class::isInstance)
+                    .findFirst()
+                    .orElseThrow());
+        } finally {
+            set(instanceField, null, previousInstance);
+        }
+    }
+
+    @Test
+    void failedPreparationLeavesNoOrphanAndControlledRetryRegistersExactlyOnce() {
+        Field instanceField = field(AltoClef.class, "instance");
+        Object previousInstance = get(instanceField, null);
+        try {
+            TestAltoClef mod = new TestAltoClef();
+            TaskRunner runner = new TaskRunner(mod);
+            mod.runner = runner;
+            set(instanceField, null, mod);
+            AutoDepositTrustedDestinationRepository repository =
+                    AutoDepositTrustedDestinationRepository.inMemoryEmpty();
+            AutoDepositTrustedDestinationRepository mismatchedRepository =
+                    AutoDepositTrustedDestinationRepository.inMemoryEmpty();
+            AutoDepositPolicyEngine matchingEngine = engine(repository);
+            AutoDepositPolicyEngine mismatchedEngine = engine(mismatchedRepository);
+            AtomicInteger attempts = new AtomicInteger();
+
+            DepositAllAutoEntrypoint entrypoint = new DepositAllAutoEntrypoint(ignored -> {
+                AutoDepositPolicyEngine selected = attempts.getAndIncrement() == 0
+                        ? mismatchedEngine
+                        : matchingEngine;
+                return AutoDepositRuntime.create(mod, repository, selected);
+            });
+
+            assertThrows(AssertionError.class, () -> invokeRegisterIfReady(entrypoint));
+            assertNull(registeredRuntime(entrypoint));
             assertEquals(0, registeredChains(runner).stream()
+                    .filter(DepositAllInventoryPressureChain.class::isInstance)
+                    .count());
+
+            invokeRegisterIfReady(entrypoint);
+            AutoDepositRuntime runtime = registeredRuntime(entrypoint);
+            invokeRegisterIfReady(entrypoint);
+
+            assertNotNull(runtime);
+            assertSame(runtime, registeredRuntime(entrypoint));
+            assertEquals(2, attempts.get());
+            assertEquals(1, registeredChains(runner).stream()
                     .filter(DepositAllInventoryPressureChain.class::isInstance)
                     .count());
         } finally {
             set(instanceField, null, previousInstance);
         }
+    }
+
+    private static AutoDepositPolicyEngine engine(
+            AutoDepositTrustedDestinationRepository repository) {
+        return new AutoDepositPolicyEngine(
+                new AutoDepositPolicyLoader().loadOrFailClosed(),
+                repository
+        );
     }
 
     private static void invokeRegisterIfReady(DepositAllAutoEntrypoint entrypoint) {

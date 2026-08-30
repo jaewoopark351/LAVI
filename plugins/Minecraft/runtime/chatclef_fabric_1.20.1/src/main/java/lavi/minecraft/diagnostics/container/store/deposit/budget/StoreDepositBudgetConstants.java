@@ -10,7 +10,8 @@ public final class StoreDepositBudgetConstants {
     public static final int MAX_TERMINAL_GROUPS = 8;
     public static final int TERMINAL_GROUP_EVENT_COUNT = 4;
     public static final int MAX_LATE_SUMMARIES = 8;
-    public static final int MAX_CONTROL_EVENTS = 8;
+    public static final int MAX_CONTROL_EVENTS = 7;
+    public static final int MAX_COVERAGE_SUPPRESSION_SUMMARIES = 1;
     public static final int MAX_KEY_LENGTH = 360;
 
     private StoreDepositBudgetConstants() {

@@ -39,6 +39,10 @@ public final class StoreDepositOperationContext {
                 || "AUTO_DEPOSIT_ALL_CHAIN".equals(requestSource);
     }
 
+    public boolean isAutomaticDepositOperation() {
+        return "AUTO_DEPOSIT_ALL_CHAIN".equals(requestSource);
+    }
+
     public Task rootTask() {
         return rootTask;
     }

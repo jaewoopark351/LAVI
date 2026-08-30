@@ -7,6 +7,7 @@ import adris.altoclef.tasks.container.StoreInAnyContainerTask;
 import adris.altoclef.tasks.container.StoreInContainerTask;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.tasksystem.TaskRunner;
+import lavi.minecraft.task.container.home.execution.StoreHomeTask;
 import org.junit.jupiter.api.Test;
 import sun.misc.Unsafe;
 
@@ -33,6 +34,18 @@ class DepositAllAutoConflictGuardTest {
         setChild(parent, allocate(DepositAllTask.class));
 
         assertTrue(hasConflict(parent));
+    }
+
+    @Test
+    void recognizesOnlyAnExactStoreHomeRootWithoutTreatingItsParentAsStoreHome() {
+        StoreHomeTask storeHome = allocate(StoreHomeTask.class);
+        UnrelatedTask parent = new UnrelatedTask();
+        setChild(parent, storeHome);
+
+        assertTrue(guard.isStoreHomeRoot(storeHome));
+        assertFalse(guard.isStoreHomeRoot(parent));
+        assertFalse(guard.hasExistingDepositTask(storeHome));
+        assertFalse(guard.hasExistingDepositTask(parent));
     }
 
     private boolean hasConflict(Task task) {

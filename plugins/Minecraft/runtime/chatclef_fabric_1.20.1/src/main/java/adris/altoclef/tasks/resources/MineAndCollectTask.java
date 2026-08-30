@@ -18,8 +18,8 @@ import adris.altoclef.util.slots.CursorSlot;
 import adris.altoclef.util.slots.PlayerSlot;
 import adris.altoclef.util.time.TimerGame;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
-import lavi.minecraft.diagnostics.mining.BaritonePathDiagnosticSnapshot;
 import lavi.minecraft.diagnostics.mining.MiningPathDiagnostics;
+import lavi.minecraft.diagnostics.mining.cancel.PreCancelBaritoneState;
 import lavi.minecraft.diagnostics.tasktrace.VisibleTaskDiagnostics;
 import lavi.minecraft.integration.mining.MiningToolReadiness;
 import net.minecraft.block.Block;
@@ -319,7 +319,11 @@ public class MineAndCollectTask extends ResourceTask {
         protected Task onTick() {
             AltoClef mod = AltoClef.getInstance();
 
-            if (mod.getClientBaritone().getPathingBehavior().isPathing()) {
+            //20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
+            // Preserve the existing pathing read and pass only its already-computed reset provenance to diagnostics.
+            boolean progressResetObservedBeforeCheck =
+                    mod.getClientBaritone().getPathingBehavior().isPathing();
+            if (progressResetObservedBeforeCheck) {
                 progressChecker.reset();
             }
             boolean progressCheckEvaluated = miningPos != null;
@@ -333,6 +337,8 @@ public class MineAndCollectTask extends ResourceTask {
                         1,
                         true,
                         progressCheckResult,
+                        progressResetObservedBeforeCheck,
+                        progressResetObservedBeforeCheck ? "BARITONE_PATHING" : "NOT_RESET",
                         progressCheckResult ? "PASS" : "PROGRESS_FAILURE",
                         false,
                         "not_destroy_move_checker",
@@ -346,7 +352,7 @@ public class MineAndCollectTask extends ResourceTask {
                         "miningPos=" + ChatClefDiagnostics.blockPos(miningPos),
                         "miningPos", ChatClefDiagnostics.blockPos(miningPos),
                         "blacklistSizeBefore", blacklist.size());
-                BaritonePathDiagnosticSnapshot cancelBefore = MiningPathDiagnostics.captureBaritoneSnapshot(mod, miningPos, null, "unavailable");
+                PreCancelBaritoneState cancelBefore = MiningPathDiagnostics.capturePreCancelBaritoneState(mod);
                 mod.getClientBaritone().getPathingBehavior().forceCancel();
                 MiningPathDiagnostics.logExistingCancelBoundary(mod, this, miningPos, "MINE_OR_COLLECT_PROGRESS_FAILURE", cancelBefore);
                 Debug.logMessage("Failed to mine block. Suggesting it may be unreachable.");
@@ -373,8 +379,10 @@ public class MineAndCollectTask extends ResourceTask {
                     miningPos = null;
                     progressChecker.reset();
                     Task requirementTask = new SatisfyMiningRequirementTask(_requirement, targetState);
+                    //20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
+                    // Reuse the behavior-owned block-state read instead of re-reading the world for diagnostics.
                     MiningPathDiagnostics.logMineTargetGoalRequest(mod, this, newPos, previousMiningPos, miningPos,
-                            localBlacklistedBefore, blacklist.size(), _blocks, _requirement, readiness,
+                            localBlacklistedBefore, blacklist.size(), _blocks, _requirement, targetState, readiness,
                             "RETURN_TARGET_TOOL_REQUIREMENT_TASK", requirementTask);
                     VisibleTaskDiagnostics.logReturnTask(mod, this, requirementTask, "mine_or_collect_return_target_tool_requirement_task",
                             "targetPosition=" + ChatClefDiagnostics.blockPos(newPos) + "|requirement=" + _requirement,
@@ -393,12 +401,10 @@ public class MineAndCollectTask extends ResourceTask {
                 miningPos = newPos;
                 Task destroyTask = new DestroyBlockTask(miningPos);
                 MiningPathDiagnostics.logMineTargetGoalRequest(mod, this, newPos, previousMiningPos, miningPos,
-                        localBlacklistedBefore, blacklist.size(), _blocks, _requirement, readiness,
+                        localBlacklistedBefore, blacklist.size(), _blocks, _requirement, targetState, readiness,
                         "RETURN_DESTROY_BLOCK_TASK", destroyTask);
-                VisibleTaskDiagnostics.logReturnTask(mod, this, destroyTask, "mine_or_collect_return_destroy_block_task",
-                        "miningPos=" + ChatClefDiagnostics.blockPos(miningPos),
-                        "miningPos", ChatClefDiagnostics.blockPos(miningPos),
-                        "targetBlockState", targetState);
+                //20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
+                // TASK_CHILD_RECONCILIATION owns candidate-versus-active evidence without candidate-identity log churn.
                 return destroyTask;
             }
             if (obj instanceof ItemEntity) {

@@ -1,6 +1,7 @@
 package lavi.minecraft.task.container.deposit.auto;
 
 import adris.altoclef.AltoClef;
+import lavi.minecraft.task.container.deposit.auto.pressure.AutoDepositInventoryPressureSource;
 import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.item.ItemStack;
 
@@ -8,7 +9,9 @@ import java.util.Objects;
 import java.util.Optional;
 
 //20260826_kpopmodder: Added client-thread main-inventory occupancy observation for automatic deposit_all.
-public final class DepositAllInventoryPressureReader {
+//20260829_kpopmodder: Expose that unchanged observation through the automatic-only read port.
+public final class DepositAllInventoryPressureReader implements AutoDepositInventoryPressureSource {
+    @Override
     public Optional<DepositAllInventoryPressureSnapshot> read(AltoClef mod) {
         Objects.requireNonNull(mod, "mod");
         if (mod.getPlayer() == null) {

@@ -4,11 +4,11 @@ import baritone.pathing.path.PathExecutor;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 
 //20260806_kpopmodder: Expose read-only Baritone executor fields for path adoption diagnostics.
-final class BaritoneExecutorDiagnosticSnapshot {
+public final class BaritoneExecutorDiagnosticSnapshot {
     private BaritoneExecutorDiagnosticSnapshot() {
     }
 
-    static Object[] fields(String role, PathExecutor executor) {
+    public static Object[] fields(String role, PathExecutor executor) {
         String prefix = role + "Executor";
         return new Object[]{
                 prefix + "Present", executor != null,

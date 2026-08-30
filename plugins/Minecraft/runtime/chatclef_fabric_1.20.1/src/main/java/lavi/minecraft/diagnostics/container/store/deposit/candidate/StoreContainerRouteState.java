@@ -64,6 +64,12 @@ public final class StoreContainerRouteState {
     private String lastParentSemanticKey = "NONE";
     private String lastFilteredSemanticKey = "NONE";
     private String lastPursuitSemanticKey = "NONE";
+    private long selectedCandidateGenerationSequence;
+    private long selectedCandidateGeneration;
+    private BlockPos selectedCandidatePosition;
+    private long progressCheckInvocationSequence;
+    private RouteCandidateStage pendingRouteCandidate;
+    private long activeRouteCandidateGeneration;
 
     public StoreContainerRouteState(long startTick) {
         this.startTick = startTick;
@@ -271,6 +277,87 @@ public final class StoreContainerRouteState {
         return resourceAcquisitionInterruptedByBranchChange;
     }
 
+    public synchronized RouteMovementObservation recordMovementObservation(
+            BlockPos selectedTargetBefore,
+            String invalidationReason,
+            boolean progressCheckEvaluated,
+            boolean progressCheckOk,
+            boolean candidateResetPerformed) {
+        long invocationId = progressCheckEvaluated ? ++progressCheckInvocationSequence : -1L;
+        long generationBefore = selectedCandidateGeneration;
+        BlockPos targetBefore = selectedTargetBefore == null
+                ? selectedCandidatePosition
+                : selectedTargetBefore;
+        boolean invalidated = invalidationReason != null && !"NONE".equals(invalidationReason);
+        if (invalidated && candidateResetPerformed) {
+            selectedCandidateGeneration = 0L;
+            selectedCandidatePosition = null;
+            pendingRouteCandidate = null;
+            semanticVersion++;
+        }
+        return new RouteMovementObservation(
+                invocationId,
+                progressCheckEvaluated,
+                progressCheckOk,
+                normalize(invalidationReason, "NONE"),
+                targetBefore,
+                selectedCandidatePosition,
+                generationBefore,
+                selectedCandidateGeneration,
+                candidateResetPerformed
+        );
+    }
+
+    public synchronized RouteCandidateStage stageRouteCandidate(Object candidateTask,
+                                                                BlockPos selectedTarget,
+                                                                int behaviorGenerationId,
+                                                                boolean selectedNewTarget) {
+        if (selectedTarget != null
+                && (selectedNewTarget
+                || selectedCandidateGeneration <= 0
+                || !selectedTarget.equals(selectedCandidatePosition))) {
+            selectedCandidateGeneration = ++selectedCandidateGenerationSequence;
+            selectedCandidatePosition = selectedTarget.toImmutable();
+            semanticVersion++;
+        }
+        pendingRouteCandidate = new RouteCandidateStage(
+                candidateTask,
+                selectedCandidateGeneration,
+                selectedCandidatePosition,
+                behaviorGenerationId
+        );
+        return pendingRouteCandidate;
+    }
+
+    public synchronized RouteCandidateReconciliation reconcileRouteCandidate(
+            Object candidateTask,
+            boolean subTasksEqual,
+            boolean replacementApplied,
+            Object activeChildAfter) {
+        RouteCandidateStage staged = pendingRouteCandidate;
+        if (staged == null || staged.candidateTask() != candidateTask) {
+            return RouteCandidateReconciliation.unavailable(activeRouteCandidateGeneration);
+        }
+        String outcome;
+        if (replacementApplied && activeChildAfter == candidateTask) {
+            activeRouteCandidateGeneration = staged.selectedCandidateGeneration();
+            outcome = "CANDIDATE_INSTALLED";
+        } else if (subTasksEqual) {
+            outcome = "EQUAL_CANDIDATE_DISCARDED_ACTIVE_RETAINED";
+        } else {
+            outcome = "CANDIDATE_NOT_INSTALLED";
+        }
+        pendingRouteCandidate = null;
+        return new RouteCandidateReconciliation(
+                true,
+                staged.selectedCandidateGeneration(),
+                activeRouteCandidateGeneration,
+                staged.behaviorGenerationId(),
+                staged.selectedTarget(),
+                outcome
+        );
+    }
+
     public synchronized boolean isCurrentRouteChild(Object task) {
         return currentRouteChild != null && currentRouteChild == task;
     }
@@ -395,6 +482,14 @@ public final class StoreContainerRouteState {
         return activeStoreAttemptSequence;
     }
 
+    public synchronized long selectedCandidateGeneration() {
+        return selectedCandidateGeneration;
+    }
+
+    public synchronized long activeRouteCandidateGeneration() {
+        return activeRouteCandidateGeneration;
+    }
+
     public synchronized long activeStoreAttemptCandidateDecisionSequence() {
         return activeStoreAttemptCandidateDecisionSequence;
     }
@@ -510,5 +605,40 @@ public final class StoreContainerRouteState {
 
     private static String identity(Object value) {
         return value == null ? "none" : Integer.toHexString(System.identityHashCode(value));
+    }
+
+    public record RouteMovementObservation(long progressCheckInvocationId,
+                                           boolean progressCheckEvaluated,
+                                           boolean progressCheckOk,
+                                           String invalidationReason,
+                                           BlockPos selectedTargetBefore,
+                                           BlockPos selectedTargetAfter,
+                                           long selectedCandidateGenerationBefore,
+                                           long selectedCandidateGenerationAfter,
+                                           boolean candidateResetPerformed) {
+    }
+
+    public record RouteCandidateStage(Object candidateTask,
+                                      long selectedCandidateGeneration,
+                                      BlockPos selectedTarget,
+                                      int behaviorGenerationId) {
+    }
+
+    public record RouteCandidateReconciliation(boolean available,
+                                               long stagedCandidateGeneration,
+                                               long activeCandidateGeneration,
+                                               int behaviorGenerationId,
+                                               BlockPos selectedTarget,
+                                               String outcome) {
+        public static RouteCandidateReconciliation unavailable(long activeCandidateGeneration) {
+            return new RouteCandidateReconciliation(
+                    false,
+                    -1L,
+                    activeCandidateGeneration,
+                    -1,
+                    null,
+                    "UNAVAILABLE"
+            );
+        }
     }
 }

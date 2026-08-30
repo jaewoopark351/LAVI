@@ -28,6 +28,11 @@ final class DestroyBlockDiagnosticState {
         return STATES.computeIfAbsent(task, ignored -> new State(++nextRunId, ChatClefDiagnostics.currentClientTickId(), -1));
     }
 
+    static Object runIdIfPresent(DestroyBlockTask task) {
+        State state = STATES.get(task);
+        return state == null ? "UNAVAILABLE_NOT_STARTED" : state.runId;
+    }
+
     static void updateObservedProgress(AltoClef mod, BlockPos target, State state) {
         if (mod == null || state == null) {
             return;

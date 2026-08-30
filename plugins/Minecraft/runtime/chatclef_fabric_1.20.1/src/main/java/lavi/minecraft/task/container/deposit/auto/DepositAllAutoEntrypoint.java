@@ -9,7 +9,8 @@ import java.util.Objects;
 import java.util.function.Function;
 
 //20260826_kpopmodder: Register and drive the LAVI-owned automatic deposit_all chain after AltoClef initialization.
-//20260827_kpopmodder: Disable that pressure chain while keeping the manual trusted-storage runtime alive.
+//20260827_kpopmodder: Previously disabled the pressure chain while isolating the manual trusted-storage runtime.
+//20260829_kpopmodder: Publish the fully prepared runtime before any diagnostic-only follow-up can fail.
 public final class DepositAllAutoEntrypoint implements ModInitializer {
     private final Function<AltoClef, AutoDepositRuntime> runtimeFactory;
     private AutoDepositRuntime runtime;
@@ -49,7 +50,7 @@ public final class DepositAllAutoEntrypoint implements ModInitializer {
                 runtimeFactory.apply(mod),
                 "runtimeFactory returned null"
         );
-        createdRuntime.registerCommands(mod);
         runtime = createdRuntime;
+        DepositAllAutoDiagnostics.logRegistered(DepositAllInventoryPressureChain.PRIORITY);
     }
 }

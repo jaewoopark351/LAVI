@@ -88,17 +88,19 @@ public final class AutoDepositPolicyEngine {
         if (!context.matches(mod)
                 || !context.taskPathFingerprint().equals(currentTaskPathFingerprint(mod))
                 || !exactBefore.equals(exactInventoryFingerprint(stackReader.read(mod)))) {
-            return AutoDepositPlanningResult.failed(
+            return AutoDepositPlanningResult.failedAfterPlan(
                     AutoDepositPlanningResult.Status.CONTEXT_CHANGED,
                     "automatic_plan_context_changed",
-                    captureGateFingerprint(mod)
+                    captureGateFingerprint(mod),
+                    plan
             );
         }
         if (!definition.loaded()) {
-            return AutoDepositPlanningResult.failed(
+            return AutoDepositPlanningResult.failedAfterPlan(
                     AutoDepositPlanningResult.Status.POLICY_UNAVAILABLE,
                     "automatic_policy_unavailable",
-                    plan.fingerprint()
+                    plan.fingerprint(),
+                    plan
             );
         }
         if (!plan.hasTargets() || plan.expectedFreedSlots() <= 0) {

@@ -2,8 +2,13 @@ package lavi.minecraft.task.container.deposit.auto.policy;
 
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.Dimension;
+import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.diagnostics.container.store.deposit.terminal.StoreDepositAutomaticContext;
+import lavi.minecraft.task.container.deposit.auto.DepositAllInventoryPressureSnapshot;
 import lavi.minecraft.task.container.deposit.auto.maintenance.AutoDepositMaintenancePhase;
 import lavi.minecraft.task.container.deposit.auto.maintenance.AutoDepositMaintenanceTask;
+import lavi.minecraft.task.container.deposit.auto.policy.diagnostics.AutoDepositPolicyItemSnapshot;
+import lavi.minecraft.task.container.deposit.auto.policy.diagnostics.AutoDepositPolicySnapshot;
 import lavi.minecraft.task.container.deposit.auto.trusted.AutoDepositTrustedDestination;
 import lavi.minecraft.task.container.deposit.auto.trusted.AutoDepositTrustedDestinationCandidate;
 import lavi.minecraft.task.container.deposit.auto.trusted.AutoDepositTrustedDestinationRepository;
@@ -11,6 +16,7 @@ import lavi.minecraft.task.container.deposit.auto.working.WorkingSetSnapshot;
 import lavi.minecraft.testsupport.TestItems;
 import net.minecraft.item.Item;
 import net.minecraft.util.math.BlockPos;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -19,11 +25,18 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AutoDepositPlanBuilderTest {
+    @AfterEach
+    void disableDiagnostics() {
+        ChatClefDiagnostics.setBoundaryEnabled(false);
+    }
+
     @Test
     void excludesAnEntireItemTypeWhenProtectedAndPlainStacksAreMixed() {
+        ChatClefDiagnostics.setBoundaryEnabled(true);
         Item chestplate = TestItems.item();
         AutoDepositStackSnapshot selected = AutoDepositPolicyTestFixtures.stack(
                 chestplate, "minecraft:iron_chestplate", 1, 0, true, false, false,
@@ -45,10 +58,59 @@ class AutoDepositPlanBuilderTest {
 
         assertFalse(plan.hasTargets());
         assertEquals(AutoDepositDisposition.HARD_PROTECTED, plan.dispositions().get(chestplate));
+
+        AutoDepositPolicyItemSnapshot decision = plan.policyItemDecisions().get(0);
+        assertEquals(2, decision.physicalStacks().size());
+        assertTrue(decision.physicalStacks().get(0).hardProtected());
+        assertFalse(decision.physicalStacks().get(1).hardProtected());
+        assertEquals("NOT_EVALUATED_HARD_PROTECTION", decision.classificationConfidence());
+        assertEquals("NOT_EVALUATED_HARD_PROTECTION", decision.classificationProvenance());
+        assertTrue(decision.observationComplete());
+
+        AutoDepositPlan sameInventoryDifferentTrustedRevision = builder.finish(
+                draft, Optional.empty(), 2L, "none"
+        );
+        StoreDepositAutomaticContext automaticContext = new StoreDepositAutomaticContext(
+                true,
+                12L,
+                1L,
+                "auto-deposit-12",
+                "auto-deposit-12-maintenance-1",
+                "auto-deposit-12-child-1",
+                0,
+                "auto-deposit-12-pressure-run-1"
+        );
+        DepositAllInventoryPressureSnapshot pressure =
+                new DepositAllInventoryPressureSnapshot(2, 36);
+        AutoDepositPolicySnapshot firstSnapshot = AutoDepositPolicySnapshot.capture(
+                plan, pressure, "READY", "ready", automaticContext
+        );
+        AutoDepositPolicySnapshot secondSnapshot = AutoDepositPolicySnapshot.capture(
+                sameInventoryDifferentTrustedRevision,
+                pressure,
+                "READY",
+                "ready",
+                automaticContext
+        );
+        assertEquals(firstSnapshot.inventorySnapshotId(), secondSnapshot.inventorySnapshotId());
+        assertNotEquals(firstSnapshot.autoPlanId(), secondSnapshot.autoPlanId());
+        assertEquals("auto-deposit-12", firstSnapshot.automaticContext().autoOperationId());
+        assertEquals(2, firstSnapshot.itemDecisions().get(0).physicalStacks().size());
+        assertTrue(firstSnapshot.observationComplete());
+
+        AutoDepositPlanningResult diagnosticFailure = AutoDepositPlanningResult.failedAfterPlan(
+                AutoDepositPlanningResult.Status.CONTEXT_CHANGED,
+                "context_changed_after_plan",
+                plan.fingerprint(),
+                plan
+        );
+        assertTrue(diagnosticFailure.plan().isEmpty());
+        assertEquals(plan, diagnosticFailure.diagnosticPlan().orElseThrow());
     }
 
     @Test
     void usesMaxOfWorkingSetAndCategoryReserveInsteadOfAddingThem() {
+        ChatClefDiagnostics.setBoundaryEnabled(true);
         Item logs = TestItems.item();
         AutoDepositStackSnapshot surplusStack = AutoDepositPolicyTestFixtures.stack(
                 logs, "minecraft:oak_log", 64, 0, false, false, false,
@@ -96,6 +158,98 @@ class AutoDepositPlanBuilderTest {
 
         assertEquals(Integer.valueOf(16), plan.protectedCounts().get(logs));
         assertEquals(64, plan.generalTargets()[0].getTargetCount());
+        AutoDepositPolicyItemSnapshot decision = plan.policyItemDecisions().get(0);
+        assertFalse(decision.observationComplete());
+        assertTrue(decision.missingBoundaries().contains("WORKING_SET_RESERVATION_PROVENANCE"));
+        assertTrue(decision.missingBoundaries().contains("CATEGORY_RESERVE_REASON"));
+        assertTrue(decision.missingBoundaries().contains("CLASSIFICATION_CONFIDENCE"));
+        assertTrue(decision.missingBoundaries().contains("CLASSIFICATION_PROVENANCE"));
+    }
+
+    @Test
+    void omitsDiagnosticPolicyPayloadWhenDiagnosticsAreOff() {
+        ChatClefDiagnostics.setBoundaryEnabled(false);
+        Item logs = TestItems.item();
+        AutoDepositStackSnapshot stack = AutoDepositPolicyTestFixtures.stack(
+                logs, "minecraft:oak_log", 64, 0, false, false, false,
+                AutoDepositItemRole.NONE, 0
+        );
+        AutoDepositPolicyDefinition definition = AutoDepositPolicyTestFixtures.definition();
+        AutoDepositHardProtectionResult hard =
+                new AutoDepositHardProtectionPolicy(definition).evaluate(List.of(stack));
+        AutoDepositPlanBuilder builder = builder(definition);
+
+        AutoDepositPlan plan = builder.finish(
+                builder.prepare(idleContext(), List.of(stack), hard, Map.of(), 1, 1),
+                Optional.empty(),
+                0L,
+                "not_required"
+        );
+
+        assertTrue(plan.hasTargets());
+        assertTrue(plan.policyItemDecisions().isEmpty());
+        assertEquals("UNAVAILABLE_DIAGNOSTICS_OFF", plan.diagnosticInventoryFingerprint());
+        AutoDepositPolicySnapshot lateSnapshot = AutoDepositPolicySnapshot.capture(
+                plan,
+                new DepositAllInventoryPressureSnapshot(1, 36),
+                "READY",
+                "late_diagnostics_enable",
+                StoreDepositAutomaticContext.unavailable()
+        );
+        assertFalse(lateSnapshot.observationComplete());
+        assertEquals(
+                "POLICY_DECISIONS_NOT_RETAINED_DIAGNOSTICS_OFF",
+                lateSnapshot.missingBoundaries()
+        );
+    }
+
+    @Test
+    void retainsNonMainOnlyPhysicalFactsAsExplicitDiagnosticExclusions() {
+        ChatClefDiagnostics.setBoundaryEnabled(true);
+        Item shield = TestItems.item();
+        AutoDepositStackSnapshot offhand = AutoDepositPolicyTestFixtures.stackAt(
+                shield,
+                "minecraft:shield",
+                1,
+                40,
+                AutoDepositStackLocation.OFFHAND,
+                false,
+                false,
+                false,
+                AutoDepositItemRole.NONE,
+                0
+        );
+        AutoDepositPolicyDefinition definition = AutoDepositPolicyTestFixtures.definition();
+        AutoDepositHardProtectionResult hard =
+                new AutoDepositHardProtectionPolicy(definition).evaluate(List.of(offhand));
+        AutoDepositPlanBuilder builder = builder(definition);
+
+        AutoDepositPlan plan = builder.finish(
+                builder.prepare(idleContext(), List.of(offhand), hard, Map.of(), 1, 1),
+                Optional.empty(),
+                0L,
+                "not_required"
+        );
+        AutoDepositPolicySnapshot snapshot = AutoDepositPolicySnapshot.capture(
+                plan,
+                new DepositAllInventoryPressureSnapshot(1, 36),
+                "READY",
+                "non_main_only",
+                StoreDepositAutomaticContext.unavailable()
+        );
+
+        assertFalse(plan.hasTargets());
+        assertEquals(1, plan.policyItemDecisions().size());
+        AutoDepositPolicyItemSnapshot decision = plan.policyItemDecisions().get(0);
+        assertEquals("EXCLUDED", decision.decision());
+        assertEquals("EXCLUDED_NON_MAIN_INVENTORY", decision.decisionReason());
+        assertEquals(1, decision.physicalStacks().size());
+        assertEquals("OFFHAND", decision.physicalStacks().get(0).location());
+        assertTrue(decision.observationComplete());
+        assertTrue(snapshot.observationComplete());
+        assertEquals(1, snapshot.itemDecisions().stream()
+                .mapToInt(item -> item.physicalStacks().size())
+                .sum());
     }
 
     @Test

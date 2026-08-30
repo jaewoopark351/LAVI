@@ -21,8 +21,8 @@ import baritone.api.pathing.goals.GoalNear;
 import baritone.api.utils.Rotation;
 import baritone.api.utils.input.Input;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
-import lavi.minecraft.diagnostics.mining.BaritonePathDiagnosticSnapshot;
 import lavi.minecraft.diagnostics.mining.MiningPathDiagnostics;
+import lavi.minecraft.diagnostics.mining.cancel.PreCancelBaritoneState;
 import lavi.minecraft.diagnostics.tasktrace.VisibleTaskDiagnostics;
 import net.minecraft.block.*;
 import adris.altoclef.multiversion.versionedfields.Blocks;
@@ -236,7 +236,7 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
                 "cursorStack", ChatClefDiagnostics.safeValue(StorageHelper::getItemStackInCursorSlot));
 
         // Cancel any ongoing pathing behavior.
-        BaritonePathDiagnosticSnapshot cancelBefore = MiningPathDiagnostics.captureBaritoneSnapshot(mod, pos, null, "unavailable");
+        PreCancelBaritoneState cancelBefore = MiningPathDiagnostics.capturePreCancelBaritoneState(mod);
         mod.getClientBaritone().getPathingBehavior().forceCancel();
         MiningPathDiagnostics.logExistingCancelBoundary(mod, this, pos, "DESTROY_ON_START", cancelBefore);
         MiningPathDiagnostics.logDestroyLifetimeStart(mod, this, pos, "DESTROY_ON_START", cancelBefore);
@@ -315,7 +315,11 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
         }
 
         // Reset the move checker if Baritone is currently pathing
-        if (mod.getClientBaritone().getPathingBehavior().isPathing()) {
+        //20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
+        // Preserve the existing pathing read and pass only its already-computed reset provenance to diagnostics.
+        boolean moveResetObservedBeforeCheck =
+                mod.getClientBaritone().getPathingBehavior().isPathing();
+        if (moveResetObservedBeforeCheck) {
             VisibleTaskDiagnostics.logProgress(mod, this, "destroy_block_pathing_active_reset_move_checker",
                     "targetPosition=" + ChatClefDiagnostics.blockPos(pos),
                     "targetPosition", ChatClefDiagnostics.blockPos(pos));
@@ -381,6 +385,8 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
                 1,
                 true,
                 moveCheckFirstResult,
+                moveResetObservedBeforeCheck,
+                moveResetObservedBeforeCheck ? "BARITONE_PATHING" : "NOT_RESET",
                 moveCheckFirstResult ? "PASS" : "MOVE_CHECK_FAILED",
                 true,
                 moveCheckFirstResult,
@@ -397,6 +403,8 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
                     1,
                     true,
                     stuckCheckResult,
+                    false,
+                    "NOT_RESET",
                     stuckCheckResult ? "PASS" : "STUCK_CHECK_FAILED",
                     true,
                     moveCheckFirstResult,
@@ -432,6 +440,8 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
                 2,
                 true,
                 moveCheckSecondResult,
+                moveResetObservedBeforeCheck,
+                moveResetObservedBeforeCheck ? "BARITONE_PATHING" : "NOT_RESET",
                 moveCheckSecondResult ? "PASS" : "MOVE_CHECK_FAILED",
                 true,
                 moveCheckFirstResult,
@@ -603,7 +613,7 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
                 "interruptTask", ChatClefDiagnostics.taskSummary(interruptTask));
 
         // Cancel Baritone pathing
-        BaritonePathDiagnosticSnapshot cancelBefore = MiningPathDiagnostics.captureBaritoneSnapshot(mod, pos, null, "unavailable");
+        PreCancelBaritoneState cancelBefore = MiningPathDiagnostics.capturePreCancelBaritoneState(mod);
         mod.getClientBaritone().getPathingBehavior().forceCancel();
         MiningPathDiagnostics.logExistingCancelBoundary(mod, this, pos, "DESTROY_ON_STOP", cancelBefore);
         MiningPathDiagnostics.logDestroyPhaseTransition(mod, this, pos, "TASK_INTERRUPTED", false, false);
@@ -645,12 +655,12 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
      */
     @Override
     public boolean isFinished() {
-        BlockState blockState = AltoClef.getInstance().getWorld().getBlockState(pos);
+        AltoClef mod = AltoClef.getInstance();
+        BlockState blockState = mod.getWorld().getBlockState(pos);
         boolean isAir = blockState.isAir();
-        Debug.logInternal("Block at position " + pos + " is air: " + isAir);
-        VisibleTaskDiagnostics.logFinishedCheck(AltoClef.getInstance(), this, isAir, "destroy_block_is_finished",
-                "targetPosition", ChatClefDiagnostics.blockPos(pos),
-                "targetBlockState", ChatClefDiagnostics.safeValue(() -> blockState));
+        //20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
+        // Project the behavior-owned state read and result without invoking the finish predicate again.
+        MiningPathDiagnostics.logDestroyFinishEvaluation(mod, this, pos, blockState, isAir);
         return isAir;
     }
 
@@ -673,8 +683,8 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
             }
         }
 
-        // Log the result of the equality check
-        Debug.logInternal("isEqual result: " + isSame);
+        //20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
+        // Equality is observed once by TASK_CHILD_RECONCILIATION; do not emit an unbounded duplicate here.
 
         // Return the result of the equality check
         return isSame;

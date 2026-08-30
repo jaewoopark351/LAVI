@@ -1,5 +1,7 @@
 package lavi.minecraft.testsupport;
 
+import net.minecraft.Bootstrap;
+import net.minecraft.SharedConstants;
 import sun.reflect.ReflectionFactory;
 
 import java.lang.reflect.Constructor;
@@ -31,6 +33,12 @@ public final class TestObjects {
         } catch (ReflectiveOperationException | RuntimeException e) {
             return allocateUnsafe(type, e);
         }
+    }
+
+    public static <T> T allocateBootstrapped(Class<T> type) {
+        SharedConstants.createGameVersion();
+        Bootstrap.initialize();
+        return allocate(type);
     }
 
     private static <T> T allocateUnsafe(Class<T> type, Throwable reflectionFailure) {

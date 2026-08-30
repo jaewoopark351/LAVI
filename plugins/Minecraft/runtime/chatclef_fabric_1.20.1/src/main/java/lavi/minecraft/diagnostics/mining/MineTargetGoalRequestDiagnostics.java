@@ -6,10 +6,10 @@ import adris.altoclef.tasks.resources.MineAndCollectTask;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.MiningRequirement;
 import adris.altoclef.util.helpers.StorageHelper;
-import adris.altoclef.util.helpers.WorldHelper;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 import lavi.minecraft.integration.mining.MiningToolReadiness;
 import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
 import net.minecraft.util.math.BlockPos;
 
 import java.util.Arrays;
@@ -28,6 +28,7 @@ final class MineTargetGoalRequestDiagnostics {
                     int localBlacklistSize,
                     Block[] requestedBlocks,
                     MiningRequirement requestedRequirement,
+                    BlockState targetState,
                     MiningToolReadiness.Readiness readiness,
                     String decisionOutcome,
                     Task returnedTask) {
@@ -37,22 +38,24 @@ final class MineTargetGoalRequestDiagnostics {
         String targetPosition = ChatClefDiagnostics.blockPos(target);
         String previousPosition = ChatClefDiagnostics.blockPos(previousMiningPos);
         String relation = MineTargetPositionRelation.classify(previousMiningPos, target);
-        String scannerUnreachable = ChatClefDiagnostics.safeValue(() ->
-                mod != null && target != null && mod.getBlockScanner().isUnreachable(target));
+        String scannerUnreachableBefore = ChatClefDiagnostics.safeValue(() ->
+                mod == null || target == null
+                        ? "unavailable"
+                        : mod.getBlockScanner().isUnreachable(target));
         String fingerprint = MiningDiagnosticEmitter.joinFingerprint(
                 "MINE_TARGET_GOAL_REQUEST",
                 targetPosition,
                 previousPosition,
                 relation,
                 decisionOutcome,
+                scannerUnreachableBefore,
                 Boolean.toString(localBlacklistContainsBefore),
-                scannerUnreachable,
                 MiningDiagnosticEmitter.taskClass(returnedTask)
         );
-        MiningDiagnosticEmitter.emit("MINE_TARGET_GOAL_REQUEST", "mine_target_goal_request", task,
+        MiningDiagnosticEmitter.emitLazy("MINE_TARGET_GOAL_REQUEST", "mine_target_goal_request", task,
                 "mine_target_goal_request|" + System.identityHashCode(task),
                 fingerprint,
-                new Object[]{
+                () -> new Object[]{
                         "owner", "mine_target_goal_request_observer",
                         "trigger", "before_mine_or_collect_goal_task_return",
                         "decisionOutcome", decisionOutcome,
@@ -69,12 +72,13 @@ final class MineTargetGoalRequestDiagnostics {
                         "previousToTargetChebyshevDistance", MineTargetPositionRelation.chebyshevDistance(previousMiningPos, target),
                         "previousToTargetSquaredDistance", MineTargetPositionRelation.squaredDistance(previousMiningPos, target),
                         "requestedBlockIds", Arrays.toString(requestedBlocks),
-                        "targetBlockId", ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(target).getBlock()),
-                        "targetBlockState", ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(target)),
-                        "blockStillMatchesRequestedType", ChatClefDiagnostics.safeValue(() -> mod.getBlockScanner().isBlockAtPosition(target, requestedBlocks)),
+                        "targetBlockId", targetState == null ? "unavailable" : targetState.getBlock(),
+                        "targetBlockState", targetState == null ? "unavailable" : targetState,
+                        "targetStateCaptureSource", "EXISTING_GET_GOAL_TASK_LOCAL",
+                        "blockStillMatchesRequestedType", matchesRequestedBlock(targetState, requestedBlocks),
                         "chunkLoaded", ChatClefDiagnostics.safeValue(() -> mod.getChunkTracker().isChunkLoaded(target)),
-                        "worldCanBreak", ChatClefDiagnostics.safeValue(() -> WorldHelper.canBreak(target)),
-                        "scannerUnreachableBefore", scannerUnreachable,
+                        "worldCanBreak", "NOT_CAPTURED_WITHOUT_BEHAVIOR_REEVALUATION",
+                        "scannerUnreachableBefore", scannerUnreachableBefore,
                         "localBlacklistContainsBefore", localBlacklistContainsBefore,
                         "localBlacklistSize", localBlacklistSize,
                         "playerPosition", mod == null ? "unavailable" : ChatClefDiagnostics.playerPosition(mod),
@@ -87,5 +91,18 @@ final class MineTargetGoalRequestDiagnostics {
                         "readinessRejectedBySavePolicy", readiness == null ? "unavailable" : readiness.rejectedBySavePolicy(),
                         "readinessRequiresAcquisition", readiness == null ? "unavailable" : readiness.requiresAcquisition()
                 });
+    }
+
+    private static Object matchesRequestedBlock(BlockState targetState, Block[] requestedBlocks) {
+        if (targetState == null || requestedBlocks == null) {
+            return "unavailable";
+        }
+        Block actual = targetState.getBlock();
+        for (Block requested : requestedBlocks) {
+            if (actual == requested) {
+                return true;
+            }
+        }
+        return false;
     }
 }

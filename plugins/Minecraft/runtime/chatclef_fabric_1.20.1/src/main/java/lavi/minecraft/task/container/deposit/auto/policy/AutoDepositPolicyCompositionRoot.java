@@ -17,11 +17,11 @@ public final class AutoDepositPolicyCompositionRoot {
         return createEngine(repository);
     }
 
-    //20260827_kpopmodder: Compose one repository instance across trusted commands, policy, and execution.
-    //20260827_kpopmodder: Do not load the disabled automatic policy for the request-only runtime.
+    //20260829_kpopmodder: Compose one repository across trusted commands, StoreHome, policy, and automatic execution.
     public AutoDepositRuntime createRuntime(AltoClef mod) {
         AutoDepositTrustedDestinationRepository repository = createRepository();
-        return AutoDepositRuntime.create(mod, repository);
+        AutoDepositPolicyEngine engine = createEngine(repository);
+        return AutoDepositRuntime.create(mod, repository, engine);
     }
 
     private AutoDepositPolicyEngine createEngine(

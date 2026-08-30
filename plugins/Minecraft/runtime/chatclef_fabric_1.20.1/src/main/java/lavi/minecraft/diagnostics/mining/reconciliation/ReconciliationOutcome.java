@@ -28,9 +28,9 @@ public record ReconciliationOutcome(
         boolean candidateDiscardedAsAllocationNoise,
         boolean sameTargetReplacementApplied
 ) {
-    public static ReconciliationOutcome classify(ReconciliationTaskSnapshot activeChildBefore,
-                                                 ReconciliationTaskSnapshot candidateChild,
-                                                 ReconciliationTaskSnapshot activeChildAfter,
+    public static ReconciliationOutcome classify(ReconciliationTaskIdentity activeChildBefore,
+                                                 ReconciliationTaskIdentity candidateChild,
+                                                 ReconciliationTaskIdentity activeChildAfter,
                                                  boolean isEqualResult,
                                                  boolean canInterruptEvaluated,
                                                  boolean canInterruptPreviousChild,

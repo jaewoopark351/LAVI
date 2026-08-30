@@ -4,7 +4,6 @@ import adris.altoclef.AltoClef;
 import adris.altoclef.tasks.construction.DestroyBlockTask;
 import adris.altoclef.tasks.resources.MineAndCollectTask;
 import adris.altoclef.tasksystem.Task;
-import adris.altoclef.util.helpers.WorldHelper;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 import net.minecraft.util.math.BlockPos;
 
@@ -39,7 +38,7 @@ public record ReconciliationTaskSnapshot(
                 targetBlockState(mod, target),
                 blockStillExists(mod, target),
                 chunkLoaded(mod, target),
-                worldCanBreak(target),
+                target == null ? "not_destroy_target" : "NOT_CAPTURED_WITHOUT_BEHAVIOR_REEVALUATION",
                 scannerUnreachable(mod, target),
                 localBlacklistContains(parent, target),
                 safeTaskActive(task),
@@ -93,13 +92,6 @@ public record ReconciliationTaskSnapshot(
             return "not_destroy_target";
         }
         return ChatClefDiagnostics.safeValue(() -> mod == null ? "unavailable" : mod.getChunkTracker().isChunkLoaded(target));
-    }
-
-    private static String worldCanBreak(BlockPos target) {
-        if (target == null) {
-            return "not_destroy_target";
-        }
-        return ChatClefDiagnostics.safeValue(() -> WorldHelper.canBreak(target));
     }
 
     private static String scannerUnreachable(AltoClef mod, BlockPos target) {

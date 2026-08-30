@@ -3,40 +3,38 @@ package lavi.minecraft.task.container.deposit.auto.maintenance;
 import adris.altoclef.AltoClef;
 import adris.altoclef.tasks.container.DepositAllTask;
 import adris.altoclef.tasksystem.Task;
-import adris.altoclef.util.ItemTarget;
-import lavi.minecraft.task.container.deposit.auto.DepositAllAutoDiagnostics;
 import lavi.minecraft.task.container.deposit.auto.DepositAllInventoryPressureReader;
-import lavi.minecraft.task.container.deposit.auto.DepositAllInventoryPressureSnapshot;
+import lavi.minecraft.task.container.deposit.auto.maintenance.child.AutoDepositGeneralTaskFactory;
+import lavi.minecraft.task.container.deposit.auto.maintenance.child.AutoDepositTrustedTaskFactory;
+import lavi.minecraft.task.container.deposit.auto.maintenance.diagnostics.AutoDepositMaintenanceDiagnostics;
+import lavi.minecraft.task.container.deposit.auto.maintenance.relief.AutoDepositFreeSlotVerdict;
+import lavi.minecraft.task.container.deposit.auto.maintenance.relief.AutoDepositFreeSlotVerifier;
+import lavi.minecraft.task.container.deposit.auto.pressure.AutoDepositInventoryPressureSource;
 import lavi.minecraft.task.container.deposit.auto.policy.AutoDepositPlan;
 import lavi.minecraft.task.container.deposit.auto.recovery.AutoDepositDestinationManifest;
-import lavi.minecraft.task.container.deposit.auto.recovery.AutoDepositDestinationManifestTracker;
+import lavi.minecraft.task.container.deposit.auto.recovery.AutoDepositDestinationManifestLifecycle;
+import lavi.minecraft.task.container.deposit.auto.recovery.AutoDepositWorkingSetRecovery;
 import lavi.minecraft.task.container.deposit.auto.recovery.RecoverReservedItemsTask;
 import lavi.minecraft.task.container.deposit.auto.trusted.AutoDepositTrustedDestinationRepository;
 import lavi.minecraft.task.container.deposit.auto.trusted.execution.AutoDepositTrustedStoreTask;
 import lavi.minecraft.task.container.deposit.auto.trusted.interaction.AutoDepositExactOpenContainerBinding;
 import lavi.minecraft.task.container.deposit.auto.working.PlayerInventorySnapshotReader;
 import lavi.minecraft.task.container.deposit.auto.working.WorkingSetSnapshot;
-import net.minecraft.item.Item;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 
 //20260827_kpopmodder: Execute one immutable auto-deposit plan and verify working-set and slot relief.
 public final class AutoDepositMaintenanceTask extends Task {
     private final AutoDepositPlan plan;
-    private final WorkingSetSnapshot workingSet;
-    private final AutoDepositTrustedDestinationRepository trustedRepository;
-    private final AutoDepositExactOpenContainerBinding exactOpenContainerBinding;
+    private final AutoDepositGeneralTaskFactory generalTaskFactory;
+    private final AutoDepositTrustedTaskFactory trustedTaskFactory;
     private List<DepositAllTask> generalTasks;
     private AutoDepositTrustedStoreTask trustedTask;
-    private final AutoDepositDestinationManifest manifest;
-    private final PlayerInventorySnapshotReader inventoryReader = new PlayerInventorySnapshotReader();
-    private final DepositAllInventoryPressureReader pressureReader = new DepositAllInventoryPressureReader();
-
-    private AutoDepositDestinationManifestTracker manifestTracker;
-    private RecoverReservedItemsTask recoveryTask;
+    private final AutoDepositDestinationManifestLifecycle manifestLifecycle;
+    private final AutoDepositWorkingSetRecovery workingSetRecovery;
+    private final AutoDepositFreeSlotVerifier freeSlotVerifier;
+    private final AutoDepositMaintenanceDiagnostics diagnostics;
     private AutoDepositMaintenancePhase phase;
     private AutoDepositMaintenanceOutcome outcome = AutoDepositMaintenanceOutcome.PENDING;
     private int generalTaskIndex;
@@ -47,7 +45,8 @@ public final class AutoDepositMaintenanceTask extends Task {
         this(
                 plan,
                 trustedRepository,
-                AutoDepositExactOpenContainerBinding.UNAVAILABLE
+                AutoDepositExactOpenContainerBinding.UNAVAILABLE,
+                new DepositAllInventoryPressureReader()
         );
     }
 
@@ -55,29 +54,55 @@ public final class AutoDepositMaintenanceTask extends Task {
             AutoDepositPlan plan,
             AutoDepositTrustedDestinationRepository trustedRepository,
             AutoDepositExactOpenContainerBinding exactOpenContainerBinding) {
-        this.plan = Objects.requireNonNull(plan, "plan");
-        this.trustedRepository = Objects.requireNonNull(trustedRepository, "trustedRepository");
-        this.exactOpenContainerBinding = Objects.requireNonNull(
+        this(
+                plan,
+                trustedRepository,
                 exactOpenContainerBinding,
-                "exactOpenContainerBinding"
+                new DepositAllInventoryPressureReader()
         );
+    }
+
+    AutoDepositMaintenanceTask(
+            AutoDepositPlan plan,
+            AutoDepositTrustedDestinationRepository trustedRepository,
+            AutoDepositExactOpenContainerBinding exactOpenContainerBinding,
+            AutoDepositInventoryPressureSource pressureSource) {
+        this.plan = Objects.requireNonNull(plan, "plan");
+        Objects.requireNonNull(trustedRepository, "trustedRepository");
+        Objects.requireNonNull(exactOpenContainerBinding, "exactOpenContainerBinding");
+        Objects.requireNonNull(pressureSource, "pressureSource");
         if (!plan.hasTargets()) {
             throw new IllegalArgumentException("automatic deposit plan must contain at least one target");
         }
-        workingSet = plan.context().workingSet();
+        AutoDepositDestinationManifest manifest = new AutoDepositDestinationManifest(
+                plan.context().worldIdentity(),
+                plan.context().dimension(),
+                plan.context().epoch()
+        );
+        generalTaskFactory = new AutoDepositGeneralTaskFactory();
+        trustedTaskFactory = new AutoDepositTrustedTaskFactory(
+                trustedRepository,
+                exactOpenContainerBinding
+        );
+        manifestLifecycle = new AutoDepositDestinationManifestLifecycle(manifest);
+        workingSetRecovery = new AutoDepositWorkingSetRecovery(
+                plan.context().workingSet(),
+                manifest,
+                new PlayerInventorySnapshotReader()
+        );
+        //20260829_kpopmodder: Keep occupied-slot verification behind the same read-only pressure port as the chain.
+        freeSlotVerifier = new AutoDepositFreeSlotVerifier(pressureSource);
+        diagnostics = new AutoDepositMaintenanceDiagnostics(plan);
         phase = plan.trustedTargets().length > 0
                 ? AutoDepositMaintenancePhase.DEPOSIT_TRUSTED
                 : AutoDepositMaintenancePhase.DEPOSIT_GENERAL;
-        manifest = new AutoDepositDestinationManifest(
-                plan.context().worldIdentity(), plan.context().dimension(), plan.context().epoch()
-        );
     }
 
     @Override
     protected void onStart() {
         if (phase == AutoDepositMaintenancePhase.DEPOSIT_TRUSTED
                 || phase == AutoDepositMaintenancePhase.DEPOSIT_GENERAL) {
-            startManifestTracking();
+            manifestLifecycle.start(AltoClef.getInstance());
         }
     }
 
@@ -85,7 +110,7 @@ public final class AutoDepositMaintenanceTask extends Task {
     protected Task onTick() {
         AltoClef mod = AltoClef.getInstance();
         if (!plan.context().matches(mod)) {
-            stopManifestTracking();
+            manifestLifecycle.stop();
             outcome = AutoDepositMaintenanceOutcome.CANCELLED;
             transition(AutoDepositMaintenancePhase.CANCELLED, "automatic_context_changed", 0);
             return null;
@@ -112,6 +137,7 @@ public final class AutoDepositMaintenanceTask extends Task {
                     }
                     return null;
                 }
+                diagnostics.registerTrustedChild(mod, this, trustedStore, plan.trustedTargets());
                 return trustedStore;
             }
             case DEPOSIT_GENERAL -> {
@@ -120,7 +146,9 @@ public final class AutoDepositMaintenanceTask extends Task {
                     finishDepositSteps("general_steps_complete");
                     return null;
                 }
-                if (generalTask.isFinished() || generalTask.stopped()) {
+                boolean generalTaskFinished = generalTask.isFinished();
+                boolean generalTaskStopped = !generalTaskFinished && generalTask.stopped();
+                if (generalTaskFinished || generalTaskStopped) {
                     generalTaskIndex++;
                     if (currentGeneralTask() != null) {
                         transition(AutoDepositMaintenancePhase.DEPOSIT_GENERAL,
@@ -130,29 +158,37 @@ public final class AutoDepositMaintenanceTask extends Task {
                     }
                     return null;
                 }
+                diagnostics.registerGeneralChild(
+                        mod,
+                        this,
+                        generalTask,
+                        generalTaskIndex,
+                        plan.trustedTargets().length > 0,
+                        plan.generalTargets()[generalTaskIndex]
+                );
                 return generalTask;
             }
             case VERIFY_WORKING_SET -> {
-                if (workingSet == null) {
+                if (!workingSetRecovery.available()) {
                     transition(AutoDepositMaintenancePhase.VERIFY_FREE_SLOTS,
                             "idle_context_has_no_working_set", 0);
                     return null;
                 }
-                Map<Item, Integer> deficits = workingSet.deficits(inventoryReader.readMainAndCursor(mod));
-                if (deficits.isEmpty()) {
+                int deficitTypes = workingSetRecovery.deficitTypeCount(mod);
+                if (deficitTypes == 0) {
                     transition(AutoDepositMaintenancePhase.VERIFY_FREE_SLOTS,
                             "working_set_preserved", 0);
                     return null;
                 }
-                recoveryTask = new RecoverReservedItemsTask(workingSet, manifest);
+                RecoverReservedItemsTask recoveryTask = workingSetRecovery.begin();
                 transition(AutoDepositMaintenancePhase.RECOVER,
-                        "working_set_deficit_detected", deficits.size());
+                        "working_set_deficit_detected", deficitTypes);
                 return recoveryTask;
             }
             case RECOVER -> {
+                RecoverReservedItemsTask recoveryTask = workingSetRecovery.task();
                 if (recoveryTask == null || recoveryTask.isFinished()) {
-                    int remaining = workingSet == null ? 0
-                            : workingSet.deficits(inventoryReader.readMainAndCursor(mod)).size();
+                    int remaining = workingSetRecovery.deficitTypeCount(mod);
                     transition(AutoDepositMaintenancePhase.VERIFY_FREE_SLOTS,
                             "recovery_terminal", remaining);
                     return null;
@@ -160,7 +196,19 @@ public final class AutoDepositMaintenanceTask extends Task {
                 return recoveryTask;
             }
             case VERIFY_FREE_SLOTS -> {
-                verifySlotRelief(mod);
+                AutoDepositFreeSlotVerdict verdict = freeSlotVerifier.verify(
+                        mod,
+                        plan.startingOccupiedSlots(),
+                        plan.targetReliefSlots()
+                );
+                outcome = verdict.outcome();
+                diagnostics.recordFreeSlotVerdict(
+                        plan.context().epoch(),
+                        plan.startingOccupiedSlots(),
+                        plan.expectedFreedSlots(),
+                        verdict,
+                        this
+                );
                 transition(AutoDepositMaintenancePhase.DONE, "free_slot_postcondition_observed", 0);
                 return null;
             }
@@ -171,51 +219,16 @@ public final class AutoDepositMaintenanceTask extends Task {
         return null;
     }
 
-    private void verifySlotRelief(AltoClef mod) {
-        DepositAllInventoryPressureSnapshot current = pressureReader.read(mod).orElse(null);
-        int endingOccupied = current == null ? plan.startingOccupiedSlots() : current.occupiedSlots();
-        int freedSlots = Math.max(0, plan.startingOccupiedSlots() - endingOccupied);
-        if (current != null
-                && (current.isAtOrBelowLowWater() || freedSlots >= plan.targetReliefSlots())) {
-            outcome = AutoDepositMaintenanceOutcome.FULL_RELIEF;
-        } else if (freedSlots > 0) {
-            outcome = AutoDepositMaintenanceOutcome.PARTIAL_RELIEF;
-        } else {
-            outcome = AutoDepositMaintenanceOutcome.NO_SLOT_RELIEF;
-        }
-        DepositAllAutoDiagnostics.logFreeSlotOutcome(
-                plan.context().epoch(),
-                plan.startingOccupiedSlots(),
-                endingOccupied,
-                plan.expectedFreedSlots(),
-                outcome,
-                this
-        );
-    }
-
-    private void startManifestTracking() {
-        if (manifestTracker == null) {
-            manifestTracker = new AutoDepositDestinationManifestTracker(AltoClef.getInstance(), manifest);
-        }
-        manifestTracker.start();
-    }
-
-    private void stopManifestTracking() {
-        if (manifestTracker != null) {
-            manifestTracker.stop();
-        }
-    }
-
     private void transition(AutoDepositMaintenancePhase next, String reason, int deficitTypes) {
         AutoDepositMaintenancePhase previous = phase;
         phase = next;
-        DepositAllAutoDiagnostics.logMaintenanceTransition(
+        diagnostics.recordTransition(
                 plan.context().epoch(), previous, next, reason, deficitTypes, this
         );
     }
 
     private void finishDepositSteps(String reason) {
-        stopManifestTracking();
+        manifestLifecycle.stop();
         transition(AutoDepositMaintenancePhase.VERIFY_WORKING_SET, reason, 0);
     }
 
@@ -224,31 +237,16 @@ public final class AutoDepositMaintenanceTask extends Task {
         return generalTaskIndex < tasks.size() ? tasks.get(generalTaskIndex) : null;
     }
 
-    private static List<DepositAllTask> createGeneralTasks(AutoDepositPlan plan) {
-        List<DepositAllTask> result = new ArrayList<>();
-        for (ItemTarget target : plan.generalTargets()) {
-            result.add(new DepositAllTask(false, target));
-        }
-        return List.copyOf(result);
-    }
-
     private List<DepositAllTask> generalTasks() {
         if (generalTasks == null) {
-            generalTasks = createGeneralTasks(plan);
+            generalTasks = generalTaskFactory.create(plan.generalTargets());
         }
         return generalTasks;
     }
 
     private AutoDepositTrustedStoreTask trustedTask() {
-        if (trustedTask == null && plan.trustedTargets().length > 0
-                && !plan.trustedCandidates().isEmpty()) {
-            trustedTask = new AutoDepositTrustedStoreTask(
-                    plan.context(),
-                    trustedRepository,
-                    plan.trustedCandidates(),
-                    exactOpenContainerBinding,
-                    plan.trustedTargets()
-            );
+        if (trustedTask == null) {
+            trustedTask = trustedTaskFactory.create(plan).orElse(null);
         }
         return trustedTask;
     }
@@ -259,7 +257,12 @@ public final class AutoDepositMaintenanceTask extends Task {
 
     @Override
     protected void onStop(Task interruptTask) {
-        stopManifestTracking();
+        manifestLifecycle.stop();
+        diagnostics.recordTerminal(
+                this,
+                "TASK_STOP_CALLBACK",
+                phase == null ? "UNAVAILABLE" : phase.name()
+        );
     }
 
     @Override
@@ -282,8 +285,12 @@ public final class AutoDepositMaintenanceTask extends Task {
         return plan;
     }
 
+    public boolean diagnosticAutomaticRunEnabled() {
+        return diagnostics.automaticRunEnabled();
+    }
+
     public WorkingSetSnapshot snapshot() {
-        return workingSet;
+        return workingSetRecovery.snapshot();
     }
 
     public DepositAllTask depositTask() {
@@ -307,6 +314,6 @@ public final class AutoDepositMaintenanceTask extends Task {
     }
 
     public AutoDepositDestinationManifest manifest() {
-        return manifest;
+        return manifestLifecycle.manifest();
     }
 }

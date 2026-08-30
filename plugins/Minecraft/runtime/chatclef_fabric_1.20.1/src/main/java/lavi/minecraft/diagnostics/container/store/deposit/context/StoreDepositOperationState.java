@@ -3,6 +3,7 @@ package lavi.minecraft.diagnostics.container.store.deposit.context;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.ItemTarget;
 import lavi.minecraft.diagnostics.container.store.deposit.candidate.StoreContainerRouteState;
+import lavi.minecraft.diagnostics.container.store.deposit.terminal.StoreDepositAutomaticContext;
 import net.minecraft.item.Item;
 
 import java.util.Arrays;
@@ -16,6 +17,8 @@ public final class StoreDepositOperationState {
     private final StoreDepositOperationContext context;
     private final StoreContainerRouteState routeState;
     private final long startNanos;
+    private StoreDepositAutomaticContext automaticContext = StoreDepositAutomaticContext.unavailable();
+    private long transferAttemptSequence;
     private ItemTarget[] requestedTargets = new ItemTarget[0];
     private int activationCount;
     private int interruptCount;
@@ -69,6 +72,20 @@ public final class StoreDepositOperationState {
 
     public StoreContainerRouteState routeState() {
         return routeState;
+    }
+
+    public synchronized StoreDepositAutomaticContext automaticContext() {
+        return automaticContext;
+    }
+
+    public synchronized void attachAutomaticContext(StoreDepositAutomaticContext context) {
+        if (context != null && context.available()) {
+            automaticContext = context;
+        }
+    }
+
+    public synchronized long nextTransferAttemptSequence() {
+        return ++transferAttemptSequence;
     }
 
     public long elapsedMillis() {

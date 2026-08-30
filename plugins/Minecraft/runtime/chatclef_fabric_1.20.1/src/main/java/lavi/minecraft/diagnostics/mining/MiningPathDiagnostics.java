@@ -5,8 +5,10 @@ import adris.altoclef.tasks.construction.DestroyBlockTask;
 import adris.altoclef.tasks.resources.MineAndCollectTask;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.MiningRequirement;
+import lavi.minecraft.diagnostics.mining.cancel.PreCancelBaritoneState;
 import lavi.minecraft.integration.mining.MiningToolReadiness;
 import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
 import net.minecraft.entity.ItemEntity;
 import net.minecraft.util.Pair;
 import net.minecraft.util.math.BlockPos;
@@ -18,11 +20,8 @@ public final class MiningPathDiagnostics {
     private MiningPathDiagnostics() {
     }
 
-    public static BaritonePathDiagnosticSnapshot captureBaritoneSnapshot(AltoClef mod,
-                                                                         BlockPos target,
-                                                                         Object goal,
-                                                                         String goalMatchesTarget) {
-        return BaritonePathDiagnosticSnapshot.capture(mod, target, goal, goalMatchesTarget);
+    public static PreCancelBaritoneState capturePreCancelBaritoneState(AltoClef mod) {
+        return PreCancelBaritoneState.capture(mod);
     }
 
     public static void logTaskChildReconciliation(Task parent,
@@ -64,12 +63,13 @@ public final class MiningPathDiagnostics {
                                                 int localBlacklistSize,
                                                 Block[] requestedBlocks,
                                                 MiningRequirement requestedRequirement,
+                                                BlockState targetState,
                                                 MiningToolReadiness.Readiness readiness,
                                                 String decisionOutcome,
                                                 Task returnedTask) {
         MineTargetGoalRequestDiagnostics.log(mod, task, target, previousMiningPos, miningPosAfterDecision,
-                localBlacklistContainsBefore, localBlacklistSize, requestedBlocks, requestedRequirement, readiness,
-                decisionOutcome, returnedTask);
+                localBlacklistContainsBefore, localBlacklistSize, requestedBlocks, requestedRequirement, targetState,
+                readiness, decisionOutcome, returnedTask);
     }
 
     public static void logDestroyNavigationState(AltoClef mod,
@@ -84,7 +84,7 @@ public final class MiningPathDiagnostics {
                                                DestroyBlockTask task,
                                                BlockPos target,
                                                String forceCancelSource,
-                                               BaritonePathDiagnosticSnapshot before) {
+                                               PreCancelBaritoneState before) {
         DestroyBlockLifetimeDiagnostics.logStart(mod, task, target, forceCancelSource, before);
     }
 
@@ -93,7 +93,7 @@ public final class MiningPathDiagnostics {
                                               BlockPos target,
                                               Task interruptTask,
                                               String forceCancelSource,
-                                              BaritonePathDiagnosticSnapshot before) {
+                                              PreCancelBaritoneState before) {
         DestroyBlockLifetimeDiagnostics.logStop(mod, task, target, interruptTask, forceCancelSource, before);
     }
 
@@ -106,11 +106,20 @@ public final class MiningPathDiagnostics {
         DestroyBlockPhaseDiagnostics.log(mod, task, target, currentPhase, reachPresent, isCloseToMoveBack);
     }
 
+    public static void logDestroyFinishEvaluation(AltoClef mod,
+                                                  DestroyBlockTask task,
+                                                  BlockPos target,
+                                                  BlockState observedBlockState,
+                                                  boolean observedIsAir) {
+        DestroyFinishEvaluationDiagnostics.log(
+                mod, task, target, observedBlockState, observedIsAir);
+    }
+
     public static void logExistingCancelBoundary(AltoClef mod,
                                                  Task task,
                                                  BlockPos target,
                                                  String cancelSource,
-                                                 BaritonePathDiagnosticSnapshot before) {
+                                                 PreCancelBaritoneState before) {
         ExistingCancelBoundaryDiagnostics.log(mod, task, target, cancelSource, before);
     }
 
@@ -137,9 +146,32 @@ public final class MiningPathDiagnostics {
                                                       Object stuckCheckResult,
                                                       boolean moveCheckSecondEvaluated,
                                                       Object moveCheckSecondResult) {
+        logMovementProgressCheckResult(mod, task, target, checkerOwner, checkerCallIndex, checkEvaluated,
+                checkResult, false, "UNAVAILABLE", failureTransition, moveCheckFirstEvaluated,
+                moveCheckFirstResult, stuckCheckEvaluated, stuckCheckResult, moveCheckSecondEvaluated,
+                moveCheckSecondResult);
+    }
+
+    public static void logMovementProgressCheckResult(AltoClef mod,
+                                                      Task task,
+                                                      BlockPos target,
+                                                      String checkerOwner,
+                                                      int checkerCallIndex,
+                                                      boolean checkEvaluated,
+                                                      boolean checkResult,
+                                                      boolean resetObservedBeforeCheck,
+                                                      String resetReason,
+                                                      String failureTransition,
+                                                      boolean moveCheckFirstEvaluated,
+                                                      Object moveCheckFirstResult,
+                                                      boolean stuckCheckEvaluated,
+                                                      Object stuckCheckResult,
+                                                      boolean moveCheckSecondEvaluated,
+                                                      Object moveCheckSecondResult) {
         MovementProgressDiagnostics.log(mod, task, target, checkerOwner, checkerCallIndex, checkEvaluated,
-                checkResult, failureTransition, moveCheckFirstEvaluated, moveCheckFirstResult,
-                stuckCheckEvaluated, stuckCheckResult, moveCheckSecondEvaluated, moveCheckSecondResult);
+                checkResult, resetObservedBeforeCheck, resetReason, failureTransition, moveCheckFirstEvaluated,
+                moveCheckFirstResult, stuckCheckEvaluated, stuckCheckResult, moveCheckSecondEvaluated,
+                moveCheckSecondResult);
     }
 
     public static void logBlockUnreachableRequest(AltoClef mod,

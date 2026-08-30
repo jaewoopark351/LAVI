@@ -25,22 +25,20 @@ final class GoalPathTransitionDiagnostics {
         SubmittedGoalDiagnosticState.SubmittedGoal submittedGoal = SubmittedGoalDiagnosticState.get(task);
         Object observedGoal = goal == null && submittedGoal != null ? submittedGoal.goal : goal;
         String goalMatchesTarget = SubmittedGoalDiagnosticState.matchesTarget(submittedGoal, target);
-        BaritonePathDiagnosticSnapshot snapshot = BaritonePathDiagnosticSnapshot.capture(mod, target, observedGoal, goalMatchesTarget);
         String fingerprint = MiningDiagnosticEmitter.joinFingerprint(
                 "BARITONE_GOAL_PATH_TRANSITION",
                 transition,
                 ChatClefDiagnostics.blockPos(target),
-                snapshot.goalSummary,
-                snapshot.customGoalActive,
-                snapshot.baritonePathing,
-                snapshot.pathPresent,
-                snapshot.currentMovementPresent,
-                snapshot.calculationState
+                ChatClefDiagnostics.className(observedGoal),
+                goalMatchesTarget
         );
-        MiningDiagnosticEmitter.emit("BARITONE_GOAL_PATH_TRANSITION", reason, task,
+        MiningDiagnosticEmitter.emitLazy("BARITONE_GOAL_PATH_TRANSITION", reason, task,
                 "baritone_goal_path|" + System.identityHashCode(task),
                 fingerprint,
-                MiningDiagnosticEmitter.merge(new Object[]{
+                () -> {
+                    BaritonePathDiagnosticSnapshot snapshot = BaritonePathDiagnosticSnapshot.capture(
+                            mod, target, observedGoal, goalMatchesTarget);
+                    return MiningDiagnosticEmitter.merge(new Object[]{
                         "owner", "baritone_path_observer",
                         "trigger", transition,
                         "transition", transition,
@@ -48,6 +46,7 @@ final class GoalPathTransitionDiagnostics {
                         "planningStartTick", "unavailable_public_api",
                         "planningElapsedTicks", "unavailable_public_api",
                         "existingCancellationReason", "unavailable_public_api"
-                }, SubmittedGoalDiagnosticState.fields(submittedGoal, target), snapshot.fields()));
+                    }, SubmittedGoalDiagnosticState.fields(submittedGoal, target), snapshot.fields());
+                });
     }
 }

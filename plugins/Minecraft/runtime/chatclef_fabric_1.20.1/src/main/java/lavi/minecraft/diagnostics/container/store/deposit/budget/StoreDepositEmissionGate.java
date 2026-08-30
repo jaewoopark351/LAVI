@@ -20,6 +20,10 @@ public final class StoreDepositEmissionGate {
         return criticalBudget.shouldEmitControl(operationId, controlEventName);
     }
 
+    public boolean shouldEmitCoverageSuppressionSummary() {
+        return criticalBudget.shouldEmitCoverageSuppressionSummary();
+    }
+
     public StoreDepositTerminalReservation reserveTerminalGroup(String operationId) {
         return criticalBudget.reserveTerminalGroup(operationId);
     }
@@ -36,6 +40,10 @@ public final class StoreDepositEmissionGate {
                 "storeBudgetExceptionSignatureMax", StoreDepositBudgetConstants.MAX_EXCEPTION_SIGNATURES,
                 "storeBudgetLateSummaryCount", criticalBudget.lateSummaryCount(),
                 "storeBudgetLateSummaryMax", StoreDepositBudgetConstants.MAX_LATE_SUMMARIES,
+                "storeBudgetCoverageSuppressionSummaryCount",
+                criticalBudget.coverageSuppressionSummaryCount(),
+                "storeBudgetCoverageSuppressionSummaryMax",
+                StoreDepositBudgetConstants.MAX_COVERAGE_SUPPRESSION_SUMMARIES,
                 "storeBudgetControlEventCount", criticalBudget.controlEventCount(),
                 "storeBudgetControlEventMax", StoreDepositBudgetConstants.MAX_CONTROL_EVENTS,
                 "storeBudgetTerminalReserveExhaustedOperations", criticalBudget.exhaustedTerminalOperationCount()

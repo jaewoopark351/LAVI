@@ -2,18 +2,25 @@ package lavi.minecraft.task.container.deposit.auto;
 
 import adris.altoclef.AltoClef;
 import adris.altoclef.tasks.container.ContainerStoredTracker;
+import adris.altoclef.player2api.AICommandBridge;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.tasksystem.TaskRunner;
+import adris.altoclef.util.ItemTarget;
+import lavi.minecraft.testsupport.HeadlessMinecraftClientSession;
+import lavi.minecraft.testsupport.TestObjects;
 import net.minecraft.client.network.ClientPlayerEntity;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+//20260829_kpopmodder: Prove automatic-owned cleanup at terminal, safety, world-leave, and disable boundaries.
 class DepositAllInventoryPressureChainLifecycleTest {
     @Test
     void naturalFinishStopsTheOwnedRootAndChildBeforeWaitingForRearm() {
@@ -48,6 +55,140 @@ class DepositAllInventoryPressureChainLifecycleTest {
         assertFalse(runner.isActive());
     }
 
+    @Test
+    void safetyInterruptionStopsOnlyAnActiveOwnedTreeExactlyOnce() {
+        HeadlessAltoClef mod = new HeadlessAltoClef();
+        TrackingTaskRunner runner = new TrackingTaskRunner(mod);
+        DepositAllInventoryPressureChain chain = new DepositAllInventoryPressureChain(runner);
+        TrackingTask child = new TrackingTask(null);
+        TrackingTask root = new TrackingTask(child);
+        TrackingInterruptingChain safety = new TrackingInterruptingChain(runner);
+
+        moveToRunning(chain);
+        chain.setTask(root);
+        chain.tick();
+
+        chain.onInterrupt(safety);
+        chain.onInterrupt(safety);
+
+        assertEquals(1, root.stopCallbacks);
+        assertEquals(1, child.stopCallbacks);
+        assertTrue(root.stopped());
+        assertTrue(child.stopped());
+        assertNull(chain.getCurrentTask());
+        assertEquals(DepositAllInventoryPressureState.WAIT_FOR_REARM, stateMachine(chain).state());
+        assertEquals(0, runner.disableCalls);
+    }
+
+    @Test
+    void safetyInterruptionDetachesANeverTickedOwnedRootWithoutInventingAStopCallback() {
+        HeadlessAltoClef mod = new HeadlessAltoClef();
+        TrackingTaskRunner runner = new TrackingTaskRunner(mod);
+        DepositAllInventoryPressureChain chain = new DepositAllInventoryPressureChain(runner);
+        TrackingTask root = new TrackingTask(null);
+        TrackingInterruptingChain safety = new TrackingInterruptingChain(runner);
+
+        moveToRunning(chain);
+        chain.setTask(root);
+
+        chain.onInterrupt(safety);
+
+        assertEquals(0, root.stopCallbacks);
+        assertFalse(root.isActive());
+        assertNull(chain.getCurrentTask());
+        assertEquals(DepositAllInventoryPressureState.WAIT_FOR_REARM, stateMachine(chain).state());
+        assertEquals(0, runner.disableCalls);
+    }
+
+    @Test
+    void inactiveRunnerIsEnabledOnceAtAutomaticStartAndNeverDisabledByOwnedTermination() {
+        HeadlessAltoClef mod = new HeadlessAltoClef();
+        TrackingTaskRunner runner = new TrackingTaskRunner(mod);
+        DepositAllInventoryPressureChain chain = new DepositAllInventoryPressureChain(runner);
+        TrackingTask root = new TrackingTask(null);
+        TrackingInterruptingChain safety = new TrackingInterruptingChain(runner);
+        DepositAllInventoryPressureSnapshot pressure =
+                new DepositAllInventoryPressureSnapshot(33, 36);
+
+        assertEquals(
+                DepositAllInventoryPressureSignal.THRESHOLD_REACHED,
+                stateMachine(chain).observe(pressure)
+        );
+        invokeStartTask(chain, pressure, root);
+
+        assertEquals(1, runner.enableCalls);
+        assertEquals(0, runner.disableCalls);
+        assertEquals(DepositAllInventoryPressureState.RUNNING, stateMachine(chain).state());
+        assertEquals(root, chain.getCurrentTask());
+
+        chain.onInterrupt(safety);
+        chain.onInterrupt(safety);
+
+        assertEquals(1, runner.enableCalls);
+        assertEquals(0, runner.disableCalls);
+        assertEquals(0, root.stopCallbacks);
+        assertNull(chain.getCurrentTask());
+        assertEquals(
+                DepositAllInventoryPressureState.WAIT_FOR_REARM,
+                stateMachine(chain).state()
+        );
+    }
+
+    @Test
+    void worldLeaveStopsTheActiveAutomaticTreeExactlyOnceWithoutDisablingTheRunner() {
+        try (HeadlessMinecraftClientSession ignored =
+                     HeadlessMinecraftClientSession.outOfGame()) {
+            HeadlessAltoClef mod = new HeadlessAltoClef();
+            TrackingTaskRunner runner = new TrackingTaskRunner(mod);
+            DepositAllInventoryPressureChain chain = new DepositAllInventoryPressureChain(runner);
+            TrackingTask child = new TrackingTask(null);
+            TrackingTask root = new TrackingTask(child);
+            moveToRunning(chain);
+            chain.setTask(root);
+            chain.tick();
+
+            chain.onEndClientTick();
+            chain.onEndClientTick();
+
+            assertEquals(1, root.stopCallbacks);
+            assertEquals(1, child.stopCallbacks);
+            assertNull(chain.getCurrentTask());
+            assertEquals(
+                    DepositAllInventoryPressureState.WAIT_FOR_REARM,
+                    stateMachine(chain).state()
+            );
+            assertEquals(0, runner.disableCalls);
+        }
+    }
+
+    @Test
+    void chatClefDisableStopsTheActiveAutomaticTreeExactlyOnceWithoutGlobalDisable() {
+        try (HeadlessMinecraftClientSession ignored =
+                     HeadlessMinecraftClientSession.inGame()) {
+            HeadlessAltoClef mod = new HeadlessAltoClef();
+            mod.bridge = TestObjects.allocate(AICommandBridge.class);
+            TrackingTaskRunner runner = new TrackingTaskRunner(mod);
+            DepositAllInventoryPressureChain chain = new DepositAllInventoryPressureChain(runner);
+            TrackingTask child = new TrackingTask(null);
+            TrackingTask root = new TrackingTask(child);
+            moveToRunning(chain);
+            chain.setTask(root);
+            chain.tick();
+
+            chain.onEndClientTick();
+            chain.onEndClientTick();
+
+            assertEquals(1, root.stopCallbacks);
+            assertEquals(1, child.stopCallbacks);
+            assertNull(chain.getCurrentTask());
+            assertEquals(
+                    DepositAllInventoryPressureState.WAIT_FOR_REARM,
+                    stateMachine(chain).state()
+            );
+            assertEquals(0, runner.disableCalls);
+        }
+    }
+
     private static void moveToRunning(DepositAllInventoryPressureChain chain) {
         DepositAllInventoryPressureStateMachine machine = stateMachine(chain);
         assertEquals(
@@ -68,10 +209,40 @@ class DepositAllInventoryPressureChainLifecycleTest {
         }
     }
 
+    private static void invokeStartTask(
+            DepositAllInventoryPressureChain chain,
+            DepositAllInventoryPressureSnapshot pressure,
+            Task task) {
+        try {
+            Method method = DepositAllInventoryPressureChain.class.getDeclaredMethod(
+                    "startTask",
+                    DepositAllInventoryPressureSnapshot.class,
+                    ItemTarget[].class,
+                    Task.class
+            );
+            method.setAccessible(true);
+            method.invoke(chain, pressure, new ItemTarget[0], task);
+        } catch (NoSuchMethodException | IllegalAccessException exception) {
+            throw new AssertionError("Failed to invoke automatic start boundary", exception);
+        } catch (InvocationTargetException exception) {
+            throw new AssertionError(
+                    "Automatic start boundary failed",
+                    exception.getCause()
+            );
+        }
+    }
+
     private static final class HeadlessAltoClef extends AltoClef {
+        private AICommandBridge bridge;
+
         @Override
         public ClientPlayerEntity getPlayer() {
             return null;
+        }
+
+        @Override
+        public AICommandBridge getAiBridge() {
+            return bridge;
         }
     }
 
@@ -133,6 +304,40 @@ class DepositAllInventoryPressureChainLifecycleTest {
         @Override
         protected String toDebugString() {
             return "automatic deposit_all lifecycle test task";
+        }
+    }
+
+    private static final class TrackingInterruptingChain
+            extends adris.altoclef.tasksystem.TaskChain {
+        private TrackingInterruptingChain(TaskRunner runner) {
+            super(runner);
+        }
+
+        @Override
+        protected void onStop() {
+        }
+
+        @Override
+        public void onInterrupt(adris.altoclef.tasksystem.TaskChain other) {
+        }
+
+        @Override
+        protected void onTick() {
+        }
+
+        @Override
+        public float getPriority() {
+            return 100.0f;
+        }
+
+        @Override
+        public boolean isActive() {
+            return true;
+        }
+
+        @Override
+        public String getName() {
+            return "automatic deposit_all safety test chain";
         }
     }
 

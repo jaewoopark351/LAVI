@@ -14,6 +14,8 @@ import lavi.minecraft.task.container.deposit.DepositAllContainerEligibility;
 import lavi.minecraft.task.container.deposit.DepositAllContainerSelector;
 import lavi.minecraft.task.container.deposit.DepositAllStoreTaskGeneration;
 import lavi.minecraft.task.container.deposit.DepositAllContainerTargetState;
+import lavi.minecraft.task.container.deposit.handoff.DepositAllPlacementTaskOwner;
+import lavi.minecraft.task.container.deposit.handoff.DepositAllPostPlaceHandoff;
 import net.minecraft.block.Block;
 import net.minecraft.item.Items;
 import net.minecraft.util.math.BlockPos;
@@ -37,19 +39,63 @@ public class DepositAllTask extends Task {
     private final DepositAllContainerSelector _containerSelector = new DepositAllContainerSelector();
     private final DepositAllContainerTargetState _targetState = new DepositAllContainerTargetState();
     private final DepositAllStoreTaskGeneration _storeTaskGeneration;
+    private final DepositAllPlacementTaskOwner _placementTaskOwner;
+    private final DepositAllPostPlaceHandoff _postPlaceHandoff;
     private final MovementProgressChecker _progressChecker = new MovementProgressChecker();
     private final ContainerStoredTracker _storedItems = new ContainerStoredTracker(slot -> true);
 
     public DepositAllTask(boolean getIfNotPresent, ItemTarget... toStore) {
-        this(getIfNotPresent, new DepositAllStoreTaskGeneration(), toStore);
+        this(
+                getIfNotPresent,
+                new DepositAllStoreTaskGeneration(),
+                DepositAllPlacementTaskOwner.ephemeral(),
+                DepositAllPostPlaceHandoff.disabled(),
+                toStore
+        );
+    }
+
+    public DepositAllTask(
+            boolean getIfNotPresent,
+            DepositAllPlacementTaskOwner placementTaskOwner,
+            DepositAllPostPlaceHandoff postPlaceHandoff,
+            ItemTarget... toStore) {
+        this(
+                getIfNotPresent,
+                new DepositAllStoreTaskGeneration(),
+                placementTaskOwner,
+                postPlaceHandoff,
+                toStore
+        );
     }
 
     DepositAllTask(boolean getIfNotPresent,
                    DepositAllStoreTaskGeneration storeTaskGeneration,
                    ItemTarget... toStore) {
+        this(
+                getIfNotPresent,
+                storeTaskGeneration,
+                DepositAllPlacementTaskOwner.ephemeral(),
+                DepositAllPostPlaceHandoff.disabled(),
+                toStore
+        );
+    }
+
+    private DepositAllTask(
+            boolean getIfNotPresent,
+            DepositAllStoreTaskGeneration storeTaskGeneration,
+            DepositAllPlacementTaskOwner placementTaskOwner,
+            DepositAllPostPlaceHandoff postPlaceHandoff,
+            ItemTarget... toStore) {
         _getIfNotPresent = getIfNotPresent;
         _toStore = toStore;
         _storeTaskGeneration = Objects.requireNonNull(storeTaskGeneration, "storeTaskGeneration");
+        _placementTaskOwner = Objects.requireNonNull(placementTaskOwner, "placementTaskOwner");
+        _postPlaceHandoff = Objects.requireNonNull(postPlaceHandoff, "postPlaceHandoff");
+        if (_placementTaskOwner.retainingIdentity() != _postPlaceHandoff.enabled()) {
+            throw new IllegalArgumentException(
+                    "post-place handoff requires retaining placement ownership"
+            );
+        }
     }
 
     @Override
@@ -141,6 +187,14 @@ public class DepositAllTask extends Task {
                 _storeTaskGeneration.clear();
                 _progressChecker.reset();
             }
+            StoreDepositDiagnostics.observeAutomaticMovementResult(
+                    this,
+                    selectedTarget,
+                    targetInvalidationReason,
+                    progressCheckEvaluated,
+                    progressCheckOk,
+                    !"NONE".equals(targetInvalidationReason)
+            );
         }
 
         Optional<BlockPos> filteredCandidate = Optional.empty();
@@ -193,6 +247,11 @@ public class DepositAllTask extends Task {
         boolean selectedWithinExtraRange = _targetState.isSelectedWithin(
                 mod.getPlayer().getPos(),
                 TOO_FAR_RANGE_EXTRA);
+        //20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
+        if (deferAfterCompletedPlacement()) {
+            setDebugState("Completing placed-container child handoff");
+            return null;
+        }
         if (selectedTarget.isPresent()) {
             BlockPos fixedTarget = selectedTarget.get();
             boolean refreshedFinishedGeneration = _storeTaskGeneration.clearIfFinishedWithRemainingWork(
@@ -266,9 +325,16 @@ public class DepositAllTask extends Task {
                     "progressCheckEvaluated", progressCheckEvaluated,
                     "progressCheckOk", progressCheckOk,
                     "childTaskClass", StoreInContainerTask.class.getName(),
-                    "storeGenerationId", _storeTaskGeneration.generationId(),
-                    "storeGenerationCreated", createdStoreGeneration,
-                    "storeGenerationRefreshReason", refreshedFinishedGeneration ? "CHILD_FINISHED_REMAINING_WORK" : "NONE");
+                     "storeGenerationId", _storeTaskGeneration.generationId(),
+                     "storeGenerationCreated", createdStoreGeneration,
+                     "storeGenerationRefreshReason", refreshedFinishedGeneration ? "CHILD_FINISHED_REMAINING_WORK" : "NONE");
+            StoreDepositDiagnostics.stageAutomaticRouteCandidate(
+                    this,
+                    storeTask,
+                    fixedTarget,
+                    _storeTaskGeneration.generationId(),
+                    selectedNewTarget
+            );
             return storeTask;
         }
 
@@ -328,13 +394,14 @@ public class DepositAllTask extends Task {
                         "containerBlockItem", couldPlace.asItem(),
                         "childTaskClass", PlaceBlockNearbyTask.class.getName());
                 setDebugState("Placing container nearby");
-                return new PlaceBlockNearbyTask(canPlace -> {
-                    // For chests, above must be air OR breakable.
-                    if (WorldHelper.isChest(couldPlace)) {
-                        return WorldHelper.isAir(canPlace.up()) || WorldHelper.canBreak(canPlace.up());
-                    }
-                    return true;
-                }, couldPlace);
+                return _placementTaskOwner.getOrCreate(couldPlace, () ->
+                        new PlaceBlockNearbyTask(canPlace -> {
+                            // For chests, above must be air OR breakable.
+                            if (WorldHelper.isChest(couldPlace)) {
+                                return WorldHelper.isAir(canPlace.up()) || WorldHelper.canBreak(canPlace.up());
+                            }
+                            return true;
+                        }, couldPlace));
             }
         }
         setDebugState("Obtaining a chest item (by default)");
@@ -387,6 +454,21 @@ public class DepositAllTask extends Task {
                 "requestedCount", 1,
                 "childTaskClass", "TaskCatalogue.getItemTask");
         return TaskCatalogue.getItemTask(Items.CHEST, 1);
+    }
+
+    private boolean deferAfterCompletedPlacement() {
+        PlaceBlockNearbyTask placementTask = _placementTaskOwner.currentTask();
+        boolean placementActive = placementTask != null && placementTask.isActive();
+        boolean placementFinished = placementActive && placementTask.isFinished();
+        if (!_postPlaceHandoff.shouldDefer(
+                placementTask,
+                placementActive,
+                placementFinished
+        )) {
+            return false;
+        }
+        _placementTaskOwner.clear(placementTask);
+        return true;
     }
 
     @Override

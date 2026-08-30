@@ -1,10 +1,15 @@
 package lavi.minecraft.diagnostics.mining;
 
-import adris.altoclef.tasks.construction.DestroyBlockTask;
 import adris.altoclef.tasksystem.Task;
-import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.diagnostics.mining.emission.MiningDiagnosticEmissionOrchestrator;
+import lavi.minecraft.diagnostics.mining.formatting.MiningDiagnosticFieldArrays;
+import lavi.minecraft.diagnostics.mining.formatting.MiningDiagnosticTaskFields;
+import lavi.minecraft.diagnostics.mining.formatting.MiningSemanticFingerprint;
+import lavi.minecraft.diagnostics.mining.gate.MiningDiagnosticEventGate;
 
-//20260806_kpopmodder: Keep mining diagnostic event contract and emission bounds in one place.
+import java.util.function.Supplier;
+
+//20260806_kpopmodder: Keep the mining event facade stable while focused collaborators own bounds and correlation.
 public final class MiningDiagnosticEmitter {
     private MiningDiagnosticEmitter() {
     }
@@ -15,99 +20,74 @@ public final class MiningDiagnosticEmitter {
                             String bucket,
                             String fingerprint,
                             Object[] eventFields) {
-        MiningDiagnosticEventGate.Decision decision = MiningDiagnosticEventGate.evaluate(bucket, fingerprint);
-        if (!decision.emit) {
-            if (decision.reportGateLimit) {
-                emitGateLimitReached(eventName, reason, bucket, fingerprint, decision);
-            }
-            return;
-        }
-        Object[] contractFields = new Object[]{
-                "mode", "BOUNDARY",
-                "dedupe_key", fingerprint,
-                "max_emission", "detail_per_bucket=256,session=5000,summary_ticks=200",
-                "terminal", false,
-                "behavior_effect", "none",
-                "summary", decision.summary,
-                "suppressedCount", decision.suppressedCount,
-                "firstObservedTick", decision.firstObservedTick,
-                "lastObservedTick", decision.lastObservedTick
-        };
-        ChatClefDiagnostics.logBoundary(eventName, reason, task,
-                ChatClefDiagnostics.withCommandContextFields(merge(contractFields, eventFields)));
+        emitLazy(eventName, reason, task, bucket, fingerprint, () -> eventFields);
     }
 
-    private static void emitGateLimitReached(String suppressedEventName,
-                                             String suppressedReason,
-                                             String suppressedBucket,
-                                             String suppressedFingerprint,
-                                             MiningDiagnosticEventGate.Decision decision) {
-        ChatClefDiagnostics.logBoundary("MINING_DIAGNOSTIC_GATE_EXHAUSTED",
-                "mining_diagnostic_event_gate_exhausted",
-                null,
-                ChatClefDiagnostics.withCommandContextFields(new Object[]{
-                        "mode", "BOUNDARY",
-                        "terminal", false,
-                        "behavior_effect", "none",
-                        "suppressedEventName", suppressedEventName,
-                        "suppressedReason", suppressedReason,
-                        "suppressedBucket", suppressedBucket,
-                        "suppressedFingerprint", suppressedFingerprint,
-                        "gateLimitReached", decision.gateLimitReached,
-                        "gateLimitReason", decision.gateLimitReason,
-                        "sessionEmissions", decision.sessionEmissions,
-                        "sessionHardCap", decision.sessionHardCap,
-                        "bucketDetailEmissions", decision.bucketDetailEmissions,
-                        "bucketDetailLimit", decision.bucketDetailLimit,
-                        "suppressedCount", decision.suppressedCount,
-                        "firstObservedTick", decision.firstObservedTick,
-                        "lastObservedTick", decision.lastObservedTick
-                }));
+    public static void emitLazy(String eventName,
+                                String reason,
+                                Task task,
+                                String bucket,
+                                String fingerprint,
+                                Supplier<Object[]> eventFieldsSupplier) {
+        MiningDiagnosticEmissionOrchestrator.emitLazy(
+                eventName, reason, task, bucket, fingerprint,
+                false, null, null, eventFieldsSupplier);
+    }
+
+    public static void emitLazyWithFallback(String eventName,
+                                            String reason,
+                                            Task task,
+                                            String bucket,
+                                            String fingerprint,
+                                            String fallbackCorrelationKey,
+                                            String fallbackCorrelationSource,
+                                            Supplier<Object[]> eventFieldsSupplier) {
+        MiningDiagnosticEmissionOrchestrator.emitLazy(
+                eventName, reason, task, bucket, fingerprint,
+                false, fallbackCorrelationKey, fallbackCorrelationSource, eventFieldsSupplier);
+    }
+
+    public static void emitReservedLazy(String eventName,
+                                        String reason,
+                                        Task task,
+                                        String bucket,
+                                        String fingerprint,
+                                        boolean terminal,
+                                        Supplier<Object[]> eventFieldsSupplier) {
+        MiningDiagnosticEmissionOrchestrator.emitLazy(
+                eventName, reason, task, bucket, fingerprint,
+                terminal, null, null, eventFieldsSupplier);
+    }
+
+    public static void resetSession() {
+        MiningDiagnosticEventGate.resetRuntimeSession();
     }
 
     static String destroyTarget(Task task) {
-        if (task instanceof DestroyBlockTask destroyBlockTask) {
-            return ChatClefDiagnostics.blockPos(destroyBlockTask.diagnosticTargetPosition());
-        }
-        return "none";
+        return MiningDiagnosticTaskFields.destroyTarget(task);
     }
 
     static String safeTaskActive(Task task) {
-        return ChatClefDiagnostics.safeValue(() -> task != null && task.isActive());
+        return MiningDiagnosticTaskFields.safeTaskActive(task);
     }
 
     static String safeTaskStopped(Task task) {
-        return ChatClefDiagnostics.safeValue(() -> task != null && task.stopped());
+        return MiningDiagnosticTaskFields.safeTaskStopped(task);
     }
 
     static String taskClass(Task task) {
-        return task == null ? "none" : task.getClass().getName();
+        return MiningDiagnosticTaskFields.taskClass(task);
     }
 
     static String instanceId(Task task) {
-        return task == null ? "none" : Integer.toHexString(System.identityHashCode(task));
+        return MiningDiagnosticTaskFields.instanceId(task);
     }
 
     public static String joinFingerprint(String... values) {
-        return String.join("|", values);
+        return MiningSemanticFingerprint.join(values);
     }
 
     public static Object[] merge(Object[]... arrays) {
-        int length = 0;
-        for (Object[] array : arrays) {
-            if (array != null) {
-                length += array.length;
-            }
-        }
-        Object[] merged = new Object[length];
-        int offset = 0;
-        for (Object[] array : arrays) {
-            if (array == null || array.length == 0) {
-                continue;
-            }
-            System.arraycopy(array, 0, merged, offset, array.length);
-            offset += array.length;
-        }
-        return merged;
+        return MiningDiagnosticFieldArrays.merge(arrays);
     }
 }
