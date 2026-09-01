@@ -51,6 +51,13 @@ public final class StoreDepositInteractionBindingRegistry {
         return bindings.size();
     }
 
+    public synchronized int clearForModeTransition() {
+        int invalidated = bindings.size() + tombstones.size();
+        bindings.clear();
+        tombstones.clear();
+        return invalidated;
+    }
+
     private void expire(long currentTick) {
         Iterator<Map.Entry<Long, StoreDepositInteractionContext>> iterator = bindings.entrySet().iterator();
         while (iterator.hasNext()) {

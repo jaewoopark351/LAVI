@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import unittest
 
+from .command_submission_transport import (
+    CommandSubmissionTransport,
+)
 from .one_shot_command_submission import (
     submit_command_once,
 )
@@ -25,6 +28,43 @@ class OneShotCommandSubmissionTests(unittest.TestCase):
         gateway = _SubmissionGateway(ConnectionResetError("response lost"))
         observation = submit_command_once(gateway, "돌 1개 가져와줘")
         self.assertEqual("submission_outcome_unknown", observation["submission_outcome"])
+        self.assertEqual(1, gateway.submit_call_count)
+        self.assertEqual(0, observation["automatic_resubmit_count"])
+        self.assertTrue(observation["reconciliation_required"])
+
+    def test_raw_transport_submits_exactly_once_without_using_korean_route(self):
+        gateway = _TransportRecordingGateway(_accepted_payload())
+
+        observation = submit_command_once(
+            gateway,
+            "@store_home",
+            transport=CommandSubmissionTransport.RAW,
+        )
+
+        self.assertEqual("accepted", observation["submission_outcome"])
+        self.assertEqual("request-1", observation["submitted_request_id"])
+        self.assertEqual(["@store_home"], gateway.raw_commands)
+        self.assertEqual([], gateway.korean_commands)
+        self.assertEqual(1, gateway.submit_call_count)
+        self.assertEqual(0, observation["automatic_resubmit_count"])
+
+    def test_raw_transport_unknown_outcome_is_never_retried(self):
+        gateway = _TransportRecordingGateway(
+            ConnectionResetError("raw response lost")
+        )
+
+        observation = submit_command_once(
+            gateway,
+            "@store_home",
+            transport=CommandSubmissionTransport.RAW,
+        )
+
+        self.assertEqual(
+            "submission_outcome_unknown",
+            observation["submission_outcome"],
+        )
+        self.assertEqual(["@store_home"], gateway.raw_commands)
+        self.assertEqual([], gateway.korean_commands)
         self.assertEqual(1, gateway.submit_call_count)
         self.assertEqual(0, observation["automatic_resubmit_count"])
         self.assertTrue(observation["reconciliation_required"])
@@ -154,6 +194,28 @@ class _SubmissionGateway:
 
     def submit_korean_command(self, _command):
         self.actual_submit_calls += 1
+        if isinstance(self._submit_result, Exception):
+            raise self._submit_result
+        return dict(self._submit_result)
+
+
+class _TransportRecordingGateway:
+    def __init__(self, submit_result):
+        self._submit_result = submit_result
+        self.submit_call_count = 0
+        self.korean_commands = []
+        self.raw_commands = []
+
+    def submit_korean_command(self, command):
+        self.korean_commands.append(command)
+        return self._result()
+
+    def submit_raw_command(self, command):
+        self.raw_commands.append(command)
+        return self._result()
+
+    def _result(self):
+        self.submit_call_count += 1
         if isinstance(self._submit_result, Exception):
             raise self._submit_result
         return dict(self._submit_result)

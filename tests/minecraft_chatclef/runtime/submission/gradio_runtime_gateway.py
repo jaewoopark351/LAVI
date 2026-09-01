@@ -25,10 +25,27 @@ class LaviGradioRuntimeGateway:
         return dict(payload)
 
     def submit_korean_command(self, command: str) -> dict[str, object]:
+        return self._submit_command(
+            command,
+            api_name="/on_submit_korean_command_click",
+        )
+
+    def submit_raw_command(self, command: str) -> dict[str, object]:
+        return self._submit_command(
+            command,
+            api_name="/on_submit_command_click",
+        )
+
+    def _submit_command(
+        self,
+        command: str,
+        *,
+        api_name: str,
+    ) -> dict[str, object]:
         self.submit_call_count += 1
         result = self._client.predict(
             command=command,
-            api_name="/on_submit_korean_command_click",
+            api_name=api_name,
         )
         if not isinstance(result, (list, tuple)) or not result:
             raise ValueError("Gradio submit response shape is invalid")

@@ -10,7 +10,7 @@ final class BlockBlacklistDiagnostics {
     private BlockBlacklistDiagnostics() {
     }
 
-    static void log(AltoClef mod,
+    static boolean log(AltoClef mod,
                     Object item,
                     boolean entryCreated,
                     int failureCountBefore,
@@ -29,7 +29,7 @@ final class BlockBlacklistDiagnostics {
                     boolean resetApplied,
                     String resetReason) {
         if (!ChatClefDiagnostics.isBoundaryEnabled() || !(item instanceof BlockPos target)) {
-            return;
+            return false;
         }
         String fingerprint = MiningDiagnosticEmitter.joinFingerprint(
                 "BLOCK_BLACKLIST_STATE_CHANGED",
@@ -40,7 +40,8 @@ final class BlockBlacklistDiagnostics {
                 Boolean.toString(resetApplied),
                 resetReason
         );
-        MiningDiagnosticEmitter.emitLazy("BLOCK_BLACKLIST_STATE_CHANGED", "block_blacklist_state_changed", null,
+        return MiningDiagnosticEmitter.emitLazyWithPhysicalOutcome(
+                "BLOCK_BLACKLIST_STATE_CHANGED", "block_blacklist_state_changed", null,
                 "block_blacklist|" + ChatClefDiagnostics.blockPos(target),
                 fingerprint,
                 () -> new Object[]{

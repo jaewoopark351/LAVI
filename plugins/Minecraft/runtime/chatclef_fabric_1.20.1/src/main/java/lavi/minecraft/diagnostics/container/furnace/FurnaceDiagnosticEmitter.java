@@ -8,18 +8,18 @@ final class FurnaceDiagnosticEmitter {
     private FurnaceDiagnosticEmitter() {
     }
 
-    static void emit(String eventName,
-                     String reason,
-                     Task task,
-                     String bucket,
-                     String fingerprint,
-                     Object[] eventFields) {
+    static boolean emit(String eventName,
+                        String reason,
+                        Task task,
+                        String bucket,
+                        String fingerprint,
+                        Object[] eventFields) {
         if (!ChatClefDiagnostics.isBoundaryEnabled()) {
-            return;
+            return false;
         }
         FurnaceDiagnosticEventGate.Decision decision = FurnaceDiagnosticEventGate.evaluate(bucket, fingerprint);
         if (!decision.emit) {
-            return;
+            return false;
         }
         Object[] contractFields = new Object[]{
                 "mode", "BOUNDARY",
@@ -32,8 +32,13 @@ final class FurnaceDiagnosticEmitter {
                 "firstObservedTick", decision.firstObservedTick,
                 "lastObservedTick", decision.lastObservedTick
         };
-        ChatClefDiagnostics.logBoundary(eventName, reason, task,
-                ChatClefDiagnostics.withCommandContextFields(merge(contractFields, eventFields)));
+        boolean sourceEmissionCompleted = ChatClefDiagnostics.logBoundaryWithPhysicalOutcome(
+                eventName,
+                reason,
+                task,
+                ChatClefDiagnostics.withCommandContextFields(merge(contractFields, eventFields))
+        );
+        return sourceEmissionCompleted;
     }
 
     static String joinFingerprint(String... values) {

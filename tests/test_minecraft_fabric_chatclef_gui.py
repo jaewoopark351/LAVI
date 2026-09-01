@@ -103,6 +103,50 @@ class MinecraftFabricChatClefGuiTests(unittest.TestCase):
         self.assertEqual("connected", lifecycle)
         self.assertEqual("true", connected)
 
+    def test_panel_preserves_exact_store_home_raw_command_identity_once(self):
+        calls = []
+
+        class FakeExtension:
+            def handle_command(self, command):
+                calls.append(command)
+                return {
+                    "ok": True,
+                    "status": {
+                        "request_id": command["request_id"],
+                        "status": "accepted",
+                    },
+                    "error": None,
+                    "message": "accepted",
+                    "details": {},
+                }
+
+            def get_status(self):
+                return {"details": {}}
+
+        with mock.patch(
+            "plugins.Minecraft.fabric.chatclef.ui."
+            "fabric_chatclef_command_controller.uuid.uuid4",
+            return_value=SimpleNamespace(hex="storehomeidentity"),
+        ):
+            result_json, *_status = FabricChatClefPanel(
+                plugin=object(),
+                extension=FakeExtension(),
+            ).on_submit_command_click("  @store_home  ")
+
+        expected_request = {
+            "request_id": "lavi-gui-storehomeidentity",
+            "command": "@store_home",
+            "source": "lavi_gui",
+            "metadata": {"ui": "fabric_chatclef"},
+        }
+        self.assertEqual([expected_request], calls)
+        result = json.loads(result_json)
+        self.assertEqual(
+            expected_request["request_id"],
+            result["status"]["request_id"],
+        )
+        self.assertEqual("accepted", result["status"]["status"])
+
     def test_panel_rejects_empty_command_locally(self):
         result_json, _endpoint, _lifecycle, _connected, _status_json = (
             FabricChatClefPanel(plugin=object()).on_submit_command_click(" ")

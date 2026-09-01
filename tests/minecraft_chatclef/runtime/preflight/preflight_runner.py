@@ -76,6 +76,7 @@ def run_live_runtime_preflight(
         "approved_command_fingerprint": command_fingerprint(
             environment.get("command")
         ),
+        "approved_transport": str(approval.get("transport") or ""),
         "approval_source": str(approval.get("approval_source") or ""),
         "approval_tuple_verified": True,
         "fabric_endpoint": f"ws://127.0.0.1:{int(environment['fabric_port'])}",
@@ -227,6 +228,7 @@ def _approval_expected(
         "instance": environment.get("expected_instance"),
         "world": environment.get("expected_world"),
         "invocation_id": environment.get("invocation_id"),
+        "transport": environment.get("transport"),
     }
 
 

@@ -12,14 +12,7 @@ class LiveRuntimeApprovalTests(unittest.TestCase):
         environment = live_environment_fixture()
         approval, error = parse_approval_record(environment["approval_json"])
         self.assertEqual("", error)
-        expected = {
-            "command": environment["command"],
-            "gradio_url": environment["gradio_url"],
-            "backend": environment["expected_backend"],
-            "instance": environment["expected_instance"],
-            "world": environment["expected_world"],
-            "invocation_id": environment["invocation_id"],
-        }
+        expected = _expected_approval(environment)
         self.assertEqual("", validate_approval_record(approval, expected))
         approval["automatic_rerun_disabled"] = False
         self.assertIn(
@@ -27,18 +20,26 @@ class LiveRuntimeApprovalTests(unittest.TestCase):
             validate_approval_record(approval, expected),
         )
 
+    def test_approval_binds_the_exact_command_transport(self):
+        environment = live_environment_fixture()
+        approval, error = parse_approval_record(environment["approval_json"])
+        self.assertEqual("", error)
+        expected = _expected_approval(environment)
+
+        self.assertEqual("", validate_approval_record(approval, expected))
+
+        approval["transport"] = "raw"
+
+        self.assertEqual(
+            "approval field mismatch: transport",
+            validate_approval_record(approval, expected),
+        )
+
     def test_coercible_or_padded_identity_values_are_rejected(self):
         environment = live_environment_fixture()
         approval, error = parse_approval_record(environment["approval_json"])
         self.assertEqual("", error)
-        expected = {
-            "command": environment["command"],
-            "gradio_url": environment["gradio_url"],
-            "backend": environment["expected_backend"],
-            "instance": environment["expected_instance"],
-            "world": environment["expected_world"],
-            "invocation_id": environment["invocation_id"],
-        }
+        expected = _expected_approval(environment)
         for field, value in (
             ("command", 1),
             ("gradio_url", True),
@@ -46,6 +47,7 @@ class LiveRuntimeApprovalTests(unittest.TestCase):
             ("instance", " LAVI_TEST_Fabric01"),
             ("world", "전용월드 "),
             ("invocation_id", 123),
+            ("transport", " raw"),
             ("approval_source", " explicit_user_approval"),
         ):
             with self.subTest(field=field, value=value):
@@ -53,6 +55,18 @@ class LiveRuntimeApprovalTests(unittest.TestCase):
                 changed[field] = value
 
                 self.assertTrue(validate_approval_record(changed, expected))
+
+
+def _expected_approval(environment: dict[str, object]) -> dict[str, object]:
+    return {
+        "command": environment["command"],
+        "gradio_url": environment["gradio_url"],
+        "backend": environment["expected_backend"],
+        "instance": environment["expected_instance"],
+        "world": environment["expected_world"],
+        "invocation_id": environment["invocation_id"],
+        "transport": environment["transport"],
+    }
 
 
 if __name__ == "__main__":

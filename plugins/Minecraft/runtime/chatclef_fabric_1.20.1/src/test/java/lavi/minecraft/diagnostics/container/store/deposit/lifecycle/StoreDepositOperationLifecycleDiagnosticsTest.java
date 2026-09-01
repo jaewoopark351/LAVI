@@ -22,6 +22,7 @@ class StoreDepositOperationLifecycleDiagnosticsTest {
     @AfterEach
     void disableDiagnostics() {
         ChatClefDiagnostics.setBoundaryEnabled(false);
+        ChatClefDiagnostics.resetDiagnosticSessionForTests();
     }
 
     @Test

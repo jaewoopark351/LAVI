@@ -22,7 +22,7 @@ class DepositAllPostPlaceHandoffLifecycleTest {
     @Test
     void stopsTheActualPlacementChildBeforeStartingTheOpenChildOnTheNextTick() {
         try (HeadlessMinecraftClientSession ignored = HeadlessMinecraftClientSession.outOfGame()) {
-            Block block = TestObjects.allocateBootstrapped(Block.class);
+            Block block = TestObjects.allocate(Block.class);
             PlacementProbe placement = placementProbe();
             OpenProbe open = new OpenProbe();
             HandoffParent parent = new HandoffParent(block, placement, open);
@@ -62,7 +62,7 @@ class DepositAllPostPlaceHandoffLifecycleTest {
     @Test
     void interruptionKeepsTheSchedulerOwnedPlacementIdentity() {
         try (HeadlessMinecraftClientSession ignored = HeadlessMinecraftClientSession.outOfGame()) {
-            Block block = TestObjects.allocateBootstrapped(Block.class);
+            Block block = TestObjects.allocate(Block.class);
             PlacementProbe placement = placementProbe();
             HandoffParent parent = new HandoffParent(block, placement, new OpenProbe());
             HarnessChain chain = new HarnessChain();

@@ -34,6 +34,26 @@ public final class MiningDiagnosticEmitter {
                 false, null, null, eventFieldsSupplier);
     }
 
+    public static boolean emitLazyWithPhysicalOutcome(
+            String eventName,
+            String reason,
+            Task task,
+            String bucket,
+            String fingerprint,
+            Supplier<Object[]> eventFieldsSupplier) {
+        return MiningDiagnosticEmissionOrchestrator.emitLazyWithPhysicalOutcome(
+                eventName,
+                reason,
+                task,
+                bucket,
+                fingerprint,
+                false,
+                null,
+                null,
+                eventFieldsSupplier
+        );
+    }
+
     public static void emitLazyWithFallback(String eventName,
                                             String reason,
                                             Task task,

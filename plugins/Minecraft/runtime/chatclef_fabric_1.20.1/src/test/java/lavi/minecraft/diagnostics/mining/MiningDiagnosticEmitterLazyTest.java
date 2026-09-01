@@ -16,6 +16,7 @@ class MiningDiagnosticEmitterLazyTest {
     @AfterEach
     void disableDiagnostics() {
         ChatClefDiagnostics.setBoundaryEnabled(false);
+        ChatClefDiagnostics.resetDiagnosticSessionForTests();
         MiningDiagnosticEmitter.resetSession();
     }
 

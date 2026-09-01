@@ -13,6 +13,7 @@ import lavi.minecraft.diagnostics.interaction.BlockInteractionObserverRegistry;
 import lavi.minecraft.diagnostics.interaction.BlockInteractionScreenSnapshot;
 import lavi.minecraft.diagnostics.interaction.BlockInteractionTargetClassifier;
 import lavi.minecraft.diagnostics.interaction.BlockInteractionTargetInfo;
+import lavi.minecraft.diagnostics.interaction.ownership.BlockInteractionOwnerTokenRegistry;
 import lavi.minecraft.diagnostics.mode.DiagnosticModeController;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
@@ -33,6 +34,8 @@ final class BlockInteractionDiagnostics {
     private final BlockInteractionInvocationTracker invocationTracker = new BlockInteractionInvocationTracker();
     private final BlockInteractionObserverRegistry observerRegistry = new BlockInteractionObserverRegistry();
     private final BlockInteractionEmissionLimiter emissionLimiter = new BlockInteractionEmissionLimiter();
+    private final BlockInteractionOwnerTokenRegistry ownerTokens =
+            new BlockInteractionOwnerTokenRegistry();
 
     BlockInteractionDiagnostics(DiagnosticModeController mode,
                                 DiagnosticEventEmitter events,
@@ -48,6 +51,23 @@ final class BlockInteractionDiagnostics {
 
     void registerObserver(BlockInteractionObserver observer) {
         observerRegistry.register(observer);
+    }
+
+    void clearForSessionTransition() {
+        invocationTracker.clearForModeTransition();
+        emissionLimiter.clearForModeTransition();
+        ownerTokens.clearForModeTransition();
+    }
+
+    void noteOwner(Task sourceTask, BlockPos targetPosition) {
+        if (!mode.isBoundaryEnabled()) {
+            return;
+        }
+        ownerTokens.publish(
+                sourceTask,
+                targetPosition,
+                currentClientTickId.getAsLong()
+        );
     }
 
     void logInteract(String phase,
@@ -75,18 +95,31 @@ final class BlockInteractionDiagnostics {
             return;
         }
 
+        long startClientTickId = currentClientTickId.getAsLong();
+        Task sourceTask = ownerTokens.consume(
+                hitResult.getBlockPos(),
+                startClientTickId
+        );
         BlockInteractionContext context = new BlockInteractionContext(
                 nextOperationId.getAsLong(),
-                currentClientTickId.getAsLong(),
+                startClientTickId,
                 target,
                 hand,
                 hitResult,
                 BlockInteractionScreenSnapshot.current(client, player),
-                true
+                true,
+                sourceTask
         );
         invocationTracker.begin(context);
-        observerRegistry.notifyBefore(context, player, hand, hitResult);
-        emitInteractionEvent("CONTAINER_OPEN_ATTEMPT_OBSERVED", "container_open_interact_head", "HEAD", context, "unavailable", null);
+        boolean sourceEmissionCompleted = emitInteractionEvent(
+                "CONTAINER_OPEN_ATTEMPT_OBSERVED",
+                "container_open_interact_head",
+                "HEAD",
+                context,
+                "unavailable",
+                null
+        );
+        observerRegistry.notifyBefore(context, player, hand, hitResult, sourceEmissionCompleted);
     }
 
     private void logReturn(ClientPlayerEntity player, Object hand, BlockHitResult hitResult, Object result) {
@@ -105,23 +138,38 @@ final class BlockInteractionDiagnostics {
                     hand,
                     hitResult,
                     BlockInteractionScreenSnapshot.current(client, player),
-                    false
+                    false,
+                    null
             );
         }
 
         BlockInteractionScreenSnapshot screenAfter = BlockInteractionScreenSnapshot.current(MinecraftClient.getInstance(), player);
-        observerRegistry.notifyAfter(context, player, hand, hitResult, result);
-        emitInteractionEvent("CONTAINER_OPEN_RETURN_OBSERVED", "container_open_interact_return", "RETURN", context, result, screenAfter);
+        boolean sourceEmissionCompleted = emitInteractionEvent(
+                "CONTAINER_OPEN_RETURN_OBSERVED",
+                "container_open_interact_return",
+                "RETURN",
+                context,
+                result,
+                screenAfter
+        );
+        observerRegistry.notifyAfter(
+                context,
+                player,
+                hand,
+                hitResult,
+                result,
+                sourceEmissionCompleted
+        );
     }
 
-    private void emitInteractionEvent(String eventName,
-                                      String reason,
-                                      String phase,
-                                      BlockInteractionContext context,
-                                      Object result,
-                                      BlockInteractionScreenSnapshot screenAfter) {
+    private boolean emitInteractionEvent(String eventName,
+                                         String reason,
+                                         String phase,
+                                         BlockInteractionContext context,
+                                         Object result,
+                                         BlockInteractionScreenSnapshot screenAfter) {
         if (!mode.isBoundaryEnabled()) {
-            return;
+            return false;
         }
 
         String repeatKey = eventName + "|"
@@ -132,24 +180,24 @@ final class BlockInteractionDiagnostics {
                 + StoreDepositDiagnostics.interactionScopeKey(context);
         BlockInteractionEmissionDecision decision = emissionLimiter.evaluate(repeatKey, currentClientTickId.getAsLong());
         if (decision.emitCap()) {
-            emitBoundary("DIAGNOSTIC_SESSION_CAP_REACHED", "block_interaction_diagnostic_cap_reached", null,
+            emitBoundary("BLOCK_INTERACTION_DIAGNOSTIC_FAMILY_CAP_REACHED", "block_interaction_diagnostic_cap_reached", null,
                     "capScope", "block_interaction",
                     "cap", 5000);
-            return;
+            return false;
         }
         if (decision.emitSummary()) {
             emitBoundary("DIAGNOSTIC_REPEAT_SUMMARY", "block_interaction_repeat_summary", null,
                     BlockInteractionDiagnosticFields.repeatSummaryFields(repeatKey, decision.suppressedRepeatCount()));
-            return;
+            return false;
         }
         if (!decision.emitEvent()) {
-            return;
+            return false;
         }
         if (!StoreDepositDiagnostics.shouldEmitInteractionDetail(context, eventName, repeatKey)) {
-            return;
+            return false;
         }
 
-        emitBoundary(eventName, reason, null,
+        return emitBoundary(eventName, reason, null,
                 DiagnosticEventEmitter.mergeFields(
                         DiagnosticEventEmitter.mergeFields(
                                 BlockInteractionDiagnosticFields.interactionFields(context, phase, result, screenAfter, decision.suppressedRepeatCount()),
@@ -159,8 +207,16 @@ final class BlockInteractionDiagnostics {
                 ));
     }
 
-    private void emitBoundary(String eventName, String reason, Task task, Object... fields) {
-        events.emitEvent("BOUNDARY", "[LAVI ChatClefBoundary]", eventName, reason, task, fields, false);
+    private boolean emitBoundary(String eventName, String reason, Task task, Object... fields) {
+        return events.emitEventWithOutcome(
+                "BOUNDARY",
+                "[LAVI ChatClefBoundary]",
+                eventName,
+                reason,
+                task,
+                fields,
+                false
+        ).emissionCompleted();
     }
 
     private static String blockPos(BlockPos pos) {

@@ -122,11 +122,6 @@ class MinecraftFabricChatClefJavaBridgeContractTests(unittest.TestCase):
             / "command"
             / "FabricChatClefCommandDispatcher.java"
         ).read_text(encoding="utf-8")
-        result_text = (
-            BRIDGE_ROOT
-            / "command"
-            / "FabricChatClefCommandResult.java"
-        ).read_text(encoding="utf-8")
         execution_root = BRIDGE_ROOT / "command" / "execution"
 
         self.assertTrue(execution_root.exists())
@@ -266,7 +261,37 @@ class MinecraftFabricChatClefJavaBridgeContractTests(unittest.TestCase):
         self.assertNotIn("detachConnection", client_text)
         self.assertIn("processConnectionDetachedEvents()", dispatcher_text)
         self.assertIn("matchesBoundRootTask(context, currentTask)", dispatcher_text)
-        self.assertIn("cancelUserTaskForDetachedCommand(rootMatchReason)", dispatcher_text)
+        self.assertIn(
+            "private final Consumer<String> detachedCommandCancellationAction;",
+            dispatcher_text,
+        )
+        self.assertIn("? this::cancelUserTaskForDetachedCommand", dispatcher_text)
+        self.assertIn(": detachedCommandCancellationAction;", dispatcher_text)
+        cancellation_delegate = (
+            "detachedCommandCancellationAction.accept(rootMatchReason);"
+        )
+        self.assertEqual(1, dispatcher_text.count(cancellation_delegate))
+        ownership_check_index = dispatcher_text.index(
+            "boolean ownsCurrentTask = "
+            "lifecycleCoordinator.matchesBoundRootTask(context, currentTask);"
+        )
+        owned_branch_index = dispatcher_text.index(
+            "if (ownsCurrentTask)", ownership_check_index
+        )
+        delegate_index = dispatcher_text.index(
+            cancellation_delegate, owned_branch_index
+        )
+        unowned_branch_index = dispatcher_text.index("} else {", delegate_index)
+        clear_index = dispatcher_text.index(
+            "lifecycleCoordinator.clearDetachedExecution", unowned_branch_index
+        )
+        self.assertLess(ownership_check_index, owned_branch_index)
+        self.assertLess(owned_branch_index, delegate_index)
+        self.assertLess(delegate_index, unowned_branch_index)
+        self.assertLess(unowned_branch_index, clear_index)
+        self.assertNotIn(
+            "cancelUserTaskForDetachedCommand(rootMatchReason)", dispatcher_text
+        )
         self.assertIn("connection_detached_task_not_owned", dispatcher_text)
         self.assertIn("mod.cancelUserTask()", dispatcher_text)
         self.assertIn("clearDetachedExecution(context, event.reason() + \":\" + rootMatchReason)", dispatcher_text)

@@ -8,8 +8,6 @@ public final class StoreHomeDiagnosticBoundary {
     }
 
     public static void runIfEnabled(Runnable action) {
-        if (ChatClefDiagnostics.isBoundaryEnabled()) {
-            action.run();
-        }
+        ChatClefDiagnostics.runIfDiagnosticsEligible(action);
     }
 }

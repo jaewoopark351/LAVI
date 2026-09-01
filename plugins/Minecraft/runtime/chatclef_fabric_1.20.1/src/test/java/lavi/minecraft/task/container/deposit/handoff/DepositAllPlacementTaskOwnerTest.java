@@ -129,7 +129,7 @@ class DepositAllPlacementTaskOwnerTest {
     }
 
     private static Block block() {
-        return TestObjects.allocateBootstrapped(Block.class);
+        return TestObjects.allocate(Block.class);
     }
 
     private static PlaceBlockNearbyTask placementTask() {

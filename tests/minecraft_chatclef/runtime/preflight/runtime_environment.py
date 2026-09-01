@@ -7,6 +7,7 @@ from typing import Mapping
 
 
 DEFAULT_KOREAN_COMMAND = "돌 1개 가져와줘"
+DEFAULT_COMMAND_TRANSPORT = "korean"
 DEFAULT_FABRIC_PORT = 4316
 DEFAULT_GRADIO_RANGE_START = 47860
 DEFAULT_GRADIO_RANGE_END = 47959
@@ -29,6 +30,10 @@ def load_live_runtime_environment(
             values.get("LAVI_MINECRAFT_RUNTIME_KOREAN_COMMAND")
         )
         or DEFAULT_KOREAN_COMMAND,
+        "transport": _text(
+            values.get("LAVI_MINECRAFT_RUNTIME_COMMAND_TRANSPORT")
+        )
+        or DEFAULT_COMMAND_TRANSPORT,
         "expected_backend": _text(
             values.get("LAVI_MINECRAFT_EXPECTED_BACKEND")
         ),

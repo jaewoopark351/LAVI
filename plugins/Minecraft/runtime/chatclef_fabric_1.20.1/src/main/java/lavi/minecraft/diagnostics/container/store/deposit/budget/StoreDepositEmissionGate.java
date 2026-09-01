@@ -57,4 +57,9 @@ public final class StoreDepositEmissionGate {
     public void purgeOperation(String operationId) {
         detailBudget.purge(operationId);
     }
+
+    public int clearForModeTransition() {
+        return detailBudget.clearForModeTransition()
+                + criticalBudget.clearForModeTransition();
+    }
 }

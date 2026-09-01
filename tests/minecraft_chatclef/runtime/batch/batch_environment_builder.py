@@ -19,6 +19,7 @@ def build_batch_command_environments(
             {
                 "command": command,
                 "invocation_id": invocation_id,
+                "transport": str(approval["transport"]),
                 "expected_item_id": str(step.get("expected_item_id") or ""),
                 "expected_item_delta": step.get("expected_item_delta"),
                 "gameplay_test_objective": step.get("gameplay_test_objective"),
@@ -30,6 +31,7 @@ def build_batch_command_environments(
                         "instance": approval["instance"],
                         "world": approval["world"],
                         "invocation_id": invocation_id,
+                        "transport": approval["transport"],
                         "approval_source": approval["approval_source"],
                         "one_shot": True,
                         "automatic_rerun_disabled": True,

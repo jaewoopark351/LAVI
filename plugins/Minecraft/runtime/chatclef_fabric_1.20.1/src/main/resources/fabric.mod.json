@@ -25,6 +25,9 @@
       "lavi.minecraft.overlay.OverlayEntrypoint",
       "lavi.minecraft.task.container.deposit.auto.DepositAllAutoEntrypoint",
       "lavi.minecraft.fabric.chatclef.bridge.FabricChatClefBridgeEntrypoint"
+    ],
+    "client": [
+      "lavi.minecraft.diagnostics.session.lifecycle.DiagnosticSessionLifecycleEntrypoint"
     ]
   },
   "mixins": [

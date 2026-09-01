@@ -16,6 +16,7 @@ REQUIRED_TEXT_FIELDS = (
     "expected_instance",
     "expected_world",
     "invocation_id",
+    "transport",
     "approval_json",
     "repository_root",
 )
@@ -25,6 +26,8 @@ def validate_preflight_environment(environment: Mapping[str, object]) -> str:
     for field in REQUIRED_TEXT_FIELDS:
         if not _exact_text(environment.get(field)):
             return f"required live runtime value is missing or invalid: {field}"
+    if environment.get("transport") not in {"korean", "raw"}:
+        return "command transport must be exactly korean or raw"
     _expected_process_identity, identity_error = (
         expected_process_identity_fingerprint(environment)
     )

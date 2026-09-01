@@ -557,6 +557,27 @@ class PluginSystemImportTests(unittest.TestCase):
         self.assertEqual("production", resolution.source)
         self.assertEqual({"RootOnly": True}, resolution.settings)
 
+    def test_modules_resolution_prefers_optional_user_override(self):
+        #20260901_kpopmodder: Prove the local override role without requiring it in deployment.
+        from core.profile_resolver import load_module_settings
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "config").mkdir()
+            (root / "modules.json").write_text(
+                json.dumps({"RootOnly": True}),
+                encoding="utf-8",
+            )
+            (root / "config" / "modules.json").write_text(
+                json.dumps({"UserOnly": True}),
+                encoding="utf-8",
+            )
+
+            resolution = load_module_settings(root, argv=[], environ={})
+
+        self.assertEqual("user", resolution.source)
+        self.assertEqual({"UserOnly": True}, resolution.settings)
+
     def test_modules_resolution_uses_core_config_only_when_profile_core(self):#20260716_kpopmodder
         from core.profile_resolver import load_module_settings
 

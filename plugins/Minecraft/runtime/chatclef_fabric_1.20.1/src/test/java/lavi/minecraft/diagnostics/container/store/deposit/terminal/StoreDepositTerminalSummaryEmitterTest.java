@@ -5,7 +5,11 @@ import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 import lavi.minecraft.diagnostics.container.store.deposit.binding.StoreDepositBindingRegistry;
 import lavi.minecraft.diagnostics.container.store.deposit.budget.StoreDepositEmissionGate;
 import lavi.minecraft.diagnostics.container.store.deposit.context.StoreDepositOperationState;
+import lavi.minecraft.diagnostics.container.store.deposit.terminal.accounting.StoreDepositTerminalLedgerSnapshot;
+import lavi.minecraft.diagnostics.container.store.deposit.terminal.accounting.StoreDepositTerminalClassification;
+import lavi.minecraft.diagnostics.container.store.deposit.terminal.accounting.StoreDepositTerminalScope;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayOutputStream;
@@ -18,14 +22,21 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 //20260829_kpopmodder: Characterize terminal summary emission before further StoreDepositDiagnostics no-growth extraction.
 class StoreDepositTerminalSummaryEmitterTest {
+    @BeforeEach
+    void enableFreshDiagnosticSession() {
+        ChatClefDiagnostics.setBoundaryEnabled(false);
+        ChatClefDiagnostics.resetDiagnosticSessionForTests();
+        ChatClefDiagnostics.setBoundaryEnabled(true);
+    }
+
     @AfterEach
     void disableDiagnostics() {
         ChatClefDiagnostics.setBoundaryEnabled(false);
+        ChatClefDiagnostics.resetDiagnosticSessionForTests();
     }
 
     @Test
     void emitsOneTerminalSummaryGroupThenPurgesTheOperation() {
-        ChatClefDiagnostics.setBoundaryEnabled(true);
         StoreDepositBindingRegistry bindings = new StoreDepositBindingRegistry();
         StoreDepositEmissionGate emissionGate = new StoreDepositEmissionGate();
         StoreDepositTerminalSummaryEmitter emitter = new StoreDepositTerminalSummaryEmitter(bindings, emissionGate);
@@ -60,11 +71,11 @@ class StoreDepositTerminalSummaryEmitterTest {
                 "event=STORE_DEPOSIT_DIAGNOSTIC_COVERAGE_SUMMARY"
         );
         assertEquals("", secondOutput.trim());
+        assertEquals(1, emitter.ledgerSnapshot().duplicateFinalizationAttempts());
     }
 
     @Test
     void mergesDepositAllRouteEvidenceIntoTheTerminalSummary() {
-        ChatClefDiagnostics.setBoundaryEnabled(true);
         StoreDepositBindingRegistry bindings = new StoreDepositBindingRegistry();
         StoreDepositEmissionGate emissionGate = new StoreDepositEmissionGate();
         StoreDepositTerminalSummaryEmitter emitter = new StoreDepositTerminalSummaryEmitter(bindings, emissionGate);
@@ -84,32 +95,57 @@ class StoreDepositTerminalSummaryEmitterTest {
     }
 
     @Test
-    void emitsOneReserveExhaustedControlEventAndStillPurgesTheOperation() {
-        ChatClefDiagnostics.setBoundaryEnabled(true);
+    void routineExhaustionDoesNotBorrowTheIndependentAbnormalTerminalQuota() {
         StoreDepositBindingRegistry bindings = new StoreDepositBindingRegistry();
         StoreDepositEmissionGate emissionGate = new StoreDepositEmissionGate();
-        for (int index = 0; index < 8; index++) {
-            emissionGate.reserveTerminalGroup("reserved-operation-" + index);
-        }
         StoreDepositTerminalSummaryEmitter emitter = new StoreDepositTerminalSummaryEmitter(bindings, emissionGate);
-        Task rootTask = new TestTask();
-        StoreDepositOperationState state = bindings.activateRoot(rootTask, "BARE_DEPOSIT_COMMAND");
+        String routineOutput = captureOutput(() -> {
+            for (int index = 0; index < 8; index++) {
+                Task routineRoot = new TestTask();
+                StoreDepositOperationState routineState =
+                        bindings.activateRoot(routineRoot, "AUTO_DEPOSIT_ALL_CHAIN");
+                emitter.emitAndPurge(
+                        routineRoot,
+                        routineState,
+                        "NATURAL_FINISH",
+                        "NATURAL_FINISH_OBSERVED"
+                );
+                assertNull(bindings.stateFor(routineRoot));
+            }
+        });
 
-        String output = captureOutput(() -> emitter.emitAndPurge(
-                rootTask,
-                state,
+        Task abnormalRoot = new TestTask();
+        StoreDepositOperationState abnormalState =
+                bindings.activateRoot(abnormalRoot, "AUTO_DEPOSIT_ALL_CHAIN");
+        String abnormalOutput = captureOutput(() -> emitter.emitAndPurge(
+                abnormalRoot,
+                abnormalState,
                 "ROOT_STOP_END",
                 "UNKNOWN_STOP"
         ));
 
-        assertEquals(1, occurrences(output, "event=STORE_DEPOSIT_TERMINAL_GROUP_RESERVE_EXHAUSTED"));
-        assertEquals(0, occurrences(output, "event=STORE_DEPOSIT_TERMINAL_SUMMARY"));
-        assertNull(bindings.stateFor(rootTask));
+        StoreDepositTerminalLedgerSnapshot snapshot = emitter.ledgerSnapshot();
+        assertEquals(2, occurrences(routineOutput, "event=STORE_DEPOSIT_TERMINAL_SUMMARY"));
+        assertEquals(1, occurrences(abnormalOutput, "event=STORE_DEPOSIT_TERMINAL_SUMMARY"));
+        assertEquals(9, snapshot.totalTerminalObserved());
+        assertEquals(3, snapshot.fullTerminalGroupAdmissionGranted());
+        assertEquals(6, snapshot.fullTerminalGroupSuppressedBeforeAdmission());
+        assertEquals(3, snapshot.fullTerminalGroupEmissionCompleted());
+        assertEquals(0, snapshot.fullTerminalGroupAdmissionPending());
+        assertEquals(0, snapshot.fullTerminalGroupEmissionPending());
+        assertEquals(8, snapshot.classificationCounts().get(
+                lavi.minecraft.diagnostics.container.store.deposit.terminal.accounting.StoreDepositTerminalClassification.NATURAL_FINISH));
+        assertEquals(1, snapshot.classificationCounts().get(
+                lavi.minecraft.diagnostics.container.store.deposit.terminal.accounting.StoreDepositTerminalClassification.UNKNOWN_STOP));
+        assertEquals(9, snapshot.scopeCounts().get(
+                lavi.minecraft.diagnostics.container.store.deposit.terminal.accounting.StoreDepositTerminalScope.AUTOMATIC_GENERAL));
+        assertTrue(snapshot.settled());
+        assertTrue(snapshot.accountingEquationsHold());
+        assertNull(bindings.stateFor(abnormalRoot));
     }
 
     @Test
-    void ignoresANullStateWithoutEmittingOrPurgingAnotherOperation() {
-        ChatClefDiagnostics.setBoundaryEnabled(true);
+    void recordsOneCoverageGapForAStateLessTerminalBoundaryWithoutPurgingAnotherOperation() {
         StoreDepositBindingRegistry bindings = new StoreDepositBindingRegistry();
         StoreDepositEmissionGate emissionGate = new StoreDepositEmissionGate();
         StoreDepositTerminalSummaryEmitter emitter = new StoreDepositTerminalSummaryEmitter(bindings, emissionGate);
@@ -125,6 +161,41 @@ class StoreDepositTerminalSummaryEmitterTest {
 
         assertEquals("", output.trim());
         assertTrue(bindings.stateFor(rootTask) != null);
+        assertEquals(0, emitter.ledgerSnapshot().totalTerminalObserved());
+        assertEquals(1, emitter.ledgerSnapshot().terminalBoundaryWithoutContextCount());
+        assertEquals(1, emitter.ledgerSnapshot().ledgerCoverageGapCount());
+    }
+
+    @Test
+    void accountsAStableStateWithMissingAncillaryContextAsUnavailableAndSettles() {
+        StoreDepositBindingRegistry bindings = new StoreDepositBindingRegistry();
+        StoreDepositEmissionGate emissionGate = new StoreDepositEmissionGate();
+        StoreDepositTerminalSummaryEmitter emitter = new StoreDepositTerminalSummaryEmitter(
+                bindings,
+                emissionGate
+        );
+        StoreDepositOperationState state = new StoreDepositOperationState(null);
+
+        String output = captureOutput(() -> emitter.emitAndPurge(
+                null,
+                state,
+                "ROOT_STOP_END",
+                "UNKNOWN_STOP"
+        ));
+
+        StoreDepositTerminalLedgerSnapshot snapshot = emitter.ledgerSnapshot();
+        assertEquals(1, occurrences(output, "event=STORE_DEPOSIT_TERMINAL_SUMMARY"));
+        assertEquals(1, snapshot.totalTerminalObserved());
+        assertEquals(1, snapshot.classificationCounts().get(
+                StoreDepositTerminalClassification.UNKNOWN_STOP
+        ));
+        assertEquals(1, snapshot.scopeCounts().get(StoreDepositTerminalScope.UNAVAILABLE));
+        assertEquals(0, snapshot.terminalContextAvailableCount());
+        assertEquals(1, snapshot.terminalContextUnavailableCount());
+        assertEquals(0, snapshot.fullTerminalGroupAdmissionPending());
+        assertEquals(0, snapshot.fullTerminalGroupEmissionPending());
+        assertTrue(snapshot.settled());
+        assertTrue(snapshot.accountingEquationsHold());
     }
 
     private static String captureOutput(Runnable action) {

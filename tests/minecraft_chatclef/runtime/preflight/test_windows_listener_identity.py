@@ -427,6 +427,101 @@ class WindowsListenerIdentityFixtureTests(unittest.TestCase):
                 self.assertFalse(result["ok"], result)
                 self.assertIn("entrypoint", result["reason"])
 
+    def test_exact_repository_venv_redirect_process_passes(self):
+        payload = listener_payload_fixture()
+        owner = payload["processes"][0]
+        owner["parent_process_id"] = 4001
+        owner["executable_path"] = "C:/Python314/python.exe"
+        owner["command_line"] = (
+            '"C:/Vtuber_Souorce_Code/LAVI/venv/Scripts/python.exe" '
+            "C:/Vtuber_Souorce_Code/LAVI/main.py"
+        )
+        payload["processes"].append(
+            {
+                "process_id": 4001,
+                "parent_process_id": 4002,
+                "name": "python.exe",
+                "creation_date": "20260818115959.000000+540",
+                "creation_time_utc_ticks": 638911007990000000,
+                "executable_path": (
+                    "C:/Vtuber_Souorce_Code/LAVI/venv/Scripts/python.exe"
+                ),
+                "command_line": (
+                    '"C:/Vtuber_Souorce_Code/LAVI/venv/Scripts/python.exe" '
+                    "C:/Vtuber_Souorce_Code/LAVI/main.py"
+                ),
+            }
+        )
+
+        result = _validate(payload)
+
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(
+            "exact_repository_venv_redirect",
+            result["observed"]["venv_redirect"]["entrypoint_provenance"],
+        )
+        self.assertEqual(4001, result["observed"]["venv_redirect"]["process_id"])
+
+    def test_venv_redirect_fails_when_parent_does_not_match_argv0(self):
+        payload = listener_payload_fixture()
+        owner = payload["processes"][0]
+        owner["parent_process_id"] = 4001
+        owner["executable_path"] = "C:/Python314/python.exe"
+        owner["command_line"] = (
+            '"C:/Vtuber_Souorce_Code/LAVI/venv/Scripts/python.exe" '
+            "C:/Vtuber_Souorce_Code/LAVI/main.py"
+        )
+        payload["processes"].append(
+            {
+                "process_id": 4001,
+                "parent_process_id": 0,
+                "name": "python.exe",
+                "creation_date": "20260818115959.000000+540",
+                "creation_time_utc_ticks": 638911007990000000,
+                "executable_path": "C:/Temp/python.exe",
+                "command_line": (
+                    '"C:/Vtuber_Souorce_Code/LAVI/venv/Scripts/python.exe" '
+                    "C:/Vtuber_Souorce_Code/LAVI/main.py"
+                ),
+            }
+        )
+
+        result = _validate(payload)
+
+        self.assertFalse(result["ok"], result)
+        self.assertIn("entrypoint", result["reason"])
+
+    def test_venv_redirect_fails_when_parent_started_after_owner(self):
+        payload = listener_payload_fixture()
+        owner = payload["processes"][0]
+        owner["parent_process_id"] = 4001
+        owner["executable_path"] = "C:/Python314/python.exe"
+        owner["command_line"] = (
+            '"C:/Vtuber_Souorce_Code/LAVI/venv/Scripts/python.exe" '
+            "C:/Vtuber_Souorce_Code/LAVI/main.py"
+        )
+        payload["processes"].append(
+            {
+                "process_id": 4001,
+                "parent_process_id": 0,
+                "name": "python.exe",
+                "creation_date": "20260818120001.000000+540",
+                "creation_time_utc_ticks": 638911008010000000,
+                "executable_path": (
+                    "C:/Vtuber_Souorce_Code/LAVI/venv/Scripts/python.exe"
+                ),
+                "command_line": (
+                    '"C:/Vtuber_Souorce_Code/LAVI/venv/Scripts/python.exe" '
+                    "C:/Vtuber_Souorce_Code/LAVI/main.py"
+                ),
+            }
+        )
+
+        result = _validate(payload)
+
+        self.assertFalse(result["ok"], result)
+        self.assertIn("entrypoint", result["reason"])
+
     def test_python_direct_form_rejects_options_and_trailing_arguments(self):
         entrypoint = "C:/Vtuber_Souorce_Code/LAVI/main.py"
         for command_line in (

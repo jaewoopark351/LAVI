@@ -15,6 +15,7 @@ import net.minecraft.screen.slot.SlotActionType;
 
 import java.util.LinkedHashSet;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 
 //20260830_kpopmodder: Correlate one local click action with its ordered slot mutations and both tracker roles.
 public final class StoreDepositSlotActionDiagnostics {
@@ -23,6 +24,7 @@ public final class StoreDepositSlotActionDiagnostics {
     private final StoreDepositAutomaticTerminalDiagnostics automaticTerminals;
     private final ThreadLocal<ActionContext> currentAction = new ThreadLocal<>();
     private final ThreadLocal<MutationContext> currentMutation = new ThreadLocal<>();
+    private final AtomicReference<Object> modeEpoch = new AtomicReference<>(new Object());
 
     public StoreDepositSlotActionDiagnostics(
             StoreDepositTransferAttemptRegistry attempts,
@@ -56,6 +58,7 @@ public final class StoreDepositSlotActionDiagnostics {
             transfer.confirmCursorSource(before);
         }
         ActionContext action = new ActionContext(
+                modeEpoch.get(),
                 transfer,
                 transfer.transferAttemptId() + "-action-" + sequence,
                 sequence,
@@ -76,7 +79,7 @@ public final class StoreDepositSlotActionDiagnostics {
     }
 
     public void observeLocalClickReturn(ItemStack cursorAfter) {
-        ActionContext action = currentAction.get();
+        ActionContext action = activeAction();
         if (action != null) {
             action.localClickReturned = true;
             if (cursorAfter != null) {
@@ -92,7 +95,7 @@ public final class StoreDepositSlotActionDiagnostics {
                               ItemStack before,
                               ItemStack after) {
         currentMutation.remove();
-        ActionContext action = currentAction.get();
+        ActionContext action = activeAction();
         if (action == null) {
             return;
         }
@@ -117,7 +120,7 @@ public final class StoreDepositSlotActionDiagnostics {
                                        Slot slot,
                                        ItemStack before,
                                        boolean playerInventorySlot) {
-        MutationContext mutation = currentMutation.get();
+        MutationContext mutation = activeMutation();
         if (mutation == null) {
             return;
         }
@@ -130,22 +133,22 @@ public final class StoreDepositSlotActionDiagnostics {
     }
 
     public Object[] currentMutationFields() {
-        MutationContext mutation = currentMutation.get();
+        MutationContext mutation = activeMutation();
         return mutation == null ? unavailableFields() : mutation.correlationFields();
     }
 
     public String currentSlotActionId() {
-        ActionContext action = currentAction.get();
+        ActionContext action = activeAction();
         return action == null ? "UNAVAILABLE" : action.slotActionId;
     }
 
     public String currentSlotMutationId() {
-        MutationContext mutation = currentMutation.get();
+        MutationContext mutation = activeMutation();
         return mutation == null ? "UNAVAILABLE" : mutation.slotMutationId;
     }
 
     public void endMutation() {
-        MutationContext mutation = currentMutation.get();
+        MutationContext mutation = activeMutation();
         currentMutation.remove();
         if (mutation == null) {
             return;
@@ -180,11 +183,11 @@ public final class StoreDepositSlotActionDiagnostics {
     }
 
     public void endAction() {
-        MutationContext dangling = currentMutation.get();
+        MutationContext dangling = activeMutation();
         if (dangling != null) {
             endMutation();
         }
-        ActionContext action = currentAction.get();
+        ActionContext action = activeAction();
         currentAction.remove();
         if (action == null) {
             return;
@@ -242,6 +245,34 @@ public final class StoreDepositSlotActionDiagnostics {
         );
     }
 
+    public int clearForModeTransition() {
+        int invalidated = (activeAction() == null ? 0 : 1)
+                + (activeMutation() == null ? 0 : 1);
+        modeEpoch.set(new Object());
+        currentMutation.remove();
+        currentAction.remove();
+        return invalidated;
+    }
+
+    private ActionContext activeAction() {
+        ActionContext action = currentAction.get();
+        if (action != null && action.modeEpoch != modeEpoch.get()) {
+            currentMutation.remove();
+            currentAction.remove();
+            return null;
+        }
+        return action;
+    }
+
+    private MutationContext activeMutation() {
+        MutationContext mutation = currentMutation.get();
+        if (mutation != null && mutation.action.modeEpoch != modeEpoch.get()) {
+            currentMutation.remove();
+            return null;
+        }
+        return mutation;
+    }
+
     private static Object[] unavailableFields() {
         return new Object[]{
                 "slotActionId", "UNAVAILABLE",
@@ -264,6 +295,7 @@ public final class StoreDepositSlotActionDiagnostics {
     }
 
     private static final class ActionContext {
+        private final Object modeEpoch;
         private final ActiveTransfer transfer;
         private final String slotActionId;
         private final long clickSequence;
@@ -279,7 +311,8 @@ public final class StoreDepositSlotActionDiagnostics {
         private int mutationCount;
         private boolean localClickReturned;
 
-        private ActionContext(ActiveTransfer transfer,
+        private ActionContext(Object modeEpoch,
+                              ActiveTransfer transfer,
                               String slotActionId,
                               long clickSequence,
                               String handlerIdentity,
@@ -289,6 +322,7 @@ public final class StoreDepositSlotActionDiagnostics {
                               String clickActionType,
                               ItemStack cursorBefore,
                               boolean cursorBeforeObserved) {
+            this.modeEpoch = modeEpoch;
             this.transfer = transfer;
             this.slotActionId = slotActionId;
             this.clickSequence = clickSequence;

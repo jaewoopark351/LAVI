@@ -4,6 +4,7 @@ import adris.altoclef.AltoClef;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.ItemTarget;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.diagnostics.crafting.acquisition.source.furnace.CraftResourceFurnaceSourceEventObserver;
 import net.minecraft.item.ItemStack;
 
 //20260814_kpopmodder: Added bounded material-progress diagnostics for cooked beef acquisition stalls.
@@ -50,7 +51,7 @@ final class FurnaceMaterialProgressDiagnostics {
                 Double.toString(burningFuelCount),
                 Double.toString(burnPercentage)
         );
-        FurnaceDiagnosticEmitter.emit("SMELT_MATERIAL_PROGRESS_SNAPSHOT", "smelt_material_progress_snapshot", task,
+        boolean sourceEmissionCompleted = FurnaceDiagnosticEmitter.emit("SMELT_MATERIAL_PROGRESS_SNAPSHOT", "smelt_material_progress_snapshot", task,
                 "smelt_material_progress|" + System.identityHashCode(task),
                 fingerprint,
                 new Object[]{
@@ -77,6 +78,22 @@ final class FurnaceMaterialProgressDiagnostics {
                         "baritonePathing", ChatClefDiagnostics.safeValue(() -> mod != null && mod.getClientBaritone().getPathingBehavior().isPathing()),
                         "customGoalActive", ChatClefDiagnostics.safeValue(() -> mod != null && mod.getClientBaritone().getCustomGoalProcess().isActive())
                 });
+        CraftResourceFurnaceSourceEventObserver.observeMaterialProgress(
+                task,
+                materialTarget,
+                outputTarget,
+                currentGate,
+                inventoryMaterialCount,
+                inventoryOutputCount,
+                materialsNeeded,
+                inventoryFuelCount,
+                fuelNeeded,
+                materialGateSatisfied,
+                fuelGateSatisfied,
+                burningFuelCount,
+                burnPercentage,
+                sourceEmissionCompleted
+        );
     }
 
     private static String normalize(String value) {

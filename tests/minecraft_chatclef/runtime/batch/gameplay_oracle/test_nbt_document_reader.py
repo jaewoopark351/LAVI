@@ -30,6 +30,10 @@ class NbtDocumentReaderTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             decode_nbt_document(b"\x0a\x00")
 
+    def test_trailing_bytes_after_root_compound_are_rejected(self):
+        with self.assertRaisesRegex(ValueError, "trailing bytes"):
+            decode_nbt_document(_player_inventory_nbt(()) + b"unexpected")
+
 
 def _player_inventory_nbt(items: tuple[tuple[str, int], ...]) -> bytes:
     payload = bytearray(b"\x0a\x00\x00")

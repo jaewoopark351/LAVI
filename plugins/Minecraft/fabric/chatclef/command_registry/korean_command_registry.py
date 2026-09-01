@@ -2,9 +2,10 @@
 #20260827_kpopmodder: Register private-rollout STORE_HOME readiness and source policy.
 #20260828_kpopmodder: Public-enable STORE_HOME for user-approved live chat and microphone validation.
 #20260829_openai: Register deposit_all as raw-only shadow metadata without Korean readiness.
+#20260901_kpopmodder: Consume command metadata from its focused contract package.
 from __future__ import annotations
 
-from plugins.Minecraft.fabric.chatclef.command_registry.korean_command_registry_model import (
+from plugins.Minecraft.fabric.chatclef.command_registry.contracts import (
     ChatClefCommandReadinessAxes,
     ChatClefCommandSpec,
 )

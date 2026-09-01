@@ -2,6 +2,7 @@ package lavi.minecraft.fabric.chatclef.bridge.command.diagnostics;
 
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandContext;
+import lavi.minecraft.fabric.chatclef.bridge.command.diagnostics.crafting.terminal.FabricChatClefCraftResourceTerminalContextUnbindObserver;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskOwnershipSnapshot;
 
 //20260808_kpopmodder: Log command context unbind mutations without changing queue ownership.
@@ -78,6 +79,16 @@ public final class FabricChatClefCommandContextUnbindDiagnostics {
                 "unbind_client_tick", ChatClefDiagnostics.currentClientTickId(),
                 "behavior_effect", "none"
         );
+        try {
+            FabricChatClefCraftResourceTerminalContextUnbindObserver.observe(
+                    unbindReason,
+                    context,
+                    mutationApplied,
+                    detachCancelAction
+            );
+        } catch (RuntimeException | LinkageError ignored) {
+            // A diagnostics-only projection failure must not alter context unbind.
+        }
     }
 
     private static String requestId(FabricChatClefCommandContext context) {

@@ -6,6 +6,7 @@ import adris.altoclef.tasks.resources.MineAndCollectTask;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.MiningRequirement;
 import lavi.minecraft.diagnostics.mining.cancel.PreCancelBaritoneState;
+import lavi.minecraft.diagnostics.mining.projection.MiningProjectionObserverRegistry;
 import lavi.minecraft.integration.mining.MiningToolReadiness;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
@@ -34,9 +35,14 @@ public final class MiningPathDiagnostics {
                                                   boolean previousChildStopCalled,
                                                   Task activeChildAfter,
                                                   boolean candidateDiscardedBecauseEqual) {
-        TaskChildReconciliationDiagnostics.log(parent, activeChildBefore, candidateChild, isEqualResult,
+        boolean sourceEmissionCompleted = TaskChildReconciliationDiagnostics.log(
+                parent, activeChildBefore, candidateChild, isEqualResult,
                 canInterruptEvaluated, canInterruptPreviousChild, replacementApplied, previousChildStopCalled,
                 activeChildAfter, candidateDiscardedBecauseEqual);
+        MiningProjectionObserverRegistry.observeTaskChildReconciliation(
+                parent, activeChildBefore, candidateChild, isEqualResult, canInterruptEvaluated,
+                canInterruptPreviousChild, replacementApplied, previousChildStopCalled,
+                activeChildAfter, candidateDiscardedBecauseEqual, sourceEmissionCompleted);
     }
 
     public static void logMineTargetSelection(AltoClef mod,
@@ -50,8 +56,13 @@ public final class MiningPathDiagnostics {
                                               Block[] requestedBlocks,
                                               int localBlacklistSize,
                                               BlockPos currentMiningPos) {
-        MineTargetSelectionDiagnostics.log(mod, task, closestBlock, closestDrop, selected, selectionReason,
+        boolean sourceEmissionCompleted = MineTargetSelectionDiagnostics.log(
+                mod, task, closestBlock, closestDrop, selected, selectionReason,
                 targetChanged, localBlacklistContains, requestedBlocks, localBlacklistSize, currentMiningPos);
+        MiningProjectionObserverRegistry.observeMineTargetSelection(
+                mod, task, closestBlock, closestDrop, selected, selectionReason, targetChanged,
+                localBlacklistContains, requestedBlocks, localBlacklistSize, currentMiningPos,
+                sourceEmissionCompleted);
     }
 
     public static void logMineTargetGoalRequest(AltoClef mod,
@@ -67,9 +78,40 @@ public final class MiningPathDiagnostics {
                                                 MiningToolReadiness.Readiness readiness,
                                                 String decisionOutcome,
                                                 Task returnedTask) {
-        MineTargetGoalRequestDiagnostics.log(mod, task, target, previousMiningPos, miningPosAfterDecision,
+        boolean sourceEmissionCompleted = MineTargetGoalRequestDiagnostics.log(
+                mod, task, target, previousMiningPos, miningPosAfterDecision,
                 localBlacklistContainsBefore, localBlacklistSize, requestedBlocks, requestedRequirement, targetState,
                 readiness, decisionOutcome, returnedTask);
+        MiningProjectionObserverRegistry.observeMineTargetGoalRequest(
+                mod, task, target, previousMiningPos, miningPosAfterDecision,
+                localBlacklistContainsBefore, localBlacklistSize, requestedBlocks,
+                requestedRequirement, targetState, readiness, decisionOutcome, returnedTask,
+                sourceEmissionCompleted);
+    }
+
+    public static void logMineTargetAbandoned(
+            AltoClef mod,
+            Task task,
+            BlockPos previousMiningPosition,
+            BlockPos miningPositionAfterBoundary,
+            String closureKind,
+            String closureReason) {
+        boolean sourceEmissionCompleted = MineTargetAbandonmentDiagnostics.log(
+                task,
+                previousMiningPosition,
+                miningPositionAfterBoundary,
+                closureKind,
+                closureReason
+        );
+        MiningProjectionObserverRegistry.observeMineTargetAbandoned(
+                mod,
+                task,
+                previousMiningPosition,
+                miningPositionAfterBoundary,
+                closureKind,
+                closureReason,
+                sourceEmissionCompleted
+        );
     }
 
     public static void logDestroyNavigationState(AltoClef mod,
@@ -181,8 +223,12 @@ public final class MiningPathDiagnostics {
                                                   String requestSource,
                                                   Task activeDestroyTask,
                                                   Task candidateDestroyTask) {
-        BlockUnreachableRequestDiagnostics.log(mod, task, target, requestedAllowedFailures, requestSource,
+        boolean sourceEmissionCompleted = BlockUnreachableRequestDiagnostics.log(
+                mod, task, target, requestedAllowedFailures, requestSource,
                 activeDestroyTask, candidateDestroyTask);
+        MiningProjectionObserverRegistry.observeBlockUnreachableRequest(
+                mod, task, target, requestedAllowedFailures, requestSource,
+                activeDestroyTask, candidateDestroyTask, sourceEmissionCompleted);
     }
 
     public static void logBlacklistStateChanged(AltoClef mod,
@@ -203,9 +249,16 @@ public final class MiningPathDiagnostics {
                                                 MiningRequirement bestToolAfter,
                                                 boolean resetApplied,
                                                 String resetReason) {
-        BlockBlacklistDiagnostics.log(mod, item, entryCreated, failureCountBefore, failureCountAfter,
+        boolean sourceEmissionCompleted = BlockBlacklistDiagnostics.log(
+                mod, item, entryCreated, failureCountBefore, failureCountAfter,
                 allowedFailuresBefore, requestedAllowedFailures, allowedFailuresAfter, unreachableBefore,
                 unreachableAfter, currentDistanceSq, bestDistanceSqBefore, bestDistanceSqAfter,
                 currentMiningRequirement, bestToolBefore, bestToolAfter, resetApplied, resetReason);
+        MiningProjectionObserverRegistry.observeBlacklistStateChanged(
+                mod, item, entryCreated, failureCountBefore, failureCountAfter,
+                allowedFailuresBefore, requestedAllowedFailures, allowedFailuresAfter,
+                unreachableBefore, unreachableAfter, currentDistanceSq, bestDistanceSqBefore,
+                bestDistanceSqAfter, currentMiningRequirement, bestToolBefore, bestToolAfter,
+                resetApplied, resetReason, sourceEmissionCompleted);
     }
 }

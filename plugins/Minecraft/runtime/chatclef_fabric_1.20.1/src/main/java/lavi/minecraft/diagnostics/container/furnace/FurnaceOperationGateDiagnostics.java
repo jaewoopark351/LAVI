@@ -3,6 +3,7 @@ package lavi.minecraft.diagnostics.container.furnace;
 import adris.altoclef.AltoClef;
 import adris.altoclef.tasksystem.Task;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.diagnostics.crafting.acquisition.source.furnace.CraftResourceFurnaceSourceEventObserver;
 
 //20260807_kpopmodder: Observe high-level furnace operation gate changes only.
 final class FurnaceOperationGateDiagnostics {
@@ -37,7 +38,7 @@ final class FurnaceOperationGateDiagnostics {
                 String.valueOf(materialsAccessible),
                 Boolean.toString(containerFlowEligible)
         );
-        FurnaceDiagnosticEmitter.emit("FURNACE_OPERATION_GATE_TRANSITION", "furnace_operation_gate_transition", task,
+        boolean sourceEmissionCompleted = FurnaceDiagnosticEmitter.emit("FURNACE_OPERATION_GATE_TRANSITION", "furnace_operation_gate_transition", task,
                 "furnace_operation_gate|" + System.identityHashCode(task),
                 fingerprint,
                 new Object[]{
@@ -58,5 +59,20 @@ final class FurnaceOperationGateDiagnostics {
                         "inventoryOutputCount", inventoryOutputCount,
                         "playerPosition", mod == null ? "unavailable" : ChatClefDiagnostics.playerPosition(mod)
                 });
+        CraftResourceFurnaceSourceEventObserver.observeOperationGate(
+                task,
+                gate.previousGate,
+                gate.currentGate,
+                inventoryMaterialCount,
+                materialsNeeded,
+                materialGateSatisfied,
+                inventoryFuelCount,
+                fuelNeeded,
+                fuelGateSatisfied,
+                materialsAccessible,
+                containerFlowEligible,
+                inventoryOutputCount,
+                sourceEmissionCompleted
+        );
     }
 }

@@ -1,4 +1,5 @@
 <!-- 20260819_kpopmodder: Defined the bounded diagnostics-only plan for the bare deposit non-terminating loop. -->
+<!-- 20260831_openai: Linked the later post-checkpoint shared admission and bounded terminal-accounting direction while preserving this plan's historical Store event provenance. -->
 
 # ChatClef Bare Deposit Diagnostics-Only Plan
 
@@ -2496,6 +2497,22 @@ operation을 추측해 붙이지 않는다.
 
 ## Bounded Logging And Cap Design
 
+### 2026-08-31 post-checkpoint ownership note
+
+The Store-specific numbers and event design below remain historical source and
+test provenance. For a separately approved future diagnostics correctness
+slice, [ChatClef Automatic Deposit Post-Checkpoint Work Separation Direction](chatclef-automatic-deposit-post-checkpoint-direction-2026-08-31.md)
+supersedes only these meanings:
+
+```text
+canonical Fabric ChatClef investigation-session admission owner
+canonical DIAGNOSTIC_SESSION_CAP_REACHED ownership
+terminal-group exhaustion as permission to lose all terminal accounting
+```
+
+The linked direction is the canonical future acceptance contract; this note
+does not change source or authorize implementation or execution.
+
 현재 구현 사실:
 
 ```text
@@ -3156,3 +3173,27 @@ terminal reason without calling cancellation a successful deposit
 
 If any material boundary remains unobserved, root cause remains unknown and the
 next action is another bounded diagnostics-only slice, not a behavior fix.
+
+## 2026-08-31 shared-session implementation delta
+
+This append-only note does not rewrite the historical partial-status ledger or
+claim completion of every D-slice in this plan. The current implementation adds
+and deterministically verifies the shared diagnostics session cap, bounded
+terminal accounting, strict-OFF state isolation, and separately owned
+tool-selection shaping described in Section 15 of
+[ChatClef Automatic Deposit Post-Checkpoint Work Separation Direction](chatclef-automatic-deposit-post-checkpoint-direction-2026-08-31.md).
+
+The current Java contract is `5000` shared hard-cap slots, `4936` ordinary
+slots, and `64` critical-reserve slots. Four-record terminal groups are atomic
+at token claim and admission, not at the physical sink: a sink failure may
+leave `0..4` physical writes and does not refund or retry slots. The emitted
+final-snapshot line may self-report one pending/unverified delivery while its
+post-call in-memory accounting closes to zero pending and one completed
+delivery.
+
+This delta is diagnostics-only. It does not close the still-unobserved Store,
+craft, container, or Baritone boundaries listed above; it does not prove a
+deposit root cause; and it does not authorize a gameplay behavior change.
+Current clean-build evidence is complete, but the fresh build JAR and active
+CurseForge JAR hashes differ, so final-artifact runtime validation remains
+`NOT_RUN`/`INCONCLUSIVE`.

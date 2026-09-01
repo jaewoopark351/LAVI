@@ -21,6 +21,7 @@ class StoreDepositDiagnosticsEffectContractTest {
     @AfterEach
     void disableDiagnostics() {
         ChatClefDiagnostics.setBoundaryEnabled(false);
+        ChatClefDiagnostics.resetDiagnosticSessionForTests();
         StoreDepositDiagnostics.clearPredicateSnapshot();
     }
 
@@ -75,7 +76,7 @@ class StoreDepositDiagnosticsEffectContractTest {
         assertTrue(output.contains("predicateMatchReason=UNAVAILABLE"));
         assertTrue(output.contains("observationOutcome=ACCEPT_ZERO_DELTA"));
         assertTrue(output.contains("observationOutcome=REJECT_TARGET_PREDICATE"));
-        assertTrue(output.contains("effectObservationCount=2"));
+        assertTrue(output.contains("effectObservationCount=2"), output);
         assertTrue(output.contains("expectedPositiveEffectCount=0"));
     }
 

@@ -72,9 +72,22 @@ def _canonical_process_identity(
     ancestor = _canonical_ancestor(evidence.get("approved_ancestor"), repository_root)
     if evidence.get("approved_ancestor") is not None and ancestor is None:
         return None
+    venv_redirect = _canonical_venv_redirect(
+        evidence.get("venv_redirect"),
+        repository_root,
+        parent_process_id,
+    )
+    if evidence.get("venv_redirect") is not None and venv_redirect is None:
+        return None
     if (
         ancestor is not None
         and int(ancestor["creation_time_utc_ticks"]) > creation_time_utc_ticks
+    ):
+        return None
+    if (
+        venv_redirect is not None
+        and int(venv_redirect["creation_time_utc_ticks"])
+        > creation_time_utc_ticks
     ):
         return None
     return {
@@ -88,6 +101,50 @@ def _canonical_process_identity(
         "process_entrypoint": process_entrypoint,
         "process_invocation_mode": invocation_mode,
         "repository_root": repository_root,
+        "resolved_entrypoint_path": resolved_entrypoint_path,
+        "venv_redirect": venv_redirect,
+    }
+
+
+def _canonical_venv_redirect(
+    value: object,
+    repository_root: str,
+    expected_process_id: int,
+) -> dict[str, object] | None:
+    if value is None:
+        return None
+    if not isinstance(value, Mapping):
+        return None
+    process_id = _positive_int(value.get("process_id"))
+    parent_process_id = _nonnegative_int(value.get("parent_process_id"))
+    creation_date = _required_text(value.get("creation_date"))
+    creation_time_utc_ticks = _positive_int(value.get("creation_time_utc_ticks"))
+    executable_path = _absolute_path(value.get("executable_path"))
+    resolved_entrypoint_path = _absolute_path(
+        value.get("resolved_entrypoint_path")
+    )
+    provenance = _required_text(value.get("entrypoint_provenance"))
+    if (
+        process_id != expected_process_id
+        or parent_process_id < 0
+        or not creation_date
+        or creation_time_utc_ticks <= 0
+        or executable_path
+        != normalize_windows_path(
+            ntpath.join(repository_root, "venv", "Scripts", "python.exe")
+        )
+        or resolved_entrypoint_path
+        != normalize_windows_path(ntpath.join(repository_root, "main.py"))
+        or provenance != "exact_repository_venv_redirect"
+    ):
+        return None
+    return {
+        "creation_date": creation_date,
+        "creation_time_utc_ticks": creation_time_utc_ticks,
+        "entrypoint_provenance": provenance,
+        "executable_path": executable_path,
+        "parent_process_id": parent_process_id,
+        "process_id": process_id,
         "resolved_entrypoint_path": resolved_entrypoint_path,
     }
 

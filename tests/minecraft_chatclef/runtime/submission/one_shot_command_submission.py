@@ -9,6 +9,9 @@ from plugins.Minecraft.fabric.chatclef.input.routing.submission.submission_resul
 from ..observation.live_run_observation import (
     new_live_run_observation,
 )
+from .command_submission_transport import (
+    CommandSubmissionTransport,
+)
 from .submission_result_observation import (
     apply_submission_result_to_observation,
 )
@@ -17,10 +20,15 @@ from .submission_result_observation import (
 _RESULT_NORMALIZER = MinecraftChatClefSubmissionResultNormalizer()
 
 
-def submit_command_once(gateway: object, command: str) -> dict[str, object]:
+def submit_command_once(
+    gateway: object,
+    command: str,
+    *,
+    transport: CommandSubmissionTransport = CommandSubmissionTransport.KOREAN,
+) -> dict[str, object]:
     observation = new_live_run_observation()
     try:
-        payload = gateway.submit_korean_command(command)
+        payload = _submit(gateway, command, transport)
     except Exception as error:
         result = _RESULT_NORMALIZER.unknown(
             "",
@@ -34,6 +42,18 @@ def submit_command_once(gateway: object, command: str) -> dict[str, object]:
         )
     observation["gradio_submit_call_count"] = _call_count(gateway)
     return apply_submission_result_to_observation(observation, result)
+
+
+def _submit(
+    gateway: object,
+    command: str,
+    transport: CommandSubmissionTransport,
+) -> object:
+    if transport is CommandSubmissionTransport.KOREAN:
+        return gateway.submit_korean_command(command)
+    if transport is CommandSubmissionTransport.RAW:
+        return gateway.submit_raw_command(command)
+    raise ValueError(f"Unsupported command submission transport: {transport!r}")
 
 
 def _call_count(gateway: object) -> int | str:

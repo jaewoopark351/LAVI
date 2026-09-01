@@ -23,6 +23,7 @@ class StoreDepositRouteDiagnosticsTest {
     @AfterEach
     void disableDiagnostics() {
         ChatClefDiagnostics.setBoundaryEnabled(false);
+        ChatClefDiagnostics.resetDiagnosticSessionForTests();
     }
 
     @Test

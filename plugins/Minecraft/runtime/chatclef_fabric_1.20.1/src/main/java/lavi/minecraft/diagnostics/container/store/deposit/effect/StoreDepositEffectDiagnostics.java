@@ -15,12 +15,14 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.util.math.BlockPos;
 
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
 //20260829_kpopmodder: Keep predicate-to-effect correlation in one thread-local diagnostics collaborator.
 public final class StoreDepositEffectDiagnostics {
     private final StoreDepositBindingRegistry bindings;
     private final StoreDepositEmissionGate emissionGate;
-    private final ThreadLocal<PredicateSnapshot> lastPredicateSnapshot = new ThreadLocal<>();
+    private final ThreadLocal<EpochPredicateSnapshot> lastPredicateSnapshot = new ThreadLocal<>();
+    private final AtomicReference<Object> modeEpoch = new AtomicReference<>(new Object());
     private final StoreDepositSlotActionDiagnostics slotActions;
 
     public StoreDepositEffectDiagnostics(StoreDepositBindingRegistry bindings,
@@ -43,6 +45,13 @@ public final class StoreDepositEffectDiagnostics {
         lastPredicateSnapshot.remove();
     }
 
+    public int clearForModeTransition() {
+        int invalidated = activePredicateSnapshot() == null ? 0 : 1;
+        modeEpoch.set(new Object());
+        lastPredicateSnapshot.remove();
+        return invalidated;
+    }
+
     public boolean hasAutomaticContext(ContainerStoredTracker tracker) {
         if (!ChatClefDiagnostics.isBoundaryEnabled()) {
             return false;
@@ -61,9 +70,12 @@ public final class StoreDepositEffectDiagnostics {
         }
         try {
             PredicateSnapshot snapshot = PredicateSnapshot.from(lastInteraction, targetContainer, accepted);
-            lastPredicateSnapshot.set(snapshot);
+            lastPredicateSnapshot.set(new EpochPredicateSnapshot(modeEpoch.get(), snapshot));
         } catch (RuntimeException | LinkageError ignored) {
-            lastPredicateSnapshot.set(PredicateSnapshot.unavailable());
+            lastPredicateSnapshot.set(new EpochPredicateSnapshot(
+                    modeEpoch.get(),
+                    PredicateSnapshot.unavailable()
+            ));
         }
     }
 
@@ -107,7 +119,7 @@ public final class StoreDepositEffectDiagnostics {
                 return;
             }
             boolean automatic = isAutomatic(state);
-            PredicateSnapshot snapshot = lastPredicateSnapshot.get();
+            PredicateSnapshot snapshot = activePredicateSnapshot();
             if (snapshot == null) {
                 snapshot = PredicateSnapshot.unavailable();
             }
@@ -218,5 +230,21 @@ public final class StoreDepositEffectDiagnostics {
                 && state.context() != null
                 && state.context().isAutomaticDepositOperation()
                 && state.automaticContext().available();
+    }
+
+    private PredicateSnapshot activePredicateSnapshot() {
+        EpochPredicateSnapshot candidate = lastPredicateSnapshot.get();
+        if (candidate == null) {
+            return null;
+        }
+        if (candidate.modeEpoch() != modeEpoch.get()) {
+            lastPredicateSnapshot.remove();
+            return null;
+        }
+        return candidate.snapshot();
+    }
+
+    private record EpochPredicateSnapshot(Object modeEpoch,
+                                          PredicateSnapshot snapshot) {
     }
 }

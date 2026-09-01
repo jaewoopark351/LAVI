@@ -103,10 +103,11 @@ final class PostPlaceContainerDiagnostics {
     }
 
     void clear(long operationId) {
-        if (mode.isOff()) {
-            return;
-        }
         state.clear(operationId);
+    }
+
+    void clearForSessionTransition() {
+        state.clearAll();
     }
 
     void registerObserver(PostPlaceContainerInteractionObserver observer) {

@@ -12,6 +12,7 @@ from ..preflight.preflight_fixture_factory import (
     runtime_status_fixture,
 )
 from ..supervised_live_run import run_supervised_live_command
+from .command_submission_transport import CommandSubmissionTransport
 
 
 class SupervisedLiveRunTests(unittest.TestCase):
@@ -78,6 +79,65 @@ class SupervisedLiveRunTests(unittest.TestCase):
         self.assertEqual(
             [live_environment_fixture()["command"]],
             gateway.submitted_commands,
+        )
+
+    def test_unapproved_raw_transport_stops_before_guard_and_submit(self):
+        environment = live_environment_fixture()
+        run_guard = _RunGuard()
+        gateway = _SupervisedGateway(
+            statuses=[runtime_status_fixture() for _index in range(4)]
+        )
+
+        result = run_supervised_live_command(
+            environment,
+            gateway,
+            process_probe=lambda **_kwargs: process_result_fixture(4100),
+            log_identity_inspector=log_identity_result_fixture,
+            terminal_observer=lambda _gateway, observation, **_kwargs: observation,
+            run_guard=run_guard,
+            reconciliation_recorder=_ReconciliationRecorder(),
+            transport=CommandSubmissionTransport.RAW,
+        )
+
+        self.assertEqual("fail", result["preflight"]["status"])
+        self.assertEqual("approval", result["preflight"]["stage"])
+        self.assertIn("transport", result["preflight"]["reason"])
+        self.assertEqual(0, run_guard.claim_calls)
+        self.assertEqual(0, gateway.submit_call_count)
+        self.assertEqual([], gateway.submitted_commands)
+        self.assertEqual([], gateway.raw_submitted_commands)
+
+    def test_approved_raw_store_home_transport_never_calls_korean_submit(self):
+        environment = _raw_store_home_environment()
+        gateway = _SupervisedGateway(
+            statuses=[runtime_status_fixture() for _index in range(4)]
+        )
+
+        result = run_supervised_live_command(
+            environment,
+            gateway,
+            process_probe=lambda **_kwargs: process_result_fixture(4100),
+            log_identity_inspector=log_identity_result_fixture,
+            terminal_observer=lambda _gateway, observation, **_kwargs: observation,
+            run_guard=_RunGuard(),
+            reconciliation_recorder=_ReconciliationRecorder(),
+            transport=CommandSubmissionTransport.RAW,
+        )
+
+        self.assertEqual("accepted", result["observation"]["submission_outcome"])
+        self.assertEqual(
+            CommandSubmissionTransport.RAW.value,
+            result["preflight"]["observed"]["approved_transport"],
+        )
+        self.assertEqual(
+            "request-raw-1",
+            result["observation"]["submitted_request_id"],
+        )
+        self.assertEqual(1, gateway.submit_call_count)
+        self.assertEqual([], gateway.submitted_commands)
+        self.assertEqual(
+            ["@store_home"],
+            gateway.raw_submitted_commands,
         )
 
     def test_existing_one_shot_block_prevents_submission(self):
@@ -161,6 +221,7 @@ class SupervisedLiveRunTests(unittest.TestCase):
             "backend": _mutate_backend,
             "instance": _mutate_instance,
             "world": _mutate_world,
+            "transport": _mutate_transport,
             "approval": _mutate_approval_source,
         }
         for name, mutate in cases.items():
@@ -235,6 +296,7 @@ class _SupervisedGateway:
         self.gradio_url = gradio_url
         self.submit_call_count = 0
         self.submitted_commands = []
+        self.raw_submitted_commands = []
 
     def submit_korean_command(self, command):
         self.submit_call_count += 1
@@ -243,6 +305,24 @@ class _SupervisedGateway:
             "ok": True,
             "status": {
                 "request_id": "request-1",
+                "ok": True,
+                "status": "accepted",
+                "error_code": None,
+                "message": "accepted",
+                "data": {},
+            },
+            "error": None,
+            "message": "accepted",
+            "details": {},
+        }
+
+    def submit_raw_command(self, command):
+        self.submit_call_count += 1
+        self.raw_submitted_commands.append(command)
+        return {
+            "ok": True,
+            "status": {
+                "request_id": "request-raw-1",
                 "ok": True,
                 "status": "accepted",
                 "error_code": None,
@@ -333,6 +413,11 @@ def _mutate_world(environment):
     _update_approval(environment, world=environment["expected_world"])
 
 
+def _mutate_transport(environment):
+    environment["transport"] = CommandSubmissionTransport.RAW.value
+    _update_approval(environment, transport=environment["transport"])
+
+
 def _mutate_approval_source(environment):
     _update_approval(environment, approval_source="changed_approval")
 
@@ -341,6 +426,18 @@ def _update_approval(environment, **changes):
     approval = json.loads(str(environment["approval_json"]))
     approval.update(changes)
     environment["approval_json"] = json.dumps(approval, ensure_ascii=False)
+
+
+def _raw_store_home_environment():
+    environment = live_environment_fixture()
+    environment["command"] = "@store_home"
+    environment["transport"] = CommandSubmissionTransport.RAW.value
+    _update_approval(
+        environment,
+        command=environment["command"],
+        transport=environment["transport"],
+    )
+    return environment
 
 
 

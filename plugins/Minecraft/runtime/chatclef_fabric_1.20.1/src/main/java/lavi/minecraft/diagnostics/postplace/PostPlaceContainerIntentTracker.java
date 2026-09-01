@@ -109,6 +109,12 @@ final class PostPlaceContainerIntentTracker {
         }
     }
 
+    void clearAll() {
+        synchronized (lock) {
+            activeIntent = null;
+        }
+    }
+
     int recordInteraction(PostPlaceContainerOpenIntent intent, PostPlaceContainerInteractionPhase phase, String result) {
         synchronized (lock) {
             if (intent == null || !matching(intent.operationId())) {

@@ -359,7 +359,17 @@ public class MineAndCollectTask extends ResourceTask {
                 MiningPathDiagnostics.logBlockUnreachableRequest(mod, this, miningPos, 2, "MINE_OR_COLLECT_PROGRESS_FAILURE", null, null);
                 mod.getBlockScanner().requestBlockUnreachable(miningPos, 2);
                 blacklist.add(miningPos);
+                BlockPos abandonedMiningPos = miningPos;
                 miningPos = null;
+                //20260901_kpopmodder: Observe the already-applied target clear without changing retry behavior.
+                MiningPathDiagnostics.logMineTargetAbandoned(
+                        mod,
+                        this,
+                        abandonedMiningPos,
+                        miningPos,
+                        "TARGET_ABANDONED",
+                        "MINE_OR_COLLECT_PROGRESS_FAILURE_AFTER_CLEAR"
+                );
                 progressChecker.reset();
             }
             return super.onTick();
@@ -377,6 +387,14 @@ public class MineAndCollectTask extends ResourceTask {
                 // Target-aware readiness keeps saved low-durability pickaxes protected and acquires a usable tool before mining.
                 if (readiness.requiresAcquisition()) {
                     miningPos = null;
+                    MiningPathDiagnostics.logMineTargetAbandoned(
+                            mod,
+                            this,
+                            previousMiningPos,
+                            miningPos,
+                            "TARGET_ABANDONED",
+                            "TARGET_TOOL_REQUIREMENT_AFTER_CLEAR"
+                    );
                     progressChecker.reset();
                     Task requirementTask = new SatisfyMiningRequirementTask(_requirement, targetState);
                     //20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
@@ -408,7 +426,16 @@ public class MineAndCollectTask extends ResourceTask {
                 return destroyTask;
             }
             if (obj instanceof ItemEntity) {
+                BlockPos previousMiningPos = miningPos;
                 miningPos = null;
+                MiningPathDiagnostics.logMineTargetAbandoned(
+                        AltoClef.getInstance(),
+                        this,
+                        previousMiningPos,
+                        miningPos,
+                        "TARGET_ABANDONED",
+                        "SWITCH_TO_ITEM_DROP_AFTER_CLEAR"
+                );
                 VisibleTaskDiagnostics.logReturnTask(AltoClef.getInstance(), this, _pickupTask, "mine_or_collect_return_pickup_task",
                         "drop=" + obj,
                         "drop", ChatClefDiagnostics.entitySummary((ItemEntity) obj));
@@ -455,6 +482,14 @@ public class MineAndCollectTask extends ResourceTask {
                     "miningPos", ChatClefDiagnostics.blockPos(miningPos),
                     "blacklistSize", blacklist.size(),
                     "interruptTask", ChatClefDiagnostics.taskSummary(interruptTask));
+            MiningPathDiagnostics.logMineTargetAbandoned(
+                    AltoClef.getInstance(),
+                    this,
+                    miningPos,
+                    miningPos,
+                    interruptTask == null ? "OWNER_STOP" : "OWNER_INTERRUPT",
+                    "MINE_OR_COLLECT_OWNER_STOP_BOUNDARY"
+            );
         }
 
         @Override

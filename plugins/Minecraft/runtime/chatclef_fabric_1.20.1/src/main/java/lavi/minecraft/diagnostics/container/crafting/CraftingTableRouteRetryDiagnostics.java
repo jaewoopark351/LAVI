@@ -4,6 +4,7 @@ import adris.altoclef.AltoClef;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.ItemTarget;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.diagnostics.crafting.acquisition.source.craftingtable.CraftResourceCraftingTableSourceEventObserver;
 import net.minecraft.block.Block;
 import net.minecraft.block.Blocks;
 import net.minecraft.item.Items;
@@ -96,7 +97,8 @@ public final class CraftingTableRouteRetryDiagnostics {
         long tick = ChatClefDiagnostics.currentClientTickId();
         emittedCount++;
         state.lastEmissionTick = tick;
-        ChatClefDiagnostics.logBoundary("CRAFTING_TABLE_ROUTE_RETRY_SUMMARY",
+        boolean sourceEmissionCompleted = ChatClefDiagnostics.logBoundaryWithPhysicalOutcome(
+                "CRAFTING_TABLE_ROUTE_RETRY_SUMMARY",
                 "crafting_table_route_retry_summary",
                 task,
                 ChatClefDiagnostics.withCommandContextFields(
@@ -136,6 +138,20 @@ public final class CraftingTableRouteRetryDiagnostics {
                         "openTableTask", diagnosticValue(field(branchFields, "openTableTask")),
                         "playerPosition", ChatClefDiagnostics.playerPosition(mod)
                 ));
+        if (sourceEmissionCompleted) {
+            CraftResourceCraftingTableSourceEventObserver.observeRouteAggregate(
+                    task,
+                    containerTarget,
+                    containerBlocks,
+                    eventName,
+                    reason,
+                    stateKey,
+                    routeKey,
+                    state.observationCount,
+                    tick - state.firstSeenTick,
+                    branchFields
+            );
+        }
     }
 
     private static boolean isRouteRetrySignal(String eventName, String reason) {

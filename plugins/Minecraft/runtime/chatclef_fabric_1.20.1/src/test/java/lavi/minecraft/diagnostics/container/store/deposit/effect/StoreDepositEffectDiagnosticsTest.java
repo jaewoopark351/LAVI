@@ -14,6 +14,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -23,6 +25,7 @@ class StoreDepositEffectDiagnosticsTest {
     @AfterEach
     void disableDiagnostics() {
         ChatClefDiagnostics.setBoundaryEnabled(false);
+        ChatClefDiagnostics.resetDiagnosticSessionForTests();
     }
 
     @Test
@@ -123,6 +126,62 @@ class StoreDepositEffectDiagnosticsTest {
         ));
         assertTrue(output.contains("predicateMatchReason=UNAVAILABLE"));
         assertEquals(1, state.effectObservationCount());
+    }
+
+    @Test
+    void modeTransitionInvalidatesAPreOffPredicateOwnedByAnotherThread() throws Exception {
+        ChatClefDiagnostics.setBoundaryEnabled(true);
+        StoreDepositBindingRegistry bindings = new StoreDepositBindingRegistry();
+        StoreDepositEffectDiagnostics diagnostics = diagnostics(
+                bindings,
+                new StoreDepositEmissionGate()
+        );
+        Task root = new TestTask();
+        ContainerStoredTracker tracker = new ContainerStoredTracker(slot -> true);
+        BlockPos target = new BlockPos(4, 65, 7);
+        bindings.activateRoot(root, "BARE_DEPOSIT_COMMAND");
+        bindings.bindTracker(root, tracker, "TARGET_CONTAINER", target);
+        CountDownLatch predicateRecorded = new CountDownLatch(1);
+        CountDownLatch resume = new CountDownLatch(1);
+        AtomicReference<String> output = new AtomicReference<>();
+        Thread worker = new Thread(() -> {
+            diagnostics.observeTargetContainerPredicate(
+                    tracker,
+                    null,
+                    target,
+                    Optional.of(target),
+                    true
+            );
+            predicateRecorded.countDown();
+            await(resume);
+            output.set(captureOutput(() -> diagnostics.logEffectObservation(
+                    tracker,
+                    null,
+                    null,
+                    null,
+                    false,
+                    true,
+                    true
+            )));
+        });
+
+        worker.start();
+        predicateRecorded.await();
+        diagnostics.clearForModeTransition();
+        resume.countDown();
+        worker.join();
+
+        assertTrue(output.get().contains("predicateMatchReason=UNAVAILABLE"));
+        assertTrue(!output.get().contains("predicateMatchReason=MATCH"));
+    }
+
+    private static void await(CountDownLatch latch) {
+        try {
+            latch.await();
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError(interrupted);
+        }
     }
 
     private static StoreDepositEffectDiagnostics diagnostics(StoreDepositBindingRegistry bindings,

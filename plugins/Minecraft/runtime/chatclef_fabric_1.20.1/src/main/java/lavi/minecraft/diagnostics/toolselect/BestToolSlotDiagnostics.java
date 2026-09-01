@@ -3,7 +3,11 @@ package lavi.minecraft.diagnostics.toolselect;
 import adris.altoclef.AltoClef;
 import adris.altoclef.util.slots.Slot;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
-import lavi.minecraft.diagnostics.toolselect.support.DiagnosticDeduplicator;
+import lavi.minecraft.diagnostics.toolselect.lifecycle.ToolSelectionDiagnosticStateObserver;
+import lavi.minecraft.diagnostics.toolselect.shaping.ToolSelectionDiagnosticShaper;
+import lavi.minecraft.diagnostics.toolselect.shaping.ToolSelectionSemanticFingerprint;
+import lavi.minecraft.diagnostics.toolselect.shaping.ToolSelectionShapingDecision;
+import lavi.minecraft.diagnostics.toolselect.shaping.ToolSelectionSuppressionSummaryEmitter;
 import lavi.minecraft.diagnostics.toolselect.support.ToolCandidateDiagnosticFormatter;
 import lavi.minecraft.diagnostics.toolselect.support.ToolDiagnosticFormatter;
 import lavi.minecraft.diagnostics.toolselect.support.ToolSavePolicyDiagnostics;
@@ -19,7 +23,15 @@ public final class BestToolSlotDiagnostics {
     public static final String DECISION_NO_ELIGIBLE_TOOL = "NO_ELIGIBLE_TOOL";
     public static final String DECISION_SELECTED_TOOL = "SELECTED_TOOL";
 
-    private static final DiagnosticDeduplicator DEDUPLICATOR = new DiagnosticDeduplicator();
+    private static final String SHAPING_CHANNEL = "best_tool_slot";
+    private static final ToolSelectionDiagnosticShaper SHAPER =
+            new ToolSelectionDiagnosticShaper();
+    private static final ToolSelectionDiagnosticStateObserver OFF_STATE_OBSERVER =
+            new ToolSelectionDiagnosticStateObserver(SHAPER::clearForModeOff);
+
+    static {
+        ChatClefDiagnostics.registerSessionLifecycleObserver(OFF_STATE_OBSERVER);
+    }
 
     private BestToolSlotDiagnostics() {
     }
@@ -117,8 +129,28 @@ public final class BestToolSlotDiagnostics {
             if (!enabled) {
                 return;
             }
+            ChatClefDiagnostics.runIfDiagnosticsEligible(
+                    () -> logReturnEligible(bestToolSlot, decisionReason, highestSpeed)
+            );
+        }
+
+        private void logReturnEligible(Slot bestToolSlot,
+                                       String decisionReason,
+                                       double highestSpeed) {
             String fingerprint = fingerprint(bestToolSlot, decisionReason, highestSpeed);
-            if (!DEDUPLICATOR.shouldEmit("best_tool_slot", fingerprint)) {
+            ToolSelectionShapingDecision shaping = SHAPER.evaluate(
+                    true,
+                    SHAPING_CHANNEL,
+                    fingerprint,
+                    ChatClefDiagnostics.currentClientTickId()
+            );
+            ToolSelectionSuppressionSummaryEmitter.emit(
+                    "BEST_TOOL_SLOT_DECISION_REPEAT_SUMMARY",
+                    "storage_helper_get_best_tool_slot_repeat_summary",
+                    SHAPING_CHANNEL,
+                    shaping
+            );
+            if (!shaping.emitEvent()) {
                 return;
             }
 
@@ -139,23 +171,34 @@ public final class BestToolSlotDiagnostics {
                     "shearsCandidateCount", shearsCandidateCount,
                     "effectiveShearsCount", effectiveShearsCount,
                     "truncatedCandidateCount", Math.max(0, candidateCount - emittedCandidates),
-                    "candidateSummary", candidates.toString());
+                    "candidateSummary", candidates.toString(),
+                    "priorSuppressedRepeatCount", shaping.suppressedRepeatCount(),
+                    "priorSuppressionFirstObservedTick", shaping.firstObservedTick(),
+                    "priorSuppressionLastObservedTick", shaping.lastObservedTick(),
+                    "priorSemanticFingerprint", shaping.summaryFingerprint());
         }
 
         private String fingerprint(Slot bestToolSlot, String decisionReason, double highestSpeed) {
-            return decisionReason
-                    + "|" + ChatClefDiagnostics.safeValue(() -> targetState == null ? null : targetState.getBlock())
-                    + "|" + ChatClefDiagnostics.slotSummary(bestToolSlot)
-                    + "|" + ToolDiagnosticFormatter.bestToolStackFingerprint(ToolDiagnosticFormatter.slotStack(bestToolSlot))
-                    + "|" + ToolDiagnosticFormatter.speedValue(highestSpeed)
-                    + "|" + candidateCount
-                    + "|" + toolCandidateCount
-                    + "|" + defaultSuitableToolCount
-                    + "|" + savedSuitableToolCount
-                    + "|" + eligibleToolCount
-                    + "|" + shearsCandidateCount
-                    + "|" + effectiveShearsCount
-                    + "|" + candidates;
+            String selectedTool = ChatClefDiagnostics.slotSummary(bestToolSlot)
+                    + "#" + ToolDiagnosticFormatter.bestToolStackFingerprint(
+                    ToolDiagnosticFormatter.slotStack(bestToolSlot)
+            );
+            String decisionDetails = ToolDiagnosticFormatter.speedValue(highestSpeed)
+                    + "#candidateCount=" + candidateCount
+                    + "#toolCandidateCount=" + toolCandidateCount
+                    + "#defaultSuitableToolCount=" + defaultSuitableToolCount
+                    + "#savedSuitableToolCount=" + savedSuitableToolCount
+                    + "#eligibleToolCount=" + eligibleToolCount
+                    + "#shearsCandidateCount=" + shearsCandidateCount
+                    + "#effectiveShearsCount=" + effectiveShearsCount
+                    + "#candidates=" + candidates;
+            return ToolSelectionSemanticFingerprint.selectionDecision(
+                    decisionReason,
+                    String.valueOf(ToolTargetDiagnosticFields.blockId(targetState)),
+                    "best_tool_scan",
+                    selectedTool,
+                    decisionDetails
+            );
         }
     }
 

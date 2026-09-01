@@ -431,6 +431,26 @@ public final class StoreDepositAutomaticLifecycleLedger {
         return state.snapshot();
     }
 
+    public synchronized ClearResult clearForModeTransition() {
+        ClearResult result = new ClearResult(
+                runs.size(),
+                pendingEvictions.size(),
+                maintenanceBindings.size(),
+                childBindings.size(),
+                userRootBindings.size()
+        );
+        runs.clear();
+        pendingEvictions.clear();
+        maintenanceBindings.clear();
+        childBindings.clear();
+        userRootBindings.clear();
+        return result;
+    }
+
+    public synchronized int activeRunCount() {
+        return runs.size();
+    }
+
     private TerminalRecord recordScope(RunState state,
                                        StoreDepositAutomaticContext context,
                                        String terminalScope,
@@ -935,6 +955,20 @@ public final class StoreDepositAutomaticLifecycleLedger {
                     identity,
                     snapshot
             );
+        }
+    }
+
+    public record ClearResult(int activeRunCount,
+                              int pendingEvictionCount,
+                              int maintenanceBindingCount,
+                              int childBindingCount,
+                              int userRootBindingCount) {
+        public int totalEntryCount() {
+            return activeRunCount
+                    + pendingEvictionCount
+                    + maintenanceBindingCount
+                    + childBindingCount
+                    + userRootBindingCount;
         }
     }
 }

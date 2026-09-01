@@ -318,7 +318,6 @@ class RepositoryContractTests(unittest.TestCase):
             "config/audio_device_config.json",
             "config/gpu_device_config.json",
             "config/gpu_device_config.example.json",
-            "config/modules.json",
             "config/modules.core.json",
             "config/modules.example.json",
             "config/chess_config.json",
@@ -331,6 +330,18 @@ class RepositoryContractTests(unittest.TestCase):
         }
 
         self.assertEqual([], sorted(required_config_paths - tracked))
+
+    def test_user_modules_override_is_local_and_ignored(self):
+        #20260901_kpopmodder: Keep the optional user/device override out of deployment artifacts.
+        tracked = set(self._git_ls_files())
+        ignored = subprocess.run(
+            ["git", "check-ignore", "-q", "config/modules.json"],
+            cwd=PROJECT_ROOT,
+            check=False,
+        )
+
+        self.assertNotIn("config/modules.json", tracked)
+        self.assertEqual(0, ignored.returncode)
 
     def test_legacy_plugin_local_config_files_are_not_tracked(self):
         tracked = set(self._git_ls_files())

@@ -16,7 +16,7 @@ final class TaskChildReconciliationDiagnostics {
     private TaskChildReconciliationDiagnostics() {
     }
 
-    static void log(Task parent,
+    static boolean log(Task parent,
                     Task activeChildBefore,
                     Task candidateChild,
                     boolean isEqualResult,
@@ -27,12 +27,12 @@ final class TaskChildReconciliationDiagnostics {
                     Task activeChildAfter,
                     boolean candidateDiscardedBecauseEqual) {
         if (!ChatClefDiagnostics.isBoundaryEnabled() || !(parent instanceof MineAndCollectTask.MineOrCollectTask)) {
-            return;
+            return false;
         }
         if (!(activeChildBefore instanceof DestroyBlockTask)
                 && !(candidateChild instanceof DestroyBlockTask)
                 && !(activeChildAfter instanceof DestroyBlockTask)) {
-            return;
+            return false;
         }
         MineAndCollectTask.MineOrCollectTask mineParent = (MineAndCollectTask.MineOrCollectTask) parent;
         ReconciliationTaskIdentity activeBeforeIdentity = ReconciliationTaskIdentity.capture(activeChildBefore);
@@ -51,7 +51,8 @@ final class TaskChildReconciliationDiagnostics {
         String fingerprint = ReconciliationSemanticFingerprint.create(
                 parent, activeBeforeIdentity, candidateIdentity, activeAfterIdentity, outcome,
                 isEqualResult, replacementApplied, candidateDiscardedBecauseEqual);
-        MiningDiagnosticEmitter.emitLazy("TASK_CHILD_RECONCILIATION", "task_child_reconciliation", parent,
+        return MiningDiagnosticEmitter.emitLazyWithPhysicalOutcome(
+                "TASK_CHILD_RECONCILIATION", "task_child_reconciliation", parent,
                 "task_child_reconciliation|" + System.identityHashCode(parent),
                 fingerprint,
                 () -> {

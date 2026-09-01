@@ -18,7 +18,7 @@ public final class MiningDiagnosticCapEventEmitter {
                             Object[] commandContextFields) {
         MiningDiagnosticBudgetSnapshot snapshot = admission.snapshot();
         ChatClefDiagnostics.logBoundary(
-                "DIAGNOSTIC_SESSION_CAP_REACHED",
+                "MINING_DIAGNOSTIC_FAMILY_CAP_REACHED",
                 "mining_diagnostic_session_detail_cap_reached",
                 null,
                 merge(new Object[]{

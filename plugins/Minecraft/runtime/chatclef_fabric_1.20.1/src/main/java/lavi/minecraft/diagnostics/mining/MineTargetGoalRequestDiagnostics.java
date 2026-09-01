@@ -19,7 +19,7 @@ final class MineTargetGoalRequestDiagnostics {
     private MineTargetGoalRequestDiagnostics() {
     }
 
-    static void log(AltoClef mod,
+    static boolean log(AltoClef mod,
                     MineAndCollectTask.MineOrCollectTask task,
                     BlockPos target,
                     BlockPos previousMiningPos,
@@ -33,7 +33,7 @@ final class MineTargetGoalRequestDiagnostics {
                     String decisionOutcome,
                     Task returnedTask) {
         if (!ChatClefDiagnostics.isBoundaryEnabled()) {
-            return;
+            return false;
         }
         String targetPosition = ChatClefDiagnostics.blockPos(target);
         String previousPosition = ChatClefDiagnostics.blockPos(previousMiningPos);
@@ -52,7 +52,8 @@ final class MineTargetGoalRequestDiagnostics {
                 Boolean.toString(localBlacklistContainsBefore),
                 MiningDiagnosticEmitter.taskClass(returnedTask)
         );
-        MiningDiagnosticEmitter.emitLazy("MINE_TARGET_GOAL_REQUEST", "mine_target_goal_request", task,
+        return MiningDiagnosticEmitter.emitLazyWithPhysicalOutcome(
+                "MINE_TARGET_GOAL_REQUEST", "mine_target_goal_request", task,
                 "mine_target_goal_request|" + System.identityHashCode(task),
                 fingerprint,
                 () -> new Object[]{

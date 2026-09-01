@@ -12,6 +12,7 @@ APPROVAL_FIELDS = (
     "instance",
     "world",
     "invocation_id",
+    "transport",
 )
 
 

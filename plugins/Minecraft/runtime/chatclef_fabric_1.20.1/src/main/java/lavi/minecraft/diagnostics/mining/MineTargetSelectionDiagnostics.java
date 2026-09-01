@@ -22,7 +22,7 @@ final class MineTargetSelectionDiagnostics {
     private MineTargetSelectionDiagnostics() {
     }
 
-    static void log(AltoClef mod,
+    static boolean log(AltoClef mod,
                     MineAndCollectTask.MineOrCollectTask task,
                     Pair<Double, Optional<BlockPos>> closestBlock,
                     Pair<Double, Optional<ItemEntity>> closestDrop,
@@ -34,7 +34,7 @@ final class MineTargetSelectionDiagnostics {
                     int localBlacklistSize,
                     BlockPos currentMiningPos) {
         if (!ChatClefDiagnostics.isBoundaryEnabled()) {
-            return;
+            return false;
         }
         String previous = LAST_SELECTED_PURSUIT.getOrDefault(task, "none");
         String selectedSummary = selected.map(value -> objectSummary(value)).orElse("none");
@@ -52,7 +52,8 @@ final class MineTargetSelectionDiagnostics {
                 selectionReason,
                 selectedBlock.map(ChatClefDiagnostics::blockPos).orElse("none")
         );
-        MiningDiagnosticEmitter.emitLazy("MINE_TARGET_SELECTION_TRANSITION", "mine_target_selection_transition", task,
+        return MiningDiagnosticEmitter.emitLazyWithPhysicalOutcome(
+                "MINE_TARGET_SELECTION_TRANSITION", "mine_target_selection_transition", task,
                 "mine_target_selection|" + System.identityHashCode(task),
                 fingerprint,
                 () -> new Object[]{

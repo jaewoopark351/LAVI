@@ -94,4 +94,18 @@ final class StoreDepositCriticalBudget {
     synchronized long exhaustedTerminalOperationCount() {
         return exhaustedTerminalOperationCount;
     }
+
+    synchronized int clearForModeTransition() {
+        int invalidated = terminalOperations.size()
+                + controlEvents.size()
+                + exceptionSignatures.size()
+                + lateSummaries.size()
+                + (coverageSuppressionSummaryEmitted ? 1 : 0);
+        terminalOperations.clear();
+        controlEvents.clear();
+        exceptionSignatures.clear();
+        lateSummaries.clear();
+        coverageSuppressionSummaryEmitted = false;
+        return invalidated;
+    }
 }

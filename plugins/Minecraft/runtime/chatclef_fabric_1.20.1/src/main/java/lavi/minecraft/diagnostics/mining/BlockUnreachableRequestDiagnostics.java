@@ -12,7 +12,7 @@ final class BlockUnreachableRequestDiagnostics {
     private BlockUnreachableRequestDiagnostics() {
     }
 
-    static void log(AltoClef mod,
+    static boolean log(AltoClef mod,
                     Task task,
                     BlockPos target,
                     int requestedAllowedFailures,
@@ -20,7 +20,7 @@ final class BlockUnreachableRequestDiagnostics {
                     Task activeDestroyTask,
                     Task candidateDestroyTask) {
         if (!ChatClefDiagnostics.isBoundaryEnabled()) {
-            return;
+            return false;
         }
         String fingerprint = MiningDiagnosticEmitter.joinFingerprint(
                 "BLOCK_UNREACHABLE_REQUEST",
@@ -28,7 +28,8 @@ final class BlockUnreachableRequestDiagnostics {
                 ChatClefDiagnostics.blockPos(target),
                 Integer.toString(requestedAllowedFailures)
         );
-        MiningDiagnosticEmitter.emitLazy("BLOCK_UNREACHABLE_REQUEST", "block_unreachable_request", task,
+        return MiningDiagnosticEmitter.emitLazyWithPhysicalOutcome(
+                "BLOCK_UNREACHABLE_REQUEST", "block_unreachable_request", task,
                 "block_unreachable_request|" + requestSource + "|" + ChatClefDiagnostics.blockPos(target),
                 fingerprint,
                 () -> {

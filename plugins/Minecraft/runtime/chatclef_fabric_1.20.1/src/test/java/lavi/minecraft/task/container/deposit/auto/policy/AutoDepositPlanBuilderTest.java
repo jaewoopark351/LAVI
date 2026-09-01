@@ -32,6 +32,7 @@ class AutoDepositPlanBuilderTest {
     @AfterEach
     void disableDiagnostics() {
         ChatClefDiagnostics.setBoundaryEnabled(false);
+        ChatClefDiagnostics.resetDiagnosticSessionForTests();
     }
 
     @Test

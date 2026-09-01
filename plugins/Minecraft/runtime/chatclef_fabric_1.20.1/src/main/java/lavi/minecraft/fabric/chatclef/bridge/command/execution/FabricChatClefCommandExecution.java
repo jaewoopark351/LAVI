@@ -166,6 +166,10 @@ public final class FabricChatClefCommandExecution {
         return state.context().requestId();
     }
 
+    public String normalizedCommand() {
+        return state.normalizedCommand();
+    }
+
     public FabricChatClefCommandContext context() {
         return state.context();
     }

@@ -43,6 +43,7 @@ import net.minecraft.item.Item;
 import net.minecraft.screen.slot.SlotActionType;
 import net.minecraft.util.math.BlockPos;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -68,9 +69,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 //20260830_kpopmodder: Lock all twenty-four Slice A diagnostics assertions into sixteen grouped scenarios.
 class StoreDepositSliceADiagnosticsContractTest {
 
+    @BeforeEach
+    void startWithFreshDiagnosticSession() {
+        ChatClefDiagnostics.setBoundaryEnabled(false);
+        ChatClefDiagnostics.resetDiagnosticSessionForTests();
+    }
+
     @AfterEach
     void disableDiagnostics() {
         ChatClefDiagnostics.setBoundaryEnabled(false);
+        ChatClefDiagnostics.resetDiagnosticSessionForTests();
     }
 
     @Test
@@ -281,7 +289,7 @@ class StoreDepositSliceADiagnosticsContractTest {
         int observationStart = slotDiagnostics.indexOf("public void observeTrackerMutation(");
         int observationEnd = slotDiagnostics.indexOf("public Object[] currentMutationFields()", observationStart);
         String observationBody = slotDiagnostics.substring(observationStart, observationEnd);
-        assertTrue(observationBody.contains("MutationContext mutation = currentMutation.get()"));
+        assertTrue(observationBody.contains("MutationContext mutation = activeMutation()"));
         assertTrue(observationBody.contains("mutation.trackerRoles.add(binding.trackerRole())"));
         assertFalse(observationBody.contains("new MutationContext"));
         assertTrue(slotDiagnostics.contains("\"trackerRolesObserved\", Set.copyOf(trackerRoles)"));

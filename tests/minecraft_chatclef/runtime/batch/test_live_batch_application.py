@@ -203,6 +203,7 @@ def _environment_fixture() -> dict[str, object]:
         "live_opt_in": True,
         "mutating_opt_in": True,
         "gradio_url": "http://127.0.0.1:47860",
+        "transport": "korean",
         "expected_backend": "fabric_chatclef",
         "expected_instance": "LAVI_TEST_Fabric01",
         "expected_world": "test-world",
@@ -214,6 +215,7 @@ def _approval_fixture() -> dict[str, object]:
     return {
         "approval_source": "operator-console",
         "gradio_url": "http://127.0.0.1:47860",
+        "transport": "korean",
         "backend": "fabric_chatclef",
         "instance": "LAVI_TEST_Fabric01",
         "world": "test-world",

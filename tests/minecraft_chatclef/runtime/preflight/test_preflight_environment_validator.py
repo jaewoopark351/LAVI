@@ -19,6 +19,7 @@ class PreflightEnvironmentValidatorTests(unittest.TestCase):
             "expected_instance",
             "expected_world",
             "invocation_id",
+            "transport",
             "approval_json",
             "repository_root",
         ):

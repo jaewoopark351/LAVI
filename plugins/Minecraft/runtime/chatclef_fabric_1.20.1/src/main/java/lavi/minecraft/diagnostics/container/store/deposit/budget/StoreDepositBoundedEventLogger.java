@@ -3,6 +3,7 @@ package lavi.minecraft.diagnostics.container.store.deposit.budget;
 import adris.altoclef.tasksystem.Task;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 import lavi.minecraft.diagnostics.container.store.deposit.event.StoreDepositEventFields;
+import lavi.minecraft.diagnostics.session.runtime.DiagnosticBoundedGroupEmitter;
 
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -24,6 +25,21 @@ public final class StoreDepositBoundedEventLogger {
                 task,
                 MAX_EVENT_UTF8_BYTES,
                 requiredFields,
+                new Object[0]
+        );
+    }
+
+    public static void logPreAdmitted(DiagnosticBoundedGroupEmitter emitter,
+                                      String eventName,
+                                      String reason,
+                                      Task task,
+                                      Object[] requiredFields) {
+        emitter.emit(
+                eventName,
+                reason,
+                task,
+                MAX_EVENT_UTF8_BYTES,
+                withCommonObservationFields(requiredFields),
                 new Object[0]
         );
     }

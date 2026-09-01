@@ -22,9 +22,11 @@ public final class StoreDepositEventFields {
     }
 
     public static Object[] operationFields(StoreDepositOperationState state) {
-        if (state == null) {
+        if (state == null || state.context() == null) {
             return new Object[]{
-                    "storeContextAvailable", false
+                    "storeContextAvailable", false,
+                    "storeOperationId", "UNAVAILABLE",
+                    "requestSource", "UNAVAILABLE"
             };
         }
         StoreDepositOperationContext context = state.context();
@@ -580,7 +582,9 @@ public final class StoreDepositEventFields {
     public static Object[] coverageSummaryFields(StoreDepositOperationState state,
                                                  String terminalTrigger,
                                                  Object[] budgetFields) {
-        boolean depositAll = state != null && state.context().isDepositAllOperation();
+        boolean depositAll = state != null
+                && state.context() != null
+                && state.context().isDepositAllOperation();
         String implementedFamilies = "lifecycle,child_reconciliation,parent_candidate,filtered_search,pursuit,"
                 + "target_callback,craft_route,transfer,effect,user_block_null_input"
                 + (depositAll ? ",predicate_rejection_aggregate,branch_epoch,operation_budget,checkpoint" : "");
@@ -703,7 +707,9 @@ public final class StoreDepositEventFields {
     }
 
     public static String operationId(StoreDepositOperationState state) {
-        return state == null ? "unavailable" : state.context().operationId();
+        return state == null || state.context() == null
+                ? "UNAVAILABLE"
+                : state.context().operationId();
     }
 
     public static String identity(Object value) {

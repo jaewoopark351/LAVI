@@ -75,6 +75,15 @@ class MinecraftFabricChatClefToolEquipDiagnosticsContractTests(unittest.TestCase
 
         self.assertTrue(diagnostics_file.exists())
         text = diagnostics_file.read_text(encoding="utf-8")
+        shaper_text = (
+            JAVA_ROOT
+            / "lavi"
+            / "minecraft"
+            / "diagnostics"
+            / "toolselect"
+            / "shaping"
+            / "ToolSelectionDiagnosticShaper.java"
+        ).read_text(encoding="utf-8")
         save_policy_text = (
             JAVA_ROOT
             / "lavi"
@@ -88,8 +97,48 @@ class MinecraftFabricChatClefToolEquipDiagnosticsContractTests(unittest.TestCase
         self.assertIn("package lavi.minecraft.diagnostics.toolselect;", text)
         self.assertIn("logBoundary(\"BEST_TOOL_SLOT_DECISION\"", text)
         self.assertIn("storage_helper_get_best_tool_slot", text)
-        self.assertIn("private static final DiagnosticDeduplicator DEDUPLICATOR", text)
-        self.assertIn("DEDUPLICATOR.shouldEmit(\"best_tool_slot\", fingerprint)", text)
+        self.assertIn(
+            'private static final String SHAPING_CHANNEL = "best_tool_slot";', text
+        )
+        self.assertIn(
+            "private static final ToolSelectionDiagnosticShaper SHAPER", text
+        )
+        self.assertIn(
+            "new ToolSelectionDiagnosticStateObserver(SHAPER::clearForModeOff)",
+            text,
+        )
+        self.assertIn(
+            "ChatClefDiagnostics.registerSessionLifecycleObserver(OFF_STATE_OBSERVER)",
+            text,
+        )
+        self.assertNotIn("DiagnosticDeduplicator", text)
+        evaluate_index = text.index("ToolSelectionShapingDecision shaping = SHAPER.evaluate(")
+        current_tick_index = text.index(
+            "ChatClefDiagnostics.currentClientTickId()", evaluate_index
+        )
+        summary_index = text.index(
+            "ToolSelectionSuppressionSummaryEmitter.emit(", current_tick_index
+        )
+        event_gate_index = text.index("if (!shaping.emitEvent())", summary_index)
+        boundary_index = text.index(
+            'ChatClefDiagnostics.logBoundary("BEST_TOOL_SLOT_DECISION"',
+            event_gate_index,
+        )
+        self.assertLess(evaluate_index, current_tick_index)
+        self.assertLess(current_tick_index, summary_index)
+        self.assertLess(summary_index, event_gate_index)
+        self.assertLess(event_gate_index, boundary_index)
+        self.assertIn('"BEST_TOOL_SLOT_DECISION_REPEAT_SUMMARY"', text)
+        self.assertIn('"storage_helper_get_best_tool_slot_repeat_summary"', text)
+        self.assertIn('"priorSuppressedRepeatCount"', text)
+        self.assertIn("ToolSelectionSemanticFingerprint.selectionDecision", text)
+        self.assertIn("MAX_CHANNEL_STATES = 16", shaper_text)
+        self.assertIn("SUMMARY_INTERVAL_TICKS = 200L", shaper_text)
+        self.assertIn(
+            "new ToolSelectionChannelRegistry(MAX_CHANNEL_STATES)", shaper_text
+        )
+        self.assertIn("public synchronized ToolSelectionShapingDecision evaluate", shaper_text)
+        self.assertIn("public synchronized void clearForModeOff()", shaper_text)
         self.assertIn("private String fingerprint(Slot bestToolSlot, String decisionReason, double highestSpeed)", text)
         self.assertIn("SKIP_SHOULD_SAVE", text)
         self.assertIn("NO_ELIGIBLE_TOOL", text)

@@ -6,6 +6,7 @@ from collections.abc import Mapping, Sequence
 
 APPROVAL_TARGET_FIELDS = (
     ("gradio_url", "gradio_url"),
+    ("transport", "transport"),
     ("backend", "expected_backend"),
     ("instance", "expected_instance"),
     ("world", "expected_world"),

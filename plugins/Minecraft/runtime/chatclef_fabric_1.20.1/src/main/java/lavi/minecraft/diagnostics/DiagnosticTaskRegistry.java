@@ -5,26 +5,28 @@ import adris.altoclef.tasksystem.Task;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.IdentityHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 
 //20260731_kpopmodder: Own diagnostic task identity and task stack tracking separately from log emission.
 final class DiagnosticTaskRegistry {
     private final IdentityHashMap<Object, Long> taskInstanceIds = new IdentityHashMap<>();
     private final IdentityHashMap<Object, Long> taskRunIds = new IdentityHashMap<>();
     private final IdentityHashMap<Object, Long> parentTaskRunIds = new IdentityHashMap<>();
-    private final ThreadLocal<Deque<Task>> taskStack = ThreadLocal.withInitial(ArrayDeque::new);
+    private final AtomicReference<Object> modeEpoch = new AtomicReference<>(new Object());
+    private final ThreadLocal<EpochTaskStack> taskStack = new ThreadLocal<>();
     private long nextTaskInstanceId = 1;
     private long nextTaskRunId = 1;
 
     void enterTask(Task task) {
         try {
-            taskStack.get().push(task);
+            currentTaskStack().push(task);
         } catch (RuntimeException | LinkageError ignored) {
         }
     }
 
     void exitTask(Task task) {
         try {
-            Deque<Task> stack = taskStack.get();
+            Deque<Task> stack = currentTaskStack();
             if (!stack.isEmpty() && stack.peek() == task) {
                 stack.pop();
                 return;
@@ -36,7 +38,7 @@ final class DiagnosticTaskRegistry {
 
     Task currentTask() {
         try {
-            Deque<Task> stack = taskStack.get();
+            Deque<Task> stack = currentTaskStack();
             return stack.isEmpty() ? null : stack.peek();
         } catch (RuntimeException | LinkageError ignored) {
             return null;
@@ -82,6 +84,27 @@ final class DiagnosticTaskRegistry {
 
     synchronized String taskRunIdLabel(Task task) {
         return task == null ? "unavailable" : idLabel(existingRunId(task));
+    }
+
+    synchronized void clearForModeTransition() {
+        taskInstanceIds.clear();
+        taskRunIds.clear();
+        parentTaskRunIds.clear();
+        modeEpoch.set(new Object());
+        taskStack.remove();
+    }
+
+    private Deque<Task> currentTaskStack() {
+        Object currentEpoch = modeEpoch.get();
+        EpochTaskStack current = taskStack.get();
+        if (current == null || current.modeEpoch != currentEpoch) {
+            current = new EpochTaskStack(currentEpoch, new ArrayDeque<>());
+            taskStack.set(current);
+        }
+        return current.tasks;
+    }
+
+    private record EpochTaskStack(Object modeEpoch, Deque<Task> tasks) {
     }
 
     static String idLabel(long id) {

@@ -3,6 +3,7 @@ package adris.altoclef.tasksystem;
 import adris.altoclef.Debug;
 import adris.altoclef.tasks.movement.TimeoutWanderTask;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.diagnostics.container.ContainerTaskDiagnostics;
 import lavi.minecraft.diagnostics.container.store.deposit.StoreDepositDiagnostics;
 import lavi.minecraft.diagnostics.mining.MiningPathDiagnostics;
 
@@ -116,6 +117,19 @@ public abstract class Task {
                         previousChildStopCalled,
                         sub,
                         subTasksEqual);
+                //20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
+                ContainerTaskDiagnostics.logChildReconciliation(
+                        this,
+                        activeChildBefore,
+                        newSub,
+                        subTasksEqual,
+                        canInterruptEvaluated,
+                        canInterrupt,
+                        replacementApplied,
+                        previousChildStopCalled,
+                        sub,
+                        subTasksEqual,
+                        false);
                 StoreDepositDiagnostics.logChildReconciliation(
                         this,
                         activeChildBefore,
@@ -163,6 +177,18 @@ public abstract class Task {
                         ChatClefDiagnostics.logTaskTransition(this, null, null, "child_cleared");
                     }
                 }
+                ContainerTaskDiagnostics.logChildReconciliation(
+                        this,
+                        activeChildBefore,
+                        null,
+                        activeChildBefore == null,
+                        true,
+                        canInterrupt,
+                        childCleared,
+                        previousChildStopCalled,
+                        sub,
+                        false,
+                        childCleared);
                 StoreDepositDiagnostics.logChildReconciliation(
                         this,
                         activeChildBefore,

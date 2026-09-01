@@ -63,6 +63,7 @@ class BatchApprovalRecordTests(unittest.TestCase):
             ("approval_source", 1),
             ("approval_source", " operator-console"),
             ("gradio_url", 1),
+            ("transport", " raw"),
             ("backend", True),
             ("instance", "LAVI_TEST_Fabric01 "),
             ("world", 1.0),
@@ -104,6 +105,7 @@ class BatchApprovalRecordTests(unittest.TestCase):
 def _environment_fixture() -> dict[str, object]:
     return {
         "gradio_url": "http://127.0.0.1:47860",
+        "transport": "korean",
         "expected_backend": "fabric_chatclef",
         "expected_instance": "LAVI_TEST_Fabric01",
         "expected_world": "test-world",
@@ -114,6 +116,7 @@ def _approval_fixture() -> dict[str, object]:
     return {
         "approval_source": "operator-console",
         "gradio_url": "http://127.0.0.1:47860",
+        "transport": "korean",
         "backend": "fabric_chatclef",
         "instance": "LAVI_TEST_Fabric01",
         "world": "test-world",

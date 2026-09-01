@@ -5,6 +5,10 @@ import net.minecraft.util.hit.BlockHitResult;
 
 //20260805_kpopmodder: Expose block-interaction observations without changing Minecraft interaction behavior.
 public interface BlockInteractionObserver {
+    default boolean requiresCompletedSourceEmission() {
+        return false;
+    }
+
     void beforeBlockInteraction(BlockInteractionContext context,
                                 ClientPlayerEntity player,
                                 Object hand,

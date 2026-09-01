@@ -200,6 +200,23 @@ public final class StoreDepositBindingRegistry {
         }
     }
 
+    public synchronized ClearResult clearForModeTransition() {
+        ClearResult result = new ClearResult(
+                operations.size(),
+                taskToOperation.size(),
+                trackerBindings.size()
+        );
+        operations.clear();
+        taskToOperation.clear();
+        trackerBindings.clear();
+        lastActiveOperationId = "none";
+        return result;
+    }
+
+    public synchronized int activeOperationCount() {
+        return operations.size();
+    }
+
     private void evictOldestOperationIfNeeded() {
         if (operations.size() < MAX_ACTIVE_OPERATIONS) {
             return;
@@ -232,5 +249,13 @@ public final class StoreDepositBindingRegistry {
                                  BlockPos targetContainer,
                                  long subscriptionGeneration,
                                  boolean subscriptionActive) {
+    }
+
+    public record ClearResult(int operationCount,
+                              int taskBindingCount,
+                              int trackerBindingCount) {
+        public int totalEntryCount() {
+            return operationCount + taskBindingCount + trackerBindingCount;
+        }
     }
 }

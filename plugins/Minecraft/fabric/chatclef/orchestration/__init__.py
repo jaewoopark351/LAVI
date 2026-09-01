@@ -1,10 +1,9 @@
 #20260819_kpopmodder: Expose Python-owned ChatClef orchestration helpers.
-from plugins.Minecraft.fabric.chatclef.orchestration.inventory_cleanup_policy import (
+#20260901_kpopmodder: Export inventory cleanup types from their canonical component.
+from plugins.Minecraft.fabric.chatclef.orchestration.inventory_cleanup import (
     ChatClefInventoryCleanupPolicy,
     CleanupAdmissionDecision,
     CleanupTargetPlan,
-)
-from plugins.Minecraft.fabric.chatclef.orchestration.inventory_cleanup_state import (
     InventoryCleanupPostcondition,
     InventoryEvidenceState,
     InventorySnapshot,

@@ -142,6 +142,13 @@ public final class StoreDepositTransferAttemptRegistry {
         return transfer;
     }
 
+    public synchronized int clearForModeTransition() {
+        int invalidated = pending.size() + active.size();
+        pending.clear();
+        active.clear();
+        return invalidated;
+    }
+
     private void evictPendingIfNeeded() {
         if (pending.size() < MAX_STAGED_TRANSFERS) {
             return;

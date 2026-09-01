@@ -1,4 +1,5 @@
 <!-- 20260806_kpopmodder: Documented the ChatClef task lifecycle diagnostic runbook for command root, child task, and Baritone loop investigations. -->
+<!-- 20260831_openai: Linked the post-checkpoint shared diagnostics-admission, bounded terminal-accounting, and separated validation direction. -->
 
 # ChatClef Task Lifecycle Diagnostics
 
@@ -1979,8 +1980,8 @@ chatclef-bare-deposit-container-handoff-loop-investigation.md
     interpretation, and the container branch/lifecycle coordination boundary.
 
 chatclef-bare-deposit-diagnostics-plan.md
-    Canonical bounded operation correlation, cap-independent aggregate, and
-    terminal-summary design plus the current partial-implementation ledger.
+    Historical/current-source provenance for bounded operation correlation,
+    cap-independent aggregate, and terminal-summary partial implementation.
 
 chatclef-bare-deposit-diagnostics-reproduction-2026-08-19-r1.md
     Separate live-prefix reproduction showing which partial diagnostics emitted,
@@ -1990,6 +1991,11 @@ chatclef-bare-deposit-diagnostics-reproduction-2026-08-19-r1.md
 chatclef-auto-deposit-obtain-chest-mining-diagnostics-review-2026-08-30.md
     Corrected obtain-chest/mining observer-contamination finding, current runtime
     evidence, and the next additive bounded diagnostics order.
+
+chatclef-automatic-deposit-post-checkpoint-direction-2026-08-31.md
+    Post-checkpoint handoff freeze, shared budgeted investigation admission,
+    bounded terminal accounting, tool-selection separation, test-only
+    container-type coverage, and release-matrix gates.
 
 chatclef-carryon-integration-direction.md
     Engine boundary, ownership, diagnostics-only, and root-cause patch gates.
@@ -2019,3 +2025,12 @@ distinct `END_CLIENT_TICK` observations, at least 500 ms of monotonic stability,
 and newest ownership evidence no older than 1000 ms. It does not prove gameplay
 success, global engine quiescence, Baritone idleness, input cleanup, or absence
 of later work.
+
+## 2026-08-31 automatic-deposit evidence pointer
+
+The current shared-session cap, terminal-accounting, tool-selection shaping,
+clean-build, artifact-identity, and remaining frozen-handoff observability status
+is recorded in Section 15 of
+`chatclef-automatic-deposit-post-checkpoint-direction-2026-08-31.md`. That
+implementation evidence does not alter the lifecycle investigation rules in
+this document, prove a gameplay fix, or constitute a final-JAR runtime PASS.

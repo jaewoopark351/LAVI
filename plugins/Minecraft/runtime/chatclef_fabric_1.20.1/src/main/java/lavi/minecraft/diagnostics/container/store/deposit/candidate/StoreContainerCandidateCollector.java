@@ -6,10 +6,13 @@ import net.minecraft.util.math.BlockPos;
 
 import java.util.EnumMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 public final class StoreContainerCandidateCollector {
     private static final ThreadLocal<Scope> ACTIVE_SCOPE = new ThreadLocal<>();
     private static final ThreadLocal<CompletedScope> COMPLETED_SCOPE = new ThreadLocal<>();
+    private static final AtomicReference<Object> MODE_EPOCH =
+            new AtomicReference<>(new Object());
 
     private StoreContainerCandidateCollector() {
     }
@@ -25,6 +28,7 @@ public final class StoreContainerCandidateCollector {
         }
         StoreContainerParentDecision parent = state.routeState().currentParentDecision();
         ACTIVE_SCOPE.set(new Scope(
+                MODE_EPOCH.get(),
                 state.context().operationId(),
                 routeChild,
                 parent.sequence(),
@@ -44,6 +48,7 @@ public final class StoreContainerCandidateCollector {
             return;
         }
         ACTIVE_SCOPE.set(new Scope(
+                MODE_EPOCH.get(),
                 state.context().operationId(),
                 parent,
                 -1,
@@ -54,7 +59,7 @@ public final class StoreContainerCandidateCollector {
 
     public static void observe(BlockPos position, StoreContainerCandidateRejectionReason reason) {
         try {
-            Scope scope = ACTIVE_SCOPE.get();
+            Scope scope = activeScope();
             if (scope == null) {
                 return;
             }
@@ -64,7 +69,7 @@ public final class StoreContainerCandidateCollector {
     }
 
     public static void end(Task routeChild, boolean completedNormally) {
-        Scope scope = ACTIVE_SCOPE.get();
+        Scope scope = activeScope();
         ACTIVE_SCOPE.remove();
         if (scope == null || scope.routeChild != routeChild) {
             COMPLETED_SCOPE.remove();
@@ -74,7 +79,7 @@ public final class StoreContainerCandidateCollector {
     }
 
     public static StoreContainerCandidateObservation take(StoreDepositOperationState state, Task routeChild) {
-        CompletedScope completed = COMPLETED_SCOPE.get();
+        CompletedScope completed = completedScope();
         COMPLETED_SCOPE.remove();
         if (completed == null || state == null) {
             return StoreContainerCandidateObservation.unavailable();
@@ -86,11 +91,39 @@ public final class StoreContainerCandidateCollector {
         return completed.scope().snapshot(completed.completedNormally(), state);
     }
 
+    public static int clearForModeTransition() {
+        int invalidated = (activeScope() == null ? 0 : 1)
+                + (completedScope() == null ? 0 : 1);
+        MODE_EPOCH.set(new Object());
+        ACTIVE_SCOPE.remove();
+        COMPLETED_SCOPE.remove();
+        return invalidated;
+    }
+
+    private static Scope activeScope() {
+        Scope scope = ACTIVE_SCOPE.get();
+        if (scope != null && scope.modeEpoch != MODE_EPOCH.get()) {
+            ACTIVE_SCOPE.remove();
+            return null;
+        }
+        return scope;
+    }
+
+    private static CompletedScope completedScope() {
+        CompletedScope completed = COMPLETED_SCOPE.get();
+        if (completed != null && completed.scope().modeEpoch != MODE_EPOCH.get()) {
+            COMPLETED_SCOPE.remove();
+            return null;
+        }
+        return completed;
+    }
+
     private static String identity(Object value) {
         return value == null ? "none" : Integer.toHexString(System.identityHashCode(value));
     }
 
     private static final class Scope {
+        private final Object modeEpoch;
         private final String operationId;
         private final Task routeChild;
         private final long parentDecisionSequence;
@@ -109,11 +142,13 @@ public final class StoreContainerCandidateCollector {
         private int rawCandidateEvaluationOrdinal;
         private StoreContainerCandidateRejectionReason rawCandidateReason;
 
-        private Scope(String operationId,
+        private Scope(Object modeEpoch,
+                      String operationId,
                       Task routeChild,
                       long parentDecisionSequence,
                       long branchEpoch,
                       BlockPos parentRawClosest) {
+            this.modeEpoch = modeEpoch;
             this.operationId = operationId;
             this.routeChild = routeChild;
             this.parentDecisionSequence = parentDecisionSequence;

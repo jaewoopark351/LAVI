@@ -43,6 +43,12 @@ public final class BlockInteractionEmissionLimiter {
         return BlockInteractionEmissionDecision.suppress();
     }
 
+    public synchronized void clearForModeTransition() {
+        emittedCount = 0;
+        capLogged = false;
+        repeatStates.clear();
+    }
+
     private static final class RepeatState {
         private boolean seen;
         private int suppressedRepeats;

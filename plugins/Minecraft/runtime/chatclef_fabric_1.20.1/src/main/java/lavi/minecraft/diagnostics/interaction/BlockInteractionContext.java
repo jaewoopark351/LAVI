@@ -1,5 +1,6 @@
 package lavi.minecraft.diagnostics.interaction;
 
+import adris.altoclef.tasksystem.Task;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.BlockPos;
 
@@ -13,6 +14,7 @@ public final class BlockInteractionContext {
     private final String hitType;
     private final BlockInteractionScreenSnapshot screenBefore;
     private final boolean matchedHead;
+    private final Task sourceTask;
 
     public BlockInteractionContext(long interactionId,
                                    long startClientTickId,
@@ -21,6 +23,26 @@ public final class BlockInteractionContext {
                                    BlockHitResult hitResult,
                                    BlockInteractionScreenSnapshot screenBefore,
                                    boolean matchedHead) {
+        this(
+                interactionId,
+                startClientTickId,
+                target,
+                hand,
+                hitResult,
+                screenBefore,
+                matchedHead,
+                null
+        );
+    }
+
+    public BlockInteractionContext(long interactionId,
+                                   long startClientTickId,
+                                   BlockInteractionTargetInfo target,
+                                   Object hand,
+                                   BlockHitResult hitResult,
+                                   BlockInteractionScreenSnapshot screenBefore,
+                                   boolean matchedHead,
+                                   Task sourceTask) {
         this.interactionId = interactionId;
         this.startClientTickId = startClientTickId;
         this.target = target;
@@ -29,6 +51,7 @@ public final class BlockInteractionContext {
         this.hitType = hitResult == null ? "unavailable" : value(hitResult.getType());
         this.screenBefore = screenBefore;
         this.matchedHead = matchedHead;
+        this.sourceTask = sourceTask;
     }
 
     public long interactionId() {
@@ -81,6 +104,10 @@ public final class BlockInteractionContext {
 
     public boolean matchedHead() {
         return matchedHead;
+    }
+
+    public Task sourceTask() {
+        return sourceTask;
     }
 
     public boolean targetMatches(BlockPos targetPosition) {

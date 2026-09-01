@@ -631,6 +631,9 @@ public class InteractWithBlockTask extends Task {
                         "inputAccepted", interactHeld,
                         "mainHandItemAfterPress", ChatClefDiagnostics.safeValue(() -> mod.getPlayer().getMainHandStack()));
                 if (interactHeld) {
+                    //20260730_kpopmodder: Added diagnostic logging to prove the Carry On interaction failure boundary.
+                    //20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
+                    ChatClefDiagnostics.noteBlockInteractionOwner(this, target);
                     if (shiftClick) {
                         ChatClefDiagnostics.logInput("REQUEST", "rightClick_shift_hold_before_click_attempted", Input.SNEAK,
                                 "inputRequested", true,

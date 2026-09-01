@@ -5,6 +5,7 @@ import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.helpers.WorldHelper;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.diagnostics.crafting.acquisition.requirement.CraftResourceRequirementSourceEventObserver;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -58,7 +59,15 @@ public final class VisibleTaskDiagnostics {
         if (!markStateChanged(task, eventName + "|" + reason, stateKey)) {
             return;
         }
-        ChatClefDiagnostics.logBoundary(eventName, reason, task, mergeCommonFields(mod, fields));
+        boolean sourceEmissionCompleted = ChatClefDiagnostics.logBoundaryWithPhysicalOutcome(
+                eventName,
+                reason,
+                task,
+                mergeCommonFields(mod, fields)
+        );
+        if (sourceEmissionCompleted && "VISIBLE_TASK_RETURN".equals(eventName)) {
+            CraftResourceRequirementSourceEventObserver.observeVisibleTaskReturn(task);
+        }
     }
 
     private static boolean markStateChanged(Task task, String bucket, String stateKey) {

@@ -97,6 +97,21 @@ class MinecraftFabricChatClefTransportTests(unittest.TestCase):
         finally:
             adapter.stop()
 
+    def test_command_request_preserves_exact_store_home_identity_once(self):
+        adapter = FabricChatClefAdapter(
+            config=FabricChatClefConfig(
+                enabled=True,
+                host="127.0.0.1",
+                port=0,
+                startup_timeout_sec=2.0,
+            )
+        )
+        try:
+            adapter.start()
+            asyncio.run(self._exercise_store_home_command_route(adapter))
+        finally:
+            adapter.stop()
+
     def test_active_disconnect_clears_connected_state(self):
         adapter = FabricChatClefAdapter(
             config=FabricChatClefConfig(
@@ -363,6 +378,49 @@ class MinecraftFabricChatClefTransportTests(unittest.TestCase):
                 message_id="next-result",
             )
             await active_websocket.send(json.dumps(next_command_result.to_dict()))
+            await asyncio.sleep(0.05)
+
+    async def _exercise_store_home_command_route(self, adapter):
+        import websockets
+
+        endpoint = adapter.get_status().details["endpoint"]
+        async with websockets.connect(endpoint) as websocket:
+            ack = await self._send_handshake(
+                websocket,
+                message_id="store-home-hello",
+            )
+            request = CommandRequestDTO(
+                request_id="p1-store-home-request",
+                command="@store_home",
+                source="lavi_gui",
+                metadata={"ui": "fabric_chatclef"},
+            )
+
+            result = adapter.submit_command(request)
+
+            self.assertTrue(result.ok)
+            self.assertEqual(CommandResultStatus.ACCEPTED, result.status)
+            self.assertEqual(request.request_id, result.request_id)
+
+            raw_command = await asyncio.wait_for(websocket.recv(), timeout=2.0)
+            command = json.loads(raw_command)
+            self.assertEqual(
+                BridgeMessageType.COMMAND_REQUEST.value,
+                command["message_type"],
+            )
+            self.assertEqual(request.request_id, command["correlation_id"])
+            self.assertEqual(request.to_dict(), command["payload"])
+
+            with self.assertRaises(asyncio.TimeoutError):
+                await asyncio.wait_for(websocket.recv(), timeout=0.2)
+
+            command_result = self._command_result(
+                request_id=request.request_id,
+                command_message_id=command["message_id"],
+                session_id=ack["payload"]["session_id"],
+                message_id="store-home-result",
+            )
+            await websocket.send(json.dumps(command_result.to_dict()))
             await asyncio.sleep(0.05)
 
     async def _exercise_active_disconnect(self, adapter):

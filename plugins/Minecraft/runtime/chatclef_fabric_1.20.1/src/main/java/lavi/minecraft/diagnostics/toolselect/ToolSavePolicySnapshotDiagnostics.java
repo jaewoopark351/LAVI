@@ -1,6 +1,7 @@
 package lavi.minecraft.diagnostics.toolselect;
 
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.diagnostics.toolselect.lifecycle.ToolSelectionDiagnosticStateObserver;
 import lavi.minecraft.diagnostics.toolselect.support.ToolMiningDiagnosticFieldValues;
 import lavi.minecraft.integration.toolselect.snapshot.ToolSavePolicySnapshot;
 import net.minecraft.block.Block;
@@ -11,18 +12,33 @@ import java.util.Locale;
 
 //20260805_kpopmodder: Bound tool-save snapshot diagnostics without reading live inventory from worker threads.
 public final class ToolSavePolicySnapshotDiagnostics {
+    static final String LOCAL_CAP_EVENT =
+            "TOOL_SAVE_POLICY_SNAPSHOT_DIAGNOSTIC_CAP_REACHED";
+
     private static final Object LOCK = new Object();
     private static final ToolSavePolicySnapshotEmissionLimiter CONSUMED_LIMITER =
             new ToolSavePolicySnapshotEmissionLimiter();
     private static String lastPublishedFingerprint = "";
+    private static final ToolSelectionDiagnosticStateObserver OFF_STATE_OBSERVER =
+            new ToolSelectionDiagnosticStateObserver(
+                    ToolSavePolicySnapshotDiagnostics::clearDiagnosticStateForModeOff
+            );
+
+    static {
+        ChatClefDiagnostics.registerSessionLifecycleObserver(OFF_STATE_OBSERVER);
+    }
 
     private ToolSavePolicySnapshotDiagnostics() {
     }
 
     public static void logPublished(ToolSavePolicySnapshot snapshot) {
-        if (!ChatClefDiagnostics.isBoundaryEnabled() || snapshot == null) {
+        if (snapshot == null) {
             return;
         }
+        ChatClefDiagnostics.runIfDiagnosticsEligible(() -> logPublishedEligible(snapshot));
+    }
+
+    private static void logPublishedEligible(ToolSavePolicySnapshot snapshot) {
         String fingerprint = "publish|"
                 + snapshot.generation()
                 + "|" + snapshot.ready()
@@ -49,14 +65,24 @@ public final class ToolSavePolicySnapshotDiagnostics {
                                    ItemStack stack,
                                    String decisionReason,
                                    boolean shouldSave) {
-        if (!ChatClefDiagnostics.isBoundaryEnabled() || snapshot == null) {
+        if (snapshot == null) {
             return;
         }
+        ChatClefDiagnostics.runIfDiagnosticsEligible(
+                () -> logConsumedEligible(snapshot, block, stack, decisionReason, shouldSave)
+        );
+    }
+
+    private static void logConsumedEligible(ToolSavePolicySnapshot snapshot,
+                                            Block block,
+                                            ItemStack stack,
+                                            String decisionReason,
+                                            boolean shouldSave) {
         String repeatKey = consumedRepeatKey(snapshot, block, stack, decisionReason, shouldSave);
         ToolSavePolicySnapshotEmissionLimiter.Decision decision = CONSUMED_LIMITER.evaluate(repeatKey);
         if (decision.emitCap) {
             ChatClefDiagnostics.logBoundary(
-                    "TOOL_SAVE_POLICY_SNAPSHOT_DIAGNOSTIC_CAP_REACHED",
+                    LOCAL_CAP_EVENT,
                     "tool_save_policy_snapshot_diagnostic_cap_reached",
                     null,
                     ChatClefDiagnostics.withCommandContextFields(new Object[]{
@@ -123,6 +149,13 @@ public final class ToolSavePolicySnapshotDiagnostics {
         );
     }
 
+    private static void clearDiagnosticStateForModeOff() {
+        synchronized (LOCK) {
+            lastPublishedFingerprint = "";
+        }
+        CONSUMED_LIMITER.clearForModeOff();
+    }
+
     private static String consumedRepeatKey(ToolSavePolicySnapshot snapshot,
                                             Block block,
                                             ItemStack stack,
@@ -161,7 +194,7 @@ public final class ToolSavePolicySnapshotDiagnostics {
     }
 
     private static String maxEmissionDescription() {
-        return "detail_per_bucket=256,session=5000,summary_ticks=200";
+        return "detail_per_bucket=256,repeat_states=16,session=5000,summary_ticks=200";
     }
 
     private static Object[] snapshotFields(ToolSavePolicySnapshot snapshot) {

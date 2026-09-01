@@ -6,6 +6,7 @@ import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.ItemTarget;
 import adris.altoclef.util.helpers.WorldHelper;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.diagnostics.crafting.acquisition.source.furnace.CraftResourceFurnaceSourceEventObserver;
 import net.minecraft.block.Block;
 import net.minecraft.block.Blocks;
 import net.minecraft.item.Items;
@@ -83,7 +84,7 @@ final class FurnaceRouteDiagnostics {
                 Boolean.toString(hasContainerBlockItem),
                 FurnaceDiagnosticEmitter.taskClass(candidateChild)
         );
-        FurnaceDiagnosticEmitter.emit("FURNACE_CONTAINER_ROUTE_TRANSITION", "furnace_container_route_transition", task,
+        boolean sourceEmissionCompleted = FurnaceDiagnosticEmitter.emit("FURNACE_CONTAINER_ROUTE_TRANSITION", "furnace_container_route_transition", task,
                 "furnace_route|" + System.identityHashCode(task),
                 fingerprint,
                 new Object[]{
@@ -132,6 +133,24 @@ final class FurnaceRouteDiagnostics {
                         "candidateChildInstanceId", FurnaceDiagnosticEmitter.instanceId(candidateChild),
                         "candidateChildSemanticKey", candidateChildSemanticKey
                 });
+        if (sourceEmissionCompleted) {
+            CraftResourceFurnaceSourceEventObserver.observeContainerRoute(
+                    task,
+                    containerTarget,
+                    containerBlocks,
+                    route.previousEffectiveBranch,
+                    route.effectiveBranch,
+                    candidateChild,
+                    candidateChildSemanticKey,
+                    nearestPosition,
+                    nearestSource,
+                    cachedContainerPositionAfter,
+                    placeTaskPlaced,
+                    hasContainerBlockItem,
+                    containerBlockItemCount,
+                    trigger
+            );
+        }
     }
 
     private static boolean isFurnaceContainer(ItemTarget containerTarget, Block[] containerBlocks) {

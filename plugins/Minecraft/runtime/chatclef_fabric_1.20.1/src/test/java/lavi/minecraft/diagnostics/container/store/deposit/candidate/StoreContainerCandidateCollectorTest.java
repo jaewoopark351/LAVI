@@ -6,6 +6,9 @@ import lavi.minecraft.diagnostics.container.store.deposit.context.StoreDepositOp
 import net.minecraft.util.math.BlockPos;
 import org.junit.jupiter.api.Test;
 
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicReference;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -137,6 +140,44 @@ class StoreContainerCandidateCollectorTest {
         assertEquals(raw, observation.parentRawClosest());
         assertEquals(StoreContainerRawCandidateOutcome.RAW_REJECTED.name(), observation.rawCandidatePredicateOutcome());
         assertEquals(StoreContainerCandidateRejectionReason.CACHED_DUNGEON_CHEST.name(), observation.rawCandidateRejectionReason());
+    }
+
+    @Test
+    void modeTransitionInvalidatesAPreOffScopeOwnedByAnotherThread() throws Exception {
+        BlockPos raw = new BlockPos(-679, 59, 105);
+        TestTask routeChild = new TestTask();
+        StoreDepositOperationState state = stateWithOpenRoute(raw, routeChild);
+        CountDownLatch started = new CountDownLatch(1);
+        CountDownLatch resume = new CountDownLatch(1);
+        AtomicReference<StoreContainerCandidateObservation> result = new AtomicReference<>();
+        Thread worker = new Thread(() -> {
+            StoreContainerCandidateCollector.begin(state, routeChild);
+            started.countDown();
+            await(resume);
+            StoreContainerCandidateCollector.observe(
+                    raw,
+                    StoreContainerCandidateRejectionReason.ACCEPTED
+            );
+            StoreContainerCandidateCollector.end(routeChild, true);
+            result.set(StoreContainerCandidateCollector.take(state, routeChild));
+        });
+
+        worker.start();
+        started.await();
+        StoreContainerCandidateCollector.clearForModeTransition();
+        resume.countDown();
+        worker.join();
+
+        assertFalse(result.get().available());
+    }
+
+    private static void await(CountDownLatch latch) {
+        try {
+            latch.await();
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError(interrupted);
+        }
     }
 
     private static StoreDepositOperationState stateWithOpenRoute(BlockPos raw, Task routeChild) {

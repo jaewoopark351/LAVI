@@ -116,7 +116,7 @@ class MiningObserverPurityContractTest {
             assertFalse(allSources.contains("NO_PROGRESS_HEARTBEAT_100"));
             assertFalse(allSources.contains("no_progress_heartbeat_100"));
             assertTrue(allSources.contains("NO_PROGRESS_HEARTBEAT_200_TICKS_OR_10_SECONDS"));
-            assertTrue(allSources.contains("DIAGNOSTIC_SESSION_CAP_REACHED"));
+            assertTrue(allSources.contains("MINING_DIAGNOSTIC_FAMILY_CAP_REACHED"));
         }
     }
 

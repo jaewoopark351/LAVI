@@ -40,6 +40,12 @@ final class StoreDepositOperationDetailBudget {
         operations.remove(StoreDepositDetailBudget.normalize(operationId));
     }
 
+    synchronized int clearForModeTransition() {
+        int invalidated = operations.size();
+        operations.clear();
+        return invalidated;
+    }
+
     private StoreDepositDetailBudget operationBudget(String operationId) {
         StoreDepositDetailBudget existing = operations.get(operationId);
         if (existing != null) {

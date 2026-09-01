@@ -86,15 +86,17 @@ public final class StoreHomeTimeoutDiagnostics {
             StoreHomePhase phase,
             StoreHomeOperationProgress operation,
             StoreHomeTimeoutObservation timeout) {
-        observeTimeout(timeout);
-        StoreHomeDiagnosticBoundary.runIfEnabled(
-                () -> ensureOperationStarted(owner, phase, operation)
-        );
+        StoreHomeDiagnosticBoundary.runIfEnabled(() -> {
+            observeTimeout(timeout);
+            ensureOperationStarted(owner, phase, operation);
+        });
     }
 
     public void recordCandidateCatalog(int candidateCount) {
-        StoreHomeDiagnosticBookkeepingGuard.runSafely(
-                () -> candidateCatalog.captureCatalog(candidateCount)
+        StoreHomeDiagnosticBoundary.runIfEnabled(() ->
+                StoreHomeDiagnosticBookkeepingGuard.runSafely(
+                        () -> candidateCatalog.captureCatalog(candidateCount)
+                )
         );
     }
 
@@ -109,11 +111,11 @@ public final class StoreHomeTimeoutDiagnostics {
             int remainingAfterRejection,
             String reason,
             String failureKind) {
-        observeTimeout(timeout);
-        int candidateOrdinal = candidateCatalog.reserveCandidateOrdinal(
-                remainingAfterRejection + 1
-        );
         StoreHomeDiagnosticBoundary.runIfEnabled(() -> {
+            observeTimeout(timeout);
+            int candidateOrdinal = candidateCatalog.reserveCandidateOrdinal(
+                    remainingAfterRejection + 1
+            );
             ensureOperationStarted(owner, phase, operation);
             long clientTickId = currentClientTickId();
             emitter.emitBoundary(
@@ -158,11 +160,11 @@ public final class StoreHomeTimeoutDiagnostics {
             HomeStorageOperationContext context,
             StoreHomeCandidateAttempt attempt,
             int remainingCandidateCountIncludingCurrent) {
-        observeTimeout(timeout);
-        candidateCatalog.rememberAttempt(
-                attempt, remainingCandidateCountIncludingCurrent
-        );
         StoreHomeDiagnosticBoundary.runIfEnabled(() -> {
+            observeTimeout(timeout);
+            candidateCatalog.rememberAttempt(
+                    attempt, remainingCandidateCountIncludingCurrent
+            );
             ensureOperationStarted(owner, phase, operation);
             startCandidate(
                     owner,
@@ -190,8 +192,8 @@ public final class StoreHomeTimeoutDiagnostics {
             HomeStorageContainerSession session,
             int remainingCandidateCountIncludingCurrent,
             Task activeChildTask) {
-        observeTimeout(timeout);
         StoreHomeDiagnosticBoundary.runIfEnabled(() -> {
+            observeTimeout(timeout);
             ensureOperationStarted(owner, phase, operation);
             if (attempt == null) {
                 return;
@@ -281,11 +283,11 @@ public final class StoreHomeTimeoutDiagnostics {
             StoreHomeTimeoutReason timeoutReason,
             boolean pendingAtDecision,
             Task activeChildTask) {
-        observeTimeout(timeout);
         String stableReason = timeoutReason == null
                 ? "unavailable_timeout_reason"
                 : timeoutReason.stableReason();
         StoreHomeDiagnosticBoundary.runIfEnabled(() -> {
+            observeTimeout(timeout);
             ensureOperationStarted(owner, phase, operation);
             long clientTickId = currentClientTickId();
             Object candidateTicksObserved = attempt == null
@@ -369,11 +371,11 @@ public final class StoreHomeTimeoutDiagnostics {
             StoreHomeTimeoutReason timeoutReason,
             boolean pendingAtDecision,
             Task activeChildTask) {
-        observeTimeout(timeout);
         String stableReason = timeoutReason == null
                 ? "unavailable_timeout_reason"
                 : timeoutReason.stableReason();
         StoreHomeDiagnosticBoundary.runIfEnabled(() -> {
+            observeTimeout(timeout);
             ensureOperationStarted(owner, phase, operation);
             ensureActiveCandidate(
                     owner,
@@ -458,8 +460,8 @@ public final class StoreHomeTimeoutDiagnostics {
             String reason,
             String failureKind,
             Task activeChildTask) {
-        observeTimeout(timeout);
         StoreHomeDiagnosticBoundary.runIfEnabled(() -> {
+            observeTimeout(timeout);
             ensureOperationStarted(owner, phase, operation);
             StoreHomeCandidateProgressState active =
                     candidateProgress.activeCandidate();
@@ -531,9 +533,8 @@ public final class StoreHomeTimeoutDiagnostics {
                     )
             );
             candidateProgress.clearActive();
+            candidateCatalog.clearKnownAttempt();
         });
-        candidateProgress.clearActive();
-        candidateCatalog.clearKnownAttempt();
     }
 
     public void recordCandidateActivated(
@@ -546,8 +547,8 @@ public final class StoreHomeTimeoutDiagnostics {
             StoreHomeCandidateAttempt attempt,
             HomeStorageContainerSession session,
             int remainingCandidateCountIncludingCurrent) {
-        observeTimeout(timeout);
         StoreHomeDiagnosticBoundary.runIfEnabled(() -> {
+            observeTimeout(timeout);
             ensureOperationStarted(owner, phase, operation);
             ensureActiveCandidate(
                     owner,
@@ -601,8 +602,8 @@ public final class StoreHomeTimeoutDiagnostics {
             int remainingCandidateCountIncludingCurrent,
             StoreHomeResult result,
             String reason) {
-        observeTimeout(timeout);
         StoreHomeDiagnosticBoundary.runIfEnabled(() -> {
+            observeTimeout(timeout);
             ensureOperationStarted(owner, phase, operation);
             long clientTickId = currentClientTickId();
             Object[] evidence = attempt == null

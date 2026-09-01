@@ -1,4 +1,5 @@
 <!-- 20260831_openai: Recorded the evidence, ownership, containment, regression, and rollback gate for the automatic-deposit-only post-placement handoff. -->
+<!-- 20260831_openai: Linked the post-checkpoint diagnostics, test-only container-type, and release-validation work separation without changing the captured handoff evidence. -->
 
 # ChatClef Automatic Deposit Post-Place Handoff Pre-Change Report
 
@@ -820,3 +821,38 @@ This verification also does not close the separate bounded-diagnostics issue.
 The session produced high-volume tool-selection output and exhausted the
 per-store terminal-group reserve. Those are follow-up diagnostics-quality
 findings, not evidence that the captured post-place handoff failed.
+
+## 17. Post-checkpoint next-work direction
+
+This report remains the canonical evidence record for the captured handoff and
+must not be reinterpreted as a release-complete declaration. The work-separation
+direction and acceptance gates for bounded diagnostics correctness,
+tool-selection shaping, test-only container-type lifecycle coverage, and the
+final release matrix are recorded in
+[ChatClef Automatic Deposit Post-Checkpoint Work Separation Direction](chatclef-automatic-deposit-post-checkpoint-direction-2026-08-31.md).
+
+That follow-up freezes the production handoff implementation at checkpoint
+`a722ac2a17a813b62e605eaeac0fc9f96f7a1b5e`. It does not retroactively change
+the source, build, artifact, or runtime evidence recorded here, and its
+documentation status does not authorize source edits, tests, builds, runtime
+reproduction, commit, or push.
+
+## 18. 2026-08-31 post-checkpoint artifact distinction
+
+The `84C6634433D7402B2935ADD6E4028F43BD3782D2E4038E00D30206092E9CA839`
+artifact and captured Minecraft evidence above remain valid historical evidence
+for checkpoint `a722ac2a17a813b62e605eaeac0fc9f96f7a1b5e`. They are not evidence for the
+later diagnostics implementation.
+
+The later clean forced build produced
+`versions/1.20.1/build/libs/chatclef-1.20.1-0.18.23.jar` with SHA-256
+`7D52F24AFA397064EC97F199297B6F8421BAD7392CE0398C35188C3F8627CD11`. The active
+CurseForge instance still contained the historical `84C6...` artifact at the
+time of inspection, so artifact identity was `MISMATCH` and the final-JAR
+Minecraft matrix was not run. This report therefore makes no new runtime,
+release, or merge claim for the later artifact. The current evidence ledger is
+maintained in Section 15 of
+[ChatClef Automatic Deposit Post-Checkpoint Work Separation Direction](chatclef-automatic-deposit-post-checkpoint-direction-2026-08-31.md).
+
+Production handoff source remains unchanged relative to the checkpoint. No
+commit, push, or deployment was performed for the later diagnostics build.

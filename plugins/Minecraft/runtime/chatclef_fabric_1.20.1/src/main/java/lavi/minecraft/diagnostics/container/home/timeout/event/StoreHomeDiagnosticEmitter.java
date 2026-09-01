@@ -13,7 +13,7 @@ import java.util.function.Supplier;
 
 //20260828_kpopmodder: Apply STORE_HOME budgets before delegating bounded event text emission.
 public final class StoreHomeDiagnosticEmitter {
-    private static final String CAP_EVENT = "DIAGNOSTIC_SESSION_CAP_REACHED";
+    private static final String CAP_EVENT = "STORE_HOME_DIAGNOSTIC_FAMILY_CAP_REACHED";
     private static final String OPERATION_CAP_EVENT =
             "STORE_HOME_OPERATION_DIAGNOSTIC_CAP_REACHED";
     private static final StoreHomeSessionLogBudget SESSION_BUDGET =
@@ -41,7 +41,10 @@ public final class StoreHomeDiagnosticEmitter {
             String reason,
             Task task,
             Object[] fields) {
-        return emit(eventName, reason, task, fields, true, false, null);
+        return ChatClefDiagnostics.callIfDiagnosticsEligible(
+                () -> emit(eventName, reason, task, fields, true, false, null),
+                false
+        );
     }
 
     public boolean emitTerminal(
@@ -49,7 +52,10 @@ public final class StoreHomeDiagnosticEmitter {
             String reason,
             Task task,
             Object[] fields) {
-        return emit(eventName, reason, task, fields, true, true, null);
+        return ChatClefDiagnostics.callIfDiagnosticsEligible(
+                () -> emit(eventName, reason, task, fields, true, true, null),
+                false
+        );
     }
 
     public boolean emitProgress(
@@ -58,26 +64,37 @@ public final class StoreHomeDiagnosticEmitter {
             String candidateId,
             Task task,
             Object[] fields) {
-        return emit(eventName, reason, task, fields, false, false, candidateId);
+        return ChatClefDiagnostics.callIfDiagnosticsEligible(
+                () -> emit(eventName, reason, task, fields, false, false, candidateId),
+                false
+        );
     }
 
     public boolean canObserveProgress(String candidateId) {
-        return operationBudget.canObserveProgress(candidateId)
-                && SESSION_BUDGET.canObserveProgress();
+        return ChatClefDiagnostics.callIfDiagnosticsEligible(
+                () -> operationBudget.canObserveProgress(candidateId)
+                        && SESSION_BUDGET.canObserveProgress(),
+                false
+        );
     }
 
     public void recordProgressSuppressed(String eventName) {
-        operationBudget.recordProgressSuppressed(eventName);
-        if (SESSION_BUDGET.recordProgressSuppressedWhenUnavailable(eventName)) {
-            operationBudget.recordSessionSuppressed(eventName);
-        }
+        ChatClefDiagnostics.runIfDiagnosticsEligible(() -> {
+            operationBudget.recordProgressSuppressed(eventName);
+            if (SESSION_BUDGET.recordProgressSuppressedWhenUnavailable(eventName)) {
+                operationBudget.recordSessionSuppressed(eventName);
+            }
+        });
     }
 
     public Object[] budgetSummaryFields() {
-        return merge(
-                operationBudget.summaryFields(),
-                operationAggregate.summaryFields(),
-                SESSION_BUDGET.summaryFields()
+        return ChatClefDiagnostics.callIfDiagnosticsEligible(
+                () -> merge(
+                        operationBudget.summaryFields(),
+                        operationAggregate.summaryFields(),
+                        SESSION_BUDGET.summaryFields()
+                ),
+                new Object[0]
         );
     }
 
@@ -89,9 +106,6 @@ public final class StoreHomeDiagnosticEmitter {
             boolean boundary,
             boolean terminal,
             String candidateId) {
-        if (!ChatClefDiagnostics.isBoundaryEnabled()) {
-            return false;
-        }
         try {
             operationAggregate.observe(fields, boundary);
             synchronized (operationBudget) {

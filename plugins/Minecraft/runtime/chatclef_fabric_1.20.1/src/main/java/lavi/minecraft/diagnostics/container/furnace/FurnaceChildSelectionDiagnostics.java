@@ -3,6 +3,7 @@ package lavi.minecraft.diagnostics.container.furnace;
 import adris.altoclef.AltoClef;
 import adris.altoclef.tasksystem.Task;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.diagnostics.crafting.acquisition.source.furnace.CraftResourceFurnaceSourceEventObserver;
 
 //20260814_kpopmodder: Added bounded child-selection diagnostics for repeated furnace material delegation.
 final class FurnaceChildSelectionDiagnostics {
@@ -40,7 +41,7 @@ final class FurnaceChildSelectionDiagnostics {
                 Boolean.toString(materialGateSatisfied),
                 Boolean.toString(fuelGateSatisfied)
         );
-        FurnaceDiagnosticEmitter.emit("SMELT_CHILD_SELECTION_STATE", "smelt_child_selection_state", task,
+        boolean sourceEmissionCompleted = FurnaceDiagnosticEmitter.emit("SMELT_CHILD_SELECTION_STATE", "smelt_child_selection_state", task,
                 "smelt_child_selection|" + System.identityHashCode(task),
                 fingerprint,
                 new Object[]{
@@ -62,6 +63,21 @@ final class FurnaceChildSelectionDiagnostics {
                         "baritonePathing", ChatClefDiagnostics.safeValue(() -> mod != null && mod.getClientBaritone().getPathingBehavior().isPathing()),
                         "customGoalActive", ChatClefDiagnostics.safeValue(() -> mod != null && mod.getClientBaritone().getCustomGoalProcess().isActive())
                 });
+        if (sourceEmissionCompleted) {
+            CraftResourceFurnaceSourceEventObserver.observeChildSelection(
+                    task,
+                    candidateChild,
+                    currentGate,
+                    candidateChildSemanticKey,
+                    inventoryMaterialCount,
+                    inventoryOutputCount,
+                    materialsNeeded,
+                    inventoryFuelCount,
+                    fuelNeeded,
+                    materialGateSatisfied,
+                    fuelGateSatisfied
+            );
+        }
     }
 
     private static String normalize(String value) {

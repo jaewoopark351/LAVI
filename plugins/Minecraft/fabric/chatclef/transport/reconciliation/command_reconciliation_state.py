@@ -11,7 +11,7 @@ from plugins.Minecraft.fabric.chatclef.transport.fabric_chatclef_active_command 
 
 from .active_command_admission_quarantine import ActiveCommandAdmissionQuarantine
 from .active_command_tombstone_store import ActiveCommandTombstoneStore
-from .reconciliation_candidate import ReconciliationCandidate
+from .candidate_tracking import ReconciliationCandidate
 
 
 @dataclass(frozen=True)

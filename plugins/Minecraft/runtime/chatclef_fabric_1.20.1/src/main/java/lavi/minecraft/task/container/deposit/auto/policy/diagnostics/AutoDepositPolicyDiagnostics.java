@@ -25,9 +25,20 @@ public final class AutoDepositPolicyDiagnostics {
                            String planningStatus,
                            String planningReason,
                            Task task) {
-        if (!ChatClefDiagnostics.isBoundaryEnabled()) {
-            return;
-        }
+        ChatClefDiagnostics.runIfDiagnosticsEligible(() -> logEligible(
+                diagnosticPlan,
+                pressure,
+                planningStatus,
+                planningReason,
+                task
+        ));
+    }
+
+    private static void logEligible(AutoDepositPlan diagnosticPlan,
+                                    DepositAllInventoryPressureSnapshot pressure,
+                                    String planningStatus,
+                                    String planningReason,
+                                    Task task) {
         try {
             StoreDepositAutomaticContext automaticContext =
                     StoreDepositAutomaticLifecycleState.contextForMaintenance(task);

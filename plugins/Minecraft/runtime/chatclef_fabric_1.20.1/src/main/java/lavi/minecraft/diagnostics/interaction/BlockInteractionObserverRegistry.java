@@ -20,7 +20,18 @@ public final class BlockInteractionObserverRegistry {
                              ClientPlayerEntity player,
                              Object hand,
                              BlockHitResult hitResult) {
+        notifyBefore(context, player, hand, hitResult, true);
+    }
+
+    public void notifyBefore(BlockInteractionContext context,
+                             ClientPlayerEntity player,
+                             Object hand,
+                             BlockHitResult hitResult,
+                             boolean sourceEmissionCompleted) {
         for (BlockInteractionObserver observer : observers) {
+            if (observer.requiresCompletedSourceEmission() && !sourceEmissionCompleted) {
+                continue;
+            }
             try {
                 observer.beforeBlockInteraction(context, player, hand, hitResult);
             } catch (RuntimeException | LinkageError ignored) {
@@ -33,7 +44,19 @@ public final class BlockInteractionObserverRegistry {
                             Object hand,
                             BlockHitResult hitResult,
                             Object result) {
+        notifyAfter(context, player, hand, hitResult, result, true);
+    }
+
+    public void notifyAfter(BlockInteractionContext context,
+                            ClientPlayerEntity player,
+                            Object hand,
+                            BlockHitResult hitResult,
+                            Object result,
+                            boolean sourceEmissionCompleted) {
         for (BlockInteractionObserver observer : observers) {
+            if (observer.requiresCompletedSourceEmission() && !sourceEmissionCompleted) {
+                continue;
+            }
             try {
                 observer.afterBlockInteraction(context, player, hand, hitResult, result);
             } catch (RuntimeException | LinkageError ignored) {

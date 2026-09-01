@@ -7,6 +7,11 @@ import adris.altoclef.util.slots.CursorSlot;
 import adris.altoclef.util.slots.Slot;
 import baritone.utils.ToolSet;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.diagnostics.toolselect.lifecycle.ToolSelectionDiagnosticStateObserver;
+import lavi.minecraft.diagnostics.toolselect.shaping.ToolSelectionDiagnosticShaper;
+import lavi.minecraft.diagnostics.toolselect.shaping.ToolSelectionSemanticFingerprint;
+import lavi.minecraft.diagnostics.toolselect.shaping.ToolSelectionShapingDecision;
+import lavi.minecraft.diagnostics.toolselect.shaping.ToolSelectionSuppressionSummaryEmitter;
 import lavi.minecraft.diagnostics.toolselect.support.DiagnosticDeduplicator;
 import lavi.minecraft.diagnostics.toolselect.support.ToolCandidateDiagnosticFormatter;
 import lavi.minecraft.diagnostics.toolselect.support.ToolDiagnosticFormatter;
@@ -24,7 +29,16 @@ import java.util.StringJoiner;
 
 //20260801_kpopmodder: Added tool equip boundary diagnostics without changing ChatClef engine behavior.
 public final class ToolEquipDiagnostics {
+    private static final String SELECTION_SHAPING_CHANNEL = "selection";
+    private static final ToolSelectionDiagnosticShaper SELECTION_SHAPER =
+            new ToolSelectionDiagnosticShaper();
     private static final DiagnosticDeduplicator DEDUPLICATOR = new DiagnosticDeduplicator();
+    private static final ToolSelectionDiagnosticStateObserver OFF_STATE_OBSERVER =
+            new ToolSelectionDiagnosticStateObserver(ToolEquipDiagnostics::clearDiagnosticStateForModeOff);
+
+    static {
+        ChatClefDiagnostics.registerSessionLifecycleObserver(OFF_STATE_OBSERVER);
+    }
 
     private ToolEquipDiagnostics() {
     }
@@ -37,13 +51,51 @@ public final class ToolEquipDiagnostics {
                                             Slot chosenSlot,
                                             ItemStack chosenStack,
                                             String decisionReason) {
-        if (!ChatClefDiagnostics.isBoundaryEnabled()) {
-            return -1L;
-        }
+        long[] equipAttemptId = {-1L};
+        ChatClefDiagnostics.runIfDiagnosticsEligible(() -> equipAttemptId[0] =
+                logSelectionDecisionEligible(
+                        mod,
+                        targetPosition,
+                        targetState,
+                        currentSlot,
+                        currentStack,
+                        chosenSlot,
+                        chosenStack,
+                        decisionReason
+                ));
+        return equipAttemptId[0];
+    }
 
+    private static long logSelectionDecisionEligible(AltoClef mod,
+                                                      BlockPos targetPosition,
+                                                      BlockState targetState,
+                                                      Slot currentSlot,
+                                                      ItemStack currentStack,
+                                                      Slot chosenSlot,
+                                                      ItemStack chosenStack,
+                                                      String decisionReason) {
         long equipAttemptId = ChatClefDiagnostics.nextOperationId();
-        String fingerprint = selectionFingerprint(targetPosition, targetState, currentSlot, currentStack, chosenSlot, chosenStack, decisionReason);
-        if (DEDUPLICATOR.shouldEmit("selection", fingerprint)) {
+        String fingerprint = selectionFingerprint(
+                targetState,
+                currentSlot,
+                currentStack,
+                chosenSlot,
+                chosenStack,
+                decisionReason
+        );
+        ToolSelectionShapingDecision shaping = SELECTION_SHAPER.evaluate(
+                true,
+                SELECTION_SHAPING_CHANNEL,
+                fingerprint,
+                ChatClefDiagnostics.currentClientTickId()
+        );
+        ToolSelectionSuppressionSummaryEmitter.emit(
+                "TOOL_SELECTION_DECISION_REPEAT_SUMMARY",
+                "destroy_block_tool_selection_repeat_summary",
+                SELECTION_SHAPING_CHANNEL,
+                shaping
+        );
+        if (shaping.emitEvent()) {
             ChatClefDiagnostics.logBoundary("TOOL_SELECTION_DECISION", "destroy_block_tool_selection", null,
                     "equipAttemptId", equipAttemptId,
                     "decisionReason", decisionReason,
@@ -63,7 +115,11 @@ public final class ToolEquipDiagnostics {
                     "baritonePathing", ChatClefDiagnostics.safeValue(() -> mod.getClientBaritone().getPathingBehavior().isPathing()),
                     "foodChainEating", ChatClefDiagnostics.safeValue(() -> mod.getFoodChain().isTryingToEat()),
                     "cursorStack", ChatClefDiagnostics.safeValue(() -> ToolDiagnosticFormatter.basicStackDetails(StorageHelper.getItemStackInSlot(CursorSlot.SLOT))),
-                    "candidateSummary", candidateSummary(mod, targetState));
+                    "candidateSummary", candidateSummary(mod, targetState),
+                    "priorSuppressedRepeatCount", shaping.suppressedRepeatCount(),
+                    "priorSuppressionFirstObservedTick", shaping.firstObservedTick(),
+                    "priorSuppressionLastObservedTick", shaping.lastObservedTick(),
+                    "priorSemanticFingerprint", shaping.summaryFingerprint());
         }
 
         if ("EQUIP_REQUEST".equals(decisionReason)) {
@@ -87,10 +143,43 @@ public final class ToolEquipDiagnostics {
                                       ItemStack mainHandAfter,
                                       boolean forceEquipReportedSuccess,
                                       String resultReason) {
-        if (!ChatClefDiagnostics.isBoundaryEnabled() || equipAttemptId < 0L) {
+        if (equipAttemptId < 0L) {
             return;
         }
+        ChatClefDiagnostics.runIfDiagnosticsEligible(() -> logEquipResultEligible(
+                mod,
+                requestedItem,
+                equipAttemptId,
+                expectedSourceSlot,
+                expectedSourceStack,
+                actualMatchingSlots,
+                inCursor,
+                selectedSlotBefore,
+                selectedSlotAfter,
+                hotbarSlot1Before,
+                hotbarSlot1After,
+                mainHandBefore,
+                mainHandAfter,
+                forceEquipReportedSuccess,
+                resultReason
+        ));
+    }
 
+    private static void logEquipResultEligible(AltoClef mod,
+                                               Item requestedItem,
+                                               long equipAttemptId,
+                                               Slot expectedSourceSlot,
+                                               ItemStack expectedSourceStack,
+                                               List<Slot> actualMatchingSlots,
+                                               boolean inCursor,
+                                               int selectedSlotBefore,
+                                               int selectedSlotAfter,
+                                               ItemStack hotbarSlot1Before,
+                                               ItemStack hotbarSlot1After,
+                                               ItemStack mainHandBefore,
+                                               ItemStack mainHandAfter,
+                                               boolean forceEquipReportedSuccess,
+                                               String resultReason) {
         boolean postconditionItemMatched = mainHandAfter != null && mainHandAfter.getItem() == requestedItem;
         boolean postconditionExactStackMatched = expectedSourceStack != null && ItemStack.areEqual(mainHandAfter, expectedSourceStack);
         String resultFingerprint = equipResultFingerprint(requestedItem, expectedSourceSlot, actualMatchingSlots,
@@ -132,6 +221,11 @@ public final class ToolEquipDiagnostics {
         }
     }
 
+    private static void clearDiagnosticStateForModeOff() {
+        SELECTION_SHAPER.clearForModeOff();
+        DEDUPLICATOR.clearForModeOff();
+    }
+
     private static void logEquipRequest(long equipAttemptId,
                                         BlockPos targetPosition,
                                         BlockState targetState,
@@ -139,7 +233,15 @@ public final class ToolEquipDiagnostics {
                                         ItemStack currentStack,
                                         Slot chosenSlot,
                                         ItemStack chosenStack) {
-        String fingerprint = selectionFingerprint(targetPosition, targetState, currentSlot, currentStack, chosenSlot, chosenStack, "EQUIP_REQUEST");
+        String fingerprint = equipRequestFingerprint(
+                targetPosition,
+                targetState,
+                currentSlot,
+                currentStack,
+                chosenSlot,
+                chosenStack,
+                "EQUIP_REQUEST"
+        );
         if (!DEDUPLICATOR.shouldEmit("equip_request", fingerprint)) {
             return;
         }
@@ -238,13 +340,32 @@ public final class ToolEquipDiagnostics {
         return expectedSourceSlot != null && actualMatchingSlots != null && actualMatchingSlots.stream().anyMatch(expectedSourceSlot::equals);
     }
 
-    private static String selectionFingerprint(BlockPos targetPosition,
-                                               BlockState targetState,
+    private static String selectionFingerprint(BlockState targetState,
                                                Slot currentSlot,
                                                ItemStack currentStack,
                                                Slot chosenSlot,
                                                ItemStack chosenStack,
                                                String decisionReason) {
+        String currentTool = ChatClefDiagnostics.slotSummary(currentSlot)
+                + "#" + ToolDiagnosticFormatter.equipItemFingerprint(currentStack);
+        String selectedTool = ChatClefDiagnostics.slotSummary(chosenSlot)
+                + "#" + ToolDiagnosticFormatter.equipItemFingerprint(chosenStack);
+        return ToolSelectionSemanticFingerprint.selectionDecision(
+                decisionReason,
+                String.valueOf(ToolTargetDiagnosticFields.blockId(targetState)),
+                currentTool,
+                selectedTool,
+                "tool_equip_selection"
+        );
+    }
+
+    private static String equipRequestFingerprint(BlockPos targetPosition,
+                                                  BlockState targetState,
+                                                  Slot currentSlot,
+                                                  ItemStack currentStack,
+                                                  Slot chosenSlot,
+                                                  ItemStack chosenStack,
+                                                  String decisionReason) {
         return ChatClefDiagnostics.blockPos(targetPosition)
                 + "|" + ChatClefDiagnostics.safeValue(() -> targetState == null ? null : targetState.getBlock())
                 + "|" + ChatClefDiagnostics.slotSummary(currentSlot)

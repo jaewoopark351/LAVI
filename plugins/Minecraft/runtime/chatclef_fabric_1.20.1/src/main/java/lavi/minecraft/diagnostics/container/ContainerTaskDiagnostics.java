@@ -6,6 +6,9 @@ import adris.altoclef.util.ItemTarget;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 import lavi.minecraft.diagnostics.container.crafting.CraftingTableRouteRetryDiagnostics;
 import lavi.minecraft.diagnostics.container.store.deposit.StoreDepositDiagnostics;
+import lavi.minecraft.diagnostics.crafting.acquisition.source.container.CraftResourceContainerSourceEventObserver;
+import lavi.minecraft.diagnostics.crafting.acquisition.source.container.lifecycle.ContainerTaskOwnerStopDiagnostics;
+import lavi.minecraft.diagnostics.crafting.acquisition.source.container.reconciliation.ContainerTaskChildReconciliationDiagnostics;
 import lavi.minecraft.integration.carryon.CarryOnDiagnostics;
 import lavi.minecraft.integration.carryon.CarryOnObservation;
 import net.minecraft.block.Block;
@@ -28,8 +31,92 @@ public final class ContainerTaskDiagnostics {
                                    ItemTarget containerTarget,
                                    Block[] containerBlocks,
                                    Object... branchFields) {
+        logBoundaryInternal(
+                eventName,
+                reason,
+                stateKey,
+                mod,
+                task,
+                containerTarget,
+                containerBlocks,
+                branchFields
+        );
+    }
+
+    public static void logBoundaryWithSelectedChild(
+            String eventName,
+            String reason,
+            String stateKey,
+            AltoClef mod,
+            Task task,
+            ItemTarget containerTarget,
+            Block[] containerBlocks,
+            Task selectedChild,
+            Object... branchFields) {
+        boolean sourceEmissionCompleted = logBoundaryInternal(
+                eventName,
+                reason,
+                stateKey,
+                mod,
+                task,
+                containerTarget,
+                containerBlocks,
+                branchFields
+        );
+        CraftResourceContainerSourceEventObserver.observeChildSelection(
+                task,
+                selectedChild,
+                containerTarget,
+                containerBlocks,
+                reason,
+                stateKey,
+                branchFields,
+                sourceEmissionCompleted
+        );
+    }
+
+    public static boolean logChildReconciliation(
+            Task parent,
+            Task activeChildBefore,
+            Task candidateChild,
+            boolean isEqualResult,
+            boolean canInterruptEvaluated,
+            boolean canInterruptPreviousChild,
+            boolean replacementApplied,
+            boolean previousChildStopCalled,
+            Task activeChildAfter,
+            boolean candidateDiscardedBecauseEqual,
+            boolean childCleared) {
+        return ContainerTaskChildReconciliationDiagnostics.log(
+                parent,
+                activeChildBefore,
+                candidateChild,
+                isEqualResult,
+                canInterruptEvaluated,
+                canInterruptPreviousChild,
+                replacementApplied,
+                previousChildStopCalled,
+                activeChildAfter,
+                candidateDiscardedBecauseEqual,
+                childCleared
+        );
+    }
+
+    public static boolean logOwnerStop(Task owner, Task interruptTask) {
+        return ContainerTaskOwnerStopDiagnostics.log(owner, interruptTask);
+    }
+
+    private static boolean logBoundaryInternal(
+            String eventName,
+            String reason,
+            String stateKey,
+            AltoClef mod,
+            Task task,
+            ItemTarget containerTarget,
+            Block[] containerBlocks,
+            Object[] branchFields) {
         if (!ChatClefDiagnostics.isBoundaryEnabled()) {
-            return;
+            return false;
         }
 
         CarryOnObservation carryOn = observeCarryOn();
@@ -53,7 +140,7 @@ public final class ContainerTaskDiagnostics {
                     ChatClefDiagnostics.withCommandContextFields(
                             ContainerTaskDiagnosticFields.cap(CAP_SCOPE, ContainerTaskEmissionLimiter.SESSION_HARD_CAP)
                     ));
-            return;
+            return false;
         }
         if (decision.emitSummary()) {
             ChatClefDiagnostics.logBoundary("CONTAINER_TASK_DIAGNOSTIC_REPEAT_SUMMARY",
@@ -62,10 +149,10 @@ public final class ContainerTaskDiagnostics {
                     ChatClefDiagnostics.withCommandContextFields(
                             ContainerTaskDiagnosticFields.repeatSummary(repeatKey, decision.suppressedRepeatCount())
                     ));
-            return;
+            return false;
         }
         if (!decision.emitEvent()) {
-            return;
+            return false;
         }
 
         Object[] fields = ContainerTaskDiagnosticFields.fields(
@@ -77,10 +164,21 @@ public final class ContainerTaskDiagnostics {
                 decision.suppressedRepeatCount(),
                 branchFields
         );
-        ChatClefDiagnostics.logBoundary(eventName,
+        boolean sourceEmissionCompleted = ChatClefDiagnostics.logBoundaryWithPhysicalOutcome(eventName,
                 reason,
                 task,
                 ChatClefDiagnostics.withCommandContextFields(fields));
+        if (sourceEmissionCompleted && "CONTAINER_TASK_TARGET_DECISION".equals(eventName)) {
+            CraftResourceContainerSourceEventObserver.observeTargetDecision(
+                    task,
+                    containerTarget,
+                    containerBlocks,
+                    reason,
+                    stateKey,
+                    branchFields
+            );
+        }
+        return sourceEmissionCompleted;
     }
 
     private static CarryOnObservation observeCarryOn() {

@@ -79,6 +79,10 @@ public final class StoreDepositInteractionDiagnostics {
         );
     }
 
+    public int clearForModeTransition() {
+        return interactionBindings.clearForModeTransition();
+    }
+
     private StoreDepositInteractionContext interactionContext(BlockInteractionContext interaction) {
         return interactionLookup(interaction).context();
     }

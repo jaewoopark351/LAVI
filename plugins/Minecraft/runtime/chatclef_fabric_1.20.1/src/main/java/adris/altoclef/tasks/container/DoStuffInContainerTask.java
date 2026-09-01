@@ -604,13 +604,14 @@ public abstract class DoStuffInContainerTask extends Task {
                 containerBlockItemCount,
                 "return_open_table_task");
         if (diagnosticsBoundary) {
-            ContainerTaskDiagnostics.logBoundary("CONTAINER_TASK_BRANCH",
+            ContainerTaskDiagnostics.logBoundaryWithSelectedChild("CONTAINER_TASK_BRANCH",
                     "return_open_table_task",
                     "OPEN_CONTAINER|" + containerTarget + "|" + cachedContainerPosition,
                     mod,
                     this,
                     containerTarget,
                     containerBlocks,
+                    openTableTask,
                     "decision", "RETURN_OPEN_TABLE_TASK",
                     "cachedContainerPosition", cachedContainerPosition,
                     "cachedContainerBlockState", cachedContainerPosition == null ? "unavailable" : ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(cachedContainerPosition)),
@@ -642,6 +643,8 @@ public abstract class DoStuffInContainerTask extends Task {
 
     @Override
     protected void onStop(Task interruptTask) {
+        //20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
+        ContainerTaskDiagnostics.logOwnerStop(this, interruptTask);
         boolean diagnosticsVerbose = ChatClefDiagnostics.isVerboseEnabled();
         if (diagnosticsVerbose) {
             ChatClefDiagnostics.logTaskTransition(this, this, interruptTask, "container_task_onStop_begin",

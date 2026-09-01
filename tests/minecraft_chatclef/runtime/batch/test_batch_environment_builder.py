@@ -12,6 +12,7 @@ class BatchEnvironmentBuilderTests(unittest.TestCase):
         approval = {
             "approval_source": "operator-console",
             "gradio_url": "http://127.0.0.1:47860",
+            "transport": "korean",
             "backend": "fabric_chatclef",
             "instance": "LAVI_TEST_Fabric01",
             "world": "test-world",
@@ -44,8 +45,10 @@ class BatchEnvironmentBuilderTests(unittest.TestCase):
             flat_approval = json.loads(str(environment["approval_json"]))
             self.assertEqual(step["command"], environment["command"])
             self.assertEqual(step["invocation_id"], environment["invocation_id"])
+            self.assertEqual("korean", environment["transport"])
             self.assertEqual(step["command"], flat_approval["command"])
             self.assertEqual(step["invocation_id"], flat_approval["invocation_id"])
+            self.assertEqual("korean", flat_approval["transport"])
             self.assertEqual(step["expected_item_id"], environment["expected_item_id"])
             self.assertEqual(
                 step["expected_item_delta"],

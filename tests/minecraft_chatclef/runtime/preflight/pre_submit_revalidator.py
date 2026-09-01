@@ -49,6 +49,7 @@ def _ticket_mismatch(
         "expected_instance": _text(environment.get("expected_instance")),
         "expected_world": _text(environment.get("expected_world")),
         "invocation_id": _text(environment.get("invocation_id")),
+        "transport": _text(environment.get("transport")),
         "approval_json": _exact_text(environment.get("approval_json")),
         "repository_root": _text(environment.get("repository_root")),
         "process_identity_fingerprint": _text(
@@ -63,6 +64,7 @@ def _ticket_mismatch(
         "expected_instance": ticket.expected_instance,
         "expected_world": ticket.expected_world,
         "invocation_id": ticket.invocation_id,
+        "transport": ticket.transport,
         "approval_json": ticket.approval_json,
         "repository_root": ticket.repository_root,
         "process_identity_fingerprint": ticket.process_identity_fingerprint,

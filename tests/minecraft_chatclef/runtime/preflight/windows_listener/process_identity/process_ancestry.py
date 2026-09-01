@@ -14,6 +14,7 @@ from .process_identity_key import process_identity_fingerprint
 from .process_evidence import process_evidence_error
 from .process_start_time import process_start_time_utc_ticks
 from .python_invocation import inspect_python_invocation
+from .venv_redirect_identity import inspect_repository_venv_redirect
 
 
 def inspect_approved_process_identity(
@@ -31,6 +32,18 @@ def inspect_approved_process_identity(
     if not owner_identity.get("ok"):
         return _failure(str(owner_identity.get("reason") or "owner identity is invalid"))
     invocation = inspect_python_invocation(owner)
+    venv_redirect: dict[str, object] | None = None
+    if not invocation.get("ok"):
+        redirect = inspect_repository_venv_redirect(owner, processes, root)
+        redirect_invocation = redirect.get("invocation")
+        redirect_observed = redirect.get("observed")
+        if (
+            redirect.get("ok") is True
+            and isinstance(redirect_invocation, Mapping)
+            and isinstance(redirect_observed, Mapping)
+        ):
+            invocation = dict(redirect_invocation)
+            venv_redirect = dict(redirect_observed)
     if (
         not invocation.get("ok")
         or invocation.get("mode") != "python_script"
@@ -42,12 +55,15 @@ def inspect_approved_process_identity(
     if not script.get("ok"):
         return _failure(str(script.get("reason") or "script entrypoint is invalid"))
 
-    approved_ancestor, ancestry_error = find_approved_launcher_ancestor(
-        _parent_process_id(owner),
-        processes,
-        root,
-        owner,
-    )
+    if venv_redirect is None:
+        approved_ancestor, ancestry_error = find_approved_launcher_ancestor(
+            _parent_process_id(owner),
+            processes,
+            root,
+            owner,
+        )
+    else:
+        approved_ancestor, ancestry_error = None, ""
     if ancestry_error:
         return _failure(f"listener ancestor identity is invalid: {ancestry_error}")
 
@@ -59,6 +75,7 @@ def inspect_approved_process_identity(
         "entrypoint_provenance": script["entrypoint_provenance"],
         "repository_root": root,
         "approved_ancestor": approved_ancestor,
+        "venv_redirect": venv_redirect,
     }
     fingerprint = process_identity_fingerprint(observed)
     if not fingerprint:

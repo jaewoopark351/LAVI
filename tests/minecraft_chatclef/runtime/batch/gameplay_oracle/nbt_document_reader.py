@@ -26,6 +26,8 @@ class NbtDocumentReader:
         root = self._read_payload(tag_type, depth=0)
         if not isinstance(root, Mapping):
             raise ValueError("NBT root payload is not a compound")
+        if self._offset != len(self._payload):
+            raise ValueError("NBT document contains trailing bytes")
         return dict(root)
 
     def _read_payload(self, tag_type: int, *, depth: int) -> object:

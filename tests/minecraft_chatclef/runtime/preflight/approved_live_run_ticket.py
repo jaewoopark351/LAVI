@@ -13,6 +13,7 @@ class ApprovedLiveRunTicket:
     expected_instance: str
     expected_world: str
     invocation_id: str
+    transport: str
     approval_json: str
     repository_root: str
     process_identity_fingerprint: str

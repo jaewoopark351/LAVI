@@ -11,6 +11,7 @@ from .observation.terminal_result_observer import (
 )
 from .preflight.approved_live_run_ticket import ApprovedLiveRunTicket
 from .preflight.command_fingerprint import command_fingerprint
+from .preflight.command_transport import validate_approved_command_transport
 from .preflight.gateway_endpoint_identity import inspect_gateway_endpoint
 from .preflight.preflight_decision import preflight_decision
 from .preflight.preflight_runner import (
@@ -19,6 +20,9 @@ from .preflight.preflight_runner import (
 from .preflight.pre_submit_revalidator import revalidate_pre_submit
 from .submission.one_shot_command_submission import (
     submit_command_once,
+)
+from .submission.command_submission_transport import (
+    CommandSubmissionTransport,
 )
 from .submission.one_shot_run_guard import OneShotRunGuard
 from .submission.reconciliation_requirement_recorder import (
@@ -35,6 +39,7 @@ def run_supervised_live_command(
     terminal_observer: Callable[..., dict[str, object]] = observe_terminal_result,
     run_guard: object | None = None,
     reconciliation_recorder: object | None = None,
+    transport: CommandSubmissionTransport = CommandSubmissionTransport.KOREAN,
 ) -> dict[str, object]:
     candidate_command = _text(environment.get("command"))
     candidate_invocation_id = _text(environment.get("invocation_id"))
@@ -43,6 +48,7 @@ def run_supervised_live_command(
     candidate_expected_backend = _text(environment.get("expected_backend"))
     candidate_expected_instance = _text(environment.get("expected_instance"))
     candidate_expected_world = _text(environment.get("expected_world"))
+    candidate_transport = _text(environment.get("transport"))
     preflight_kwargs: dict[str, object] = {
         "status_reader": lambda: gateway.read_status()
     }
@@ -56,6 +62,16 @@ def run_supervised_live_command(
             "preflight": preflight,
             "observation": new_live_run_observation(),
         }
+    transport_error = validate_approved_command_transport(
+        candidate_transport,
+        transport,
+    )
+    if transport_error:
+        return _preflight_failure(
+            "approval",
+            transport_error,
+            _mapping(preflight.get("observed")),
+        )
     gateway_endpoint = inspect_gateway_endpoint(gateway)
     if not gateway_endpoint.get("ok"):
         return _preflight_failure(
@@ -78,6 +94,7 @@ def run_supervised_live_command(
         expected_instance=candidate_expected_instance,
         expected_world=candidate_expected_world,
         invocation_id=candidate_invocation_id,
+        transport=candidate_transport,
         approval_json=candidate_approval_json,
         repository_root=candidate_repository_root,
         process_identity_fingerprint=_text(
@@ -143,7 +160,11 @@ def run_supervised_live_command(
             _mapping(revalidation.get("observed")),
         )
     preflight = revalidation
-    observation = submit_command_once(gateway, ticket.command)
+    observation = submit_command_once(
+        gateway,
+        ticket.command,
+        transport=transport,
+    )
     if observation.get("gradio_submit_call_count") != 1:
         observation["reconciliation_required"] = True
         recorder.record(

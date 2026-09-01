@@ -21,6 +21,7 @@ class RuntimeEnvironmentTests(unittest.TestCase):
             "get_acquisition_delta",
             environment["gameplay_test_objective"],
         )
+        self.assertEqual("korean", environment["transport"])
 
     def test_invalid_gameplay_timing_fails_environment_validation_later(self):
         environment = load_live_runtime_environment(
@@ -38,6 +39,13 @@ class RuntimeEnvironmentTests(unittest.TestCase):
             "movement_and_mining",
             environment["gameplay_test_objective"],
         )
+
+    def test_explicit_raw_transport_is_preserved_for_approval_binding(self):
+        environment = load_live_runtime_environment(
+            {"LAVI_MINECRAFT_RUNTIME_COMMAND_TRANSPORT": "raw"}
+        )
+
+        self.assertEqual("raw", environment["transport"])
 
 
 if __name__ == "__main__":

@@ -3,13 +3,23 @@ package lavi.minecraft.diagnostics.formatting;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 //20260828_kpopmodder: Encode one diagnostic event under an explicit UTF-8 byte cap.
 public final class DiagnosticBoundedEventFormatter {
     private static final int INITIAL_VALUE_LIMIT_BYTES = 256;
-    private static final int[] REQUIRED_VALUE_LIMITS_BYTES = {128, 96, 64, 32};
+    private static final int[] REQUIRED_VALUE_LIMITS_BYTES = {
+            128, 96, 64, 32, 16, 8, 4, 1
+    };
     private static final int KEY_LIMIT_BYTES = 96;
     private static final String CAPTURE_STATUS_KEY = "diagnosticCaptureStatus";
+    private static final Set<String> EXACT_REQUIRED_VALUE_KEYS = Set.of(
+            "commandRequestId",
+            "commandCorrelationId",
+            "commandSessionId",
+            "rootAssignmentId",
+            "boundRootTaskInstanceId"
+    );
 
     private DiagnosticBoundedEventFormatter() {
     }
@@ -24,9 +34,9 @@ public final class DiagnosticBoundedEventFormatter {
             throw new IllegalArgumentException("maxUtf8Bytes must be positive");
         }
 
-        NormalizedFields base = normalize(baseFields, INITIAL_VALUE_LIMIT_BYTES);
-        NormalizedFields required = normalize(requiredFields, INITIAL_VALUE_LIMIT_BYTES);
-        NormalizedFields optional = normalize(optionalFields, INITIAL_VALUE_LIMIT_BYTES);
+        NormalizedFields base = normalize(baseFields, INITIAL_VALUE_LIMIT_BYTES, false);
+        NormalizedFields required = normalize(requiredFields, INITIAL_VALUE_LIMIT_BYTES, true);
+        NormalizedFields optional = normalize(optionalFields, INITIAL_VALUE_LIMIT_BYTES, false);
         boolean partial = base.partial() || required.partial() || optional.partial();
         List<Field> retainedOptional = new ArrayList<>(optional.fields());
 
@@ -47,8 +57,8 @@ public final class DiagnosticBoundedEventFormatter {
 
         if (utf8Length(rendered) > maxUtf8Bytes) {
             for (int valueLimit : REQUIRED_VALUE_LIMITS_BYTES) {
-                base = normalize(baseFields, valueLimit);
-                required = normalize(requiredFields, valueLimit);
+                base = normalize(baseFields, valueLimit, false);
+                required = normalize(requiredFields, valueLimit, true);
                 rendered = render(
                         prefix,
                         withCaptureStatus(base.fields(), required.fields(), true),
@@ -80,7 +90,10 @@ public final class DiagnosticBoundedEventFormatter {
         return value == null ? 0 : value.getBytes(StandardCharsets.UTF_8).length;
     }
 
-    private static NormalizedFields normalize(Object[] fields, int valueLimitBytes) {
+    private static NormalizedFields normalize(
+            Object[] fields,
+            int valueLimitBytes,
+            boolean preserveExactRequiredValues) {
         List<Field> normalized = new ArrayList<>();
         boolean partial = false;
         if (fields == null) {
@@ -88,11 +101,15 @@ public final class DiagnosticBoundedEventFormatter {
         }
         for (int index = 0; index < fields.length; index += 2) {
             String rawKey = DiagnosticValueFormatter.value(fields[index]);
-            String rawValue = DiagnosticValueFormatter.value(
+            String rawValue = DiagnosticFieldValueEncoder.encode(
                     index + 1 < fields.length ? fields[index + 1] : "missing"
             );
             String key = truncateUtf8(rawKey, KEY_LIMIT_BYTES);
-            String value = truncateUtf8(rawValue, valueLimitBytes);
+            boolean preserveExactValue = preserveExactRequiredValues
+                    && EXACT_REQUIRED_VALUE_KEYS.contains(rawKey);
+            String value = preserveExactValue
+                    ? rawValue
+                    : truncateUtf8(rawValue, valueLimitBytes);
             partial |= !key.equals(rawKey) || !value.equals(rawValue);
             normalized.add(new Field(key, value));
         }

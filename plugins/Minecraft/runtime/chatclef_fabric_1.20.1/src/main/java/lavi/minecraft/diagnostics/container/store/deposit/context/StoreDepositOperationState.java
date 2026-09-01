@@ -224,7 +224,7 @@ public final class StoreDepositOperationState {
                 && lastCompletedStopTick == clientTick;
     }
 
-    public boolean markTerminalFinalized() {
+    public synchronized boolean markTerminalFinalized() {
         if (terminalFinalized) {
             return false;
         }
@@ -320,7 +320,7 @@ public final class StoreDepositOperationState {
         return naturalFinishObserved;
     }
 
-    public boolean terminalFinalized() {
+    public synchronized boolean terminalFinalized() {
         return terminalFinalized;
     }
 

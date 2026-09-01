@@ -133,7 +133,6 @@ plugins/StarCraft2/config/starcraft2_config.json
 # Track shareable runtime config files.
 !config/audio_device_config.json
 !config/gpu_device_config.json
-!config/modules.json
 !config/chess_config.json
 !config/starcraft2_config.json
 !config/starcraft116_config.json

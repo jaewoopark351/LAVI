@@ -1,7 +1,8 @@
 #20260827_kpopmodder: Enforce STORE_HOME source and staged readiness before public submission.
+#20260901_kpopmodder: Depend on the canonical command specification contract.
 from __future__ import annotations
 
-from plugins.Minecraft.fabric.chatclef.command_registry.korean_command_registry_model import (
+from plugins.Minecraft.fabric.chatclef.command_registry.contracts import (
     ChatClefCommandSpec,
 )
 from plugins.Minecraft.fabric.chatclef.command_registry.admission.store_home_command_admission_decision import (

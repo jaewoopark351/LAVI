@@ -25,6 +25,29 @@ public final class MiningDiagnosticEmissionOrchestrator {
                                 String fallbackCorrelationKey,
                                 String fallbackCorrelationSource,
                                 Supplier<Object[]> eventFieldsSupplier) {
+        emitLazyWithPhysicalOutcome(
+                eventName,
+                reason,
+                task,
+                bucket,
+                fingerprint,
+                terminal,
+                fallbackCorrelationKey,
+                fallbackCorrelationSource,
+                eventFieldsSupplier
+        );
+    }
+
+    public static boolean emitLazyWithPhysicalOutcome(
+            String eventName,
+            String reason,
+            Task task,
+            String bucket,
+            String fingerprint,
+            boolean terminal,
+            String fallbackCorrelationKey,
+            String fallbackCorrelationSource,
+            Supplier<Object[]> eventFieldsSupplier) {
         MiningDiagnosticCorrelation correlation = MiningDiagnosticCorrelation.capture(
                 task, fallbackCorrelationKey, fallbackCorrelationSource);
         MiningDiagnosticGateDecision decision = MiningDiagnosticEventGate.evaluate(
@@ -43,7 +66,7 @@ public final class MiningDiagnosticEmissionOrchestrator {
                         decision.suppressedCount, decision.firstObservedTick, decision.lastObservedTick,
                         decision.admission, correlation.commandContextFields());
             }
-            return;
+            return false;
         }
 
         Object[] eventFields = eventFieldsSupplier == null ? new Object[0] : eventFieldsSupplier.get();
@@ -60,7 +83,7 @@ public final class MiningDiagnosticEmissionOrchestrator {
                 "diagnosticCorrelationKey", correlation.key(),
                 "diagnosticCorrelationSource", correlation.source()
         };
-        ChatClefDiagnostics.logBoundary(eventName, reason, task,
+        return ChatClefDiagnostics.logBoundaryWithPhysicalOutcome(eventName, reason, task,
                 MiningDiagnosticFieldArrays.merge(
                         contractFields,
                         eventFields,
