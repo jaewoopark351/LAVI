@@ -17,6 +17,7 @@ import lavi.minecraft.diagnostics.container.store.deposit.candidate.StoreContain
 import lavi.minecraft.diagnostics.container.store.deposit.candidate.StoreContainerParentDecision;
 import lavi.minecraft.diagnostics.container.store.deposit.candidate.StoreContainerRouteCheckpoint;
 import lavi.minecraft.diagnostics.container.store.deposit.candidate.range.StoreContainerRangeEventFields;
+import lavi.minecraft.diagnostics.container.store.deposit.candidate.range.StoreDepositUserBlockRangeNullDiagnostics;
 import lavi.minecraft.diagnostics.container.store.deposit.context.StoreDepositOperationState;
 import lavi.minecraft.diagnostics.container.store.deposit.event.StoreDepositEventFields;
 import lavi.minecraft.diagnostics.container.store.deposit.effect.StoreDepositEffectDiagnostics;
@@ -110,6 +111,8 @@ public final class StoreDepositDiagnostics {
             new StoreDepositTargetCallbackDiagnostics(BINDINGS, EMISSION_GATE);
     private static final StoreDepositContainerRouteEventDiagnostics ROUTE_EVENTS =
             new StoreDepositContainerRouteEventDiagnostics(BINDINGS, EMISSION_GATE);
+    private static final StoreDepositUserBlockRangeNullDiagnostics USER_BLOCK_RANGE_NULL_INPUTS =
+            new StoreDepositUserBlockRangeNullDiagnostics(EMISSION_GATE);
 
     static {
         StoreDepositModeStateInvalidator invalidator =
@@ -989,27 +992,7 @@ public final class StoreDepositDiagnostics {
     }
 
     public static void logUserBlockRangeNullInput(Object owner, BlockPos observedPosition) {
-        runEligible(() -> {
-            try {
-                String signature = "UserBlockRangeTracker.updateState|null_block_pos";
-                StoreDepositOperationState state = null;
-                if (!EMISSION_GATE.shouldEmitExceptionSignature(signature)) {
-                    return;
-                }
-                StoreDepositBoundedEventLogger.log("USER_BLOCK_RANGE_NULL_INPUT_OBSERVED",
-                        "user_block_range_null_input_observed",
-                        null,
-                        ChatClefDiagnostics.withCommandContextFields(
-                                StoreDepositEventFields.exceptionFields(
-                                        state,
-                                        owner,
-                                        observedPosition,
-                                        signature
-                                )
-                        ));
-            } catch (RuntimeException | LinkageError ignored) {
-            }
-        });
+        runEligible(() -> USER_BLOCK_RANGE_NULL_INPUTS.logNullInput(owner, observedPosition));
     }
 
     private static void emitCheckpointIfDue(Task task, StoreDepositOperationState state) {
