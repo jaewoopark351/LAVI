@@ -4,6 +4,7 @@ import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.ItemTarget;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 import lavi.minecraft.diagnostics.container.store.deposit.candidate.range.StoreContainerRangeEventFields;
+import lavi.minecraft.diagnostics.container.store.deposit.candidate.snapshot.StoreContainerRouteSnapshot;
 import lavi.minecraft.diagnostics.container.store.deposit.context.StoreDepositOperationState;
 import lavi.minecraft.diagnostics.container.store.deposit.event.StoreDepositEventFields;
 import net.minecraft.block.Block;
@@ -258,39 +259,39 @@ public final class StoreContainerCandidateEventFields {
         );
     }
 
+    //20260902_kpopmodder: Preserve ordered route-summary fields through one immutable aggregate snapshot.
     public static Object[] routeSummaryFields(StoreDepositOperationState state) {
         if (state == null) {
             return new Object[]{"routeSummaryAvailable", false};
         }
-        StoreContainerRouteState route = state.routeState();
-        StoreContainerParentDecision parent = route.currentParentDecision();
+        StoreContainerRouteSnapshot snapshot = state.routeState().snapshot();
         return StoreDepositEventFields.merge(
                 new Object[]{
                         "routeSummaryAvailable", true,
-                        "finalCandidateDecisionSequence", parent.sequence(),
-                        "finalBranchEpoch", route.branchEpoch(),
-                        "finalBranch", route.currentBranch(),
-                        "finalRawCandidate", ChatClefDiagnostics.blockPos(parent.rawClosest()),
-                        "finalFilteredCandidate", ChatClefDiagnostics.blockPos(route.currentFilteredCandidate()),
-                        "finalPursuit", ChatClefDiagnostics.blockPos(route.currentPursuit()),
-                        "branchCounts", route.branchCounts(),
-                        "branchTransitionCounts", route.branchTransitionCounts(),
-                        "childReplacementCount", route.childReplacementCount(),
-                        "rootRouteChildReplacementCount", route.rootRouteChildReplacementCount(),
-                        "childLifecycleSequence", route.childLifecycleSequence(),
-                        "finalRouteChildIdentity", route.currentRouteChildIdentity(),
-                        "finalRouteChildClass", route.currentRouteChildClass(),
-                        "routeTransferDecisionCount", route.transferDecisionCount(),
-                        "candidateEvaluationCount", route.candidateEvaluationCount(),
-                        "predicateAcceptedCount", route.predicateAcceptedCount(),
-                        "predicateRejectedCount", route.predicateRejectedCount(),
-                        "predicateRejectionCounts", route.rejectionCounts(),
-                        "checkpointCount", route.checkpointCount(),
-                        "lastSuccessfulBoundary", route.lastSuccessfulBoundary(),
-                        "firstExplicitFailureBoundary", route.firstExplicitFailureBoundary(),
-                        "firstUnobservedBoundary", route.firstUnobservedBoundary()
+                        "finalCandidateDecisionSequence", snapshot.candidateDecisionSequence(),
+                        "finalBranchEpoch", snapshot.branchEpoch(),
+                        "finalBranch", snapshot.currentBranch(),
+                        "finalRawCandidate", ChatClefDiagnostics.blockPos(snapshot.currentRawCandidate()),
+                        "finalFilteredCandidate", ChatClefDiagnostics.blockPos(snapshot.currentFilteredCandidate()),
+                        "finalPursuit", ChatClefDiagnostics.blockPos(snapshot.currentPursuit()),
+                        "branchCounts", snapshot.branchCounts(),
+                        "branchTransitionCounts", snapshot.branchTransitionCounts(),
+                        "childReplacementCount", snapshot.childReplacementCount(),
+                        "rootRouteChildReplacementCount", snapshot.rootRouteChildReplacementCount(),
+                        "childLifecycleSequence", snapshot.childLifecycleSequence(),
+                        "finalRouteChildIdentity", snapshot.currentRouteChildIdentity(),
+                        "finalRouteChildClass", snapshot.currentRouteChildClass(),
+                        "routeTransferDecisionCount", snapshot.transferDecisionCount(),
+                        "candidateEvaluationCount", snapshot.candidateEvaluationCount(),
+                        "predicateAcceptedCount", snapshot.predicateAcceptedCount(),
+                        "predicateRejectedCount", snapshot.predicateRejectedCount(),
+                        "predicateRejectionCounts", snapshot.rejectionCounts(),
+                        "checkpointCount", snapshot.checkpointCount(),
+                        "lastSuccessfulBoundary", snapshot.lastSuccessfulBoundary(),
+                        "firstExplicitFailureBoundary", snapshot.firstExplicitFailureBoundary(),
+                        "firstUnobservedBoundary", snapshot.firstUnobservedBoundary()
                 },
-                StoreContainerRangeEventFields.aggregateFields("total", route.rangeSummary())
+                StoreContainerRangeEventFields.aggregateFields("total", snapshot.rangeSummary())
         );
     }
 

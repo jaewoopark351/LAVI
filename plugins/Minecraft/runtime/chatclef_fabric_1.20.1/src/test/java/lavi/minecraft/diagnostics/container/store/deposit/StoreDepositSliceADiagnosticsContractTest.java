@@ -363,8 +363,9 @@ class StoreDepositSliceADiagnosticsContractTest {
         assertEquals(true, targetRejected.get("predicateEvaluated"));
         assertEquals(false, targetRejected.get("predicateResult"));
 
+        //20260902_kpopmodder: Follow the effect-family implementation after preserving its facade entry points.
         String effectFields = source(
-                "src/main/java/lavi/minecraft/diagnostics/container/store/deposit/event/StoreDepositEventFields.java"
+                "src/main/java/lavi/minecraft/diagnostics/container/store/deposit/event/effect/StoreDepositEffectEventFields.java"
         );
         String rootSource = source("src/main/java/adris/altoclef/tasks/container/DepositAllTask.java");
         String targetSource = source("src/main/java/adris/altoclef/tasks/container/StoreInContainerTask.java");

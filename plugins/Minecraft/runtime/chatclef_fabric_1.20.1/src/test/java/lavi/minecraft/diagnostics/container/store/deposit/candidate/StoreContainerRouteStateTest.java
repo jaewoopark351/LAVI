@@ -1,9 +1,12 @@
 package lavi.minecraft.diagnostics.container.store.deposit.candidate;
 
+import lavi.minecraft.diagnostics.container.store.deposit.candidate.snapshot.StoreContainerRouteSnapshot;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -169,6 +172,57 @@ class StoreContainerRouteStateTest {
                 false, false, null, "RAW_CLOSEST_WITHIN_50", "targets-a", new Vec3d(1, 64, 0));
         StoreContainerRouteCheckpoint third = state.checkpoint(3600).orElseThrow();
         assertEquals(1, third.rangeAggregateSinceLastCheckpoint().raw50CrossingCount());
+    }
+
+    @Test
+    void capturesOneStableFinalSummarySnapshotAcrossLaterRouteMutations() {
+        StoreContainerRouteState state = new StoreContainerRouteState(0);
+        BlockPos firstRaw = new BlockPos(1, 64, 1);
+        BlockPos secondRaw = new BlockPos(2, 64, 2);
+
+        state.recordParentDecision("OPEN_EXISTING", true, firstRaw, true, true,
+                false, false, null, "RAW_CLOSEST_WITHIN_50", "targets-a");
+        state.recordPursuit(firstRaw, "OPEN_CHEST");
+        StoreContainerRouteSnapshot first = state.snapshot();
+
+        state.recordParentDecision("OBTAIN_CHEST", true, secondRaw, true, false,
+                false, false, null, "RAW_PRESENT_BUT_OUTSIDE_RANGES", "targets-b");
+        state.recordPursuit(secondRaw, "OBTAIN_CHEST");
+        state.recordTransferDecision();
+        StoreContainerRouteSnapshot second = state.snapshot();
+
+        assertEquals(1, first.candidateDecisionSequence());
+        assertEquals(1, first.branchEpoch());
+        assertEquals("OPEN_EXISTING", first.currentBranch());
+        assertEquals(firstRaw, first.currentRawCandidate());
+        assertEquals(firstRaw, first.currentPursuit());
+        assertEquals("{OPEN_EXISTING=1}", first.branchCounts());
+        assertEquals("{NONE->OPEN_EXISTING=1}", first.branchTransitionCounts());
+        assertEquals(0, first.transferDecisionCount());
+        assertEquals("PURSUIT_DECISION", first.lastSuccessfulBoundary());
+
+        assertEquals(2, second.candidateDecisionSequence());
+        assertEquals(2, second.branchEpoch());
+        assertEquals("OBTAIN_CHEST", second.currentBranch());
+        assertEquals(secondRaw, second.currentRawCandidate());
+        assertEquals(secondRaw, second.currentPursuit());
+        assertEquals("{OPEN_EXISTING=1, OBTAIN_CHEST=1}", second.branchCounts());
+        assertEquals(
+                "{NONE->OPEN_EXISTING=1, OPEN_EXISTING->OBTAIN_CHEST=1}",
+                second.branchTransitionCounts()
+        );
+        assertEquals(1, second.transferDecisionCount());
+        assertEquals("TRANSFER_DECISION", second.lastSuccessfulBoundary());
+    }
+
+    @Test
+    void exposesSnapshotAsOneSynchronizedImmutableCaptureBoundary() throws Exception {
+        Method snapshotMethod = StoreContainerRouteState.class.getDeclaredMethod("snapshot");
+
+        assertTrue(Modifier.isPublic(snapshotMethod.getModifiers()));
+        assertTrue(Modifier.isSynchronized(snapshotMethod.getModifiers()));
+        assertTrue(StoreContainerRouteSnapshot.class.isRecord());
+        assertTrue(Modifier.isFinal(StoreContainerRouteSnapshot.class.getModifiers()));
     }
 
     private static StoreContainerCandidateObservation observation(StoreContainerParentDecision parent,

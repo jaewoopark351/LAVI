@@ -5,6 +5,7 @@ import lavi.minecraft.diagnostics.container.store.deposit.candidate.range.StoreC
 import lavi.minecraft.diagnostics.container.store.deposit.candidate.range.StoreContainerRangeSnapshot;
 import lavi.minecraft.diagnostics.container.store.deposit.candidate.range.StoreContainerRangeTracker;
 import lavi.minecraft.diagnostics.container.store.deposit.candidate.range.StoreContainerRangeTransition;
+import lavi.minecraft.diagnostics.container.store.deposit.candidate.snapshot.StoreContainerRouteSnapshot;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 
@@ -424,6 +425,36 @@ public final class StoreContainerRouteState {
         if (emittedCheckpointSequence == checkpointSequence) {
             rangeTracker.resetCheckpoint();
         }
+    }
+
+    //20260902_kpopmodder: Capture the route summary under the aggregate's existing synchronization boundary.
+    public synchronized StoreContainerRouteSnapshot snapshot() {
+        StoreContainerParentDecision parent = currentParentDecision;
+        return new StoreContainerRouteSnapshot(
+                parent.sequence(),
+                branchEpoch,
+                parent.selectedBranch(),
+                parent.rawClosest(),
+                currentFilteredCandidate,
+                currentPursuit,
+                branchCounts.toString(),
+                branchTransitionCounts.toString(),
+                childReplacementCount,
+                rootRouteChildReplacementCount,
+                childLifecycleSequence,
+                identity(currentRouteChild),
+                currentRouteChild == null ? "none" : currentRouteChild.getClass().getName(),
+                transferDecisionCount,
+                candidateEvaluationCount,
+                predicateAcceptedCount,
+                predicateRejectedCount,
+                rejectionCounts.toString(),
+                checkpointCount,
+                lastSuccessfulBoundary,
+                firstExplicitFailureBoundary,
+                firstUnobservedBoundary,
+                rangeTracker.summary()
+        );
     }
 
     public synchronized StoreContainerParentDecision currentParentDecision() {

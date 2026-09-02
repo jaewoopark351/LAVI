@@ -4,10 +4,12 @@ import adris.altoclef.AltoClef;
 import adris.altoclef.tasksystem.Task;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 import lavi.minecraft.diagnostics.container.home.timeout.artifact.StoreHomeRunManifestDiagnostics;
+import lavi.minecraft.diagnostics.container.home.timeout.candidate.StoreHomeCandidateBoundaryDiagnostics;
 import lavi.minecraft.diagnostics.container.home.timeout.event.StoreHomeDiagnosticEmitter;
-import lavi.minecraft.diagnostics.container.home.timeout.event.StoreHomeEventFields;
 import lavi.minecraft.diagnostics.container.home.timeout.guard.StoreHomeDiagnosticBookkeepingGuard;
 import lavi.minecraft.diagnostics.container.home.timeout.guard.StoreHomeDiagnosticBoundary;
+import lavi.minecraft.diagnostics.container.home.timeout.operation.StoreHomeOperationDiagnostics;
+import lavi.minecraft.diagnostics.container.home.timeout.progress.StoreHomeCandidateProgressDiagnostics;
 import lavi.minecraft.diagnostics.container.home.timeout.progress.StoreHomeCandidateProgressState;
 import lavi.minecraft.diagnostics.container.home.timeout.progress.StoreHomeCandidateProgressObservation;
 import lavi.minecraft.diagnostics.container.home.timeout.progress.StoreHomePlayerPositionSnapshot;
@@ -17,6 +19,7 @@ import lavi.minecraft.diagnostics.container.home.timeout.progress.StoreHomeProgr
 import lavi.minecraft.diagnostics.container.home.timeout.state.StoreHomeDiagnosticCandidateCatalogState;
 import lavi.minecraft.diagnostics.container.home.timeout.state.StoreHomeDiagnosticCandidateProgressLifecycle;
 import lavi.minecraft.diagnostics.container.home.timeout.state.StoreHomeDiagnosticOperationState;
+import lavi.minecraft.diagnostics.container.home.timeout.terminal.StoreHomeTerminalSummaryEmitter;
 import lavi.minecraft.task.container.deposit.auto.trusted.AutoDepositTrustedDestinationCandidate;
 import lavi.minecraft.task.container.deposit.auto.trusted.interaction.AutoDepositExactOpenContainerBinding;
 import lavi.minecraft.task.container.home.execution.HomeStorageOperationContext;
@@ -60,6 +63,15 @@ public final class StoreHomeTimeoutDiagnostics {
             new StoreHomeDiagnosticCandidateCatalogState();
     private final StoreHomeDiagnosticCandidateProgressLifecycle candidateProgress =
             new StoreHomeDiagnosticCandidateProgressLifecycle();
+    //20260902_kpopmodder: Delegate event-family payload assembly while retaining one mutable timeout state owner.
+    private final StoreHomeCandidateBoundaryDiagnostics candidateBoundaryDiagnostics =
+            new StoreHomeCandidateBoundaryDiagnostics();
+    private final StoreHomeCandidateProgressDiagnostics progressDiagnostics =
+            new StoreHomeCandidateProgressDiagnostics();
+    private final StoreHomeOperationDiagnostics operationDiagnostics =
+            new StoreHomeOperationDiagnostics();
+    private final StoreHomeTerminalSummaryEmitter terminalSummaryEmitter =
+            new StoreHomeTerminalSummaryEmitter();
 
     public StoreHomeTimeoutDiagnostics(
             long operationId,
@@ -118,35 +130,21 @@ public final class StoreHomeTimeoutDiagnostics {
             );
             ensureOperationStarted(owner, phase, operation);
             long clientTickId = currentClientTickId();
-            emitter.emitBoundary(
+            candidateBoundaryDiagnostics.emitRejectedBeforeAttempt(
+                    emitter,
                     CANDIDATE_REJECTED,
                     reason,
                     owner,
-                    StoreHomeDiagnosticEmitter.merge(
-                            operationFields(owner, phase, clientTickId, operation),
-                            StoreHomeEventFields.operationContext(context, candidate),
-                            StoreHomeEventFields.candidateBeforeAttempt(
-                                    operationId,
-                                    candidate,
-                                    candidateOrdinal,
-                                    candidateCatalog.effectiveCandidateCount(
-                                            remainingAfterRejection + 1
-                                    ),
-                                    remainingAfterRejection
-                            ),
-                            new Object[]{
-                                    "rejectionStage", "PRE_ATTEMPT_VALIDATION",
-                                    "candidateAttemptStarted", false,
-                                    "candidateActuallyRemoved", true,
-                                    "rejectionReason", reason,
-                                    "actualRejectionReason", reason,
-                                    "failureKind", failureKind,
-                                    "actualAction",
-                                    remainingAfterRejection > 0
-                                            ? "NEXT_CANDIDATE_SELECTION_PENDING"
-                                            : "CANDIDATE_QUEUE_EXHAUSTED_PENDING_TERMINAL"
-                            }
-                    )
+                    operationFields(owner, phase, clientTickId),
+                    operationId,
+                    context,
+                    candidate,
+                    candidateOrdinal,
+                    candidateCatalog.effectiveCandidateCount(
+                            remainingAfterRejection + 1
+                    ),
+                    remainingAfterRejection,
+                    failureKind
             );
         });
     }
@@ -210,7 +208,8 @@ public final class StoreHomeTimeoutDiagnostics {
             StoreHomeCandidateProgressState active =
                     candidateProgress.activeCandidate();
             long clientTickId = currentClientTickId();
-            if (!emitter.canObserveProgress(active.candidateId())) {
+            if (!progressDiagnostics.admitsSnapshotCapture(
+                    emitter, active.candidateId())) {
                 StoreHomePlayerPositionSnapshot player = snapshotReader.capturePlayer(
                         mod, attempt.candidate()
                 );
@@ -218,7 +217,7 @@ public final class StoreHomeTimeoutDiagnostics {
                         clientTickId, player, activeChildTask
                 );
                 active.recordSuppressedRepeat();
-                emitter.recordProgressSuppressed(CANDIDATE_PROGRESS);
+                progressDiagnostics.recordSuppressed(emitter, CANDIDATE_PROGRESS);
                 return;
             }
             StoreHomeProgressSnapshot snapshot = snapshotReader.capture(
@@ -228,37 +227,29 @@ public final class StoreHomeTimeoutDiagnostics {
                     active.observe(
                             clientTickId, phase, snapshot, activeChildTask
                     );
-            if (!observation.shouldEmit()) {
+            if (!progressDiagnostics.admitsSemanticEmission(observation)) {
                 active.recordSuppressedRepeat();
-                emitter.recordProgressSuppressed(CANDIDATE_PROGRESS);
+                progressDiagnostics.recordSuppressed(emitter, CANDIDATE_PROGRESS);
                 return;
             }
             int suppressedBefore = active.suppressedRepeatCount();
-            boolean emitted = emitter.emitProgress(
+            boolean emitted = progressDiagnostics.emitProgress(
+                    emitter,
                     CANDIDATE_PROGRESS,
                     observation.progressKind().toLowerCase(),
                     active.candidateId(),
                     owner,
-                    StoreHomeDiagnosticEmitter.merge(
-                            operationFields(owner, phase, clientTickId, operation),
-                            StoreHomeEventFields.operationContext(
-                                    context, attempt.candidate()
-                            ),
-                            StoreHomeEventFields.candidate(
-                                    active,
-                                    remainingCandidateCountIncludingCurrent,
-                                    candidateTicks(),
-                                    clientTickId
-                            ),
-                            StoreHomeEventFields.progress(
-                                    active,
-                                    snapshot,
-                                    observation,
-                                    clientTickId,
-                                    suppressedBefore
-                            ),
-                            StoreHomeEventFields.session(session)
-                    )
+                    operationFields(owner, phase, clientTickId),
+                    context,
+                    attempt.candidate(),
+                    active,
+                    remainingCandidateCountIncludingCurrent,
+                    candidateTicks(),
+                    clientTickId,
+                    snapshot,
+                    observation,
+                    suppressedBefore,
+                    session
             );
             if (emitted) {
                 active.markProgressEmitted(
@@ -307,53 +298,23 @@ public final class StoreHomeTimeoutDiagnostics {
                     OPERATION_TIMEOUT,
                     stableReason
             );
-            Object[] captureStatus = attempt == null
-                    ? new Object[]{
-                    "diagnosticCaptureStatus", "complete_no_active_candidate",
-                    "diagnosticErrorClass", "none"
-            }
-                    : new Object[0];
             boolean sessionPending = session != null
                     && session.pendingTransfer().isPresent();
-            emitter.emitBoundary(
+            operationDiagnostics.emitTimeoutDecision(
+                    emitter,
                     OPERATION_TIMEOUT,
                     stableReason,
                     owner,
-                    StoreHomeDiagnosticEmitter.merge(
-                            operationFields(owner, phase, clientTickId, operation),
-                            evidence,
-                            captureStatus,
-                            StoreHomeEventFields.timeoutDecision(
-                                    "OPERATION",
-                                    clientTickId,
-                                    candidateTicksObserved,
-                                    operationDecisionTicks(timeoutReason),
-                                    false,
-                                    "unavailable_not_evaluated",
-                                    true,
-                                    true,
-                                    pendingAtDecision
-                                            ? "FINISH_TRANSFER_UNCONFIRMED"
-                                            : "FINISH_EXHAUSTED",
-                                    "not_applicable",
-                                    pendingAtDecision
-                                            ? stableReason + "_with_pending_transfer"
-                                            : stableReason,
-                                    pendingAtDecision
-                                            ? "TRANSFER_UNCONFIRMED"
-                                            : "EXISTING_EXHAUSTED_CLASSIFIER",
-                                    pendingAtDecision,
-                                    sessionPending
-                            ),
-                            new Object[]{
-                                    "candidateTicksObservedAtOperationDecision",
-                                    candidateTicksObserved,
-                                    "operationDecisionCounterKind",
-                                    operationDecisionCounterKind(timeoutReason),
-                                    "operationDecisionCounterLimitTicks",
-                                    operationDecisionCounterLimit(timeoutReason)
-                            }
-                    )
+                    operationFields(owner, phase, clientTickId),
+                    evidence,
+                    attempt != null,
+                    clientTickId,
+                    candidateTicksObserved,
+                    operationDecisionTicks(timeoutReason),
+                    timeoutReason,
+                    operationState.observation(),
+                    pendingAtDecision,
+                    sessionPending
             );
         });
     }
@@ -403,45 +364,20 @@ public final class StoreHomeTimeoutDiagnostics {
                     CANDIDATE_TIMEOUT,
                     stableReason
             );
-            emitter.emitBoundary(
+            candidateBoundaryDiagnostics.emitTimeoutDecision(
+                    emitter,
                     CANDIDATE_TIMEOUT,
                     stableReason,
                     owner,
-                    StoreHomeDiagnosticEmitter.merge(
-                            operationFields(owner, phase, clientTickId, operation),
-                            evidence,
-                            StoreHomeEventFields.timeoutDecision(
-                                    "CANDIDATE",
-                                    clientTickId,
-                                    candidateTicks(),
-                                    operationTicks(),
-                                    true,
-                                    true,
-                                    true,
-                                    false,
-                                    pendingAtDecision
-                                            ? "FINISH_TRANSFER_UNCONFIRMED"
-                                            : "REJECT_CANDIDATE",
-                                    pendingAtDecision
-                                            ? "not_applicable"
-                                            : stableReason,
-                                    pendingAtDecision
-                                            ? stableReason + "_with_pending_transfer"
-                                            : "not_applicable",
-                                    pendingAtDecision
-                                            ? "TRANSFER_UNCONFIRMED"
-                                            : "not_applicable",
-                                    pendingAtDecision,
-                                    sessionPending
-                            ),
-                            new Object[]{
-                                    "candidateDecisionCounterKind",
-                                    candidateDecisionCounterKind(timeoutReason),
-                                    "candidateDecisionCounterLimitTicks",
-                                    operationState.observation()
-                                            .activeCandidateLimitTicks()
-                            }
-                    )
+                    operationFields(owner, phase, clientTickId),
+                    evidence,
+                    clientTickId,
+                    candidateTicks(),
+                    operationTicks(),
+                    timeoutReason,
+                    operationState.observation(),
+                    pendingAtDecision,
+                    sessionPending
             );
         });
     }
@@ -482,9 +418,8 @@ public final class StoreHomeTimeoutDiagnostics {
             }
             long clientTickId = currentClientTickId();
             Object[] evidence = active == null
-                    ? StoreHomeDiagnosticEmitter.merge(
-                    StoreHomeEventFields.operationContext(context, candidate),
-                    StoreHomeEventFields.candidateAfterUnobservedAttempt(
+                    ? candidateBoundaryDiagnostics.unobservedRejectionEvidence(
+                            context,
                             candidate,
                             candidateCatalog.effectiveCandidateCount(
                                     remainingCandidateCountAfterRejection + 1
@@ -492,7 +427,6 @@ public final class StoreHomeTimeoutDiagnostics {
                             remainingCandidateCountAfterRejection,
                             candidateTicks()
                     )
-            )
                     : candidateEvidenceForKnownState(
                     mod,
                     phase,
@@ -507,30 +441,16 @@ public final class StoreHomeTimeoutDiagnostics {
                     CANDIDATE_REJECTED,
                     reason
             );
-            emitter.emitBoundary(
+            candidateBoundaryDiagnostics.emitRejected(
+                    emitter,
                     CANDIDATE_REJECTED,
                     reason,
                     owner,
-                    StoreHomeDiagnosticEmitter.merge(
-                            operationFields(owner, phase, clientTickId, operation),
-                            evidence,
-                            new Object[]{
-                                    "rejectionStage", "ACTIVE_ATTEMPT",
-                                    "candidateAttemptStarted", true,
-                                    "candidateActuallyRemoved", true,
-                                    "rejectionReason", reason,
-                                    "actualRejectionReason", reason,
-                                    "failureKind", failureKind,
-                                    "remainingCandidateCountAfterRejection",
-                                    remainingCandidateCountAfterRejection,
-                                    "candidateActiveTicksAtRejection",
-                                    candidateActiveTicksAtRejection,
-                                    "actualAction",
-                                    remainingCandidateCountAfterRejection > 0
-                                            ? "NEXT_CANDIDATE_SELECTION_PENDING"
-                                            : "CANDIDATE_QUEUE_EXHAUSTED_PENDING_TERMINAL"
-                            }
-                    )
+                    operationFields(owner, phase, clientTickId),
+                    evidence,
+                    candidateActiveTicksAtRejection,
+                    remainingCandidateCountAfterRejection,
+                    failureKind
             );
             candidateProgress.clearActive();
             candidateCatalog.clearKnownAttempt();
@@ -574,18 +494,13 @@ public final class StoreHomeTimeoutDiagnostics {
                     CANDIDATE_ACTIVATED,
                     "exact_trusted_container_session_activated"
             );
-            emitter.emitBoundary(
+            candidateBoundaryDiagnostics.emitActivated(
+                    emitter,
                     CANDIDATE_ACTIVATED,
                     "exact_trusted_container_session_activated",
                     owner,
-                    StoreHomeDiagnosticEmitter.merge(
-                            operationFields(owner, phase, clientTickId, operation),
-                            evidence,
-                            new Object[]{
-                                    "candidateActivated", true,
-                                    "activationResult", "EXACT_SESSION_INSTALLED"
-                            }
-                    )
+                    operationFields(owner, phase, clientTickId),
+                    evidence
             );
         });
     }
@@ -607,16 +522,15 @@ public final class StoreHomeTimeoutDiagnostics {
             ensureOperationStarted(owner, phase, operation);
             long clientTickId = currentClientTickId();
             Object[] evidence = attempt == null
-                    ? StoreHomeDiagnosticEmitter.merge(
-                    StoreHomeEventFields.operationContext(context, null),
-                    StoreHomeEventFields.candidateUnavailable(
+                    ? candidateBoundaryDiagnostics.unavailableEvidence(
+                            context,
+                            null,
                             candidateCatalog.effectiveCandidateCount(
                                     remainingCandidateCountIncludingCurrent
                             ),
-                            remainingCandidateCountIncludingCurrent
-                    ),
-                    StoreHomeEventFields.session(session)
-            )
+                            remainingCandidateCountIncludingCurrent,
+                            session
+                    )
                     : candidateEvidence(
                     owner,
                     mod,
@@ -631,19 +545,15 @@ public final class StoreHomeTimeoutDiagnostics {
                     OPERATION_TERMINAL,
                     reason
             );
-            emitter.emitTerminal(
+            terminalSummaryEmitter.emit(
+                    emitter,
                     OPERATION_TERMINAL,
                     reason,
                     owner,
-                    StoreHomeDiagnosticEmitter.merge(
-                            operationFields(owner, phase, clientTickId, operation),
-                            evidence,
-                            StoreHomeEventFields.terminal(result, reason, operation),
-                            new Object[]{
-                                    "budgetSummaryCapturedBeforeTerminalEmission", true
-                            },
-                            emitter.budgetSummaryFields()
-                    )
+                    operationFields(owner, phase, clientTickId),
+                    evidence,
+                    result,
+                    operation
             );
             candidateProgress.clearActive();
         });
@@ -687,33 +597,20 @@ public final class StoreHomeTimeoutDiagnostics {
                 new StoreHomeCandidateProgressObservation(
                         "NO_NEW_PROGRESS", fingerprint, true, false
                 );
-        emitter.emitBoundary(
+        candidateBoundaryDiagnostics.emitStarted(
+                emitter,
                 CANDIDATE_STARTED,
                 reason,
                 owner,
-                StoreHomeDiagnosticEmitter.merge(
-                        operationFields(owner, phase, clientTickId, operation),
-                        StoreHomeEventFields.operationContext(
-                                context, attempt.candidate()
-                        ),
-                        StoreHomeEventFields.candidate(
-                                active,
-                                remainingCandidateCountIncludingCurrent,
-                                candidateTicks(),
-                                clientTickId
-                        ),
-                        StoreHomeEventFields.progress(
-                                active,
-                                snapshot,
-                                startObservation,
-                                clientTickId,
-                                0
-                        ),
-                        new Object[]{
-                                "diagnosticBoundaryKind", CANDIDATE_STARTED
-                        },
-                        StoreHomeEventFields.session(null)
-                )
+                operationFields(owner, phase, clientTickId),
+                context,
+                attempt.candidate(),
+                active,
+                remainingCandidateCountIncludingCurrent,
+                candidateTicks(),
+                clientTickId,
+                snapshot,
+                startObservation
         );
     }
 
@@ -794,15 +691,14 @@ public final class StoreHomeTimeoutDiagnostics {
             String diagnosticBoundaryKind,
             String diagnosticBoundaryReason) {
         if (attempt == null) {
-            return StoreHomeDiagnosticEmitter.merge(
-                    StoreHomeEventFields.operationContext(context, null),
-                    StoreHomeEventFields.candidateUnavailable(
-                            candidateCatalog.effectiveCandidateCount(
-                                    remainingCandidateCountIncludingCurrent
-                            ),
+            return candidateBoundaryDiagnostics.unavailableEvidence(
+                    context,
+                    null,
+                    candidateCatalog.effectiveCandidateCount(
                             remainingCandidateCountIncludingCurrent
                     ),
-                    StoreHomeEventFields.session(session)
+                    remainingCandidateCountIncludingCurrent,
+                    session
             );
         }
         ensureActiveCandidate(
@@ -871,34 +767,19 @@ public final class StoreHomeTimeoutDiagnostics {
                         observed.semanticStateChanged(),
                         observed.sampleDue()
                 );
-        Object[] candidateFields = candidateIncludedInQueue
-                ? StoreHomeEventFields.candidate(
-                        active,
-                        candidateQueueRemaining,
-                        candidateTicks,
-                        clientTickId
-                )
-                : StoreHomeEventFields.candidateAfterRejection(
-                        active,
-                        candidateQueueRemaining,
-                        candidateTicks,
-                        clientTickId
-                );
-        return StoreHomeDiagnosticEmitter.merge(
-                StoreHomeEventFields.operationContext(context, candidate),
-                candidateFields,
-                StoreHomeEventFields.progress(
-                        active,
-                        snapshot,
-                        boundaryObservation,
-                        clientTickId,
-                        active.suppressedRepeatCount()
-                ),
-                new Object[]{
-                        "diagnosticBoundaryKind", diagnosticBoundaryKind,
-                        "diagnosticBoundaryReason", diagnosticBoundaryReason
-                },
-                StoreHomeEventFields.session(session)
+        return candidateBoundaryDiagnostics.observedEvidence(
+                context,
+                candidate,
+                active,
+                session,
+                snapshot,
+                boundaryObservation,
+                candidateQueueRemaining,
+                candidateIncludedInQueue,
+                candidateTicks,
+                clientTickId,
+                diagnosticBoundaryKind,
+                diagnosticBoundaryReason
         );
     }
 
@@ -911,46 +792,32 @@ public final class StoreHomeTimeoutDiagnostics {
         }
         operationState.markStarted(currentClientTickId());
         StoreHomeRunManifestDiagnostics.emitOnce(owner, emitter);
-        emitter.emitBoundary(
-                OPERATION_STARTED,
-                operationState.startClientTickKnown()
-                        ? "store_home_task_started"
-                        : "store_home_diagnostics_attached_after_start",
+        boolean operationStartClientTickKnown =
+                operationState.startClientTickKnown();
+        Object[] startedOperationFields = operationFields(
                 owner,
-                StoreHomeDiagnosticEmitter.merge(
-                        operationFields(
-                                owner,
-                                phase,
-                                operationState.startClientTickId(),
-                                operation
-                        ),
-                        StoreHomeEventFields.operationContext(null, null),
-                        StoreHomeEventFields.candidateUnavailable(
-                                candidateCatalog.catalogCaptured()
-                                        ? candidateCatalog.totalCandidateCount()
-                                        : "unavailable_not_built",
-                                candidateCatalog.catalogCaptured()
-                                        ? candidateCatalog.totalCandidateCount()
-                                        : "unavailable_not_built"
-                        ),
-                        new Object[]{
-                                "operationStartObservation",
-                                operationState.startClientTickKnown()
-                                        ? "TASK_ON_START"
-                                        : "FIRST_VISIBLE_DIAGNOSTIC_BOUNDARY",
-                                "candidateCatalogCaptured",
-                                candidateCatalog.catalogCaptured()
-                        }
-                )
+                phase,
+                operationState.startClientTickId()
+        );
+        boolean candidateCatalogCaptured = candidateCatalog.catalogCaptured();
+        operationDiagnostics.emitStarted(
+                emitter,
+                OPERATION_STARTED,
+                owner,
+                startedOperationFields,
+                operationStartClientTickKnown,
+                candidateCatalogCaptured,
+                candidateCatalogCaptured
+                        ? candidateCatalog.totalCandidateCount()
+                        : "unavailable_not_built"
         );
     }
 
     private Object[] operationFields(
             Task owner,
             StoreHomePhase phase,
-            long clientTickId,
-            StoreHomeOperationProgress operation) {
-        return StoreHomeEventFields.operation(
+            long clientTickId) {
+        return operationDiagnostics.operationFields(
                 owner,
                 topLevelTaskRunId,
                 phase,
@@ -975,27 +842,6 @@ public final class StoreHomeTimeoutDiagnostics {
 
     private int operationDecisionTicks(StoreHomeTimeoutReason reason) {
         return operationState.decisionTicks(reason);
-    }
-
-    private String operationDecisionCounterKind(
-            StoreHomeTimeoutReason reason) {
-        return reason == StoreHomeTimeoutReason.OPERATION_EMERGENCY_HARD_CAP
-                ? "OPERATION_ACTIVE_TICKS"
-                : "OPERATION_NO_PROGRESS_TICKS";
-    }
-
-    private int operationDecisionCounterLimit(StoreHomeTimeoutReason reason) {
-        StoreHomeTimeoutObservation observation = operationState.observation();
-        return reason == StoreHomeTimeoutReason.OPERATION_EMERGENCY_HARD_CAP
-                ? observation.maxOperationEmergencyHardCapTicks()
-                : observation.maxOperationNoProgressTicks();
-    }
-
-    private static String candidateDecisionCounterKind(
-            StoreHomeTimeoutReason reason) {
-        return reason == StoreHomeTimeoutReason.CANDIDATE_LOCAL_INTERACTION_TIMEOUT
-                ? "CANDIDATE_LOCAL_INTERACTION_TICKS"
-                : "CANDIDATE_NAVIGATION_NO_PROGRESS_TICKS";
     }
 
     private static long currentClientTickId() {

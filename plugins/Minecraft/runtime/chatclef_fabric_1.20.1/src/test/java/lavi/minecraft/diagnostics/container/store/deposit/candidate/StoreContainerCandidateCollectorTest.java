@@ -7,10 +7,13 @@ import net.minecraft.util.math.BlockPos;
 import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class StoreContainerCandidateCollectorTest {
@@ -143,6 +146,36 @@ class StoreContainerCandidateCollectorTest {
     }
 
     @Test
+    void completedScopeIsSingleUse() {
+        BlockPos raw = new BlockPos(-679, 59, 105);
+        TestTask routeChild = new TestTask();
+        StoreDepositOperationState state = stateWithOpenRoute(raw, routeChild);
+
+        StoreContainerCandidateCollector.begin(state, routeChild);
+        StoreContainerCandidateCollector.observe(raw, StoreContainerCandidateRejectionReason.ACCEPTED);
+        StoreContainerCandidateCollector.end(routeChild, true);
+
+        assertTrue(StoreContainerCandidateCollector.take(state, routeChild).available());
+        assertFalse(StoreContainerCandidateCollector.take(state, routeChild).available());
+    }
+
+    @Test
+    void mismatchedConsumerCannotReuseCompletedScope() {
+        BlockPos raw = new BlockPos(-679, 59, 105);
+        TestTask routeChild = new TestTask();
+        TestTask differentChild = new TestTask();
+        StoreDepositOperationState state = stateWithOpenRoute(raw, routeChild);
+
+        StoreContainerCandidateCollector.begin(state, routeChild);
+        StoreContainerCandidateCollector.observe(raw, StoreContainerCandidateRejectionReason.ACCEPTED);
+        StoreContainerCandidateCollector.end(routeChild, true);
+
+        assertFalse(StoreContainerCandidateCollector.take(state, differentChild).available());
+        assertFalse(StoreContainerCandidateCollector.take(state, routeChild).available());
+    }
+
+    @Test
+    //20260902_kpopmodder: Bound cross-thread coordination so collector regressions fail instead of hanging.
     void modeTransitionInvalidatesAPreOffScopeOwnedByAnotherThread() throws Exception {
         BlockPos raw = new BlockPos(-679, 59, 105);
         TestTask routeChild = new TestTask();
@@ -150,30 +183,44 @@ class StoreContainerCandidateCollectorTest {
         CountDownLatch started = new CountDownLatch(1);
         CountDownLatch resume = new CountDownLatch(1);
         AtomicReference<StoreContainerCandidateObservation> result = new AtomicReference<>();
+        AtomicReference<Throwable> workerFailure = new AtomicReference<>();
         Thread worker = new Thread(() -> {
-            StoreContainerCandidateCollector.begin(state, routeChild);
-            started.countDown();
-            await(resume);
-            StoreContainerCandidateCollector.observe(
-                    raw,
-                    StoreContainerCandidateRejectionReason.ACCEPTED
-            );
-            StoreContainerCandidateCollector.end(routeChild, true);
-            result.set(StoreContainerCandidateCollector.take(state, routeChild));
+            try {
+                StoreContainerCandidateCollector.begin(state, routeChild);
+                started.countDown();
+                await(resume);
+                StoreContainerCandidateCollector.observe(
+                        raw,
+                        StoreContainerCandidateRejectionReason.ACCEPTED
+                );
+                StoreContainerCandidateCollector.end(routeChild, true);
+                result.set(StoreContainerCandidateCollector.take(state, routeChild));
+            } catch (Throwable throwable) {
+                workerFailure.set(throwable);
+            } finally {
+                started.countDown();
+            }
         });
+        worker.setDaemon(true);
 
         worker.start();
-        started.await();
+        assertTrue(started.await(5, TimeUnit.SECONDS), "worker did not begin candidate collection");
         StoreContainerCandidateCollector.clearForModeTransition();
         resume.countDown();
-        worker.join();
+        worker.join(5000L);
 
-        assertFalse(result.get().available());
+        assertFalse(worker.isAlive(), "worker thread remained alive");
+        assertNull(workerFailure.get(), () -> "worker failed: " + workerFailure.get());
+        StoreContainerCandidateObservation observation = result.get();
+        assertNotNull(observation, "worker did not publish its observation");
+        assertFalse(observation.available());
     }
 
     private static void await(CountDownLatch latch) {
         try {
-            latch.await();
+            if (!latch.await(5, TimeUnit.SECONDS)) {
+                throw new AssertionError("timed out waiting for test coordination");
+            }
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
             throw new AssertionError(interrupted);

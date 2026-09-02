@@ -22,8 +22,43 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FabricChatClefBoundRootDetachOwnershipTest {
+    @Test
+    void coordinatorFacadePreservesMatchingContextOwnershipQueryContract() {
+        IdleTask root = new IdleTask();
+        Harness harness = harness(root, FabricChatClefRootOwnershipClassification.COMMAND_OWNED_ROOT);
+
+        assertTrue(harness.coordinator.hasActiveExecution(harness.context));
+        assertTrue(harness.coordinator.matchesBoundRootTask(harness.context, root));
+        assertEquals("same_task_instance", harness.coordinator.boundRootMatchReason(harness.context, root));
+        assertEquals(
+                "COMMAND_OWNED_ROOT:same_task_instance",
+                harness.coordinator.boundRootOwnershipForDetach(harness.context, root)
+        );
+        assertEquals("cancel_owned_root", harness.coordinator.detachCancelAction(harness.context, root));
+    }
+
+    @Test
+    void coordinatorFacadeRejectsDifferentContextAcrossEveryOwnershipQuery() {
+        IdleTask root = new IdleTask();
+        Harness harness = harness(root, FabricChatClefRootOwnershipClassification.COMMAND_OWNED_ROOT);
+        FabricChatClefCommandContext differentContext = context();
+
+        assertFalse(harness.coordinator.hasActiveExecution(differentContext));
+        assertFalse(harness.coordinator.matchesBoundRootTask(differentContext, root));
+        assertEquals(
+                "no_matching_lifecycle_execution",
+                harness.coordinator.boundRootMatchReason(differentContext, root)
+        );
+        assertEquals(
+                "no_matching_lifecycle_execution",
+                harness.coordinator.boundRootOwnershipForDetach(differentContext, root)
+        );
+        assertEquals("skip_not_owned", harness.coordinator.detachCancelAction(differentContext, root));
+    }
+
     @Test
     void dispatcherDetachSkipsPreexistingIdleRootCancellation() {
         IdleTask idle = new IdleTask();
@@ -139,7 +174,7 @@ class FabricChatClefBoundRootDetachOwnershipTest {
                 taskStateReader,
                 cancelCounter::accept
         );
-        return new Harness(queue, dispatcher, cancelCounter.count);
+        return new Harness(queue, dispatcher, coordinator, context, cancelCounter.count);
     }
 
     private static Harness harnessWithoutLifecycle() {
@@ -169,7 +204,7 @@ class FabricChatClefBoundRootDetachOwnershipTest {
                 taskStateReader,
                 cancelCounter::accept
         );
-        return new Harness(queue, dispatcher, cancelCounter.count);
+        return new Harness(queue, dispatcher, coordinator, context, cancelCounter.count);
     }
 
     private static FabricChatClefTaskOwnershipEvidence evidence(Task root) {
@@ -205,15 +240,21 @@ class FabricChatClefBoundRootDetachOwnershipTest {
     private static final class Harness {
         private final FabricChatClefCommandQueue queue;
         private final FabricChatClefCommandDispatcher dispatcher;
+        private final FabricChatClefCommandLifecycleCoordinator coordinator;
+        private final FabricChatClefCommandContext context;
         private final AtomicInteger cancellationActionCount;
 
         private Harness(
                 FabricChatClefCommandQueue queue,
                 FabricChatClefCommandDispatcher dispatcher,
+                FabricChatClefCommandLifecycleCoordinator coordinator,
+                FabricChatClefCommandContext context,
                 AtomicInteger cancellationActionCount
         ) {
             this.queue = queue;
             this.dispatcher = dispatcher;
+            this.coordinator = coordinator;
+            this.context = context;
             this.cancellationActionCount = cancellationActionCount;
         }
     }

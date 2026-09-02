@@ -10,6 +10,7 @@ import lavi.minecraft.fabric.chatclef.bridge.command.execution.FabricChatClefCom
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.evidence.FabricChatClefNonterminalLifecycleEvidencePublisher;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.evidence.FabricChatClefStableRequestQuiescenceObservation;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.details.FabricChatClefTaskFinishedEventDetailsPayload;
+import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.ownership.FabricChatClefBoundRootOwnershipView;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskSnapshot;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskOwnershipEvidence;
 import lavi.minecraft.fabric.chatclef.bridge.command.result.FabricChatClefCommandResultDataPayload;
@@ -27,6 +28,9 @@ public final class FabricChatClefCommandLifecycleCoordinator {
     private final FabricChatClefUserTaskFinishedObserver taskFinishedObserver;
     private final FabricChatClefCommandOutcomeClassifier outcomeClassifier;
     private final FabricChatClefRootOwnershipClassifier rootOwnershipClassifier = new FabricChatClefRootOwnershipClassifier();
+    //20260902_kpopmodder: Delegate read-only root ownership projections without moving lifecycle state.
+    private final FabricChatClefBoundRootOwnershipView boundRootOwnershipView =
+            new FabricChatClefBoundRootOwnershipView();
     private final FabricChatClefPreexistingIdleRootStabilityGate preexistingIdleRootStabilityGate =
             new FabricChatClefPreexistingIdleRootStabilityGate();
     private final FabricChatClefCommandResultOutbox resultOutbox;
@@ -204,46 +208,23 @@ public final class FabricChatClefCommandLifecycleCoordinator {
     }
 
     public boolean hasActiveExecution(FabricChatClefCommandContext context) {
-        FabricChatClefCommandExecution execution = activeExecution.get();
-        return execution != null && execution.context() == context;
+        return boundRootOwnershipView.hasActiveExecution(activeExecution.get(), context);
     }
 
     public boolean matchesBoundRootTask(FabricChatClefCommandContext context, Task candidateTask) {
-        FabricChatClefCommandExecution execution = activeExecution.get();
-        return execution != null
-                && execution.context() == context
-                && execution.matchesBoundRootTask(candidateTask);
+        return boundRootOwnershipView.matchesBoundRootTask(activeExecution.get(), context, candidateTask);
     }
 
     public String boundRootMatchReason(FabricChatClefCommandContext context, Task candidateTask) {
-        FabricChatClefCommandExecution execution = activeExecution.get();
-        if (execution == null || execution.context() != context) {
-            return "no_matching_lifecycle_execution";
-        }
-        return execution.boundRootMatchReason(candidateTask);
+        return boundRootOwnershipView.boundRootMatchReason(activeExecution.get(), context, candidateTask);
     }
 
     public String boundRootOwnershipForDetach(FabricChatClefCommandContext context, Task candidateTask) {
-        FabricChatClefCommandExecution execution = activeExecution.get();
-        if (execution == null || execution.context() != context) {
-            return "no_matching_lifecycle_execution";
-        }
-        return classificationName(execution) + ":" + execution.boundRootMatchReason(candidateTask);
+        return boundRootOwnershipView.boundRootOwnershipForDetach(activeExecution.get(), context, candidateTask);
     }
 
     public String detachCancelAction(FabricChatClefCommandContext context, Task candidateTask) {
-        FabricChatClefCommandExecution execution = activeExecution.get();
-        if (execution == null || execution.context() != context) {
-            return "skip_not_owned";
-        }
-        if (execution.matchesBoundRootTask(candidateTask)) {
-            return "cancel_owned_root";
-        }
-        if (execution.rootOwnershipClassification()
-                == FabricChatClefRootOwnershipClassification.PREEXISTING_UNCHANGED_IDLE_ROOT) {
-            return "skip_preexisting_root";
-        }
-        return "skip_not_owned";
+        return boundRootOwnershipView.detachCancelAction(activeExecution.get(), context, candidateTask);
     }
 
     private void drainObservations() {
@@ -479,8 +460,4 @@ public final class FabricChatClefCommandLifecycleCoordinator {
         return FabricChatClefCommandDeadlinePayload.markTaskMayStillBeRunning(context.ownershipPayload());
     }
 
-    private static String classificationName(FabricChatClefCommandExecution execution) {
-        FabricChatClefRootOwnershipClassification classification = execution.rootOwnershipClassification();
-        return classification == null ? "OWNERSHIP_UNKNOWN" : classification.name();
-    }
 }

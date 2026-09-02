@@ -7,19 +7,10 @@ import adris.altoclef.util.ItemTarget;
 import adris.altoclef.util.slots.Slot;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 import lavi.minecraft.diagnostics.container.store.deposit.binding.StoreDepositBindingRegistry;
-import lavi.minecraft.diagnostics.container.store.deposit.budget.StoreDepositBoundedEventLogger;
 import lavi.minecraft.diagnostics.container.store.deposit.budget.StoreDepositEmissionGate;
 import lavi.minecraft.diagnostics.container.store.deposit.budget.StoreDepositSharedBudget;
-import lavi.minecraft.diagnostics.container.store.deposit.candidate.StoreContainerCandidateCollector;
-import lavi.minecraft.diagnostics.container.store.deposit.candidate.StoreContainerCandidateEventFields;
-import lavi.minecraft.diagnostics.container.store.deposit.candidate.StoreContainerCandidateObservation;
-import lavi.minecraft.diagnostics.container.store.deposit.candidate.StoreContainerCandidateRejectionReason;
-import lavi.minecraft.diagnostics.container.store.deposit.candidate.StoreContainerParentDecision;
-import lavi.minecraft.diagnostics.container.store.deposit.candidate.StoreContainerRouteCheckpoint;
-import lavi.minecraft.diagnostics.container.store.deposit.candidate.range.StoreContainerRangeEventFields;
 import lavi.minecraft.diagnostics.container.store.deposit.candidate.range.StoreDepositUserBlockRangeNullDiagnostics;
 import lavi.minecraft.diagnostics.container.store.deposit.context.StoreDepositOperationState;
-import lavi.minecraft.diagnostics.container.store.deposit.event.StoreDepositEventFields;
 import lavi.minecraft.diagnostics.container.store.deposit.effect.StoreDepositEffectDiagnostics;
 import lavi.minecraft.diagnostics.container.store.deposit.interaction.StoreDepositInteractionBindingRegistry;
 import lavi.minecraft.diagnostics.container.store.deposit.interaction.StoreDepositInteractionDiagnostics;
@@ -29,6 +20,9 @@ import lavi.minecraft.diagnostics.container.store.deposit.lifecycle.StoreDeposit
 import lavi.minecraft.diagnostics.container.store.deposit.lifecycle.StoreDepositTaskLifecycleDiagnostics;
 import lavi.minecraft.diagnostics.container.store.deposit.lifecycle.StoreDepositTrackerBindingDiagnostics;
 import lavi.minecraft.diagnostics.container.store.deposit.route.StoreDepositContainerRouteEventDiagnostics;
+import lavi.minecraft.diagnostics.container.store.deposit.route.StoreDepositCheckpointDiagnostics;
+import lavi.minecraft.diagnostics.container.store.deposit.route.StoreDepositFilteredSearchDiagnostics;
+import lavi.minecraft.diagnostics.container.store.deposit.route.StoreDepositParentCandidateDiagnostics;
 import lavi.minecraft.diagnostics.container.store.deposit.route.StoreDepositPursuitDiagnostics;
 import lavi.minecraft.diagnostics.container.store.deposit.route.StoreDepositMovementDiagnostics;
 import lavi.minecraft.diagnostics.container.store.deposit.route.StoreDepositTargetCallbackDiagnostics;
@@ -111,6 +105,13 @@ public final class StoreDepositDiagnostics {
             new StoreDepositTargetCallbackDiagnostics(BINDINGS, EMISSION_GATE);
     private static final StoreDepositContainerRouteEventDiagnostics ROUTE_EVENTS =
             new StoreDepositContainerRouteEventDiagnostics(BINDINGS, EMISSION_GATE);
+    //20260902_kpopmodder: Route candidate diagnostics through focused collaborators behind the static facade.
+    private static final StoreDepositCheckpointDiagnostics CHECKPOINTS =
+            new StoreDepositCheckpointDiagnostics(EMISSION_GATE);
+    private static final StoreDepositParentCandidateDiagnostics PARENT_CANDIDATES =
+            new StoreDepositParentCandidateDiagnostics(BINDINGS, EMISSION_GATE, CHECKPOINTS);
+    private static final StoreDepositFilteredSearchDiagnostics FILTERED_SEARCHES =
+            new StoreDepositFilteredSearchDiagnostics(BINDINGS, EMISSION_GATE);
     private static final StoreDepositUserBlockRangeNullDiagnostics USER_BLOCK_RANGE_NULL_INPUTS =
             new StoreDepositUserBlockRangeNullDiagnostics(EMISSION_GATE);
 
@@ -408,18 +409,15 @@ public final class StoreDepositDiagnostics {
                                                    BlockPos currentChestTry,
                                                    ItemTarget[] notStored,
                                                    Object... fields) {
-        runEligible(() -> logParentCandidateDecisionInternal(
-                    task,
-                    selectedBranch,
-                    true,
-                    rawClosest,
-                    rawClosest != null,
-                    closestWithinRange,
-                    true,
-                    currentTryWithinExtraRange,
-                    currentChestTry,
-                    notStored,
-                    fields
+        runEligible(() -> PARENT_CANDIDATES.logParentCandidateDecision(
+                task,
+                selectedBranch,
+                rawClosest,
+                closestWithinRange,
+                currentTryWithinExtraRange,
+                currentChestTry,
+                notStored,
+                fields
         ));
     }
 
@@ -434,7 +432,7 @@ public final class StoreDepositDiagnostics {
                                                             BlockPos currentChestTry,
                                                             ItemTarget[] notStored,
                                                             Object... fields) {
-        runEligible(() -> logParentCandidateDecisionInternal(
+        runEligible(() -> PARENT_CANDIDATES.logDepositAllParentCandidateDecision(
                 task,
                 selectedBranch,
                 closestEvaluated,
@@ -449,284 +447,33 @@ public final class StoreDepositDiagnostics {
         ));
     }
 
-    private static void logParentCandidateDecisionInternal(Task task,
-                                                           String selectedBranch,
-                                                           boolean closestEvaluated,
-                                                           BlockPos rawClosest,
-                                                           boolean closestWithinRangeEvaluated,
-                                                           boolean closestWithinRange,
-                                                           boolean currentTryWithinExtraRangeEvaluated,
-                                                           boolean currentTryWithinExtraRange,
-                                                           BlockPos currentChestTry,
-                                                           ItemTarget[] notStored,
-                                                           Object[] fields) {
-        if (!ChatClefDiagnostics.isBoundaryEnabled()) {
-            return;
-        }
-        try {
-            StoreDepositOperationState state = BINDINGS.stateFor(task);
-            if (state == null) {
-                return;
-            }
-            state.recordParentCandidateDecision(selectedBranch);
-            if (!state.context().isDepositAllOperation()) {
-                String legacyKey = StoreDepositEventFields.operationId(state)
-                        + "|" + selectedBranch
-                        + "|" + ChatClefDiagnostics.blockPos(rawClosest)
-                        + "|" + ChatClefDiagnostics.blockPos(currentChestTry);
-                if (!EMISSION_GATE.shouldEmitDetail(
-                        StoreDepositEventFields.operationId(state),
-                        "STORE_CONTAINER_PARENT_CANDIDATE_DECISION",
-                        legacyKey
-                )) {
-                    return;
-                }
-                StoreDepositBoundedEventLogger.log("STORE_CONTAINER_PARENT_CANDIDATE_DECISION",
-                        "store_container_parent_candidate_decision",
-                        task,
-                        ChatClefDiagnostics.withCommandContextFields(
-                                StoreDepositEventFields.parentCandidateDecisionFields(
-                                        state,
-                                        task,
-                                        selectedBranch,
-                                        rawClosest,
-                                        closestWithinRange,
-                                        currentTryWithinExtraRange,
-                                        currentChestTry,
-                                        notStored,
-                                        fields
-                                )
-                        ));
-                return;
-            }
-            Object rangeDecisionOverride = fieldValue(fields, "candidateDecisionOutcome");
-            String rangeDecisionOutcome = "unavailable".equals(rangeDecisionOverride)
-                    ? rangeDecisionOutcome(
-                            closestEvaluated,
-                            rawClosest,
-                            closestWithinRange,
-                            currentTryWithinExtraRange
-                    )
-                    : String.valueOf(rangeDecisionOverride);
-            StoreContainerParentDecision decision = state.routeState().recordParentDecision(
-                    selectedBranch,
-                    closestEvaluated,
-                    rawClosest,
-                    closestWithinRangeEvaluated,
-                    closestWithinRange,
-                    currentTryWithinExtraRangeEvaluated,
-                    currentTryWithinExtraRange,
-                    currentChestTry,
-                    rangeDecisionOutcome,
-                    notStoredStateHash(notStored),
-                    null
-            );
-            String key = StoreDepositEventFields.operationId(state)
-                    + "|" + selectedBranch
-                    + "|" + ChatClefDiagnostics.blockPos(rawClosest)
-                    + "|" + ChatClefDiagnostics.blockPos(currentChestTry)
-                    + "|" + rangeDecisionOutcome
-                    + "|" + decision.notStoredStateHash();
-            if (EMISSION_GATE.shouldEmitDetail(
-                    StoreDepositEventFields.operationId(state),
-                    "STORE_CONTAINER_PARENT_CANDIDATE_DECISION",
-                    key
-            )) {
-                Object[] eventFields = StoreContainerCandidateEventFields.parentDecisionFields(
-                        state,
-                        task,
-                        decision,
-                        notStored,
-                        withoutField(fields, "fallbackContainerItemPresent")
-                );
-                eventFields = StoreDepositEventFields.merge(
-                        eventFields,
-                        StoreContainerRangeEventFields.parentDecisionFields(
-                                state.routeState().currentRangeTransition(),
-                                fieldValue(fields, "fallbackContainerItemPresent")
-                        )
-                );
-                StoreDepositBoundedEventLogger.log("STORE_CONTAINER_PARENT_CANDIDATE_DECISION",
-                        "store_container_parent_candidate_decision",
-                        task,
-                        ChatClefDiagnostics.withCommandContextFields(eventFields));
-            }
-            emitCheckpointIfDue(task, state);
-        } catch (RuntimeException | LinkageError ignored) {
-        }
-    }
-
     public static void beginFilteredSearchObservation(Task task) {
-        runEligible(() -> {
-            try {
-                StoreContainerCandidateCollector.begin(BINDINGS.stateFor(task), task);
-            } catch (RuntimeException | LinkageError ignored) {
-            }
-        });
+        runEligible(() -> FILTERED_SEARCHES.begin(task));
     }
 
     public static void beginDepositAllParentFilteredSearchObservation(Task task, BlockPos rawClosest) {
-        runEligible(() -> {
-            try {
-                StoreContainerCandidateCollector.beginParentSelection(
-                        BINDINGS.stateFor(task),
-                        task,
-                        rawClosest
-                );
-            } catch (RuntimeException | LinkageError ignored) {
-            }
-        });
+        runEligible(() -> FILTERED_SEARCHES.beginParentSelection(task, rawClosest));
     }
 
     public static void observeDepositAllContainerEligibility(BlockPos position, String outcome) {
-        runEligible(() -> {
-            StoreContainerCandidateRejectionReason reason;
-            try {
-                reason = StoreContainerCandidateRejectionReason.valueOf(outcome);
-            } catch (IllegalArgumentException | NullPointerException ignored) {
-                reason = StoreContainerCandidateRejectionReason.UNKNOWN;
-            }
-            StoreContainerCandidateCollector.observe(position, reason);
-        });
+        runEligible(() -> FILTERED_SEARCHES.observeContainerEligibility(position, outcome));
     }
 
     public static void endDepositAllParentFilteredSearchObservation(Task task,
                                                                     boolean completedNormally) {
-        runEligible(() -> {
-            try {
-                StoreContainerCandidateCollector.end(task, completedNormally);
-            } catch (RuntimeException | LinkageError ignored) {
-            }
-        });
+        runEligible(() -> FILTERED_SEARCHES.endParentSelection(task, completedNormally));
     }
 
     public static void endFilteredSearchObservation(Task task,
                                                     boolean completedNormally,
                                                     Block[] targetBlocks) {
-        runEligible(() -> {
-            try {
-                StoreContainerCandidateCollector.end(task, completedNormally);
-                if (!completedNormally) {
-                    logIncompleteFilteredSearchResult(task, targetBlocks);
-                }
-            } catch (RuntimeException | LinkageError ignored) {
-            }
-        });
-    }
-
-    private static void logIncompleteFilteredSearchResult(Task task, Block[] targetBlocks) {
-        if (!ChatClefDiagnostics.isBoundaryEnabled()) {
-            return;
-        }
-        StoreDepositOperationState state = BINDINGS.stateFor(task);
-        if (state == null
-                || !state.context().isDepositAllOperation()
-                || !"OPEN_EXISTING".equals(state.routeState().currentBranch())
-                || !state.routeState().isCurrentRouteChild(task)) {
-            return;
-        }
-        StoreContainerCandidateObservation observation = StoreContainerCandidateCollector.take(state, task);
-        if (!observation.available()) {
-            return;
-        }
-        state.recordFilteredSearchResult("FILTERED_SCAN_DID_NOT_COMPLETE");
-        state.routeState().recordFilteredSearch(Optional.empty(), observation);
-        String key = StoreDepositEventFields.operationId(state)
-                + "|FILTERED_SCAN_DID_NOT_COMPLETE|"
-                + ChatClefDiagnostics.blockPos(observation.parentRawClosest())
-                + "|" + observation.rawCandidatePredicateOutcome()
-                + "|" + observation.rawCandidateRejectionReason();
-        if (!EMISSION_GATE.shouldEmitDetail(
-                StoreDepositEventFields.operationId(state),
-                "STORE_CONTAINER_FILTERED_SEARCH_RESULT",
-                key
-        )) {
-            return;
-        }
-        StoreDepositBoundedEventLogger.log(
-                "STORE_CONTAINER_FILTERED_SEARCH_RESULT",
-                "store_container_filtered_scan_did_not_complete",
-                task,
-                ChatClefDiagnostics.withCommandContextFields(
-                        StoreContainerCandidateEventFields.filteredSearchFields(
-                                state,
-                                task,
-                                Optional.empty(),
-                                targetBlocks,
-                                observation
-                        )
-                )
-        );
+        runEligible(() -> FILTERED_SEARCHES.end(task, completedNormally, targetBlocks));
     }
 
     public static void logFilteredSearchResult(Task task,
                                                Optional<BlockPos> result,
                                                Block[] targetBlocks) {
-        runEligible(() -> logFilteredSearchResultEligible(task, result, targetBlocks));
-    }
-
-    private static void logFilteredSearchResultEligible(Task task,
-                                                        Optional<BlockPos> result,
-                                                        Block[] targetBlocks) {
-        if (!ChatClefDiagnostics.isBoundaryEnabled()) {
-            return;
-        }
-        try {
-            StoreDepositOperationState state = BINDINGS.stateFor(task);
-            if (state == null) {
-                return;
-            }
-            String relation = result != null && result.isPresent() ? "FILTERED_TARGET_PRESENT" : "FILTERED_TARGET_ABSENT";
-            state.recordFilteredSearchResult(relation);
-            boolean depositAllParentSelectionSearch = state.context().isDepositAllOperation()
-                    && state.context().isRoot(task);
-            boolean depositAllContainerRouteSearch = state.context().isDepositAllOperation()
-                    && "OPEN_EXISTING".equals(state.routeState().currentBranch())
-                    && state.routeState().isCurrentRouteChild(task);
-            boolean depositAllCandidateSearch = depositAllParentSelectionSearch || depositAllContainerRouteSearch;
-            StoreContainerCandidateObservation observation = depositAllCandidateSearch
-                    ? StoreContainerCandidateCollector.take(state, task)
-                    : StoreContainerCandidateObservation.unavailable();
-            if (depositAllCandidateSearch) {
-                state.routeState().recordFilteredSearch(result, observation);
-            }
-            String position = result == null ? "unavailable" : result.map(BlockPos::toShortString).orElse("none");
-            BlockPos originatingRaw = observation.available()
-                    ? observation.parentRawClosest()
-                    : state.routeState().currentParentDecision().rawClosest();
-            String key = depositAllCandidateSearch
-                    ? StoreDepositEventFields.operationId(state)
-                            + "|" + relation
-                            + "|" + ChatClefDiagnostics.blockPos(originatingRaw)
-                            + "|" + position
-                            + "|" + observation.candidateEvaluationCount()
-                             + "|" + observation.rejectionCountsByReason()
-                             + "|" + observation.firstRejectedReason()
-                             + "|" + observation.lastRejectedReason()
-                             + "|" + observation.rawCandidatePredicateOutcome()
-                             + "|" + observation.rawCandidateRejectionReason()
-                    : StoreDepositEventFields.operationId(state)
-                            + "|" + StoreDepositEventFields.identity(task)
-                            + "|" + relation
-                            + "|" + position;
-            if (!EMISSION_GATE.shouldEmitDetail(StoreDepositEventFields.operationId(state), "STORE_CONTAINER_FILTERED_SEARCH_RESULT", key)) {
-                return;
-            }
-            Object[] eventFields = depositAllCandidateSearch
-                    ? StoreContainerCandidateEventFields.filteredSearchFields(
-                            state,
-                            task,
-                            result,
-                            targetBlocks,
-                            observation
-                    )
-                    : StoreDepositEventFields.filteredSearchResultFields(state, task, result, targetBlocks);
-            StoreDepositBoundedEventLogger.log("STORE_CONTAINER_FILTERED_SEARCH_RESULT",
-                    "store_container_filtered_search_result",
-                    task,
-                    ChatClefDiagnostics.withCommandContextFields(eventFields));
-        } catch (RuntimeException | LinkageError ignored) {
-        }
+        runEligible(() -> FILTERED_SEARCHES.logResult(task, result, targetBlocks));
     }
 
     public static void logPursuitDecision(Task task,
@@ -993,96 +740,6 @@ public final class StoreDepositDiagnostics {
 
     public static void logUserBlockRangeNullInput(Object owner, BlockPos observedPosition) {
         runEligible(() -> USER_BLOCK_RANGE_NULL_INPUTS.logNullInput(owner, observedPosition));
-    }
-
-    private static void emitCheckpointIfDue(Task task, StoreDepositOperationState state) {
-        if (state == null || !state.context().isDepositAllOperation()) {
-            return;
-        }
-        Optional<StoreContainerRouteCheckpoint> checkpoint = state.routeState().checkpoint(
-                ChatClefDiagnostics.currentClientTickId()
-        );
-        if (checkpoint.isEmpty()) {
-            return;
-        }
-        StoreContainerRouteCheckpoint value = checkpoint.get();
-        String key = StoreDepositEventFields.operationId(state) + "|" + value.checkpointSequence();
-        if (!EMISSION_GATE.shouldEmitDetail(
-                StoreDepositEventFields.operationId(state),
-                "STORE_DEPOSIT_CHECKPOINT_SUMMARY",
-                key
-        )) {
-            return;
-        }
-        StoreDepositBoundedEventLogger.log("STORE_DEPOSIT_CHECKPOINT_SUMMARY",
-                "store_deposit_checkpoint_summary",
-                task,
-                ChatClefDiagnostics.withCommandContextFields(
-                        StoreDepositEventFields.merge(
-                                StoreContainerCandidateEventFields.checkpointFields(state, value),
-                                EMISSION_GATE.budgetSummaryFields(StoreDepositEventFields.operationId(state))
-                        )
-                ));
-        state.routeState().acknowledgeCheckpointEmission(value.checkpointSequence());
-    }
-
-    private static String rangeDecisionOutcome(boolean closestEvaluated,
-                                               BlockPos rawClosest,
-                                               boolean closestWithinRange,
-                                               boolean currentTryWithinExtraRange) {
-        if (!closestEvaluated) {
-            return "NOT_EVALUATED_EARLY_GET_MISSING_TARGET";
-        }
-        if (rawClosest == null) {
-            return "NO_RAW_CLOSEST";
-        }
-        if (closestWithinRange && currentTryWithinExtraRange) {
-            return "BOTH_RANGE_CONDITIONS";
-        }
-        if (closestWithinRange) {
-            return "RAW_CLOSEST_WITHIN_50";
-        }
-        if (currentTryWithinExtraRange) {
-            return "CURRENT_TRY_WITHIN_70";
-        }
-        return "RAW_PRESENT_BUT_OUTSIDE_RANGES";
-    }
-
-    private static String notStoredStateHash(ItemTarget[] notStored) {
-        return Integer.toHexString(ChatClefDiagnostics.itemTargets(notStored).hashCode());
-    }
-
-    private static Object fieldValue(Object[] fields, String key) {
-        if (fields == null || key == null) {
-            return "unavailable";
-        }
-        for (int index = 0; index + 1 < fields.length; index += 2) {
-            if (key.equals(String.valueOf(fields[index]))) {
-                return fields[index + 1];
-            }
-        }
-        return "unavailable";
-    }
-
-    private static Object[] withoutField(Object[] fields, String key) {
-        if (fields == null || fields.length == 0 || key == null) {
-            return fields;
-        }
-        int retainedLength = 0;
-        for (int index = 0; index + 1 < fields.length; index += 2) {
-            if (!key.equals(String.valueOf(fields[index]))) {
-                retainedLength += 2;
-            }
-        }
-        Object[] retained = new Object[retainedLength];
-        int targetIndex = 0;
-        for (int index = 0; index + 1 < fields.length; index += 2) {
-            if (!key.equals(String.valueOf(fields[index]))) {
-                retained[targetIndex++] = fields[index];
-                retained[targetIndex++] = fields[index + 1];
-            }
-        }
-        return retained;
     }
 
     private static void runEligible(Runnable action) {
