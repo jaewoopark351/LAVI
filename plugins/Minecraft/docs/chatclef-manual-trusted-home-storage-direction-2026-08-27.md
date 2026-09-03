@@ -24,19 +24,39 @@
 <!-- 20260829_openai: Clarified that STORE_HOME remains explicit-request-only while any automatic pressure-deposit restoration is a separate, still-disabled subsystem. -->
 <!-- 20260829_openai: Reconciled the independent automatic-pressure review with STORE_HOME invariants while preserving the current disabled source status and avoiding any false restoration claim. -->
 <!-- 20260829_kpopmodder: Recorded the separately authorized automatic-pressure composition restoration while preserving STORE_HOME behavior and keeping build/runtime evidence open. -->
+<!-- 20260902_openai: Reviewed and closed the H5 fixed-volume bulk-trust pre-change contract, including fail-closed grammar, exact scan coverage, double-chest identity, one repository transaction, downstream revision effects, and deferred bulk undo without authorizing source work. -->
+<!-- 20260903_kpopmodder: Applied the canonical GUI-gate continuous implementation, bounded-log, and verification workflow without rewriting historical approval records. -->
+<!-- 20260903_openai: Aligned trusted-home GUI activation with safe open-child quiescence, exact one-shot interaction binding, full-path suppression, explicit serials, and one-time permission consumption; recorded the independent dirty H5 worktree provenance. -->
 
 # ChatClef Manual Trusted Home Storage Direction
 
-문서 상태: `CORE_V1_RUNTIME_VERIFIED_H6_CHAT_RUNTIME_VERIFIED_MIC_PENDING_SESSION_LOCAL_MANIFEST_RUNTIME_VERIFIED_LONG_DISTANCE_TIMEOUT_CAUSE_PROVEN_PHASE_SCOPED_TIMEOUT_OBSERVED_HAPPY_PATH_VERIFIED_PARITY_UNPROVEN_PYTHON_COMMAND_CATALOG_PARITY_VERIFIED_STORE_HOME_DIRECT_TESTS_VERIFIED_LATEST_CLEAN_BUILD_VERIFIED_SOURCE_COMMITS_CREATED_AUTO_PRESSURE_SOURCE_RESTORED_TEST_VERIFIED_BUILD_RUNTIME_PENDING`
+문서 상태: `CORE_V1_RUNTIME_VERIFIED_H6_CHAT_RUNTIME_VERIFIED_MIC_PENDING_SESSION_LOCAL_MANIFEST_RUNTIME_VERIFIED_LONG_DISTANCE_TIMEOUT_CAUSE_PROVEN_PHASE_SCOPED_TIMEOUT_OBSERVED_HAPPY_PATH_VERIFIED_PARITY_UNPROVEN_PYTHON_COMMAND_CATALOG_PARITY_VERIFIED_STORE_HOME_DIRECT_TESTS_VERIFIED_HISTORICAL_2026_08_29_LATEST_CLEAN_BUILD_VERIFIED_SOURCE_COMMITS_CREATED_AUTO_PRESSURE_SOURCE_RESTORED_TEST_VERIFIED_BUILD_RUNTIME_PENDING_H5_DOCUMENT_SNAPSHOT_STALE_DIRTY_WORKTREE_SOURCE_PRESENT_UNVERIFIED`
 
-작성 기준일: 2026-08-27, 상태 갱신일: 2026-08-29
+작성 기준일: 2026-08-27, 상태 갱신일: 2026-09-03
+
+위 `HISTORICAL_2026_08_29_LATEST_CLEAN_BUILD_VERIFIED`는 §26.14에 기록된 당시 artifact의
+역사적 상태다. 현재 dirty H5 source나 이후 GUI-gate source를 포함하는 최신 worktree build를
+뜻하지 않는다. 두 change unit이 함께 dirty인 상태에서 수행하는 향후 build는 별도 attribution이
+없는 한 mixed provenance다.
 
 이 문서는 Fabric ChatClef 1.20.1에서 사용자가 명시적으로 요청했을 때만
 등록된 trusted destination을 집 보관소로 사용해 인벤토리를 정리하는 방향을
 정의한다.
 
-이 문서 자체는 Java 또는 JSON 수정, build, test, JAR 배포, Minecraft 실행,
-commit 또는 push를 승인하지 않는다. 각 작업은 별도의 사용자 승인이 필요하다.
+이 문서 자체를 읽는 것만으로 새 작업이 시작되지는 않는다. 사용자가 manual trusted-home
+GUI exact-binding/three-later-tick 구현을 직접 요청하면 canonical Carry On 방향의
+`구현 -> bounded 로그 보강 -> focused test/clean build 검증` workflow를 별도 단계 승인 없이
+연속 수행한다. 외부 JAR 배포, Minecraft 실행, commit 또는 push는 현재 요청이 그 정확한
+작업을 포함할 때만 수행한다.
+
+아래 승인·미승인 표현은 각 날짜의 역사적 실행 범위와 증거를 보존하기 위한 기록이며,
+현재 GUI gate의 단계별 정지 규칙이 아니다.
+
+특히 아래 H1-H7, H5/H6, §26 approval row와 `별도 승인` 문장은 해당 역사 작업의
+provenance만 기록한다. 현재 exact chest/trapped-chest/regular-furnace GUI gate에는 위
+continuous override가 이미 적용되며, 그 역사 문구를 source/test/required clean build의 새
+중단점으로 재해석하지 않는다. 반대로 이 override를 H5 bulk trust, 외부 배포, Minecraft
+runtime, commit 또는 push 승인으로 확대하지 않는다.
 
 2026-08-27 사용자 요청은 H1-H4 Java source와 focused test source를 먼저 승인했다.
 이후 별도 명시적 요청으로 clean forced build, JAR 배포, Minecraft runtime log 검토,
@@ -95,6 +115,17 @@ Screen, exact binding과 container session에는 도달하지 못했다. 따라�
 stall, binding 실패와 operation timeout은 직접 원인으로 지지되지 않는다. 23.3절과 별도
 조사 문서는 direct evidence, `@goto`와의 차이, PASS를 받은 phase-scoped timeout 방향과
 아직 미승인인 behavior 경계를 기록한다.
+
+2026-09-02 H5 nearby batch registration 재검토 당시에는 문서 계약만 보강했다. 당시
+`@auto_deposit_trust` 구현은 무인자 command이며 handler가 parser를 소비하지 않고, upstream
+command runner도 call 뒤 남은 argument를 검증하지 않는다. 따라서 당시 2026-09-02 baseline tree에서
+`@auto_deposit_trust area 16x16`을 실행하면 batch로 거절되지 않고 기존 단일 target 등록으로
+떨어질 수 있다는 것이 문서 snapshot의 결론이었다. 현재 dirty worktree에는 이 문서와 독립적인
+modified/untracked H5 Java/test source가 존재하므로 `SOURCE_NOT_STARTED`는 더 이상 current-tree
+사실이 아니다. 그 source는 이 문서 보정에서 검수·승인·검증된 것으로 간주하지 않고 그대로
+보존한다. 13절의 fail-closed grammar가 deterministic evidence로 검증되기 전까지 네 batch form은
+계속 실행 금지다. 이후 runtime-root clean build는 H5와 GUI 변경을 함께 포함하는 mixed-provenance
+build이므로 GUI-only artifact 또는 H5 완료 증거로 보고하지 않는다.
 
 2026-08-29 phase-scoped artifact 재현에서는 이전 고정 lifetime 실패가 재현되지 않았다.
 Operation `225`의 첫 candidate는 `7,726` active ticks 동안 유지된 뒤 exact activation에
@@ -402,10 +433,68 @@ same STORE_HOME operation
 AND cursor empty
 AND same worldKey and dimension
 AND candidate still registered, trusted and enabled
+AND the exact matching BlockInteractEvent for this attempt was consumed once
+AND the route-owned open child and its normal operation cleanup are quiescent
 AND current GUI exactly bound to that destination
-AND supported handler and container type
+AND exact in-scope screen and handler classes match
+AND three distinct later client-tick boundaries completed
+AND this attempt's one-time GUI permission is available
 AND no pending transfer
 ```
+
+For the GUI stabilization change, trusted-home activation uses the following
+additional fixed contract:
+
+```text
+in-scope targets:
+    minecraft:chest
+    minecraft:trapped_chest
+
+exact screen/handler:
+    GenericContainerScreen
+    GenericContainerScreenHandler
+
+explicitly unchanged on this route:
+    minecraft:barrel
+    every shulker box
+    every unlisted container and handler
+```
+
+The matching `BlockInteractEvent` must occur after `WORLD_OPEN_REQUESTED` and
+before the accepted TAIL candidate, match the immutable target/world/dimension,
+and be consumed exactly once. The TAIL callback captures an immutable candidate
+snapshot only. Before `GUI_BOUND`, the parent lets the reusable open child stop
+through its normal lifecycle and completes only operation-owned cleanup. If a
+binding identity changes while that happens, discard the candidate rather than
+binding the replacement. The consumed event remains permanently spent for that
+attempt even when the candidate is discarded; a retry needs a new
+attempt/correlation and matching event. A stop/cleanup path that releases global
+or otherwise unowned input, screen, goal or path state is not operation-owned
+cleanup and cannot satisfy the binding predicate.
+
+The TAIL candidate tick `K` and route-owned promotion tick `B` are both excluded;
+no `K`-to-`B` gap is backfilled. The implementation ledger must prove current-tick
+serial publication before route promotion and observation of that same serial at
+the chosen boundary. The bound attempt stores immutable `boundClientTickSerial` and initializes
+`lastCountedBoundarySerial` to it. A serial at or below either boundary does not
+count; only a strictly later serial may increment after full validation. Boundary
+#3 publishes permission only. On the next normal `StoreHomeTask` evaluation,
+the activation gate revalidates the entire live predicate and route-specific
+transfer preconditions. Permission consumption, activation-snapshot creation and
+entry into the existing transfer lifecycle form one logical commit. If that entry
+cannot be established, do not consume permission; return a typed invalidation or
+terminal result without a slot action.
+
+During stabilization, the entire reachable path—including the parent, current
+or former open child, observer, normal cleanup, fallback, helper and any
+`super.onTick()` path—is gameplay-mutation-free. Operation-local validation,
+serial, deduplication, counter, invalidation and permission bookkeeping may
+change. It must short-circuit before QUICK_MOVE,
+any other `clickSlot`, slot-action registration, cursor change, screen close or
+reopen, `interactBlock`, input change, or Baritone goal/path change. This does
+not authorize global cleanup or a generic Task/chain behavior change. A child
+tick or stop that can perform one of those mutations also cannot run after
+`GUI_BOUND` and before the one-time permission is consumed.
 
 Activation gate를 모두 통과한 뒤 player-held state를 정확히 한 번 immutable
 activation snapshot으로 capture한다. Planner input, full activation inventory baseline,
@@ -708,31 +797,329 @@ x / y / z
 enabled
 ```
 
-capacity, path cost, retry, current operation, item policy 또는 trusted area radius는
+capacity, path cost, retry, current operation, item policy, trusted area radius 또는 batch receipt를
 destination JSON에 저장하지 않는다.
 
 V1 loadout, SAFE reserve와 item disposition은 Java source의 고정 정책으로 구현하며
-별도 item-policy JSON, profile JSON 또는 pin JSON을 추가하지 않는다. 따라서 이 기능이
-계속 사용하는 JSON은 기존 exact trusted destination 좌표 registry뿐이다.
+별도 item-policy JSON, profile JSON 또는 pin JSON을 추가하지 않는다. H5도 persistent trusted
+area를 만들지 않고, command 실행 시 발견한 logical destination을 기존 exact coordinate entry로만
+추가하거나 다시 enable한다.
 
-반경 8블록 등록은 storage operation과 분리된 batch snapshot UX다.
+### 13.1 H5 상태와 현재 실행 금지
 
 ```text
-anchor:
-    사용자가 바라본 지원 container
-
-scan:
-    현재 존재하고 로드된 chest / trapped chest / barrel
-
-result:
-    여러 exact destination entry를 한 transaction으로 등록
-
-future container:
-    자동 trusted로 승격하지 않음
+H5_DOCUMENT_STATUS: DIRECTION_AND_PRECHANGE_CONTRACT
+H5_DOCUMENT_SNAPSHOT_IMPLEMENTATION_STATUS: NOT_STARTED_AT_2026-09-02_REVIEW
+H5_CURRENT_WORKTREE_STATUS: INDEPENDENT_MODIFIED_AND_UNTRACKED_JAVA_TEST_SOURCE_PRESENT; UNVERIFIED_BY_THIS_DOCUMENT
+H5_CURRENT_SCOPED_BUILD_RUNTIME_COMMIT_PUSH: NOT_ESTABLISHED_BY_THIS DOCUMENT
+H5_FUTURE_RUNTIME_ROOT_CLEAN_BUILD: MIXED_H5_AND_GUI_PROVENANCE_WHILE_BOTH_CHANGE_SETS_REMAIN
+H5_CURRENT_BATCH_COMMAND_EXECUTION: PROHIBITED
 ```
 
-persistent trusted area는 V1 범위에 포함하지 않는다. 기존 단일 exact registration,
-unregistration과 list 명령의 의미를 변경하지 않는다.
+현재 `AutoDepositTrustCommand`는 argument가 선언되지 않은 기존 단일 등록 command이고
+`call(...)`에서 `ArgParser`를 읽지 않는다. 현재 upstream `Command.run(...)`과 `ArgParser`는
+handler가 소비하지 않은 trailing argument를 call 뒤 자동 거절하지 않는다. 따라서 현재 source에서
+`@auto_deposit_trust area 16x16` 또는 유사 form을 실행하면 batch parser failure가 아니라 기존
+exact-open/crosshair 단일 등록 경로가 실행될 수 있다.
+
+H5가 구현되기 전에는 아래 네 batch form을 실행하지 않는다. 구현 뒤에도 malformed, unsupported 또는
+extra argument가 기존 무인자 single-registration 경로로 fallback하는 순간 H5 acceptance는 실패다.
+이 parser 결함을 고치기 위해 `adris/**` command system을 변경하지 않고 LAVI-owned command 경계에서
+fail closed한다.
+
+### 13.2 exact command grammar와 alias 경계
+
+승인된 command form은 다음 다섯 개뿐이다.
+
+```text
+@auto_deposit_trust
+    -> 기존 exact-open 또는 crosshair 단일 등록 의미 유지
+
+@auto_deposit_trust area 16x16
+@auto_deposit_trust 반경 16x16
+@자동보관등록 영역 16x16
+@자동보관등록 반경 16x16
+    -> 동일한 H5 fixed-volume batch snapshot
+```
+
+`반경`은 사용자-facing alias일 뿐 원형 거리, Manhattan 거리 또는 anchor에서 각 방향 16블록을
+뜻하지 않는다. 네 batch form은 모두 같은 16 x 16 X/Z footprint와 16-level Y window를 사용한다.
+
+다음 입력은 H5에서 승인하지 않는다.
+
+```text
+@자동보관등록                         # 무인자 Korean single alias는 H5 범위 아님
+@auto_deposit_trust 영역 16x16        # 승인되지 않은 mixed alias
+@자동보관등록 area 16x16              # 승인되지 않은 mixed alias
+@auto_deposit_trust area              # size 누락
+@auto_deposit_trust area 8x8          # unsupported size
+@auto_deposit_trust area 16x16 extra  # extra argument
+```
+
+Whitespace tokenization 외의 fuzzy matching, LLM normalization 또는 자연어 추론을 direct `@`
+command parser에 넣지 않는다. H5의 direct Korean command name `@자동보관등록`은 batch-only
+alias이며 반드시 `영역 16x16` 또는 `반경 16x16` argument를 요구한다. 무인자 invocation은
+승인하지 않는다. 이 alias registration은 LAVI-owned Java command 범위다. Python chat/microphone
+natural-language phrase, command catalog, schema, router와 Fabric wire protocol은 별도 범위이며
+H5 구현으로 자동 추가하지 않는다.
+
+정상적인 H5 command registration 뒤에는 기존 English trust/untrust/list 세 이름과 Korean batch-only
+direct alias `자동보관등록` 한 이름, 총 네 trusted command name이 존재한다. English와 Korean command instance는
+mutable parser/onFinish state를 공유하지 않고 pure H5 batch service만 공유한다. Korean alias name이 이미
+사용 중이면 existing command를 overwrite하지 않고 alias readiness를 명시적 failure로 남긴다. 이 충돌을
+이유로 기존 English trust/untrust/list registration을 제거하거나 막지 않으며, 반대로
+`CommandExecutor.registerNewCommand(...)`의 skip-and-continue만 믿고 Korean alias도 등록됐다고 false
+success를 보고하지 않는다.
+
+### 13.3 anchor, fixed half-open volume와 loaded coverage
+
+기존 §13의 H5 anchor 의미를 유지한다. H5 anchor는 player position이나 exact-open binding이 아니라
+사용자가 현재 crosshair로 바라본 exact block target이다.
+
+```text
+1. existing crosshair distance/screen safety boundary 안의 current BlockHitResult가 anchor 후보
+2. anchor 후보 자체를 H5 exact block allowlist로 검증
+3. exact-open container binding, last interaction position 또는 nearest container로 fallback하지 않음
+4. anchor가 없거나 world/dimension identity가 불완전하면 repository mutation 0
+```
+
+무인자 `@auto_deposit_trust`는 기존처럼 exact-open binding을 우선하고 없으면 crosshair target을 쓰는
+single-registration 의미와 기존 support predicate를 그대로 유지한다. H5 argument branch만 looked-at
+anchor와 더 좁은 exact allowlist를 사용한다. 따라서 batch 구현을 이유로 existing no-arg target
+precedence나 supported-container 종류를 바꾸지 않고, 반대로 stale/open binding을 H5 area 중심으로
+조용히 사용하는 일도 없다.
+
+Anchor의 `(anchorX, anchorY, anchorZ)`를 한 번 snapshot한 뒤 다음 half-open 범위를 사용한다.
+
+```text
+X: [anchorX - 8, anchorX + 8)   -> anchorX-8 ... anchorX+7
+Y: [anchorY - 8, anchorY + 8)   -> anchorY-8 ... anchorY+7
+Z: [anchorZ - 8, anchorZ + 8)   -> anchorZ-8 ... anchorZ+7
+```
+
+수직 범위의 review decision은 권장안인 `[anchorY-8, anchorY+8)`로 닫는다. World build-height 밖의
+Y는 world의 유효 `[bottomY, topYExclusive)`와 교집합만 취하고 반대편으로 window를 밀어 16칸을
+보충하지 않는다. Requested range와 effective range를 결과에 구분한다. Base scan은 최대
+`16 * 16 * 16 = 4096` BlockPos로 bounded하다.
+
+H5는 chunk를 load, generate 또는 pathfind하지 않는다. Requested X/Z footprint와 double-chest
+pair 검증에 필요한 adjacent position의 chunk가 모두 이미 loaded인지 먼저 확인한다. 하나라도
+확인되지 않으면 loaded subset만 등록하지 않고 `SCAN_COVERAGE_INCOMPLETE`로 전체 command를
+무변경 실패시킨다. Scan 도중 world/dimension/anchor provenance가 바뀌거나 complete coverage를
+유지할 수 없으면 같은 fail-closed 결과를 사용한다.
+
+World block-state scan은 Minecraft client-thread의 한 bounded command action에서 수행한다. Async
+world access, entity enumeration, screen open, click, input acquisition, Task 생성 또는 Baritone
+path request를 사용하지 않는다.
+
+### 13.4 exact block allowlist와 double-chest logical identity
+
+H5 batch target predicate는 다음 exact vanilla block allowlist다.
+
+```text
+Blocks.CHEST
+Blocks.TRAPPED_CHEST
+Blocks.BARREL
+```
+
+다음은 batch anchor와 scan target에서 제외한다.
+
+```text
+all shulker boxes
+ender chest
+minecart/entity inventory
+furnace, smoker, blast furnace, hopper, dispenser, dropper 등 processing/utility container
+modded container와 tag 기반 확장
+```
+
+현재 `AutoDepositTrustedContainerSupport.isSupported(...)`는 upstream
+`StoreInContainerTask.CONTAINER_BLOCKS`를 재사용하고 그 목록에는 shulker box가 포함된다. H5가 이
+predicate를 그대로 재사용하면 확정된 batch exclusion과 충돌한다. 따라서 H5는 LAVI-owned exact
+allowlist를 별도로 소유하거나 그와 동등한 명시적 좁힘을 사용하며, upstream support array나 generic
+container/block-entity predicate를 batch discovery 기준으로 사용하지 않는다. 이미 no-arg single
+command로 등록된 shulker나 다른 H5-excluded exact entry는 batch discovery 대상이 아닐 뿐 H5가 삭제,
+disable 또는 migrate하지 않는다.
+
+Double chest는 두 physical half를 하나의 logical destination으로 취급한다. 단순 인접만으로 pair를
+추정하지 않고, 같은 vanilla block type, 같은 facing, complementary chest type와 reciprocal partner
+관계가 모두 확인된 pair만 인정한다.
+
+```text
+logicalPairKey:
+    두 half BlockPos를 (x, y, z) lexicographic order로 정렬한 order-independent pair identity
+
+repository representative:
+    pair half 중 정확히 하나가 기존 registry에 있으면 그 exact position과 destination ID를 보존
+    기존 half가 disabled면 같은 position을 enabled=true로 update
+    기존 half가 하나도 없으면 lexicographically smaller BlockPos를 새 representative로 등록
+    두 half가 모두 기존 registry에 있으면 H5가 조용히 삭제/병합하지 않고
+        PREEXISTING_DOUBLE_CHEST_DUPLICATE로 전체 transaction 실패
+```
+
+이 규칙은 H5가 기존 exact ID를 몰래 바꾸거나 registration command가 cleanup/untrust까지 수행하는
+것을 막으면서, 새 batch 결과와 기존 registry를 합친 최종 상태에서 한 pair가 한 entry만 갖게 한다.
+Pair의 한 half만 requested volume 안에 있어도 logical destination은 포함할 수 있으며, validated
+partner가 volume 경계를 한 칸 넘어가면 representative도 경계 밖에 있을 수 있다. 이 경우에도 pair
+partner는 loaded이고 reciprocal validation을 통과해야 한다.
+
+Chest state가 `LEFT/RIGHT`인데 partner chunk가 unloaded이거나 reciprocal pair를 증명할 수 없으면
+single chest로 꾸미지 않고 `AMBIGUOUS_DOUBLE_CHEST`로 전체 transaction을 거절한다. 등록 뒤 chest가
+분리, 재결합 또는 교체돼 topology가 달라져도 H5가 registry를 자동 migration하지 않는다. 기존 exact
+runtime revalidation과 다음 explicit registration/untrust가 그 후속 상태를 다룬다.
+
+### 13.5 한 repository atomic transaction
+
+Scan과 double-chest normalization이 complete하게 끝난 immutable logical destination set 전체를
+repository에 한 번 전달한다. Command 또는 service가 발견 순서대로 기존 `register(...)`를 반복
+호출하지 않는다.
+
+Repository-level transaction은 current registry snapshot이 정상적으로 읽혔다는 사실부터 소유해야
+한다. 현재 repository의 `loadSafely()`는 persistence `IOException`을 log한 뒤 empty list로 바꿀 수
+있으므로, H5 bulk path가 그 empty fallback을 정상적인 빈 registry로 해석해 save하면 기존 trusted
+entries를 덮어쓸 수 있다. H5 transaction은 missing-and-valid-empty, successful parsed registry와
+read/parse failure를 구분한다. `REGISTRY_READ_FAILED` 또는 schema/provenance 불명확 상태에서는
+scan 결과가 완전해도 save, in-memory publish와 H5-owned revision mutation이 모두 0이다.
+
+Repository-level transaction은 다음 의미를 가져야 한다.
+
+```text
+strictly load/reload current registry once
+-> require registryReadStatus=OK
+-> on read/parse failure: save 0, publish 0, H5-owned revision mutation 0
+-> otherwise preserve existing entry order
+-> resolve every new / already-enabled / disabled-to-enabled / conflict outcome
+-> append genuinely new representatives in deterministic (x, y, z) order
+-> construct one complete updated exact-destination list
+-> persist at most once
+-> publish in-memory list at most once
+-> H5-owned effective mutation이면 repository revision exactly +1
+```
+
+모든 발견 destination이 이미 enabled여서 final set이 같으면 `NO_CHANGE`이며 persistence mutation과
+revision increment는 0이다. 새 entry 또는 disabled-to-enabled update가 하나 이상 있으면 destination
+수와 무관하게 H5-owned revision increment는 정확히 한 번이다. Persistence failure, validation conflict,
+incomplete scan 또는 ambiguous double chest에서는 in-memory list, persisted logical set과 H5-owned
+revision mutation이 모두 0이다. Partial success list를 success로 반환하지 않는다.
+
+`atomic transaction`은 one-process repository semantic all-or-none, one save/publish와 one revision을
+뜻한다. 현재 file store가 `ATOMIC_MOVE` 실패 시 ordinary replace로 fallback할 수 있으므로 power loss,
+filesystem crash 또는 외부 process와의 완전한 serializable transaction까지 보장한다고 과장하지
+않는다. Command 실행 중 registry JSON을 외부에서 동시에 수정하는 것은 지원하지 않는다. Reload 뒤
+external modification conflict가 탐지되면 덮어쓰기나 임의 merge 대신 무변경 실패한다.
+
+H5는 기존 exact destination JSON schema만 사용한다. Area bounds, anchor, scan receipt, logical pair key,
+capacity, path cost와 current operation을 persistent destination entry에 추가하지 않는다.
+
+### 13.6 64-candidate 정책과 side-effect 경계
+
+H5 discovery/registration에는 임의 `64` 절단을 적용하지 않는다. Fixed volume 안에서 검증된 모든
+logical destination을 한 repository transaction의 input과 결과에 포함한다. 현재
+`AutoDepositTrustedDestinationSelector`의 `MAX_OPERATION_CANDIDATES=64`와 bounded fingerprint state는
+한 automatic/storage operation의 candidate snapshot과 diagnostics 정책이며 registry capacity 또는
+H5 registration limit가 아니다.
+
+따라서 65개 이상의 destination이 성공적으로 등록될 수 있지만, 뒤의 한 automatic operation은 기존
+정책에 따라 그중 최대 64개만 candidate로 볼 수 있다. H5 command success를 모든 destination이 다음
+operation에서 즉시 시도된다는 의미로 사용하지 않는다.
+
+현재 selector는 final candidate list를 64개로 자르기 전에 repository의 matching destination을 순회하고
+evaluator를 호출한다. 따라서 operation output 64 제한만으로 repository lifetime size와 per-operation
+evaluation cost가 bounded하다고 주장할 수 없다. H5는 per-batch 또는 global repository entry를 조용히
+64개로 자르지 않는다. 별도 global repository capacity/indexing 정책이 필요하다고 판정되면 exact 숫자와
+근거를 별도 승인하고, limit 초과 시 whole transaction을 무변경 거절해야지 앞의 N개만 저장하지 않는다.
+현재 H5 문서는 global capacity 숫자를 확정하지 않으며 release 전 repeated-batch size/per-operation cost
+stress evidence를 요구한다.
+
+H5 command handler가 직접 허용되는 side effect는 다음뿐이다.
+
+```text
+loaded world block-state read
+repository bulk mutation attempt
+bounded command result/log output
+```
+
+Command handler는 `Task`, path, click, screen open, cursor transfer, input acquisition 또는 automatic
+operation을 직접 만들지 않는다. 그러나 effective repository revision 변경은 기존
+automatic-pressure chain의 `WAIT_FOR_REARM` 또는 policy fingerprint를 다음 client tick에서 다시
+평가하게 할 수 있다. Inventory pressure와 기존 guard가 만족되면 command가 끝난 뒤 downstream
+automatic execution이 별도로 시작될 수 있다. 이를 command handler의 직접 navigation/click으로
+기록하거나, 반대로 registration 뒤 gameplay side effect가 절대 없다고 주장하지 않는다.
+
+`NO_CHANGE`는 revision을 바꾸지 않으므로 H5 자체가 revision-change reevaluation을 만들지 않는다.
+Registration result와 뒤의 automatic operation identity, terminal과 transfer evidence는 별도 lifecycle로
+기록한다.
+
+### 13.7 bounded result와 acceptance contract
+
+Command output은 전체 destination ID 목록을 한 줄에 펼치지 않고 다음 bounded summary를 최소
+포함한다.
+
+```text
+status / reason / boundedFirstConflict
+commandForm
+registryReadStatus
+anchorSource / anchorPos
+requestedRange / effectiveRange
+coverageComplete
+scannedPositionCount
+physicalSupportedBlockCount
+logicalDestinationCount
+newlyRegisteredCount
+reenabledCount
+alreadyRegisteredCount
+doubleChestCollapsedHalfCount
+repositoryRevisionBefore / repositoryRevisionAfter
+totalRegistryCountBefore / totalRegistryCountAfter
+downstreamAutomaticReevaluationPossible
+```
+
+새 Fabric wire payload, bridge result schema 또는 Python command result를 H5 때문에 추가하지 않는다.
+Exact before/after destination set이 필요한 runtime fixture는 별도 승인된 read-only list/repository evidence로
+검증한다.
+
+향후 source-edit와 test-execution이 각각 별도 승인된 뒤 최소 acceptance는 다음이다.
+
+1. 무인자 English command의 기존 single target 의미와 기존 supported-container 범위가 변하지 않는다.
+2. 네 batch form만 정확히 승인되고 malformed/extra/unsupported argument는 mutation 0이며 single fallback 0이다.
+3. 정상 등록에서는 English trust/untrust/list + Korean batch alias의 정확히 네 command name이 존재한다.
+   Korean alias collision은 overwrite/false-ready 0으로 실패하되 기존 English 세 command는 보존하고,
+   English/Korean command instance의 mutable parser/onFinish 공유는 0이다.
+4. Direct Korean batch-only alias는 Java command registry에만 존재하고 Python chat/microphone route 변화는 0이다.
+5. H5는 looked-at crosshair anchor만 사용하고 exact-open/nearest/player-position fallback은 0이다.
+6. negative coordinate, half-open high edge와 world build-height 교집합이 exact range와 일치한다.
+7. incomplete chunk coverage, world/dimension change와 invalid anchor는 scan subset을 commit하지 않는다.
+8. chest, trapped chest, barrel은 포함되고 shulker, ender chest, entity/processing/modded container는 제외된다.
+9. double chest 두 half, volume-edge pair, existing-one-half, existing-both-halves와 ambiguous partner를 각각 검증한다.
+10. missing registry와 valid empty registry는 성공적으로 구분되고, corrupt JSON/load IOException/unknown read
+    provenance는 save 0, publish 0, H5-owned revision mutation 0이다.
+11. 65개 이상 logical destination fixture에서 registration truncation 0, repository final set 전부 보존,
+    downstream operation candidate limit 64는 기존 selector 계약으로 별도 유지된다.
+12. persistence failure와 external conflict는 final set/revision mutation 0이며 effective multi-entry success는
+    save 1회, publish 1회, revision +1회다.
+13. repeated-batch registry growth stress는 total registry size와 selector evaluation cost를 기록하며, explicit
+    global capacity 정책 없이 hidden truncation 또는 bounded-cost claim을 만들지 않는다.
+14. command handler의 Task/path/click/input call 0을 deterministic seam으로 검증하고, revision 변경 뒤
+    automatic chain reevaluation은 별도 next-tick lifecycle test로 구분한다.
+
+2026-09-02 문서 snapshot에는 test source나 test/build/runtime 실행이 없었다. 현재 dirty
+worktree의 독립 H5 Java/test source는 이 절의 acceptance를 통과했다고 검수되지 않았고, 관련
+clean build/runtime 증거도 이 문서에 없다. 위 항목은 여전히 acceptance contract이며 현재 구현
+완료 증거가 아니다.
+
+### 13.8 bulk undo/untrust UX
+
+H5 initial slice에는 bulk undo, area untrust와 batch receipt persistence를 넣지 않는다. 기존
+`@auto_deposit_untrust <exact-destination-id>`와 `@auto_deposit_trusted_list` 의미만 유지한다.
+
+단순히 같은 area를 다시 scan해 현재 들어 있는 destination을 모두 지우는 undo는 금지한다. 그러면 H5
+이전부터 있던 trusted destination이나 그 사이 사용자가 수동 등록한 entry까지 삭제할 수 있다. 향후
+bulk undo가 필요하면 특정 successful batch가 **새로 추가하거나 enable한 exact ID delta만** 소유하는
+bounded receipt, repository revision/conflict 검증과 all-or-none removal을 별도 UX/JSON 결정으로
+설계한다. 그 전에는 H5 registration command가 cleanup, migration 또는 bulk removal을 수행하지 않는다.
+
+Persistent trusted area는 V1/H5 범위에 포함하지 않는다. 미래에 새로 배치된 container를 자동 trusted로
+승격하지 않으며, 기존 단일 exact registration, exact unregistration과 list command의 의미를 변경하지
+않는다.
 
 ## 14. 재사용 경계
 
@@ -1148,8 +1535,37 @@ summary count로 억제됐다. 상세 event/field, artifact qualifier와 runtime
 | emergency hard cap 도달 | `operation_emergency_hard_cap` operation-level terminal; candidate rejection/unusable 판정으로 오용 0; pending precedence 유지 |
 | phase별 네 timeout 경로 | `candidate_navigation_no_progress`, `candidate_local_interaction_timeout`, `operation_no_progress`, `operation_emergency_hard_cap`을 서로 다른 stable reason으로 보존 |
 | 모든 candidate가 실제 phase-scoped failure | 기존 terminal precedence와 `NO_USABLE_TRUSTED_DESTINATION` 의미 유지; IdleTask 전환 1회 |
+| matching BlockInteractEvent 없음/중복/다른 target 또는 TAIL 뒤 event | GUI_BOUND 0; event consume 최대 1회; open-wait refresh 0 |
+| TAIL candidate 뒤 open child가 아직 tickable 또는 cleanup 미완료 | GUI_BOUND/slot mutation 0; parent의 정상 quiescence 뒤 재검증 |
+| child quiescence 중 screen/handler/world/operation 변경 | candidate 폐기; consumed event는 attempt에서 영구 spent이며 재사용 0 |
+| chest/trapped chest의 exact screen/handler mismatch | GUI_BOUND 0; broad ContainerType fallback 0 |
+| Barrel/shulker 또는 unlisted container | GUI gate state 생성 0; 기존 route behavior 유지 |
+| opening/stale/duplicate boundary serial | count 0; `lastCountedBoundarySerial` 불변 |
+| 서로 다른 later boundary #1/#2 | full validation 뒤 count만 증가; 전체 reachable mutation 0 |
+| later boundary #3 | one-time permission만 available; QUICK_MOVE 0 |
+| 다음 정상 Task evaluation의 full revalidation 실패 | permission 폐기; activation snapshot/manifest/click 0 |
+| 다음 정상 Task evaluation의 full revalidation 성공 | permission consume + activation/기존 QUICK_MOVE lifecycle 진입을 logical commit 1회로 수행 |
+| permission은 valid하지만 activation/transfer lifecycle 진입 생성 실패 | permission consume 0; typed invalidation/terminal; slot action 0 |
+| 같은 permission의 재진입/두 번째 consume | 거절; 추가 slot action 0 |
+| parent/former child/cleanup/fallback/super path | stabilization 동안 slot/cursor/screen/interact/input/Baritone mutation 0 |
 | H6 chat/microphone adapter | admission 이후 command와 같은 Task factory 및 policy |
 | 기존 `@deposit_all`, `@deposit`, `@get` | 기존 behavior 유지 |
+
+GUI gate의 bounded logs/tests는
+[Task Lifecycle Diagnostics](chatclef-task-lifecycle-diagnostics.md#canonical-exact-gui-gate-log-fields)의
+canonical 이름을 그대로 사용한다. 최소한 `operationId`, `openAttemptId`, `correlationId`,
+`matchingBlockInteractEventObserved`, `matchingBlockInteractEventCount`,
+`matchingBlockInteractEventConsumed`, `duplicateBlockInteractEventRejected`, `openChildIdentity`,
+`openChildQuiescent`, `openChildCleanupComplete`, `screenTypeExpected`, `screenTypeActual`,
+`screenTypeMatched`, `handlerTypeExpected`, `handlerTypeActual`, `handlerTypeMatched`,
+`screenObjectIdentity`, `handledScreenHandlerIdentity`, `playerHandlerIdentity`, `capturedSyncId`,
+`liveSyncId`, `candidateClientTickSerial`, `boundClientTickSerial`, `clientTickBoundarySerial`,
+`lastCountedBoundarySerial`, `candidateTickExcluded`, `boundPromotionTickExcluded`,
+`sameBoundaryDuplicateSuppressed`, `stableLaterBoundaries`, `fullGuiBoundPredicate`, `guiInputAllowed`,
+`slotMutationSuppressed`, `reachableMutationPath`, `reachableMutationKind`,
+`suppressedMutationOwner`, `permissionAvailable`, `permissionFullRevalidationPassed`,
+`permissionConsumed`, `permissionReuseRejected`, `transferLifecycleEntryCommitted`, `slotActionOwner`, `slotActionType`와
+`slotButton`을 같은 attempt로 연결한다. Unchanged tick/slot polling log는 추가하지 않는다.
 
 Core focused tests, clean forced build, deployed JAR hash와 direct-command happy path
 검증은 23절과 같이 완료됐다. 아직 runtime으로 확인하지 않은 core failure/fallback
@@ -1181,7 +1597,7 @@ click 0회 matrix는 아직 runtime으로 모두 재현한 것이 아니다.
 - 범용 enchantment 가치 점수화
 - cursor 기반 정밀 partial-stack split
 - 새 pin command, pin JSON 또는 별도 pin UX
-- nearby batch registration UX
+- nearby batch registration UX(H5 fixed-volume 별도 범위)
 - chat와 microphone intent adapter 구현(H6 별도 범위)
 - home storage retrieval
 - generic `StoreInContainerTask` source-selection 변경
@@ -1223,13 +1639,17 @@ H7  clean build, JAR deployment and Minecraft runtime reproduction
 다음은 V1 core가 runtime에서 검증된 뒤의 별도 후속 범위다.
 
 ```text
-H5  nearby batch registration UX
+H5  fixed 16x16x16 exact-container batch registration와 Korean batch-only direct @ forms
 H6  chat and microphone intent adapters
 ```
 
-각 slice는 별도 사용자 승인을 요구한다. H1-H4 source, focused tests와 H7의
+이 문장의 slice별 승인 요구는 H1-H7 역사 실행과 H5/H6 자체 범위의 provenance다. 현재 exact
+GUI stabilization source/test/required clean build에는 문서 서두의 continuous override가 우선한다.
+H1-H4 source, focused tests와 H7의
 clean build/JAR 배포/단일 destination happy path 검증은 별도 승인에 따라 완료됐다.
-H5와 H6는 H4/H7의 완료 조건에 포함하지 않는다. H6 방향은 24절에서 승인됐고,
+H5와 H6는 H4/H7의 완료 조건에 포함하지 않는다. H5 pre-change 계약은 13절에서
+2026-09-02 docs-only로 보강됐다. 현재 dirty worktree에는 별도 H5 Java/test source가 존재하지만
+이 문서에서 검증된 H5 구현이나 build/runtime 완료로 승격하지 않는다. H6 방향은 24절에서 승인됐고,
 이후 별도 사용자 승인에 따라 Python natural-language source와 LAVI-owned typed
 terminal projection source가 현재 worktree에 구현됐다. 이 source 승인은 clean build,
 runtime reproduction, public enable, commit 또는 push를 승인하지 않는다.
@@ -1240,9 +1660,12 @@ runtime reproduction, public enable, commit 또는 push를 승인하지 않는�
 사용자 승인은 현재 문서 갱신에만 적용되며 추가 Java/test source 변경, test 실행,
 clean build, 배포와 runtime reproduction을 승인하지 않는다.
 
-## 23. 현재 구현 상태
+## 23. 역사적 구현·검증 snapshot과 현재 dirty-worktree qualifier
 
-2026-08-29 기준 현재 상태는 다음과 같다.
+아래 표의 build/test/JAR 수치는 2026-08-29 core/runtime artifact에 2026-09-02 H5 docs-only
+qualifier를 덧붙인 역사적 snapshot이다. 이 표의 `243 TESTS`와 direct-test `NOT IMPLEMENTED`를
+현재 최신 수치로 읽지 않는다. 이후 direct gates와 최신 기록 build는 §26.14의 `254 tests`가
+대체하며, 현재 dirty H5 source와 향후 GUI-gate source는 어느 역사적 artifact로도 검증되지 않았다.
 
 ```text
 exact trusted destination repository:            IMPLEMENTED; RUNTIME REGISTRY OBSERVED
@@ -1253,13 +1676,14 @@ manual StoreHomeTask:                             IMPLEMENTED; TWO COMPLETED OPE
 exact-slot manifest and executor:                 IMPLEMENTED; PAIRED DELTA VERIFIED
 operation-wide early manifest lifetime:           HISTORICAL DEPLOYED BASELINE STRUCTURE
 trusted-container-session-local manifest:         CLEAN BUILD/DEPLOY + ACTIVATION/PAIRED-DELTA RUNTIME VERIFIED
-nearby batch registration:                        NOT IMPLEMENTED
+H5 fixed-volume batch registration:               2026-09-02 DIRECTION REVIEWED; CURRENT DIRTY JAVA/TEST SOURCE PRESENT; UNVERIFIED; EXECUTION PROHIBITED
 chat/microphone STORE_HOME adapters:              SOURCE IMPLEMENTED; PUBLIC LIVE VALIDATION ENABLED
 STORE_HOME Python intent/compiler/registry:        IMPLEMENTED; STORE_HOME CONTRACTS PASS; deposit_all CATALOG/REGISTRY PARITY BLOCKED
 typed StoreHomeResult bridge projection:          BUILD/JUNIT AND CHAT RUNTIME VERIFIED
-automatic entrypoint disabled for manual policy:  IMPLEMENTED; UNIT/BUILD VERIFIED
-focused 1.20.1 Gradle tests:                       PASS FOR EXECUTED ARTIFACT; 243 TESTS, 0 FAILURES, 0 ERRORS, 14 SKIPPED
-clean forced Gradle build and deployed JAR:       VERIFIED
+automatic manual-policy disable (historical H1):  IMPLEMENTED; UNIT/BUILD VERIFIED
+automatic pressure current source:                RESTORED/ACTIVE; EVIDENCE OWNED BY §16 AND AUTOMATIC DOC
+focused 1.20.1 Gradle tests (historical snapshot): PASS FOR EXECUTED ARTIFACT; 243 TESTS, 0 FAILURES, 0 ERRORS, 14 SKIPPED
+clean forced Gradle build and deployed JAR (historical snapshot): VERIFIED
 Minecraft runtime STORE_HOME reproduction:        OP225 >2400 DIRECT; OP30351 REPEAT COMPLETION; COMPLETE MATRIX OPEN
 H6 matching-request typed terminal runtime:        VERIFIED THROUGH KOREAN CHAT
 H6 Korean chat runtime:                            TWO COMPLETED AFTER ONE SAFE MANIFEST_STALE
@@ -1272,13 +1696,18 @@ long-distance candidate timeout during active progress: PROVEN; DIRECT RUNTIME B
 timeout/progress boundary diagnostics:              IMPLEMENTED; CLEAN BUILD/DEPLOYED FILE/RUNTIME EVENTS VERIFIED; COMPLETE SOURCE PARITY UNPROVEN
 phase-scoped timeout behavior direction:            SOURCE/JUNIT/BUILD + OP225 OBSERVED >2400 HAPPY PATH VERIFIED
 phase-scoped timeout focused JUnit:                  PASS IN CLEAN FORCED BUILD; NEW DIRECT SEMANTIC GATES NOT INCLUDED
-StoreHomeTaskLifecycleController direct order test: NOT IMPLEMENTED
-StoreHomeTask shared state/timeout identity test:    NOT IMPLEMENTED
-submitted-root/termination/projector identity test: NOT IMPLEMENTED
+StoreHomeTaskLifecycleController direct order test (at this snapshot): NOT IMPLEMENTED
+StoreHomeTask shared state/timeout identity test (at this snapshot):    NOT IMPLEMENTED
+submitted-root/termination/projector identity test (at this snapshot): NOT IMPLEMENTED
 operation absolute timeout risk after candidate fix: NO-PROGRESS + EMERGENCY CAP IMPLEMENTED; FIRING MATRIX RUNTIME OPEN
 UserBlockRangeTracker null-path NPE:                RUNTIME OBSERVED; SECONDARY CONTRIBUTION UNPROVEN
 recurring JVM G1 Remark native crash:              SEPARATE INVESTIGATION; ROOT CAUSE UNPROVEN
 ```
+
+§26.14 owns the later direct-test and 254-test clean-build record. Neither that
+record nor this §23 snapshot covers the current independent dirty H5 source or a
+future GUI-gate implementation. A build that consumes both must be reported as
+mixed H5+GUI provenance, not as a GUI-only or H5-only verification result.
 
 검증된 1.20.1 build JAR과 active CurseForge instance JAR은 모두 다음 SHA-256을
 가졌다.
@@ -2099,7 +2528,7 @@ H6 V1은 다음을 포함하지 않는다.
 - 자동 retry, replay 또는 reconnect 재실행
 - loadout planner, manifest, repository 또는 transfer executor 변경
 - 일반 상자 fallback 또는 inventory-pressure 자동 실행
-- nearby 8-block batch registration
+- H5 fixed 16x16x16 direct-command batch registration와 Korean batch-only direct `@` forms
 - 새 item-policy JSON, profile JSON 또는 pin JSON
 
 H6로 인해 새 JSON item classification은 추가하지 않는다. 기존 exact trusted
@@ -3170,7 +3599,9 @@ source 비변경은 runtime assertion이 아니라 diff/scope static gate로 검
 ### 26.11 승인과 중단 gate
 
 이 절을 처음 문서화한 작업은 docs-only였다. 2026-08-28 후속 behavior 승인의 현재
-상태는 §26.12에서 별도로 갱신한다. 다음 실행·배포 작업은 계속 각각 별도 승인이다.
+상태는 §26.12에서 별도로 갱신한다. 아래 목록은 그 manifest-lifetime change unit의 역사
+승인 경계다. 현재 exact GUI stabilization의 source/test/required clean build에 새 정지점을
+만들지 않으며, 외부 배포·Minecraft runtime·commit·push에는 계속 별도 범위가 필요하다.
 
 ```text
 focused test source 작성

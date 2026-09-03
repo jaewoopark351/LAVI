@@ -24,6 +24,12 @@ The current active behavior-changing divergences are:
   `adris.altoclef.mixins.MovementHelperMixin`.
 - The bounded post-place container handoff in `adris.altoclef.tasks.container.DoStuffInContainerTask`.
 - The Baritone worker tool-save policy snapshot boundary in `adris.altoclef.util.helpers.StorageHelper`.
+- The default-preserving accepted-input, interaction-observer, container-factory,
+  parent-retention, and client-tick-boundary seams used by the exact-container
+  GUI three-later-tick gate.
+- The exact-container route integration in the upstream-derived general-storage
+  and regular-furnace Task owners, including ancestor retention while the gate
+  forbids parent mutation.
 
 These are engine divergences because the classes are generic upstream-derived ChatClef / AltoClef workflow helpers.
 
@@ -1491,3 +1497,290 @@ events, and exhausted the per-store terminal-group reserve.
 
 The detailed build, artifact, tick, terminal, and limitation ledger is recorded
 in [ChatClef Automatic Deposit Post-Place Handoff Pre-Change Report](chatclef-auto-deposit-post-place-handoff-pre-change-report-2026-08-31.md#16-post-implementation-verification-update).
+
+## 2026-09-03 Exact-Container GUI Three-Later-Tick Gate
+
+<!-- 20260903_kpopmodder: Recorded the exact-container GUI gate and its minimum upstream seams. -->
+
+### Implementation baseline and verification state
+
+```text
+repository HEAD used as the working-tree comparison baseline:
+  39ea27c83c6e5808535d68aef5a8b4c33548f002
+
+worktree at record time:
+  DIRTY - pre-existing user and concurrent agent changes preserved
+
+exact upstream repository, tag, and commit:
+  UNVERIFIED
+
+source state:
+  PRESENT_IN_WORKTREE
+
+focused tests:
+  PASSED - 61 total / 61 passed / 0 skipped / 0 failed / 0 errors
+
+full Fabric 1.20.1 tests:
+  PASSED - 723 total / 722 passed / 1 skipped / 0 failed / 0 errors
+
+clean forced Gradle build:
+  PASSED - .\gradlew.bat clean build --rerun-tasks
+  3m 49s / 171 tasks executed / Gradle 8.8
+  Eclipse Temurin JDK 21.0.12+8-LTS
+
+canonical remapped runtime JAR:
+  C:\Vtuber_Souorce_Code\LAVI\plugins\Minecraft\runtime\chatclef_fabric_1.20.1\versions\1.20.1\build\libs\chatclef-1.20.1-0.18.23.jar
+  size: 8,132,655 bytes
+  mtime: 2026-09-03 18:57:31 +09:00
+  SHA-256: A526C8FFD2A7ED0E78018D3180FE195AA280F1CB364EDDFEA28BCD12E268055D
+
+artifact verification status:
+  BUILD_PASSED_RUNTIME_NOT_VERIFIED
+
+JAR deployment:
+  NOT_RUN
+
+Minecraft runtime reproduction:
+  NOT_RUN
+
+runtime Mixin injection verification:
+  NOT_RUN
+
+commit and push:
+  NOT_PERFORMED
+```
+
+The focused suite, full Fabric 1.20.1 suite, and canonical clean forced build
+prove source compilation and automated-test compatibility for this worktree.
+Inspection of the unclassified remapped runtime JAR also found
+`ClientTickMixin.class`, `ExactContainerGuiGate.class`,
+`ExactContainerGuiAttemptState.class`, and `fabric.mod.json` in the artifact.
+They do not prove deployment, runtime Mixin injection, or live Minecraft
+behavior. The resulting status is `BUILD_PASSED_RUNTIME_NOT_VERIFIED`; those
+runtime stages remain `NOT_RUN`.
+
+### Classified minimum generic engine seams
+
+The following files are upstream-derived engine surfaces or new generic seam
+types placed in the upstream engine namespace. Their default behavior is
+preserved for callers that do not opt into the exact GUI gate.
+
+| File and baseline Git blob | Exact seam | Behavior-preserving default |
+| --- | --- | --- |
+| `adris/altoclef/control/InputControls.java` at `d6e30cbf5b75df03cc0c0154355af186eb9e933b` | `tryPressAndReportAccepted(Input)` reports whether the existing press request passed `_waitForRelease`; the existing `void tryPress(Input)` delegates to it. | Existing callers keep the void API and the same press, auto-release, and suppression effects. |
+| `adris/altoclef/tasks/InteractWithBlockTask.java` at `8621e1ddcd54b6da983060d447606cf4bb1ba1a9` plus new `adris/altoclef/tasks/interaction/InteractWithBlockLifecycleObserver.java` | One observer can be supplied by composition. It is notified only after a newly accepted interaction input remains held. The stop hook can decide whether this exact child may run the legacy global cleanup. | `InteractWithBlockLifecycleObserver.NONE` does nothing and returns `false`; ordinary tasks therefore retain the existing `forceCancel()` and SNEAK-release stop path. No engine subclass was added. |
+| `adris/altoclef/tasks/AbstractDoToClosestObjectTask.java` at `1498fd0dbbed3b5b6dc1a8feae0571c5a060721e` plus new `adris/altoclef/tasksystem/ParentTaskRetention.java` | An already selected child that implements the narrow predicate can request identity retention before closest-object scanning, heuristic work, goal replacement, or wandering. | A null child or any child not implementing the interface returns `false`; ordinary closest-object evaluation is unchanged. |
+| `adris/altoclef/tasksystem/Task.java` at `6842ced52ae86d168c09962e59f438a60c1e8b76` | `getRetainedChildForParentEvaluation()` exposes the already reconciled `sub` only when that same child implements `ParentTaskRetention` and currently requests retention. | It is a read-only protected query. It does not start, stop, replace, or tick a child, and returns `null` for every non-participating child; scheduler reconciliation remains unchanged. |
+| `adris/altoclef/tasks/ResourceTask.java` at `bbf31d83dae014f053f446653e545a876fc059d7` | Propagates an exact-furnace descendant's retention before cursor, screen, scanner, fallback, or replacement work, and exposes that active descendant to its own parent through the same predicate. | With no retained descendant, the original resource acquisition and fallback evaluation runs unchanged. |
+| `adris/altoclef/tasks/speedrun/beatgame/BeatMinecraftTask.java` at `948dfda062ede2df9eae96c7a3f6b84a46e235bb` | Propagates exact-furnace descendant retention before speedrun policy can equip items, alter Baritone settings, close screens, or replace the route. | With no retained descendant, the original speedrun evaluation and policy mutations run unchanged. |
+| `adris/altoclef/tasks/container/AbstractDoToStorageContainerTask.java` at `a1f7067fdf1b83c4ff101f50023535485495f80f` | `isContainerOpenForTarget(...)` and `createContainerOpenTask(...)` are overridable seams at the existing open check and open-child construction points. | The defaults call the original broad `ContainerType.screenHandlerMatches(...)` predicate and create the original `new InteractWithBlockTask(targetPos)`. |
+| `adris/altoclef/tasks/container/DoStuffInContainerTask.java` at `38dde0ec21baa1e6d566aff16379db9d0b3794c8` | The existing closest-block opener uses `this::createContainerOpenTask`; the new factory can be overridden by the regular-furnace owner. | The default factory returns the same `new InteractWithBlockTask(targetPos)`. Smoker, blast-furnace, and other subclasses do not opt in. This hunk is distinct from the previously recorded post-place handoff in the same file. |
+| `adris/altoclef/mixins/ClientTickMixin.java` at `622e72e0cff130f98fd6ba794f473fe0fa5b4d62` | A per-`MinecraftClient` serial opens at `tick` HEAD, and one boundary event is claimed and published at `tick` RETURN before the serial is closed. The Mixin implements the narrow LAVI-owned `GuiTickRuntimeAccess`. | The existing `ChatClefDiagnostics.onClientTickHead()` and `ClientTickEvent` publication remain in their existing HEAD path. The new RETURN callback performs gate bookkeeping and listener publication only; it does not click, press input, close a screen, select a Task, or mutate a Baritone goal/path. |
+
+The required divergence marker is present at the generic hunk boundaries:
+
+```java
+//20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
+```
+
+### Route-owner and ancestor integration
+
+The generic seams alone do not delay any container action. The following
+behavior-owning files opt the enumerated in-scope routes into the gate or preserve their child
+identity through the reachable parent chain:
+
+| File and baseline Git blob | Integration responsibility |
+| --- | --- |
+| `adris/altoclef/tasks/container/StoreInContainerTask.java` at `3556435f056382d112c33fe73c27cb140d9d5d2f` | Owns the `GENERAL_STORAGE` gate, selects the exact open wrapper only for chest/trapped chest, suppresses parent mutation, performs full revalidation, and commits one permission before returning the existing `MoveItemToSlotFromInventoryTask`. Barrel and shulker targets use the base factory and legacy flow. |
+| `adris/altoclef/tasks/container/SmeltInFurnaceTask.java` at `4add6a0a0cbbd447d99c56facb6de9abeca83fd6` | Owns the `REGULAR_FURNACE` gate, retains the inner container Task before `ResourceTask` fallback, validates material/fuel/accessibility before permission consumption, and enters the existing PICKUP-based furnace flow. Smoker and blast furnace are not changed through this route. |
+| `adris/altoclef/tasks/container/StoreInAnyContainerTask.java` at `abd6d7c3ed74bb627cce9451bf8ca09f0a09ebda` and `StoreInStashTask.java` at `f8fe4ebe120bf8d738d6bc2d1673febb56754ae7` | Cache the actual closest-container route, exact `StoreInContainerTask` leaf, and pinned target, then return that same route identity before acquisition, scanner, progress, placement, travel, or fallback work. The references survive a normal `Task.interrupt` because the scheduler preserves its reconciled child; they are cleared only when normal evaluation selects a replacement branch. Stash recreates the leaf only after recomputing remaining work and detecting a target or snapshot change, while the any-container route preserves its original callback-captured work semantics. |
+| `adris/altoclef/tasks/container/DepositAllTask.java` at `e8a121de9aa5e6bc9c7ab667299d0de3d01c7ab2` | Propagates retention from its stable generated store child before scanner, progress, placement, or fallback work. This is LAVI-created code in the engine namespace and remains conservatively classified as an engine/integration divergence. |
+
+LAVI-owned automatic-deposit parents propagate the same narrow retention
+predicate. `AutoDepositTrustedStoreTask` now returns its sole
+`StoreInContainerTask` child and no longer owns a duplicate ungated
+`InteractWithBlockTask`. `AutoDepositMaintenanceTask` returns a protected
+trusted or general child before context and phase evaluation. These LAVI-owned
+changes are containment code, not additional upstream engine seams.
+
+### Exact ordering and behavior change
+
+The intentional behavior change is limited to the enumerated in-scope exact routes:
+
+```text
+normal world-open input accepted during active client tick
+  -> exactly one same-target BlockInteractEvent in that same active serial
+  -> raw ScreenOpenEvent TAIL observation
+  -> only a serial-proven accepted candidate is candidate K and is consumed once
+  -> open wrapper and nested interaction child stop
+  -> operation-owned input/goal/path resources prove quiescent
+  -> live exact binding revalidated and promoted at client RETURN boundary B
+  -> count three distinct RETURN boundaries strictly later than B
+  -> later boundary #3 sets GUI_INPUT_ALLOWED only
+  -> next normal Task evaluation revalidates the complete binding
+  -> one attempt-scoped permission is committed before existing transfer work
+```
+
+`K` and `B` are different concepts. A raw TAIL observation made while no active
+client-tick serial exists has no candidate serial, is not `K`, and must not be
+retained, replayed, or backfilled into a later tick. An accepted candidate `K`
+and `B` may share a serial when cleanup is already complete by that tick's
+RETURN, but candidate capture never counts as a later boundary. `B` initializes
+`boundClientTickSerial` and
+`lastCountedBoundarySerial`; only strictly greater, non-duplicate serials can
+advance the count.
+
+No slot click, cursor mutation, second world interaction, physical SNEAK input,
+screen close/reopen, Task selection, retry, fallback, or Baritone goal/path
+mutation is performed by `ScreenOpenEvent`, `BlockInteractEvent`, or client
+RETURN callbacks. The third later boundary grants permission only.
+
+### Correlation, cleanup, and fail-closed boundaries
+
+- The accepted-input seam creates one operation-local attempt with immutable
+  operation, open-attempt, and correlation identifiers.
+- The matching block event must use the pinned target and accepted-input client
+  serial. A target mismatch, serial mismatch, or second matching event
+  invalidates the attempt.
+- The first accepted or rejected TAIL candidate permanently spends the matching
+  interaction. A retry requires a new attempt/correlation identity.
+- The exact wrapper composes the existing `InteractWithBlockTask`; it does not
+  subclass it or override engine-wide Task lifecycle.
+- The exact stop hook suppresses the legacy global `forceCancel`/SNEAK cleanup
+  only for the exact wrapper's owned interaction. Promotion still requires the
+  wrapper and nested interaction to be stopped/inactive and CLICK_RIGHT,
+  SNEAK, portal-forward, custom-goal, and pathing state to be quiescent.
+- World object, dimension, pinned target position/block identity, screen object
+  and exact class, handled-screen handler/player-handler identity, captured
+  handler identity, and sync id are revalidated fail-closed.
+- Invalidated pre-transfer attempts may be retired only through the owning
+  parent's explicit retry path. Each attempt retains its own bounded
+  open/quiescence wait.
+- A consumed permission is never reused. If the complete live binding becomes
+  invalid during `TRANSFER_ACTIVE`, the owner retires the entire old attempt
+  and starts a wholly fresh attempt, correlation identity, and retry generation
+  against the same pinned target after recomputing remaining work. This permits
+  recovery without turning the invalidated committed attempt into a permanent
+  no-op loop.
+
+### Existing behavior preserved outside the enumerated in-scope routes
+
+```text
+one initial normal right-click world interaction
+trusted-home transfer: button 0 + QUICK_MOVE
+general-storage transfer: existing PICKUP button 0/1 contract
+regular-furnace transfer: existing PICKUP call-site contracts
+barrel and shulker: legacy general-storage/trusted-home open path
+smoker and blast furnace: legacy DoStuffInContainerTask path
+ordinary InteractWithBlockTask observer and stop cleanup
+ordinary AbstractDoToClosestObjectTask reevaluation
+TaskRunner selection and scheduling
+Carry On optionality and class loading
+global input, goal, path, and cleanup ownership
+```
+
+The gate is a post-GUI-open stability mechanism. It does not claim to fix a
+stale Carry On key state that consumes the initial world interaction before any
+GUI opens.
+
+### Regression scope and rollback unit
+
+Focused source and state-machine tests cover serial identity,
+same-boundary suppression, exact event consumption, TAIL rejection,
+open-child quiescence, route allowlists, parent retention, one-time permission,
+regular-furnace preconditions, trusted-home route pinning, and absence of the
+duplicate automatic trusted open owner. The focused run passed all 61 tests.
+The full Fabric 1.20.1 run passed 722 of 723 tests with one skipped test
+and no failures or errors. The canonical
+`.\gradlew.bat clean build --rerun-tasks` run also passed in 3m 49s with all 171
+tasks executed under Gradle 8.8 and Eclipse Temurin JDK 21.0.12+8-LTS.
+
+The unclassified remapped runtime JAR was recorded at
+`C:\Vtuber_Souorce_Code\LAVI\plugins\Minecraft\runtime\chatclef_fabric_1.20.1\versions\1.20.1\build\libs\chatclef-1.20.1-0.18.23.jar`
+with size 8,132,655 bytes, modification time
+`2026-09-03 18:57:31 +09:00`, and SHA-256
+`A526C8FFD2A7ED0E78018D3180FE195AA280F1CB364EDDFEA28BCD12E268055D`.
+Artifact inspection found `ClientTickMixin.class`,
+`ExactContainerGuiGate.class`, `ExactContainerGuiAttemptState.class`, and
+`fabric.mod.json`. Deployment, Minecraft launch, live-world reproduction, and
+runtime Mixin injection verification were not run, so the status remains
+`BUILD_PASSED_RUNTIME_NOT_VERIFIED`, not runtime acceptance.
+
+Rollback must be hunk-scoped and dependency ordered:
+
+1. Disconnect `GENERAL_STORAGE`, `REGULAR_FURNACE`, trusted-home, and ancestor
+   retention callers from the LAVI-owned exact GUI collaborators.
+2. Revert only the accepted-result, observer, parent-retention, factory, and
+   client-RETURN seam hunks listed above.
+3. Remove the two new generic seam interfaces only after no caller references
+   them.
+4. Remove the LAVI-owned exact GUI packages and tests only as the same feature
+   rollback unit.
+
+Do not revert the whole files, the prior diagnostics, the existing post-place
+handoff, or unrelated dirty work. Do not use `git reset`, broad checkout,
+restore, cleanup, or a broad commit revert.
+
+The complete LAVI-owned file, route, state, test, and verification inventory is
+recorded in
+[ChatClef Exact-Container GUI Three-Tick Implementation Ledger](chatclef-exact-container-gui-three-tick-implementation-ledger-2026-09-03.md).
+
+### Post-Build Runtime Reproduction Update
+
+<!-- 20260903_kpopmodder: Recorded the matching-JAR furnace failure and diagnostics-only evidence plan without adding a behavior divergence. -->
+<!-- 20260903_kpopmodder: Corrected runtime counts, evidence strength, and the exact source-to-gate observation boundary after immutable-log re-review. -->
+
+The `BUILD_PASSED_RUNTIME_NOT_VERIFIED` statements above are the historical
+implementation-time checkpoint. A later run deployed the same 8,132,655-byte
+JAR to the active `LAVI_TEST_Fabric01` instance; the built and active files both
+had SHA-256
+`A526C8FFD2A7ED0E78018D3180FE195AA280F1CB364EDDFEA28BCD12E268055D`.
+
+```text
+CURRENT_RUNTIME_STATUS: FAILED_REPRODUCED_FIRST_FAILING_BOUNDARY_DIRECT_OBSERVATION_PENDING
+CURRENT_CAUSE_CLASSIFICATION: LEADING_SOURCE_AND_LOG_HYPOTHESIS
+```
+
+The regular-furnace route then failed in live Minecraft. The logs recorded 165
+exact-GUI open requests and 165 matching block interactions. Generic screen
+diagnostics recorded 165 delayed GUI observations in total: 164 furnace
+`class_3858` observations and one unrelated crafting-table `class_1714`
+observation. Before the ordinary diagnostic ceiling, they recorded zero
+admitted `EXACT_GUI_SCREEN_TAIL_CANDIDATE`, `EXACT_GUI_BOUND`, permission, or
+transfer-commit events. There were 164
+`gui_open_or_quiescence_timeout` invalidations, 164 open-child cleanup-skip
+records, and 164 parent retry authorizations before the ordinary diagnostic
+event ceiling was reached while the critical reserve remained available.
+
+No generic slot-click boundary record appears in this BOUNDARY-mode capture,
+but `ChatClefDiagnostics.logSlotClick(...)` is VERBOSE-only. Post-ceiling
+exact-gate detail is also unobserved. Therefore this evidence proves only that
+no exact-gate transfer commit or gated transfer entry was admitted in the
+pre-ceiling evidence window; it does not prove the whole-run physical
+`clickSlot` or transfer-commit count. The user-observed outcome remains that
+iron smelting did not proceed.
+
+The last proven forward-progress boundary is the matching block interaction.
+The first missing required boundary is at the expected `ClientOpenScreenMixin`
+TAIL producer or somewhere between that producer and exact-gate intake; current
+logs do not prove that TAIL publication itself ran. Source inspection shows
+that `GuiContainerEventHub.onScreen()` silently returns when no active
+client-tick serial exists, so an inter-tick TAIL drop is the leading source-and-
+log hypothesis. It is not a directly logged root cause: the TAIL source log is
+VERBOSE-only and the hub early return has no decision record.
+
+The next in-scope source work is diagnostics-only. It will observe the TAIL
+source, hub disposition, and gate/coordinator outcome through bounded LAVI-owned
+diagnostic collaborators while deliberately preserving the current event
+delivery/drop result, serial lifecycle, listener order, retry, timeout, Task,
+slot, input, screen, and Baritone behavior. No new behavior-changing engine
+divergence has been applied by this documentation update. Once those observations
+identify the boundary, any exact-contract correction proceeds under the active
+continuous implementation, bounded-log, test, and clean-build workflow without
+a separate phase-approval pause.
+
+Incident counts, evidence paths, ownership, future files, tests, and the
+one-reproduction decision matrix are in
+[Section 18 of the implementation ledger](chatclef-exact-container-gui-three-tick-implementation-ledger-2026-09-03.md#18-post-build-furnace-runtime-reproduction-and-diagnostic-reinforcement-plan).
+Canonical event/field/boundedness rules are in
+[Screen TAIL Source-To-Hub-To-Coordinator Diagnostic Contract](chatclef-task-lifecycle-diagnostics.md#screen-tail-source-to-hub-to-coordinator-diagnostic-contract).

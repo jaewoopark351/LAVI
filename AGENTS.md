@@ -87,19 +87,30 @@ Required build verification runbook:
 [Fabric ChatClef 1.20.1 Build Verification](plugins/Minecraft/docs/chatclef-fabric-build-verification.md)
 
 Codex must read and apply this runbook before running or evaluating a Fabric
-ChatClef 1.20.1 runtime build. Build execution still requires separate
-authorization. When an authorized build is used as compatibility evidence, run
-from the runtime root:
+ChatClef 1.20.1 runtime build. A direct request to implement the exact GUI-open
+stabilization contract below already includes its in-repository verification;
+the clean build is part of that continuous workflow and does not require the
+user to repeat the word "verification" or provide a second phase-specific
+confirmation. Run it from the runtime root:
 
 ```bat
 .\gradlew.bat clean build --rerun-tasks
 ```
 
+For this canonical command only, Gradle's wrapper-owned removal of generated
+build outputs below this exact runtime root is part of the normal build
+lifecycle. It is not a manual cleanup or deletion operation that requires a
+second confirmation under the cleanup rules. This narrow exception does not
+authorize manual deletion commands, deletion outside the runtime's generated
+build-output directories, removal of wrapper/vendor/runtime JARs, or any
+external-instance cleanup.
+
 Do not treat incremental Gradle success as sufficient proof. Preprocess/remap
 outputs and Mixin targets can be stale, and Gradle success does not prove
-runtime Mixin injection. Verify the fresh 1.20.1 jar copied into the active
+runtime Mixin injection. When deployment and runtime verification are in the
+active request, verify the fresh 1.20.1 jar copied into the exact active
 CurseForge instance, then inspect Minecraft logs and any crash report after
-launch.
+launch. Otherwise report deployment and runtime as `NOT_RUN`.
 
 Required operational troubleshooting note:
 
@@ -110,14 +121,131 @@ routes, wrong-target movement, mining stalls, or world-replacement regressions
 as a LAVI behavior bug. This is especially important after a Minecraft test
 world is copied, restored, replaced, or renamed.
 
-Reading the companion document alone does not authorize a later phase, Java
-modification, diagnostics patch, behavioral fix, build, commit, or push.
-The standing authorization in `ChatClef Fabric 1.20.1 Diagnostics-Only and
-Bounded Logging Policy` below separately authorizes the smallest bounded
-diagnostics-only source edit when all of that policy's conditions are met.
+Reading the companion document alone is not a work request. A direct user
+request to implement a Fabric ChatClef change defines the repository-local
+source, resource, test, documentation, bounded-logging, and verification scope
+described by that request. The exact GUI-open stabilization workflow below does
+not require a new confirmation between its implementation, logging, test, and
+clean-build stages. Commit, push, deployment, external-instance mutation, and
+live-world execution remain outside that scope unless the active request names
+them explicitly.
+
+<!-- 20260903_kpopmodder: Replaced repeated GUI-gate approval stops with one continuous implementation, bounded-log, and verification workflow. -->
+
+#### Fabric ChatClef Container GUI-Open Stabilization Continuous Workflow
+
+This subsection applies only to the Fabric ChatClef container contract below:
+
+```text
+one route-owned normal world open request
+-> exactly one matching BlockInteractEvent after WORLD_OPEN_REQUESTED and before TAIL
+-> immutable ScreenOpenEvent TAIL candidate snapshot consumes that event once and permanently spends it for the attempt
+-> route-owned open child becomes quiescent and operation-owned cleanup completes
+-> exact route/target/world/dimension/screen/handler/syncId/attempt GUI binding
+-> TAIL-candidate tick K and GUI_BOUND-promotion tick B both excluded
+-> three distinct later client-tick boundaries
+-> permission only at later boundary #3
+-> full revalidation and one-time permission consumption on the next normal Task evaluation
+-> existing route-owned slot action
+```
+
+The initial target set is exact `minecraft:chest` and
+`minecraft:trapped_chest` with `GenericContainerScreen` /
+`GenericContainerScreenHandler`, plus regular `minecraft:furnace` with
+`FurnaceScreen` / `FurnaceScreenHandler`. Barrel, shulker, smoker, blast
+furnace, and every unlisted route retain their existing behavior.
+
+`GUI_BOUND` must not be established while the route-owned open child can still
+tick, repeat `interactBlock`, or defer mutation-capable cleanup. During
+`GUI_STABILIZING`, the parent, current or former child, observer, cleanup,
+fallback, helper, and every other route-reachable path must be structurally
+unable to mutate slots, cursor state, screens, world interaction, input, or
+Baritone goals/paths. Operation-local validation, deduplication, serial,
+counter, invalidation, and one-time-permission bookkeeping are allowed because
+they do not mutate gameplay state. A rejected candidate does not return its
+consumed `BlockInteractEvent` to the attempt; a retry requires a new attempt,
+correlation identity, and matching event. The third later boundary publishes only an
+attempt-and-binding-scoped one-time permission. The next normal route evaluation
+must revalidate the complete live binding and route-specific transfer
+preconditions. Permission consumption and entry into the existing transfer
+lifecycle are one logical commit. If entry cannot be established, do not consume
+the permission; invalidate or terminate with a typed reason and perform no slot
+action.
+
+New exact GUI-gate boundary logs, focused-test fixtures, parsers, and runtime
+evidence must use the canonical field names in
+[Task Lifecycle Diagnostics](plugins/Minecraft/docs/chatclef-task-lifecycle-diagnostics.md#canonical-exact-gui-gate-log-fields).
+Do not create route-specific aliases for those fields. Existing unrelated log
+payload keys are not renamed by this requirement.
+
+When the user directly requests implementation of this contract, treat that
+request as one continuous in-repository work unit covering:
+
+1. baseline, ownership, route, and dirty-worktree inspection
+2. the smallest ownership-preserving implementation
+3. responsibility-based splitting and package organization for new or touched
+   LAVI-owned code
+4. bounded state-change and boundary logging reinforcement
+5. focused unit and integration tests
+6. the required clean forced build
+7. diff, artifact, and available log inspection
+
+Do not stop for a separate proposal, source-edit, diagnostics, test-execution,
+or clean-build confirmation between these stages. A pre-change report or
+engine-divergence record is a non-blocking implementation ledger and rollback
+record, not a user-approval checkpoint.
+
+This feature is an explicitly specified behavior contract, not an
+unknown-root-cause fix. The general diagnostics-before-behavior rules below do
+not force a diagnostics-only first patch when source evidence identifies the
+route owner, callback boundary, and mutation boundary. Implement the exact
+fail-closed contract first, then reinforce its bounded logs, and then verify it.
+If a newly discovered, unrelated defect has an unknown cause, apply the normal
+diagnostics-first rules only to that additional defect.
+
+More than one route-local upstream-derived file may receive a minimal hunk when
+the listed chest/trapped-chest/furnace routes require it. Keep every such hunk
+independently reviewable and reversible. Do not move, split, repackage, or
+broadly refactor upstream-derived code. Do not expand this workflow into
+`AltoClef`, `TaskRunner`, `PlayerInteractionFixChain`, generic Task scheduling,
+global input ownership, or global Baritone goal/path behavior merely for
+convenience. If source evidence proves that the current Task contract cannot
+make the open child quiescent without a mutation-capable tick or stop, one
+minimum generic extension seam with a behavior-preserving no-op/no-override
+default may be included as a `SOURCE_PROVEN_CONTRACT_GAP` in the same
+non-blocking workflow. This exception does not permit a scheduler redesign or
+global policy change. Any wider engine-wide expansion is a new task scope rather
+than another phase approval within this task.
+
+If the user requested refactoring and folderization, that request covers clean,
+in-scope LAVI-owned extraction, file creation, and reference updates after the
+exact paths are recorded. It never covers moving upstream-derived files,
+overwriting unrelated dirty/untracked work, deleting compatibility paths, or
+introducing mutable static/global behavior state.
+
+The continuous workflow does not include any of the following unless the
+active request explicitly includes the exact action and target:
+
+* Forge or MineMind work
+* dependency, Minecraft, Fabric, Loader, Loom, Gradle, Java, ChatClef, Baritone,
+  or Carry On version changes
+* Gradle-wrapper replacement or external software installation
+* writes outside the active repository
+* deployment or overwrite of an active CurseForge JAR
+* Minecraft launch, server connection, or live-world mutation
+* destructive cleanup or broad rollback
+* commit, push, publish, or release
+
+When an exact disposable runtime target and reproduction are already included
+in the user's active request, carry the same workflow through bounded runtime
+verification without stage-by-stage confirmation. Otherwise finish all safe
+in-repository verification and report runtime status as `NOT_RUN`.
 
 This subsection has higher priority for that tree than:
 
+* Section 21 and Section 21.1 ordering requirements, solely for the specified
+  implementation-before-log-reinforcement order; all boundedness, privacy, and
+  diagnostic-safety requirements still apply
 * Section 29 refactoring rules
 * Section 29.1 folder and package organization rules
 * Section 29.2 file and type separation rules
@@ -216,7 +344,12 @@ A new Carry On-specific Task may extend the existing upstream Task abstraction o
 
 Do not deepen existing upstream inheritance merely to reuse a few helpers. Do not introduce an abstract base class for Carry On integration unless direct evidence shows a stable `is-a` contract that cannot be represented safely by composition and the user explicitly approves the hierarchy.
 
-Before proposing inheritance in this scope, report:
+Before proposing inheritance in this scope, record the following. For the exact
+GUI-open stabilization workflow, a narrow LAVI-owned route Task that extends the
+established `Task` abstraction uses this as a non-blocking implementation
+ledger; the direct implementation request already covers that established Task
+participation. A new abstract base, deeper hierarchy, or engine-wide lifecycle
+subclass remains outside that narrow exception.
 
 ```text
 Proposed subclass:
@@ -228,10 +361,12 @@ Lifecycle newly owned by the subclass:
 Inputs, goals, paths, and cleanup affected:
 Generic ChatClef behavior that could regress:
 Upstream comparison impact:
-User approval required:
+Separate hierarchy scope required:
 ```
 
-If these questions cannot be answered with direct code and runtime evidence, reject the inheritance proposal and use composition or diagnostics instead.
+If these questions cannot be answered with runtime evidence or with direct
+source evidence for the specified feature contract, reject the inheritance
+proposal and use composition or diagnostics instead.
 
 ##### Layer and dependency direction
 
@@ -438,6 +573,12 @@ Remaining risk:
 
 Any edit to upstream-derived ChatClef or AltoClef source is an engine divergence.
 
+For the exact container GUI-open stabilization contract, the continuous
+workflow above replaces the report-and-approval pauses in this subsection. The
+same evidence, minimal-hunk, marker, rollback, and regression requirements still
+apply as a non-blocking implementation record. Other Carry On or unknown-cause
+engine changes continue to use this last-resort gate normally.
+
 A diagnostics-only engine divergence may be applied under the standing diagnostics-only authorization when the required failure boundary cannot be observed from a LAVI-owned layer. It must remain the smallest method-level or diff-hunk-level observation change and must not change return values, task selection, completion, retry, timeout, input state, Baritone goal or path state, fallback behavior, exception handling, cleanup, or lifecycle ordering. If the observation requires a broad engine change, more than the minimum upstream hunks, or any behavior change, stop and report instead of applying it.
 
 A behavior-changing engine divergence is a last-resort operation.
@@ -446,7 +587,7 @@ Before proposing such a change, Codex must complete the `ChatClef Engine Modific
 
 [ChatClef / Carry On Integration Direction](plugins/Minecraft/docs/chatclef-carryon-integration-direction.md)
 
-Codex must prove why the defect cannot be contained in LAVI orchestration, the optional Carry On bridge, a task-local helper, or a LAVI-owned parent Task. Codex must then report the exact proposed files, methods, and hunks and stop for explicit user approval.
+Codex must prove why the defect cannot be contained in LAVI orchestration, the optional Carry On bridge, a task-local helper, or a LAVI-owned parent Task. Record the exact files, methods, hunks, and rollback unit. For the exact GUI-open stabilization workflow, continue with the minimum in-scope hunk without an approval pause; otherwise follow the normal last-resort decision gate.
 
 The first direct behavior-changing engine patch should normally be limited to:
 
@@ -454,17 +595,22 @@ The first direct behavior-changing engine patch should normally be limited to:
 * one method
 * one minimal hunk
 
-If more than one upstream lifecycle class, more than one behavior-owning method, or a wider engine boundary is required, Codex must stop and report why the failure cannot be isolated more narrowly.
+If more than one upstream lifecycle class, more than one behavior-owning method, or a wider engine boundary is required, re-run the containment analysis and record why the change cannot be isolated more narrowly. The exact GUI-open stabilization workflow may continue across its enumerated route-local files when every hunk is minimal and independently reversible; an engine-wide expansion remains out of scope.
 
 Carry On-specific types, imports, version checks, retry policy, timeout policy, success criteria, and cleanup policy must remain outside generic engine classes.
 
-When a generic extension seam is proven necessary, it must use a generic contract and a behavior-preserving default. Observation hooks must default to no-op. Decision hooks must default to an explicit no-override or unchanged result, never to success. The Carry On implementation must be connected through external composition from a LAVI-owned namespace.
+When a generic extension seam is proven necessary by runtime evidence or by the
+exact GUI feature's source-proven contract gap, it must use a generic contract
+and a behavior-preserving default. Observation hooks must default to no-op.
+Decision hooks must default to an explicit no-override or unchanged result,
+never to success. The Carry On implementation must be connected through
+external composition from a LAVI-owned namespace.
 
-Every approved engine divergence must include the required marker near the exact hunk and must be recorded with its evidence, baseline, regression scope, and rollback procedure:
+Every applied engine divergence must include the required marker near the exact hunk and must be recorded with its evidence, baseline, regression scope, and rollback procedure:
 
 `//20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.`
 
-Approval for an engine patch does not authorize build, runtime reproduction, commit, or push. Each action requires separate explicit approval.
+Outside the exact continuous GUI workflow, an engine patch does not implicitly include unrelated build, runtime, commit, or push work. Inside that workflow, focused tests and the required clean build follow automatically; runtime, deployment, commit, and push follow only when the active request already includes them.
 
 ##### Required design report before implementation
 
@@ -489,7 +635,7 @@ Evidence still missing:
 Tests required before behavior change:
 ```
 
-If ownership, state transition, or the exact failing boundary remains unproven, stop at diagnostics. Do not implement the behavioral change.
+For an unknown-cause defect, if ownership, state transition, or the exact failing boundary remains unproven, keep the behavioral change out and stay at bounded diagnostics. For the explicitly specified GUI-open stabilization feature, implement the source-proven portion first, reinforce bounded logs, and continue verification while keeping only the unresolved portion fail-closed.
 
 #### Previous failed AI work is reference-only
 
@@ -570,12 +716,12 @@ This standing authorization:
 * does not authorize a behavior-changing fix
 * does not authorize a dependency or version change
 * does not authorize a wire-protocol change
-* does not authorize a build, Minecraft launch, runtime reproduction, commit, or push unless the user's current instruction separately authorizes that action
+* includes a clean build only when the active request falls under the exact continuous GUI implementation workflow above; Minecraft launch, runtime reproduction, commit, or push still require those actions to be part of the active request
 * does not override an explicit read-only, audit-only, no-edit, or proposal-only instruction
 * does not override the strict read-only restoration and salvage protocol
 * does not authorize edits outside the active repository boundary
 
-When the required observation boundary exists only inside upstream-derived ChatClef or AltoClef code, Codex may add one minimal method-level or diff-hunk-level diagnostic block without separate behavior-fix approval. If the required observation would span multiple upstream lifecycle owners, restructure an upstream class, or modify behavior, stop and report the wider scope instead.
+When the required observation boundary exists only inside upstream-derived ChatClef or AltoClef code, Codex may add one minimal method-level or diff-hunk-level diagnostic block. Outside the exact GUI workflow, a wider observation or behavior scope must be reported before it is expanded. Inside the exact GUI workflow, record the route-local scope and continue only with minimal independently reversible hunks; do not restructure an upstream class.
 
 ##### Unknown-cause behavior gate
 
@@ -1146,7 +1292,7 @@ Tests to run:
 Remaining uncertainty:
 ```
 
-If the exact failure boundary is still unknown, stop at diagnostics and do not apply the behavioral change.
+For unknown-cause work, if the exact failure boundary is still unknown, remain at bounded diagnostics and do not apply that unproven behavioral change. This does not reverse the implementation-first order for the explicitly specified GUI-open stabilization contract.
 
 #### Read-only restoration baseline audit and failed-work salvage protocol
 
@@ -2739,6 +2885,13 @@ Do not reduce or silence investigation logs until the root cause has been verifi
 ---
 
 ## 21.1 Diagnostic Logging First Rule
+
+The exact Fabric ChatClef container GUI-open stabilization contract follows the
+higher-priority continuous workflow in Section 0: implement the source-proven
+fail-closed contract, reinforce bounded logs, and then verify it. This section's
+logging-first order applies to a newly discovered unknown-cause defect, including
+one found during that verification; it does not reclassify the specified GUI
+contract as an unknown-cause fix or create another phase-confirmation gate.
 
 When a feature fails, behaves inconsistently, hangs, returns an unexpected result, or cannot be reproduced reliably, Codex must first determine whether the existing logs are sufficient to identify the exact failing step.
 
@@ -5782,6 +5935,10 @@ Before editing:
 1. Verify the current directory, Git root, branch, upstream, and working tree using read-only commands.
 2. Classify each affected file as LAVI-owned, upstream-derived, vendored, generated, or third-party, and apply the highest-priority scoped rule before evaluating refactoring.
 3. Inspect the relevant files, surrounding callers, fallback paths, cleanup ownership, and existing tests.
+   The Fabric ChatClef container GUI-open stabilization contract uses its
+   higher-priority continuous order: implement, reinforce bounded logs, then
+   verify. The failure-investigation ordering below applies to unknown-cause
+   defects, not to that explicitly specified feature.
 4. For a failure or unexpected behavior, inspect the existing logs, stack traces, compiler output, tests, and reproduction evidence.
 5. If the root cause is not proven, state that it is unknown and add structured diagnostic logs before changing behavior.
 6. Reproduce the problem and inspect the new trace.

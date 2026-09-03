@@ -3,6 +3,10 @@
 <!-- 20260831_openai: Documented an optional, separately authorized Python harness for final-JAR runtime orchestration and evidence collection without replacing Java tests or authorizing implementation or execution. -->
 <!-- 20260831_openai: Reconciled the post-checkpoint Java test-only/build state and tightened the Python harness around reuse-first architecture, hermetic pytest, explicit transport modes, fixture/setup separation, run-scoped evidence integrity, and phased source/live gates. -->
 <!-- 20260901_kpopmodder: Clarified the Java/Python/Minecraft/operator evidence ownership split and the evidence-driven runtime-harness implementation order. -->
+<!-- 20260902_openai: Linked the still-unimplemented H5 bulk-trust command to the exact-fixture safety contract. -->
+<!-- 20260902_openai: Tightened the still-unimplemented H5 bulk-trust safety boundary around fail-closed parsing, exact fixture ownership, no harness submission, and downstream revision-triggered automatic reevaluation. -->
+<!-- 20260903_kpopmodder: Applied the canonical GUI-gate continuous implementation, bounded-log, and verification workflow while preserving historical checkpoint approvals. -->
+<!-- 20260903_openai: Aligned the automatic storage GUI boundary with one-shot interaction correlation, safe open-child quiescence, exact route types, explicit tick serials, full-path suppression, and one-time permission; recorded independent dirty H5 provenance. -->
 
 # ChatClef Automatic Deposit Post-Checkpoint Work Separation Direction
 
@@ -14,7 +18,28 @@ Scope: Fabric ChatClef 1.20.1 automatic-deposit checkpoint follow-up and budgete
 이 문서는 automatic-deposit handoff 체크포인트 뒤의 작업 경계와 검증 계약을
 기록한다. 구현 완료 보고서나 release 승인 문서가 아니다.
 
+현재 container GUI exact-binding/three-later-tick 작업에는 canonical Carry On 방향의
+continuous workflow가 우선한다. 사용자가 해당 구현을 직접 요청하면 source/config/test
+구현, bounded logging, focused tests와 required clean build를 단계별 승인 대기 없이
+연속 수행한다. 이 문서의 과거 `CURRENT_AUTHORIZATION`, Stage별 승인 및 checkpoint 표는
+당시 provenance를 보존하는 역사 기록이며 현재 GUI gate를 다시 정지시키지 않는다.
+외부 JAR 배포, Minecraft/live-world 실행, commit과 push는 현재 요청이 정확히 포함할 때만
+수행한다.
+
+이 override는 아래 Stage 1-6, `CURRENT_AUTHORIZATION`과 action table을 삭제하지 않지만 의미를
+명확히 제한한다. 그 row들은 automatic-deposit diagnostics/harness/H5 당시 작업의 provenance이며,
+현재 exact GUI stabilization source/test/required clean build에 새 승인 중단점을 만들지 않는다.
+반대로 GUI override는 diagnostics backlog, H5, Python harness, 외부 배포, Minecraft runtime,
+commit 또는 push를 자동 승인하지 않는다.
+
+아래 fenced status block의 checkpoint, Stage, `380 PASSED`, harness `NOT_IMPLEMENTED` 값은
+2026-08-31 역사 snapshot이다. 현재 test/build/harness evidence로 인용하지 않는다. 이후 상태는
+§15의 implementation/build delta와 §16.4의 2026-09-01 live evidence delta가 소유한다. 단,
+아래 H5 current-worktree와 future mixed-provenance row는 2026-09-03에 추가한 현재 qualifier다.
+
 ```text
+STATUS_BLOCK_CLASSIFICATION: HISTORICAL_2026_08_31_CHECKPOINT_SNAPSHOT_WITH_2026_09_03_H5_QUALIFIERS
+LATEST_TEST_BUILD_HARNESS_EVIDENCE_POINTER: SECTION_15_AND_SECTION_16_4
 DOCUMENT_STATUS: DIRECTION_AND_PRECHANGE_CONTRACT
 EXTERNAL_REVIEW_RESULT: PASS_FOR_STAGE_1_PRECHANGE_CONTRACT_AFTER_HARNESS_BOUNDARY_CORRECTIONS
 DOCUMENT_REVIEW_DISPOSITION: PASS_TO_BEGIN_SEPARATELY_AUTHORIZED_STAGE_1_CLOSURE
@@ -38,7 +63,16 @@ PYTHON_RUNTIME_EVIDENCE_ROOT: test/test_Isolation/automatic_deposit_runtime/<new
 PYTHON_RUNTIME_HARNESS_IMPLEMENTATION_GATE: PHASED; HERMETIC CORE AFTER STAGE_1; FEATURE BINDING AFTER STAGE_2/3 + STAGE_4; LIVE EXECUTION AFTER FINAL JAR
 RELEASE_READY: NO
 
+H5_BULK_TRUST_DOCUMENT_SNAPSHOT: DIRECTION_ONLY; SOURCE_NOT_STARTED_AT_2026-09-02_REVIEW
+H5_CURRENT_WORKTREE_STATUS: INDEPENDENT_MODIFIED_AND_UNTRACKED_JAVA_TEST_SOURCE_PRESENT; UNVERIFIED_BY_THIS_DOCUMENT
+H5_2026_09_02_AREA_COMMAND_BEHAVIOR: TRAILING_ARGUMENTS_NOT_FAIL_CLOSED; MAY_EXECUTE EXISTING SINGLE REGISTRATION
+H5_CURRENT_AREA_COMMAND_BEHAVIOR: UNVERIFIED_DIRTY_WORKTREE; DO NOT INFER FROM DOCUMENT SNAPSHOT
+H5_BATCH_COMMAND_EXECUTION: PROHIBITED_UNTIL CURRENT DIRTY SOURCE IS AUDITED + DETERMINISTIC TEST EVIDENCE
+H5_CURRENT_BUILD_RUNTIME_COMMIT_PUSH_EVIDENCE: NOT ESTABLISHED BY THIS DOCUMENT
+FUTURE_RUNTIME_ROOT_CLEAN_BUILD_PROVENANCE: MIXED_H5_AND_GUI_WHILE_BOTH_DIRTY_CHANGE_SETS_REMAIN
+
 MARKDOWN_DOCUMENTATION: AUTHORIZED_FOR_THIS_TASK
+AUTHORIZATION_ROWS_CLASSIFICATION: HISTORICAL_CHECKPOINT_PROVENANCE; NOT_A_CURRENT_GUI_GATE
 CURRENT_AUTHORIZATION: MARKDOWN_ONLY
 FURTHER_JAVA_JSON_RESOURCE_OR_TEST_SOURCE_CHANGE: NOT_AUTHORIZED_BY_THIS_DOCUMENT
 PYTHON_TEST_HARNESS_SOURCE_CHANGE: NOT_AUTHORIZED_BY_THIS_DOCUMENT
@@ -46,6 +80,85 @@ FURTHER_TEST_OR_BUILD_EXECUTION: NOT_AUTHORIZED_BY_THIS_DOCUMENT
 JAR_DEPLOYMENT_OR_MINECRAFT_RUNTIME: NOT_AUTHORIZED_BY_THIS_DOCUMENT
 COMMIT_OR_PUSH: NOT_AUTHORIZED_BY_THIS_DOCUMENT
 ```
+
+### 1.1 Current exact GUI stabilization boundary
+
+Automatic-deposit history does not broaden the current GUI gate. The first
+implementation mapping remains:
+
+```text
+in-scope general storage:
+    minecraft:chest, minecraft:trapped_chest
+    exact screen: GenericContainerScreen
+    exact handler: GenericContainerScreenHandler
+
+parallel regular-furnace route owned outside automatic deposit:
+    minecraft:furnace
+    exact screen: FurnaceScreen
+    exact handler: FurnaceScreenHandler
+
+unchanged:
+    minecraft:barrel, every shulker box, minecraft:smoker,
+    minecraft:blast_furnace and every unlisted block/screen/handler
+```
+
+For an in-scope storage attempt, exactly one matching `BlockInteractEvent` must
+be observed after `WORLD_OPEN_REQUESTED` and before its TAIL candidate, match the
+immutable target/world/dimension, and be consumed by only that candidate. The
+TAIL callback captures an immutable candidate snapshot and
+`candidateClientTickSerial` only. It does not grant permission or perform child
+cleanup. Once consumed, the event remains permanently spent for that attempt
+even if the candidate is later rejected. A retry requires a new
+attempt/correlation and matching event.
+
+Before `GUI_BOUND`, the route parent must make its open child quiescent so it
+cannot tick, repeat `interactBlock`, close/replace the screen, or perform delayed
+input/path work, and must finish only the operation-owned normal child cleanup.
+Any binding change during that handoff discards the candidate. During
+`GUI_STABILIZING`, the parent, current/former child, observer, cleanup, fallback
+and every other reachable path are blocked from slot/cursor/screen/interact/input
+and Baritone mutation; no mutation-capable child tick or stop may run. A child
+cleanup that releases global or otherwise unowned state is not operation-owned
+cleanup. Operation-local validation, serial, deduplication, counter, invalidation
+and permission bookkeeping may change because it does not mutate gameplay.
+
+The TAIL candidate tick `K` and route-owned promotion tick `B` are both excluded,
+and the `K`-to-`B` gap is never backfilled. The ledger must prove current-tick
+serial publication before route promotion and chosen-boundary observation of the
+same serial. The bound attempt owns immutable `boundClientTickSerial` and initializes
+`lastCountedBoundarySerial` to it. For observed serial `S`, `S <= bound` or
+`S <= lastCounted` never counts. Only a strictly later distinct boundary may
+fully validate, increment once, and store `S`. Boundary #3 publishes an
+attempt/binding-scoped one-time permission only. The next normal route Task
+evaluation must revalidate the complete live predicate and route-specific
+transfer preconditions. Permission consumption and entry into the existing
+PICKUP/button lifecycle are one logical commit. If entry cannot be established,
+do not consume permission; return a typed invalidation or terminal result and
+perform no slot action.
+
+Focused regression and bounded logs must cover at least: missing/duplicate or
+reused interaction observations; child quiescence and cleanup; candidate change
+during handoff; exact screen/handler mismatch; opening/stale/duplicate boundary
+serials; mutation suppression across every reachable participant at counts
+0/1/2 and the third callback; full next-evaluation revalidation; one-time
+permission/retry isolation; preserved action type/button; and unchanged
+Barrel/shulker/smoker/blast/unlisted and generic interaction routes. Use the
+canonical names in
+[Task Lifecycle Diagnostics](chatclef-task-lifecycle-diagnostics.md#canonical-exact-gui-gate-log-fields)
+verbatim and correlate `operationId`, `openAttemptId`, `correlationId`,
+`matchingBlockInteractEventObserved`, `matchingBlockInteractEventCount`,
+`matchingBlockInteractEventConsumed`, `duplicateBlockInteractEventRejected`, `openChildIdentity`,
+`openChildQuiescent`, `openChildCleanupComplete`, `screenTypeExpected`, `screenTypeActual`,
+`screenTypeMatched`, `handlerTypeExpected`, `handlerTypeActual`, `handlerTypeMatched`,
+`screenObjectIdentity`, `handledScreenHandlerIdentity`, `playerHandlerIdentity`, `capturedSyncId`,
+`liveSyncId`, `candidateClientTickSerial`, `boundClientTickSerial`, `clientTickBoundarySerial`,
+`lastCountedBoundarySerial`, `candidateTickExcluded`, `boundPromotionTickExcluded`,
+`sameBoundaryDuplicateSuppressed`, `stableLaterBoundaries`, `fullGuiBoundPredicate`, `guiInputAllowed`,
+`slotMutationSuppressed`, `reachableMutationPath`, `reachableMutationKind`,
+`suppressedMutationOwner`, `permissionAvailable`, `permissionFullRevalidationPassed`,
+`permissionConsumed`, `permissionReuseRejected`, `transferLifecycleEntryCommitted`, `slotActionOwner`, `slotActionType`, and
+`slotButton`. Do not emit
+unchanged per-tick or per-slot polling logs.
 
 최초 방향 문서 작성 전 읽기 전용 preflight는 다음과 같았다.
 
@@ -64,9 +177,9 @@ live remote freshness: not checked; no fetch performed
 문서의 예상된 미커밋 Markdown 변경만 있었고 Java, test source, resource 또는 build output
 변경은 없었다. 이는 최초 문서 보정 시점의 역사적 provenance다.
 
-그 뒤 별도 승인된 test-only work에서 production handoff hunk는 유지한 채 container
+그 뒤 2026-08-31 당시 별도 승인된 test-only work에서 production handoff hunk는 유지한 채 container
 generation/candidate 전환과 operation isolation의 Java test source만 보강되었다. 현재 작업에서
-제공된 상태에 따르면 clean forced build가 완료되었고 Java test는 380개가 통과했으며 기존
+제공된 당시 상태에 따르면 clean forced build가 완료되었고 Java test는 380개가 통과했으며 기존
 1개가 skipped다. 이 결과는 post-checkpoint test-only tree의 자동 검증 증거이며 Stage 2/3
 diagnostics 구현 뒤의 final RC 검증이나 Minecraft runtime 증거가 아니다. 최종 JAR은 아직
 CurseForge에 배포하거나 Minecraft에서 검증하지 않았다.
@@ -91,6 +204,11 @@ provenance로 기록하며, exact Java diff, build log와 artifact hash를 이 �
 | Minecraft launch 또는 runtime reproduction | 별도 runtime 승인 |
 | commit | 별도 commit 승인 |
 | push | 별도 push 승인 |
+
+이 표는 automatic-deposit checkpoint 작업 당시 action provenance다. 현재 exact GUI
+stabilization 요청에는 §1.1과 canonical Carry On continuous workflow가 이미 적용되므로,
+표의 generic source/test/build row가 그 기능의 중간 승인 gate로 다시 작동하지 않는다.
+H5, diagnostics/harness, 배포, runtime, commit과 push에는 표의 원래 범위가 유지된다.
 
 ## 2. 문서 관계와 부분 supersession
 
@@ -1565,6 +1683,10 @@ Section 3 frozen handoff hunk 변화 0 확인
 
 ### Stage 2 - Diagnostics Core Boundedness
 
+Stage 2-6의 승인 문장은 diagnostics core, tool-selection, frozen handoff, harness와 final
+runtime matrix의 역사 범위에만 적용한다. 현재 exact GUI stabilization의 source/test/required
+clean build는 이 Stage ladder에 편입하지 않고 §1.1 continuous override를 따른다.
+
 Source/test-source edit와 focused test execution은 각각 별도 승인이다. Source edit 승인
 뒤 B unit를 구현할 수 있지만 test 실행, build, runtime, commit 또는 push까지 승인된
 것으로 해석하지 않는다. Gameplay behavior change 또는 upstream engine refactor가
@@ -1723,6 +1845,38 @@ setup이며 row execution allowlist가 아니다. Test operator 또는 별도 �
 cursor 전에 수행하고 manifest가 resulting trusted-destination state를 검증한다. Placeholder
 `[destinationId]`는 실행 가능한 승인 command가 아니다. `@auto_deposit_trusted_list` 같은 read-only
 verification도 exact route proof와 별도 승인 없이는 Python이 제출하지 않는다.
+
+H5 `@auto_deposit_trust area 16x16`, `@auto_deposit_trust 반경 16x16`,
+`@자동보관등록 영역 16x16`, `@자동보관등록 반경 16x16`도 mutating fixture setup으로 분류한다.
+2026-09-02 문서 snapshot에서는 direction만 있고 source가 구현되지 않았다. 현재 dirty worktree에는
+이 문서와 독립적인 modified/untracked H5 Java/test source가 존재하므로 그 snapshot을 current source
+사실로 읽지 않는다. 해당 dirty source는 이 문서 보정에서 검수·승인·검증하지 않고 보존한다.
+그 snapshot의 zero-argument trust handler와 upstream argument handling은 trailing argument를 fail
+closed하지 않아 English form이 기존 single registration으로 떨어질 수 있었고, Korean form은 당시
+command registry에 없었다.
+Deterministic parser/repository evidence가 이 exact worktree에 결합되기 전에는 operator와 Python
+harness 모두 네 form을 실행하거나 setup allowlist에 넣지 않는다. 이후 runtime-root clean build는
+H5와 GUI change set을 함께 포함하므로 exact dirty input과 resulting artifact hash를 기록하고,
+GUI-only 또는 H5-only verification으로 과장하지 않는다.
+
+구현된 뒤에도 broad batch는 R5/R8의 exact fixture 준비를 자동으로 대체하지 않는다. Setup manifest는
+command 전후의 전체 exact destination set, double-chest logical dedupe, excluded-container registration 0건,
+registration truncation 0건과 예상하지 않은 추가·삭제 0건을 검증한다. H5 registration은 임의 64개로
+자르지 않지만, downstream automatic operation의 기존 64-candidate snapshot은 별도 정책으로 남는다.
+
+Command handler 자체는 loaded block-state scan, 한 repository transaction과 bounded output만 소유하고
+Task/path/click을 만들지 않는다. 다만 effective repository revision 변경은 기존 automatic-pressure
+chain의 다음 tick 재평가를 유발할 수 있으므로, 그 뒤 automatic run이 시작되면 registration command의
+직접 side effect가 아니라 별도 downstream lifecycle와 evidence owner로 기록한다. `NO_CHANGE`는 H5-owned
+revision change를 만들지 않는다.
+
+H5의 Korean `@자동보관등록` command name은 `영역 16x16` 또는 `반경 16x16`을 요구하는
+batch-only direct alias이며 LAVI-owned Java command scope다. 무인자 Korean invocation은 승인하지 않는다.
+Python chat/microphone natural-language route와 Fabric wire protocol은 별도 범위다. Canonical H5
+grammar, fixed half-open volume, exact block allowlist, double-chest identity, all-or-none repository
+mutation과 deferred bulk undo 계약은
+[ChatClef Manual Trusted Home Storage Direction §13](chatclef-manual-trusted-home-storage-direction-2026-08-27.md#13-trusted-등록-ux와-json)이
+소유한다.
 
 Harness가 허용되는 역할은 다음으로 제한한다.
 

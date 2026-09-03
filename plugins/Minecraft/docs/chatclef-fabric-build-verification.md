@@ -1,6 +1,7 @@
 <!-- 20260807_kpopmodder: Documented clean, forced, artifact-aware runtime build verification for Fabric ChatClef 1.20.1. -->
 <!-- 20260827_openai: Clarified the Temurin 21 build SDK and Java 17 target/runtime boundary for Minecraft 1.20.1. -->
 <!-- 20260827_openai: Clarified Temurin 21 as the controlled reference SDK rather than a Java 21 game-runtime requirement. -->
+<!-- 20260903_kpopmodder: Included the clean forced build in a directly requested implementation-and-verification workflow without a second approval pause. -->
 
 # Fabric ChatClef 1.20.1 Build Verification
 
@@ -9,10 +10,14 @@ Date: 2026-08-07
 This runbook defines the minimum evidence required before treating a Fabric
 ChatClef 1.20.1 build as valid for Minecraft runtime testing.
 
-It is documentation only. Reading this document does not authorize a Gradle
-build, dependency resolution, Minecraft launch, runtime reproduction, file
-copy, commit, or push. Those actions still require the authorization applicable
-to the current task.
+It is documentation, not a work request by itself. A direct request to
+implement the exact Fabric ChatClef GUI-open stabilization contract already
+includes its in-repository verification. The required clean forced build and
+focused tests are part of that continuous workflow; the user need not repeat
+the word "verification" or provide a second build-phase confirmation.
+Dependency or version changes, Minecraft launch, runtime reproduction, external
+file copy or deployment, commit, and push remain outside that implicit scope
+unless the active request names them explicitly.
 
 ## Scope
 
@@ -60,12 +65,15 @@ separate reproducibility artifact with its own SHA-256.
 Before a verification build, record both `java -version` and the JVM reported
 by Gradle. Do not change a global `JAVA_HOME`, system environment variable, IDE
 SDK, Minecraft runtime, or project Java target merely to run the verification.
-Use a process-local build JDK when a separately authorized build requires one.
+Use a process-local build JDK when the active continuous implementation-and-
+verification workflow or a direct build request requires one.
 
 ## Canonical Verification Build
 
-When a Fabric ChatClef 1.20.1 build is separately authorized and the result will
-be used as compatibility evidence, run the following from the runtime root:
+When the active request directly implements the exact GUI-open stabilization
+contract, otherwise includes Fabric ChatClef implementation with in-repository
+verification, or directly requests this build, run the following from the
+runtime root without another build-phase confirmation:
 
 ```bat
 cd C:\Vtuber_Souorce_Code\LAVI\plugins\Minecraft\runtime\chatclef_fabric_1.20.1
@@ -76,9 +84,16 @@ Use this clean forced build by default for verification. Do not substitute an
 incremental `build` result as proof that the current source produced the runtime
 jar under test.
 
+For this canonical command only, Gradle's wrapper-owned removal of generated
+build outputs below this exact runtime root is normal build lifecycle work, not
+a manual cleanup or deletion requiring another confirmation. This does not
+authorize manual deletion commands, deletion in any other repository or
+external-instance path, or removal of wrapper, vendor, API, or runtime JARs.
+
 Incremental, compile-only, or targeted Gradle tasks may be used only as quick
-local sanity checks when separately authorized. They must not be reported as
-runtime verification, deployment verification, or compatibility evidence.
+local sanity checks when included in the active continuous workflow or directly
+requested. They must not be reported as runtime verification, deployment
+verification, or compatibility evidence.
 
 ## PowerShell Execution Baseline
 
@@ -140,7 +155,16 @@ Before building, record the current directory and repository root:
 ```bat
 cd
 git rev-parse --show-toplevel
+git branch --show-current
+git rev-parse HEAD
+git status --short
 ```
+
+Record the exact dirty source, resource, test, and build inputs that Gradle will
+consume. If unrelated or independently owned changes are present, do not call
+the result a feature-only build. Attribute every dirty input to its change unit
+and classify the result as mixed provenance unless a clean, exact source
+boundary is proven.
 
 The intended runtime root is:
 
@@ -273,6 +297,10 @@ A build-verification report must include:
 ```text
 repository root
 runtime working directory
+branch name and HEAD commit
+complete pre-build dirty input list for source, resource, test, and build files
+change-unit attribution for every dirty build input
+build provenance classification: EXACT_CHANGE_UNIT or MIXED_PROVENANCE
 exact Gradle command
 build JDK vendor and full version
 Gradle JVM vendor and full version

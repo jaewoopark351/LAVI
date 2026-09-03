@@ -1,5 +1,10 @@
 <!-- 20260806_kpopmodder: Documented the ChatClef task lifecycle diagnostic runbook for command root, child task, and Baritone loop investigations. -->
 <!-- 20260831_openai: Linked the post-checkpoint shared diagnostics-admission, bounded terminal-accounting, and separated validation direction. -->
+<!-- 20260903_openai: Added the exact GUI-bound, three-later-client-tick lifecycle audit and pre-change report gate. -->
+<!-- 20260903_kpopmodder: Converted the GUI-gate pre-change stop into a continuous implementation, bounded-log, and verification ledger. -->
+<!-- 20260903_openai: Aligned the GUI gate with open-child quiescence, one-shot interaction correlation, full reachable-path suppression, exact route types, explicit boundary serials, and one-time permission consumption. -->
+<!-- 20260903_kpopmodder: Defined bounded source-to-hub-to-coordinator diagnostics for the live inter-tick ScreenOpenEvent TAIL gap. -->
+<!-- 20260903_kpopmodder: Corrected runtime evidence and made the screen-dispatch schema, budgets, summaries, and test isolation implementable. -->
 
 # ChatClef Task Lifecycle Diagnostics
 
@@ -8,9 +13,12 @@ Date: 2026-08-06
 This runbook documents how to investigate Fabric ChatClef / AltoClef task
 lifecycle loops before making a behavior fix.
 
-It is documentation only. It does not approve Java changes, Gradle changes,
-dependency changes, Minecraft launch, runtime reproduction, cache deletion,
-commit, push, or a behavior-changing fix.
+It is documentation, not a work request by itself. When the user directly asks
+for the exact container GUI-bound three-later-tick feature, that request follows
+the continuous implementation workflow in the canonical Carry On direction:
+implementation, bounded-log reinforcement, tests, and clean-build verification
+without per-stage approval pauses. Dependency/version changes, external runtime
+mutation, cache deletion, commit, and push remain outside that implicit scope.
 
 ## Scope
 
@@ -21,6 +29,10 @@ plugins/Minecraft/runtime/chatclef_fabric_1.20.1/**
 plugins/Minecraft/fabric/chatclef/**
 plugins/Minecraft/common/dto/**
 ```
+
+The generic lifecycle runbook may inspect the common DTO layer, but the exact
+container GUI stabilization behavior does not add or change a common DTO,
+wire-protocol field, message ordering, status value, or acknowledgement.
 
 Relevant boundaries:
 
@@ -741,64 +753,1240 @@ That pattern points to the boundary between existing cancellation,
 reselection, and Baritone active-idle/path adoption. It does not by itself
 authorize a new cancellation, retry, timeout, or blacklist change.
 
-### 10. Container Open And Click Boundary
+### 10. Container World-Click, GUI Binding, Stability, And Slot-Input Boundaries
 
-For container loops such as crafting table or furnace open attempts, capture the
-click-to-GUI transition.
+For a container loop, do not collapse world reach, click acceptance, a screen
+callback, exact GUI ownership, three-boundary stability, and a slot mutation
+into one `GUI_OPEN` result. They are separate lifecycle boundaries.
 
-Suggested event:
+This section records the 2026-09-03 implementation contract. A direct user
+implementation request covers its repository-local source/config/test changes,
+bounded logging, focused tests, and required clean build as one continuous
+workflow. External runtime, deployment, commit, and push remain outside that
+scope unless the active request names them.
+
+Current evidence status: the working-tree implementation, repository tests,
+and clean build passed, but the matching-JAR regular-furnace runtime failed
+before any accepted exact-gate TAIL candidate was recorded. The requested GUI
+became live independently; the first failing source/hub/gate boundary remains
+directly unobserved. Incident counts and the next diagnostics-only work are in
+[implementation ledger Section 18](chatclef-exact-container-gui-three-tick-implementation-ledger-2026-09-03.md#18-post-build-furnace-runtime-reproduction-and-diagnostic-reinforcement-plan).
+
+#### Fixed Lifecycle Model
+
+Suggested diagnostic phase names, not prescribed Java enum names:
+
+```text
+OPEN_ATTEMPT_CREATED
+WORLD_OPEN_REQUESTED
+WORLD_CLICK_OBSERVED
+SCREEN_TAIL_CANDIDATE
+OPEN_CHILD_QUIESCING
+OPEN_CHILD_QUIESCENT
+GUI_BOUND
+GUI_STABILIZING_0
+GUI_STABILIZING_1
+GUI_STABILIZING_2
+GUI_INPUT_ALLOWED
+SLOT_ACTION_ISSUED
+TERMINAL
+```
+
+The fixed operation order is:
+
+```text
+one route-owned normal world right-click for one open attempt
+-> observe exactly one matching BlockInteractEvent for that attempt
+-> raw ScreenOpenEvent TAIL source observation
+-> only active-serial and exact-correlation acceptance creates the candidate,
+   whose snapshot consumes that event once
+-> route parent stops or quiesces the open child through its normal lifecycle so it cannot click again
+-> operation-owned normal open-child cleanup completes
+-> exact target/world/dimension/screen/handler/syncId/operation-attempt binding
+-> do not count TAIL-candidate tick K or GUI_BOUND-promotion tick B
+-> validate the same binding at three distinct later client-tick boundaries
+-> transition permission to GUI_INPUT_ALLOWED
+-> next normal Task evaluation fully revalidates and commits permission consumption with transfer entry
+-> allow the existing route-owned screen-local slot action
+```
+
+A retry creates a new `openAttemptId` and `correlationId`; it inherits no
+binding, count, or permission from the previous attempt.
+
+`GUI_BOUND` is not allowed while the open child can still reach another world
+interaction. The parent must first observe the exact matching
+`BlockInteractEvent` once, require the matching TAIL candidate to consume that
+pending match once, and let the existing child replacement/stop lifecycle reach
+a quiescent state. Quiescent means that
+the old child is no longer tickable by the route, has no pending route-owned
+right-click, and cannot be returned again for the same attempt. This is not
+permission to change generic `InteractWithBlockTask.isFinished()`, equality, or
+global input cleanup.
+
+The phrase “Shift right-click after three ticks” must not be used as an
+implementation instruction. The gate does not authorize another
+`interactBlock`, physical SNEAK injection, right-button synthesis, or a change
+to the existing slot action. Trusted-home `QUICK_MOVE`/button 0 and current
+storage/furnace `PICKUP`/button contracts remain route-specific.
+
+#### First-Pickup Limitation
+
+The post-open gate begins only after `GUI_BOUND`. If Carry On server-side
+`keyPressed` is stale true, the first normal world click may be consumed as a
+pickup. Then no requested GUI opens, `GUI_BOUND` does not exist, and no
+stabilization phase starts.
+
+Deterministic prevention of that initial pickup requires a separate Carry On
+policy such as exact `forbiddenTiles` configuration or a dedicated Carry key.
+This post-open task does not silently include such a configuration or key
+change. Do not report a
+post-open three-boundary gate as proof that the initial pickup problem is
+solved.
+
+The existing `DoStuffInContainerTask` post-placement SNEAK wait is a separate
+pre-GUI bounded handoff. It currently can proceed after its budget is
+exhausted. It is not the new fixed post-GUI gate and is not deterministic
+Carry On pickup prevention.
+
+#### Raw ScreenOpenEvent TAIL And Accepted Candidate Are Distinct
+
+Current source facts:
+
+```text
+ClientOpenScreenMixin
+    publishes ScreenOpenEvent at MinecraftClient.setScreen HEAD and TAIL
+
+ScreenOpenEvent
+    contains only screen and preOpen
+
+ClientInteractWithBlockMixin / BlockInteractEvent
+    expose a BlockHitResult interaction boundary
+    do not expose owning operation or attempt identity
+```
+
+Therefore `preOpen=false` proves only that `MinecraftClient.setScreen` reached
+TAIL for that requested screen argument. It does not by itself prove target,
+world, dimension, handler, syncId, current operation, or current attempt.
+
+A raw TAIL source observation is not yet `SCREEN_TAIL_CANDIDATE` and does not
+necessarily own a tick `K`. If the producer or hub observes it while no active
+client-tick serial exists, record `clientTickWindowState=BETWEEN_TICKS`,
+`activeClientTickSerialPresent=false`, and
+`candidateClientTickSerial=-1`. The diagnostics-only stage must not retain,
+replay, forward, or backfill that event. Tick `K` is defined only after the
+event is delivered under proven current-tick serial ownership and the
+coordinator accepts it as the attempt's candidate. Any inter-tick
+behavior correction requires direct source→hub→gate evidence and an exact
+ownership-preserving design; until then candidate creation remains fail-closed.
+
+For one attempt, only one `BlockInteractEvent` observed after
+`WORLD_OPEN_REQUESTED` and before its TAIL candidate, whose world, dimension and
+exact `BlockHitResult` target match the immutable attempt target, may satisfy the
+world-click boundary. Keep it as a pending observation until the matching TAIL
+candidate atomically consumes it once. Duplicate events, a later event, a
+different target, or a crosshair fallback must not replace it or refresh the
+open-wait window. Only an accepted TAIL candidate captures an immutable
+candidate snapshot, including its proven `candidateClientTickSerial`; it does
+not finish child cleanup or publish permission.
+
+Consumption permanently spends that event for this attempt. If the captured
+candidate is later rejected, the event is not returned to pending state and a
+later TAIL candidate cannot reuse it. A retry starts a new attempt/correlation
+and must observe a new matching event.
+
+A captured TAIL candidate may later be promoted to `GUI_BOUND` only if the
+active route-owned attempt proves all of these together at that route-owned
+promotion boundary:
+
+```text
+owning operation is still active
+openAttemptId and correlationId match the current attempt
+the attempt observed exactly one matching BlockInteractEvent after WORLD_OPEN_REQUESTED
+the event preceded this TAIL candidate and matched target, world and dimension
+this TAIL candidate consumed that still-unconsumed event exactly once
+the route-owned open child is stopped or otherwise proven quiescent
+operation-owned normal child cleanup completed before GUI_BOUND
+immutable target position matches the observed world-click target
+world object identity matches
+dimension matches
+target block is in the route's explicit in-scope target set
+event.screen is non-null
+MinecraftClient.currentScreen == event.screen
+event.screen instanceof HandledScreen<?>
+event.screen class matches the exact screen class mapped for this route
+HandledScreen.getScreenHandler() object == player.currentScreenHandler object
+captured handler object remains the live player handler object
+captured handler syncId == live handler syncId
+handler class matches the exact handler class mapped for this route
+candidate is inside the route-owned bounded open-wait window
+```
+
+If any candidate binding identity changes while the parent is quiescing the
+open child or completing its normal cleanup, discard the candidate and end its
+association with the permanently spent event. Do not restore that event to
+pending state, bind the replacement screen, or inherit the old attempt's event.
+If the existing stop/cleanup path releases global or otherwise unowned input,
+screen, goal or path state, it is not operation-owned cleanup. Keep the handoff
+in a narrow composed owner; if source proves that impossible, record the
+contract gap and use only the minimal behavior-preserving generic seam allowed
+by the canonical direction.
+
+The initial exact target/type mapping is:
+
+```text
+minecraft:chest and minecraft:trapped_chest
+    screen class: GenericContainerScreen
+    handler class: GenericContainerScreenHandler
+
+minecraft:furnace
+    screen class: FurnaceScreen
+    handler class: FurnaceScreenHandler
+```
+
+Match the actual runtime class and the exact handler object/syncId; do not accept
+only a superclass name or broad `ContainerType`. Barrel, every shulker box,
+smoker, blast furnace, hopper, dispenser, dropper, ender chest, entity inventory,
+crafting/brewing screens, modded containers, and every unlisted block or handler
+remain outside this gate.
+
+Do not prove `GUI_BOUND` using only:
+
+```text
+interactBlock ActionResult
+tryPressAccepted
+screenName
+screen class
+handler class
+syncId changed
+elapsed time
+ContainerSubTracker classification
+crosshair fallback
+CarryOnContainerExpectedGui.expectedGuiOpened
+```
+
+#### Three Distinct Later Client-Tick Boundaries
+
+Neither the tick containing the accepted TAIL candidate nor the tick in which
+the route later promotes that candidate to `GUI_BOUND` is one of the three
+stable later boundaries. Counting is anchored to `boundClientTickSerial`, not
+wall time or a possibly earlier candidate serial. A raw
+`currentTick - openTick >= 3` test is insufficient without a proven boundary
+serial and callback order.
+
+The implementation ledger must identify a monotonically increasing current-tick
+identity and its chosen boundary observation, and the bounded logs and tests
+must show `current-tick serial publication -> route-owned promotion -> chosen
+boundary observation of that same serial`. If the stored counter advances only
+at END, a TAIL callback or Task HEAD must not mislabel the last completed END
+serial as the identity of the currently executing tick or reuse that existing
+counter blindly.
+
+The attempt records two distinct serial fields:
+
+```text
+boundClientTickSerial
+    serial of the client tick in which route-owned promotion establishes GUI_BOUND
+    immutable for that binding
+
+lastCountedBoundarySerial
+    most recent distinct later boundary counted for this attempt
+    initialized to boundClientTickSerial
+```
+
+A boundary is countable only when its serial is strictly greater than both
+`boundClientTickSerial` and `lastCountedBoundarySerial`. After successful full
+binding validation, update `lastCountedBoundarySerial` and increment once.
+
+Conceptual trace:
+
+```text
+accepted TAIL candidate with proven serial K captures candidateClientTickSerial and immutable candidate:
+    matching BlockInteractEvent is consumed once
+    GUI_BOUND is not yet established
+
+route-owned promotion in tick B after open-child quiescence/cleanup establishes GUI_BOUND:
+    stableLaterBoundaries=0
+    boundClientTickSerial=serial for tick B
+    lastCountedBoundarySerial=boundClientTickSerial
+
+boundary belonging to binding tick B:
+    validate only, count remains 0
+
+first distinct later boundary B+1:
+    validate full binding, count=1
+
+second distinct later boundary B+2:
+    validate full binding, count=2
+
+third distinct later boundary B+3:
+    validate full binding, count=3
+    permission may become GUI_INPUT_ALLOWED
+
+subsequent normal evaluation, normally Task HEAD at B+4, by the existing route owner:
+    revalidates the full binding and route-specific transfer preconditions
+    commits one-time permission consumption together with transfer-lifecycle entry
+    may then issue the existing slot action
+```
+
+The entire route-reachable execution path is gameplay-mutation-free at counts
+0, 1, 2 and 3, not only the gate/event/tick observer. Operation-local
+validation, serial, deduplication, counter, invalidation and permission
+bookkeeping may change. The parent must short-circuit
+before any `super.onTick()`, child return, fallback, helper, chain, or callback
+that could call `clickSlot`, register a slot action, mutate the cursor, close or
+replace the screen, call `interactBlock`, modify input, or change Baritone
+state. Permission transition and slot mutation remain separate ownership
+boundaries. Existing global behavior must remain unchanged; the route audit
+must prove that no independently reachable owner can bypass the gate. After
+`GUI_BOUND` and before permission consumption, do not tick or stop a current or
+former child when that lifecycle call can perform any forbidden mutation.
+
+Duplicate observation of the same boundary, render frames, wall-clock delay,
+server ticks, Task invocation count, packet callback count, or screen-event
+count must not advance `stableLaterBoundaries`.
+
+`GUI_INPUT_ALLOWED` is an attempt-bound, one-time permission, not a durable
+boolean capability. The later-boundary callback may only make it available. On
+the next normal evaluation, the owning route must fully revalidate the operation,
+attempt, target, world, dimension, screen object, handler object, syncId, exact
+screen/handler type, open-child quiescence, and empty/valid route preconditions
+before consuming the permission once. Permission consumption and entry into the
+existing route-specific transfer lifecycle are one logical commit. If entry
+cannot be established, do not consume the permission; invalidate or terminate
+with a typed reason and perform no slot action. A failed revalidation invalidates
+it; a second consumer or later evaluation cannot reuse it.
+
+#### Binding Invalidation And Typed Failure
+
+Clear the captured binding, stability count, and input permission immediately
+when any of these changes:
+
+```text
+screen object
+HandledScreen handler object
+player.currentScreenHandler object
+captured or live syncId
+world object
+dimension
+target position or in-scope target family
+owning operation
+openAttemptId or correlationId
+```
+
+Also invalidate on `setScreen(null)`, screen replacement, Task interruption,
+owner stop/finish, open timeout, or failed stability observation.
+
+Suggested diagnostic outcomes, not prescribed Java enums:
+
+```text
+GUI_OPEN_TIMEOUT
+SCREEN_TAIL_CANDIDATE_REJECTED
+SCREEN_CLOSED_BEFORE_STABLE
+GUI_STABILITY_INVALIDATED
+OPERATION_INTERRUPTED
+```
+
+Every result fails closed. Timeout or invalidation does not authorize an
+unsafe click, early slot mutation, global input release, forced screen close,
+Baritone cancellation, fallback success, or inherited retry state.
+
+#### Current Reusable Evidence Is Not A Shared Behavior Owner
+
+`AutoDepositOpenContainerBindingTracker` is a useful storage-specific
+correlation precedent, but current source does not satisfy the full contract:
+
+```text
+present:
+    pending BlockInteractEvent to ScreenOpenEvent TAIL correlation
+    world, dimension, position, current screen and player handler snapshots
+    broad ContainerType compatibility
+
+missing:
+    operation-local openAttemptId and retry identity
+    HandledScreen.getScreenHandler() object equality check
+    explicit captured/live syncId field comparison
+    three later-boundary counter and GUI_INPUT_ALLOWED permission
+```
+
+Its target policy is also incompatible with the in-scope target set:
+
+```text
+AutoDepositTrustedContainerSupport
+    delegates to StoreInContainerTask.CONTAINER_BLOCKS
+
+that block list includes:
+    chest, trapped chest, Barrel, shulker boxes
+
+that block list excludes:
+    furnace processing blocks
+```
+
+Do not promote that tracker unchanged to a chest/furnace common authority. It
+would include out-of-scope Barrel/shulker behavior and omit furnace behavior.
+H5 bulk trust registration owns loaded-block scan and repository mutation only;
+it must not own this GUI lifecycle.
+
+`CarryOnContainerExpectedGui` and `ContainerSubTracker` are broad diagnostics or
+legacy tracking boundaries. Their visible-screen, handler-change, broad target,
+or crosshair-fallback rules are not strict current-operation GUI binding.
+
+#### Non-Blocking Route Owner Audit
+
+Audit these routes separately rather than naming one global owner:
+
+```text
+manual trusted-home storage:
+    StoreHomeCandidateAttempt
+    StoreHomeCandidateNavigationStep.tick
+    HomeStorageContainerActivationGate
+    HomeStorageQuickMoveIssuer
+
+other storage-container path:
+    AbstractDoToStorageContainerTask.onTick
+    concrete StoreInContainerTask callers and their parent/retry lifecycle
+
+furnace processing path:
+    DoStuffInContainerTask.onStart/onTick/onStop
+    SmeltInFurnaceTask.DoSmeltInFurnaceTask
+    smoker/blast-furnace variants only if explicitly included and proven
+```
+
+Current source indicates:
+
+```text
+StoreHomeCandidateAttempt owns one reusable open child for one candidate
+StoreHomeCandidateNavigationStep activates as soon as exact binding matches
+HomeStorageQuickMoveIssuer performs QUICK_MOVE with button 0
+AbstractDoToStorageContainerTask enters onContainerOpenSubtask when its broad
+    ContainerType predicate matches
+DoStuffInContainerTask enters containerSubTask when isContainerOpen succeeds
+InteractWithBlockTask(BlockPos) is non-shift, isFinished() is false, and may be
+    returned repeatedly until its parent changes state
+```
+
+These are candidate seams, not blanket authority to change generic behavior. A hunk in
+`AbstractDoToStorageContainerTask`, `DoStuffInContainerTask`, or another
+upstream-derived engine file is an engine divergence and must remain minimal,
+recorded, reversible, and verified in the continuous workflow. Do not start with `InteractWithBlockTask`,
+`PlayerInteractionFixChain`, `TaskRunner`, global input, or global Baritone
+handling.
+
+#### Suggested Additive Observation Event
+
+The existing event name may remain:
 
 ```text
 CONTAINER_INTERACTION_OBSERVATION
 ```
 
-Required fields:
+##### Canonical Exact GUI-Gate Log Fields
+
+The field names below are the canonical schema for newly added exact GUI-gate
+boundary records, focused-test fixtures, parsers and runtime evidence. Use them
+verbatim; do not introduce shortened aliases such as `observedBoundarySerial`,
+`screenIdentity`, `fullBindingValid`, or `duplicateEventRejected`. This does not
+rename unrelated existing payload keys. Add a canonical field during bounded-log
+reinforcement only when the existing observer cannot supply it.
+
+Canonical fields (emit only where applicable to the boundary record):
 
 ```text
-interactIdentity
+operationId
+openAttemptId
+correlationId
+diagnosticSessionId
+diagnosticBoundaryActivationId
+diagnosticFlushReason
+gameTick
+threadName
+routeOwnerClass
+routeOwnerIdentity
+retryOwnerClass
+retryIndex
 target
-containerTarget
-reachable
-lookingAtTarget
-crosshairHitType
-crosshairBlockPos
-tryPressAccepted
-rightClickHeld
-playerSneaking
-sneakHeld
-mainHandItem
-offHandItem
+targetBlockId
+targetFamily
+worldIdentity
+dimension
+clientTickBoundarySerial
+candidateClientTickSerial
+boundClientTickSerial
+lastCountedBoundarySerial
+screenOpenEventIdentity
+screenEventStage
+clientTickWindowState
+activeClientTickSerialPresent
+activeClientTickSerial
+lastIssuedClientTickSerial
+lastPublishedClientTickBoundarySerial
+guiContainerEventHubIdentity
+registeredGuiListenerCount
+dispatchEligibleGuiListenerCount
+completedGuiListenerCallbackCount
+skippedInactiveAfterSnapshotGuiListenerCount
+screenEventDisposition
+screenEventDropReason
+gateOutcome
+coordinatorOutcome
+operationContextAvailable
+activeAttemptPresent
+gatePhaseBefore
+eventPreOpen
+matchingBlockInteractEventObserved
+matchingBlockInteractEventCount
+matchingBlockInteractEventConsumed
+duplicateBlockInteractEventRejected
+openChildIdentity
+openChildState
+openChildQuiescent
+openChildCleanupOwner
+openChildCleanupComplete
+screenTailCandidate
+tailCandidateSnapshotIdentity
+screenObjectIdentity
 screenName
-screenHandlerClass
-screenHandlerSyncId
-currentScreenChanged
+screenTypeExpected
+screenTypeActual
+screenTypeMatched
+screenIsHandled
+handledScreenHandlerIdentity
+playerHandlerIdentity
+capturedSyncId
+liveSyncId
+handlerTypeExpected
+handlerTypeActual
+handlerTypeMatched
+eventScreenIsCurrentScreen
+eventHandlerIsPlayerHandler
+fullGuiBoundPredicate
+stableLaterBoundaries
+candidateTickExcluded
+boundPromotionTickExcluded
+sameBoundaryDuplicateSuppressed
+guiInputAllowed
+permissionAttemptIdentity
+permissionAvailable
+permissionFullRevalidationPassed
+permissionConsumed
+permissionReuseRejected
+transferLifecycleEntryCommitted
+slotMutationSuppressed
+reachableMutationPath
+reachableMutationKind
+suppressedMutationOwner
+slotActionOwner
+slotActionType
+slotButton
+invalidationReason
+terminalReason
 carryState
-clickStatusBefore
-clickStatusAfter
-observationWindowTick
+diagnosticBudgetScope
+diagnosticDetailObservationCount
+diagnosticDetailDedupeSuppressedCount
+diagnosticDetailLocalAdmissionCount
+diagnosticDetailLocalCapSuppressedCount
+diagnosticDetailSharedAdmissionRejectedCount
+diagnosticDetailPhysicalEmissionCount
+firstObservedGameTick
+lastObservedGameTick
+lastSuccessfulBoundary
+firstFailingBoundary
+screenTailSourceObservedCount
+screenTailHubDroppedCount
+screenTailHubDispatchStartedCount
+screenTailHubDispatchCompletedCount
+screenTailHubNoActiveListenerCount
+screenTailHubInactiveAfterSnapshotSkipCount
+screenTailGateReceivedCount
+screenTailGateDecisionCount
+screenTailGateNoActiveAttemptCount
+screenTailCoordinatorAcceptedCount
+screenTailCoordinatorRejectedCount
+screenTailCoordinatorNoStateChangeCount
+finalCheckpointEmissionAttempted
+operationFinalCheckpointAdmissionRequestCount
+operationFinalCheckpointAdmittedCount
+operationFinalCheckpointPhysicalEmissionCount
+operationAggregateRegistrationRejectedCount
+diagnosticEvidenceCompleteness
+diagnosticEvidenceGapReasons
+omittedCount
 ```
 
-Suggested click status changes:
+Within one attempt, `matchingBlockInteractEventConsumed` is monotonic: once true,
+candidate rejection must not return it to false or permit reuse.
+`transferLifecycleEntryCommitted=true` is valid only in the same logical commit
+that changes `permissionConsumed` to true; neither field may claim success alone.
+
+Do not read a state-changing Carry On API or perform a slot/input action merely
+to populate a field.
+
+##### Screen TAIL Source-To-Hub-To-Coordinator Diagnostic Contract
+
+The 2026-09-03 regular-furnace runtime capture proves that the requested
+`FurnaceScreen` and `FurnaceScreenHandler` became live, while no exact-gate TAIL
+candidate was recorded. Source inspection also shows a previously unobservable
+drop boundary: `GuiContainerEventHub.onScreen()` returns when the active
+client-tick serial is unavailable. The current evidence classification is:
 
 ```text
-CANT_REACH -> WAIT_FOR_CLICK
-WAIT_FOR_CLICK -> CLICK_ATTEMPTED
-CLICK_ATTEMPTED -> GUI_OPEN
-CLICK_ATTEMPTED -> OBSERVATION_WINDOW_EXPIRED
+LOG_CONFIRMED:
+    165 exact-furnace open requests and 165 matching world interactions
+    164 FurnaceScreen/FurnaceScreenHandler next-tick observations with changed syncId
+    the 165th GUI_OPEN_DELAYED record belongs to an unrelated crafting-table screen
+    before the ordinary ceiling, no admitted EXACT_GUI_SCREEN_TAIL_CANDIDATE,
+        GUI_BOUND, permission, or EXACT_GUI_TRANSFER_ENTRY_COMMITTED record
+    post-ceiling exact-gate detail is unobserved; the user-observed outcome is
+        that iron smelting did not proceed
+    no BOUNDARY-visible generic slot-request record; generic physical clickSlot
+        counting is VERBOSE-only and is therefore UNOBSERVED_IN_BOUNDARY
+
+LEADING_SOURCE_AND_LOG_HYPOTHESIS:
+    setScreen TAIL may be arriving after client tick RETURN/endTick and before
+        the next client tick HEAD/beginTick
+    the hub may therefore discard the event because no active serial exists
+
+DIRECTLY_UNVERIFIED:
+    execution of the TAIL producer for the affected event
+    hub receipt and its exact early-return reason
+    whether any listener received that same event
 ```
 
-Decision signals:
+Do not upgrade the inference to a confirmed root cause until one bounded
+reproduction observes the applicable boundaries in order:
 
 ```text
-CLICK_ATTEMPTED never appears
-    -> movement, reachability, or look boundary is suspect
-
-CLICK_ATTEMPTED and tryPressAccepted=true but no GUI opens
-    -> interaction packet, input, server response, or Carry On interception is suspect
-
-screenName=none and screenHandlerClass=PlayerScreenHandler
-    -> no container GUI is currently open
+ClientOpenScreenMixin TAIL source
+-> GuiContainerEventHub receipt and disposition
+-> ExactContainerGuiGate intake, when dispatch starts
+-> coordinator evaluation and any existing candidate/invalidation lifecycle record
+-> ExactContainerGuiGate decision, when the complete gate path returns normally
+-> GuiContainerEventHub dispatch completion, when the fan-out loop returns normally
 ```
+
+Use these canonical BOUNDARY event names:
+
+```text
+EXACT_GUI_SCREEN_TAIL_SOURCE_OBSERVED
+EXACT_GUI_SCREEN_TAIL_HUB_DECISION
+EXACT_GUI_SCREEN_TAIL_GATE_INTAKE
+EXACT_GUI_SCREEN_TAIL_GATE_DECISION
+EXACT_GUI_SCREEN_TAIL_HUB_DISPATCH_COMPLETED
+EXACT_GUI_SCREEN_DISPATCH_SUPPRESSION_SUMMARY
+EXACT_GUI_OPERATION_FINAL_CHECKPOINT
+EXACT_GUI_SCREEN_SESSION_FINAL_CHECKPOINT
+```
+
+`EXACT_GUI_SCREEN_TAIL_SOURCE_OBSERVED` is emitted immediately before the
+existing synchronous `EventBus.publish` call at `setScreen` TAIL. It proves
+only that the producer ran. These exact-screen events apply to TAIL only and
+carry `eventPreOpen=false`; the existing HEAD event contract remains
+unchanged.
+
+While diagnostics mode is `BOUNDARY`, every valid `ScreenOpenEvent` reaching
+that TAIL source is eligible for a diagnostic source observation subject to the
+uncorrelated screen-activation budget; source admission must not depend on an
+active exact-GUI operation or attempt because neither identity is available
+there. The source record therefore carries no fabricated operation/task
+correlation. It also does not retain, queue, replay, or backfill the event when
+the active tick serial is unavailable downstream.
+
+The canonical value sets are:
+
+```text
+screenEventStage:
+    TAIL_SOURCE_PRE_PUBLISH
+    TAIL_HUB_PRE_DISPATCH
+    TAIL_GATE_INTAKE
+    TAIL_GATE_DECISION
+    TAIL_HUB_POST_DISPATCH
+
+screenEventDisposition:
+    OBSERVED
+    DROPPED
+    DISPATCH_STARTED
+    RECEIVED
+    PROCESSED
+    DISPATCH_COMPLETED
+
+screenEventDropReason:
+    NONE
+    ACTIVE_CLIENT_TICK_SERIAL_UNAVAILABLE
+    NO_ACTIVE_GUI_LISTENER
+
+gateOutcome:
+    NOT_APPLICABLE
+    NOT_EVALUATED
+    NO_ACTIVE_ATTEMPT
+    COORDINATOR_CALLED
+
+coordinatorOutcome:
+    NOT_CALLED
+    ACCEPTED_TAIL_CANDIDATE
+    RETURNED_INVALIDATE
+    RETURNED_NO_STATE_CHANGE
+
+diagnosticBudgetScope:
+    NOT_APPLICABLE
+    OPERATION_ACTIVATION_DETAIL
+    UNCORRELATED_SCREEN_ACTIVATION_DETAIL
+    LOCAL_DETAIL_EXEMPT_AGGREGATE_CHECKPOINT
+    LOCAL_DETAIL_EXEMPT_SUPPRESSION_SUMMARY
+    LOCAL_DETAIL_EXEMPT_FINAL_SNAPSHOT_PROJECTION
+
+diagnosticFlushReason:
+    NOT_APPLICABLE
+    MODE_OFF
+    CLEAN_TEARDOWN_FINAL_SNAPSHOT
+```
+
+Use `UNCORRELATED_SCREEN_ACTIVATION_DETAIL` for every source/hub record and for
+gate intake/decision without operation context. Use
+`OPERATION_ACTIVATION_DETAIL` only when the gate record has a proven operation
+context. Final checkpoints and suppression summaries use their explicit
+local-detail-exempt values; exemption from the local 256 cap does not bypass
+the applicable shared-session subquota.
+
+For this contract, `operationContextAvailable=true` is deliberately narrower
+than “an operation lifecycle has started.” At the entry of
+`ExactContainerGuiGate.onScreen`, before intake logging, the active-attempt
+guard, or the coordinator call, capture one immutable method-local entry
+snapshot: active-attempt presence, operation/attempt/correlation identities,
+and `gatePhaseBefore`. Context is proven only when that entry snapshot has an
+active attempt and its `operationId` equals the entry-time live gate lifecycle's
+`operationId`. Intake and a normal-return decision for the same callback must
+reuse this exact snapshot; never recompute context from state the coordinator
+may have invalidated. The snapshot is discarded when the callback returns and
+must not become retained attempt state.
+
+When entry context is false, the intake and subsequent `NO_ACTIVE_ATTEMPT`
+decision both report `operationContextAvailable=false`, leave
+operation/attempt/correlation identity unavailable, and use the uncorrelated
+screen-activation budget and aggregate. Do not copy an otherwise live lifecycle
+`operationId` into those records. When entry context is true, a
+`RETURNED_INVALIDATE` decision remains correlated to that entry operation and
+operation budget even though the coordinator invalidated the live attempt
+before decision logging; its operation aggregate records the rejection.
+
+Use this exact mapping:
+
+| Event | Stage | Disposition | Drop reason | Gate/coordinator outcome |
+| --- | --- | --- | --- | --- |
+| source observed | `TAIL_SOURCE_PRE_PUBLISH` | `OBSERVED` | `NONE` | `NOT_APPLICABLE` / `NOT_CALLED` |
+| hub cannot dispatch without active serial | `TAIL_HUB_PRE_DISPATCH` | `DROPPED` | `ACTIVE_CLIENT_TICK_SERIAL_UNAVAILABLE` | `NOT_APPLICABLE` / `NOT_CALLED` |
+| hub has no eligible GUI listener | `TAIL_HUB_PRE_DISPATCH` | `DROPPED` | `NO_ACTIVE_GUI_LISTENER` | `NOT_APPLICABLE` / `NOT_CALLED` |
+| hub begins fan-out | `TAIL_HUB_PRE_DISPATCH` | `DISPATCH_STARTED` | `NONE` | `NOT_APPLICABLE` / `NOT_CALLED` |
+| gate entry | `TAIL_GATE_INTAKE` | `RECEIVED` | `NONE` | `NOT_EVALUATED` / `NOT_CALLED` |
+| gate has no active attempt | `TAIL_GATE_DECISION` | `PROCESSED` | `NONE` | `NO_ACTIVE_ATTEMPT` / `NOT_CALLED` |
+| coordinator returns normally | `TAIL_GATE_DECISION` | `PROCESSED` | `NONE` | `COORDINATOR_CALLED` / its exact typed outcome |
+| snapshot loop returns normally after invoking each registration still active at its turn | `TAIL_HUB_POST_DISPATCH` | `DISPATCH_COMPLETED` | `NONE` | `NOT_APPLICABLE` / `NOT_CALLED` |
+
+`EXACT_GUI_SCREEN_TAIL_HUB_DECISION` is emitted once per receiving hub
+instance before either the existing early return or fan-out. It records
+`registeredGuiListenerCount` and the snapshot-time
+`dispatchEligibleGuiListenerCount`; it must not claim that a callback has
+completed. Do not emit one hub decision per listener.
+
+`EXACT_GUI_SCREEN_TAIL_GATE_INTAKE` is emitted before the active-attempt guard
+or coordinator call. `EXACT_GUI_SCREEN_TAIL_GATE_DECISION` is emitted only
+after that gate path returns normally and supplements rather than replaces the
+existing `EXACT_GUI_SCREEN_TAIL_CANDIDATE` and `EXACT_GUI_INVALIDATED`
+lifecycle records. `EXACT_GUI_SCREEN_TAIL_HUB_DISPATCH_COMPLETED` is emitted
+only after the snapshot fan-out loop returns normally. A registration present
+in the snapshot is invoked only if it is still active at its turn; report both
+`completedGuiListenerCallbackCount` for callbacks actually invoked and returned
+normally and `skippedInactiveAfterSnapshotGuiListenerCount` for registrations
+deactivated after the snapshot. A listener or coordinator exception must
+propagate unchanged: do not place observed fan-out/coordinator behavior inside
+a new catch or finally merely to force a decision/completion record. When
+diagnostic admission remains available, absence of the later record is evidence
+that the fan-out path did not return normally.
+
+The existing defensive `event == null` return remains behavior-preserving but
+is not a canonical TAIL evidence result: `EventBus.publish` dereferences the
+event before the hub can receive it. Do not confuse a null event object with a
+valid `ScreenOpenEvent` whose `screen` field is null for screen closure.
+
+The same `screenOpenEventIdentity` may connect source, hub, and gate
+records for the same synchronous event object, and
+`guiContainerEventHubIdentity` distinguishes receiving hub instances. Both are
+auxiliary identity-hash evidence and are not globally unique join keys. They
+must not become operation identity, Task equality input, retry key, or dedupe
+fingerprint fields. Correlate them only with synchronous ordering, thread,
+adjacent diagnostic event sequence, and the bounded screen/handler snapshot.
+If that evidence is ambiguous, report incomplete correlation rather than
+introducing a mutable event-identity registry or fabricating an `operationId`,
+`openAttemptId`, or `correlationId`.
+
+`clientTickWindowState` has these diagnostic meanings:
+
+```text
+ACTIVE_BEFORE_RETURN
+ACTIVE_BOUNDARY_CLAIMED
+BETWEEN_TICKS
+UNAVAILABLE
+```
+
+The value must come from one side-effect-free serial-state snapshot. When no
+active serial exists, set `activeClientTickSerialPresent=false` and emit
+`activeClientTickSerial=-1` and `clientTickBoundarySerial=-1`. A previous
+issued/completed serial may be logged only in its own
+`lastIssuedClientTickSerial` or `lastPublishedClientTickBoundarySerial` field.
+It must never be copied into `candidateClientTickSerial`,
+`activeClientTickSerial`, or `clientTickBoundarySerial`, and a future serial
+must never be predicted.
+
+`gameTick` remains an ordering aid from the existing diagnostics clock. It is
+not proof that a `GuiClientTickSerialState` window is active and must not be
+used as a replacement serial when `activeClientTickSerialPresent=false`.
+
+For source, hub, and rejected gate/coordinator records, populate the existing screen
+and handler fields from the raw `ScreenOpenEvent` and the same live client
+snapshot rather than from `attempt.binding()`. In particular, preserve
+`screenObjectIdentity`, `screenTypeActual`, `handledScreenHandlerIdentity`,
+`playerHandlerIdentity`, `liveSyncId`, `eventScreenIsCurrentScreen`, and
+`eventHandlerIsPlayerHandler`. `screenTailCandidate=true` remains valid only
+after the coordinator accepts the candidate.
+
+These records are observation only. Their implementation must not retain or
+replay the event, extend serial lifetime, move a callback, change listener
+fan-out, add a new catch around observed behavior, alter retry/timeout state,
+create `GUI_BOUND` or permission, or mutate a slot, cursor, screen, input,
+Task, goal, or path.
+
+Use the existing shared admission path and these bounds:
+
+```text
+normal investigation mode: BOUNDARY
+normal runtime mode: OFF
+per-event payload cap: 8192 UTF-8 bytes
+correlated exact-GUI detail cap: 256 total per operation within one continuous
+    BOUNDARY activation across existing gate lifecycle detail plus new gate
+    intake/decision detail; retry does not reset it within that activation
+uncorrelated exact-screen detail cap: 256 total per continuous BOUNDARY activation
+    across all source/hub detail plus gate intake/decision records that have no
+    operation context
+first new semantic stage/disposition/reason: emit immediately
+unchanged repeat summary: at most once per 200 game ticks or about 10 seconds
+bounded reason/fingerprint buckets: at most 32, sorted, with omittedCount
+shared session hard cap: 5000
+ordinary ceiling: 4936
+critical reserve: 64
+```
+
+Do not create a second independent 5000-event budget. The local 256-detail
+budgets are subordinate admission controls, not new sessions. A continuous
+`BOUNDARY` activation starts when BOUNDARY becomes active and ends at OFF or
+clean teardown; give it a diagnostic-only `diagnosticBoundaryActivationId`.
+Turning OFF clears every local budget/aggregate. Re-enabling BOUNDARY inside
+the same production `diagnosticSessionId` creates a new activation and does not
+pretend that the prior activation's local state still exists. The screen
+diagnostics facade creates the activation identity lazily on the first eligible
+BOUNDARY observation and never retains it through OFF. Process each
+observation in this order: update diagnostic-only counters, semantic dedupe,
+local detail-budget admission, existing shared-session admission, then record
+the physical-emission result. Select the operation budget only when operation
+context exists; otherwise source, hub, gate-intake, and gate-decision detail use
+the uncorrelated activation budget. Final-checkpoint and suppression-summary requests
+do not consume the local 256 detail allowance, but they still consume their
+existing shared critical subquota. The 64-slot reserve is partitioned rather
+than fungible: current source provides 8 aggregate-checkpoint slots, 8
+non-store-terminal slots, and 6 suppression-control slots among the other
+reserved families. Do not promise a physical summary after its classified
+shared subquota is exhausted.
+
+The dedupe fingerprint uses stable semantic fields such as event family,
+stage, route/target family, `eventPreOpen`, screen/handler class,
+`clientTickWindowState`, disposition, outcome, and reason. Keep tick/time,
+serial, syncId, attempt/correlation UUID, and every object identity out of the
+fingerprint even when they remain useful payload fields.
+
+Stateful dedupe and the 200-tick unchanged-repeat summary have the same scope as
+their local detail budget. The gate-owned per-operation/activation aggregate
+owns one correlated dedupe state and summary schedule across that operation's
+retries. `ExactContainerGuiScreenDiagnosticRuntime` owns a separate
+uncorrelated dedupe state and summary schedule for one screen BOUNDARY
+activation. Neither state may suppress another operation or survive its own
+activation. The operation checkpoint emit-once flag belongs to its individual
+operation/activation segment; the mutually exclusive mode-OFF versus clean-
+teardown screen flush state belongs to the screen activation aggregate.
+
+`EXACT_GUI_OPERATION_FINAL_CHECKPOINT` is owned by the per-operation
+diagnostic aggregate composed into `ExactContainerGuiGate`. Create that
+aggregate only while BOUNDARY is active. Within one continuous activation,
+retain it across `authorizeRetry()` and request checkpoint emission once from
+`beginOwnerStop()` after the existing final lifecycle observation and before
+operation stop/listener unregister. Attempt invalidation or parent retry does
+not flush it. Repeated stop/close calls do not submit a second admission request
+for the same operation/activation segment. “Once” means one shared-admission
+request for that segment, not guaranteed physical output; the existing
+aggregate-checkpoint subquota remains authoritative.
+
+The checkpoint payload may carry
+`finalCheckpointEmissionAttempted=true`, because that fact is known before the
+call. Admission and physical-emission outcomes exist only after the emitter
+returns: record them in the returned diagnostic result, test projection, and
+later activation/session counters, then purge the operation aggregate. Never
+backfill `admitted` or `completed` into the already submitted checkpoint. The
+physical checkpoint record's presence is itself evidence that its emission
+completed.
+
+Checkpoint emission is diagnostics-only and must not obstruct owner cleanup.
+`beginOwnerStop()` invokes it through a non-throwing diagnostic wrapper and uses
+cleanup `finally` blocks so aggregate purge, lifecycle-observer unregister, the
+existing `operationLifecycle.stop`, and GUI-listener unregister still run when
+exact-GUI field formatting or diagnostic dispatch fails. A returned shared
+`DiagnosticDispatchResult` is accounted normally; a local
+`RuntimeException`/`LinkageError` is converted to a typed diagnostic-only
+failure result and is never rethrown into the Task lifecycle. This isolation is
+specific to diagnostic checkpoint work: exceptions from the observed
+listener/coordinator path still propagate unchanged as specified above.
+
+The per-operation checkpoint consists of this exact correlation envelope and
+gate-owned aggregate evidence. Its envelope is:
+
+```text
+diagnosticSessionId
+diagnosticBoundaryActivationId
+operationId
+gameTick
+threadName
+routeOwnerClass
+routeOwnerIdentity
+diagnosticFlushReason=NOT_APPLICABLE
+diagnosticBudgetScope=LOCAL_DETAIL_EXEMPT_AGGREGATE_CHECKPOINT
+```
+
+Its aggregate fields are:
+
+```text
+screenTailGateReceivedCount
+screenTailGateDecisionCount
+screenTailCoordinatorAcceptedCount
+screenTailCoordinatorRejectedCount
+screenTailCoordinatorNoStateChangeCount
+diagnosticDetailObservationCount
+diagnosticDetailDedupeSuppressedCount
+diagnosticDetailLocalAdmissionCount
+diagnosticDetailLocalCapSuppressedCount
+diagnosticDetailSharedAdmissionRejectedCount
+diagnosticDetailPhysicalEmissionCount
+firstObservedGameTick
+lastObservedGameTick
+lastSuccessfulBoundary
+firstFailingBoundary
+diagnosticEvidenceCompleteness
+diagnosticEvidenceGapReasons
+omittedCount
+terminalReason
+finalCheckpointEmissionAttempted
+```
+
+Because the aggregate spans retries, it must not select or infer one
+`openAttemptId`, `correlationId`, `retryIndex`, target snapshot, or permission
+identity for this checkpoint.
+
+Any per-reason counts are normalized, sorted, limited to 32 entries, and carry
+`omittedCount` when truncated. These counters affect logging only and must not
+be reused as gameplay retry, timeout, or terminal state.
+
+Strict OFF cleanup uses the existing diagnostics-session lifecycle boundary.
+Each live operation aggregate registers as a cleanup-only
+`DiagnosticSessionLifecycleObserver` while its BOUNDARY activation is active;
+the existing bounded observer registry and `ChatClefDiagnostics` facade gain a
+non-throwing `tryRegister` path plus idempotent unregister support. Existing
+registration behavior remains unchanged for existing callers. The exact-GUI
+operation creates/retains its aggregate only after `tryRegister` succeeds. If
+capacity rejects registration, retain no operation aggregate, increment only
+the screen-activation aggregate's
+`operationAggregateRegistrationRejectedCount`, mark its evidence
+with the `PARTIAL_LIFECYCLE_OBSERVER_CAPACITY` gap reason, and preserve gameplay
+behavior. Owner stop
+unregisters after checkpoint-result accounting. `beforeModeOff()` and
+`afterCleanTeardownSnapshotAttempt(...)` clear only that aggregate's diagnostic
+state and unregister it. The registry is not exposed to the hub and must not be
+queried for an active operation, correlation ID, retry decision, or gameplay
+state. If the same gameplay operation is first observed again in a later
+BOUNDARY activation, create a new aggregate segment and report
+the `PARTIAL_MODE_TRANSITION` gap reason; derive the primary completeness value
+by the precedence below. Retain no bridge state through OFF merely to join the
+two segments.
+
+`ExactContainerGuiScreenDiagnosticRuntime` itself implements
+`DiagnosticSessionLifecycleObserver`. During `ChatClefDiagnostics` static
+composition, `ChatClefDiagnostics` constructs the one runtime, calls the
+non-throwing `tryRegister` exactly once before exposing the source/hub/gate
+facades, and owns its registration lifetime. A successful registration remains
+installed across OFF/BOUNDARY toggles; `beforeModeOff()` clears only the
+runtime's current activation state, `finalSnapshotFields()` projects that state
+at clean teardown, and `afterCleanTeardownSnapshotAttempt(...)` clears it before
+the registration is idempotently released with the diagnostic session. Do not
+register once per activation. If initial lifecycle registration is unavailable,
+leave that runtime disabled and empty for the session; do not throw into
+Minecraft initialization, weaken the GUI gate, or retain partial activation
+state.
+
+Do not add a broad static active-operation registry merely to attach operation
+IDs to a hub-level drop. If an event cannot be tied to exactly one operation by
+an already active, side-effect-free listener context, leave the operation fields
+unavailable. An instance-owned screen-activation aggregate records only
+uncorrelated source/hub/gate counts, reasons, first/last tick, suppression,
+prior operation-checkpoint result counts, and physical-emission outcomes; it
+stores no operation ID or Task reference.
+
+Its uncorrelated counters include `screenTailSourceObservedCount`, the hub
+drop/start/completion and inactive-after-snapshot counts,
+`screenTailGateNoActiveAttemptCount`, and bounded per-reason buckets. A
+`NO_ACTIVE_ATTEMPT` decision must never be copied into a per-operation
+checkpoint merely to make its count available. It always has
+`operationContextAvailable=false` under the active-attempt rule above.
+
+The prior-operation result counters are
+`operationFinalCheckpointAdmissionRequestCount`,
+`operationFinalCheckpointAdmittedCount`, and
+`operationFinalCheckpointPhysicalEmissionCount`. They summarize completed
+emitter calls only; they are not backfilled into an operation checkpoint.
+
+The named screen-session checkpoint and clean-final-snapshot projection contain
+only activation-level diagnostic evidence:
+
+```text
+diagnosticSessionId
+diagnosticBoundaryActivationId
+diagnosticFlushReason
+diagnosticBudgetScope
+screenTailSourceObservedCount
+screenTailHubDroppedCount
+screenTailHubDispatchStartedCount
+screenTailHubDispatchCompletedCount
+screenTailHubNoActiveListenerCount
+screenTailHubInactiveAfterSnapshotSkipCount
+screenTailGateReceivedCount
+screenTailGateDecisionCount
+screenTailGateNoActiveAttemptCount
+diagnosticDetailObservationCount
+diagnosticDetailDedupeSuppressedCount
+diagnosticDetailLocalAdmissionCount
+diagnosticDetailLocalCapSuppressedCount
+diagnosticDetailSharedAdmissionRejectedCount
+diagnosticDetailPhysicalEmissionCount
+operationFinalCheckpointAdmissionRequestCount
+operationFinalCheckpointAdmittedCount
+operationFinalCheckpointPhysicalEmissionCount
+operationAggregateRegistrationRejectedCount
+firstObservedGameTick
+lastObservedGameTick
+diagnosticEvidenceCompleteness
+diagnosticEvidenceGapReasons
+omittedCount
+finalCheckpointEmissionAttempted
+```
+
+It must not contain or infer `operationId`, `openAttemptId`, `correlationId`,
+Task/owner identity, retry state, target, or permission state. For the clean
+teardown projection, `finalCheckpointEmissionAttempted` is not asserted because
+no nested named checkpoint is attempted.
+
+The two aggregate-flush paths are distinct and share one emit-once/flush state:
+
+```text
+BOUNDARY -> OFF:
+    beforeModeOff uses try/finally
+    try: request one named EXACT_GUI_SCREEN_SESSION_FINAL_CHECKPOINT
+         with diagnosticFlushReason=MODE_OFF,
+         diagnosticBudgetScope=LOCAL_DETAIL_EXEMPT_AGGREGATE_CHECKPOINT,
+         and finalCheckpointEmissionAttempted=true
+         account for its returned dispatch result when the call returns
+    finally: clear activation aggregate, budget, dedupe, summary, and emit-once state
+
+clean teardown while BOUNDARY:
+    do not start a nested named diagnostic dispatch
+    contribute the aggregate through finalSnapshotFields to the existing
+        DIAGNOSTIC_SESSION_FINAL_SNAPSHOT
+    diagnosticFlushReason=CLEAN_TEARDOWN_FINAL_SNAPSHOT and do not assert
+        finalCheckpointEmissionAttempted
+    diagnosticBudgetScope=LOCAL_DETAIL_EXEMPT_FINAL_SNAPSHOT_PROJECTION
+    afterCleanTeardownSnapshotAttempt clears the aggregate regardless of outcome
+```
+
+The two paths must not request duplicate checkpoints. Remaining operation
+checkpoints are never fabricated from the screen aggregate.
+When source/hub evidence cannot be tied to exactly one operation, add the
+`PARTIAL_UNCORRELATED_HUB_EVENT` gap reason to the screen activation aggregate,
+preserve every other applicable screen gap, and derive that aggregate's primary
+completeness value by the precedence below. Do not copy this reason into a
+per-operation checkpoint merely from timing or adjacency. Missing correlation
+is evidence, not permission to guess.
+
+Use these canonical completeness values where applicable:
+
+```text
+COMPLETE_FOR_BOUNDARY_ACTIVATION
+PARTIAL_MODE_TRANSITION
+PARTIAL_UNCORRELATED_HUB_EVENT
+PARTIAL_LOCAL_DETAIL_CAP
+PARTIAL_SHARED_ADMISSION
+PARTIAL_LIFECYCLE_OBSERVER_CAPACITY
+```
+
+More than one gap can apply. `diagnosticEvidenceGapReasons` is the exact sorted
+set of all applicable `PARTIAL_*` values above (maximum five; no truncation or
+`omittedCount`). `diagnosticEvidenceCompleteness` is
+`COMPLETE_FOR_BOUNDARY_ACTIVATION` only when that set is empty. Otherwise it is
+the first applicable value in this fixed precedence, used only as a compact
+primary status: `PARTIAL_LIFECYCLE_OBSERVER_CAPACITY`,
+`PARTIAL_MODE_TRANSITION`, `PARTIAL_UNCORRELATED_HUB_EVENT`,
+`PARTIAL_LOCAL_DETAIL_CAP`, then `PARTIAL_SHARED_ADMISSION`. The precedence does
+not erase lower-priority reasons and is not a gameplay-severity ranking.
+
+Suggested phase transitions:
+
+```text
+WORLD_OPEN_REQUESTED -> WORLD_CLICK_OBSERVED
+WORLD_CLICK_OBSERVED -> SCREEN_TAIL_CANDIDATE
+SCREEN_TAIL_CANDIDATE -> OPEN_CHILD_QUIESCING
+OPEN_CHILD_QUIESCING -> OPEN_CHILD_QUIESCENT
+OPEN_CHILD_QUIESCENT -> GUI_BOUND
+SCREEN_TAIL_CANDIDATE -> CANDIDATE_REJECTED
+GUI_BOUND -> GUI_STABILIZING_0
+GUI_STABILIZING_0 -> GUI_STABILIZING_1
+GUI_STABILIZING_1 -> GUI_STABILIZING_2
+GUI_STABILIZING_2 -> GUI_INPUT_ALLOWED
+any active phase -> typed invalidation/timeout/interruption
+```
+
+Suggested decision signals:
+
+```text
+WORLD_CLICK_OBSERVED never appears
+    -> movement, reach, look, parent-child selection, or click request boundary
+
+WORLD_CLICK_OBSERVED appears and the requested GUI becomes live, but no TAIL
+source record appears
+    -> inspect setScreen TAIL Mixin execution and diagnostic admission
+
+TAIL source appears but no hub decision appears
+    -> inspect EventBus subscription, hub construction, and synchronous delivery
+
+hub decision has screenEventDisposition=DROPPED and
+screenEventDropReason=ACTIVE_CLIENT_TICK_SERIAL_UNAVAILABLE
+    -> the inter-tick active-serial drop is directly confirmed; do not yet change
+       serial lifetime or retain/replay the event in a diagnostics-only patch
+
+hub decision has screenEventDisposition=DISPATCH_STARTED but no gate intake appears
+    -> inspect listener snapshot/order, wrong hub instance, and an earlier callback exception
+
+gate intake appears but no gate decision appears
+    -> inspect the active-attempt guard/coordinator boundary and propagated exception
+
+gate decisions appear but no hub dispatch-completed record appears while
+diagnostic admission remains available
+    -> inspect a later invoked listener exception and inactive-after-snapshot
+       skips; do not fabricate completion
+
+gate decision has gateOutcome=NO_ACTIVE_ATTEMPT
+    -> only proves that no active attempt existed at gate receipt; it does not
+       encode before-first-attempt, between-retries, post-invalidation,
+       retirement/owner-stop, or unrelated-TAIL cause
+    -> inspect adjacent attempt create/activate/invalidate/retire and
+       owner-lifecycle records; do not infer operation identity or blame slot transfer
+
+gate decision has coordinatorOutcome=RETURNED_INVALIDATE
+    -> inspect its exact correlation or binding reason and raw event snapshot
+
+WORLD_CLICK_OBSERVED appears, no TAIL source appears, and no requested GUI
+becomes live
+    -> interaction packet/server response/Carry On interception remains possible;
+       the post-open gate never started
+
+TAIL candidate appears but fullGuiBoundPredicate=false
+    -> inspect the exact failed identity; do not call this GUI_OPEN
+
+GUI_BOUND appears but stableLaterBoundaries advances on candidate tick K or promotion tick B
+    -> tick-boundary ownership or off-by-one error
+
+same boundary advances the count twice
+    -> non-monotonic or duplicate callback accounting
+
+slot mutation appears while count < 3
+    -> premature route mutation and gate-owner violation
+
+binding changes but guiInputAllowed remains true
+    -> fail-closed invalidation defect
+
+retry reuses attempt/correlation/count
+    -> retry ownership defect
+```
+
+#### Mandatory Non-Blocking Implementation Ledger And Regression Mapping
+
+Before source changes, capture a non-blocking implementation ledger containing:
+
+```text
+baseline/archive or HEAD identity and preserved worktree paths
+prior reviewed-document hashes and a statement that any changed document bytes require a new manifest
+exact commands/root Tasks and exact target block IDs for each included route
+operation, attempt, click, timeout, retry, binding, mutation and cleanup owners
+current-tick serial publication -> accepted setScreen TAIL candidate K -> route promotion B
+    -> same-B boundary observation -> B+1/B+2/B+3 -> next Task evaluation -> slot call ordering proof
+exact repository-relative files, classes, methods and minimal implementation hunks
+LAVI-owned versus upstream-derived classification for every affected file
+failure/invalidation/retry behavior and rollback unit
+all current affected clickSlot/action-type/button call sites
+exact test files and scenario-to-test mapping
+verification commands, prerequisites, expected results, and executed or `NOT_RUN` status
+```
+
+The regression implementation and verification must include at least:
+
+```text
+HEAD does not bind
+null/unrelated/non-HandledScreen candidates reject
+screen/handler object and syncId mismatch reject
+world/dimension/target/operation/attempt mismatch reject
+TAIL-candidate tick K and GUI_BOUND-promotion tick B are not counted
+three distinct later boundaries are required
+same boundary cannot count twice
+no slot mutation at stable counts 0, 1 or 2
+third boundary changes permission only
+screen close/replacement and every identity change invalidate
+interruption invalidates
+retry starts with a new attempt/correlation and zero count
+only the matching BlockInteractEvent between request and TAIL is consumed, exactly once
+rejected candidate cannot restore or reuse its permanently spent BlockInteractEvent
+open child and its operation-owned normal cleanup are quiescent before GUI_BOUND
+binding change during child quiescence rejects the candidate
+exact GenericContainerScreen/GenericContainerScreenHandler mapping is required for chest/trapped chest
+exact FurnaceScreen/FurnaceScreenHandler mapping is required for regular furnace
+trusted-home QUICK_MOVE button 0 is unchanged
+storage/furnace PICKUP/button contracts are unchanged at actual call sites
+in-scope world open attempt uses no ChatClef-owned SNEAK
+Carry On absence preserves loadability and generic behavior
+stale initial Carry On pickup yields no GUI_BOUND
+Barrel and every unlisted container route remain unchanged
+generic right-click, doors, trapdoors, beds, buttons, levers, block placement,
+    item use, Task replacement and Baritone pathing remain unchanged
+parent, current/former child, observer, cleanup and fallback have no reachable mutation while stabilizing
+boundClientTickSerial is immutable and lastCountedBoundarySerial suppresses stale/duplicate boundaries
+next normal Task evaluation fully revalidates and consumes one attempt-bound permission once
+permission consumption and transfer-lifecycle entry commit together; failed entry performs neither
+```
+
+A checksum manifest attests only the exact document bytes it names. When these
+repository documents change, regenerate any in-repository manifest included in
+the active documentation or implementation work before claiming that an earlier
+external review hash covers the current text. This checksum update is not a
+phase-approval gate. An external archive or Downloads-path artifact is updated
+only when the active request includes that external write. The current modified
+documentation therefore cannot be described as byte-identical to the earlier
+reviewed bundle, and implementation must not depend on an external archive or
+machine-specific manifest path.
+
+After capturing the ledger, continue directly with the smallest implementation,
+bounded logging, focused tests, and required clean build when the active request
+asks for implementation. The ledger is a traceability and rollback record, not
+an approval checkpoint. External runtime, deployment, commit, and push are run
+only when the active request includes those exact actions.
 
 ### 11. Mining And DestroyBlock Boundary
 
@@ -1881,6 +3069,42 @@ Suspected boundary:
     interaction packet, input, server response, or Carry On interception
 
 Observed result:
+    normal world click is followed by target removal/carry transition and no TAIL candidate
+Suspected boundary:
+    initial Carry On interception before GUI_BOUND; the post-open three-boundary gate never started
+
+Observed result:
+    ScreenOpenEvent TAIL appears but full GUI binding predicate is false
+Suspected boundary:
+    unrelated/stale screen, handler object mismatch, syncId mismatch, target/world/dimension mismatch,
+    or operation-attempt correlation failure; do not classify as GUI_OPEN
+
+Observed result:
+    GUI_BOUND count advances during candidate tick K/promotion tick B or the same boundary counts twice
+Suspected boundary:
+    tick serial/callback ordering defect or off-by-one stabilization accounting
+
+Observed result:
+    slot mutation occurs before three distinct later boundaries complete
+Suspected boundary:
+    route parent entered its transfer subtask before GUI_INPUT_ALLOWED
+
+Observed result:
+    screen/handler/syncId/world/operation changes but permission remains true
+Suspected boundary:
+    fail-closed invalidation defect
+
+Observed result:
+    retry inherits prior binding, correlation, or stable-boundary count
+Suspected boundary:
+    open-attempt identity and retry ownership defect
+
+Observed result:
+    Barrel or an unlisted container is gated by the chest/furnace policy
+Suspected boundary:
+    target policy was copied from AutoDepositTrustedContainerSupport without explicit scope isolation
+
+Observed result:
     targetStillExists=false while task keeps targeting the block
 Suspected boundary:
     scanner, cached block state, or Baritone/world cache
@@ -1934,7 +3158,37 @@ cleanup owner, if relevant
 fallback behavior that must remain unchanged
 ```
 
-If any of these remain unknown, stop at diagnostics.
+For an unknown-cause defect, keep the unproven behavior unchanged and reinforce
+bounded diagnostics. For the explicitly specified GUI-bound three-boundary
+feature, implement the source-proven portion first, reinforce logs, and continue
+verification; keep only the unresolved portion fail-closed.
+
+For the GUI-bound three-boundary contract, the implementation ledger and
+verification evidence must cover these route-specific items before the related
+behavior is treated as complete:
+
+```text
+exact storage commands/root Tasks and their parent/retry owner
+exact furnace-processing commands/root Tasks and their parent/retry owner
+exact target block IDs and exact handler classes included per route
+operation-local openAttemptId and correlation lifecycle
+one normal world click per attempt without changing generic interaction globally
+setScreen TAIL and chosen client-tick-boundary ordering
+opening-tick exclusion and duplicate-boundary suppression
+full screen/HandledScreen handler/player handler/syncId/world/dimension/target binding
+permission invalidation on every identity or lifecycle change
+all affected slot mutation call sites and preserved action type/button
+proof that Barrel and unlisted containers remain unchanged
+exact proposed unit/integration test files and rollback unit
+```
+
+Do not name `AutoDepositOpenContainerBindingTracker` as the shared behavior
+owner without addressing its current target-policy mismatch: it includes
+Barrel/shulker storage and excludes furnace processing. Do not name
+`CarryOnContainerExpectedGui`, `ContainerSubTracker`, `InteractWithBlockTask`,
+`PlayerInteractionFixChain`, `TaskRunner`, global input, or global Baritone
+handling as the first behavior owner without direct source evidence and the
+applicable last-resort report.
 
 Do not apply these as speculative fixes:
 
@@ -1998,7 +3252,16 @@ chatclef-automatic-deposit-post-checkpoint-direction-2026-08-31.md
     container-type coverage, and release-matrix gates.
 
 chatclef-carryon-integration-direction.md
-    Engine boundary, ownership, diagnostics-only, and root-cause patch gates.
+    Engine boundary, exact GUI binding, three-later-client-tick input gate,
+    ownership, diagnostics-only, and root-cause patch gates.
+
+chatclef-exact-container-gui-three-tick-implementation-ledger-2026-09-03.md
+    Deployed furnace failure counts, exact evidence paths, diagnostics-only
+    source plan, focused tests, and one-reproduction decision matrix.
+
+chatclef-engine-divergence-record.md
+    Historical exact-GUI engine seams and the post-build matching-JAR runtime
+    status update.
 
 fabric-chatclef-bridge-protocol-v1.md
     Stable bridge request/result wire protocol.
@@ -2028,9 +3291,9 @@ of later work.
 
 ## 2026-08-31 automatic-deposit evidence pointer
 
-The current shared-session cap, terminal-accounting, tool-selection shaping,
-clean-build, artifact-identity, and remaining frozen-handoff observability status
-is recorded in Section 15 of
+The latest shared-session cap, terminal-accounting, tool-selection shaping,
+artifact-identity, live-evidence, and remaining frozen-handoff observability
+status is recorded in Section 16.4 of
 `chatclef-automatic-deposit-post-checkpoint-direction-2026-08-31.md`. That
 implementation evidence does not alter the lifecycle investigation rules in
 this document, prove a gameplay fix, or constitute a final-JAR runtime PASS.
