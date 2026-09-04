@@ -3,6 +3,7 @@
 <!-- 20260903_kpopmodder: Recorded the applied exact-GUI gate, ownership, scope, and completed repository-local verification. -->
 <!-- 20260903_kpopmodder: Added the deployed furnace failure evidence and the diagnostics-only source-to-hub-to-gate logging plan. -->
 <!-- 20260903_kpopmodder: Corrected runtime/build evidence and completed the diagnostic schema, ownership, budget, and test-isolation plan. -->
+<!-- 20260904_kpopmodder: Recorded the implemented bounded diagnostic checkpoint and corrected the active-source/runtime status without claiming a gate behavior fix. -->
 
 ## 1. Ledger Status
 
@@ -20,7 +21,8 @@ existing exact-gate lifecycle logging:
   PRESENT_IN_WORKTREE
 
 source-to-hub-to-gate diagnostic reinforcement:
-  NOT_IMPLEMENTED
+  IMPLEMENTED_AS_BOUNDED_DIAGNOSTICS_CHECKPOINT
+  EXACT_GATE_INTAKE_NOT_PRESENT_IN_ACTIVE_SOURCE
 
 focused test sources:
   PRESENT_AND_PASSED (61 / 61)
@@ -81,10 +83,11 @@ current runtime acceptance status:
   FAILED_REPRODUCED_FIRST_FAILING_BOUNDARY_DIRECT_OBSERVATION_PENDING
 
 diagnostic reinforcement source implementation:
-  NOT_RUN - this documentation pass specifies the next in-scope diagnostics-only patch
+  PRESENT - generic container source/transport/task/slot/reconciliation observation
+  EXACT_GATE_BEHAVIOR_SOURCE_ABSENT
 
 diagnostic reinforcement tests/build/runtime:
-  NOT_RUN
+  PASSED_AND_RUNTIME_OBSERVED - 630 tests, 0 failures, clean 171/171 tasks
 ```
 
 The initial workflow was implementation, bounded log reinforcement, then verification.
@@ -1455,3 +1458,101 @@ serial, while preserving active-tick delivery, exact correlation, candidate
 event consumption, B/B+1/B+2/B+3 ordering, one-time permission, route-specific
 slot contracts, excluded containers, Carry On absence, and generic interaction
 behavior.
+
+### 18.8 2026-09-04 Diagnostics Implementation And Runtime Result
+
+The diagnostics-only follow-up was implemented and verified against review
+baseline `46dd942ed504e6d0209c2fc57e6336c2e10ac950`. It adds bounded observation
+of the existing screen TAIL source, synchronous EventBus transport, Task
+evaluation and reconciliation, slot requests and local deltas, applied server
+reconciliation, client tick boundaries, and root terminal state. It does not
+create, activate, or repair an exact-container GUI gate.
+
+Active-source and current-JAR inspection corrected an important historical
+assumption in the earlier implementation checkpoint. The current Git tree and
+the 2026-09-04 remapped JAR contain no `ExactContainerGuiGate`,
+`GuiContainerEventHub`, `GuiClientTickSerialState`, `ExactContainerGuiOpenTask`,
+or route integration for the documented gate. The earlier 8,132,655-byte
+`A526C8...` artifact remains a historical transient artifact record, not the
+identity of the current source or deployed runtime.
+
+```text
+CURRENT_DIAGNOSTIC_STATUS: BUILD_PASSED_RUNTIME_OBSERVED
+CURRENT_ARTIFACT_STATUS: BUILD_AND_ACTIVE_INSTANCE_BYTE_IDENTICAL
+CURRENT_BEHAVIOR_STATUS: EXACT_GUI_GATE_NOT_PRESENT_IN_ACTIVE_SOURCE_OR_CURRENT_JAR
+DIVERGENCE_CLASSIFICATION: DIAGNOSTICS_ONLY
+```
+
+The canonical clean forced command completed successfully:
+
+```bat
+.\gradlew.bat clean build --rerun-tasks
+```
+
+```text
+BUILD SUCCESSFUL
+171 actionable tasks
+171 executed
+tests=630
+failures=0
+errors=0
+skipped=1
+new container-GUI diagnostic tests=31 passed
+```
+
+The current remapped build artifact and active instance artifact are
+byte-identical:
+
+```text
+size: 8,013,409 bytes
+modified: 2026-09-04 11:47:44.141 +09:00
+SHA-256: EBA0552F33A18AE3A55E4BE5D8CE006E10308EA2A271F55BF2B585EB900B6D93
+```
+
+The live `LAVI_TEST_Fabric01` reproduction emitted the new source, transport,
+slot, local-delta, terminal, and applied-server-reconciliation observations.
+No relevant Mixin application or injection error occurred. Five LAVI commands
+reached natural completion. The chest and regular-furnace screen observations
+both reported the following honest absence of exact-gate context:
+
+```text
+operationId=unavailable
+openAttemptId=unavailable
+correlationId=unavailable
+operationContextAvailable=false
+activeAttemptPresent=false
+gateOutcome=NOT_APPLICABLE
+coordinatorOutcome=NOT_CALLED
+targetScreenAssociationProven=false
+```
+
+No `EXACT_GUI_SCREEN_TAIL_CANDIDATE`, `EXACT_GUI_BOUND`, `GUI_STABILIZING`, or
+`GUI_INPUT_ALLOWED` record was observed. Existing chest `QUICK_MOVE` and furnace
+`PICKUP` slot work proceeded through the ungated route. Command completion is
+therefore runtime proof of preserved legacy behavior, not proof of the
+three-later-tick contract.
+
+The ordinary admission ceiling of 4936 was reached and emitted one
+`DIAGNOSTIC_SESSION_CAP_REACHED` marker. At that marker the admitted total was
+4954, 46 critical-reserve admissions remained, and the 5000-event hard cap had
+not been reached. Terminal summaries were emitted, but later ordinary detail is
+partial. Correlation to the chest and furnace is explicitly heuristic and does
+not fabricate operation, attempt, target-screen, or permission identity.
+
+`ChatClefDiagnostics` still uses the existing throwing lifecycle
+`register(...)` API. Registration succeeded in this run, but the planned
+nonthrowing `tryRegister`/unregister contract is not implemented and is not
+claimed as verified. Callback-exception preservation remains source-reviewed
+rather than covered by a dedicated dynamic sentinel test. These are recorded
+limitations of this investigation checkpoint, not hidden behavior changes.
+
+At 15:41:16 a separate nonfatal
+`BlockOptionalMeta.getManager -> drops -> getStackHashes` exception occurred
+during Baritone builder recalculation. It is not attributed to the GUI
+diagnostics, WebSocket bridge, or disk world cache. The command continued to
+completion; a fresh Minecraft JVM is required before the next controlled
+reproduction.
+
+The exact engine observation hunks, ownership, behavior-preservation evidence,
+boundedness limits, and hunk-scoped rollback order are recorded in
+[ChatClef Engine Divergence Record](chatclef-engine-divergence-record.md#2026-09-04-bounded-container-gui-diagnostics-only-reinforcement).

@@ -8,6 +8,7 @@ import adris.altoclef.tasksystem.Task;
 import adris.altoclef.tasksystem.TaskRunner;
 import adris.altoclef.util.time.Stopwatch;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.diagnostics.container.gui.ContainerGuiDiagnostics;
 import lavi.minecraft.diagnostics.container.store.deposit.StoreDepositDiagnostics;
 import lavi.minecraft.diagnostics.tasktrace.UserTaskChainDiagnostics;
 import lavi.minecraft.diagnostics.tasktrace.userchain.UserTaskChainDiagnosticLedger;
@@ -216,6 +217,14 @@ public class UserTaskChain extends SingleTaskChain {
                         "runningIdleTask", runningIdleTask,
                         "willPublishTaskFinishedEvent", actuallyDone && !runningIdleTask,
                         "willStartIdleCommand", actuallyDone && shouldIdle));
+        //20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
+        ContainerGuiDiagnostics.onUserTaskTerminal(
+                oldTask,
+                actuallyDone,
+                finishTrigger.rootAssignmentId(),
+                diagnosticLedger.currentRootAssignmentId(),
+                finishTrigger.finishTriggerHint()
+        );
         if (actuallyDone) {
             if (!runningIdleTask) {
                 Debug.logMessage("User task FINISHED. Took %s seconds.", prettyPrintTimeDuration(seconds));

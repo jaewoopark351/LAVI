@@ -200,7 +200,16 @@ final class BlockInteractionDiagnostics {
         return emitBoundary(eventName, reason, null,
                 DiagnosticEventEmitter.mergeFields(
                         DiagnosticEventEmitter.mergeFields(
-                                BlockInteractionDiagnosticFields.interactionFields(context, phase, result, screenAfter, decision.suppressedRepeatCount()),
+                                DiagnosticEventEmitter.mergeFields(
+                                        BlockInteractionDiagnosticFields.interactionFields(
+                                                context,
+                                                phase,
+                                                result,
+                                                screenAfter,
+                                                decision.suppressedRepeatCount()
+                                        ),
+                                        DiagnosticInputState.currentStateFields()
+                                ),
                                 StoreDepositDiagnostics.interactionFields(context)
                         ),
                         commandContextRegistry.fields()

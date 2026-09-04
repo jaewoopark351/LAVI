@@ -9,6 +9,7 @@ import baritone.api.utils.input.Input;
 import lavi.minecraft.diagnostics.command.DiagnosticCommandContextProvider;
 import lavi.minecraft.diagnostics.command.DiagnosticCommandContextRegistry;
 import lavi.minecraft.diagnostics.container.store.deposit.interaction.StoreDepositInteractionObserver;
+import lavi.minecraft.diagnostics.container.gui.ContainerGuiDiagnostics;
 import lavi.minecraft.diagnostics.formatting.DiagnosticFormatterFacade;
 import lavi.minecraft.diagnostics.interaction.BlockInteractionObserver;
 import lavi.minecraft.diagnostics.mode.DiagnosticModeController;
@@ -74,6 +75,7 @@ public final class ChatClefDiagnostics {
 
     static {
         BLOCK_INTERACTIONS.registerObserver(new StoreDepositInteractionObserver());
+        BLOCK_INTERACTIONS.registerObserver(ContainerGuiDiagnostics.interactionObserver());
         SESSION_LIFECYCLE.register(new DiagnosticStateCleanupLifecycleObserver(
                 TASKS::clearForModeTransition
         ));
@@ -83,6 +85,7 @@ public final class ChatClefDiagnostics {
         SESSION_LIFECYCLE.register(new DiagnosticStateCleanupLifecycleObserver(
                 BLOCK_INTERACTIONS::clearForSessionTransition
         ));
+        SESSION_LIFECYCLE.register(ContainerGuiDiagnostics.lifecycleObserver());
     }
 
     private ChatClefDiagnostics() {
@@ -92,6 +95,7 @@ public final class ChatClefDiagnostics {
         SESSION.runIfEligible(() -> {
             try {
                 TRACE_STATE.advanceClientTick();
+                ContainerGuiDiagnostics.onClientTickHead(TRACE_STATE.currentClientTickId());
                 logRuntimeIdentityOnce();
             } catch (RuntimeException | LinkageError ignored) {
             }
@@ -182,7 +186,10 @@ public final class ChatClefDiagnostics {
     }
 
     public static void enterTask(Task task) {
-        SESSION.runIfEligible(() -> TASKS.enterTask(task));
+        SESSION.runIfEligible(() -> {
+            ContainerGuiDiagnostics.onTaskEvaluationStarted(task);
+            TASKS.enterTask(task);
+        });
     }
 
     public static void exitTask(Task task) {
@@ -545,6 +552,10 @@ public final class ChatClefDiagnostics {
 
     public static Object[] withCommandContextFields(Object... fields) {
         return COMMAND_CONTEXTS.appendFields(fields);
+    }
+
+    public static Object[] currentCommandContextFields() {
+        return COMMAND_CONTEXTS.fields();
     }
 
     public static String className(Object value) {

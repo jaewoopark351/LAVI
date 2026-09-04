@@ -4,6 +4,7 @@ import adris.altoclef.eventbus.EventBus;
 import adris.altoclef.eventbus.events.SlotClickChangedEvent;
 import adris.altoclef.tasksystem.Task;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.diagnostics.container.gui.ContainerGuiDiagnostics;
 import lavi.minecraft.diagnostics.container.store.deposit.StoreDepositDiagnostics;
 import com.google.common.collect.ImmutableList;
 import net.minecraft.entity.player.PlayerEntity;
@@ -78,6 +79,8 @@ public abstract class SlotClickMixin {
                                 after
                         );
                     }
+                    //20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
+                    ContainerGuiDiagnostics.onLocalSlotMutation(self, i, before, after);
                     try {
                         EventBus.publish(new SlotClickChangedEvent(slot, before, after));
                     } finally {

@@ -1,5 +1,9 @@
 package adris.altoclef.eventbus;
 
+import adris.altoclef.eventbus.events.ScreenOpenEvent;
+import lavi.minecraft.diagnostics.container.gui.ContainerGuiDiagnostics;
+import lavi.minecraft.diagnostics.container.gui.dispatch.ContainerScreenDispatchProbe;
+import lavi.minecraft.diagnostics.container.gui.dispatch.ContainerScreenListenerSnapshot;
 import net.minecraft.util.Pair;
 
 import java.util.ArrayList;
@@ -28,8 +32,26 @@ public class EventBus {
         }
         toAdd.clear();
 
-        if (topics.containsKey(type)) {
-            List<Subscription> subscribers = topics.get(type);
+        List<Subscription> subscribers = topics.get(type);
+        ScreenOpenEvent screenOpenEvent = event instanceof ScreenOpenEvent
+                ? (ScreenOpenEvent) event
+                : null;
+        boolean observeScreenTransport = screenOpenEvent != null
+                && ContainerGuiDiagnostics.screenTransportObservationEnabled();
+        ContainerScreenListenerSnapshot screenListeners = observeScreenTransport
+                ? ContainerScreenListenerSnapshot.capture(subscribers)
+                : ContainerScreenListenerSnapshot.empty();
+
+        //20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
+        ContainerScreenDispatchProbe screenDispatch = observeScreenTransport
+                ? ContainerGuiDiagnostics.beginScreenDispatch(
+                        screenOpenEvent,
+                        screenListeners.registeredCount(),
+                        screenListeners.eligibleCount()
+                )
+                : ContainerScreenDispatchProbe.noop();
+
+        if (subscribers != null) {
 
             // Subscriptions can be deleted while they're called
             List<Subscription> toDelete = new ArrayList<>();
@@ -37,15 +59,36 @@ public class EventBus {
             // Go through our subscription list. We shouldn't modify the list while we're iterating it.
             lock = true;
             for (Subscription subRaw : subscribers) {
+                boolean observeScreenListener = screenDispatch.isActive();
+                String listenerClass = "unavailable";
+                String listenerIdentity = "unavailable";
+                if (observeScreenListener) {
+                    listenerClass = subRaw.diagnosticCallbackClassName();
+                    listenerIdentity = listenerClass + "@"
+                            + Integer.toHexString(System.identityHashCode(subRaw));
+                }
                 Subscription<T> sub;
                 try {
                     sub = (Subscription<T>) subRaw;
                     if (sub.shouldDelete()) {
                         toDelete.add(sub);
+                        if (observeScreenListener
+                                && screenListeners.wasEligible(subRaw)) {
+                            screenDispatch.listenerSkippedInactive(listenerClass, listenerIdentity);
+                        }
                     } else {
+                        if (observeScreenListener) {
+                            screenDispatch.listenerStarted(listenerClass, listenerIdentity);
+                        }
                         sub.accept(event);
+                        if (observeScreenListener) {
+                            screenDispatch.listenerCompleted(listenerClass, listenerIdentity);
+                        }
                     }
                 } catch (ClassCastException e) {
+                    if (observeScreenListener) {
+                        screenDispatch.listenerClassCastFailed(listenerClass, listenerIdentity);
+                    }
                     System.err.println("TRIED PUBLISHING MISMAPPED EVENT: " + event);
                     e.printStackTrace();
                 }
@@ -53,6 +96,7 @@ public class EventBus {
             // Delete all subscriptions
             lock = false;
         }
+        screenDispatch.dispatchCompleted();
     }
 
     private static <T> void subscribeInternal(Class<T> type, Subscription<T> sub) {

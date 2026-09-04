@@ -22,4 +22,13 @@ public class Subscription<T> {
     public boolean shouldDelete() {
         return shouldDelete;
     }
+
+    //20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
+    public String diagnosticCallbackClassName() {
+        try {
+            return callback == null ? "unavailable" : callback.getClass().getName();
+        } catch (RuntimeException | LinkageError ignored) {
+            return "unavailable";
+        }
+    }
 }

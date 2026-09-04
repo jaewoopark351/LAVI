@@ -3,6 +3,7 @@ package adris.altoclef.mixins;
 import adris.altoclef.eventbus.EventBus;
 import adris.altoclef.eventbus.events.ScreenOpenEvent;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.diagnostics.container.gui.ContainerGuiDiagnostics;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.Screen;
 import org.jetbrains.annotations.Nullable;
@@ -31,6 +32,9 @@ public final class ClientOpenScreenMixin {
     private void onScreenOpenEnd(@Nullable Screen screen, CallbackInfo ci) {
         ChatClefDiagnostics.logEvent("SCREEN", "TAIL", "setScreen_end", null,
                 "requestedScreenClass", ChatClefDiagnostics.className(screen));
-        EventBus.publish(new ScreenOpenEvent(screen, false));
+        ScreenOpenEvent event = new ScreenOpenEvent(screen, false);
+        //20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
+        ContainerGuiDiagnostics.onScreenTailSource(event);
+        EventBus.publish(event);
     }
 }

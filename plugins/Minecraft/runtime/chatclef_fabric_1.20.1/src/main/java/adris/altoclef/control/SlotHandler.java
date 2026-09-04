@@ -10,10 +10,13 @@ import adris.altoclef.util.slots.PlayerSlot;
 import adris.altoclef.util.slots.Slot;
 import adris.altoclef.util.time.TimerGame;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.diagnostics.container.gui.ContainerGuiDiagnostics;
+import lavi.minecraft.diagnostics.container.gui.slot.ContainerSlotActionProbe;
 import lavi.minecraft.diagnostics.toolselect.ToolEquipDiagnostics;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.item.*;
+import net.minecraft.screen.ScreenHandler;
 import net.minecraft.screen.slot.SlotActionType;
 
 import java.util.List;
@@ -99,7 +102,17 @@ public class SlotHandler {
             return;
         }
         registerSlotAction();
-        int syncId = player.currentScreenHandler.syncId;
+        ScreenHandler handler = player.currentScreenHandler;
+        int syncId = handler.syncId;
+        //20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
+        ContainerSlotActionProbe containerProbe = ContainerGuiDiagnostics.beginSlotAction(
+                handler,
+                syncId,
+                windowSlot,
+                mouseButton,
+                type,
+                player
+        );
 
         try {
             ChatClefDiagnostics.logEvent("SLOT", "WINDOW_CLICK_HEAD", "controller_clickSlot_begin", null,
@@ -109,6 +122,7 @@ public class SlotHandler {
                     "slotActionType", type,
                     "cursorStackBefore", ChatClefDiagnostics.safeValue(() -> player.currentScreenHandler.getCursorStack()));
             mod.getController().clickSlot(syncId, windowSlot, mouseButton, type, player);
+            containerProbe.returned();
             ChatClefDiagnostics.logEvent("SLOT", "WINDOW_CLICK_RETURN", "controller_clickSlot_end", null,
                     "syncId", syncId,
                     "windowSlot", windowSlot,
@@ -116,6 +130,7 @@ public class SlotHandler {
                     "slotActionType", type,
                     "cursorStackAfter", ChatClefDiagnostics.safeValue(() -> player.currentScreenHandler.getCursorStack()));
         } catch (Exception e) {
+            containerProbe.failed(e);
             ChatClefDiagnostics.logEvent("SLOT", "WINDOW_CLICK_EXCEPTION", "controller_clickSlot_exception", null,
                     "syncId", syncId,
                     "windowSlot", windowSlot,

@@ -17,6 +17,11 @@ public final class DiagnosticBoundedEventFormatter {
             "commandRequestId",
             "commandCorrelationId",
             "commandSessionId",
+            "diagnosticSessionId",
+            "diagnosticBoundaryActivationId",
+            "operationId",
+            "openAttemptId",
+            "correlationId",
             "rootAssignmentId",
             "boundRootTaskInstanceId"
     );

@@ -1784,3 +1784,205 @@ one-reproduction decision matrix are in
 [Section 18 of the implementation ledger](chatclef-exact-container-gui-three-tick-implementation-ledger-2026-09-03.md#18-post-build-furnace-runtime-reproduction-and-diagnostic-reinforcement-plan).
 Canonical event/field/boundedness rules are in
 [Screen TAIL Source-To-Hub-To-Coordinator Diagnostic Contract](chatclef-task-lifecycle-diagnostics.md#screen-tail-source-to-hub-to-coordinator-diagnostic-contract).
+
+## 2026-09-04 Bounded Container-GUI Diagnostics-Only Reinforcement
+
+<!-- 20260904_kpopmodder: Recorded the bounded container-GUI diagnostic divergence and matching live-runtime evidence without claiming a behavior fix. -->
+
+Review baseline SHA: `46dd942ed504e6d0209c2fc57e6336c2e10ac950`
+
+Review branch: `minecraft-plugin-fix/alto-clef-infinite-loop`
+
+```text
+CURRENT_DIAGNOSTIC_STATUS: BUILD_PASSED_RUNTIME_OBSERVED
+CURRENT_ARTIFACT_STATUS: BUILD_AND_ACTIVE_INSTANCE_BYTE_IDENTICAL
+CURRENT_BEHAVIOR_STATUS: EXACT_GUI_GATE_NOT_PRESENT_IN_ACTIVE_SOURCE_OR_CURRENT_JAR
+DIVERGENCE_CLASSIFICATION: DIAGNOSTICS_ONLY
+```
+
+This working-tree change adds bounded observation of the existing container
+screen, Task, slot-action, local-delta, server-reconciliation, and root-terminal
+flow. It does not add, restore, or repair the exact-container GUI gate.
+
+At this baseline, source, Git-tree, and remapped-JAR inspection found no active
+`ExactContainerGuiGate`, `GuiContainerEventHub`, `GuiClientTickSerialState`,
+`ExactContainerGuiOpenTask`, or exact-route gate integration. The earlier
+8,132,655-byte / `A526C8...` artifact record is a historical transient artifact
+checkpoint and must not be treated as the current source or artifact identity.
+
+### Scope and ownership
+
+The atomic runtime change contains exactly 66 paths:
+
+| Ownership | Existing modified | New | Total |
+| --- | ---: | ---: | ---: |
+| Upstream/engine-namespace Java | 7 | 1 diagnostic Mixin | 8 |
+| LAVI-owned main Java | 5 | 42 | 47 |
+| Mixin resource configuration | 1 | 0 | 1 |
+| LAVI-owned tests/support | 0 | 10 | 10 |
+| Total | 13 | 53 | 66 |
+
+The 42 new LAVI-owned production files are responsibility-separated below
+`lavi/minecraft/diagnostics/container/gui/` into facade, budget, correlation,
+dispatch, emission, lifecycle, runtime, screen, slot, task, and tick packages.
+The ten new test paths contain nine JUnit test classes and one shared immutable
+test-snapshot support file.
+
+### Exact engine-namespace observation hunks
+
+| File | Exact method or seam | Observation and preserved behavior |
+| --- | --- | --- |
+| `adris/altoclef/chains/UserTaskChain.java` | `onTaskFinish(AltoClef)` | Observes root assignment and terminal decision after `actuallyDone` is computed. It does not change callback execution, `TaskFinishedEvent`, idle selection, input cleanup, or Baritone cancellation. |
+| `adris/altoclef/control/SlotHandler.java` | `clickWindowSlot(int,int,SlotActionType)` | Opens a method-local probe around the existing controller call. Handler, sync ID, slot, button, action type, call, and exception policy are unchanged. |
+| `adris/altoclef/eventbus/EventBus.java` | `publish(T)` | Observes screen-listener eligibility, start, normal return, inactive skip, class-cast failure, and full-loop completion. Listener order, membership, deletion, invocation, and callback-exception propagation remain unchanged. |
+| `adris/altoclef/eventbus/Subscription.java` | `diagnosticCallbackClassName()` | Supplies a bounded callback-class label without invoking, retaining, deleting, or reordering the callback. |
+| `adris/altoclef/mixins/ClientOpenScreenMixin.java` | `onScreenOpenEnd(...)` | Observes the same TAIL `ScreenOpenEvent` immediately before its existing publication without retaining, replaying, suppressing, or reordering it. |
+| `adris/altoclef/mixins/ClientTickMixin.java` | `clientTick(...)`, `clientTickReturn(...)` | Records HEAD, the existing published boundary, and RETURN. It creates no permission and changes no Task, input, goal, path, or world interaction. |
+| `adris/altoclef/mixins/SlotClickMixin.java` | redirected `slotClick(...)` | Observes a local slot mutation only after the existing before/after comparison detects it. Mutation and event behavior are unchanged. |
+| new `adris/altoclef/mixins/diagnostics/ClientScreenHandlerUpdateDiagnosticMixin.java` | two post-apply S2C injections | Observes slot/full-inventory reconciliation after Minecraft applies it. It does not modify, cancel, replace, acknowledge, or synthesize a packet. Exact descriptors use `require=1`, `allow=1` for the supported 1.20.1 mapping. |
+| `src/main/resources/altoclef.mixins.json` | one client-Mixin registration | Registers the S2C observer once without changing any dependency or version. |
+
+The upstream observation hunks carry the required marker:
+
+```java
+//20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
+```
+
+The first LAVI-owned diagnostic implementation block carries the required
+diagnostics marker. Its historical Carry On wording is retained as project
+policy and does not classify this incident as Carry On interception:
+
+```java
+//20260730_kpopmodder: Added diagnostic logging to prove the Carry On interaction failure boundary.
+```
+
+Existing LAVI-owned integration is limited to observation and composition:
+
+- `BlockInteractionDiagnostics` supplies input-state and interaction snapshots.
+- `ChatClefDiagnostics` composes lifecycle, tick, Task, and command-context observation.
+- `ContainerTaskDiagnostics` mirrors the already-computed reconciliation result.
+- `DiagnosticBoundedEventFormatter` protects required diagnostic identity values.
+- `HomeStorageQuickMoveIssuer` observes its existing direct `QUICK_MOVE` call.
+
+Static inspection found no `clickSlot`, `interactBlock`, `setScreen`, input
+mutation, Task selection, retry/timeout mutation, or Baritone goal/path mutation
+call in the new diagnostic package.
+
+### Build, tests, and artifact evidence
+
+The canonical command completed successfully:
+
+```bat
+.\gradlew.bat clean build --rerun-tasks
+```
+
+```text
+BUILD SUCCESSFUL
+171 actionable tasks
+171 executed
+tests=630
+failures=0
+errors=0
+skipped=1
+new container-GUI diagnostic tests=31 passed
+```
+
+The remapped build artifact and active deployed artifact are byte-identical:
+
+```text
+size: 8,013,409 bytes
+modified: 2026-09-04 11:47:44.141 +09:00
+SHA-256: EBA0552F33A18AE3A55E4BE5D8CE006E10308EA2A271F55BF2B585EB900B6D93
+```
+
+The runtime identity record resolves the code source to the same deployed JAR,
+and the active instance contains no duplicate loadable ChatClef JAR.
+
+### Live-runtime evidence and finding
+
+Evidence was read from the active `LAVI_TEST_Fabric01` instance:
+
+```text
+C:\Users\jaewo\curseforge\minecraft\Instances\LAVI_TEST_Fabric01\logs\latest.log
+C:\Users\jaewo\curseforge\minecraft\Instances\LAVI_TEST_Fabric01\logs\stdout-logs.txt
+C:\Users\jaewo\curseforge\minecraft\Instances\LAVI_TEST_Fabric01\logs\instance_audit.txt
+C:\Vtuber_Souorce_Code\LAVI\logs\20260904_153122_log.txt
+```
+
+The bridge connected to `ws://127.0.0.1:4316` with generation 1. Five LAVI
+commands reached natural completion. The runtime emitted the new TAIL source,
+EventBus transport, slot request/return, local delta, root terminal, and applied
+server reconciliation observations. No relevant Mixin application or injection
+error occurred.
+
+Chest and regular-furnace observations both honestly reported:
+
+```text
+operationId=unavailable
+openAttemptId=unavailable
+correlationId=unavailable
+operationContextAvailable=false
+activeAttemptPresent=false
+gateOutcome=NOT_APPLICABLE
+coordinatorOutcome=NOT_CALLED
+targetScreenAssociationProven=false
+```
+
+The admitted source/transport evidence included five TAIL source records, five
+hub decisions, and four normal dispatch-completion records. The missing fifth
+completion must not be fabricated or interpreted without its listener path.
+No `EXACT_GUI_SCREEN_TAIL_CANDIDATE`, `EXACT_GUI_BOUND`, `GUI_STABILIZING`, or
+`GUI_INPUT_ALLOWED` record appeared. Chest `QUICK_MOVE` and furnace `PICKUP`
+work proceeded through the current ungated route. Successful command completion
+therefore proves preserved legacy behavior, not the three-later-tick contract.
+
+### Boundedness, privacy, and known gaps
+
+The implementation bounds correlation, pending-slot, detail, semantic-bucket,
+tick-summary, and UTF-8 payload state. The shared diagnostic session reached its
+4936 ordinary-admission ceiling and emitted one
+`DIAGNOSTIC_SESSION_CAP_REACHED` marker. At that marker the admitted total was
+4954, 46 critical-reserve admissions remained, and the 5000-event hard cap had
+not been reached. Terminal summaries were emitted; ordinary detail after the
+ordinary ceiling is partial.
+
+The runtime logs contain parsed game command text, world coordinates, session
+and correlation UUIDs, and JVM-local object identities. They contain no token,
+password, authorization header, or credential introduced by this change. The
+runtime log files remained open and growing during review, so immutable evidence
+hashes and clean shutdown were not claimed.
+
+Known limitations retained by this diagnostics-only checkpoint:
+
+1. The behavior-owning exact GUI gate is absent from the active source and JAR.
+2. Chest/furnace correlation is explicitly heuristic and does not fabricate route-owned operation, attempt, target-screen, or permission identity.
+3. Each accepted screen flow owns a finite local limiter, while the shared session cap is the final cross-flow bound; this is not the planned one-operation-across-retries budget.
+4. `ChatClefDiagnostics` still uses the existing throwing lifecycle `register(...)` API. Registration succeeded, but the planned nonthrowing `tryRegister` and idempotent unregister path is not implemented or claimed as verified.
+5. Callback-exception preservation is source-reviewed but lacks a dedicated dynamic sentinel test.
+6. The strict S2C Mixin is verified on the supported 1.20.1 runtime; mapping drift remains a startup risk and its registration/file are one rollback unit.
+7. A separate nonfatal `BlockOptionalMeta.getManager -> drops -> getStackHashes` exception occurred during Baritone builder recalculation. It is not attributed to this instrumentation, WebSocket dispatch, or disk world cache.
+
+### Behavior-preservation conclusion
+
+The diagnostic delta does not create or activate an exact attempt, promote
+`GUI_BOUND`, count permission boundaries, publish or consume GUI permission,
+change Task selection or reconciliation outcome, change retry/timeout/fallback,
+change slot parameters, add world interaction or physical input, close or
+replace a screen, or change Baritone goal/path/process ownership. Runtime shows
+that existing commands continued and the observation hooks loaded. Runtime does
+not prove the exact GUI contract because its behavior implementation is absent.
+
+### Hunk-scoped rollback
+
+Rollback is dependency ordered:
+
+1. Disconnect the LAVI-owned calls from `ChatClefDiagnostics`, `BlockInteractionDiagnostics`, `ContainerTaskDiagnostics`, and `HomeStorageQuickMoveIssuer`.
+2. Revert only the observation hunks in `UserTaskChain.onTaskFinish`, `SlotHandler.clickWindowSlot`, `EventBus.publish`, `ClientOpenScreenMixin.onScreenOpenEnd`, `ClientTickMixin.clientTick`/`clientTickReturn`, and `SlotClickMixin.slotClick`.
+3. Remove `Subscription.diagnosticCallbackClassName()` after `EventBus` no longer calls it.
+4. Remove only `diagnostics.ClientScreenHandlerUpdateDiagnosticMixin` from `altoclef.mixins.json`, then remove the new Mixin file.
+5. Remove the 42 files under `lavi/minecraft/diagnostics/container/gui/` and ten matching test/support files only after callers are disconnected.
+6. Restore the previous bounded-formatter required-key set only if no remaining payload depends on the added identity keys.
+
+Do not revert whole upstream files, prior diagnostics, post-place handoff,
+automatic-deposit work, documentation, or unrelated dirty work. Do not use a
+broad reset, restore, checkout, cleanup, or commit revert.

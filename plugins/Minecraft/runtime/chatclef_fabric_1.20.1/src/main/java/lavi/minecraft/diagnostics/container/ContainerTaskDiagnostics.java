@@ -5,6 +5,7 @@ import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.ItemTarget;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 import lavi.minecraft.diagnostics.container.crafting.CraftingTableRouteRetryDiagnostics;
+import lavi.minecraft.diagnostics.container.gui.ContainerGuiDiagnostics;
 import lavi.minecraft.diagnostics.container.store.deposit.StoreDepositDiagnostics;
 import lavi.minecraft.diagnostics.crafting.acquisition.source.container.CraftResourceContainerSourceEventObserver;
 import lavi.minecraft.diagnostics.crafting.acquisition.source.container.lifecycle.ContainerTaskOwnerStopDiagnostics;
@@ -87,6 +88,19 @@ public final class ContainerTaskDiagnostics {
             Task activeChildAfter,
             boolean candidateDiscardedBecauseEqual,
             boolean childCleared) {
+        ContainerGuiDiagnostics.onTaskReconciliation(
+                parent,
+                activeChildBefore,
+                candidateChild,
+                isEqualResult,
+                canInterruptEvaluated,
+                canInterruptPreviousChild,
+                replacementApplied,
+                previousChildStopCalled,
+                activeChildAfter,
+                candidateDiscardedBecauseEqual,
+                childCleared
+        );
         return ContainerTaskChildReconciliationDiagnostics.log(
                 parent,
                 activeChildBefore,
