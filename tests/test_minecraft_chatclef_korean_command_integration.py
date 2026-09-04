@@ -17,13 +17,14 @@ class MinecraftChatClefKoreanCommandIntegrationTests(unittest.TestCase):
             {
                 "request_id": "ko-1",
                 "text": "다이아몬드 도끼 하나 가져와",
+                "source": "direct_typed",
                 "metadata": {"origin": "test"},
             }
         )
 
         self.assertTrue(result["ok"])
         self.assertEqual("get diamond_axe 1", adapter.requests[0].command)
-        self.assertEqual("lavi_korean_intent", adapter.requests[0].source)
+        self.assertEqual("direct_typed", adapter.requests[0].source)
         self.assertEqual("test", adapter.requests[0].metadata["origin"])
         self.assertIn("natural_language", adapter.requests[0].metadata)
 
@@ -49,6 +50,7 @@ class MinecraftChatClefKoreanCommandIntegrationTests(unittest.TestCase):
             {
                 "request_id": "ko-translated-1",
                 "text": "다이아몬드 캐줘",
+                "source": "direct_typed",
                 "metadata": {"origin": "router"},
             },
             {
@@ -97,6 +99,35 @@ class MinecraftChatClefKoreanCommandIntegrationTests(unittest.TestCase):
         self.assertFalse(result["ok"])
         self.assertEqual("malformed_translation_result", result["error"])
         self.assertEqual([], adapter.requests)
+
+    def test_generic_admission_does_not_trim_or_coerce_source_identity(self):
+        translation = {
+            "status": "validated",
+            "executable": True,
+            "command": "get diamond 1",
+            "intent": {
+                "intent_type": "get_item",
+                "item_phrase": "다이아몬드",
+                "quantity": 1,
+            },
+            "resolved_target": "diamond",
+        }
+        for source in (" lavi_chat_ui ", "\tlavi_chat_ui\n", ["lavi_chat_ui"]):
+            with self.subTest(source=source):
+                adapter = _RecordingAdapter()
+                extension = MinecraftFabricChatClefExtension(adapter=adapter)
+
+                result = extension.submit_translated_command(
+                    {"text": "다이아몬드 캐줘", "source": source},
+                    translation,
+                )
+
+                self.assertFalse(result["ok"])
+                self.assertEqual(
+                    "korean_command_source_not_allowed",
+                    result["details"]["admission_reason"],
+                )
+                self.assertEqual([], adapter.requests)
 
 
 class _RecordingAdapter:

@@ -5,6 +5,7 @@ from __future__ import annotations
 import unittest
 from dataclasses import replace
 
+from input_core.input_event.contracts import LaviInputEvent
 from plugins.Minecraft.common.dto.command_result_dto import CommandResultDTO
 from plugins.Minecraft.common.dto.status_snapshot_dto import StatusSnapshotDTO
 from plugins.Minecraft.common.protocol.bridge_lifecycle_state import BridgeLifecycleState
@@ -28,7 +29,7 @@ class StoreHomeRouterContractTests(unittest.TestCase):
             log_callback=lambda _message: None,
         )
 
-        decision = router.route("인벤토리 전부 집에 보관해")
+        decision = router.route(_chat_event("인벤토리 전부 집에 보관해"))
 
         self.assertTrue(decision.handled)
         self.assertEqual("minecraft_command_routed", decision.reason)
@@ -48,14 +49,14 @@ class StoreHomeRouterContractTests(unittest.TestCase):
             log_callback=lambda _message: None,
         )
 
-        decision = router.route("지금 아이템 다 집에 가져다 놔")
+        decision = router.route(_chat_event("지금 아이템 다 집에 가져다 놔"))
 
         self.assertTrue(decision.handled)
         self.assertEqual("minecraft_command_routed", decision.reason)
         self.assertEqual(1, len(adapter.requests))
         request = adapter.requests[0]
         self.assertEqual("store_home", request.command)
-        self.assertEqual("lavi_chat_mic_router", request.source)
+        self.assertEqual("lavi_chat_ui", request.source)
         self.assertFalse(request.command.startswith("@"))
         self.assertTrue(request.request_id.startswith("lavi-input-ko-"))
 
@@ -76,14 +77,24 @@ class StoreHomeRouterContractTests(unittest.TestCase):
                     log_callback=lambda _message: None,
                 )
 
-                decision = router.route(transcript)
+                event = (
+                    _chat_event(transcript)
+                    if physical_source == "chat"
+                    else _voice_event(transcript)
+                )
+                decision = router.route(event)
 
                 self.assertTrue(decision.handled)
                 self.assertEqual("minecraft_command_routed", decision.reason)
                 self.assertEqual(1, len(adapter.requests))
                 request = adapter.requests[0]
                 self.assertEqual("store_home", request.command)
-                self.assertEqual("lavi_chat_mic_router", request.source)
+                self.assertEqual(
+                    "lavi_chat_ui"
+                    if physical_source == "chat"
+                    else "voice_input_final",
+                    request.source,
+                )
                 self.assertEqual(
                     transcript,
                     request.metadata["natural_language"]["original_text"],
@@ -189,7 +200,9 @@ class StoreHomeRouterContractTests(unittest.TestCase):
                     log_callback=lambda _message: None,
                 )
 
-                first = router.route("인벤토리 전부 집에 보관해")
+                first = router.route(
+                    _chat_event("인벤토리 전부 집에 보관해", "1" * 32)
+                )
 
                 self.assertTrue(first.handled)
                 self.assertEqual(reason, first.reason)
@@ -203,7 +216,9 @@ class StoreHomeRouterContractTests(unittest.TestCase):
                 if reason == "minecraft_command_busy":
                     self.assertEqual("active-1", original_active_request_id)
 
-                fresh = router.route("인벤토리 전부 집에 보관해")
+                fresh = router.route(
+                    _chat_event("인벤토리 전부 집에 보관해", "2" * 32)
+                )
 
                 self.assertTrue(fresh.handled)
                 self.assertEqual("minecraft_command_routed", fresh.reason)
@@ -222,7 +237,7 @@ class StoreHomeRouterContractTests(unittest.TestCase):
 
         decision = StoreHomeCommandAdmission().inspect(
             "store_home",
-            "lavi_chat_mic_router",
+            "lavi_chat_ui",
             incomplete_public_readiness,
         )
 
@@ -231,6 +246,30 @@ class StoreHomeRouterContractTests(unittest.TestCase):
             "store_home_public_readiness_incomplete",
             decision.reason_code,
         )
+
+def _chat_event(text: str, event_id: str = "1" * 32) -> LaviInputEvent:
+    return LaviInputEvent(
+        text=text,
+        source="lavi_chat_ui",
+        provider_id="lavi_chat_ui",
+        event_kind="chat_submit",
+        final=True,
+        event_id=event_id,
+        fallback_payload=text,
+    )
+
+
+def _voice_event(text: str) -> LaviInputEvent:
+    return LaviInputEvent(
+        text=text,
+        source="voice_input_final",
+        provider_id="VoiceInput",
+        event_kind="final_transcript",
+        final=True,
+        event_id="3" * 32,
+        fallback_payload=text,
+    )
+
 
 class _RecordingAdapter:
     backend_id = "fabric_chatclef"

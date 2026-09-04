@@ -5,6 +5,9 @@
 <!-- 20260820_kpopmodder: Documented stale-active-command reconciliation for callback-without-TaskFinishedEvent false-busy states. -->
 <!-- 20260820_kpopmodder: Added implementation-plan boundaries for monotonic lifecycle evidence, release-trigger purity, and restart-safe admission quarantine. -->
 <!-- 20260821_kpopmodder: Added conditional-pass v2 guardrails for wire/local snapshots, source-contract proof, runtime readiness gating, and immutable state-swap CAS. -->
+<!-- 20260904_kpopmodder: Linked the docs-only H5 Korean Chat/microphone command contract to the existing single-pass, no-replay and response-evidence owners. -->
+<!-- 20260905_kpopmodder: Reconciled H5 bridge lifecycle readiness after test-only Java coverage and the clean forced build. -->
+<!-- 20260905_kpopmodder: Reconciled H5 shared-registry ownership and non-consuming inspection versus atomic submission commit. -->
 
 # ChatClef Python Command Orchestration Plan
 
@@ -37,13 +40,26 @@ e08af63948a3fa4675c70279db59c2a70b00a332
 This document owns Python user replies, lifecycle wording, operation context,
 single-pass submission, and the high-level command-orchestration flow.
 
-The full 20-command Korean registry, per-command resolver domains, lifecycle
-kinds, safety tiers, confirmation modes, allowed input sources, and public
-enablement axes are owned by:
+The dated Korean command-registry baselines, current activation-aware command
+surface, per-command resolver domains, lifecycle kinds, safety tiers,
+confirmation modes, allowed input sources, and public enablement axes are owned
+by:
 
 ```text
 plugins/Minecraft/docs/chatclef-python-korean-command-registry-plan.md
 ```
+
+The feature-specific contract for exposing the existing H5 player-centered
+trusted registration through Korean Chat and microphone input is owned by:
+
+```text
+plugins/Minecraft/docs/chatclef-h5-auto-deposit-trust-korean-chat-microphone-pre-change-contract-2026-09-04.md
+```
+
+That document owns H5 Korean natural-language grammar, zero-slot intent, deterministic rejection,
+canonical command and command-specific admission. This orchestration plan
+continues to own single-pass translation, exactly-once submission, busy and
+UNKNOWN handling, no replay and evidence-bounded user wording.
 
 Implemented at the reviewed archive baseline:
 
@@ -2458,3 +2474,144 @@ evidence from a trusted Fabric status snapshot. The first later route may perfor
 that read-only reconciliation, but its triggering command is never translated
 or submitted even when reconciliation succeeds; a fresh explicit command is
 required. There is no automatic replay, rerun, retry, or inference of success.
+
+## 2026-09-04 H5 immediate-registration orchestration application
+
+The existing orchestration invariants apply unchanged to the planned H5
+`AUTO_DEPOSIT_TRUST_AREA` intent:
+
+```text
+local Chat or VoiceInput final transcript
+-> frozen typed event with source, provider_id, event_kind, final, event_id,
+   routing text and unchanged opaque fallback_payload
+-> always-installed Minecraft router with nullable extension dependency
+-> one typed outer gate decision preserving H5 candidate identity
+-> trusted-source/final admission and exact event-id structural validation
+-> raw CR/LF/control safety scan before strip or normalization
+-> route lock and one-shot event-id claim issues an opaque event/source-bound receipt
+-> prior UNKNOWN reconciliation
+-> exact trusted @ whole-string adapter when applicable
+-> one translation
+   -> one authoritative deterministic classification
+   -> schema/compiler
+   -> one validated prefixless command: auto_deposit_trust area 16x16
+-> translation DTO validation
+-> existing bridge readiness/busy/quarantine precheck
+-> submit-once boundary
+   -> registry/admission using translation.command
+   -> matching in-process receipt validation without consumption
+   -> side-effect-free request construction without the receipt
+   -> atomic receipt revalidation/one-time consumption immediately before submitter entry
+   -> at most one submission
+      Chat source=lavi_chat_ui
+      microphone source=voice_input_final
+      metadata.input_route=minecraft_fabric_chatclef
+```
+
+The current `lavi_chat_mic_router` value is only a router-synthesized label
+after all loaded Input providers have collapsed to raw strings. It is not a
+trusted Chat/microphone origin. Before H5 can be public, the producer-assigned
+source must survive the local Chat adapter or provider-bound Input adapter,
+LLM queue, predict boundary, router and request factory. Twitch, YouTube,
+IdleThink, ScreenVision, StarCraft, unknown/raw input and Voice partial events
+must produce a handled H5 source rejection with zero translation, submission
+and LLM calls. Unrelated non-H5 text keeps the ordinary LLM path.
+The app wiring installs the router even when the Minecraft extension is absent;
+that H5 route returns `auto_deposit_trust_extension_unavailable`. Router
+import/construction failure is a startup/composition error and must not be
+swallowed into a routerless ordinary-LLM state. Once H5 route identity is known,
+every route-local exception is converted to a handled failure rather than
+escaping through `_try_route_external_input()` and reopening LLM fallback.
+
+The typed wrapper does not flatten ordinary structured LLM input. On a
+`GENERIC`/`NONE` decision, it passes the unchanged `fallback_payload` to the
+existing response pipeline so ScreenVision's kind/source/observation/display
+text, `remember_history=false`, metadata, nested payload and observation-memory
+side effects remain intact. Descriptor-bound policy, not provider payload
+fields, owns source/provider/kind/final; provider-supplied lookalike fields are
+never promoted to authorization data.
+
+The two user-provided exact forms `@auto_deposit_trust area 16x16` and
+`@auto_deposit_trust 반경 16x16` are accepted only as trusted whole-string
+input. A pre-translation adapter preserves the raw original and passes the
+prefixless canonical form to the unchanged dangerous-text/translation service.
+Every other `@` form remains rejected; raw passthrough is never used.
+The raw safety scan applies to natural-language H5 candidates too and runs
+before any current `.strip()` helper can erase trailing CR/LF evidence.
+
+Existing public command allowlists migrate from the coarse label to the real
+Chat/voice sources and retain `direct_typed` where already authorized. Commands
+already exposed through the Fabric Korean UI retain `lavi_gui_korean`;
+STORE_HOME and H5 do not gain that source.
+
+The H5 command is an immediate persistent registry mutation, not a ChatClef
+user Task. No cleanup, retry, continuation or follow-up command is generated by
+Python. Pre-existing busy, disconnected, reconciliation, quarantine or guarded
+state stops the current input before submission. If the current submit call
+itself resolves to synthetic `UNKNOWN`, that input has one submit attempt and
+zero retry/replay; later input remains blocked until matching reconciliation.
+Reconnect never replays the registration command.
+
+Source strings and serialized metadata are not sufficient H5 authority. The
+claim registry issues an opaque receipt bound to the event ID, trusted source
+and registry instance. The extension composition owns one process-lifetime
+registry object and injects that exact object into the router, coordinator and
+H5 authorizer; a separate static/global registry is forbidden and object-identity
+tests use `is` assertions. Admission first validates an `ISSUED` receipt without
+consuming it. The coordinator then builds the request without the receipt and
+atomically revalidates/consumes it immediately before synchronous command
+submission, with no callback or await between commit and submitter entry. A
+factory failure abandons the receipt; a commit failure submits zero; a submitter
+exception or `UNKNOWN` leaves it spent and never retries. The receipt is never
+serialized into a DTO, log or wire payload. Direct `handle_natural_language_command()` or
+`submit_translated_command()` calls with forged source/metadata/translation,
+Fabric Korean UI calls, and missing/forged/spent receipts all produce H5 submit
+zero. Existing non-H5 direct extension/UI behavior is preserved.
+
+Raw control rejection happens before claim and therefore consumes no registry
+capacity. After claim, every no-submit exit—including unavailable handlers,
+reconciliation/precheck/admission rejection, translation/validation/factory
+failure, and commit rejection/exception—runs idempotent `abandon_if_issued()`.
+Router-to-coordinator ownership handoff plus both scopes' `finally` safety net
+ensures no terminal branch leaves an `ISSUED` receipt. A successful commit or a
+prior concurrent spend makes the safety-net abandon a no-op.
+
+The planned route's current generic local `accepted` result would prove only
+Python transport-send submission, not a Java wire terminal:
+
+```text
+[Minecraft] 주변 16×16 자동 보관 대상 등록 명령을 제출했어요.
+```
+
+That bounded text is a direct Gradio Chat return contract. The current queued
+VoiceInput path iterates the response generator to execute routing but discards
+its yielded value, so microphone Chat-UI/TTS/output ACK delivery is
+`NOT_IMPLEMENTED` and is not part of H5 acceptance. Adding it later requires a
+separate bounded output owner and exactly-once delivery test.
+
+An eventual wire `status=completed` result with
+`data.result_reason=callback_completed_without_user_task`, when source-backed
+ownership permits it, does not prove that the H5 repository mutation succeeded.
+The router-normalized assertion paths are `status.status` and
+`status.data.result_reason`, with `details.result_reason` as the copied mirror.
+Pre-existing root ownership may also require a fail-closed generic terminal.
+Current H5 `UPDATED`, `NO_CHANGE`, failure reason and count fields are emitted
+to bounded Minecraft logs and are not typed into `command_result.data`.
+Therefore orchestration and response code must not say `등록 완료`, report a
+count, advance another workflow, or infer downstream automatic-deposit success.
+
+If exact H5 result wording is requested later, add a separately reviewed typed
+result projection and Python validator/renderer. Do not parse human-readable
+Minecraft logs into a public response.
+
+The dedicated Java integration fixture now proves exact H5 normalized dispatch,
+its callback, matching-request terminal send and queue retirement together, and
+the required clean forced build passed. `BRIDGE_LIFECYCLE_READY` is therefore
+true for this exact route. This is Java test-only verification; Java production
+behavior remains unchanged and registry mutation success remains unproven.
+
+The complete feature contract and test vectors are in
+[H5 Auto-Deposit Trust Korean Chat/Microphone Pre-Change Contract](chatclef-h5-auto-deposit-trust-korean-chat-microphone-pre-change-contract-2026-09-04.md).
+Its Python source is implemented and offline tests plus the clean forced build
+passed. Deployment, live Chat/microphone runtime and request-bound registry
+mutation verification remain `NOT_RUN`; commit/push remain `NOT_PERFORMED`.

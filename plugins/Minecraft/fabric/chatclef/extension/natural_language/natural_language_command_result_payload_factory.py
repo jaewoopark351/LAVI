@@ -73,3 +73,27 @@ class NaturalLanguageCommandResultPayloadFactory:
             "message": message,
             "details": {},
         }
+
+    def operation_failure(
+        self,
+        command: Any,
+        reason_code: str,
+        error: Exception,
+    ) -> dict[str, Any]:
+        rejected_request_id = request_id(command)
+        message = f"{type(error).__name__}: {error}"
+        return {
+            "request_id": rejected_request_id,
+            "ok": False,
+            "status": {
+                "request_id": rejected_request_id,
+                "ok": False,
+                "status": CommandResultStatus.REJECTED.value,
+                "error_code": BridgeErrorCode.INTERNAL_ERROR.value,
+                "message": message,
+                "data": {"reason_code": reason_code},
+            },
+            "error": BridgeErrorCode.INTERNAL_ERROR.value,
+            "message": message,
+            "details": {"reason_code": reason_code},
+        }

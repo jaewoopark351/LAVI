@@ -1,5 +1,8 @@
 <!-- 20260904_kpopmodder: Defined the H5 player-position anchor contract and recorded its worktree implementation verification. -->
 <!-- 20260904_kpopmodder: Reconciled the current build, matching active-instance deployment, and partial live player-position registration evidence before commit. -->
+<!-- 20260904_kpopmodder: Linked the separate docs-only Python Korean Chat/microphone exposure contract without changing the verified Java H5 scope. -->
+<!-- 20260904_kpopmodder: Separated the pre-commit evidence snapshot from the later committed and pushed source state. -->
+<!-- 20260905_kpopmodder: Reconciled the separate Python Chat/microphone route after its offline implementation and build verification. -->
 
 # ChatClef H5 Player-Position Anchor Implementation Contract and Verification Record
 
@@ -11,10 +14,11 @@ DECISION_DATE: 2026-09-04
 DECISION_STATUS: APPROVED_IMPLEMENTED_AND_RUNTIME_PARTIALLY_VERIFIED
 DOCUMENT_REVIEW_STATUS: REVIEWED_2026-09-04; SOURCE_BUILD_DEPLOYMENT_RUNTIME_AND_CANONICAL_CROSS_CHECKED
 PRE_CHANGE_SOURCE_ANCHOR: CROSSHAIR
-CURRENT_WORKTREE_SOURCE_ANCHOR: PLAYER_BLOCK_POSITION
+DOCUMENT_SNAPSHOT_WORKTREE_SOURCE_ANCHOR: PLAYER_BLOCK_POSITION
+CURRENT_SOURCE_ANCHOR: PLAYER_BLOCK_POSITION; COMMITTED_AT_f301770d1885f8d7239846a97b187f4d51c05a55
 TARGET_BATCH_ANCHOR: PLAYER_BLOCK_POSITION
 TARGET_VOLUME: FIXED_HALF_OPEN_16_X_16_X_16
-SOURCE_CHANGE_IN_THIS_TASK: IMPLEMENTED_IN_WORKTREE
+SOURCE_CHANGE_AT_DOCUMENT_SNAPSHOT: IMPLEMENTED_IN_WORKTREE
 TEST_EXECUTION_IN_THIS_TASK: PASSED; 1.20.1=707_TESTS_0_FAILURES_0_ERRORS_1_SKIPPED; ALL_11_VERSION_TEST_TASKS_PASSED
 BUILD_IN_THIS_TASK: PASSED; CLEAN_BUILD_RERUN_TASKS; 171_TASKS_EXECUTED
 ARTIFACT_INSPECTION_IN_THIS_TASK: PASSED; FRESH_1.20.1_REMAPPED_JAR_AND_EXPECTED_CLASSES_PRESENT
@@ -22,11 +26,13 @@ ARTIFACT_SHA256_IN_THIS_TASK: 24DD4C8DEBA968D0206CA3D68A227C57D513E55769F1BB51F5
 DEPLOYMENT_IN_THIS_TASK: PASSED; ACTIVE_LAVI_TEST_FABRIC01_JAR_SHA256_MATCH
 MINECRAFT_RUNTIME_IN_THIS_TASK: PARTIAL_PASS; PLAYER_POSITION_BATCH_UPDATED_REGISTRATION_OBSERVED
 RUNTIME_ACCEPTANCE_REMAINING: NO_CHANGE_RERUN + PLAYER_MOVE_RANGE_SHIFT + EXPLICIT_EDGE_TESTS + NEWLY_ADDED_DESTINATION_SELECTION NOT_RUN
-COMMIT_PUSH_IN_THIS_TASK: NOT_PERFORMED_AT_DOCUMENT_SNAPSHOT
+PYTHON_KOREAN_CHAT_MICROPHONE_ROUTE: SEPARATE_CONTRACT; PYTHON_IMPLEMENTED_AND_OFFLINE_VERIFIED; CATALOG_26_PARITY_CLOSED
+COMMIT_PUSH_AT_DOCUMENT_SNAPSHOT: NOT_PERFORMED_AT_DOCUMENT_SNAPSHOT
+CURRENT_COMMIT_PUSH_STATUS: COMMITTED_AND_PUSHED; COMMIT=f301770d1885f8d7239846a97b187f4d51c05a55; UPSTREAM=origin/minecraft-plugin-fix/alto-clef-infinite-loop
 ```
 
-이 문서는 H5 bulk trusted-destination registration의 구현 계약과 worktree 구현 결과를 함께
-기록한다. 현재 Java source는 player feet `BlockPos`를 batch anchor로 사용한다. 생성된 JAR과
+이 문서는 H5 bulk trusted-destination registration의 구현 계약과 최초 worktree 구현 결과, 이후
+commit/push 상태를 함께 기록한다. 현재 Java source는 player feet `BlockPos`를 batch anchor로 사용한다. 생성된 JAR과
 `LAVI_TEST_Fabric01` active JAR의 SHA-256이 일치하며, 한 번의 live batch registration에서
 `PLAYER_BLOCK_POSITION`과 registry `13 -> 22` 변경이 확인됐다. 이 증거는 전체 runtime
 acceptance나 downstream automatic transfer 성공으로 확대하지 않는다.
@@ -139,7 +145,13 @@ anchor, volume, allowlist, transaction 또는 logging 의미가 달라지지 않
 않는다. 무인자 `@자동보관등록`을 새 single alias로 만들지 않으며 malformed, mixed,
 unsupported 또는 extra argument의 fail-closed 문법도 그대로 유지한다.
 
-Python chat/microphone natural-language route와 Fabric wire protocol 변경은 이 계약의 범위가 아니다.
+Python Chat/microphone natural-language route와 Fabric wire protocol 변경은 이 Java H5 계약의
+범위가 아니다. 그 후속 구현은 Python production change와 Java test-only lifecycle verification으로
+구성하며 Java production behavior를 보존했다. 세부 계약과 offline evidence는
+[H5 Auto-Deposit Trust Korean Chat/Microphone Pre-Change Contract](chatclef-h5-auto-deposit-trust-korean-chat-microphone-pre-change-contract-2026-09-04.md)가
+소유한다. 해당 route는 구현·offline test·clean build까지 완료됐지만 deployment와 Chat/microphone
+live runtime은 실행하지 않았다. 이 문서의 기존 Java runtime evidence를 그 Python route의 live
+검증으로 확대하지 않는다.
 
 ## 6. Player anchor contract
 
@@ -899,7 +911,8 @@ ACTIVE_INSTANCE_JAR_SIZE_BYTES: 8112941
 ACTIVE_INSTANCE_JAR_SHA256: 24DD4C8DEBA968D0206CA3D68A227C57D513E55769F1BB51F5943F549989CC27
 BUILD_DEPLOYED_ARTIFACT_IDENTITY: MATCH
 MINECRAFT_RUNTIME: PARTIAL_PASS; PLAYER_POSITION_BATCH_UPDATED_REGISTRATION_OBSERVED
-COMMIT_PUSH: NOT_PERFORMED_AT_DOCUMENT_SNAPSHOT
+COMMIT_PUSH_AT_EVIDENCE_SNAPSHOT: NOT_PERFORMED_AT_DOCUMENT_SNAPSHOT
+CURRENT_COMMIT_PUSH_STATUS: COMMITTED_AND_PUSHED; COMMIT=f301770d1885f8d7239846a97b187f4d51c05a55; UPSTREAM=origin/minecraft-plugin-fix/alto-clef-infinite-loop
 
 RUNTIME_EVIDENCE_DATE: 2026-09-04
 RUNTIME_EVIDENCE_SOURCE: LAVI_TEST_Fabric01/logs/stdout-logs.txt
@@ -986,6 +999,11 @@ ownership/package split implemented
 fail-closed and bounded logging contract recorded
 deterministic acceptance covered by automated tests
 ```
+
+위 완료 정의는 Java H5 direct-command implementation에만 적용한다. LAVI Chat/microphone 한국어
+adapter의 구현·offline 검증 상태와 남은 live-runtime 경계는 별도
+[H5 Korean Chat/Microphone contract](chatclef-h5-auto-deposit-trust-korean-chat-microphone-pre-change-contract-2026-09-04.md)에
+기록한다.
 
 Test, clean build, artifact inspection, deployment와 runtime verification은 서로 다른 완료 상태다.
 각 결과가 실제로 존재할 때만 §1 status와 verification record를 갱신한다. Worktree source 구현이나

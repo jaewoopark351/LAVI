@@ -1,10 +1,16 @@
 #20260803_kpopmodder: Added deterministic Korean rule parsing for ChatClef intents.
 #20260827_kpopmodder: Resolve STORE_HOME before generic item deposit rules.
 #20260828_kpopmodder: Pass raw text to STORE_HOME so question punctuation remains observable.
+#20260905_kpopmodder: Resolve guarded H5 area registration before STORE_HOME and item rules.
 from __future__ import annotations
 
 import re
 
+from plugins.Minecraft.fabric.chatclef.intent.auto_deposit_trust import (
+    AutoDepositTrustGuardIntentEncoder,
+    AutoDepositTrustIntentClassification,
+    KoreanAutoDepositTrustIntentClassifier,
+)
 from plugins.Minecraft.fabric.chatclef.intent.chatclef_intent_dto import (
     ChatClefIntentDTO,
 )
@@ -45,6 +51,9 @@ class KoreanChatClefRuleParser:
         acquisition_verbs: KoreanAcquisitionVerbMatcher | None = None,
         item_actions: KoreanItemActionRuleParser | None = None,
         store_home: KoreanStoreHomeIntentClassifier | None = None,
+        auto_deposit_trust: KoreanAutoDepositTrustIntentClassifier | None = None,
+        auto_deposit_trust_guard_encoder: AutoDepositTrustGuardIntentEncoder
+        | None = None,
     ):
         self._normalizer = normalizer or KoreanTextNormalizer()
         self._quantity_parser = quantity_parser or KoreanQuantityParser()
@@ -58,10 +67,19 @@ class KoreanChatClefRuleParser:
         self._store_home = store_home or KoreanStoreHomeIntentClassifier(
             self._normalizer
         )
+        self._auto_deposit_trust = (
+            auto_deposit_trust or KoreanAutoDepositTrustIntentClassifier()
+        )
+        self._auto_deposit_trust_guard_encoder = (
+            auto_deposit_trust_guard_encoder or AutoDepositTrustGuardIntentEncoder()
+        )
 
     def parse(self, text: object) -> ChatClefIntentDTO:
         original = self._normalizer.normalize(text, lowercase_english=False)
         normalized = self._normalizer.normalize(text)
+        auto_deposit_trust = self._auto_deposit_trust.classify(text)
+        if auto_deposit_trust.candidate:
+            return self._auto_deposit_trust_intent(original, auto_deposit_trust)
         if self._is_stop(normalized):
             return self._intent(ChatClefIntentType.STOP, original)
         if self._is_idle(normalized):
@@ -101,6 +119,23 @@ class KoreanChatClefRuleParser:
                 item_phrase=item_phrase,
             )
         return self._intent(ChatClefIntentType.UNKNOWN, original)
+
+    def _auto_deposit_trust_intent(
+        self,
+        original: str,
+        classification: AutoDepositTrustIntentClassification,
+    ) -> ChatClefIntentDTO:
+        if classification.executable:
+            return ChatClefIntentDTO(
+                intent_type=ChatClefIntentType.AUTO_DEPOSIT_TRUST_AREA,
+                original_text=original,
+                source="rule",
+                slots={},
+            )
+        return self._auto_deposit_trust_guard_encoder.encode(
+            original,
+            classification,
+        )
 
     def _store_home_intent(
         self,

@@ -1,7 +1,11 @@
 #20260803_kpopmodder: Added Korean natural-language orchestration before ChatClef command submission.
 #20260827_kpopmodder: Consume guarded STORE_HOME candidates without LLM fallback or submission.
+#20260905_kpopmodder: Decode H5 guards before generic UNKNOWN handling and never recover malformed guards.
 from __future__ import annotations
 
+from plugins.Minecraft.fabric.chatclef.intent.auto_deposit_trust import (
+    AutoDepositTrustGuardIntentDecoder,
+)
 from plugins.Minecraft.fabric.chatclef.intent.chatclef_command_compiler import (
     ChatClefCommandCompiler,
 )
@@ -49,12 +53,17 @@ class ChatClefNaturalLanguageService:
         resolver: KoreanItemPhraseResolver | None = None,
         target_catalog: ChatClefTargetCatalog | None = None,
         compiler: ChatClefCommandCompiler | None = None,
+        auto_deposit_trust_guard_decoder: AutoDepositTrustGuardIntentDecoder
+        | None = None,
     ):
         self._extractor = extractor or CompositeChatClefIntentExtractor()
         self._schema_validator = schema_validator or ChatClefIntentSchemaValidator()
         self._resolver = resolver or KoreanItemPhraseResolver()
         self._target_catalog = target_catalog
         self._compiler = compiler or ChatClefCommandCompiler()
+        self._auto_deposit_trust_guard_decoder = (
+            auto_deposit_trust_guard_decoder or AutoDepositTrustGuardIntentDecoder()
+        )
 
     def translate(self, text: object) -> ChatClefTranslationResultDTO:
         raw_text = str(text or "").strip()
@@ -72,6 +81,31 @@ class ChatClefNaturalLanguageService:
             )
         try:
             intent = self._extractor.extract(raw_text)
+            auto_deposit_trust_guard = (
+                self._auto_deposit_trust_guard_decoder.decode(intent)
+            )
+            if auto_deposit_trust_guard.is_valid:
+                classification = auto_deposit_trust_guard.classification
+                if classification is None:
+                    raise RuntimeError("valid_auto_deposit_trust_guard_missing_classification")
+                return self._reject(
+                    ChatClefIntentStatus.INVALID,
+                    auto_deposit_trust_guard.reason_code,
+                    auto_deposit_trust_guard.message,
+                    intent,
+                    {
+                        "auto_deposit_trust_decision": (
+                            classification.decision.value
+                        )
+                    },
+                )
+            if auto_deposit_trust_guard.is_invalid:
+                return self._reject(
+                    ChatClefIntentStatus.INVALID,
+                    auto_deposit_trust_guard.reason_code,
+                    auto_deposit_trust_guard.message,
+                    intent,
+                )
             valid, reason_code, message = self._schema_validator.validate(intent)
             if not valid:
                 return self._reject(

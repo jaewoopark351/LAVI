@@ -1,6 +1,7 @@
 #20260717_kpopmodder: Groups app composition DTOs and services behind compatibility facades.
 
 from .app_component_wiring_service import AppComponentWiringService
+from .component_wiring import AppComponentWiringError
 from .core_component_composition_result import CoreComponentCompositionResult
 from .core_component_composition_service import CoreComponentCompositionService
 from .managed_component_wiring_result import ManagedComponentWiringResult
@@ -11,6 +12,7 @@ from .optional_plugin_spec import OptionalPluginSpec
 
 __all__ = [
     "AppComponentWiringService",
+    "AppComponentWiringError",
     "CoreComponentCompositionResult",
     "CoreComponentCompositionService",
     "ManagedComponentWiringResult",

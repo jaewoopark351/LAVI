@@ -6,7 +6,10 @@
 <!-- 20260819_kpopmodder: Added canonical submission, reconciliation latch, and split terminal/checkpoint/advancement regression contracts. -->
 <!-- 20260829_openai: Versioned the registered-command count and kept current pass/fail ownership in the merge-blocker document. -->
 <!-- 20260829_openai: Added the current deposit_all exact-set gate and topology-correct STORE_HOME decision-order and identity test contracts. -->
+<!-- 20260905_kpopmodder: Reconciled the implemented H5 provenance route, 26-row catalog, Java test-only proof, and offline verification. -->
 <!-- 20260829_openai: Recorded the final focused registry synchronization result without promoting runtime evidence. -->
+<!-- 20260904_kpopmodder: Added the docs-only H5 Korean Chat/microphone test contract and recorded the activation-aware 26-command catalog gap. -->
+<!-- 20260905_kpopmodder: Reconciled H5 receipt-commit race tests and the two distinct Java test-only obligations. -->
 
 # ChatClef Korean Test Strategy
 
@@ -31,6 +34,7 @@ plugins/Minecraft/docs/chatclef-korean-item-action-alias-v2-plan.md
 plugins/Minecraft/docs/chatclef-python-command-orchestration-plan.md
 plugins/Minecraft/docs/chatclef-python-inventory-cleanup-preflight-contract.md
 plugins/Minecraft/docs/chatclef-korean-post-review-merge-blockers.md
+plugins/Minecraft/docs/chatclef-h5-auto-deposit-trust-korean-chat-microphone-pre-change-contract-2026-09-04.md
 plugins/Minecraft/README.md
 plugins/Minecraft/docs/chatclef-command-lifecycle-and-threading.md
 plugins/Minecraft/docs/fabric-chatclef-bridge-protocol-v1.md
@@ -39,10 +43,11 @@ plugins/Minecraft/docs/fabric-chatclef-live-runtime-process-lifecycle-plan.md
 ```
 
 The Python Korean command registry plan owns the source-backed Java
-registered-command snapshot: 20 commands at its reviewed baseline and 22 in the
-current Java surface, with production Python metadata still at 21 until
-`deposit_all` synchronization. It also owns command-by-command resolver domains,
-lifecycle kinds, safety tiers,
+registered-command snapshot: 20 commands at its reviewed baseline, 22 at the
+dated 2026-08-29 closure, and an activation-aware target of 26 after the
+separate H5 registrar. Production Python metadata and artifacts are now
+synchronized at 26. It also owns command-by-command resolver
+domains, lifecycle kinds, safety tiers,
 confirmation modes, allowed input sources, and public enablement axes. The alias
 v2 plan owns item/action design, command-specific Korean UX policy, canonical
 aliases, display wording, capability gates, and phased item/action
@@ -2837,13 +2842,13 @@ No Java, DTO, wire payload, ChatClef engine, Forge MineMind, live Minecraft
 behavior, or test execution was changed by this documentation revision.
 ```
 
-## 2026-08-29 Current Registered-Command And STORE_HOME Direct-Test Gate
+## 2026-08-29 Checkpoint Registered-Command And STORE_HOME Direct-Test Gate
 
 This addendum supersedes historical current-status wording above where the
 dates conflict. It augments, rather than replaces, the broader Phase 0 and CI
 gate.
 
-The current command-catalog and focused-suite evidence is:
+The command-catalog and focused-suite evidence at that checkpoint was:
 
 ```text
 Java registered-command snapshot: 22
@@ -2881,12 +2886,12 @@ The exact Python values are `slot_schema=("items?",)` and
 `allowed_input_sources=()`. `items?` uses the existing optional-slot suffix
 convention and is not an unresolved marker. `exposure` is derived from source
 registration and readiness rather than stored as a separate
-`ChatClefCommandSpec` field. The current snapshot and support-matrix schema do
-not carry `slot_schema`; their obligation is exact command identity and support
+`ChatClefCommandSpec` field. The checkpoint snapshot and support-matrix schema did
+not carry `slot_schema`; their obligation was exact command identity and support
 classification. A dedicated production-registry spec test owns the exact slot
 and readiness values without expanding either artifact schema.
 
-The latest supplied STORE_HOME evidence separately proves a clean Gradle build,
+The STORE_HOME evidence supplied for that checkpoint separately proved a clean Gradle build,
 243 JUnit tests with zero failure/error and 14 skipped, matching built/deployed
 JAR file identity, an observed runtime code-source path, and two completed
 STORE_HOME operations with zero candidate/operation timeout decisions.
@@ -2895,7 +2900,7 @@ operation 30351 is a repeat completion/no-timeout observation. This does not
 prove complete source-to-runtime provenance, so
 `artifactParity=PARITY_UNPROVEN` remains required.
 
-Before commit, focused Java coverage must directly prove the following actual
+At that checkpoint, focused Java coverage before commit had to directly prove the following actual
 production contracts.
 
 ```text
@@ -2929,7 +2934,7 @@ and view do not own a Task back-reference, and the projector reads
 it would require production back-references solely to satisfy a test and would
 weaken the thin-facade ownership boundary.
 
-Current closure requires:
+Checkpoint closure required:
 
 ```text
 registered-command exact set is 22 across the Java snapshot, support matrix,
@@ -2946,7 +2951,7 @@ all broader Phase 0, offline CI, artifact-provenance, and live-safety gates abov
 
 ## 2026-08-29 Final Focused Registry Verification
 
-This addendum supersedes only the earlier 2026-08-29 current-status values of
+This addendum supersedes only the earlier 2026-08-29 checkpoint-status values of
 21 production registry names and 36 passed / 1 failed. It does not rewrite the
 historical failing runs or the broader Phase 0, CI, live-safety, and STORE_HOME
 direct Java coverage gates.
@@ -2986,3 +2991,192 @@ No runtime-manifest provenance or runtime behavior follows from this focused
 result. Runtime manifest Git/source/build-input/runtime SHA provenance remains
 `UNVERIFIED`, and `artifactParity=PARITY_UNPROVEN` remains unchanged. This
 addendum records no commit or push.
+
+## 2026-09-04 H5 Korean Chat/microphone test extension
+
+The 22-row result above remains dated verification for its exact source and
+test baseline. At the exact H5 activation source baseline recorded in the
+[Python Korean Command Registry Plan](chatclef-python-korean-command-registry-plan.md#2026-09-04-h5-registrar-current-source-delta),
+`AutoDepositTrustedCommandRegistrar` declares and attempts four H5 names.
+Collision-free normal activation therefore targets 26 unique names. If any
+English trio name collides, the registrar refuses the whole English trio and
+does not attempt the Korean alias. If only the Korean alias collides after the
+English trio succeeds, the three English names remain registered and only the
+alias is refused. Actual runtime effective ownership remains a separate
+observation:
+
+```text
+auto_deposit_trust
+auto_deposit_untrust
+auto_deposit_trusted_list
+자동보관등록
+```
+
+Before implementation, the production Python registry, registered-command
+snapshot and support matrix remained at 22. The 2026-09-05 implementation now
+keeps all three at 26; the earlier passing result remains dated 22-row evidence.
+
+The catalog test must add the actual H5 registrar activation source to its
+source extraction and prove all of the following:
+
+```text
+source-declared collision-free activation target: 26
+snapshot rows:                            26
+support-matrix rows:                      26
+production registry names:               26
+exact sets:                               equal
+duplicate command names:                 0
+H5 owner/class/registration paths:        exact
+existing registrar no-collision branch:  preserved and directly tested
+existing Korean-alias collision branch:  preserved and directly tested
+any-English-trio collision branch:        trust/untrust/list each run as a parameterized registrar subcase
+```
+
+Only `auto_deposit_trust` is a candidate for the new public natural-language
+feature. `auto_deposit_untrust`, `auto_deposit_trusted_list` and
+`자동보관등록` remain raw-only in this slice.
+
+The former input path collapsed local Chat, VoiceInput and other loaded `Input`
+providers to raw strings before the Minecraft router. The implementation now
+uses a frozen envelope that preserves
+`source/provider_id/event_kind/final/event_id`, routing text and an opaque
+unchanged `fallback_payload` from ingress through queue and router. H5 request
+creation copies the trusted source. H5 admits only these exact tuples:
+
+```text
+lavi_chat_ui / lavi_chat_ui / chat_submit / true
+voice_input_final / VoiceInput / final_transcript / true
+```
+
+Twitch, YouTube, IdleThink, ScreenVision, StarCraft, unknown providers, raw
+legacy strings and partial transcripts must produce handled H5 source rejection
+with zero translation, submission and LLM calls. The Minecraft router remains
+installed with a nullable extension dependency, so extension-unavailable H5
+input fails closed while unrelated text still follows the normal LLM path.
+Router import/construction failure must surface as startup/composition failure;
+it must not be swallowed into a routerless LLM fallback state.
+
+The feature-specific offline test matrix must prove:
+
+```text
+positive Korean Chat and microphone-style final transcripts
+exact prefixless shorthand forms without @
+trusted exact @auto_deposit_trust area 16x16 and @auto_deposit_trust 반경 16x16
+  -> preserve original text and adapt once to the prefixless canonical input
+the same forms with an untrusted/invalid source tuple
+  -> auto_deposit_trust_input_source_not_allowed or auto_deposit_trust_input_provenance_invalid,
+     zero claim/translation/submit/LLM call
+every other trusted @ form, suffix or injected slot
+  -> dangerous_command_slot handled rejection, zero submit, zero LLM call
+fixed-size normalization for 16x16 / 16 X 16 / 16×16 / 16 곱하기 16
+fullwidth/circled/NFKC compatibility forms, Unicode Zs spacing and shorthand-internal punctuation
+  -> H5 guarded rejection, zero submit, zero LLM fallback
+rule-only AUTO_DEPOSIT_TRUST_AREA with zero user-controlled slots
+guarded decisions use UNKNOWN + exact rule_auto_deposit_trust_guard slots/reason codes
+malformed/contradictory guard payload -> typed rejection, zero submit, zero LLM call
+one exact compiler output: auto_deposit_trust area 16x16
+LLM authority denied before and after payload validation
+H5 candidate priority over STORE_HOME and DEPOSIT_ITEM
+negation/question/hypothetical/deferred/compound rejection
+8x8 / 16x8 / 32x32 / missing size / extra-number rejection
+guarded candidate handled without LLM fallback
+candidate detector is total/no-throw for string fixtures
+final classifier exception -> translation_internal_error handled rejection, zero submission, zero LLM call
+any H5 route-local exception after candidate identity -> handled failure, zero LLM fallback
+raw CR/LF/control/non-ASCII-Zs scan precedes strip and normalization for exact and natural-language H5 input
+  -> auto_deposit_trust_input_raw_control_not_allowed, zero claim/translation/submit/LLM call
+one admitted immutable ingress event (source/provider_id/event_kind/final/event_id)
+  -> one process-lifetime event claim -> at most one translation -> at most one submit attempt
+event_id accepts only an adapter-generated built-in string matching [0-9a-f]{32};
+  missing/empty/whitespace/padded/uppercase/wrong-length/non-hex/control/non-string values
+  fail before claim with zero translation/submission
+same event_id redelivery/concurrent claim -> zero additional translation or submission
+descriptor-bound policy overwrites/ignores provider-supplied source/provider_id/event_kind/final/event_id fields
+non-H5 ScreenVision dict fallback preserves the original object and all nested fields,
+  including remember_history=false and observation-memory semantics
+claim issues a non-serializable event/source/registry-bound receipt;
+  admission inspection is non-consuming, request construction never receives the receipt,
+  and only one atomic revalidation/consumption may enter H5 command submission
+extension composition, router, coordinator and authorizer share the exact same process-lifetime
+  claim registry object; no static/global or second submission-capable registry exists
+request-factory failure abandons the receipt and submits zero
+concurrent post-inspection commits permit at most one submitter entry
+commit failure submits zero; submitter exception/UNKNOWN leaves the receipt spent with zero retry
+every no-submit exit after claim abandons ISSUED -> SPENT exactly once;
+  router/coordinator finally safety nets are idempotent, leave no live ISSUED receipt,
+  and same-event redelivery remains claim/translation/submit zero
+direct handle_natural_language_command forged source/metadata -> H5 submit zero
+direct submit_translated_command forged source/metadata/executable translation -> H5 submit zero
+missing/forged/mismatched/spent receipt and Fabric Korean UI -> H5 submit zero
+Fabric Korean UI source lavi_gui_korean remains admitted only for commands that already allow it;
+  STORE_HOME and H5 do not gain that source
+existing public commands preserve local Chat/VoiceInput/direct/Fabric-UI cases but reject
+  Twitch/YouTube/IdleThink/ScreenVision/StarCraft/unknown command candidates after generic enforcement
+parser-ready, Python-admission-ready and public memberships are source-independent;
+  staged/rollback fixtures keep parse/admission true + public false with submit zero,
+  while current production metadata is parse/admission/bridge/public true
+pre-existing busy/disconnected/reconciliation/quarantine -> current event submit zero
+current submit outcome UNKNOWN -> one attempt, zero retry/replay
+post-UNKNOWN later event -> submit zero until matching reconciliation
+local Python accepted submission result says submitted, not completed or count-confirmed;
+  it is not a Java wire command_result
+direct Chat displays that bounded ACK; queued microphone ACK/TTS delivery remains NOT_IMPLEMENTED
+existing GET/DEPOSIT/STORE_HOME/control regressions remain green
+```
+
+The raw-safety collaborator scans the immutable raw text for CR/LF/TAB/control
+characters after source/event-ID admission and before claim or outer ASCII-space
+trim. After that scan passes and the event is claimed once, the dedicated exact-input
+adapter handles the two trusted whole-string `@` forms, preserves `original_text`,
+and passes only the prefixless canonical text to the unchanged dangerous-text/translation service. Every other literal `@` form
+remains rejected; the common dangerous-text rule is not weakened. Raw Minecraft
+command tests continue to own the four direct-command forms separately.
+
+Existing H5 command, generic callback-lifecycle and result-fidelity tests remain
+supporting evidence. The new focused Java integration test now exercises exact
+H5 normalized dispatch, its completion callback, matching-request terminal send
+and queue retirement in one fixture, and the required clean forced build passed.
+Therefore `BRIDGE_LIFECYCLE_READY=true` for this route. This test-only addition
+does not change Java production behavior and does not prove registry mutation
+success. It separates exact terminal branches:
+`NO_ROOT_VISIBLE` produces `completed / callback_completed_without_user_task /
+callback_without_user_task`, while `PREEXISTING_UNCHANGED_IDLE_ROOT` produces
+`unknown / finish_callback_without_new_command_owned_root /
+callback_without_matching_user_task_event`. Both require matching request ID,
+one terminal send and retirement only after successful asynchronous terminal-send
+completion with `outcome.succeeded()=true`.
+The pre-existing-idle fixture additionally requires synchronous callback
+observation before dispatch return, no `taskFinishedObservation`, and
+`preexistingIdleRootStabilityQualified=true`; otherwise it has not reached that
+classifier branch.
+
+Registrar verification is covered by the focused Java test. The existing
+`AutoDepositTrustedCommandRegistrarTest` no-collision and Korean-alias collision
+cases remain, and the added parameterized trust/untrust/list subcases prove that
+any English-trio collision refuses the whole trio and skips the Korean alias.
+This is the one existing-registrar test hunk in the Java test-only scope; Java
+production source remains unchanged.
+
+Offline microphone fixtures prove only typed final-transcript semantic parity,
+not physical microphone wiring or provider duplicate suppression. A physical
+utterance producing exactly one provider callback remains `INCONCLUSIVE` until
+live observation; only duplicate delivery of the same `event_id` is deterministically
+suppressed offline. Live
+acceptance follows the operator-authorized staged public rollout in the feature
+contract and requires separate Chat and real microphone final-transcript runs
+with one request and normalized Java dispatch each. A second run
+at the same player range may correctly produce `NO_CHANGE`; use controlled
+fixtures rather than classifying that as microphone failure. Generic bridge
+completion is not an H5 mutation oracle. The current human-readable H5 log may
+support only isolated temporal/run-scoped evidence because it has no matching
+request/session/generation/correlation fields. Exact request-to-mutation binding
+is `INCONCLUSIVE`, and the log must not be parsed into a public Python
+success/count response.
+
+The normative grammar, ownership, registry metadata, ACK limit and full
+feature matrix are defined in
+[H5 Auto-Deposit Trust Korean Chat/Microphone Pre-Change Contract](chatclef-h5-auto-deposit-trust-korean-chat-microphone-pre-change-contract-2026-09-04.md).
+The 2026-09-04 addendum itself was documentation-only. The 2026-09-05 follow-up
+implemented the Python route, passed offline tests and the clean Java build, and
+left deployment, Minecraft/live Chat/microphone runtime, commit and push
+unperformed.

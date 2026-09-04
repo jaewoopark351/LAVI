@@ -23,14 +23,29 @@ class MinecraftChatClefSubmissionBoundary:
     def submit_once(
         self,
         extension: Any,
-        text: str,
+        event: Any,
         translation: Mapping[str, Any],
+        *,
+        route_claim: object = None,
+        original_text: str | None = None,
+        translation_input_text: str | None = None,
     ) -> dict[str, Any]:
-        request = self._request_factory.build(text)
+        request = self._request_factory.build(
+            event,
+            original_text=original_text,
+            translation_input_text=translation_input_text,
+        )
         request_id = str(request["request_id"])
         submitter = getattr(extension, "submit_translated_command")
         try:
-            payload = submitter(request, dict(translation))
+            if route_claim is None:
+                payload = submitter(request, dict(translation))
+            else:
+                payload = submitter(
+                    request,
+                    dict(translation),
+                    route_claim=route_claim,
+                )
         except Exception as error:
             result = self._result_normalizer.unknown(
                 request_id,

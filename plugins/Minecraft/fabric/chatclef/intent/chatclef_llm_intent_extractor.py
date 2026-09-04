@@ -1,5 +1,6 @@
 #20260803_kpopmodder: Added optional LLM extraction isolated from ChatClef execution.
 #20260827_kpopmodder: Deny LLM authority to create STORE_HOME.
+#20260905_kpopmodder: Deny LLM authority to create persistent H5 registration intents.
 from __future__ import annotations
 
 import json
@@ -49,8 +50,11 @@ class ChatClefLLMIntentExtractor:
                     "message": f"{type(error).__name__}: {error}",
                 },
             )
-        if isinstance(payload, dict) and payload.get("intent_type") == "store_home":
-            return self._store_home_rejection(text)
+        if isinstance(payload, dict):
+            if payload.get("intent_type") == "store_home":
+                return self._store_home_rejection(text)
+            if payload.get("intent_type") == "auto_deposit_trust_area":
+                return self._auto_deposit_trust_rejection(text)
         valid, reason_code, message = self._validator.validate(payload)
         if not valid:
             return ChatClefIntentDTO(
@@ -63,6 +67,8 @@ class ChatClefLLMIntentExtractor:
         intent = ChatClefIntentDTO.from_mapping(payload)
         if intent.intent_type is ChatClefIntentType.STORE_HOME:
             return self._store_home_rejection(text)
+        if intent.intent_type is ChatClefIntentType.AUTO_DEPOSIT_TRUST_AREA:
+            return self._auto_deposit_trust_rejection(text)
         return intent
 
     def _store_home_rejection(self, text: str) -> ChatClefIntentDTO:
@@ -74,5 +80,20 @@ class ChatClefLLMIntentExtractor:
             slots={
                 "reason_code": "llm_store_home_not_authorized",
                 "message": "LLM extraction cannot authorize STORE_HOME.",
+            },
+        )
+
+    def _auto_deposit_trust_rejection(self, text: str) -> ChatClefIntentDTO:
+        return ChatClefIntentDTO(
+            intent_type=ChatClefIntentType.UNKNOWN,
+            original_text=text,
+            source="llm_invalid",
+            confidence=0.0,
+            slots={
+                "reason_code": "llm_auto_deposit_trust_area_not_authorized",
+                "message": (
+                    "LLM extraction cannot authorize "
+                    "AUTO_DEPOSIT_TRUST_AREA."
+                ),
             },
         )

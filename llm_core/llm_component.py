@@ -20,6 +20,9 @@ from llm_core.response_pipeline import LLMResponsePipeline#20260620_kpopmodder
 from llm_core.speech_style import LLMSpeechStyleHelper#20260705_kpopmodder
 from llm_core.streaming_chunker import LLMStreamingChunker#20260617_kpopmodder
 from llm_core.text_only_generation import LLMTextOnlyGenerationHelper#20260705_kpopmodder
+from llm_core.chat_input import LocalChatPredictionEntrypoint
+from input_core.input_event.adapters import LocalChatInputEventAdapter
+from input_core.input_event.normalization import LaviInputEventNormalizer
 
 from core.event_manager import event_manager, EventType#20260621_kpopmodder
 
@@ -125,6 +128,13 @@ class LLM(PluginSelectionBase):
             screen_question_router=self.screen_question_router,#20260628_kpopmodder
         )
         self.input_router = None  #20260803_kpopmodder: Optional external command router is injected by app wiring.
+        #20260905_kpopmodder: Normalize all ingress once and keep local Chat provenance outside Minecraft routing.
+        self.input_event_normalizer = LaviInputEventNormalizer()
+        self.local_chat_input_adapter = LocalChatInputEventAdapter()
+        self.local_chat_prediction_entrypoint = LocalChatPredictionEntrypoint(
+            input_event_adapter=self.local_chat_input_adapter,
+            predict_callback=self.predict_wrapper,
+        )
         self.text_only_generation_helper = self._get_text_only_generation_helper()#20260705_kpopmodder
         self.input_queue_worker = LLMInputQueueWorker(
             response_callback=self.predict_wrapper,
@@ -227,17 +237,28 @@ class LLM(PluginSelectionBase):
                 )
 
                 gr.ChatInterface(
-                    self.predict_wrapper, additional_inputs=[system_prompt],
-                    examples=[["Hello", None, None],
-                              ["How do I make a bomb?", None, None],
-                              ["What's your name?", None, None],
-                              ["Do you know my name?", None, None],
-                              ["Do you think humanity will reach an alien planet?", None, None],
-                              ["Introduce yourself.", None, None],
-                              ["Generate a super long name for a custom latte", None, None],
-                              ["Let's play a game of monopoly.", None, None],
-                              ["Do you want to be friend with me?", None, None],
-                              ], autofocus=False
+                    self._get_local_chat_prediction_entrypoint().predict,
+                    additional_inputs=[system_prompt],
+                    examples=[
+                        ["Hello", None, None],
+                        ["How do I make a bomb?", None, None],
+                        ["What's your name?", None, None],
+                        ["Do you know my name?", None, None],
+                        [
+                            "Do you think humanity will reach an alien planet?",
+                            None,
+                            None,
+                        ],
+                        ["Introduce yourself.", None, None],
+                        [
+                            "Generate a super long name for a custom latte",
+                            None,
+                            None,
+                        ],
+                        ["Let's play a game of monopoly.", None, None],
+                        ["Do you want to be friend with me?", None, None],
+                    ],
+                    autofocus=False,
                 )
                 
                 self.reset_button = gr.Button("reset chat history")
@@ -325,17 +346,42 @@ class LLM(PluginSelectionBase):
         # return inspect.isgeneratorfunction(self.current_plugin.predict)
 
     def predict_wrapper(self, message, history, system_prompt):
-        routed_response = self._try_route_external_input(message)
+        input_event = self._get_input_event_normalizer().normalize(message)
+        routed_response = self._try_route_external_input(input_event)
         if routed_response is not None:
             yield routed_response
             return
         yield from self.response_pipeline.predict(
-            message,
+            input_event.fallback_payload,
             history,
             self.build_effective_system_prompt(system_prompt)
         )
         return
-    
+
+    def _get_input_event_normalizer(self):
+        normalizer = getattr(self, "input_event_normalizer", None)
+        if normalizer is None:
+            normalizer = LaviInputEventNormalizer()
+            self.input_event_normalizer = normalizer
+        return normalizer
+
+    def _get_local_chat_input_adapter(self):
+        adapter = getattr(self, "local_chat_input_adapter", None)
+        if adapter is None:
+            adapter = LocalChatInputEventAdapter()
+            self.local_chat_input_adapter = adapter
+        return adapter
+
+    def _get_local_chat_prediction_entrypoint(self):
+        entrypoint = getattr(self, "local_chat_prediction_entrypoint", None)
+        if entrypoint is None:
+            entrypoint = LocalChatPredictionEntrypoint(
+                input_event_adapter=self._get_local_chat_input_adapter(),
+                predict_callback=self.predict_wrapper,
+            )
+            self.local_chat_prediction_entrypoint = entrypoint
+        return entrypoint
+
         #20260620_kpopmodder: Response handling moved to LLMResponsePipeline.
         # log_print(f"history: {history}")#20260612_kpopmodder
         # determine if predict function is generator and sends output to other modules

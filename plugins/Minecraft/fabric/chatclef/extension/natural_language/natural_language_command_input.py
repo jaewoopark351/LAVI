@@ -15,7 +15,8 @@ def natural_language_text(command: Any) -> str:
 
 def request_source(command: Any) -> str:
     if isinstance(command, Mapping):
-        return str(command.get("source") or "").strip()
+        source = command.get("source")
+        return source if type(source) is str else ""
     return ""
 
 

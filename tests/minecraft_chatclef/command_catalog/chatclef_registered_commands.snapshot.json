@@ -133,6 +133,30 @@
       "command": "store_home",
       "owner": "lavi_store_home",
       "path": "lavi/minecraft/task/container/home/command/StoreHomeCommand.java"
+    },
+    {
+      "class_name": "AutoDepositTrustCommand",
+      "command": "auto_deposit_trust",
+      "owner": "lavi_auto_deposit_trusted",
+      "path": "lavi/minecraft/task/container/deposit/auto/trusted/command/AutoDepositTrustCommand.java"
+    },
+    {
+      "class_name": "AutoDepositUntrustCommand",
+      "command": "auto_deposit_untrust",
+      "owner": "lavi_auto_deposit_trusted",
+      "path": "lavi/minecraft/task/container/deposit/auto/trusted/command/AutoDepositUntrustCommand.java"
+    },
+    {
+      "class_name": "AutoDepositTrustedListCommand",
+      "command": "auto_deposit_trusted_list",
+      "owner": "lavi_auto_deposit_trusted",
+      "path": "lavi/minecraft/task/container/deposit/auto/trusted/command/AutoDepositTrustedListCommand.java"
+    },
+    {
+      "class_name": "AutoDepositKoreanBulkTrustCommand",
+      "command": "자동보관등록",
+      "owner": "lavi_auto_deposit_trusted",
+      "path": "lavi/minecraft/task/container/deposit/auto/trusted/command/AutoDepositKoreanBulkTrustCommand.java"
     }
   ]
 }

@@ -5,6 +5,7 @@ import unittest
 from app_core.composition_core.app_component_wiring_service import (
     AppComponentWiringService,
 )
+from input_core.input_event.contracts import LaviInputEvent
 from plugins.Minecraft.fabric.chatclef.input import (
     MinecraftChatClefInputIntentGate,
     MinecraftChatClefInputRouter,
@@ -65,7 +66,7 @@ class MinecraftChatClefInputRouterTests(unittest.TestCase):
             log_callback=lambda _message: None,
         )
 
-        decision = router.route("금괴 8개 구해")
+        decision = router.route(_chat_event("금괴 8개 구해"))
 
         self.assertTrue(decision.handled)
         self.assertEqual("minecraft_command_routed", decision.reason)
@@ -79,7 +80,7 @@ class MinecraftChatClefInputRouterTests(unittest.TestCase):
             extension.submitted[0]["text"],
         )
         self.assertEqual("get gold_ingot 8", extension.submitted[0]["translation"]["command"])
-        self.assertEqual("lavi_chat_mic_router", extension.submitted[0]["source"])
+        self.assertEqual("lavi_chat_ui", extension.submitted[0]["source"])
 
     def test_unknown_translation_falls_through_to_llm(self):
         extension = _RecordingExtension(
@@ -246,6 +247,18 @@ class _RecordingExtension:
 
     def get_status(self):
         return dict(self.bridge_status)
+
+
+def _chat_event(text: str) -> LaviInputEvent:
+    return LaviInputEvent(
+        text=text,
+        source="lavi_chat_ui",
+        event_id="1" * 32,
+        event_kind="chat_submit",
+        final=True,
+        provider_id="lavi_chat_ui",
+        fallback_payload=text,
+    )
 
 
 def _validated_get_translation(

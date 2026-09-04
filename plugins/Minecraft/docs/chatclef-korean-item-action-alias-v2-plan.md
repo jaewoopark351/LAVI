@@ -6,6 +6,7 @@
 <!-- 20260820_kpopmodder: Split full Korean command registry authority from item-action alias planning. -->
 <!-- 20260820_chatgpt: Clarified full-registry authority, docs-only provenance, readiness gates, and handoff synchronization. -->
 <!-- 20260829_openai: Reconciled the historical 20-command baseline with the current 22-command Java surface without expanding item-action aliases. -->
+<!-- 20260904_kpopmodder: Delegated the moving activation-aware command count to the registry plan after the separate H5 registrar delta. -->
 
 # ChatClef Korean Item Action Alias V2 Plan
 
@@ -76,8 +77,8 @@ this plan:
   command-capability boundaries, and item-action phase order
 
 Python Korean command registry plan:
-  versioned registered-command snapshot: 20 at the reviewed historical baseline
-  and 22 in the current Java surface, plus per-command lifecycle kind,
+  dated and current activation-aware registered-command snapshots, plus
+  per-command lifecycle kind,
   resolver domain, safety tier, confirmation mode, allowed input source, and
   public enablement axes
 
@@ -112,8 +113,7 @@ live-runtime process lifecycle index:
 
 When wording conflicts, this plan controls Korean item/action language, alias
 policy, and item-target capability. The command registry plan controls the full
-versioned registration taxonomy (20 at the reviewed historical baseline and 22
-in the current Java surface) and each command's lifecycle kind, resolver
+versioned and activation-aware registration taxonomy and each command's lifecycle kind, resolver
 domain, safety tier, confirmation mode, allowed input source, readiness axes,
 and public enablement. The orchestration plan controls user-response evidence
 and operation sequencing; the cleanup contract controls automatic or
@@ -126,10 +126,14 @@ docs-only change unit. Later changes must update and commit every directly
 affected normative document together. Linked live-runtime documents need an
 update only when their live-run contract actually changes.
 
-The current 22-command Java surface includes raw-only `deposit_all` and the
-separately governed `store_home`. Neither expands this item/action alias plan.
-This plan adds no `deposit_all` Korean alias, parser/compiler branch, admission
-source, bridge route, gameplay claim, or public exposure.
+The dated 2026-08-29 22-command Java surface includes raw-only `deposit_all`
+and the separately governed `store_home`. The current activation-aware source
+target is 26 unique names on the collision-free normal path after the separate
+H5 registrar delta. Neither delta expands this item/action alias plan. This plan
+adds no `deposit_all` or H5 item/action alias, parser/compiler branch, admission
+source, bridge route, gameplay claim, or public exposure. H5 Korean
+Chat/microphone exposure is governed separately by
+[the H5 Auto-Deposit Trust contract](chatclef-h5-auto-deposit-trust-korean-chat-microphone-pre-change-contract-2026-09-04.md).
 
 For the 2026-08-20 command-registry split, the current docs-only change unit is:
 
@@ -1485,8 +1489,8 @@ extraction are Layer 1 action/context policy, not flat concrete item aliases.
 
 Recommended order when code changes are later approved:
 
-0. Registry Phase 0 prerequisite - close the versioned registration contract
-   (20 at the reviewed historical baseline and 22 in the current Java surface),
+0. Registry Phase 0 prerequisite - close the versioned and current
+   activation-aware registration contract recorded by the registry plan,
    lifecycle, resolver-domain, safety, confirmation, allowed-source, readiness,
    and public-enablement contracts in
    `chatclef-python-korean-command-registry-plan.md`. This is a hard gate: no
@@ -1928,9 +1932,9 @@ Authority split:
 
 - this plan owns Korean item/action language, aliases, canonical display,
   capability boundaries, and item-action phase order
-- chatclef-python-korean-command-registry-plan.md owns the versioned registration
-  snapshot (20 at the reviewed historical baseline and 22 in the current Java
-  surface), lifecycle kind, resolver domain, safety tier,
+- chatclef-python-korean-command-registry-plan.md owns the versioned and moving
+  activation-aware registration snapshot (including the dated 2026-08-29
+  22-name closure and current H5 26-name target), lifecycle kind, resolver domain, safety tier,
   confirmation mode, allowed input source, readiness axes, and public enablement
 - chatclef-python-command-orchestration-plan.md owns evidence-bounded Korean
   responses, lifecycle sequencing, and exactly-once primary submission

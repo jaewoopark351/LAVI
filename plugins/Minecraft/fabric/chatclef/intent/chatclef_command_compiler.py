@@ -1,5 +1,6 @@
 #20260803_kpopmodder: Added strict ChatClef DSL compilation from validated intents.
 #20260827_kpopmodder: Compile zero-slot STORE_HOME to one prefixless command.
+#20260905_kpopmodder: Compile H5 to one fixed prefixless Java grammar form.
 from __future__ import annotations
 
 import re
@@ -19,6 +20,7 @@ from plugins.Minecraft.fabric.chatclef.intent.chatclef_numeric_constraints impor
 
 
 class ChatClefCommandCompiler:
+    _AUTO_DEPOSIT_TRUST_AREA_COMMAND = "auto_deposit_trust area 16x16"
     _TARGET_RE = re.compile(r"^[a-z0-9_]+$")
     _PLAYER_RE = re.compile(r"^[A-Za-z0-9_]{3,16}$")
     _DANGEROUS_RE = re.compile(r"[;#\r\n\"'@]|[\x00-\x1f\x7f]")
@@ -35,6 +37,8 @@ class ChatClefCommandCompiler:
             target_text = self._target(target)
             quantity = self._positive_int(intent.quantity, "quantity")
             return f"deposit {target_text} {quantity}"
+        if intent.intent_type is ChatClefIntentType.AUTO_DEPOSIT_TRUST_AREA:
+            return self._AUTO_DEPOSIT_TRUST_AREA_COMMAND
         if intent.intent_type is ChatClefIntentType.STORE_HOME:
             return "store_home"
         if intent.intent_type is ChatClefIntentType.GIVE_ITEM:

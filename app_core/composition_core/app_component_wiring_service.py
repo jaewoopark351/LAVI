@@ -1,19 +1,44 @@
 #20260717_kpopmodder: Keeps AppComposer focused on assembly order while this service owns component wiring rules.
-
-from core.logger import log_print
-
-from .managed_component_wiring_result import ManagedComponentWiringResult
+from app_core.composition_core.component_wiring import (
+    ComponentEventListenerWiring,
+    MinecraftInputRouterWiring,
+    OptionalPluginCallbackWiring,
+)
+from app_core.composition_core.managed_components import (
+    ManagedComponentCollectionService,
+)
 
 
 class AppComponentWiringService:
+    def __init__(
+        self,
+        *,
+        optional_plugin_callback_wiring=None,
+        minecraft_input_router_wiring=None,
+        component_event_listener_wiring=None,
+        managed_component_collection_service=None,
+    ):
+        #20260905_kpopmodder: Keep the compatibility facade while collaborators own separate change reasons.
+        self._optional_plugin_callback_wiring = (
+            optional_plugin_callback_wiring or OptionalPluginCallbackWiring()
+        )
+        self._minecraft_input_router_wiring = (
+            minecraft_input_router_wiring or MinecraftInputRouterWiring()
+        )
+        self._component_event_listener_wiring = (
+            component_event_listener_wiring
+            or ComponentEventListenerWiring(self._minecraft_input_router_wiring)
+        )
+        self._managed_component_collection_service = (
+            managed_component_collection_service
+            or ManagedComponentCollectionService()
+        )
+
     #20260717_kpopmodder: Cross-component callback wiring belongs here, not in AppComposer startup flow.
     def wire_optional_plugin_callbacks(self, *, starcraft_plugin=None, screen_vision=None):
-        if starcraft_plugin is None:
-            return
-        starcraft_plugin.set_screen_observation_provider(
-            lambda: getattr(screen_vision, "last_screen_observation", "")
-            if screen_vision is not None
-            else ""
+        return self._optional_plugin_callback_wiring.wire(
+            starcraft_plugin=starcraft_plugin,
+            screen_vision=screen_vision,
         )
 
     def wire_event_listeners(
@@ -30,52 +55,19 @@ class AppComponentWiringService:
         screen_vision_input_callback=None,
         minecraft_fabric_chatclef_extension=None,
     ):
-        self._wire_minecraft_chatclef_input_router(
+        return self._component_event_listener_wiring.wire(
+            input_component=input_component,
             llm=llm,
-            minecraft_fabric_chatclef_extension=minecraft_fabric_chatclef_extension,
-        )
-        input_component.add_output_event_listener(llm.receive_input)
-        llm.add_output_event_listener(translate.receive_input)
-        translate.add_output_event_listener(tts.receive_input)
-        tts.add_output_event_listener(vtuber.receive_input)
-        if song_player is not None:
-            song_player.add_output_event_listener(vtuber.receive_input)
-            song_player.add_expression_event_listener(
-                vtuber.receive_song_expression
-            )
-        if starcraft_plugin is not None:
-            starcraft_plugin.add_output_event_listener(llm.receive_input)
-            llm.add_output_event_listener(
-                starcraft_plugin.receive_coach_response,
-                full_response=True,
-            )
-
-        if screen_vision is not None and screen_vision_input_callback is not None:
-            screen_vision.add_output_event_listener(screen_vision_input_callback)
-
-    def _wire_minecraft_chatclef_input_router(
-        self,
-        *,
-        llm,
-        minecraft_fabric_chatclef_extension=None,
-    ):
-        setter = getattr(llm, "set_input_router", None)
-        if not callable(setter):
-            return
-        if minecraft_fabric_chatclef_extension is None:
-            setter(None)
-            return
-        try:
-            from plugins.Minecraft.fabric.chatclef.input import (
-                MinecraftChatClefInputRouter,
-            )
-        except Exception as e:
-            log_print(f"[MinecraftChatClefInputRouter] import failed: {e}")
-            return
-        setter(
-            MinecraftChatClefInputRouter(
-                extension=minecraft_fabric_chatclef_extension,
-            )
+            translate=translate,
+            tts=tts,
+            vtuber=vtuber,
+            song_player=song_player,
+            starcraft_plugin=starcraft_plugin,
+            screen_vision=screen_vision,
+            screen_vision_input_callback=screen_vision_input_callback,
+            minecraft_fabric_chatclef_extension=(
+                minecraft_fabric_chatclef_extension
+            ),
         )
 
     def build_managed_components(
@@ -92,41 +84,15 @@ class AppComponentWiringService:
         game_extension_registry=None,
         optional_components=(),
     ):
-        managed_components = [
-            input_component,
-            llm,
-            translate,
-            tts,
-            vtuber,
-        ]
-        core_components = [
-            input_component,
-            llm,
-            translate,
-            tts,
-            vtuber,
-        ]
-        optional_components = list(optional_components or ())
-        startup_components = []
-
-        if screen_vision is not None:
-            managed_components.insert(0, screen_vision)
-        if song_player is not None:
-            managed_components.insert(-1, song_player)
-        if starcraft_plugin is not None:
-            managed_components.insert(-1, starcraft_plugin)
-        if (
-            game_extension_registry is not None
-            and callable(getattr(game_extension_registry, "all", None))
-            and game_extension_registry.all()
-        ):
-            optional_components.append(game_extension_registry)
-            startup_components.append(game_extension_registry)
-            managed_components.insert(-1, game_extension_registry)
-
-        return ManagedComponentWiringResult(
-            managed_components=tuple(managed_components),
-            core_components=tuple(core_components),
-            optional_components=tuple(optional_components),
-            startup_components=tuple(startup_components),
+        return self._managed_component_collection_service.build(
+            input_component=input_component,
+            llm=llm,
+            translate=translate,
+            tts=tts,
+            vtuber=vtuber,
+            screen_vision=screen_vision,
+            song_player=song_player,
+            starcraft_plugin=starcraft_plugin,
+            game_extension_registry=game_extension_registry,
+            optional_components=optional_components,
         )

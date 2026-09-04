@@ -6,9 +6,11 @@
 <!-- 20260902_openai: Linked the still-unimplemented H5 bulk-trust command to the exact-fixture safety contract. -->
 <!-- 20260902_openai: Tightened the still-unimplemented H5 bulk-trust safety boundary around fail-closed parsing, exact fixture ownership, no harness submission, and downstream revision-triggered automatic reevaluation. -->
 <!-- 20260903_kpopmodder: Applied the canonical GUI-gate continuous implementation, bounded-log, and verification workflow while preserving historical checkpoint approvals. -->
+<!-- 20260905_kpopmodder: Reconciled the separate H5 Korean Chat/microphone route after Python implementation and offline verification. -->
 <!-- 20260903_openai: Aligned the automatic storage GUI boundary with one-shot interaction correlation, safe open-child quiescence, exact route types, explicit tick serials, full-path suppression, and one-time permission; recorded independent dirty H5 provenance. -->
 <!-- 20260904_kpopmodder: Recorded the verified H5 crosshair source/test/build/deployment/runtime baseline and separated the docs-only player-position follow-up; commit and push remain open. -->
 <!-- 20260904_kpopmodder: Recorded the current H5 player-position source/test/build/deployment and partial runtime registration evidence while retaining the earlier crosshair baseline as historical provenance. -->
+<!-- 20260904_kpopmodder: Linked the separate docs-only H5 Korean Chat/microphone natural-language contract without expanding automatic-deposit runtime ownership. -->
 
 # ChatClef Automatic Deposit Post-Checkpoint Work Separation Direction
 
@@ -37,7 +39,8 @@ commit 또는 push를 자동 승인하지 않는다.
 아래 fenced status block의 checkpoint, Stage, `380 PASSED`, harness `NOT_IMPLEMENTED` 값은
 2026-08-31 역사 snapshot이다. 현재 test/build/harness evidence로 인용하지 않는다. 이후 상태는
 §15의 implementation/build delta와 §16.4의 2026-09-01 live evidence delta가 소유한다. 단,
-아래 H5 current-worktree row는 2026-09-04 player-position 구현·검증까지 갱신된 current qualifier다.
+아래 H5 status rows는 2026-09-04 player-position 구현·검증, 이후 commit/push와 별도 Korean
+Chat/microphone 문서 상태까지 갱신한 qualifier다.
 
 ```text
 STATUS_BLOCK_CLASSIFICATION: HISTORICAL_2026_08_31_CHECKPOINT_SNAPSHOT_WITH_2026_09_04_H5_PLAYER_POSITION_DELTA
@@ -67,17 +70,20 @@ RELEASE_READY: NO
 
 H5_BULK_TRUST_DOCUMENT_SNAPSHOT: DIRECTION_ONLY; SOURCE_NOT_STARTED_AT_2026-09-02_REVIEW
 H5_2026_09_02_AREA_COMMAND_BEHAVIOR: TRAILING_ARGUMENTS_NOT_FAIL_CLOSED; MAY_EXECUTE EXISTING SINGLE REGISTRATION
-H5_CURRENT_SOURCE_STATUS: PLAYER_BLOCK_POSITION_IMPLEMENTED_IN_CURRENT_WORKTREE; EXACT_FORMS_FAIL_CLOSED
+H5_DOCUMENT_SNAPSHOT_SOURCE_STATUS: PLAYER_BLOCK_POSITION_IMPLEMENTED_IN_WORKTREE; EXACT_FORMS_FAIL_CLOSED
+H5_CURRENT_SOURCE_STATUS: PLAYER_BLOCK_POSITION_COMMITTED_AT_f301770d1885f8d7239846a97b187f4d51c05a55; EXACT_FORMS_FAIL_CLOSED
 H5_CURRENT_DETERMINISTIC_TEST_STATUS: PASS; 1.20.1=707 TESTS; 0 FAILURES; 0 ERRORS; 1 EXISTING SKIPPED; ALL 11 CONFIGURED VERSION TEST TASKS PASSED
 H5_CURRENT_FOCUSED_TEST_STATUS: INCLUDED_IN_FULL_SUITE; SEPARATE_CURRENT_FOCUSED_COUNT_NOT_RECORDED
 H5_CURRENT_CLEAN_FORCED_BUILD_STATUS: PASS; 171 OF 171 ACTIONABLE TASKS EXECUTED
 H5_CURRENT_1_20_1_ARTIFACT_SHA256: 24DD4C8DEBA968D0206CA3D68A227C57D513E55769F1BB51F5943F549989CC27
 H5_CURRENT_DEPLOYMENT_STATUS: VERIFIED_IN_LAVI_TEST_FABRIC01; ACTIVE_JAR_SHA256_MATCH
 H5_CURRENT_MINECRAFT_RUNTIME_STATUS: PLAYER_POSITION_BATCH_REGISTRATION_LIVE_VERIFIED; PARTIAL_ACCEPTANCE
-H5_CURRENT_COMMIT_PUSH_STATUS: NOT_PERFORMED_AT_DOCUMENT_SNAPSHOT
+H5_DOCUMENT_SNAPSHOT_COMMIT_PUSH_STATUS: NOT_PERFORMED_AT_DOCUMENT_SNAPSHOT
+H5_CURRENT_COMMIT_PUSH_STATUS: COMMITTED_AND_PUSHED; COMMIT=f301770d1885f8d7239846a97b187f4d51c05a55; UPSTREAM=origin/minecraft-plugin-fix/alto-clef-infinite-loop
 H5_BATCH_COMMAND_EXECUTION: LIVE_UPDATED_AT_2026-09-04_21:32:57_KST; SCANNED_4096; PHYSICAL_44; LOGICAL_22; NEW_9; EXISTING_13; REVISION_1_TO_2; REGISTRY_13_TO_22
 H5_PLAYER_POSITION_ANCHOR_STATUS: IMPLEMENTED; TESTED; BUILT; DEPLOYED; RUNTIME_OBSERVED
 H5_OPEN_RUNTIME_ACCEPTANCE: NO_CHANGE_RERUN + PLAYER_MOVE_RANGE_SHIFT + EXPLICIT_EDGE_TESTS + NEWLY_ADDED_DESTINATION_SELECTION NOT_RUN
+H5_KOREAN_CHAT_MICROPHONE_STATUS: PYTHON_IMPLEMENTED_AND_OFFLINE_VERIFIED; CATALOG_26_PARITY_CLOSED; CLEAN_BUILD_PASS; DEPLOYMENT_AND_LIVE_RUNTIME_NOT_RUN
 
 MARKDOWN_DOCUMENTATION: AUTHORIZED_FOR_THIS_TASK
 AUTHORIZATION_ROWS_CLASSIFICATION: HISTORICAL_CHECKPOINT_PROVENANCE; NOT_A_CURRENT_GUI_GATE
@@ -1908,9 +1914,13 @@ revision change를 만들지 않는다.
 
 H5의 Korean `@자동보관등록` command name은 `영역 16x16` 또는 `반경 16x16`을 요구하는
 batch-only direct alias이며 LAVI-owned Java command scope다. 무인자 Korean invocation은 승인하지 않는다.
-Python chat/microphone natural-language route와 Fabric wire protocol은 별도 범위다. Canonical H5
-grammar, fixed half-open volume, exact block allowlist, double-chest identity, all-or-none repository
-mutation과 deferred bulk undo 계약은
+Python Chat/microphone natural-language route와 Fabric wire protocol은 이 automatic-deposit runtime
+문서의 별도 범위다. 기존 H5를 호출하는 Python production 구현, Java test-only lifecycle
+verification과 offline 검증 상태는
+[H5 Auto-Deposit Trust Korean Chat/Microphone Pre-Change Contract](chatclef-h5-auto-deposit-trust-korean-chat-microphone-pre-change-contract-2026-09-04.md)가
+소유한다. 이 링크는 runtime harness에 H5 fixture setup, command submission, registry mutation 또는
+automatic execution 권한을 추가하지 않는다. Canonical H5 grammar, fixed half-open volume, exact block
+allowlist, double-chest identity, all-or-none repository mutation과 deferred bulk undo 계약은
 [ChatClef Manual Trusted Home Storage Direction §13](chatclef-manual-trusted-home-storage-direction-2026-08-27.md#13-trusted-등록-ux와-json)이
 소유한다.
 

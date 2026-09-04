@@ -1,5 +1,6 @@
 #20260815_kpopmodder: Cover current Korean support and unsupported ChatClef command gaps.
 #20260819_kpopmodder: Lock the approved four-command live GET translations.
+#20260905_kpopmodder: Add the public H5 fixed-area Korean translation contract.
 from __future__ import annotations
 
 import unittest
@@ -11,6 +12,14 @@ from plugins.Minecraft.fabric.chatclef.intent import (
 
 
 SUPPORTED_KOREAN_TRANSLATION_CASES = {
+    "auto_deposit_trust": [
+        ("auto_deposit_trust area 16x16", "auto_deposit_trust area 16x16"),
+        ("자동보관등록 반경 16×16", "auto_deposit_trust area 16x16"),
+        (
+            "캐릭터 주변 16x16 범위의 상자를 자동 보관 대상으로 등록해",
+            "auto_deposit_trust area 16x16",
+        ),
+    ],
     "get": [
         ("다이아몬드 가져와줘", "get diamond 1"),
         ("다이아몬드를 가져와줘", "get diamond 1"),
@@ -107,6 +116,7 @@ class KoreanCommandSupportMatrixTests(unittest.TestCase):
     def test_current_supported_korean_command_set_is_explicit(self):
         self.assertEqual(
             {
+                "auto_deposit_trust",
                 "deposit",
                 "equip",
                 "follow",

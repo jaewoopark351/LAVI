@@ -23,6 +23,10 @@
     { "command": "resetmemory", "owner": "chatclef_java", "natural_language_status": "RAW_ONLY", "support_status": "java_only_user_or_dev_command" },
     { "command": "scan", "owner": "chatclef_java", "natural_language_status": "RAW_ONLY", "support_status": "java_only_task_command" },
     { "command": "stop", "owner": "chatclef_java", "natural_language_status": "IMPLEMENTED", "support_status": "supported_korean" },
-    { "command": "store_home", "owner": "lavi_store_home", "natural_language_status": "IMPLEMENTED", "support_status": "supported_korean" }
+    { "command": "store_home", "owner": "lavi_store_home", "natural_language_status": "IMPLEMENTED", "support_status": "supported_korean" },
+    { "command": "auto_deposit_trust", "owner": "lavi_auto_deposit_trusted", "natural_language_status": "IMPLEMENTED", "support_status": "supported_korean" },
+    { "command": "auto_deposit_untrust", "owner": "lavi_auto_deposit_trusted", "natural_language_status": "RAW_ONLY", "support_status": "java_only_user_or_dev_command" },
+    { "command": "auto_deposit_trusted_list", "owner": "lavi_auto_deposit_trusted", "natural_language_status": "RAW_ONLY", "support_status": "java_only_user_or_dev_command" },
+    { "command": "자동보관등록", "owner": "lavi_auto_deposit_trusted", "natural_language_status": "RAW_ONLY", "support_status": "java_only_user_or_dev_command" }
   ]
 }

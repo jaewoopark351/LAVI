@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import unittest
 
+from input_core.input_event.contracts import LaviInputEvent
 from plugins.Minecraft.common.dto.command_result_dto import CommandResultDTO
 from plugins.Minecraft.common.dto.status_snapshot_dto import StatusSnapshotDTO
 from plugins.Minecraft.common.protocol.bridge_lifecycle_state import (
@@ -61,7 +62,7 @@ class KoreanInputToChatClefSubmissionPathTests(unittest.TestCase):
                     log_callback=lambda _message: None,
                 )
 
-                decision = router.route(text)
+                decision = router.route(_chat_event(text))
 
                 self.assertTrue(decision.handled)
                 self.assertEqual("minecraft_command_routed", decision.reason)
@@ -71,7 +72,7 @@ class KoreanInputToChatClefSubmissionPathTests(unittest.TestCase):
                 request = adapter.requests[0]
                 self.assertEqual(expected_command, request.command)
                 self.assertFalse(request.command.startswith("@"))
-                self.assertEqual("lavi_chat_mic_router", request.source)
+                self.assertEqual("lavi_chat_ui", request.source)
                 self.assertTrue(request.request_id.startswith("lavi-input-ko-"))
                 self.assertEqual(
                     "minecraft_fabric_chatclef",
@@ -100,7 +101,7 @@ class KoreanInputToChatClefSubmissionPathTests(unittest.TestCase):
             log_callback=lambda _message: None,
         )
 
-        decision = router.route("다이아몬드 캐줘")
+        decision = router.route(_chat_event("다이아몬드 캐줘"))
 
         self.assertTrue(decision.handled)
         self.assertEqual(1, service.translate_calls)
@@ -185,7 +186,7 @@ class KoreanInputToChatClefSubmissionPathTests(unittest.TestCase):
             log_callback=lambda _message: None,
         )
 
-        decision = router.route("다이아몬드 캐줘")
+        decision = router.route(_chat_event("다이아몬드 캐줘"))
 
         self.assertTrue(decision.handled)
         self.assertEqual("minecraft_bridge_disconnected", decision.reason)
@@ -199,7 +200,7 @@ class KoreanInputToChatClefSubmissionPathTests(unittest.TestCase):
             log_callback=lambda _message: None,
         )
 
-        decision = router.route("다이아몬드 캐줘")
+        decision = router.route(_chat_event("다이아몬드 캐줘"))
 
         self.assertTrue(decision.handled)
         self.assertEqual("minecraft_command_busy", decision.reason)
@@ -216,7 +217,7 @@ class KoreanInputToChatClefSubmissionPathTests(unittest.TestCase):
             log_callback=lambda _message: None,
         )
 
-        decision = router.route("다이아몬드 캐줘")
+        decision = router.route(_chat_event("다이아몬드 캐줘"))
 
         self.assertTrue(decision.handled)
         self.assertEqual("minecraft_command_rejected", decision.reason)
@@ -234,12 +235,24 @@ class KoreanInputToChatClefSubmissionPathTests(unittest.TestCase):
             log_callback=lambda _message: None,
         )
 
-        decision = router.route("다이아몬드 캐줘")
+        decision = router.route(_chat_event("다이아몬드 캐줘"))
 
         self.assertTrue(decision.handled)
         self.assertEqual("minecraft_submission_outcome_unknown", decision.reason)
         self.assertTrue(decision.result["details"]["reconciliation_required"])
         self.assertEqual(1, len(adapter.requests))
+
+
+def _chat_event(text: str) -> LaviInputEvent:
+    return LaviInputEvent(
+        text=text,
+        source="lavi_chat_ui",
+        provider_id="lavi_chat_ui",
+        event_kind="chat_submit",
+        final=True,
+        event_id="1" * 32,
+        fallback_payload=text,
+    )
 
 
 class _RecordingAdapter:

@@ -17,9 +17,30 @@ class TranslatedCommandRequestFactory:
     ) -> CommandRequestDTO:
         payload = dict(command) if isinstance(command, Mapping) else {}
         metadata = dict(payload.get("metadata") or {})
+        route_input = metadata.pop("natural_language_input", {})
+        if not isinstance(route_input, Mapping):
+            route_input = {}
+        translation_input_text = str(
+            route_input.get("translation_input_text") or original_text
+        )
+        input_event = metadata.get("input_event")
+        if isinstance(input_event, Mapping):
+            metadata["input_event"] = {
+                key: input_event.get(key)
+                for key in (
+                    "source",
+                    "provider_id",
+                    "event_kind",
+                    "final",
+                    "event_id",
+                )
+            }
+        else:
+            metadata.pop("input_event", None)
         metadata["natural_language"] = {
             "language": "ko",
             "original_text": original_text,
+            "translation_input_text": translation_input_text,
             "translation": translation.to_dict(),
         }
         return CommandRequestDTO(

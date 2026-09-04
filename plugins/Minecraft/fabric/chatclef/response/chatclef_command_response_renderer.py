@@ -27,6 +27,8 @@ class ChatClefCommandResponseRenderer:
     ) -> str:
         if self._store_home.matches_translation(translation):
             return self._store_home.render_submitted(result)
+        if self._is_auto_deposit_trust_area(translation) and result.get("ok") is True:
+            return "[Minecraft] 주변 16×16 자동 보관 대상 등록 명령을 제출했어요."
         result_status = self._result_status(result)
         message = self._text(result.get("message"))
         command_label = self._command_label(translation)
@@ -132,6 +134,18 @@ class ChatClefCommandResponseRenderer:
             if isinstance(data, Mapping):
                 return data.get("expected_gameplay_effect_verified") is True
         return False
+
+    def _is_auto_deposit_trust_area(
+        self,
+        translation: Mapping[str, Any],
+    ) -> bool:
+        intent = translation.get("intent")
+        if isinstance(intent, Mapping):
+            if intent.get("intent_type") == "auto_deposit_trust_area":
+                return True
+        return self._text(translation.get("command")) == (
+            "auto_deposit_trust area 16x16"
+        )
 
     def _result_status(self, result: Mapping[str, Any]) -> str:
         status = result.get("status")

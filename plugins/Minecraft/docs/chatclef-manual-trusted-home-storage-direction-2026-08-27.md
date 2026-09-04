@@ -29,12 +29,14 @@
 <!-- 20260903_openai: Aligned trusted-home GUI activation with safe open-child quiescence, exact one-shot interaction binding, full-path suppression, explicit serials, and one-time permission consumption; recorded the independent dirty H5 worktree provenance. -->
 <!-- 20260904_kpopmodder: Recorded the verified H5 crosshair source/test/build/deployment/runtime baseline and separated the docs-only player-position follow-up; commit and push remain open. -->
 <!-- 20260904_kpopmodder: Recorded the current H5 player-position source/test/build/deployment and partial runtime registration evidence while retaining the earlier crosshair baseline as historical provenance. -->
+<!-- 20260904_kpopmodder: Linked the docs-only H5 Korean Chat/microphone contract and reopened activation-aware Python catalog parity for the separate H5 registrar. -->
+<!-- 20260905_kpopmodder: Reconciled H5 Korean Chat/microphone Python implementation, 26-row parity, test-only Java proof, and clean-build evidence. -->
 
 # ChatClef Manual Trusted Home Storage Direction
 
-문서 상태: `CORE_V1_RUNTIME_VERIFIED_H6_CHAT_RUNTIME_VERIFIED_MIC_PENDING_SESSION_LOCAL_MANIFEST_RUNTIME_VERIFIED_LONG_DISTANCE_TIMEOUT_CAUSE_PROVEN_PHASE_SCOPED_TIMEOUT_OBSERVED_HAPPY_PATH_VERIFIED_PARITY_UNPROVEN_PYTHON_COMMAND_CATALOG_PARITY_VERIFIED_STORE_HOME_DIRECT_TESTS_VERIFIED_HISTORICAL_2026_08_29_LATEST_CLEAN_BUILD_VERIFIED_SOURCE_COMMITS_CREATED_AUTO_PRESSURE_SOURCE_RESTORED_TEST_VERIFIED_BUILD_RUNTIME_PENDING_H5_PLAYER_POSITION_SOURCE_TEST_BUILD_DEPLOYMENT_RUNTIME_REGISTRATION_VERIFIED_PARTIAL_RUNTIME_MATRIX_OPEN`
+문서 상태: `CORE_V1_RUNTIME_VERIFIED_H6_CHAT_RUNTIME_VERIFIED_MIC_PENDING_SESSION_LOCAL_MANIFEST_RUNTIME_VERIFIED_LONG_DISTANCE_TIMEOUT_CAUSE_PROVEN_PHASE_SCOPED_TIMEOUT_OBSERVED_HAPPY_PATH_VERIFIED_PARITY_UNPROVEN_HISTORICAL_2026_08_29_PYTHON_COMMAND_CATALOG_PARITY_VERIFIED_H5_ACTIVATION_AWARE_CATALOG_PARITY_VERIFIED_H5_KOREAN_CHAT_MICROPHONE_PYTHON_OFFLINE_VERIFIED_STORE_HOME_DIRECT_TESTS_VERIFIED_HISTORICAL_2026_08_29_LATEST_CLEAN_BUILD_VERIFIED_SOURCE_COMMITS_CREATED_AUTO_PRESSURE_SOURCE_RESTORED_TEST_VERIFIED_BUILD_RUNTIME_PENDING_H5_PLAYER_POSITION_SOURCE_TEST_BUILD_DEPLOYMENT_RUNTIME_REGISTRATION_VERIFIED_PARTIAL_RUNTIME_MATRIX_OPEN`
 
-작성 기준일: 2026-08-27, 상태 갱신일: 2026-09-04
+작성 기준일: 2026-08-27, 상태 갱신일: 2026-09-05
 
 위 `HISTORICAL_2026_08_29_LATEST_CLEAN_BUILD_VERIFIED`는 §26.14에 기록된 당시 artifact의
 역사적 상태이며 현재 H5 source를 검증하지 않는다. 현재 player-position H5의
@@ -92,9 +94,9 @@ test/build 실행, JAR 배포, Minecraft 재현, commit 또는 push는 승인하
 25절의 당시 diagnostics 증거와 `planned_fingerprint_changed` reason-label
 비정합도 삭제하거나 해결된 것으로 바꾸지 않는다.
 
-현재 dirty worktree에는 26절의 trusted-container-session-local 구조와 phase-scoped
-timeout 구조가 source로 존재한다. 이는 각 절을 처음 작성했을 때의 docs-only 승인
-이력과 구분한다. 2026-08-29 별도 사용자 요청에 따른 최종 folderization 뒤 clean forced
+2026-08-29 후속 source 검수 당시 dirty worktree에는 26절의 trusted-container-session-local 구조와
+phase-scoped timeout 구조가 존재했다. 이는 각 절을 처음 작성했을 때의 docs-only 승인
+이력과 구분하는 historical checkpoint다. 같은 날 별도 사용자 요청에 따른 최종 folderization 뒤 clean forced
 build가 통과했고, build output과 active instance JAR의 file-level SHA-256이 일치했다.
 같은 runtime에서 exact container activation, capacity fallback, paired-delta transfer와
 terminal `COMPLETED`가 두 operation에서 확인됐다. 다만 runtime manifest의 complete
@@ -121,12 +123,15 @@ stall, binding 실패와 operation timeout은 직접 원인으로 지지되지 �
 `@auto_deposit_trust` 구현은 무인자 command이며 handler가 parser를 소비하지 않고, upstream
 command runner도 call 뒤 남은 argument를 검증하지 않는다. 따라서 당시 2026-09-02 baseline tree에서
 `@auto_deposit_trust area 16x16`을 실행하면 batch로 거절되지 않고 기존 단일 target 등록으로
-떨어질 수 있다는 것이 문서 snapshot의 결론이었다. 현재 dirty worktree에는 이 문서와 독립적인
-modified/untracked H5 Java/test source가 존재하므로 `SOURCE_NOT_STARTED`는 더 이상 current-tree
-사실이 아니다. 그 source는 이 문서 보정에서 검수·승인·검증된 것으로 간주하지 않고 그대로
-보존한다. 13절의 fail-closed grammar가 deterministic evidence로 검증되기 전까지 네 batch form은
-계속 실행 금지다. 이후 runtime-root clean build는 H5와 GUI 변경을 함께 포함하는 mixed-provenance
-build이므로 GUI-only artifact 또는 H5 완료 증거로 보고하지 않는다.
+떨어질 수 있다는 것이 문서 snapshot의 결론이었다. 당시 dirty worktree에는 이 문서와 독립적인
+modified/untracked H5 Java/test source가 존재했다는 내용까지가 2026-09-02 snapshot이다. 그 당시에는
+그 source를 검수·승인·검증된 것으로 간주하지 않았고 네 batch form도 실행 금지였다.
+
+현재 source는 별도 H5 계약에 따라 fail-closed grammar와 player-position batch anchor를 구현·검증했고
+commit `f301770d1885f8d7239846a97b187f4d51c05a55`로
+`origin/minecraft-plugin-fix/alto-clef-infinite-loop`에 push됐다. §13.1의 707-test, clean build, matching
+deployed JAR과 partial runtime evidence가 현재 상태를 소유한다. 다만 LAVI Korean Chat/microphone route는
+여전히 미구현이며 이 Java 완료 상태로부터 public Python exposure를 추론하지 않는다.
 
 2026-08-29 phase-scoped artifact 재현에서는 이전 고정 lifetime 실패가 재현되지 않았다.
 Operation `225`의 첫 candidate는 `7,726` active ticks 동안 유지된 뒤 exact activation에
@@ -818,17 +823,20 @@ area를 만들지 않고, command 실행 시 발견한 logical destination을 �
 ```text
 H5_DOCUMENT_STATUS: CANONICAL_DIRECTION_WITH_IMPLEMENTED_PLAYER_POSITION_SCOPED_OVERRIDE
 H5_DOCUMENT_SNAPSHOT_IMPLEMENTATION_STATUS: NOT_STARTED_AT_2026-09-02_REVIEW
-H5_CURRENT_SOURCE_STATUS: PLAYER_BLOCK_POSITION_IMPLEMENTED_IN_CURRENT_WORKTREE; LAVI_OWNED_JAVA_AND_TEST_SOURCE
+H5_DOCUMENT_SNAPSHOT_SOURCE_STATUS: PLAYER_BLOCK_POSITION_IMPLEMENTED_IN_WORKTREE; LAVI_OWNED_JAVA_AND_TEST_SOURCE
+H5_CURRENT_SOURCE_STATUS: PLAYER_BLOCK_POSITION_COMMITTED_AT_f301770d1885f8d7239846a97b187f4d51c05a55
 H5_CURRENT_DETERMINISTIC_TEST_STATUS: PASS; 1.20.1=707 TESTS; 0 FAILURES; 0 ERRORS; 1 EXISTING SKIPPED; ALL 11 CONFIGURED VERSION TEST TASKS PASSED
 H5_CURRENT_FOCUSED_TEST_STATUS: INCLUDED_IN_FULL_SUITE; SEPARATE_CURRENT_FOCUSED_COUNT_NOT_RECORDED
 H5_CURRENT_CLEAN_FORCED_BUILD_STATUS: PASS; 171 OF 171 ACTIONABLE TASKS EXECUTED
 H5_CURRENT_1_20_1_ARTIFACT_SHA256: 24DD4C8DEBA968D0206CA3D68A227C57D513E55769F1BB51F5943F549989CC27
 H5_CURRENT_DEPLOYMENT_STATUS: VERIFIED_IN_LAVI_TEST_FABRIC01; ACTIVE_JAR_SHA256_MATCH
 H5_CURRENT_MINECRAFT_RUNTIME_STATUS: PLAYER_POSITION_BATCH_REGISTRATION_LIVE_VERIFIED; PARTIAL_ACCEPTANCE
-H5_CURRENT_COMMIT_PUSH_STATUS: NOT_PERFORMED_AT_DOCUMENT_SNAPSHOT
+H5_DOCUMENT_SNAPSHOT_COMMIT_PUSH_STATUS: NOT_PERFORMED_AT_DOCUMENT_SNAPSHOT
+H5_CURRENT_COMMIT_PUSH_STATUS: COMMITTED_AND_PUSHED; COMMIT=f301770d1885f8d7239846a97b187f4d51c05a55; UPSTREAM=origin/minecraft-plugin-fix/alto-clef-infinite-loop
 H5_CURRENT_BATCH_COMMAND_EXECUTION: LIVE_UPDATED_AT_2026-09-04_21:32:57_KST; SCANNED_4096; PHYSICAL_44; LOGICAL_22; NEW_9; EXISTING_13; REVISION_1_TO_2; REGISTRY_13_TO_22
 H5_PLAYER_POSITION_ANCHOR_STATUS: IMPLEMENTED; TESTED; BUILT; DEPLOYED; RUNTIME_OBSERVED
 H5_OPEN_RUNTIME_ACCEPTANCE: NO_CHANGE_RERUN + PLAYER_MOVE_RANGE_SHIFT + EXPLICIT_EDGE_TESTS + NEWLY_ADDED_DESTINATION_SELECTION NOT_RUN
+H5_KOREAN_CHAT_MICROPHONE_STATUS: PYTHON_IMPLEMENTED_AND_OFFLINE_VERIFIED; CATALOG_26_PARITY_CLOSED; CLEAN_BUILD_PASS; DEPLOYMENT_AND_LIVE_RUNTIME_NOT_RUN
 ```
 
 2026-09-02 review snapshot의 `AutoDepositTrustCommand`는 `ArgParser`를 읽지 않는 기존 단일 등록
@@ -901,7 +909,9 @@ command parser에 넣지 않는다. H5의 direct Korean command name `@자동보
 alias이며 반드시 `영역 16x16` 또는 `반경 16x16` argument를 요구한다. 무인자 invocation은
 승인하지 않는다. 이 alias registration은 LAVI-owned Java command 범위다. Python chat/microphone
 natural-language phrase, command catalog, schema, router와 Fabric wire protocol은 별도 범위이며
-H5 구현으로 자동 추가하지 않는다.
+H5 구현으로 자동 추가하지 않는다. 그 별도 Python 범위는
+[H5 Auto-Deposit Trust Korean Chat/Microphone Pre-Change Contract](chatclef-h5-auto-deposit-trust-korean-chat-microphone-pre-change-contract-2026-09-04.md)가
+소유한다.
 
 정상적인 H5 command registration 뒤에는 기존 English trust/untrust/list 세 이름과 Korean batch-only
 direct alias `자동보관등록` 한 이름, 총 네 trusted command name이 존재한다. English와 Korean command instance는
@@ -1137,7 +1147,11 @@ Exact before/after destination set이 필요한 runtime fixture는 별도 승인
 3. 정상 등록에서는 English trust/untrust/list + Korean batch alias의 정확히 네 command name이 존재한다.
    Korean alias collision은 overwrite/false-ready 0으로 실패하되 기존 English 세 command는 보존하고,
    English/Korean command instance의 mutable parser/onFinish 공유는 0이다.
-4. Direct Korean batch-only alias는 Java command registry에만 존재하고 Python chat/microphone route 변화는 0이다.
+4. Direct Korean batch-only alias는 Java command registry에만 존재하고, 이 Java H5 implementation
+    자체가 Python Chat/microphone route를 변경한 횟수는 0이다. 후속 Python natural-language 방향과
+    현재 구현·offline 검증 상태는
+   [H5 Auto-Deposit Trust Korean Chat/Microphone Pre-Change Contract](chatclef-h5-auto-deposit-trust-korean-chat-microphone-pre-change-contract-2026-09-04.md)가
+   별도로 소유한다.
 5. H5 batch는 player feet `BlockPos`만 anchor로 사용하고 crosshair/exact-open/nearest fallback은
    0이다. 무인자 English single-registration만 기존 exact-open/crosshair precedence를 유지한다.
 6. negative coordinate, half-open high edge와 world build-height 교집합이 exact range와 일치한다.
@@ -1278,9 +1292,10 @@ STORE_HOME dependency on automatic chain: none
 STORE_HOME explicit-request-only behavior: preserved
 ```
 
-기존 automatic source를 삭제하거나 리팩터링할지는 복구와 분리된 후속 결정이다. 현재 dirty
-worktree의 lifecycle, diagnostics와 test 변경을 이 composition 작업과 한 diff에서 삭제,
-이동 또는 흡수하지 않는다.
+기존 automatic source를 삭제하거나 리팩터링할지는 복구와 분리된 후속 결정이다. 이 문장을 작성한
+2026-08-29 forward-restoration checkpoint의 dirty worktree에 있던 lifecycle, diagnostics와 test 변경은
+이 composition 작업과 한 diff에서 삭제, 이동 또는 흡수하지 않는 범위였다. 이후 검증·source 상태는
+§26.14가 소유한다.
 
 ### 16.1 2026-08-29 automatic pressure conflict 계약
 
@@ -1709,13 +1724,18 @@ H6 방향은 24절에서 승인됐고,
 terminal projection source가 현재 worktree에 구현됐다. 이 source 승인은 clean build,
 runtime reproduction, public enable, commit 또는 push를 승인하지 않는다.
 
+여기서 H6는 `STORE_HOME` adapter를 뜻한다. H5 fixed-volume registration의 Chat/microphone
+자연어 노출은 H6에 합치지 않으며 별도
+[H5 Korean Chat/Microphone contract](chatclef-h5-auto-deposit-trust-korean-chat-microphone-pre-change-contract-2026-09-04.md)가
+소유한다. 해당 Python source는 이 문서 snapshot에서 구현되지 않았다.
+
 26절의 trusted-container-session-local manifest lifetime은 기존 H1-H4/H7 검증 이후의
 별도 change unit이다. 이 문장은 26절 방향을 처음 작성했을 때의 docs-only 승인 이력을
-기록한다. 현재 dirty source 존재와 미검증 상태는 23절 상태표가 별도로 소유한다. 이번
-사용자 승인은 현재 문서 갱신에만 적용되며 추가 Java/test source 변경, test 실행,
+기록한다. 그 시점의 dirty source 존재와 미검증 상태는 23절 historical 상태표가 별도로 소유하고,
+이후 verified source 상태는 §26.14가 소유한다. 당시 사용자 승인은 문서 갱신에만 적용됐으며 추가 Java/test source 변경, test 실행,
 clean build, 배포와 runtime reproduction을 승인하지 않는다.
 
-## 23. 역사적 구현·검증 snapshot과 현재 dirty-worktree qualifier
+## 23. 역사적 구현·검증 snapshot과 당시 dirty-worktree qualifier
 
 아래 표의 build/test/JAR 수치는 2026-08-29 core/runtime artifact에 2026-09-02 H5 docs-only
 qualifier를 덧붙인 역사적 snapshot이다. 이 표의 `243 TESTS`와 direct-test `NOT IMPLEMENTED`를
@@ -1760,10 +1780,11 @@ UserBlockRangeTracker null-path NPE:                RUNTIME OBSERVED; SECONDARY 
 recurring JVM G1 Remark native crash:              SEPARATE INVESTIGATION; ROOT CAUSE UNPROVEN
 ```
 
-§26.14 owns the later direct-test and 254-test clean-build record. Neither that
-record nor this §23 snapshot covers the current independent dirty H5 source or a
-future GUI-gate implementation. A build that consumes both must be reported as
-mixed H5+GUI provenance, not as a GUI-only or H5-only verification result.
+§26.14 owns the later direct-test and 254-test clean-build record. At this §23
+snapshot, neither record covered the then-independent dirty H5 source or a
+future GUI-gate implementation. A build that consumed both at that checkpoint
+had to be reported as mixed H5+GUI provenance, not as a GUI-only or H5-only
+verification result. The later H5 source/build/runtime record is §13.1.
 
 검증된 1.20.1 build JAR과 active CurseForge instance JAR은 모두 다음 SHA-256을
 가졌다.
@@ -1887,8 +1908,8 @@ baseline arm은 별도 clean worktree에서 current artifact를 만들 때 사�
 Temurin JDK 21 vendor와 exact patch, 동일 Gradle wrapper와 동일 build command로 생성한다.
 artifact manifest에는 build JDK, Gradle version, JAR SHA-256과 Java 17 class target 증거를
 남긴다. fresh current rebuild는 첫 A/B 전에 crash-run JAR을 대체하지 않으며, 나중에
-수행한다면 reproducibility를 확인하는 별도 세 번째 artifact로 취급한다. 현재 dirty
-worktree를 직접 checkout하거나 A/B 중간에 build SDK를 바꾸지 않는다.
+수행한다면 reproducibility를 확인하는 별도 세 번째 artifact로 취급한다. 이 A/B가 조사 대상으로
+고정한 worktree를 직접 checkout하거나 A/B 중간에 build SDK를 바꾸지 않는다.
 
 H6 source를 포함한 clean forced multi-version build는 다음 evidence를 남겼다.
 
@@ -2045,7 +2066,7 @@ touchedStacks: 0
 remaining:     22 stacks
 ```
 
-당시 read-only current dirty source의 `MAX_CANDIDATE_TICKS=2400`과 candidate 수 3을
+당시 read-only comparison source의 `MAX_CANDIDATE_TICKS=2400`과 candidate 수 3을
 대조하면
 `2400 * 3 = 7200`이며 root 시작/terminal의 elapsed `clientTickId`와 2 tick만 차이
 난다. 약 120.6초와 241.0초 지점에는 각각 다음 destination이 처음 관찰됐고, 세 후보
@@ -2054,7 +2075,7 @@ lifetime budget의 순차 소진 가설은 이번 terminal의 가장 강한 sour
 설명이었다.
 
 이 초기 log에는 Task-owned candidate counter 또는 후보별
-`rejectionReason=candidate_timeout` event가 직접 없고 incident JAR과 current dirty
+`rejectionReason=candidate_timeout` event가 직접 없고 incident JAR과 그 comparison
 source의 complete parity도 미확정이다. Candidate ID의 순차 관찰은 candidate switch를
 간접 지지하지만 후보별 start/reject decision event를 대체하지 않았다. 따라서 이
 시점의 문서 판정은 `STRONGLY SUPPORTED`였고 direct timeout observation으로 확대하지
@@ -2130,7 +2151,7 @@ IdleTask transition: NORMAL POST-TERMINAL LIFECYCLE
 Build output과 active instance JAR은 7,007,701 bytes와 SHA-256
 `B5C63F0D5D8D3043151A10107BB5C7CB213188651483F62CCFD6E1F147496A55`로 일치했다.
 Runtime manifest 자체는 complete repository/source/build-input identity가 없어
-`PARITY_UNPROVEN`을 유지했다. 이 qualifier는 current dirty source의 exact provenance를
+`PARITY_UNPROVEN`을 유지했다. 이 qualifier는 그 실행과 비교한 source tree의 exact provenance를
 추정하지 못하게 하지만, 같은 runtime operation이 직접 기록한 counter/decision/rejection을
 그 실행의 behavior evidence로 사용하는 것을 막지 않는다.
 
@@ -2439,7 +2460,7 @@ quantity, player 또는 coordinate를 붙이지 않는다. 원문 또는 slot에
 translation validator는 intent와 compiled command가 정확히 일치하는지 다시
 검증한다.
 
-권장 registry 계약:
+2026-08-27 H6 구현 시점의 registry 계약:
 
 ```text
 command_name: store_home
@@ -2453,6 +2474,22 @@ allowed_input_sources:
   - direct_typed
 serializer_id: prefixless_store_home
 ```
+
+위 `lavi_chat_mic_router`는 당시 router가 합성한 coarse label을 기록한 historical evidence다. 2026-09-04
+H5 입력 출처 검수에서 local Chat, VoiceInput과 다른 Input provider가 router 전에 raw string으로 합쳐지는
+것이 확인되었으므로 새 public H5 구현과 함께 typed provenance를 도입한다. 그 migration의 STORE_HOME
+target registry tuple은 다음과 같다.
+
+```text
+allowed_input_sources:
+  - lavi_chat_ui
+  - voice_input_final
+  - direct_typed
+```
+
+`lavi_gui_korean`은 이미 그 UI를 허용하는 기존 public command에만 유지한다. STORE_HOME에는 새로
+추가하지 않는다. 이 target은 아직 production source에 구현되지 않았으며 canonical owner는
+[H5 Auto-Deposit Trust Korean Chat/Microphone Pre-Change Contract](chatclef-h5-auto-deposit-trust-korean-chat-microphone-pre-change-contract-2026-09-04.md)다.
 
 명확한 결정론적 직접 요청 자체를 실행 승인으로 사용하므로 별도 2차 확인은 두지
 않는다. 다만 readiness는 실제 증거에 따라 다음 순서로 올린다.
@@ -2475,8 +2512,11 @@ matrix 완료를 뜻하지 않는다.
 
 ### 24.6 Submission과 busy 계약
 
-chat과 microphone은 공통 `lavi_chat_mic_router` source를 사용한다. 물리 입력
-종류는 선택적 metadata로만 보존하고 intent 또는 execution policy를 바꾸지 않는다.
+2026-08-27 H6 runtime evidence에서 chat과 microphone은 공통 `lavi_chat_mic_router` source를 사용했다.
+이는 historical coarse route label이며 물리 입력 출처를 증명하지 않는다. 2026-09-04 target에서는 immutable
+typed input event가 Chat은 `lavi_chat_ui`, VoiceInput final transcript는 `voice_input_final`을 ingress부터
+request까지 보존한다. `metadata.input_route=minecraft_fabric_chatclef`가 router identity를 별도로 소유하며,
+source는 user text나 router에서 합성하지 않는다.
 각 input event는 고유 request ID를 사용하며 다음 불변조건을 지킨다.
 
 ```text
@@ -2488,8 +2528,11 @@ terminal reconciliation: matching request ID only
 reconnect: no automatic STORE_HOME replay
 ```
 
-마이크 계층이 같은 final transcript를 중복 emit할 가능성은 공통 input event ID로
-방지한다. adapter 자체 retry로 해결하지 않는다.
+현재 H6 coarse raw-string 경로에는 trusted common input event ID나 STORE_HOME one-shot claim이 없다.
+2026-09-04 H5 계약의 process-lifetime same-event-ID claim은 H5에만 적용되며 STORE_HOME에 자동 확장하지
+않는다. Provider가 같은 물리 발화를 두 callback으로 emit해 서로 다른 ID가 생기는 경우도 이 계약으로
+dedupe할 수 없으며 live microphone에서 `INCONCLUSIVE` 또는 별도 관찰 결과로 기록한다. STORE_HOME
+dedupe를 추가하려면 별도 계약과 구현이 필요하고 adapter retry나 text/time heuristic으로 합치지 않는다.
 
 기존 bridge command가 active이면 chat/microphone `STORE_HOME`은
 `minecraft_command_busy`로 거절하고 기존 Task를 선점하지 않는다. 게임에서 직접
@@ -2546,13 +2589,17 @@ runtime 로그에서는 최소한 다음 correlation을 확인한다.
 one input event
 one validated translation
 canonical command=store_home
-request source=lavi_chat_mic_router
+historical request source=lavi_chat_mic_router
 one Java normalized @store_home dispatch
 one StoreHomeTask root
 matching request ID terminal
 typed StoreHomeResult
 zero duplicate submission
 ```
+
+Typed-provenance migration 뒤의 새 runtime evidence는 Chat과 microphone에 각각
+`request source=lavi_chat_ui`와 `request source=voice_input_final`을 요구한다. Historical line을 새 source의
+검증으로 재해석하지 않는다.
 
 공개 순서:
 
@@ -2584,7 +2631,9 @@ H6 V1은 다음을 포함하지 않는다.
 - 자동 retry, replay 또는 reconnect 재실행
 - loadout planner, manifest, repository 또는 transfer executor 변경
 - 일반 상자 fallback 또는 inventory-pressure 자동 실행
-- H5 fixed 16x16x16 direct-command batch registration와 Korean batch-only direct `@` forms
+- H5 fixed 16x16x16 direct-command batch registration와 Korean batch-only direct `@` forms.
+  STORE_HOME H6에서는 계속 제외하며, 별도 Chat/microphone natural-language 노출은
+  [H5 Korean Chat/Microphone contract](chatclef-h5-auto-deposit-trust-korean-chat-microphone-pre-change-contract-2026-09-04.md)가 소유한다.
 - 새 item-policy JSON, profile JSON 또는 pin JSON
 
 H6로 인해 새 JSON item classification은 추가하지 않는다. 기존 exact trusted
@@ -2667,7 +2716,7 @@ Forge / MineMind backend
 
 ### 24.11 H6 source implementation evidence
 
-2026-08-27 별도 source 승인에 따라 다음을 현재 worktree에 구현했다.
+2026-08-27 별도 source 승인에 따라 다음을 당시 worktree에 구현했다.
 
 ```text
 deterministic STORE_HOME classifier:       implemented; gate/parser shared owner
@@ -2728,7 +2777,8 @@ PythonKoreanCommandRegistryTests.
 test_registry_contains_exactly_the_registered_chatclef_commands
 ```
 
-현재 source-extracted snapshot과 support matrix는 22 commands이지만 production
+이 수치는 2026-08-29 closure 전 snapshot이다. 당시 source-extracted snapshot과 support matrix는
+22 commands이지만 production
 `KoreanChatClefCommandRegistry`는 21 commands이며 `deposit_all` metadata가 없다. Test
 fixture만 완화하거나 Java source registration을 숨기는 것은 금지한다. 올바른 closure는
 canonical registry 문서에서 `deposit_all`의 raw-only metadata를 고정하고 production
@@ -3690,8 +3740,8 @@ confirmed delta를 다음 revalidation/session transition 전에 overlay/progres
 ### 26.12 Phase-scoped timeout source implementation status
 
 2026-08-28 후속 사용자 승인으로 고정 candidate lifetime timeout을 phase-scoped
-timeout으로 교체하는 behavior source와 focused JUnit source를 현재 dirty worktree에
-구현했다.
+timeout으로 교체하는 behavior source와 focused JUnit source를 당시 worktree에
+구현했다. 이후 direct gate, clean build와 committed source 상태는 §26.14가 소유한다.
 
 ```text
 NAVIGATE_TO_CANDIDATE
@@ -3781,8 +3831,8 @@ candidate 유지의 직접 증거는 operation 225이고, operation 30351은 반
 이 결과는 실제 장시간 safety-chain 선점, 네 timeout reason의 발동, pending timeout에서
 container click 0회를 모두 재현했다는 뜻이 아니다. Runtime manifest의 complete
 source/build-input identity도 없으므로 `PARITY_UNPROVEN`을 유지한다. Repository commit
-readiness는 별도 Python `deposit_all` catalog/registry contract failure, 아래 direct-test
-gap과 혼재된 dirty-worktree/change scope가 남아 있어 `NOT_READY`다. `adris/**`, TaskRunner,
+readiness는 그 §26.12 checkpoint에서 별도 Python `deposit_all` catalog/registry contract failure,
+아래 direct-test gap과 혼재된 worktree/change scope가 남아 있어 `NOT_READY`였다. `adris/**`, TaskRunner,
 UserTaskChain, `PlayerInteractionFixChain`과 Baritone behavior source 변경은 0이다.
 
 ### 26.13 2026-08-29 final cross-review correction
@@ -3816,7 +3866,7 @@ Task back-reference가 없고 projector는 `terminationObservation.task()`를 �
 않는다. Shared state/clock wiring과 외부 command-lifecycle Task identity를 소유권별로
 분리해 검증한다.
 
-Python command catalog의 current 상태도 독립 gate다.
+다음 Python command catalog 상태는 §26.13 당시의 historical pre-closure gate다.
 
 ```text
 Java registered-command snapshot: 22
@@ -3839,7 +3889,7 @@ parity, 위 세 direct coverage gate와 zero-failure focused rerun이 모두 닫
 결과로 닫았다.
 
 ```text
-registered-command snapshot / support matrix / production registry: 22 / 22 / 22
+dated 2026-08-29 registered-command snapshot / support matrix / production registry: 22 / 22 / 22
 focused Python: 38 tests passed, 179 subtests passed, 0 failures,
                 no deselection or automatic retry
 full focused Python closure: 404 passed, 2 pre-existing live-test skips,
@@ -3880,6 +3930,12 @@ log도 callback과 matching task-finished event로 같은 typed result를 확인
 `ab0355b1`, Windows clean-build helper는 `d0a23ea`에 각각 기록했으며 문서 commit과 push는
 이 기록 뒤의 별도 Git 단계다.
 
+2026-09-04 기준으로 위 22/22/22는 역사적 closure다. Baseline
+`f301770d1885f8d7239846a97b187f4d51c05a55`의 별도 H5 registrar를 포함한 collision-free normal
+activation source target은 26 unique names이다. 2026-09-05 Python registry/snapshot/support matrix도
+26으로 동기화되어 activation-aware offline catalog parity는 닫혔다. Exact current catalog contract와
+남은 live-runtime 경계는 아래 H5 Korean Chat/microphone 문서와 Python registry plan이 소유한다.
+
 ## 27. 관련 문서
 
 - [Minecraft Backend Separation](minecraft-backend-separation.md)
@@ -3889,6 +3945,10 @@ log도 callback과 matching task-finished event로 같은 typed result를 확인
 - [Fabric ChatClef Bridge Protocol V1](fabric-chatclef-bridge-protocol-v1.md)
 - [ChatClef Deposit Sync-Finish Idle Root Investigation](chatclef-deposit-sync-finish-idle-root-investigation-2026-08-21.md)
 - [Fabric ChatClef 1.20.1 Build Verification](chatclef-fabric-build-verification.md)
+- [ChatClef H5 Player-Position Anchor Contract](chatclef-h5-player-position-anchor-pre-change-contract-2026-09-04.md)
+- [ChatClef H5 Auto-Deposit Trust Korean Chat/Microphone Contract](chatclef-h5-auto-deposit-trust-korean-chat-microphone-pre-change-contract-2026-09-04.md)
+- [ChatClef Python Korean Command Registry Plan](chatclef-python-korean-command-registry-plan.md)
+- [ChatClef Python Command Orchestration Plan](chatclef-python-command-orchestration-plan.md)
 - [ChatClef JVM G1 Remark Native Crash Investigation](chatclef-jvm-g1-remark-native-crash-investigation-2026-08-27.md)
 - [ChatClef STORE_HOME Long-Distance Timeout Investigation](chatclef-store-home-long-distance-timeout-investigation-2026-08-28.md)
 

@@ -1,4 +1,5 @@
 <!-- 20260806_kpopmodder: Added the Minecraft plugin documentation entrypoint and reading map. -->
+<!-- 20260905_kpopmodder: Reconciled the H5 Korean Chat/microphone entry after Python implementation and offline verification. -->
 
 # LAVI Minecraft Plugin
 
@@ -268,12 +269,22 @@ phrase `다이아 곡괭이 만들어줘` already validates to `get diamond_pick
 incident remains classified as stale active-command admission blocking, not a
 Korean compiler gap.
 
-For the full 20-command Korean registry, command-by-command lifecycle
-classification, safety tiers, confirmation modes, resolver domains, and public
-enablement axes, read:
+For the dated Korean command-registry baselines, activation-aware command
+catalog, command-by-command lifecycle classification, safety tiers,
+confirmation modes, resolver domains, and public enablement axes, read:
 
 ```text
 plugins/Minecraft/docs/chatclef-python-korean-command-registry-plan.md
+```
+
+For the implementation contract and offline verification record for exposing the existing H5 player-centered
+`auto_deposit_trust area 16x16` operation to LAVI Chat and microphone Korean
+input, including the required typed input-provenance migration, exact trusted
+two-form `@` adapter, deterministic parsing, prefixless compilation, catalog
+parity, focused Java test-only lifecycle proof, ACK wording and tests, read:
+
+```text
+plugins/Minecraft/docs/chatclef-h5-auto-deposit-trust-korean-chat-microphone-pre-change-contract-2026-09-04.md
 ```
 
 For the Python-only inventory-full cleanup preflight contract, protected-item
@@ -360,6 +371,9 @@ Python orchestration planning:
 
 Python Korean command registry planning:
   chatclef-python-korean-command-registry-plan.md
+
+H5 Korean Chat/microphone pre-change contract:
+  chatclef-h5-auto-deposit-trust-korean-chat-microphone-pre-change-contract-2026-09-04.md
 
 Python inventory cleanup preflight contract:
   chatclef-python-inventory-cleanup-preflight-contract.md

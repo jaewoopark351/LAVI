@@ -1,6 +1,8 @@
 #20260815_kpopmodder: Lock registered Java ChatClef commands and Korean support status.
+#20260905_kpopmodder: Include the activated H5 registrar in the exact source-backed 26-command catalog.
 from __future__ import annotations
 
+from collections import Counter
 import json
 import re
 import unittest
@@ -20,6 +22,28 @@ JAVA_ROOT = (
 )
 
 ALTOCLEF_COMMANDS_SOURCE = JAVA_ROOT / "adris" / "altoclef" / "AltoClefCommands.java"
+AUTO_DEPOSIT_RUNTIME_SOURCE = (
+    JAVA_ROOT
+    / "lavi"
+    / "minecraft"
+    / "task"
+    / "container"
+    / "deposit"
+    / "auto"
+    / "AutoDepositRuntime.java"
+)
+AUTO_DEPOSIT_TRUSTED_REGISTRAR_SOURCE = (
+    JAVA_ROOT
+    / "lavi"
+    / "minecraft"
+    / "task"
+    / "container"
+    / "deposit"
+    / "auto"
+    / "trusted"
+    / "command"
+    / "AutoDepositTrustedCommandRegistrar.java"
+)
 ARTIFACT_ROOT = Path(__file__).resolve().parent
 REGISTERED_COMMANDS_ARTIFACT = (
     ARTIFACT_ROOT / "chatclef_registered_commands.snapshot.json"
@@ -46,6 +70,35 @@ class JavaChatClefCommandCatalogContractTests(unittest.TestCase):
                 )
 
                 self.assertEqual(command["command"], actual_name)
+
+    def test_activated_h5_registrar_matches_four_source_backed_snapshot_rows(self):
+        activation = AUTO_DEPOSIT_RUNTIME_SOURCE.read_text(encoding="utf-8")
+        self.assertRegex(
+            activation,
+            r"trustedCommandRegistrar\.register\(mod\)\s*;",
+        )
+
+        actual = _registered_h5_command_classes()
+        expected = _snapshot_lavi_auto_deposit_trusted_commands()
+
+        self.assertEqual(expected, actual)
+        self.assertEqual(4, len(actual))
+
+    def test_active_catalog_has_exact_26_names_without_duplicates(self):
+        snapshot = _registered_command_snapshot()
+        names = [row["command"] for row in snapshot]
+        expected_names = set(_support_by_command())
+
+        self.assertEqual(26, len(names))
+        self.assertEqual(26, len(set(names)))
+        self.assertEqual([], [name for name, count in Counter(names).items() if count > 1])
+        self.assertEqual(expected_names, set(names))
+
+        source_names = {
+            _command_name_from_constructor(JAVA_ROOT / Path(row["path"]))
+            for row in snapshot
+        }
+        self.assertEqual(set(names), source_names)
 
     def test_lavi_overlay_command_is_separate_java_only_command(self):
         for command in _registered_command_snapshot():
@@ -103,6 +156,7 @@ class JavaChatClefCommandCatalogContractTests(unittest.TestCase):
                 "meat",
                 "stop",
                 "store_home",
+                "auto_deposit_trust",
             },
             supported,
         )
@@ -134,10 +188,42 @@ def _registered_altoclef_command_classes() -> list[str]:
 
 def _command_name_from_constructor(path: Path) -> str:
     text = path.read_text(encoding="utf-8")
-    match = re.search(r"super\(\s*\"([a-z0-9_]+)\"", text)
-    if match is None:
-        raise AssertionError(f"Command constructor name not found: {path}")
-    return match.group(1)
+    literal = re.search(r'super\(\s*"((?:\\.|[^"\\])*)"', text)
+    if literal is not None:
+        return _decode_java_string(literal.group(1))
+    if re.search(r"super\(\s*COMMAND_NAME\b", text) is not None:
+        constant = re.search(
+            r'public\s+static\s+final\s+String\s+COMMAND_NAME\s*=\s*"((?:\\.|[^"\\])*)"',
+            text,
+        )
+        if constant is not None:
+            return _decode_java_string(constant.group(1))
+    raise AssertionError(f"Command constructor name not found: {path}")
+
+
+def _decode_java_string(value: str) -> str:
+    return json.loads(f'"{value}"')
+
+
+def _registered_h5_command_classes() -> dict[str, str]:
+    text = AUTO_DEPOSIT_TRUSTED_REGISTRAR_SOURCE.read_text(encoding="utf-8")
+    class_names = set(
+        re.findall(
+            r"new\s+(AutoDeposit(?:Trust|Untrust|TrustedList|KoreanBulkTrust)Command)\s*\(",
+            text,
+        )
+    )
+    snapshot = {
+        row["class_name"]: row
+        for row in _registered_command_snapshot()
+        if row["owner"] == "lavi_auto_deposit_trusted"
+    }
+    return {
+        class_name: _command_name_from_constructor(
+            JAVA_ROOT / Path(snapshot[class_name]["path"])
+        )
+        for class_name in class_names
+    }
 
 
 def _registered_command_snapshot() -> list[dict[str, str]]:
@@ -155,6 +241,14 @@ def _snapshot_chatclef_java_commands() -> dict[str, str]:
         command["class_name"]: command["command"]
         for command in _registered_command_snapshot()
         if command["owner"] == "chatclef_java"
+    }
+
+
+def _snapshot_lavi_auto_deposit_trusted_commands() -> dict[str, str]:
+    return {
+        command["class_name"]: command["command"]
+        for command in _registered_command_snapshot()
+        if command["owner"] == "lavi_auto_deposit_trusted"
     }
 
 

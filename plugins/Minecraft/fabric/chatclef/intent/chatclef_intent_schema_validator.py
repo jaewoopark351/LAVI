@@ -1,5 +1,6 @@
 #20260803_kpopmodder: Added strict intent validation before DSL compilation.
 #20260827_kpopmodder: Enforce the STORE_HOME zero-slot contract.
+#20260905_kpopmodder: Enforce the deterministic rule-only H5 zero-slot contract.
 from __future__ import annotations
 
 import re
@@ -76,6 +77,31 @@ class ChatClefIntentSchemaValidator:
                     False,
                     "store_home_requires_zero_slots",
                     "store_home does not accept item, quantity, player, coordinate, or extra slots",
+                )
+            return True, "validated_intent", "intent schema is valid"
+        if intent.intent_type is ChatClefIntentType.AUTO_DEPOSIT_TRUST_AREA:
+            if intent.source != "rule":
+                return (
+                    False,
+                    "auto_deposit_trust_area_requires_rule_source",
+                    "auto_deposit_trust_area can only be authorized by deterministic rules",
+                )
+            if any(
+                (
+                    intent.quantity is not None,
+                    bool(intent.item_phrase.strip()),
+                    intent.food_units is not None,
+                    intent.x is not None,
+                    intent.y is not None,
+                    intent.z is not None,
+                    bool(intent.player_name.strip()),
+                    bool(intent.slots),
+                )
+            ):
+                return (
+                    False,
+                    "auto_deposit_trust_area_requires_zero_slots",
+                    "auto_deposit_trust_area does not accept user-controlled slots",
                 )
             return True, "validated_intent", "intent schema is valid"
         if intent.intent_type in {

@@ -9,8 +9,13 @@ from plugins.Minecraft.fabric.chatclef.command_registry import (
     KoreanChatClefCommandRegistry,
 )
 from plugins.Minecraft.fabric.chatclef.command_registry.admission import (
+    AutoDepositTrustClaimedSubmissionAuthorizer,
+    AutoDepositTrustCommandAdmission,
     KoreanCommandSubmissionAdmission,
     StoreHomeCommandAdmission,
+)
+from plugins.Minecraft.fabric.chatclef.input.auto_deposit_trust.delivery import (
+    AutoDepositTrustInputEventClaimRegistry,
 )
 from plugins.Minecraft.fabric.chatclef.adapter.fabric_chatclef_adapter import (
     FabricChatClefAdapter,
@@ -32,6 +37,9 @@ class MinecraftFabricChatClefExtension(GameExtensionInterface):
         plugin: Any = None,
         adapter: FabricChatClefAdapter | None = None,
         natural_language_service: ChatClefNaturalLanguageService | None = None,
+        auto_deposit_trust_claim_registry: (
+            AutoDepositTrustInputEventClaimRegistry | None
+        ) = None,
     ):
         self.plugin = plugin
         self.adapter = adapter or self._adapter_from_plugin(plugin)
@@ -40,6 +48,17 @@ class MinecraftFabricChatClefExtension(GameExtensionInterface):
         )
         self.korean_command_registry = KoreanChatClefCommandRegistry()
         self.store_home_command_admission = StoreHomeCommandAdmission()
+        self.auto_deposit_trust_input_claim_registry = (
+            auto_deposit_trust_claim_registry
+            or AutoDepositTrustInputEventClaimRegistry()
+        )
+        self.auto_deposit_trust_command_admission = (
+            AutoDepositTrustCommandAdmission(
+                authorizer=AutoDepositTrustClaimedSubmissionAuthorizer(
+                    self.auto_deposit_trust_input_claim_registry
+                )
+            )
+        )
         self._command_submission = FabricChatClefCommandSubmissionService(
             adapter=self.adapter,
             record_command=self.record_command,
@@ -57,7 +76,8 @@ class MinecraftFabricChatClefExtension(GameExtensionInterface):
                 action=action,
             ),
             admission=KoreanCommandSubmissionAdmission(
-                self.store_home_command_admission
+                self.store_home_command_admission,
+                self.auto_deposit_trust_command_admission,
             ),
         )
         self.context = None
@@ -95,11 +115,19 @@ class MinecraftFabricChatClefExtension(GameExtensionInterface):
         self,
         command: Any,
         translation: Any,
+        *,
+        route_claim: object = None,
     ) -> dict[str, Any]:
         return self._natural_language_commands.submit_translated(
             command,
             translation,
+            route_claim=route_claim,
         )
+
+    def get_auto_deposit_trust_input_claim_registry(
+        self,
+    ) -> AutoDepositTrustInputEventClaimRegistry:
+        return self.auto_deposit_trust_input_claim_registry
 
     def get_status(self) -> dict[str, Any]:
         status = self.adapter.get_status().to_dict()

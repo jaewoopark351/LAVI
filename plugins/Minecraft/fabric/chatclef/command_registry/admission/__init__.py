@@ -11,10 +11,20 @@ from plugins.Minecraft.fabric.chatclef.command_registry.admission.store_home_com
 from plugins.Minecraft.fabric.chatclef.command_registry.admission.store_home_command_admission_decision import (
     StoreHomeCommandAdmissionDecision,
 )
+from plugins.Minecraft.fabric.chatclef.command_registry.admission.auto_deposit_trust import (
+    AutoDepositTrustClaimedSubmissionAuthorizer,
+    AutoDepositTrustCommandAdmission,
+    AutoDepositTrustCommandAdmissionDecision,
+    AutoDepositTrustSourceReadinessAdmission,
+)
 
 __all__ = [
     "KoreanCommandSubmissionAdmission",
     "KoreanCommandSubmissionAdmissionDecision",
+    "AutoDepositTrustClaimedSubmissionAuthorizer",
+    "AutoDepositTrustCommandAdmission",
+    "AutoDepositTrustCommandAdmissionDecision",
+    "AutoDepositTrustSourceReadinessAdmission",
     "StoreHomeCommandAdmission",
     "StoreHomeCommandAdmissionDecision",
 ]

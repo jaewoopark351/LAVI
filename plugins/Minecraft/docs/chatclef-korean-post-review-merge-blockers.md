@@ -1,6 +1,7 @@
 <!-- 20260815_kpopmodder: Recorded the post-implementation Korean ChatClef merge-blocker review. -->
 <!-- 20260815_chatgpt: Reconciled the documentation-set resolution and retained only implementation/CI blockers as current merge gates. -->
 <!-- 20260818_kpopmodder: Added the post-restore live-test addendum and corrected request-correlation versus environment-preflight status. -->
+<!-- 20260905_kpopmodder: Reconciled the H5 Python implementation, 26-row catalog, test-only Java verification, and clean-build status. -->
 <!-- 20260818_kpopmodder: Bound live status to audited baseline 4239c23 and added approval, no-replay, and end-to-end observation blockers. -->
 <!-- 20260818_kpopmodder: Added gameplay observation completeness and verified expected/partial/prohibited effect merge criteria. -->
 <!-- 20260819_kpopmodder: Recorded strict listener identity, canonical submission reconciliation, and split batch advancement gates. -->
@@ -9,6 +10,8 @@
 <!-- 20260829_openai: Recorded the current 22-command catalog versus 21-command Python registry drift and the resulting focused-test merge blocker. -->
 <!-- 20260829_openai: Added the topology-correct STORE_HOME direct-test gates and separated observed runtime evidence from unproven artifact provenance. -->
 <!-- 20260829_openai: Closed the registry drift with final focused evidence while preserving remaining merge gates. -->
+<!-- 20260904_kpopmodder: Reopened activation-aware catalog parity for four H5 registrar commands and recorded the docs-only Korean Chat/microphone public-enable gate. -->
+<!-- 20260905_kpopmodder: Reconciled H5 two-phase receipt authorization and both Java test-only blockers. -->
 
 # ChatClef Korean Post-Review Merge Blockers
 
@@ -23,6 +26,13 @@ cleanup documentation pass:
 
 ```text
 e08af63948a3fa4675c70279db59c2a70b00a332
+```
+
+Current H5 documentation/source baseline for the 2026-09-04 activation-aware
+catalog delta:
+
+```text
+f301770d1885f8d7239846a97b187f4d51c05a55
 ```
 
 This document records the original documentation-only merge review for Korean
@@ -75,6 +85,12 @@ document without changing code:
 plugins/Minecraft/docs/chatclef-python-korean-command-registry-plan.md
 ```
 
+The 2026-09-04 H5 Korean Chat/microphone documentation unit adds:
+
+```text
+plugins/Minecraft/docs/chatclef-h5-auto-deposit-trust-korean-chat-microphone-pre-change-contract-2026-09-04.md
+```
+
 Authority is split as follows:
 
 ```text
@@ -83,8 +99,9 @@ alias v2 plan:
   phase order
 
 Python Korean command registry plan:
-  versioned registered command snapshot: 20 at the reviewed baseline and 22 in
-  the current Java surface, with production Python metadata tracked separately,
+  versioned registered command snapshot: 20 at the reviewed baseline, 22 at
+  the dated 2026-08-29 closure, and activation-aware target 26 after the H5
+  registrar, with production Python metadata tracked separately,
   command resolver domains, lifecycle kinds,
   safety tiers, confirmation modes, allowed sources, and public enablement axes
 
@@ -789,11 +806,11 @@ This addendum is documentation-only. It does not authorize code, tests, build,
 runtime execution, Java, DTO, wire-payload, ChatClef/AltoClef behavior, commit,
 or push changes.
 
-## 2026-08-29 Registered-Command Drift And Current Merge Gate
+## 2026-08-29 Registered-Command Drift And Checkpoint Merge Gate
 
-The current Java registration surface contains 22 commands. Compared with the
-historical 20-command baseline, `deposit_all` and `store_home` are now
-source-registered. The current worktree artifacts and Python registry are not
+At this dated 2026-08-29 checkpoint, the Java registration surface contained 22 commands. Compared with the
+historical 20-command baseline, `deposit_all` and `store_home` were then
+source-registered. The checkpoint worktree artifacts and Python registry were not
 yet in parity:
 
 ```text
@@ -820,13 +837,13 @@ test_registry_contains_exactly_the_registered_chatclef_commands
 The first run failed because the active Java set contained
 `DepositAllCommand` while the snapshot omitted it. After the test snapshot and
 support matrix were reconciled to include `deposit_all`, the second run exposed
-the remaining production drift: `KoreanChatClefCommandRegistry` still contains
+the then-remaining production drift: `KoreanChatClefCommandRegistry` still contained
 21 commands. This is separate from the successful clean Java build, matching
 built/deployed JAR file identity, observed runtime code-source path, and
 observed behavior of STORE_HOME operations 225 and 30351;
 `artifactParity=PARITY_UNPROVEN` remains unchanged.
 
-The merge/commit gate remains closed until all of the following are true:
+At that checkpoint, the merge/commit gate remained closed until all of the following were true:
 
 ```text
 canonical deposit_all raw-only metadata is added to the production registry
@@ -845,8 +862,8 @@ make the test pass is not an acceptable closure.
 
 ## 2026-08-29 Final Cross-Review Correction
 
-The documentation and resolution direction is `CONDITIONAL PASS`. Current
-merge/commit readiness remains `BLOCKED`.
+At that checkpoint, the documentation and resolution direction was
+`CONDITIONAL PASS`, and merge/commit readiness remained `BLOCKED`.
 
 The STORE_HOME evidence must remain separated by scope:
 
@@ -957,3 +974,99 @@ listed STORE_HOME direct Java coverage and broader merge gates.
 Runtime manifest Git/source/build-input/runtime SHA provenance remains
 `UNVERIFIED`, and `artifactParity=PARITY_UNPROVEN` remains unchanged. No runtime
 execution, commit, or push is claimed or authorized by this addendum.
+
+## 2026-09-04 H5 activation-aware catalog and public-exposure blocker
+
+The 2026-08-29 22-command closure above remains valid historical evidence for
+its exact baseline. At the current H5 source baseline,
+`AutoDepositTrustedCommandRegistrar` declares and attempts four H5 commands.
+Collision-free normal activation registers all four. A collision in any English
+trio name refuses the whole English trio and skips the Korean alias attempt;
+a Korean-alias-only collision after successful English registration preserves
+the three English names and refuses only the alias. Actual runtime effective
+registration and owner remain runtime evidence:
+
+```text
+auto_deposit_trust
+auto_deposit_untrust
+auto_deposit_trusted_list
+자동보관등록
+```
+
+At the 2026-09-04 documentation snapshot, the Python registry, snapshot and
+support matrix remained at 22 names while the collision-free target was 26.
+The 2026-09-05 implementation now extracts the separate registrar and keeps all
+three source-backed sets at 26:
+
+```text
+Python registry/snapshot/support matrix: 26
+collision-free source activation target: 26 unique names
+H5 catalog parity:                       CLOSED_OFFLINE
+```
+
+This is not a regression in the earlier `deposit_all` closure. It is a later
+source-surface delta that requires its own source extraction and exact-set
+reconciliation.
+
+The Korean Chat/microphone implementation now has the following status:
+
+```text
+immutable Chat/VoiceInput ingress provenance:       implemented and offline tested
+raw-string provider-origin collapse removed:        implemented and offline tested
+structured non-H5 LLM fallback preservation:        implemented and offline tested
+exact source/provider/kind/final admission:          implemented and offline tested
+opaque router claim receipt/direct-API bypass gate: implemented and offline tested
+single claim-registry object graph:                  implemented and offline tested
+two-phase receipt inspection/atomic submit commit:  implemented and offline tested
+existing-public-command source migration:           implemented and regression tested
+nullable-extension router fail-closed wiring:        implemented and offline tested
+router import/construction startup fail-closed gate: implemented and offline tested
+AUTO_DEPOSIT_TRUST_AREA deterministic classifier:   implemented and offline tested
+rule-only zero-slot schema/compiler:                 implemented and offline tested
+H5-specific registry/admission:                     implemented and offline tested
+parser/admission/public membership decoupling:       implemented and offline tested
+trusted two-form @ pre-translation adapter:          implemented and offline tested
+Chat/microphone exactly-once route tests:             passed offline
+microphone user-visible/TTS ACK delivery:           not implemented; not required for command execution
+English-trio registrar collision direct coverage:   passed in Java test source
+exact H5 dispatcher/lifecycle Java integration:     passed in Java test source
+required clean forced build:                        passed; 171/171 tasks executed
+public Korean enablement:                           true for auto_deposit_trust only
+gameplay-effect verification in Python:            false
+```
+
+The current synthesized `lavi_chat_mic_router` value is a coarse route label,
+not trusted physical input origin, and must not appear in target allowlists.
+Target H5 admission permits only `lavi_chat_ui` and `voice_input_final` with
+their exact provider/event-kind/final tuples. Existing public commands migrate
+to the real ingress source values plus `direct_typed` where already authorized;
+commands already exposed through the Fabric Korean UI preserve
+`lavi_gui_korean`. `STORE_HOME` and H5 do not gain that UI source.
+Generic source enforcement intentionally rejects public Korean Minecraft command
+candidates from Twitch, YouTube, IdleThink, ScreenVision, StarCraft and unknown
+sources; ordinary non-command LLM text from those sources remains unchanged.
+
+The only literal `@` inputs admitted by this feature are the exact trusted
+whole-string forms `@auto_deposit_trust area 16x16` and
+`@auto_deposit_trust 반경 16x16`. A separate adapter must preserve their raw
+original and pass a prefixless canonical string to the unchanged dangerous-text
+service. Every other `@` form, CR/LF/control input and source mismatch fails
+closed with zero LLM and submission calls.
+
+Only `auto_deposit_trust` may become the fixed batch natural-language command
+in this slice, with target support classification
+`IMPLEMENTED/supported_korean`. `auto_deposit_untrust`,
+`auto_deposit_trusted_list` and `자동보관등록` remain
+`RAW_ONLY/java_only_user_or_dev_command`. Public enablement must not be used to
+make the 26-name catalog test pass. It follows the feature contract's explicit
+offline -> exact H5 Java lifecycle test and clean build -> candidate public flag
+and production-metadata regression suite -> user-authorized Chat/microphone
+runtime -> retain-or-revert sequence. Generic terminal completion must not be described as
+trusted-registry mutation success.
+
+The exact implementation and test gates are owned by
+[H5 Auto-Deposit Trust Korean Chat/Microphone Pre-Change Contract](chatclef-h5-auto-deposit-trust-korean-chat-microphone-pre-change-contract-2026-09-04.md).
+This addendum began as a documentation-only 2026-09-04 snapshot. The linked
+contract now records the 2026-09-05 Python implementation, offline tests and
+clean build. Deployment, live Chat/microphone runtime, H5 mutation attribution,
+commit and push remain unperformed in that follow-up scope.

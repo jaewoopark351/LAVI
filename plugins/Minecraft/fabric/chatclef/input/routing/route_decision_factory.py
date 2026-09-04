@@ -154,6 +154,24 @@ class MinecraftChatClefRouteDecisionFactory:
             translation=dict(translation or {}),
         )
 
+    def input_rejection(
+        self,
+        reason_code: str,
+        message: str,
+    ) -> MinecraftChatClefInputRouteDecision:
+        reason = str(reason_code or "auto_deposit_trust_input_internal_error")
+        text = str(message or reason).strip()
+        return MinecraftChatClefInputRouteDecision.handled_result(
+            reason=reason,
+            response_text=f"[Minecraft] 자동 보관 대상 등록 명령을 실행하지 않았어요: {text}",
+            result={
+                "ok": False,
+                "error": reason,
+                "message": text,
+                "details": {"reason_code": reason},
+            },
+        )
+
     def _response_text(
         self,
         translation: Mapping[str, Any],

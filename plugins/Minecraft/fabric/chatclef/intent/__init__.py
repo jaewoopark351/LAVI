@@ -1,4 +1,9 @@
 #20260803_kpopmodder: Export Korean ChatClef intent services as a focused package.
+from plugins.Minecraft.fabric.chatclef.intent.auto_deposit_trust import (
+    AutoDepositTrustIntentClassification,
+    AutoDepositTrustIntentDecision,
+    KoreanAutoDepositTrustIntentClassifier,
+)
 from plugins.Minecraft.fabric.chatclef.intent.chatclef_intent_status import (
     ChatClefIntentStatus,
 )
@@ -16,9 +21,12 @@ from plugins.Minecraft.fabric.chatclef.intent.chatclef_translation_result_dto im
 )
 
 __all__ = [
+    "AutoDepositTrustIntentClassification",
+    "AutoDepositTrustIntentDecision",
     "ChatClefIntentStatus",
     "ChatClefIntentType",
     "ChatClefKoreanDisplayNameRepository",
     "ChatClefNaturalLanguageService",
     "ChatClefTranslationResultDTO",
+    "KoreanAutoDepositTrustIntentClassifier",
 ]

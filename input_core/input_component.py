@@ -3,6 +3,9 @@ from plugin_system.interfaces import InputPluginInterface
 from plugin_system.selection import PluginSelectionBase
 
 from core.logger import log_print#20260612_kpopmodder
+from input_core.input_event.adapters import ProviderBoundInputEventAdapter
+from input_core.input_event.normalization import LaviInputEventNormalizer
+from input_core.input_event.provenance import InputProviderSourceResolver
 
 
 class Input(PluginSelectionBase):
@@ -11,6 +14,10 @@ class Input(PluginSelectionBase):
         super().__init__(InputPluginInterface)
         self._shutdown = False
         self.output_event_listeners = []
+        #20260905_kpopmodder: Provider callbacks retain descriptor-bound identity across every listener sync.
+        self._provider_source_resolver = InputProviderSourceResolver()
+        self._input_event_normalizer = LaviInputEventNormalizer()
+        self._provider_input_event_adapters = {}
         self._sync_provider_listeners()
 
     def create_ui(self):
@@ -34,7 +41,7 @@ class Input(PluginSelectionBase):
         return selected_name
 
     def _sync_provider_listeners(self):
-        #20260716_kpopmodder: Input providers are simultaneous sources, so every loaded provider routes to Input exactly once.
+        #20260905_kpopmodder: Each constructed provider owns one stable descriptor-bound ingress callback.
         for provider in list(self.provider_list):
             plugin = getattr(provider, "plugin", None)
             if plugin is None:
@@ -42,8 +49,18 @@ class Input(PluginSelectionBase):
             listeners = self._provider_listener_list(plugin)
             while self.send_output in listeners:
                 listeners.remove(self.send_output)
+            adapter = self._provider_input_event_adapters.get(provider)
+            if adapter is None:
+                adapter = ProviderBoundInputEventAdapter(
+                    provider=provider,
+                    output_callback=self.send_output,
+                    source_resolver=self._provider_source_resolver,
+                )
+                self._provider_input_event_adapters[provider] = adapter
+            while adapter in listeners:
+                listeners.remove(adapter)
             if not getattr(provider, "disabled", False):
-                listeners.append(self.send_output)
+                listeners.append(adapter)
 
     def _provider_listener_list(self, plugin):
         listeners = getattr(plugin, "input_event_listeners", None)
@@ -53,9 +70,10 @@ class Input(PluginSelectionBase):
         return listeners
 
     def send_output(self, output):
-        log_print(output)#20260612_kpopmodder
+        event = self._input_event_normalizer.normalize(output)
+        log_print(event.text)#20260612_kpopmodder
         for subcriber in list(self.output_event_listeners):
-            subcriber(output)
+            subcriber(event)
 
     def add_output_event_listener(self, function):
         if function in self.output_event_listeners:
@@ -82,6 +100,10 @@ class Input(PluginSelectionBase):
                 continue
             while self.send_output in listeners:
                 listeners.remove(self.send_output)
+            adapter = self._provider_input_event_adapters.get(provider)
+            while adapter is not None and adapter in listeners:
+                listeners.remove(adapter)
 
+        self._provider_input_event_adapters.clear()
         self.output_event_listeners.clear()
         super().shutdown()
