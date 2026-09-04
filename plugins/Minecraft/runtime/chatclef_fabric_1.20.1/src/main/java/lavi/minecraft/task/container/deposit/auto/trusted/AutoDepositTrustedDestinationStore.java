@@ -6,6 +6,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import lavi.minecraft.task.container.deposit.auto.trusted.persistence.AutoDepositTrustedConditionalSaveStatus;
+import lavi.minecraft.task.container.deposit.auto.trusted.persistence.read.AutoDepositTrustedRegistryFileReader;
+import lavi.minecraft.task.container.deposit.auto.trusted.persistence.read.AutoDepositTrustedRegistryFileSnapshot;
+import lavi.minecraft.task.container.deposit.auto.trusted.persistence.read.AutoDepositTrustedRegistryProvenance;
+import lavi.minecraft.task.container.deposit.auto.trusted.persistence.read.AutoDepositTrustedRegistryReadResult;
+import lavi.minecraft.task.container.deposit.auto.trusted.persistence.read.AutoDepositTrustedStrictSnapshotReader;
 import net.minecraft.util.math.BlockPos;
 
 import java.io.IOException;
@@ -14,12 +20,17 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 //20260827_kpopmodder: Expose file persistence through the instance-owned trusted repository boundary.
 public final class AutoDepositTrustedDestinationStore
         implements AutoDepositTrustedDestinationPersistence {
     private final Path path;
     private final ObjectMapper mapper = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
+    private final AutoDepositTrustedStrictSnapshotReader strictSnapshotReader =
+            new AutoDepositTrustedStrictSnapshotReader();
+    private final AutoDepositTrustedRegistryFileReader registryFileReader =
+            new AutoDepositTrustedRegistryFileReader();
 
     public AutoDepositTrustedDestinationStore(Path path) {
         this.path = path.toAbsolutePath().normalize();
@@ -31,6 +42,9 @@ public final class AutoDepositTrustedDestinationStore
             return List.of();
         }
         JsonNode root = mapper.readTree(path.toFile());
+        if (root == null || !root.isObject()) {
+            throw new IOException("trusted destination root must be an object");
+        }
         JsonNode entries = root.path("destinations");
         if (!entries.isArray()) {
             throw new IOException("destinations must be an array");
@@ -97,6 +111,25 @@ public final class AutoDepositTrustedDestinationStore
         } catch (IOException ignored) {
             return -1L;
         }
+    }
+
+    @Override
+    public AutoDepositTrustedRegistryReadResult readStrictSnapshot() {
+        return strictSnapshotReader.read(path);
+    }
+
+    @Override
+    public AutoDepositTrustedConditionalSaveStatus saveIfUnchanged(
+            AutoDepositTrustedRegistryProvenance expected,
+            List<AutoDepositTrustedDestination> destinations) throws IOException {
+        Objects.requireNonNull(expected, "expected");
+        Objects.requireNonNull(destinations, "destinations");
+        AutoDepositTrustedRegistryFileSnapshot current = registryFileReader.read(path);
+        if (!expected.equals(current.provenance())) {
+            return AutoDepositTrustedConditionalSaveStatus.CONFLICT;
+        }
+        save(destinations);
+        return AutoDepositTrustedConditionalSaveStatus.SAVED;
     }
 
     public Path path() {

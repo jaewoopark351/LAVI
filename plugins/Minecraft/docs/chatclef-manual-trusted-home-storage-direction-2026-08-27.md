@@ -27,17 +27,18 @@
 <!-- 20260902_openai: Reviewed and closed the H5 fixed-volume bulk-trust pre-change contract, including fail-closed grammar, exact scan coverage, double-chest identity, one repository transaction, downstream revision effects, and deferred bulk undo without authorizing source work. -->
 <!-- 20260903_kpopmodder: Applied the canonical GUI-gate continuous implementation, bounded-log, and verification workflow without rewriting historical approval records. -->
 <!-- 20260903_openai: Aligned trusted-home GUI activation with safe open-child quiescence, exact one-shot interaction binding, full-path suppression, explicit serials, and one-time permission consumption; recorded the independent dirty H5 worktree provenance. -->
+<!-- 20260904_kpopmodder: Recorded the verified H5 crosshair source/test/build/deployment/runtime baseline and separated the docs-only player-position follow-up; commit and push remain open. -->
+<!-- 20260904_kpopmodder: Recorded the current H5 player-position source/test/build/deployment and partial runtime registration evidence while retaining the earlier crosshair baseline as historical provenance. -->
 
 # ChatClef Manual Trusted Home Storage Direction
 
-문서 상태: `CORE_V1_RUNTIME_VERIFIED_H6_CHAT_RUNTIME_VERIFIED_MIC_PENDING_SESSION_LOCAL_MANIFEST_RUNTIME_VERIFIED_LONG_DISTANCE_TIMEOUT_CAUSE_PROVEN_PHASE_SCOPED_TIMEOUT_OBSERVED_HAPPY_PATH_VERIFIED_PARITY_UNPROVEN_PYTHON_COMMAND_CATALOG_PARITY_VERIFIED_STORE_HOME_DIRECT_TESTS_VERIFIED_HISTORICAL_2026_08_29_LATEST_CLEAN_BUILD_VERIFIED_SOURCE_COMMITS_CREATED_AUTO_PRESSURE_SOURCE_RESTORED_TEST_VERIFIED_BUILD_RUNTIME_PENDING_H5_DOCUMENT_SNAPSHOT_STALE_DIRTY_WORKTREE_SOURCE_PRESENT_UNVERIFIED`
+문서 상태: `CORE_V1_RUNTIME_VERIFIED_H6_CHAT_RUNTIME_VERIFIED_MIC_PENDING_SESSION_LOCAL_MANIFEST_RUNTIME_VERIFIED_LONG_DISTANCE_TIMEOUT_CAUSE_PROVEN_PHASE_SCOPED_TIMEOUT_OBSERVED_HAPPY_PATH_VERIFIED_PARITY_UNPROVEN_PYTHON_COMMAND_CATALOG_PARITY_VERIFIED_STORE_HOME_DIRECT_TESTS_VERIFIED_HISTORICAL_2026_08_29_LATEST_CLEAN_BUILD_VERIFIED_SOURCE_COMMITS_CREATED_AUTO_PRESSURE_SOURCE_RESTORED_TEST_VERIFIED_BUILD_RUNTIME_PENDING_H5_PLAYER_POSITION_SOURCE_TEST_BUILD_DEPLOYMENT_RUNTIME_REGISTRATION_VERIFIED_PARTIAL_RUNTIME_MATRIX_OPEN`
 
-작성 기준일: 2026-08-27, 상태 갱신일: 2026-09-03
+작성 기준일: 2026-08-27, 상태 갱신일: 2026-09-04
 
 위 `HISTORICAL_2026_08_29_LATEST_CLEAN_BUILD_VERIFIED`는 §26.14에 기록된 당시 artifact의
-역사적 상태다. 현재 dirty H5 source나 이후 GUI-gate source를 포함하는 최신 worktree build를
-뜻하지 않는다. 두 change unit이 함께 dirty인 상태에서 수행하는 향후 build는 별도 attribution이
-없는 한 mixed provenance다.
+역사적 상태이며 현재 H5 source를 검증하지 않는다. 현재 player-position H5의
+source/test/build/deployment/runtime 증거는 §13.1과 연결된 H5 구현 문서가 소유한다.
 
 이 문서는 Fabric ChatClef 1.20.1에서 사용자가 명시적으로 요청했을 때만
 등록된 trusted destination을 집 보관소로 사용해 인벤토리를 정리하는 방향을
@@ -805,27 +806,66 @@ V1 loadout, SAFE reserve와 item disposition은 Java source의 고정 정책으�
 area를 만들지 않고, command 실행 시 발견한 logical destination을 기존 exact coordinate entry로만
 추가하거나 다시 enable한다.
 
-### 13.1 H5 상태와 현재 실행 금지
+> 2026-09-04 player-position scoped override: 현재 H5 batch anchor 구현은
+> [H5 Player-Position Anchor Implementation Contract and Verification Record](chatclef-h5-player-position-anchor-pre-change-contract-2026-09-04.md)를
+> 따른다. 아래 crosshair 기록은 pre-change source/runtime provenance로만 유지한다.
+> 새 문서가 §13.3의 crosshair/container-anchor 조건과 §13.7 acceptance item 5를 대체하고,
+> player-centered empty volume의 `NO_CHANGE` reason을 §13.5에 확장한다. 나머지 grammar,
+> fixed volume, loaded-only coverage, allowlist, topology와 transaction 계약은 유지된다.
+
+### 13.1 H5 상태와 현재 검증 경계
 
 ```text
-H5_DOCUMENT_STATUS: DIRECTION_AND_PRECHANGE_CONTRACT
+H5_DOCUMENT_STATUS: CANONICAL_DIRECTION_WITH_IMPLEMENTED_PLAYER_POSITION_SCOPED_OVERRIDE
 H5_DOCUMENT_SNAPSHOT_IMPLEMENTATION_STATUS: NOT_STARTED_AT_2026-09-02_REVIEW
-H5_CURRENT_WORKTREE_STATUS: INDEPENDENT_MODIFIED_AND_UNTRACKED_JAVA_TEST_SOURCE_PRESENT; UNVERIFIED_BY_THIS_DOCUMENT
-H5_CURRENT_SCOPED_BUILD_RUNTIME_COMMIT_PUSH: NOT_ESTABLISHED_BY_THIS DOCUMENT
-H5_FUTURE_RUNTIME_ROOT_CLEAN_BUILD: MIXED_H5_AND_GUI_PROVENANCE_WHILE_BOTH_CHANGE_SETS_REMAIN
-H5_CURRENT_BATCH_COMMAND_EXECUTION: PROHIBITED
+H5_CURRENT_SOURCE_STATUS: PLAYER_BLOCK_POSITION_IMPLEMENTED_IN_CURRENT_WORKTREE; LAVI_OWNED_JAVA_AND_TEST_SOURCE
+H5_CURRENT_DETERMINISTIC_TEST_STATUS: PASS; 1.20.1=707 TESTS; 0 FAILURES; 0 ERRORS; 1 EXISTING SKIPPED; ALL 11 CONFIGURED VERSION TEST TASKS PASSED
+H5_CURRENT_FOCUSED_TEST_STATUS: INCLUDED_IN_FULL_SUITE; SEPARATE_CURRENT_FOCUSED_COUNT_NOT_RECORDED
+H5_CURRENT_CLEAN_FORCED_BUILD_STATUS: PASS; 171 OF 171 ACTIONABLE TASKS EXECUTED
+H5_CURRENT_1_20_1_ARTIFACT_SHA256: 24DD4C8DEBA968D0206CA3D68A227C57D513E55769F1BB51F5943F549989CC27
+H5_CURRENT_DEPLOYMENT_STATUS: VERIFIED_IN_LAVI_TEST_FABRIC01; ACTIVE_JAR_SHA256_MATCH
+H5_CURRENT_MINECRAFT_RUNTIME_STATUS: PLAYER_POSITION_BATCH_REGISTRATION_LIVE_VERIFIED; PARTIAL_ACCEPTANCE
+H5_CURRENT_COMMIT_PUSH_STATUS: NOT_PERFORMED_AT_DOCUMENT_SNAPSHOT
+H5_CURRENT_BATCH_COMMAND_EXECUTION: LIVE_UPDATED_AT_2026-09-04_21:32:57_KST; SCANNED_4096; PHYSICAL_44; LOGICAL_22; NEW_9; EXISTING_13; REVISION_1_TO_2; REGISTRY_13_TO_22
+H5_PLAYER_POSITION_ANCHOR_STATUS: IMPLEMENTED; TESTED; BUILT; DEPLOYED; RUNTIME_OBSERVED
+H5_OPEN_RUNTIME_ACCEPTANCE: NO_CHANGE_RERUN + PLAYER_MOVE_RANGE_SHIFT + EXPLICIT_EDGE_TESTS + NEWLY_ADDED_DESTINATION_SELECTION NOT_RUN
 ```
 
-현재 `AutoDepositTrustCommand`는 argument가 선언되지 않은 기존 단일 등록 command이고
-`call(...)`에서 `ArgParser`를 읽지 않는다. 현재 upstream `Command.run(...)`과 `ArgParser`는
-handler가 소비하지 않은 trailing argument를 call 뒤 자동 거절하지 않는다. 따라서 현재 source에서
-`@auto_deposit_trust area 16x16` 또는 유사 form을 실행하면 batch parser failure가 아니라 기존
-exact-open/crosshair 단일 등록 경로가 실행될 수 있다.
+2026-09-02 review snapshot의 `AutoDepositTrustCommand`는 `ArgParser`를 읽지 않는 기존 단일 등록
+command였고, trailing argument가 기존 exact-open/crosshair 단일 등록 경로로 떨어질 수 있었다.
+이 설명은 위의 dated snapshot 상태이며 현재 source 상태가 아니다.
 
-H5가 구현되기 전에는 아래 네 batch form을 실행하지 않는다. 구현 뒤에도 malformed, unsupported 또는
-extra argument가 기존 무인자 single-registration 경로로 fallback하는 순간 H5 acceptance는 실패다.
-이 parser 결함을 고치기 위해 `adris/**` command system을 변경하지 않고 LAVI-owned command 경계에서
-fail closed한다.
+2026-09-04 19:03 KST에 검증된 pre-player-position crosshair baseline source는 LAVI-owned
+exact-form parser와 별도 Korean batch-only Command 객체를 연결했다. 무인자 English form만 기존
+단일 등록으로 유지하고, 승인된 네 batch form만 bulk service로 보내며 malformed, unsupported,
+mixed 또는 extra argument는 single/bulk operation 호출 전에 fail closed했다. `adris/**` command
+system은 변경하지 않았다. 당시 parser, command dispatch, crosshair safety, loaded scan,
+double-chest topology, strict repository transaction, 65+ 등록, bounded result와 next-tick revision
+재평가를 deterministic tests로 검증했다. 당시 clean build가 생성한 1.20.1 JAR은 8,101,548
+bytes이고 SHA-256은 `3DF3582702C28A35BD83E5AACA82B945A060CE00988E89C800538444FF49612F`다.
+
+같은 SHA-256의 JAR이 `LAVI_TEST_Fabric01` active instance에 배포된 상태로 2026-09-04
+18:51:28 KST launch됐다. 19:03:22 KST crosshair baseline batch는 4096 positions를 complete scan하고
+logical destination 9개 중 신규 6개, 기존 3개를 판정해 repository revision `1 -> 2`, total registry
+`7 -> 13`으로 `UPDATED`됐다. 19:03:36 KST 별도 invocation은 crosshair anchor가 없어 scan 0,
+registry read 0과 mutation 0으로 `INVALID_ANCHOR` fail closed했고, 이후 list도 13개를 유지했다.
+19:11:01 KST에는 신규 등록 destination 하나를 별도 manual `store_home` operation이 사용해 171 items를
+보관 완료했다. 이는 player-position 변경 전 crosshair implementation의 dated runtime baseline이며
+현재 player-position source, build 또는 runtime 상태로 인용하지 않는다.
+
+현재 player-position implementation은 1.20.1의 707 tests와 전체 11개 configured-version test task,
+그리고 171/171 clean forced build를 통과했다. 생성된 1.20.1 JAR은 8,112,941 bytes이고 SHA-256은
+`24DD4C8DEBA968D0206CA3D68A227C57D513E55769F1BB51F5943F549989CC27`이다.
+`LAVI_TEST_Fabric01` active JAR과 이 hash가 일치한다.
+
+2026-09-04 21:32:57 KST runtime의 `@auto_deposit_trust area 16x16`은
+`anchorSource=PLAYER_BLOCK_POSITION`, `anchorPos=-743,69,65`, `coverageComplete=true`,
+`scannedPositionCount=4096`, `physicalSupportedBlockCount=44`, `logicalDestinationCount=22`,
+`newlyRegisteredCount=9`, `alreadyRegisteredCount=13`, repository revision `1 -> 2`와 total registry
+`13 -> 22`의 `UPDATED`로 종료됐다. 이는 player-position batch registration의 live evidence다.
+이후 `store_home`은 기존 13개 중 하나를 선택했으므로 신규 9개 중 하나의 downstream 선택을
+증명하지 않는다. 반복 `NO_CHANGE`, 이동 후 anchor 변경과 명시적 edge runtime test도 아직 실행하지
+않았다.
 
 ### 13.2 exact command grammar와 alias 경계
 
@@ -865,7 +905,7 @@ H5 구현으로 자동 추가하지 않는다.
 
 정상적인 H5 command registration 뒤에는 기존 English trust/untrust/list 세 이름과 Korean batch-only
 direct alias `자동보관등록` 한 이름, 총 네 trusted command name이 존재한다. English와 Korean command instance는
-mutable parser/onFinish state를 공유하지 않고 pure H5 batch service만 공유한다. Korean alias name이 이미
+mutable parser/onFinish state를 공유하지 않고 같은 stateless H5 batch operation instance만 공유한다. Korean alias name이 이미
 사용 중이면 existing command를 overwrite하지 않고 alias readiness를 명시적 failure로 남긴다. 이 충돌을
 이유로 기존 English trust/untrust/list registration을 제거하거나 막지 않으며, 반대로
 `CommandExecutor.registerNewCommand(...)`의 skip-and-continue만 믿고 Korean alias도 등록됐다고 false
@@ -873,8 +913,11 @@ success를 보고하지 않는다.
 
 ### 13.3 anchor, fixed half-open volume와 loaded coverage
 
-기존 §13의 H5 anchor 의미를 유지한다. H5 anchor는 player position이나 exact-open binding이 아니라
-사용자가 현재 crosshair로 바라본 exact block target이다.
+아래 crosshair 조건은 2026-09-04 pre-player-position source/runtime baseline이다. 현재 batch
+구현에는 이 조건을 적용하지 않으며 역사 provenance로만 보존한다.
+
+당시 §13의 H5 anchor는 player position이나 exact-open binding이 아니라 사용자가 crosshair로 바라본
+exact block target이었다.
 
 ```text
 1. existing crosshair distance/screen safety boundary 안의 current BlockHitResult가 anchor 후보
@@ -883,11 +926,21 @@ success를 보고하지 않는다.
 4. anchor가 없거나 world/dimension identity가 불완전하면 repository mutation 0
 ```
 
+현재 player-position batch 규칙은 다음과 같다.
+
+```text
+1. 명령 시작 시 player feet getBlockPos()를 유일한 batch anchor로 획득
+2. anchor block 자체는 supported container일 필요가 없음
+3. batch anchor 획득에는 crosshair, exact-open binding 또는 screen state를 사용하지 않음
+4. commit 전에 같은 player identity, world provenance와 player BlockPos를 재검증
+5. 무인자 English single-registration의 exact-open/crosshair 계약은 그대로 유지
+```
+
 무인자 `@auto_deposit_trust`는 기존처럼 exact-open binding을 우선하고 없으면 crosshair target을 쓰는
-single-registration 의미와 기존 support predicate를 그대로 유지한다. H5 argument branch만 looked-at
-anchor와 더 좁은 exact allowlist를 사용한다. 따라서 batch 구현을 이유로 existing no-arg target
-precedence나 supported-container 종류를 바꾸지 않고, 반대로 stale/open binding을 H5 area 중심으로
-조용히 사용하는 일도 없다.
+single-registration 의미와 기존 support predicate를 그대로 유지한다. 현재 H5 batch argument branch는
+player anchor와 exact batch allowlist를 사용한다. 따라서 batch 구현을 이유로 existing no-arg target
+precedence나 supported-container 종류를 바꾸지 않고, stale/open binding 또는 looked-at block을 H5
+area 중심으로 조용히 사용하는 일도 없다.
 
 Anchor의 `(anchorX, anchorY, anchorZ)`를 한 번 snapshot한 뒤 다음 half-open 범위를 사용한다.
 
@@ -1077,7 +1130,7 @@ downstreamAutomaticReevaluationPossible
 Exact before/after destination set이 필요한 runtime fixture는 별도 승인된 read-only list/repository evidence로
 검증한다.
 
-향후 source-edit와 test-execution이 각각 별도 승인된 뒤 최소 acceptance는 다음이다.
+현재 구현의 deterministic acceptance와 남은 live acceptance는 다음과 같다.
 
 1. 무인자 English command의 기존 single target 의미와 기존 supported-container 범위가 변하지 않는다.
 2. 네 batch form만 정확히 승인되고 malformed/extra/unsupported argument는 mutation 0이며 single fallback 0이다.
@@ -1085,7 +1138,8 @@ Exact before/after destination set이 필요한 runtime fixture는 별도 승인
    Korean alias collision은 overwrite/false-ready 0으로 실패하되 기존 English 세 command는 보존하고,
    English/Korean command instance의 mutable parser/onFinish 공유는 0이다.
 4. Direct Korean batch-only alias는 Java command registry에만 존재하고 Python chat/microphone route 변화는 0이다.
-5. H5는 looked-at crosshair anchor만 사용하고 exact-open/nearest/player-position fallback은 0이다.
+5. H5 batch는 player feet `BlockPos`만 anchor로 사용하고 crosshair/exact-open/nearest fallback은
+   0이다. 무인자 English single-registration만 기존 exact-open/crosshair precedence를 유지한다.
 6. negative coordinate, half-open high edge와 world build-height 교집합이 exact range와 일치한다.
 7. incomplete chunk coverage, world/dimension change와 invalid anchor는 scan subset을 commit하지 않는다.
 8. chest, trapped chest, barrel은 포함되고 shulker, ender chest, entity/processing/modded container는 제외된다.
@@ -1101,10 +1155,10 @@ Exact before/after destination set이 필요한 runtime fixture는 별도 승인
 14. command handler의 Task/path/click/input call 0을 deterministic seam으로 검증하고, revision 변경 뒤
     automatic chain reevaluation은 별도 next-tick lifecycle test로 구분한다.
 
-2026-09-02 문서 snapshot에는 test source나 test/build/runtime 실행이 없었다. 현재 dirty
-worktree의 독립 H5 Java/test source는 이 절의 acceptance를 통과했다고 검수되지 않았고, 관련
-clean build/runtime 증거도 이 문서에 없다. 위 항목은 여전히 acceptance contract이며 현재 구현
-완료 증거가 아니다.
+2026-09-02 문서 snapshot에는 test source나 test/build/runtime 실행이 없었다. 이후 current
+player-position implementation은 §13.1의 deterministic tests, clean build, active-instance
+deployment와 한 번의 live `UPDATED` registration evidence를 확보했다. 반복 `NO_CHANGE`, player
+이동에 따른 range 변경, 명시적 edge와 신규 등록 destination 선택은 open runtime acceptance로 남는다.
 
 ### 13.8 bulk undo/untrust UX
 
@@ -1648,8 +1702,9 @@ GUI stabilization source/test/required clean build에는 문서 서두의 contin
 H1-H4 source, focused tests와 H7의
 clean build/JAR 배포/단일 destination happy path 검증은 별도 승인에 따라 완료됐다.
 H5와 H6는 H4/H7의 완료 조건에 포함하지 않는다. H5 pre-change 계약은 13절에서
-2026-09-02 docs-only로 보강됐다. 현재 dirty worktree에는 별도 H5 Java/test source가 존재하지만
-이 문서에서 검증된 H5 구현이나 build/runtime 완료로 승격하지 않는다. H6 방향은 24절에서 승인됐고,
+2026-09-02 docs-only로 보강됐다. 당시 별도 H5 Java/test source는 이 문서만으로 검증된 구현이나
+build/runtime 완료로 승격하지 않았다. 이후 player-position 구현과 검증 상태는 §13.1이 소유한다.
+H6 방향은 24절에서 승인됐고,
 이후 별도 사용자 승인에 따라 Python natural-language source와 LAVI-owned typed
 terminal projection source가 현재 worktree에 구현됐다. 이 source 승인은 clean build,
 runtime reproduction, public enable, commit 또는 push를 승인하지 않는다.
@@ -1665,7 +1720,8 @@ clean build, 배포와 runtime reproduction을 승인하지 않는다.
 아래 표의 build/test/JAR 수치는 2026-08-29 core/runtime artifact에 2026-09-02 H5 docs-only
 qualifier를 덧붙인 역사적 snapshot이다. 이 표의 `243 TESTS`와 direct-test `NOT IMPLEMENTED`를
 현재 최신 수치로 읽지 않는다. 이후 direct gates와 최신 기록 build는 §26.14의 `254 tests`가
-대체하며, 현재 dirty H5 source와 향후 GUI-gate source는 어느 역사적 artifact로도 검증되지 않았다.
+대체한다. 현재 player-position H5 source/test/build/deployment/runtime evidence는 §13.1이 별도로
+소유하며 이 역사적 artifact로 검증됐다고 주장하지 않는다.
 
 ```text
 exact trusted destination repository:            IMPLEMENTED; RUNTIME REGISTRY OBSERVED
@@ -1676,7 +1732,7 @@ manual StoreHomeTask:                             IMPLEMENTED; TWO COMPLETED OPE
 exact-slot manifest and executor:                 IMPLEMENTED; PAIRED DELTA VERIFIED
 operation-wide early manifest lifetime:           HISTORICAL DEPLOYED BASELINE STRUCTURE
 trusted-container-session-local manifest:         CLEAN BUILD/DEPLOY + ACTIVATION/PAIRED-DELTA RUNTIME VERIFIED
-H5 fixed-volume batch registration:               2026-09-02 DIRECTION REVIEWED; CURRENT DIRTY JAVA/TEST SOURCE PRESENT; UNVERIFIED; EXECUTION PROHIBITED
+H5 player-position batch registration:            SOURCE + FULL MULTI-VERSION TEST + CLEAN BUILD/DEPLOYMENT + LIVE UPDATED REGISTRATION VERIFIED; PARTIAL RUNTIME MATRIX OPEN; SEE SECTION 13.1
 chat/microphone STORE_HOME adapters:              SOURCE IMPLEMENTED; PUBLIC LIVE VALIDATION ENABLED
 STORE_HOME Python intent/compiler/registry:        IMPLEMENTED; STORE_HOME CONTRACTS PASS; deposit_all CATALOG/REGISTRY PARITY BLOCKED
 typed StoreHomeResult bridge projection:          BUILD/JUNIT AND CHAT RUNTIME VERIFIED

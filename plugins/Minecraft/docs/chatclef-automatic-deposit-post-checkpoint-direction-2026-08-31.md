@@ -7,6 +7,8 @@
 <!-- 20260902_openai: Tightened the still-unimplemented H5 bulk-trust safety boundary around fail-closed parsing, exact fixture ownership, no harness submission, and downstream revision-triggered automatic reevaluation. -->
 <!-- 20260903_kpopmodder: Applied the canonical GUI-gate continuous implementation, bounded-log, and verification workflow while preserving historical checkpoint approvals. -->
 <!-- 20260903_openai: Aligned the automatic storage GUI boundary with one-shot interaction correlation, safe open-child quiescence, exact route types, explicit tick serials, full-path suppression, and one-time permission; recorded independent dirty H5 provenance. -->
+<!-- 20260904_kpopmodder: Recorded the verified H5 crosshair source/test/build/deployment/runtime baseline and separated the docs-only player-position follow-up; commit and push remain open. -->
+<!-- 20260904_kpopmodder: Recorded the current H5 player-position source/test/build/deployment and partial runtime registration evidence while retaining the earlier crosshair baseline as historical provenance. -->
 
 # ChatClef Automatic Deposit Post-Checkpoint Work Separation Direction
 
@@ -35,10 +37,10 @@ commit 또는 push를 자동 승인하지 않는다.
 아래 fenced status block의 checkpoint, Stage, `380 PASSED`, harness `NOT_IMPLEMENTED` 값은
 2026-08-31 역사 snapshot이다. 현재 test/build/harness evidence로 인용하지 않는다. 이후 상태는
 §15의 implementation/build delta와 §16.4의 2026-09-01 live evidence delta가 소유한다. 단,
-아래 H5 current-worktree와 future mixed-provenance row는 2026-09-03에 추가한 현재 qualifier다.
+아래 H5 current-worktree row는 2026-09-04 player-position 구현·검증까지 갱신된 current qualifier다.
 
 ```text
-STATUS_BLOCK_CLASSIFICATION: HISTORICAL_2026_08_31_CHECKPOINT_SNAPSHOT_WITH_2026_09_03_H5_QUALIFIERS
+STATUS_BLOCK_CLASSIFICATION: HISTORICAL_2026_08_31_CHECKPOINT_SNAPSHOT_WITH_2026_09_04_H5_PLAYER_POSITION_DELTA
 LATEST_TEST_BUILD_HARNESS_EVIDENCE_POINTER: SECTION_15_AND_SECTION_16_4
 DOCUMENT_STATUS: DIRECTION_AND_PRECHANGE_CONTRACT
 EXTERNAL_REVIEW_RESULT: PASS_FOR_STAGE_1_PRECHANGE_CONTRACT_AFTER_HARNESS_BOUNDARY_CORRECTIONS
@@ -64,12 +66,18 @@ PYTHON_RUNTIME_HARNESS_IMPLEMENTATION_GATE: PHASED; HERMETIC CORE AFTER STAGE_1;
 RELEASE_READY: NO
 
 H5_BULK_TRUST_DOCUMENT_SNAPSHOT: DIRECTION_ONLY; SOURCE_NOT_STARTED_AT_2026-09-02_REVIEW
-H5_CURRENT_WORKTREE_STATUS: INDEPENDENT_MODIFIED_AND_UNTRACKED_JAVA_TEST_SOURCE_PRESENT; UNVERIFIED_BY_THIS_DOCUMENT
 H5_2026_09_02_AREA_COMMAND_BEHAVIOR: TRAILING_ARGUMENTS_NOT_FAIL_CLOSED; MAY_EXECUTE EXISTING SINGLE REGISTRATION
-H5_CURRENT_AREA_COMMAND_BEHAVIOR: UNVERIFIED_DIRTY_WORKTREE; DO NOT INFER FROM DOCUMENT SNAPSHOT
-H5_BATCH_COMMAND_EXECUTION: PROHIBITED_UNTIL CURRENT DIRTY SOURCE IS AUDITED + DETERMINISTIC TEST EVIDENCE
-H5_CURRENT_BUILD_RUNTIME_COMMIT_PUSH_EVIDENCE: NOT ESTABLISHED BY THIS DOCUMENT
-FUTURE_RUNTIME_ROOT_CLEAN_BUILD_PROVENANCE: MIXED_H5_AND_GUI_WHILE_BOTH_DIRTY_CHANGE_SETS_REMAIN
+H5_CURRENT_SOURCE_STATUS: PLAYER_BLOCK_POSITION_IMPLEMENTED_IN_CURRENT_WORKTREE; EXACT_FORMS_FAIL_CLOSED
+H5_CURRENT_DETERMINISTIC_TEST_STATUS: PASS; 1.20.1=707 TESTS; 0 FAILURES; 0 ERRORS; 1 EXISTING SKIPPED; ALL 11 CONFIGURED VERSION TEST TASKS PASSED
+H5_CURRENT_FOCUSED_TEST_STATUS: INCLUDED_IN_FULL_SUITE; SEPARATE_CURRENT_FOCUSED_COUNT_NOT_RECORDED
+H5_CURRENT_CLEAN_FORCED_BUILD_STATUS: PASS; 171 OF 171 ACTIONABLE TASKS EXECUTED
+H5_CURRENT_1_20_1_ARTIFACT_SHA256: 24DD4C8DEBA968D0206CA3D68A227C57D513E55769F1BB51F5943F549989CC27
+H5_CURRENT_DEPLOYMENT_STATUS: VERIFIED_IN_LAVI_TEST_FABRIC01; ACTIVE_JAR_SHA256_MATCH
+H5_CURRENT_MINECRAFT_RUNTIME_STATUS: PLAYER_POSITION_BATCH_REGISTRATION_LIVE_VERIFIED; PARTIAL_ACCEPTANCE
+H5_CURRENT_COMMIT_PUSH_STATUS: NOT_PERFORMED_AT_DOCUMENT_SNAPSHOT
+H5_BATCH_COMMAND_EXECUTION: LIVE_UPDATED_AT_2026-09-04_21:32:57_KST; SCANNED_4096; PHYSICAL_44; LOGICAL_22; NEW_9; EXISTING_13; REVISION_1_TO_2; REGISTRY_13_TO_22
+H5_PLAYER_POSITION_ANCHOR_STATUS: IMPLEMENTED; TESTED; BUILT; DEPLOYED; RUNTIME_OBSERVED
+H5_OPEN_RUNTIME_ACCEPTANCE: NO_CHANGE_RERUN + PLAYER_MOVE_RANGE_SHIFT + EXPLICIT_EDGE_TESTS + NEWLY_ADDED_DESTINATION_SELECTION NOT_RUN
 
 MARKDOWN_DOCUMENTATION: AUTHORIZED_FOR_THIS_TASK
 AUTHORIZATION_ROWS_CLASSIFICATION: HISTORICAL_CHECKPOINT_PROVENANCE; NOT_A_CURRENT_GUI_GATE
@@ -1848,16 +1856,44 @@ verification도 exact route proof와 별도 승인 없이는 Python이 제출하
 
 H5 `@auto_deposit_trust area 16x16`, `@auto_deposit_trust 반경 16x16`,
 `@자동보관등록 영역 16x16`, `@자동보관등록 반경 16x16`도 mutating fixture setup으로 분류한다.
-2026-09-02 문서 snapshot에서는 direction만 있고 source가 구현되지 않았다. 현재 dirty worktree에는
-이 문서와 독립적인 modified/untracked H5 Java/test source가 존재하므로 그 snapshot을 current source
-사실로 읽지 않는다. 해당 dirty source는 이 문서 보정에서 검수·승인·검증하지 않고 보존한다.
-그 snapshot의 zero-argument trust handler와 upstream argument handling은 trailing argument를 fail
-closed하지 않아 English form이 기존 single registration으로 떨어질 수 있었고, Korean form은 당시
-command registry에 없었다.
-Deterministic parser/repository evidence가 이 exact worktree에 결합되기 전에는 operator와 Python
-harness 모두 네 form을 실행하거나 setup allowlist에 넣지 않는다. 이후 runtime-root clean build는
-H5와 GUI change set을 함께 포함하므로 exact dirty input과 resulting artifact hash를 기록하고,
-GUI-only 또는 H5-only verification으로 과장하지 않는다.
+2026-09-02 문서 snapshot에서는 direction만 있고 source가 구현되지 않았다. 그 snapshot의
+zero-argument trust handler는 trailing argument를 fail closed하지 않아 English form이 기존 single
+registration으로 떨어질 수 있었고, Korean form은 당시 command registry에 없었다. 이는 dated
+historical baseline이며 현재 source 상태가 아니다.
+
+2026-09-04 19:03 KST에 검증된 pre-player-position crosshair baseline source에는 exact
+English/Korean grammar, crosshair-only anchor, loaded-only fixed volume scan, exact batch allowlist,
+reciprocal double-chest normalization, strict one-transaction repository mutation, bounded result와
+next-tick automatic-pressure revision observation이 연결되어 있었다. 당시 H5 focused tests 66개와
+전체 1.20.1 tests 684개가 통과했다. 당시 clean forced build도 171/171 actionable tasks 실행으로
+통과했고, 생성된 1.20.1 JAR SHA-256은
+`3DF3582702C28A35BD83E5AACA82B945A060CE00988E89C800538444FF49612F`다. 첫 시도의 1.18.2
+실패는 `TitleScreen` 생성자가 headless 환경에서 null `MinecraftClient`를 참조한 test-fixture
+결함이었고, production selector 실행 전의 실패였다. 기존 `TestObjects.allocate` fixture로 바꾼 뒤
+전체 multi-version build가 통과했다.
+
+같은 SHA-256의 JAR은 `LAVI_TEST_Fabric01`에서 2026-09-04 18:51:28 KST launch됐고, 19:03:22 KST
+crosshair baseline batch가 4096 positions complete scan, 신규 6개와 기존 3개, revision `1 -> 2`,
+registry `7 -> 13`으로 `UPDATED`됐다. 별도 19:03:36 invocation은 unavailable crosshair anchor에서
+scan/repository mutation 0의 `INVALID_ANCHOR`로 fail closed했고 list는 13개를 유지했다. 이후 신규
+destination 하나를 manual `store_home`이 사용해 171 items를 보관했다. 이는 player-position 변경 전
+crosshair baseline의 dated deployment/runtime evidence다. 현재 player-position source, build 또는
+runtime 상태로 인용하지 않는다.
+
+현재 player-position implementation은 1.20.1의 707 tests와 전체 11개 configured-version test task,
+그리고 171/171 clean forced build를 통과했다. 생성된 1.20.1 JAR은 8,112,941 bytes이고 SHA-256은
+`24DD4C8DEBA968D0206CA3D68A227C57D513E55769F1BB51F5943F549989CC27`이다.
+`LAVI_TEST_Fabric01` active JAR과 이 hash가 일치한다.
+
+2026-09-04 21:32:57 KST runtime에서 `@auto_deposit_trust area 16x16`은
+`anchorSource=PLAYER_BLOCK_POSITION`, `anchorPos=-743,69,65`, `coverageComplete=true`,
+`scannedPositionCount=4096`, `physicalSupportedBlockCount=44`, `logicalDestinationCount=22`,
+`newlyRegisteredCount=9`, `alreadyRegisteredCount=13`, `repositoryRevisionBefore=1`,
+`repositoryRevisionAfter=2`, `totalRegistryCountBefore=13`, `totalRegistryCountAfter=22`의
+`UPDATED`로 종료됐다. 이는 player-position batch registration의 live evidence다.
+`downstreamAutomaticReevaluationPossible=true`는 실제 automatic deposit 실행 증거가 아니며, 반복
+`NO_CHANGE`, 이동 후 anchor 변경, 명시적 경계 테스트와 신규 등록 destination 선택은 아직 실행하지
+않았다. Operator/harness setup allowlist 승격도 계속 별도 runtime evidence gate로 남는다.
 
 구현된 뒤에도 broad batch는 R5/R8의 exact fixture 준비를 자동으로 대체하지 않는다. Setup manifest는
 command 전후의 전체 exact destination set, double-chest logical dedupe, excluded-container registration 0건,
@@ -1877,6 +1913,11 @@ grammar, fixed half-open volume, exact block allowlist, double-chest identity, a
 mutation과 deferred bulk undo 계약은
 [ChatClef Manual Trusted Home Storage Direction §13](chatclef-manual-trusted-home-storage-direction-2026-08-27.md#13-trusted-등록-ux와-json)이
 소유한다.
+
+현재 player-position batch anchor, scanner precondition, result field와 empty-volume result의 scoped
+override는 [H5 Player-Position Anchor Implementation Contract and Verification Record](chatclef-h5-player-position-anchor-pre-change-contract-2026-09-04.md)가
+소유한다. Java source는 `PLAYER_BLOCK_POSITION`을 사용하며 test/build/deployment와 한 번의 live
+registration이 확인됐다. 남은 runtime matrix는 해당 문서의 open acceptance로 유지한다.
 
 Harness가 허용되는 역할은 다음으로 제한한다.
 
