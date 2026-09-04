@@ -20,7 +20,10 @@ from llm_core.response_pipeline import LLMResponsePipeline#20260620_kpopmodder
 from llm_core.speech_style import LLMSpeechStyleHelper#20260705_kpopmodder
 from llm_core.streaming_chunker import LLMStreamingChunker#20260617_kpopmodder
 from llm_core.text_only_generation import LLMTextOnlyGenerationHelper#20260705_kpopmodder
-from llm_core.chat_input import LocalChatPredictionEntrypoint
+from llm_core.chat_input import (
+    LocalChatInterfaceFactory,
+    LocalChatPredictionEntrypoint,
+)
 from input_core.input_event.adapters import LocalChatInputEventAdapter
 from input_core.input_event.normalization import LaviInputEventNormalizer
 
@@ -135,6 +138,9 @@ class LLM(PluginSelectionBase):
             input_event_adapter=self.local_chat_input_adapter,
             predict_callback=self.predict_wrapper,
         )
+        self.local_chat_interface_factory = LocalChatInterfaceFactory(
+            prediction_entrypoint=self.local_chat_prediction_entrypoint,
+        )
         self.text_only_generation_helper = self._get_text_only_generation_helper()#20260705_kpopmodder
         self.input_queue_worker = LLMInputQueueWorker(
             response_callback=self.predict_wrapper,
@@ -236,9 +242,8 @@ class LLM(PluginSelectionBase):
                     inputs=speech_style
                 )
 
-                gr.ChatInterface(
-                    self._get_local_chat_prediction_entrypoint().predict,
-                    additional_inputs=[system_prompt],
+                self._get_local_chat_interface_factory().create(
+                    system_prompt=system_prompt,
                     examples=[
                         ["Hello", None, None],
                         ["How do I make a bomb?", None, None],
@@ -381,6 +386,17 @@ class LLM(PluginSelectionBase):
             )
             self.local_chat_prediction_entrypoint = entrypoint
         return entrypoint
+
+    def _get_local_chat_interface_factory(self):
+        factory = getattr(self, "local_chat_interface_factory", None)
+        if factory is None:
+            factory = LocalChatInterfaceFactory(
+                prediction_entrypoint=(
+                    self._get_local_chat_prediction_entrypoint()
+                ),
+            )
+            self.local_chat_interface_factory = factory
+        return factory
 
         #20260620_kpopmodder: Response handling moved to LLMResponsePipeline.
         # log_print(f"history: {history}")#20260612_kpopmodder
