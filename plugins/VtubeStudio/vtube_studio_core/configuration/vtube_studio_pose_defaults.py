@@ -1,0 +1,78 @@
+#20260904_kpopmodder: Keep VTube Studio pose defaults separate from file I/O and validation.
+#20260707_kpopmodder: Keep speaking pose tuning in JSON so VTube Studio values can be adjusted without code edits.
+
+DEFAULT_SPEAKING_POSE_CONFIG = {
+    "eye_open": 0.5,
+    "face_angle_x": -3.0,
+    "face_angle_y": -6.0,
+    "face_angle_z": -4.0,
+    "eye_ball_x": 0.35,
+    "eye_ball_y": -0.35,
+    "mouth_smile": 0.0,
+    "reset_eye_open": 0.5,
+    "reset_face_angle_x": 0.0,
+    "reset_face_angle_y": 0.0,
+    "reset_face_angle_z": 0.0,
+    "reset_eye_ball_x": 0.0,
+    "reset_eye_ball_y": 0.0,
+    "reset_mouth_smile": 1.0,
+    "mouth_threshold": 0.04,
+    "release_hold_sec": 0.15,
+    "refresh_interval_sec": 0.05,
+}
+
+SPEAKING_POSE_CONFIG_RANGES = {
+    "eye_open": (0.0, 1.0),
+    "face_angle_x": (-30.0, 30.0),
+    "face_angle_y": (-30.0, 30.0),
+    "face_angle_z": (-30.0, 30.0),
+    "eye_ball_x": (-1.0, 1.0),
+    "eye_ball_y": (-1.0, 1.0),
+    "mouth_smile": (0.0, 1.0),
+    "reset_eye_open": (0.0, 1.0),
+    "reset_face_angle_x": (-30.0, 30.0),
+    "reset_face_angle_y": (-30.0, 30.0),
+    "reset_face_angle_z": (-30.0, 30.0),
+    "reset_eye_ball_x": (-1.0, 1.0),
+    "reset_eye_ball_y": (-1.0, 1.0),
+    "reset_mouth_smile": (0.0, 1.0),
+    "mouth_threshold": (0.0, 1.0),
+    "release_hold_sec": (0.0, 5.0),
+    "refresh_interval_sec": (0.01, 1.0),
+}
+
+DEFAULT_IDLE_POSE_CONFIG = {
+    "eye_open": 0.52,
+    "face_angle_x": 0.0,
+    "face_angle_y": 0.0,
+    "face_angle_z": 0.0,
+    "eye_ball_x": 0.0,
+    "eye_ball_y": 0.0,
+    "mouth_smile": 1.0,
+    "reset_eye_open": 0.52,
+    "reset_face_angle_x": 0.0,
+    "reset_face_angle_y": 0.0,
+    "reset_face_angle_z": 0.0,
+    "reset_eye_ball_x": 0.0,
+    "reset_eye_ball_y": 0.0,
+    "reset_mouth_smile": 1.0,
+    "refresh_interval_sec": 0.05,
+}
+
+IDLE_POSE_CONFIG_RANGES = {
+    "eye_open": (0.0, 1.0),
+    "face_angle_x": (-30.0, 30.0),
+    "face_angle_y": (-30.0, 30.0),
+    "face_angle_z": (-30.0, 30.0),
+    "eye_ball_x": (-1.0, 1.0),
+    "eye_ball_y": (-1.0, 1.0),
+    "mouth_smile": (0.0, 1.0),
+    "reset_eye_open": (0.0, 1.0),
+    "reset_face_angle_x": (-30.0, 30.0),
+    "reset_face_angle_y": (-30.0, 30.0),
+    "reset_face_angle_z": (-30.0, 30.0),
+    "reset_eye_ball_x": (-1.0, 1.0),
+    "reset_eye_ball_y": (-1.0, 1.0),
+    "reset_mouth_smile": (0.0, 1.0),
+    "refresh_interval_sec": (0.01, 1.0),
+}

@@ -10,13 +10,13 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from plugin_system.interfaces import VtuberPluginInterface
 from plugins.VtubeStudio.VtubeStudio import VtubeStudio
-from plugins.VtubeStudio.vtube_studio_core.vtube_studio_auth_manager import (
+from plugins.VtubeStudio.vtube_studio_core.authentication import (
     VTubeStudioAuthManager,
 )
 from plugins.VtubeStudio.vtube_studio_core.vtube_studio_blink_controller import (
     VTubeStudioBlinkController,
 )
-from plugins.VtubeStudio.vtube_studio_core.vtube_studio_mouth_controller import (
+from plugins.VtubeStudio.vtube_studio_core.controllers.mouth import (
     VTubeStudioMouthController,
 )
 from plugins.VtubeStudio.vtube_studio_core.vtube_studio_smile_controller import (

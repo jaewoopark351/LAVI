@@ -1235,9 +1235,10 @@ class PluginSystemImportTests(unittest.TestCase):
         )
         self.assertEqual("VtubeStudio", vtube_handle.descriptor.id)
         self.assertIn("websocket", vtube_handle.descriptor.required_python_packages)
-        self.assertIn(
-            "VTube Studio websocket ws://localhost:8001",
-            vtube_handle.descriptor.required_services,
+        self.assertEqual((), vtube_handle.descriptor.required_services)
+        self.assertEqual(
+            "ws://localhost:8001",
+            vtube_handle.descriptor.config_schema["service"]["websocket_url"],
         )
         self.assertNotIn(voice_module, sys.modules)
         self.assertNotIn(vtube_module, sys.modules)
@@ -1519,7 +1520,7 @@ class PluginSystemImportTests(unittest.TestCase):
         self.assertEqual("required_service_unavailable", handle.diagnostic.reason_code)
         self.assertEqual(["microphone_input_device"], list(handle.diagnostic.missing_services))
 
-    def test_p1a_vtube_studio_missing_websocket_is_unavailable(self):#20260716_kpopmodder
+    def test_declared_required_local_service_remains_fail_closed(self):#20260716_kpopmodder
         from plugin_system.loader import PluginLoader, PluginState
 
         with tempfile.TemporaryDirectory() as temp_dir:

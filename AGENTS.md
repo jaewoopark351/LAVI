@@ -2668,6 +2668,26 @@ When modifying audio device code, preserve fallback to default device.
 
 VTube Studio integration must remain stable.
 
+Required companion lifecycle document:
+
+[VTube Studio Connection Lifecycle](docs/VTubeSTudio/vtube-studio-connection-lifecycle.md)
+
+<!-- 20260904_kpopmodder: Preserve delayed VTube Studio startup and runtime reconnect behavior. -->
+
+The VTube Studio Plugin API endpoint at `ws://localhost:8001` is a
+runtime-reconnectable service, not a provider startup dependency. A closed or
+not-yet-ready port must not prevent LAVI or the `VtubeStudio` provider from
+initializing. Keep the `websocket` Python package as a static dependency, keep
+the endpoint in plugin configuration, and let the connection instance own the
+single worker, three-second retry wait, socket generation, and bounded
+shutdown. Do not weaken the shared plugin availability policy to implement
+this VTube Studio-specific lifecycle.
+
+On Windows, preserve the configured `localhost` endpoint but connect its local
+transport through IPv4 loopback. VTube Studio can listen only on IPv4 while
+`localhost` resolves to `::1` first, and a bounded IPv6 timeout must not prevent
+the same attempt from reaching `127.0.0.1`.
+
 Be careful with:
 
 * token authentication

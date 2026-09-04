@@ -73,6 +73,7 @@ venv/
 .venv/
 
 token.txt
+plugins/VtubeStudio/.vtube-token-*.tmp
 *.gguf
 plugins/Korea_Chat_GGUF/models/
 
