@@ -29,4 +29,4 @@ class LocalChatInterfaceFactory:
         )
 
 
-__all__ = ["LocalChatInterfaceFactory"]
+__all__ = ("LocalChatInterfaceFactory",)

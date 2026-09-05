@@ -57,6 +57,12 @@ class LLMSpeechStyleTests(unittest.TestCase):
         self.assertEqual("casual", llm.normalize_speech_style("반말"))
         self.assertEqual("polite", llm.normalize_speech_style("존댓말"))
 
+    def test_facade_speech_style_maps_are_immutable(self):
+        with self.assertRaises(TypeError):
+            LLM.speech_style_labels["polite"] = "changed"
+        with self.assertRaises(TypeError):
+            LLM.speech_style_prompts["polite"] = "changed"
+
     def test_game_reaction_prompt_uses_selected_speech_style(self):
         polite_prompt = build_game_reaction_system_prompt("base", "polite")
         casual_prompt = build_game_reaction_system_prompt("base", "casual")

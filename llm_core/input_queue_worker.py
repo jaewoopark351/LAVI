@@ -1,8 +1,9 @@
 #20260621_kpopmodder: Queue worker keeps structured LLM inputs so ScreenVision events can skip chat history.
-from queue import Queue, Empty
-import threading
+#20260905_kpopmodder: Preserve the LLM input queue worker compatibility facade.
 
-from llm_core.input_queue_runtime import LLMInputQueueRuntime
+from llm_core.input_queue.llm_input_queue_worker_component_graph import (
+    LlmInputQueueWorkerComponentGraph,
+)
 
 
 class LLMInputQueueWorker:#20260621_kpopmodder
@@ -12,21 +13,57 @@ class LLMInputQueueWorker:#20260621_kpopmodder
         history_callback,
         system_prompt_callback,
         queue_updated_callback,
+        queued_response_callback=None,
     ):
         self.response_callback = response_callback
         self.history_callback = history_callback
         self.system_prompt_callback = system_prompt_callback
         self.queue_updated_callback = queue_updated_callback
-        self.input_queue = Queue()
-        self.input_process_thread = None
-        self.input_queue_lock = threading.Lock()#20260617_kpopmodder
-        self.queue_runtime = LLMInputQueueRuntime(self)#20260706_kpopmodder
+        self.queued_response_callback = queued_response_callback
+        self._components = LlmInputQueueWorkerComponentGraph(self)
+
+    @property
+    def input_queue(self):
+        return self._components.queue_store.queue
+
+    @input_queue.setter
+    def input_queue(self, value) -> None:
+        self._components.queue_store.queue = value
+
+    @property
+    def input_queue_lock(self):
+        return self._components.queue_store.lock
+
+    @input_queue_lock.setter
+    def input_queue_lock(self, value) -> None:
+        self._components.queue_store.lock = value
+
+    @property
+    def input_process_thread(self):
+        return self._components.thread_state.thread
+
+    @input_process_thread.setter
+    def input_process_thread(self, value) -> None:
+        self._components.thread_state.thread = value
+
+    @property
+    def queue_runtime(self):
+        return self._components.queue_runtime
+
+    @property
+    def claim_aware_input_queue_sink(self):
+        return self._components.claim_aware_input_queue_sink
+
+    @property
+    def _submission_coordinator(self):
+        return self._components.submission_coordinator
+
+    @property
+    def _pending_input_clearer(self):
+        return self._components.pending_input_clearer
 
     def receive_input(self, text):
-        with self.input_queue_lock:
-            self.input_queue.put(text)
-            self.queue_updated_callback()
-        self.process_input_queue()
+        return self._submission_coordinator.submit(text)
 
     def process_input_queue(self):
         self.queue_runtime.start_once(self.generate_response)
@@ -36,86 +73,4 @@ class LLMInputQueueWorker:#20260621_kpopmodder
 
     def clear_pending_inputs(self):#20260621_kpopmodder
         #20260621_kpopmodder: ScreenVision 최신 화면/사용자 인터럽트 우선 처리를 위해 대기 중인 LLM 입력만 제거한다.
-        with self.input_queue_lock:
-            while True:
-                try:
-                    self.input_queue.get_nowait()
-                except Empty:
-                    break
-                except Exception:
-                    break
-            self.queue_updated_callback()
-
-# #from queue import Queue#20260621_kpopmodder
-# from queue import Queue, Empty#20260621_kpopmodder
-# import threading
-
-
-# class LLMInputQueueWorker:#20260621_kpopmodder
-#     def __init__(
-#         self,
-#         response_callback,
-#         history_callback,
-#         system_prompt_callback,
-#         queue_updated_callback
-#     ):
-#         self.response_callback = response_callback
-#         self.history_callback = history_callback
-#         self.system_prompt_callback = system_prompt_callback
-#         self.queue_updated_callback = queue_updated_callback
-
-#         self.input_queue = Queue()
-#         self.input_process_thread = None
-#         self.input_queue_lock = threading.Lock()#20260617_kpopmodder
-
-#     def receive_input(self, text):
-#         with self.input_queue_lock:
-#             self.input_queue.put(text)
-
-#         self.queue_updated_callback()
-#         self.process_input_queue()
-
-#     def process_input_queue(self):
-#         if (
-#             self.input_process_thread is not None
-#             and self.input_process_thread.is_alive()
-#         ):
-#             return
-
-#         self.input_process_thread = threading.Thread(
-#             target=self.generate_response,
-#         )
-#         self.input_process_thread.daemon = True
-#         self.input_process_thread.start()
-
-#     def generate_response(self):
-#         while True:
-#             with self.input_queue_lock:
-#                 if self.input_queue.empty():
-#                     break
-
-#                 next_input = self.input_queue.get()
-
-#             response_generator = self.response_callback(
-#                 next_input,
-#                 self.history_callback(),
-#                 self.system_prompt_callback(),
-#             )
-
-#             for _ in response_generator:
-#                 pass
-
-#             self.queue_updated_callback()
-
-#     def clear_pending_inputs(self):#20260621_kpopmodder
-#         #20260621_kpopmodder: ScreenVision 최신 화면 우선 처리를 위해 대기 중인 LLM 입력만 제거한다.
-#         with self.input_queue_lock:
-#             while True:
-#                 try:
-#                     self.input_queue.get_nowait()
-#                 except Empty:
-#                     break
-#                 except Exception:
-#                     break
-
-#         self.queue_updated_callback()
+        return self._pending_input_clearer.clear()

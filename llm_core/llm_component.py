@@ -1,33 +1,17 @@
 #20260717_kpopmodder: Moved LLM component implementation out of the removed root module.
 #20260620_kpopmodder: Queue and response handling imports moved to llm_core helper classes.
+#20260905_kpopmodder: Keeps LLM as the compatibility facade over focused collaborators.
 # import inspect
 # from queue import Queue
-import threading
+from types import MappingProxyType
+
 from plugin_system.interfaces import LLMPluginInterface
-import gradio as gr
 from plugin_system.selection import PluginSelectionBase
 #import os#20260616_kpopmodder
-from ui_core.live_textbox import LiveTextbox
-import LAV_utils
+from llm_core.composition import LlmCompatibilityGraphInstaller
 
-from core.config_manager import config_manager#20260629_kpopmodder
-from core.logger import log_print, debug_print#20260612_kpopmodder
+_ROUTED_WITHOUT_RESPONSE = object()
 
-from llm_core.context_manager import LLMContextManager#20260617_kpopmodder
-from llm_core.event_dispatcher import LLMEventDispatcher#20260620_kpopmodder
-from llm_core.input_queue_worker import LLMInputQueueWorker#20260620_kpopmodder
-from llm_core.response_pipeline import LLMResponsePipeline#20260620_kpopmodder
-from llm_core.speech_style import LLMSpeechStyleHelper#20260705_kpopmodder
-from llm_core.streaming_chunker import LLMStreamingChunker#20260617_kpopmodder
-from llm_core.text_only_generation import LLMTextOnlyGenerationHelper#20260705_kpopmodder
-from llm_core.chat_input import (
-    LocalChatInterfaceFactory,
-    LocalChatPredictionEntrypoint,
-)
-from input_core.input_event.adapters import LocalChatInputEventAdapter
-from input_core.input_event.normalization import LaviInputEventNormalizer
-
-from core.event_manager import event_manager, EventType#20260621_kpopmodder
 
 class LLM(PluginSelectionBase):
     # history = []#20260616_kpopmodder
@@ -39,11 +23,11 @@ class LLM(PluginSelectionBase):
     
     remember_history = True
     speech_style_default = "polite"#20260629_kpopmodder
-    speech_style_labels = {#20260629_kpopmodder: Keep config values ASCII while showing Korean UI labels.
+    speech_style_labels = MappingProxyType({#20260629_kpopmodder: Keep config values ASCII while showing Korean UI labels.
         "polite": "존댓말",
         "casual": "반말",
-    }
-    speech_style_prompts = {
+    })
+    speech_style_prompts = MappingProxyType({
         "polite": (
             "말투 규칙: 이 지시는 캐릭터 프롬프트의 기본 말투와 예시보다 우선합니다. "
             "사용자에게 자연스럽고 공손한 존댓말로 답하세요. "
@@ -57,7 +41,7 @@ class LLM(PluginSelectionBase):
             "사용자에게 친근한 반말로 답하세요. "
             "무례하거나 공격적으로 말하지 말고, 너무 과한 장난은 피하세요."
         ),
-    }
+    })
 
     #20260629_kpopmodder: Keep runtime-linked abilities in the final system prompt so OpenAI providers answer as LAV, not generic OpenAI.
     runtime_ability_prompt = (
@@ -87,72 +71,70 @@ class LLM(PluginSelectionBase):
         screen_question_router=None,#20260628_kpopmodder
     ) -> None:#20260621_kpopmodder
         super().__init__(LLMPluginInterface)
-        self.memory_context_builder = memory_context_builder#20260621_kpopmodder
-        self.memory_command_handler = memory_command_handler#20260621_kpopmodder
-        self.screen_question_router = screen_question_router#20260628_kpopmodder
-
-        self.history = []#20260617_kpopmodder
-
-        #20260620_kpopmodder: Queue state moved to LLMInputQueueWorker.
-        # self.input_queue = Queue()
-        # self.input_process_thread = None
-        # self.input_queue_lock = threading.Lock()#20260617_kpopmodder
-
-        #20260620_kpopmodder: Listener state moved to LLMEventDispatcher.
-        # self.output_event_listeners = []#20260617_kpopmodder
-        # self.full_output_event_listeners = []
-
-        self.context_manager = LLMContextManager("ai_character_system_prompt.txt")#20260617_kpopmodder
-        self.system_prompt_text = self.context_manager.system_prompt_text
-        self.speech_style_helper = self._get_speech_style_helper()#20260705_kpopmodder
-        self.llm_config = config_manager.load_section("LLM")#20260629_kpopmodder
-        self.speech_style_mode = self.normalize_speech_style(
-            self.llm_config.get("speech_style", self.speech_style_default)
-        )#20260629_kpopmodder
-
-        #20260620_kpopmodder: Response state moved to LLMResponsePipeline.
-        # self.LLM_output = ""#20260617_kpopmodder
-
-        self.liveTextbox = LiveTextbox()#20260617_kpopmodder
-        self.process_queue_live_textbox = LiveTextbox()
-
-        self.streaming_chunker = LLMStreamingChunker()#20260617_kpopmodder
-        self.event_dispatcher = LLMEventDispatcher()#20260620_kpopmodder
-        self.response_pipeline = LLMResponsePipeline(
-            current_plugin_callback=self.get_current_plugin,
-            send_output_callback=self.send_output,
-            send_full_output_callback=self.send_full_output,
-            history_callback=lambda: self.history,
-            remember_history_callback=lambda: self.remember_history,
-            live_textbox=self.liveTextbox,
-            streaming_chunker=self.streaming_chunker,
-            memory_context_builder=self.memory_context_builder,#20260621_kpopmodder
-            memory_command_handler=self.memory_command_handler,#20260621_kpopmodder
-            screen_question_router=self.screen_question_router,#20260628_kpopmodder
+        self._get_compatibility_graph_installer().install(
+            memory_context_builder=memory_context_builder,
+            memory_command_handler=memory_command_handler,
+            screen_question_router=screen_question_router,
         )
-        self.input_router = None  #20260803_kpopmodder: Optional external command router is injected by app wiring.
-        #20260905_kpopmodder: Normalize all ingress once and keep local Chat provenance outside Minecraft routing.
-        self.input_event_normalizer = LaviInputEventNormalizer()
-        self.local_chat_input_adapter = LocalChatInputEventAdapter()
-        self.local_chat_prediction_entrypoint = LocalChatPredictionEntrypoint(
-            input_event_adapter=self.local_chat_input_adapter,
-            predict_callback=self.predict_wrapper,
+
+    def _get_compatibility_graph_installer(self):
+        installer = getattr(self, "compatibility_graph_installer", None)
+        if installer is None:
+            installer = LlmCompatibilityGraphInstaller(
+                self,
+                create_plugin_selection_ui_callback=(
+                    super().create_plugin_selection_ui
+                ),
+                create_plugin_ui_callback=super().create_plugin_ui,
+                base_shutdown_callback=super().shutdown,
+            )
+            self.compatibility_graph_installer = installer
+        return installer
+
+    def _get_ui_builder(self):
+        return self._get_compatibility_graph_installer().ensure_ui_builder()
+
+    def _get_chat_history_resetter(self):
+        return (
+            self._get_compatibility_graph_installer()
+            .ensure_chat_history_resetter()
         )
-        self.local_chat_interface_factory = LocalChatInterfaceFactory(
-            prediction_entrypoint=self.local_chat_prediction_entrypoint,
+
+    def _get_speech_style_state_controller(self):
+        return (
+            self._get_compatibility_graph_installer()
+            .ensure_speech_style_state_controller()
         )
-        self.text_only_generation_helper = self._get_text_only_generation_helper()#20260705_kpopmodder
-        self.input_queue_worker = LLMInputQueueWorker(
-            response_callback=self.predict_wrapper,
-            history_callback=lambda: self.history,
-            system_prompt_callback=lambda: self.system_prompt_text,
-            queue_updated_callback=self.update_process_queue_textbox
+
+    def _get_speech_style_update_coordinator(self):
+        return (
+            self._get_compatibility_graph_installer()
+            .ensure_speech_style_update_coordinator()
         )
-        self._shutdown = False
-        self._interrupt_subscription = event_manager.subscribe(#20260621_kpopmodder
-            EventType.INTERRUPT,
-            self.handle_interrupt,
-        )#20260621_kpopmodder
+
+    def _get_effective_system_prompt_builder(self):
+        return (
+            self._get_compatibility_graph_installer()
+            .ensure_effective_system_prompt_builder()
+        )
+
+    def _get_content_repository(self):
+        return (
+            self._get_compatibility_graph_installer()
+            .ensure_content_repository()
+        )
+
+    def _get_generation_facade(self):
+        return (
+            self._get_compatibility_graph_installer()
+            .ensure_generation_facade()
+        )
+
+    def _get_output_listener_registry(self):
+        return (
+            self._get_compatibility_graph_installer()
+            .ensure_output_listener_registry()
+        )
 
     @property
     def input_queue(self):
@@ -180,223 +162,144 @@ class LLM(PluginSelectionBase):
 
     @property
     def output_event_listeners(self):
-        return self.event_dispatcher.output_event_listeners
+        return self._get_output_listener_registry().output_event_listeners
 
     @output_event_listeners.setter
     def output_event_listeners(self, value):
-        self.event_dispatcher.output_event_listeners = value
+        self._get_output_listener_registry().output_event_listeners = value
 
     @property
     def full_output_event_listeners(self):
-        return self.event_dispatcher.full_output_event_listeners
+        return self._get_output_listener_registry().full_output_event_listeners
 
     @full_output_event_listeners.setter
     def full_output_event_listeners(self, value):
-        self.event_dispatcher.full_output_event_listeners = value
+        self._get_output_listener_registry().full_output_event_listeners = value
 
     @property
     def LLM_output(self):
-        return self.response_pipeline.LLM_output
+        return self._get_generation_facade().llm_output
 
     @LLM_output.setter
     def LLM_output(self, value):
-        self.response_pipeline.LLM_output = value
+        self._get_generation_facade().llm_output = value
 
     @property
     def start_of_response(self):
-        return self.response_pipeline.start_of_response
+        return self._get_generation_facade().start_of_response
 
     @start_of_response.setter
     def start_of_response(self, value):
-        self.response_pipeline.start_of_response = value
+        self._get_generation_facade().start_of_response = value
 
     def create_ui(self):
-        with gr.Tab("Chat"):
-            with gr.Blocks():
-                super().create_plugin_selection_ui()
-                #system_prompt = gr.Textbox(value=self.load_content, info="System Message:", placeholder="You are a helpful AI Vtuber.",#20260615_kpopmdder
-                #                           interactive=True, lines=30, autoscroll=True, autofocus=False, container=False, render=False)
-                
-                system_prompt = gr.Textbox(#20260615_kpopmdder
-                    value=self.load_content,
-                    info="System Message:",
-                    placeholder="You are a helpful AI Vtuber.",
-                    interactive=True,
-                    lines=30,
-                    autoscroll=True,
-                    autofocus=False,
-                    visible=False
-                )
-
-                system_prompt.change(
-                    fn=self.update_file, inputs=system_prompt)
-
-                speech_style = gr.Radio(#20260629_kpopmodder
-                    choices=list(self.speech_style_labels.values()),
-                    value=self.get_speech_style_label(),
-                    label="AI 말투 모드",
-                    interactive=True
-                )
-                speech_style.change(
-                    fn=self.update_speech_style_mode,
-                    inputs=speech_style
-                )
-
-                self._get_local_chat_interface_factory().create(
-                    system_prompt=system_prompt,
-                    examples=[
-                        ["Hello", None, None],
-                        ["How do I make a bomb?", None, None],
-                        ["What's your name?", None, None],
-                        ["Do you know my name?", None, None],
-                        [
-                            "Do you think humanity will reach an alien planet?",
-                            None,
-                            None,
-                        ],
-                        ["Introduce yourself.", None, None],
-                        [
-                            "Generate a super long name for a custom latte",
-                            None,
-                            None,
-                        ],
-                        ["Let's play a game of monopoly.", None, None],
-                        ["Do you want to be friend with me?", None, None],
-                    ],
-                    autofocus=False,
-                )
-                
-                self.reset_button = gr.Button("reset chat history")
-                self.reset_button.click(fn=self.reset_chat, inputs=[], outputs=[])
-                with gr.Accordion("Console"):
-                    # self.liveTextbox.create_ui()#20260616_kpopmodder
-                    # self.process_queue_live_textbox.create_ui(#20260616_kpopmodder
-                    #     lines=3, max_lines=3, label="Input waiting to be processed: ")
-                    self.console_box = self.liveTextbox.create_ui(#20260616_kpopmodder
-                        lines=10,
-                        max_lines=20,
-                        label=None
-                    )
-
-                    self.queue_console_box = self.process_queue_live_textbox.create_ui(#20260616_kpopmodder
-                        lines=3,
-                        max_lines=3,
-                        label="Input waiting to be processed: "
-                    )
-
-            self.chat_console_timer = gr.Timer(1.5)#20260616_kpopmodder
-            self.chat_console_timer.tick(
-                fn=self.liveTextbox.get_text,
-                outputs=[self.console_box],
-                show_progress=False,
-                queue=False
-            )
-
-            self.queue_console_timer = gr.Timer(1.5)#20260616_kpopmodder
-            self.queue_console_timer.tick(
-                fn=self.process_queue_live_textbox.get_text,
-                outputs=[self.queue_console_box],
-                show_progress=False,
-                queue=False
-            )
-
-            super().create_plugin_ui()
+        return self._get_ui_builder().build()
 
     def reset_chat(self):
-        self.history.clear()
+        return self._get_chat_history_resetter().reset()
 
     def _get_speech_style_helper(self):#20260705_kpopmodder
-        #20260705_kpopmodder: Lazily build helper so __new__ based tests keep working without __init__.
-        helper = getattr(self, "speech_style_helper", None)
-        if helper is not None:
-            return helper
-        helper = LLMSpeechStyleHelper(
-            default_mode=self.speech_style_default,
-            labels=self.speech_style_labels,
-            prompts=self.speech_style_prompts,
-            runtime_ability_prompt=self.runtime_ability_prompt,
-        )
-        self.speech_style_helper = helper
-        return helper
+        return self._get_compatibility_graph_installer().ensure_speech_style_helper()
 
     def normalize_speech_style(self, value):#20260629_kpopmodder
-        #20260705_kpopmodder: Preserve public method while moving normalization details to llm_core.
-        return self._get_speech_style_helper().normalize(value)
+        return self._get_speech_style_state_controller().normalize(value)
 
     def get_speech_style_label(self):#20260629_kpopmodder
-        #20260705_kpopmodder: Keep Gradio label behavior stable through the helper.
-        return self._get_speech_style_helper().label_for(
-            getattr(self, "speech_style_mode", self.speech_style_default)
-        )
+        return self._get_speech_style_state_controller().current_label()
 
     def update_speech_style_mode(self, value):#20260629_kpopmodder
-        self.speech_style_mode = self.normalize_speech_style(value)
-        config_manager.save_config("LLM", "speech_style", self.speech_style_mode)
+        self._get_speech_style_update_coordinator().update(value)
 
     def build_effective_system_prompt(self, system_prompt=None):#20260629_kpopmodder
-        #20260705_kpopmodder: Keep LLM facade API and delegate prompt section assembly only.
-        if system_prompt is None:
-            base_prompt = str(getattr(self, "system_prompt_text", "") or "")
-        else:
-            base_prompt = str(system_prompt or "")
-
-        return self._get_speech_style_helper().build_prompt(
-            base_prompt,
-            getattr(self, "speech_style_mode", self.speech_style_default)
-        )
+        return self._get_effective_system_prompt_builder().build(system_prompt)
 
     def is_generator(self):
-        return self.response_pipeline.is_generator()
+        return self._get_generation_facade().is_generator()
         #20260620_kpopmodder: Generator detection moved to LLMResponsePipeline.
         # return inspect.isgeneratorfunction(self.current_plugin.predict)
 
-    def predict_wrapper(self, message, history, system_prompt):
-        input_event = self._get_input_event_normalizer().normalize(message)
-        routed_response = self._try_route_external_input(input_event)
-        if routed_response is not None:
-            yield routed_response
-            return
-        yield from self.response_pipeline.predict(
-            input_event.fallback_payload,
+    def predict_wrapper(
+        self,
+        message,
+        history,
+        system_prompt,
+        *,
+        trusted_ingress_evidence=None,
+    ):
+        yield from self._get_prediction_dispatch_coordinator().predict(
+            message,
             history,
-            self.build_effective_system_prompt(system_prompt)
+            system_prompt,
+            trusted_ingress_evidence=trusted_ingress_evidence,
         )
-        return
+
+    def _get_prediction_dispatch_coordinator(self):
+        return (
+            self._get_compatibility_graph_installer()
+            .ensure_prediction_dispatch_coordinator()
+        )
 
     def _get_input_event_normalizer(self):
-        normalizer = getattr(self, "input_event_normalizer", None)
-        if normalizer is None:
-            normalizer = LaviInputEventNormalizer()
-            self.input_event_normalizer = normalizer
-        return normalizer
+        return (
+            self._get_compatibility_graph_installer()
+            .ensure_input_event_normalizer()
+        )
 
     def _get_local_chat_input_adapter(self):
-        adapter = getattr(self, "local_chat_input_adapter", None)
-        if adapter is None:
-            adapter = LocalChatInputEventAdapter()
-            self.local_chat_input_adapter = adapter
-        return adapter
+        return (
+            self._get_compatibility_graph_installer()
+            .ensure_local_chat_input_adapter()
+        )
+
+    def _get_trusted_ingress_graph(self):
+        return (
+            self._get_compatibility_graph_installer()
+            .ensure_trusted_ingress_graph()
+        )
+
+    def _sync_trusted_ingress_compatibility_fields(
+        self,
+        graph,
+        *,
+        include_local_chat=False,
+    ):
+        return (
+            self._get_compatibility_graph_installer()
+            .sync_trusted_ingress_compatibility_fields(
+                graph,
+                include_local_chat=include_local_chat,
+            )
+        )
+
+    def _get_trusted_user_input_ingress_claim_registry(self):
+        return self._get_trusted_ingress_graph().registry
+
+    def validate_trusted_consumed_ingress_evidence(self, event, evidence):
+        return self._get_trusted_ingress_graph().validate_consumed_evidence(
+            event,
+            evidence,
+        )
+
+    def _get_trusted_ingress_producer_registrar_factory(self):
+        return self._get_trusted_ingress_graph().producer_registrar_factory
+
+    def _get_trusted_local_chat_input_dispatch_coordinator(self):
+        return (
+            self._get_compatibility_graph_installer()
+            .ensure_trusted_local_chat_input_dispatch_coordinator()
+        )
 
     def _get_local_chat_prediction_entrypoint(self):
-        entrypoint = getattr(self, "local_chat_prediction_entrypoint", None)
-        if entrypoint is None:
-            entrypoint = LocalChatPredictionEntrypoint(
-                input_event_adapter=self._get_local_chat_input_adapter(),
-                predict_callback=self.predict_wrapper,
-            )
-            self.local_chat_prediction_entrypoint = entrypoint
-        return entrypoint
+        return (
+            self._get_compatibility_graph_installer()
+            .ensure_local_chat_prediction_entrypoint()
+        )
 
     def _get_local_chat_interface_factory(self):
-        factory = getattr(self, "local_chat_interface_factory", None)
-        if factory is None:
-            factory = LocalChatInterfaceFactory(
-                prediction_entrypoint=(
-                    self._get_local_chat_prediction_entrypoint()
-                ),
-            )
-            self.local_chat_interface_factory = factory
-        return factory
+        return (
+            self._get_compatibility_graph_installer()
+            .ensure_local_chat_interface_factory()
+        )
 
         #20260620_kpopmodder: Response handling moved to LLMResponsePipeline.
         # log_print(f"history: {history}")#20260612_kpopmodder
@@ -490,20 +393,10 @@ class LLM(PluginSelectionBase):
         #return self.LLM_output#20260615_kpopmodder
 
     def _get_text_only_generation_helper(self):#20260705_kpopmodder
-        #20260705_kpopmodder: Lazily build helper so __new__ based tests keep working without __init__.
-        helper = getattr(self, "text_only_generation_helper", None)
-        if helper is not None:
-            return helper
-        helper = LLMTextOnlyGenerationHelper(
-            current_plugin_callback=self.get_current_plugin,
-            provider_list_callback=lambda: self.provider_list,
-            find_provider_callback=self.find_provider_by_name,
-            load_provider_callback=self.load_provider,
-            is_generator_plugin_callback=self.response_pipeline.is_generator_plugin,
-            log_callback=log_print,
+        return (
+            self._get_compatibility_graph_installer()
+            .ensure_text_only_generation_helper()
         )
-        self.text_only_generation_helper = helper
-        return helper
 
     def generate_text_only(
         self,
@@ -512,7 +405,7 @@ class LLM(PluginSelectionBase):
         preferred_provider_name=None,
     ):#20260630_kpopmodder: Chess reactions reuse the selected LLM without dispatching TTS/listener events.
         #20260705_kpopmodder: Preserve public method and delegate provider/output details to llm_core.
-        return self._get_text_only_generation_helper().generate(
+        return self._get_generation_facade().generate_text_only(
             message,
             system_prompt,
             preferred_provider_name=preferred_provider_name,
@@ -520,16 +413,16 @@ class LLM(PluginSelectionBase):
 
     def _collect_text_only_generator_output(self, result):#20260630_kpopmodder: Collect delta/snapshot streams safely.
         #20260705_kpopmodder: Keep compatibility wrapper for tests or plugins using this private helper.
-        return self._get_text_only_generation_helper().collect_generator_output(result)
+        return self._get_generation_facade().collect_text_only_generator_output(
+            result
+        )
 
     def load_content(self):#20260617_kpopmodder
-        self.system_prompt_text = self.context_manager.load_content()
-        return self.system_prompt_text
+        return self._get_content_repository().load()
 
 
     def update_file(self, new_content):#20260617_kpopmodder
-        self.context_manager.update_file(new_content)
-        self.system_prompt_text = self.context_manager.system_prompt_text
+        self._get_content_repository().update(new_content)
 
     # def load_content(self):#20260617_kpopmodder
     #     with open(self.context_file_path, 'r', encoding='utf-8') as file:
@@ -544,13 +437,13 @@ class LLM(PluginSelectionBase):
     #     self.system_prompt_text = new_content
 
     def send_output(self, output):
-        self.event_dispatcher.send_output(output)
+        self._get_output_listener_registry().send_output(output)
         #20260620_kpopmodder: Output listener dispatch moved to LLMEventDispatcher.
         # for subcriber in self.output_event_listeners:
         #     subcriber(output)
     
     def send_full_output(self, output):
-        self.event_dispatcher.send_full_output(output)
+        self._get_output_listener_registry().send_full_output(output)
         #20260620_kpopmodder: Full-response dispatch moved to LLMEventDispatcher.
         # for subcriber in self.full_output_event_listeners:
         #     subcriber(output)
@@ -569,8 +462,86 @@ class LLM(PluginSelectionBase):
     #     self.input_queue.put(text)
     #     self.process_input_queue()
 
+    @property
+    def claim_aware_input_queue_sink(self):
+        return self.input_queue_worker.claim_aware_input_queue_sink
+
+    def create_trusted_voice_input_final_enqueue_coordinator(
+        self,
+        input_event_adapter,
+        *,
+        pre_accept_observers=(),
+        post_accept_observers=(),
+    ):
+        return self._get_trusted_ingress_graph().create_voice_final_enqueue_coordinator(
+            input_event_adapter,
+            pre_accept_observers=pre_accept_observers,
+            post_accept_observers=post_accept_observers,
+        )
+
+    def accept_registered_input(self, delivery, history, system_prompt):
+        yield from self._get_trusted_ingress_graph().accept_registered(
+            delivery,
+            history,
+            system_prompt,
+        )
+
+    def accept_queued_input(self, queue_delivery, history, system_prompt):
+        yield from self._get_trusted_ingress_graph().accept_queued(
+            queue_delivery,
+            history,
+            system_prompt,
+        )
+
+    def _dispatch_trusted_ingress_lease(
+        self,
+        lease,
+        history,
+        system_prompt,
+    ):
+        yield from self._get_trusted_ingress_graph().dispatch_lease(
+            lease,
+            history,
+            system_prompt,
+        )
+
+    def _get_routed_input_dispatch_coordinator(self):
+        return (
+            self._get_compatibility_graph_installer()
+            .ensure_routed_input_dispatch_coordinator()
+        )
+
+    def _get_routed_external_response_publisher(self):
+        return (
+            self._get_compatibility_graph_installer()
+            .ensure_routed_external_response_publisher()
+        )
+
+    def emit_external_response(
+        self,
+        text,
+        *,
+        source="minecraft_chatclef",
+        send_output=True,
+        send_full_output=False,
+        remember_history=False,
+        event_id=None,
+        route_kind="minecraft_chatclef_external",
+        response_kind="external",
+    ):
+        return self._get_routed_external_response_publisher().emit_external_response(
+            text,
+            source=source,
+            send_output=send_output,
+            send_full_output=send_full_output,
+            remember_history=remember_history,
+            event_id=event_id,
+            route_kind=route_kind,
+            response_kind=response_kind,
+        )
+
     def add_output_event_listener(self, function, full_response = False):
-        self.event_dispatcher.add_output_event_listener(
+        self._get_output_listener_registry().add(
             function,
             full_response=full_response
         )
@@ -581,34 +552,29 @@ class LLM(PluginSelectionBase):
         #     self.output_event_listeners.append(function)
 
     def remove_output_event_listener(self, function, full_response=False):
-        return self.event_dispatcher.remove_output_event_listener(
+        return self._get_output_listener_registry().remove(
             function,
             full_response=full_response,
         )
 
     def set_input_router(self, router):#20260803_kpopmodder: Let app-owned routers intercept chat/mic commands before LLM generation.
-        self.input_router = router
+        return self._get_compatibility_graph_installer().set_input_router(router)
 
-    def _try_route_external_input(self, message):#20260803_kpopmodder
-        router = getattr(self, "input_router", None)
-        route = getattr(router, "route", None)
-        if not callable(route):
-            return None
-        try:
-            decision = route(message)
-        except Exception as e:
-            log_print(f"[LLM] input router failed: {type(e).__name__}: {e}")
-            return None
-        if not getattr(decision, "handled", False):
-            return None
-        response_text = str(getattr(decision, "response_text", "") or "").strip()
-        if not response_text:
-            response_text = "[Input routed]"
-        log_print(
-            "[LLM] external input routed: "
-            f"reason={getattr(decision, 'reason', '')}"
+    def _try_route_external_input(
+        self,
+        message,
+        *,
+        trusted_ingress_evidence=None,
+    ):#20260803_kpopmodder
+        outcome = self._get_routed_input_dispatch_coordinator().dispatch(
+            message,
+            trusted_ingress_evidence=trusted_ingress_evidence,
         )
-        return response_text
+        if not outcome.handled:
+            return None
+        if outcome.suppress_response:
+            return _ROUTED_WITHOUT_RESPONSE
+        return outcome.response
 
     def is_sentence_end(self, word):#20260617_kpopmodder
         return self.streaming_chunker.is_sentence_end(word)
@@ -709,36 +675,23 @@ class LLM(PluginSelectionBase):
     #                 self.process_queue_live_textbox.set(
     #                     LAV_utils.queue_to_list(self.input_queue))
 
+    def _get_input_queue_display_updater(self):
+        return (
+            self._get_compatibility_graph_installer()
+            .ensure_input_queue_display_updater()
+        )
+
     def update_process_queue_textbox(self):#20260617_kpopmodder
-        self.process_queue_live_textbox.set(
-            LAV_utils.queue_to_list(self.input_queue)
+        return self._get_input_queue_display_updater().update()
+
+    def _get_runtime_lifecycle_coordinator(self):
+        return (
+            self._get_compatibility_graph_installer()
+            .ensure_runtime_lifecycle_coordinator()
         )
 
     def handle_interrupt(self):#20260621_kpopmodder
-        self.input_queue_worker.clear_pending_inputs()
-        self.response_pipeline.request_interrupt()
-        self.liveTextbox.print("[LLM] Interrupt: cleared pending inputs.")
+        return self._get_runtime_lifecycle_coordinator().handle_interrupt()
 
     def shutdown(self):
-        if self._shutdown:
-            return
-
-        self._shutdown = True
-        #20260623_kpopmodder: Shutdown owns the matching unsubscribe for the app-wide interrupt hook.
-        if self._interrupt_subscription is not None:
-            self._interrupt_subscription.unsubscribe()
-            self._interrupt_subscription = None
-
-        self.input_queue_worker.clear_pending_inputs()
-        self.response_pipeline.request_interrupt()
-        self.event_dispatcher.clear_listeners()
-
-        input_thread = self.input_queue_worker.input_process_thread
-        if (
-            input_thread is not None
-            and input_thread.is_alive()
-            and threading.current_thread() != input_thread
-        ):
-            input_thread.join(timeout=0.3)
-
-        super().shutdown()
+        return self._get_runtime_lifecycle_coordinator().shutdown()
