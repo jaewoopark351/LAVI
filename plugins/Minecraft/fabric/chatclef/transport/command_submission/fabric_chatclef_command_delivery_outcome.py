@@ -1,10 +1,6 @@
-#20260819_kpopmodder: Keep command-delivery result data separate from delivery behavior.
-from __future__ import annotations
+#20260905_kpopmodder: Preserve the legacy ordinary-command delivery outcome import path.
+from .delivery.fabric_chatclef_command_delivery_outcome import (
+    FabricChatClefCommandDeliveryOutcome,
+)
 
-from dataclasses import dataclass
-
-
-@dataclass(frozen=True)
-class FabricChatClefCommandDeliveryOutcome:
-    status: str
-    error: Exception | None = None
+__all__ = ("FabricChatClefCommandDeliveryOutcome",)

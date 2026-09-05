@@ -1,4 +1,4 @@
-#20260818_kpopmodder: Build Fabric ChatClef command submission result DTOs.
+#20260905_kpopmodder: Convert ordinary-command submission outcomes into result DTOs.
 from __future__ import annotations
 
 from plugins.Minecraft.common.dto.command_result_dto import CommandResultDTO
