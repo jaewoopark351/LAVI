@@ -1,5 +1,8 @@
 <!-- 20260806_kpopmodder: Added the Minecraft plugin documentation entrypoint and reading map. -->
 <!-- 20260905_kpopmodder: Reconciled the H5 Korean Chat/microphone entry after Python implementation and offline verification. -->
+<!-- 20260905_kpopmodder: Indexed the Chat/final-microphone Korean-only feedback, GET-alias, and trusted-stop pre-change contract. -->
+<!-- 20260905_kpopmodder: Reconciled the Korean feedback, scoped crafting defaults, and STOP implementation verification status. -->
+<!-- 20260906_kpopmodder: Reconciled the applied wooden-button engine hunk, refreshed clean-build artifact, and remaining runtime status. -->
 
 # LAVI Minecraft Plugin
 
@@ -29,6 +32,48 @@ LAVI
   -> Forge adapter
     -> Forge MineMind
 ```
+
+The current worktree also contains the Fabric ChatClef-only implementation for
+trusted Korean LAVI Chat and final VoiceInput transcripts:
+
+```text
+one-shot trusted ingress
+  -> Korean eligibility proof
+  -> STOP-first branch
+     | exact safe STOP -> guarded stop_control_v1 priority lane
+     | unsafe stop-like input -> deterministic local rejection
+     | unrelated -> ordinary Minecraft-command branch
+  -> ordinary Korean command ownership
+     -> existing command or request-local generic crafting defaults
+     -> deterministic source-correct command feedback
+```
+
+Its offline verification status is `IMPLEMENTED_VERIFIED_OFFLINE`. The final
+behavior-focused suite passed 116 tests and 617 subtests; the Minecraft Python
+suite passed 901 tests, skipped 2, and passed 3462 subtests; and the full Python
+suite passed 2093 tests, skipped 4, and passed 4496 subtests. The required clean
+forced Gradle build completed all 171 tasks. The 1.20.1 test XML records 216
+suites and 762 tests with 0 failures, 0 errors, and 1 skip. The fresh
+unclassified runtime JAR has SHA-256
+`0C8E7F774C52D79DE5BD1BB9B0E516F6E75C5C20CF5D73414EDD6D8154128161`.
+
+That matching JAR was later observed in a live test instance. Trapdoor, empty
+map, wooden pressure plate, and trusted STOP paths completed, while the broad
+`get wooden_button 1` path reproduced an engine `StackOverflowError`. The
+button root cause was source-recorded, and the minimum one-value correction has
+since been applied. Its focused Java suite passed 5 tests with no failures,
+errors, or skips; the refreshed clean forced build executed all 171 tasks, and
+the 1.20.1 XML records 767 tests with 0 failures, 0 errors, and 1 unrelated
+skip. The corrected mixed-provenance JAR has SHA-256
+`488C195B8C87919E349549DD5B0766D05D669222BB63FCCDEDD0E38FDB2861B2`.
+The active test-instance JAR is byte-identical. Two trusted Chat requests and
+one exact `VoiceInput` final-transcript request for the generic wooden button
+all reached natural terminal completion without `StackOverflowError` or a
+fatal error; the microphone request also delivered and played its Korean TTS
+feedback once. The button divergence is `PARTIALLY_VERIFIED` because the
+contract's live explicit-oak and stone-button comparison remains unexercised.
+The build/deployment identity and runtime-load status are `RUNTIME_VERIFIED`.
+See the focused report linked below.
 
 Fabric ChatClef and Forge MineMind are independent sibling backends. Do not add
 Forge, MineMind, shared Java runtime, shared WebSocket server, shared reconnect
@@ -88,12 +133,47 @@ LAVI-owned Python side of the Fabric ChatClef integration. This includes the
 adapter, config, diagnostics, extension, input routing, intent extraction,
 session ownership, WebSocket transport, and UI glue for Fabric ChatClef.
 
+The trusted Korean Chat/final-microphone feature keeps its responsibilities in
+separate boundaries:
+
+```text
+input_core/input_event/provenance/trusted_user_ingress/**
+input_core/input_event/delivery/**
+input_core/input_event/delivery/trusted_voice/**
+llm_core/chat_input/trusted_local/**
+llm_core/input_queue/**
+llm_core/input_routing/**
+llm_core/composition/speech_content/**
+llm_core/composition/generation_output/**
+llm_core/composition/trusted_ingress/**
+llm_core/composition/ui_lifecycle/**
+llm_core/routed_response/**
+plugins/Minecraft/fabric/chatclef/input/eligibility/**
+plugins/Minecraft/fabric/chatclef/input/diagnostics/**
+plugins/Minecraft/fabric/chatclef/input/ownership/item_command/**
+plugins/Minecraft/fabric/chatclef/input/aliases/generic_crafting_defaults/**
+plugins/Minecraft/fabric/chatclef/intent/scoped_resolution/**
+plugins/Minecraft/fabric/chatclef/intent/natural_language/**
+plugins/Minecraft/fabric/chatclef/extension/natural_language/generic_crafting_defaults/**
+plugins/Minecraft/fabric/chatclef/input/stop/**
+plugins/Minecraft/fabric/chatclef/response/stop/**
+plugins/Minecraft/fabric/chatclef/transport/control/stop/**
+```
+
+The five generic crafting defaults are not stored in the global generated
+Korean item-alias artifact. They are activated only for one proved Chat/final
+microphone request.
+
 ```text
 plugins/Minecraft/runtime/chatclef_fabric_1.20.1/**
 ```
 
 Upstream-derived ChatClef / AltoClef Fabric runtime with LAVI compatibility
-patches and LAVI-owned bridge or integration entrypoints. Treat this tree as a
+patches and LAVI-owned bridge or integration entrypoints. The implemented STOP
+and command-result responsibilities remain separated under
+`bridge/command/control/stop/**`, `bridge/command/lifecycle/outbox/**`,
+`bridge/transport/inbound/{stop,command}/**`, and
+`bridge/transport/{session,connection,result}/**`. Treat this tree as a
 preserved third-party-derived baseline unless a file is proven LAVI-owned.
 
 ```text
@@ -119,9 +199,10 @@ plugins/Minecraft/docs/**
 Architecture, runbooks, audit notes, and divergence records for this
 integration.
 
-## End-To-End Command Flow
+## End-To-End Ordinary Command Flow
 
-Current Fabric ChatClef command flow:
+Current ordinary Fabric ChatClef command flow (after the trusted Korean
+STOP-first branch has returned `unrelated`):
 
 ```text
 raw user text
@@ -148,7 +229,8 @@ raw user text
 
 The Java WebSocket callback is not the command executor. It must only decode,
 validate, and enqueue. The client tick dispatcher owns Minecraft-client-thread
-dispatch.
+dispatch. The higher-priority STOP-control flow is documented separately in
+[Fabric ChatClef Bridge Protocol V1](docs/fabric-chatclef-bridge-protocol-v1.md#additive-stop-control-profile-within-v1).
 
 ## Reading Order
 
@@ -287,6 +369,25 @@ parity, focused Java test-only lifecycle proof, ACK wording and tests, read:
 plugins/Minecraft/docs/chatclef-h5-auto-deposit-trust-korean-chat-microphone-pre-change-contract-2026-09-04.md
 ```
 
+For the pre-change contract covering deterministic replies, Korean
+GET-acquisition aliases/defaults for trapdoors, empty maps, pressure plates,
+and buttons, plus global `stop_ai`, all limited to Korean input from LAVI Chat
+or final VoiceInput microphone transcripts, including its current
+implementation, offline-verification ledger, and the later live-runtime
+wooden-button regression status, read:
+
+```text
+plugins/Minecraft/docs/chatclef-korean-command-feedback-crafting-stop-pre-change-contract-2026-09-05.md
+```
+
+For the exact `get wooden_button 1` StackOverflow reproduction, source-proven
+one-plank recipe/two-slot mask mismatch, applied one-value engine hunk, offline
+verification evidence, remaining runtime contract, and rollback unit, read:
+
+```text
+plugins/Minecraft/docs/chatclef-wooden-button-stack-overflow-pre-change-report-2026-09-06.md
+```
+
 For the Python-only inventory-full cleanup preflight contract, protected-item
 policy, post-cleanup verification, and fail-closed primary-submit gate, read:
 
@@ -375,6 +476,12 @@ Python Korean command registry planning:
 H5 Korean Chat/microphone pre-change contract:
   chatclef-h5-auto-deposit-trust-korean-chat-microphone-pre-change-contract-2026-09-04.md
 
+Chat/final-microphone Korean command feedback, scoped GET defaults, and STOP contract (implemented and verified offline; pre-fix wooden-button runtime regression recorded; corrected runtime verification pending):
+  chatclef-korean-command-feedback-crafting-stop-pre-change-contract-2026-09-05.md
+
+Generic wooden-button StackOverflow root cause, applied correction, and offline-built/runtime-unverified status:
+  chatclef-wooden-button-stack-overflow-pre-change-report-2026-09-06.md
+
 Python inventory cleanup preflight contract:
   chatclef-python-inventory-cleanup-preflight-contract.md
 
@@ -417,6 +524,9 @@ deterministic user response rendering
 Python-local command orchestration
 inventory preflight evidence evaluation
 targeted cleanup planning
+trusted Chat/final-Voice ingress claims and one-shot response authorization
+request-local generic crafting-default activation
+STOP control claim, barrier, result demux, strict terminal validation, and quarantine
 ```
 
 Java bridge owns:
@@ -431,6 +541,8 @@ command root binding
 terminal observation
 command_result envelope sending
 nonterminal status=running lifecycle evidence publication
+STOP-control candidate validation and queueing
+END_CLIENT_TICK StopCommand dispatch and bounded STOP result verification
 ```
 
 ChatClef / AltoClef owns:
@@ -503,6 +615,22 @@ tests/minecraft_chatclef/korean_translation/
 tests/minecraft_chatclef/lavi_input/
 tests/minecraft_chatclef/lifecycle/
 tests/minecraft_chatclef/runtime/
+```
+
+Trusted ingress, routed response, generic crafting defaults, and STOP control:
+
+```text
+tests/input_core/input_event/provenance/trusted_user_ingress/
+tests/input_core/input_event/delivery/
+tests/llm_core/chat_input/
+tests/llm_core/routed_response/
+tests/minecraft_chatclef/generic_crafting_defaults/
+tests/minecraft_chatclef/stop/
+tests/minecraft_chatclef/lavi_input/test_trusted_korean_chat_voice_integration.py
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/test/java/lavi/minecraft/fabric/chatclef/bridge/command/control/stop/
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/test/java/lavi/minecraft/fabric/chatclef/bridge/transport/FabricChatClefResultEnvelopeSenderTest.java
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/test/java/lavi/minecraft/fabric/chatclef/bridge/transport/connection/FabricChatClefConnectionDetachHandlerTest.java
+plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/test/java/lavi/minecraft/task/resources/wood/WoodenButtonRecipeMaskRegressionTest.java
 ```
 
 Run tests only when the current task explicitly authorizes tests or when the

@@ -5,6 +5,9 @@
 <!-- 20260904_kpopmodder: Recorded the post-baseline four-command H5 registrar catalog drift and linked the docs-only Korean Chat/microphone exposure contract. -->
 <!-- 20260905_kpopmodder: Clarified H5 claim-registry object identity and two-phase submission authorization. -->
 <!-- 20260905_kpopmodder: Reconciled the implemented 26-row H5 catalog, independent readiness axes, and offline rollout evidence. -->
+<!-- 20260905_kpopmodder: Reconciled STOP's guarded control-lane readiness and kept generic crafting defaults outside the global alias registry. -->
+<!-- 20260905_kpopmodder: Recorded final offline regression and clean-build verification without changing gameplay verifiability. -->
+<!-- 20260906_kpopmodder: Reconciled the later matching-JAR runtime and isolated the generic wooden-button engine regression from registry readiness. -->
 
 # ChatClef Python Korean Command Registry Plan
 
@@ -68,6 +71,10 @@ chatclef-korean-post-review-merge-blockers.md:
 chatclef-h5-auto-deposit-trust-korean-chat-microphone-pre-change-contract-2026-09-04.md:
   H5-specific deterministic Korean grammar, zero-slot intent, canonical
   prefixless command, admission, ACK wording and Chat/microphone tests.
+
+chatclef-korean-command-feedback-crafting-stop-pre-change-contract-2026-09-05.md:
+  trusted Chat/final-microphone Korean eligibility, routed command feedback,
+  request-local generic crafting defaults, and the guarded STOP-control lane.
 ```
 
 When wording conflicts, this registry plan controls command taxonomy and
@@ -812,3 +819,109 @@ evidence and test matrix are owned by
 [H5 Auto-Deposit Trust Korean Chat/Microphone Pre-Change Contract](chatclef-h5-auto-deposit-trust-korean-chat-microphone-pre-change-contract-2026-09-04.md).
 The earlier 22-command test result remains valid only for its recorded baseline;
 the current implementation and artifacts are verified at 26 commands.
+
+## 2026-09-05 Korean feedback, crafting defaults, and STOP reconciliation
+
+This addendum supersedes only the earlier current-status statements that call
+the active-command STOP lane unresolved. It does not rewrite the dated 20/22/26
+command snapshots or turn the five crafting phrases into global registry rows.
+The owning implementation contract is
+[ChatClef Korean Command Feedback, Generic Crafting, and Stop Pre-Change Contract](chatclef-korean-command-feedback-crafting-stop-pre-change-contract-2026-09-05.md).
+
+Current worktree status:
+
+```text
+OVERALL_FEATURE_STATUS: IMPLEMENTED_VERIFIED_OFFLINE
+USER_BEHAVIOR_FOCUSED_PYTHON: PASS_116_TESTS_617_SUBTESTS
+MINECRAFT_PYTHON_SUITE: PASS_901_TESTS_2_SKIPPED_3462_SUBTESTS
+FULL_PYTHON_REGRESSION_SUITE: PASS_2093_TESTS_4_SKIPPED_4496_SUBTESTS
+FABRIC_1_20_1_JAVA_TEST_XML: PASS_216_SUITES_762_TESTS_0_FAILURES_0_ERRORS_1_SKIPPED
+FABRIC_CLEAN_FORCED_BUILD: PASS_171_OF_171_TASKS
+FRESH_1_20_1_JAR_SHA256: 0C8E7F774C52D79DE5BD1BB9B0E516F6E75C5C20CF5D73414EDD6D8154128161
+OFFLINE_LEDGER_DEPLOYMENT: NOT_RUN
+OFFLINE_LEDGER_MINECRAFT_RUNTIME: NOT_RUN
+POST_LEDGER_ACTIVE_JAR_HASH_MATCH: TRUE
+POST_LEDGER_MINECRAFT_RUNTIME: PARTIAL_PASS_WITH_CONFIRMED_WOODEN_BUTTON_STACK_OVERFLOW
+```
+
+The current production registry metadata for `stop` is:
+
+```text
+command_name: stop
+slot_schema: ()
+resolver_domain: command_specific
+lifecycle_kind: control
+safety_tier: R0
+confirmation_mode: none
+allowed_input_sources:
+  - lavi_chat_ui
+  - voice_input_final
+
+SOURCE_REGISTERED: true
+KOREAN_PARSE_COMPILE_READY: true
+PYTHON_ADMISSION_READY: true
+BRIDGE_LIFECYCLE_READY: true
+GAMEPLAY_EFFECT_VERIFIABLE: false
+PUBLIC_KOREAN_ENABLED: true
+```
+
+These readiness values authorize only the dedicated, proof-gated control
+route. They do not authorize an ordinary busy-lane `command_request(stop)`, a
+raw `stop` string, an LLM-created STOP intent, a copied provenance tuple,
+`direct_typed`, `lavi_gui_korean`, a microphone partial, or an external chat
+source. Actual admission additionally requires the live one-shot trusted
+ingress proof, exact Korean whole-utterance grammar, a STOP claim receipt, an
+accepted session/generation, and literal
+`capabilities.chatclef_stop_control_v1=true`.
+
+The STOP route reuses v1 `command_request` and `command_result` envelopes with
+the additive `stop_control_v1` metadata/data profile. It remains separate from
+ordinary active-command admission, executes through the existing registered
+`StopCommand -> AltoClef.stop()` path on `END_CLIENT_TICK`, and treats any
+unverified result as `unknown` without automatic replay. The v1 profile and
+compatibility table are defined in
+[Fabric ChatClef Bridge Protocol V1](fabric-chatclef-bridge-protocol-v1.md).
+
+Feature A, deterministic command feedback, is a trusted input/router/output
+delivery responsibility rather than a new command-catalog row. Feature B also
+does not add registry commands: its five Korean phrases are request-local
+aliases for the existing public `get` command and compile only on the exact
+trusted Chat/final-microphone craft route:
+
+```text
+다락문 -> get trapdoor 1
+지도 -> get map 1
+압력판 -> get wooden_pressure_plate 1
+발판 -> get wooden_pressure_plate 1
+버튼 -> get wooden_button 1
+```
+
+The global `CURATED_ALIASES`, generated `korean_item_aliases.json`, registered
+command count, and existing `get` allowed-source policy are unchanged by this
+profile. Explicit material phrases continue through the existing specific-item
+resolver and take precedence over these defaults.
+
+Focused behavior, Minecraft Python, full repository Python, Java 1.20.1 tests,
+and the required clean forced Gradle build all pass offline. The fresh
+unclassified 1.20.1 runtime JAR is 8,370,930 bytes, timestamped
+`2026-09-05T13:05:23.279Z`, with SHA-256
+`0C8E7F774C52D79DE5BD1BB9B0E516F6E75C5C20CF5D73414EDD6D8154128161`.
+No deployment, Minecraft launch, or live gameplay verification follows from
+the worktree readiness flags or this offline evidence.
+
+A later matching-JAR live run did not change the registry shape or readiness
+classification. It confirmed the Chat/final-Voice request-local mapping and
+bridge admission, then exposed an existing AltoClef
+`CollectWoodenButtonTask` recipe-mask defect after `get wooden_button 1` was
+dispatched. Trapdoor, empty-map, wooden-pressure-plate, and trusted STOP paths
+completed in the same session. The generic button root cause, applied one-value
+correction, and post-fix verification contract are documented in
+[ChatClef Wooden Button Stack Overflow Pre-Change Root-Cause Report](chatclef-wooden-button-stack-overflow-pre-change-report-2026-09-06.md).
+The corrected mixed-provenance artifact passes focused Java, adjacent/full
+Minecraft ChatClef Python, and clean forced Gradle verification. The active
+test-instance JAR now matches it byte-for-byte. Two generic-button Chat requests
+and one exact `VoiceInput` final-transcript request reached natural terminal
+completion without `StackOverflowError`; the final-microphone response was
+delivered and played by TTS once. The downstream button divergence is therefore
+`PARTIALLY_VERIFIED`: the contract's live explicit-oak and stone-button
+comparisons remain unexercised. This does not change the registry shape.

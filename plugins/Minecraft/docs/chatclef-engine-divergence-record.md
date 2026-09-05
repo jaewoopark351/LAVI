@@ -1,6 +1,8 @@
 # ChatClef Engine Divergence Record
 
 <!-- 20260730_kpopmodder: Recorded ChatClef engine divergence status for Carry On diagnostics review. -->
+<!-- 20260906_kpopmodder: Recorded the proven wooden-button recipe-mask correction, then advanced it to BUILT_NOT_REPRODUCED after the minimum hunk and clean build. -->
+<!-- 20260906_kpopmodder: Advanced the wooden-button correction to PARTIALLY_VERIFIED after matching-JAR Chat and final-microphone runtime success. -->
 
 ## Current Status
 
@@ -30,8 +32,16 @@ The current active behavior-changing divergences are:
 - The exact-container route integration in the upstream-derived general-storage
   and regular-furnace Task owners, including ancestor retention while the gate
   forbids parent mutation.
+- The wooden-button one-plank recipe mask correction in
+  `adris.altoclef.tasks.resources.wood.CollectWoodenButtonTask`.
 
 These are engine divergences because the classes are generic upstream-derived ChatClef / AltoClef workflow helpers.
+
+The wooden-button matching-plank recipe-mask correction is documented below
+with verification status `PARTIALLY_VERIFIED`. Its source, clean-build,
+matching-JAR deployment, generic-button Chat, and generic-button final-microphone
+runtime evidence are complete. Live explicit-oak and stone-button comparison
+requests remain `NOT_RUN`.
 
 ## Upstream Baseline Provenance
 
@@ -1986,3 +1996,141 @@ Rollback is dependency ordered:
 Do not revert whole upstream files, prior diagnostics, post-place handoff,
 automatic-deposit work, documentation, or unrelated dirty work. Do not use a
 broad reset, restore, checkout, cleanup, or commit revert.
+
+## 2026-09-06 Applied Wooden-Button Matching-Plank Recipe-Mask Correction
+
+This is an applied behavior-changing engine divergence record. The complete
+root-cause evidence and verification contract are in
+[ChatClef Wooden Button Stack Overflow Pre-Change Root-Cause Report](chatclef-wooden-button-stack-overflow-pre-change-report-2026-09-06.md).
+
+```text
+Upstream component:
+  ChatClef / AltoClef wooden resource crafting Task
+
+Engine baseline reference:
+  recorded import commit daa9b13641cb3beb33ddb12b51f8e2bed5be3944
+
+Repository HEAD at documentation time:
+  0931e07874f9bd634aada282233e41bd66d1c000
+
+Modified production file:
+  plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/main/java/adris/altoclef/tasks/resources/wood/CollectWoodenButtonTask.java
+
+Modified class:
+  adris.altoclef.tasks.resources.wood.CollectWoodenButtonTask
+
+Modified method:
+  CollectWoodenButtonTask(Item[] targets, ItemTarget planks, int count)
+
+Baseline file hash:
+  SHA256 85AA18165EFFCA7BB5A3E00B41AAF93AB85503AADFB022AFDFAE2B80A6CA8DC8
+
+Applied file hash:
+  SHA256 CE447971FC1596C6333B9EAFB86DBDD0FB32C09862177F3E3F7FC6DE709D3283
+
+Focused LAVI-owned test:
+  plugins/Minecraft/runtime/chatclef_fabric_1.20.1/src/test/java/lavi/minecraft/task/resources/wood/WoodenButtonRecipeMaskRegressionTest.java
+
+Focused test file hash:
+  SHA256 F9F8DD95B892AC466CB505A63E34A76DFEC0DC1B40781E9278F2BC62586A8E1E
+
+Exact applied LAVI hunk:
+  new boolean[]{true, true, false, false}
+  -> new boolean[]{true, false, false, false}
+
+Divergence category:
+  BEHAVIOR_CHANGING_ENGINE_DIVERGENCE
+
+Verified reason:
+  the button recipe occupies only slot 0, but the current mask also selects
+  empty slot 1; the resulting copied zero-match target recursively constructs
+  CataloguedResourceTask until StackOverflowError
+
+Evidence:
+  runtime request lavi-input-ko-83534b8c6b75453e858032487e7a37d8
+  correlation lavi-d02edd568fa744639c464cefa907ed54
+  session fabric-chatclef-86f8b275562e4c838bc8693c7024edf1
+  connection generation 1
+  client tick 12915
+  crash report crash-2026-09-05_23.56.53-client.txt
+
+Last successful boundary:
+  Korean route ownership, get wooden_button 1 compilation, bridge admission,
+  Render-thread dispatch, and CollectWoodenButtonTask root assignment
+
+First failing boundary:
+  first normal Task evaluation derives the matching material from empty recipe
+  slot 1 and enters zero-match CataloguedResourceTask construction recursion
+
+Containment analysis:
+  Python alias substitution to one wood species would violate the documented
+  any-wood target; Carry On owns no crafting data; a new wrapper or parent Task
+  would duplicate established engine behavior; a global TaskCatalogue guard is
+  broader than correcting the Task that owns the invalid mask
+
+Ownership impact:
+  button recipe material-slot selection only; no input, retry, timeout, custom
+  goal, path, interruption, cleanup, scheduler, or global-state ownership change
+
+Generic behavior preserved:
+  Korean mapping, explicit material buttons, pressure plates, trapdoors, maps,
+  STOP, ordinary command lifecycle, Baritone, Carry On, and Forge/MineMind
+
+Offline verification coverage:
+  focused exact one-slot/pre-recursion invariant and species-output structure;
+  explicit oak/stone button preservation; pressure-plate comparison; adjacent
+  Korean Chat/final-Voice and STOP regression; clean forced build
+
+Remaining runtime verification:
+  explicit oak-button and stone-button live comparison requests
+
+Runtime reproduction result:
+  PRE_FIX_REPRODUCED
+  POST_FIX_GENERIC_BUTTON_CHAT_VERIFIED_TWICE
+  POST_FIX_GENERIC_BUTTON_FINAL_MICROPHONE_VERIFIED_ONCE
+  POST_FIX_EXPLICIT_OAK_AND_STONE_BUTTON_RUNTIME_NOT_RUN
+
+Offline verification result:
+  focused Java 5 passed, failures/errors/skipped 0
+  adjacent Python 52 passed plus 121 subtests
+  full Minecraft ChatClef Python 901 passed, 2 skipped, 3462 subtests
+  clean forced Gradle build 171 tasks executed, exit code 0
+  all-version Java XML 8437 tests, failures 0, errors 0, skipped 9
+
+Build provenance:
+  MIXED_PROVENANCE; unrelated pre-existing runtime source and test changes were
+  present and are not part of this divergence unit
+
+Fresh 1.20.1 artifact:
+  8370931 bytes
+  SHA256 488C195B8C87919E349549DD5B0766D05D669222BB63FCCDEDD0E38FDB2861B2
+
+Deployment and runtime evidence:
+  active LAVI_TEST_Fabric01 JAR is byte-identical to the fresh artifact
+  build/deployment/load classification RUNTIME_VERIFIED
+  Chat request IDs lavi-input-ko-da979ad84d4f4c44bb6d62f3f1f09403 and
+    lavi-input-ko-3a04f90c28004e599b3c95e27359f76f completed naturally
+  final-microphone request lavi-input-ko-7af892f671bc4e71aefb6b17aad8deaf
+    completed naturally with exact VoiceInput/final_transcript/final=true
+  final-microphone Korean command feedback was delivered and played by TTS once
+  current-session StackOverflowError count 0; fatal error count 0
+
+Build evidence:
+  codex-build-logs/chatclef-fabric-1.20.1-build-20260906-005443.log
+  SHA256 F2BE63098FEB16706873E1BDAE36AB44499350D17C1F80318DB0973F97708183
+
+Known separate risk:
+  the existing bamboo WoodItems/plank mapping inconsistency was observed but
+  is not the reproduced mask defect and remains outside this hunk
+
+Rollback:
+  apply the exact inverse boolean hunk and remove only its adjacent divergence
+  marker/reference and dependent focused test; retain the incident record and
+  mark this entry ROLLED_BACK; do not use broad reset/checkout/restore/clean
+
+Upstream comparison status:
+  exact upstream commit UNVERIFIED; local import provenance recorded
+
+Verification status:
+  PARTIALLY_VERIFIED
+```

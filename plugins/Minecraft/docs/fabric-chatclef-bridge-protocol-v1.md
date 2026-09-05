@@ -1,5 +1,10 @@
 <!-- 20260801_kpopmodder: Drafted the inert v1 wire contract for the Fabric ChatClef bridge. -->
 <!-- 20260821_kpopmodder: Clarified that Python-local reconciliation state must not leak into Java-facing status snapshots. -->
+<!-- 20260905_kpopmodder: Documented the additive Fabric ChatClef STOP-control capability and metadata/data profile without a v1 version or message-type change. -->
+<!-- 20260905_kpopmodder: Recorded final offline STOP-profile regression and clean-build evidence. -->
+<!-- 20260906_kpopmodder: Distinguished the later verified STOP/bridge runtime from the downstream wooden-button engine StackOverflow. -->
+<!-- 20260906_kpopmodder: Recorded the downstream button fix's offline-built/runtime-unverified follow-up without changing the bridge contract. -->
+<!-- 20260906_kpopmodder: Recorded matching-JAR generic-button success from Chat and final microphone without changing the bridge contract. -->
 
 # Fabric ChatClef Bridge Protocol V1
 
@@ -12,6 +17,36 @@ timing, and handshake/status/error exchange. Phase 4 owns command_request
 transport, Java-side queueing, and client-tick command dispatch. Phase 5 adds
 only LAVI-side Fabric ChatClef GUI controls and does not change the wire
 protocol.
+
+The current worktree also implements an optional Fabric ChatClef STOP-control
+profile inside the same v1 `command_request` / `command_result` envelopes.
+That additive profile is `IMPLEMENTED_VERIFIED_OFFLINE`: the full Python suite
+passed 2093 tests with 4 skips and 4496 subtests, the 1.20.1 Java test XML
+records 216 suites and 762 tests with 0 failures, 0 errors, and 1 skip, and the
+required clean forced Gradle build executed all 171 tasks. The fresh 1.20.1
+runtime JAR SHA-256 is
+`0C8E7F774C52D79DE5BD1BB9B0E516F6E75C5C20CF5D73414EDD6D8154128161`.
+This evidence was offline only at the close of that verification ledger;
+deployment and Minecraft runtime were then `NOT_RUN`. A later matching-JAR
+session verified the STOP profile through its closed terminal and dispatched
+ordinary crafting commands. Its subsequent `get wooden_button 1`
+`StackOverflowError` occurred inside the assigned AltoClef resource Task, after
+bridge admission and root binding, and is not a v1 envelope or STOP-control
+failure. See
+[ChatClef Wooden Button Stack Overflow Pre-Change Root-Cause Report](chatclef-wooden-button-stack-overflow-pre-change-report-2026-09-06.md).
+The minimum downstream recipe-mask correction is now applied. Its focused Java
+suite passes 5 tests without skips, the refreshed clean forced build executes
+all 171 tasks, and the corrected mixed-provenance 1.20.1 JAR has SHA-256
+`488C195B8C87919E349549DD5B0766D05D669222BB63FCCDEDD0E38FDB2861B2`.
+The active test-instance JAR is byte-identical. Generic wooden-button requests
+from Chat twice and an exact `VoiceInput` final transcript once all reached
+natural terminal completion without `StackOverflowError`; the microphone path
+also delivered and played its Korean TTS feedback once. The downstream
+divergence is `PARTIALLY_VERIFIED` because live explicit-oak and stone-button
+comparisons remain unexercised. This downstream change does not alter the v1
+envelope, STOP-control profile, transport, or dispatch contract.
+The profile does not add a top-level message type, change `protocol_version`,
+or extend the common DTO field set.
 
 ## Envelope
 
@@ -251,20 +286,29 @@ The Phase 4 Java bridge handshake declares:
 ```text
 payload.capabilities.fabric_chatclef_bridge = true
 payload.capabilities.chatclef_command_dispatch = true
+payload.capabilities.chatclef_stop_control_v1 = true
 payload.metadata.backend = fabric_chatclef
 payload.metadata.loader = fabric
 payload.metadata.phase = phase_4_tick_dispatch
 ```
+
+`chatclef_stop_control_v1` is supported only when its JSON value is the boolean
+literal `true`. The string `"true"`, the number `1`, a missing key, `false`, or
+any other value is not support. Python must then reject the STOP-control request
+locally with `stop_control_capability_unavailable` and must not send a control
+frame.
 
 The Java bridge must not call `TaskRunner`, Baritone APIs, input override APIs,
 path/goal APIs, or Minecraft player/world mutation APIs during Phase 4 command
 transport. `CommandExecutor.execute(...)` is allowed only from the dedicated
 client-tick dispatcher.
 
-## Phase 4 Command Flow
+## Phase 4 Ordinary Command Flow
 
-Python sends `command_request` only when there is an active Fabric Java bridge
-session and no active command request:
+Python sends an ordinary `command_request` only when there is an active Fabric
+Java bridge session and no pending or active ordinary command request. The
+additive STOP-control profile below uses the same v1 envelope type but a
+separate priority lane, barrier, and quarantine lifecycle:
 
 ```text
 message_type = command_request
@@ -285,8 +329,153 @@ CommandExecutor.execute(command, onFinish, onException)
 command_result send
 ```
 
-Only one command may be pending or active. Disconnection clears the Java queue
-and does not replay the command on reconnect.
+Only one ordinary command may be pending or active. Disconnection clears the
+ordinary Java queue and does not replay that command on reconnect. STOP-control
+admission and replay behavior are governed by the additive profile below.
+
+## Additive STOP-Control Profile Within V1
+
+The STOP-control lane stops current global ChatClef automation through the
+existing registered `StopCommand -> AltoClef.stop()` path. It is not an
+ordinary second task command and does not weaken ordinary single-active-command
+admission. WebSocket callbacks validate and enqueue only; `END_CLIENT_TICK`
+owns the Minecraft/ChatClef mutation.
+
+The profile reuses these existing v1 values:
+
+```text
+protocol_version = 1
+request envelope message_type = command_request
+result envelope message_type = command_result
+```
+
+No `BridgeMessageType`, `CommandRequestDTO`, `CommandResultDTO`, common JSON
+schema union, or backend-neutral status value is added.
+
+### STOP-Control Request Metadata
+
+The request payload is an ordinary `CommandRequestDTO` with:
+
+```text
+request_id = unique STOP-control request ID
+command = stop
+source = lavi_chat_ui | voice_input_final
+deadline_ms = Python submission time + 2000 ms
+
+metadata.request_kind = stop_control_v1
+metadata.operation = stop_ai
+metadata.input_event.source
+metadata.input_event.provider_id
+metadata.input_event.event_kind
+metadata.input_event.final
+metadata.input_event.event_id
+metadata.server_connection_generation
+metadata.target_scope = tracked_command | current_global_automation
+```
+
+`metadata.input_event` is bounded audit correlation copied only after Python's
+in-process trusted-ingress and one-shot STOP claim checks. It is not a
+serializable claim or independent Java authorization. No claim receipt, nonce,
+registry token, or capability object crosses the wire.
+
+For `target_scope=tracked_command`, all four fields below are required and form
+one immutable original-command retirement correlation quartet:
+
+```text
+metadata.target_request_id
+metadata.target_command_message_id
+metadata.target_session_id
+metadata.target_server_connection_generation
+```
+
+For `target_scope=current_global_automation`, all four target fields are
+forbidden. Target fields correlate retirement of a Python-tracked ordinary
+command; they do not narrow the global effect of `AltoClef.stop()`.
+
+A frame with either exact marker, or `command=stop` plus presence of either
+marker key, is a STOP-control candidate. Once claimed as a candidate it must not
+fall through to the ordinary queue when the profile is partial or malformed.
+An ordinary legacy `command=stop` request with neither marker key preserves its
+pre-existing ordinary-command behavior.
+
+### STOP-Control Result Data
+
+A STOP-control result is an ordinary `CommandResultDTO`. Its envelope and
+payload echo the request identity as follows:
+
+```text
+payload.request_id = original STOP-control request_id
+envelope.correlation_id = original command_request envelope message_id
+envelope.session_id = original command_request session_id
+data.connection_generation = original metadata.server_connection_generation
+```
+
+Every wire-result-eligible STOP terminal carries this complete additive `data`
+profile:
+
+```text
+data.request_kind = stop_control_v1
+data.operation = stop_ai
+data.control_outcome = stopped | rejected | unknown
+data.control_reason
+data.target_scope = tracked_command | current_global_automation | null
+data.target_resolution = not_evaluated | exact | captured_current | none | unknown
+
+data.requested_target_request_id
+data.requested_target_command_message_id
+data.requested_target_session_id
+data.requested_target_server_connection_generation
+
+data.resolved_target_request_id
+data.resolved_target_command_message_id
+data.resolved_target_session_id
+data.resolved_target_server_connection_generation
+
+data.target_state_before = pending | active | none | not_evaluated | unknown
+data.target_state_after = retired | unchanged | none | not_evaluated | unknown
+data.original_result_delivery = sent | not_applicable | failed | unknown
+data.stop_command_invoked = true | false
+data.connection_generation
+data.java_socket_generation
+data.executed_client_tick
+data.verified_client_tick
+```
+
+`connection_generation` is Python's server-assigned generation and participates
+in result acceptance. `java_socket_generation` is a distinct positive Java-local
+diagnostic fence; the two values must not be assumed equal. Tick values are
+non-negative integers or null. A captured-context result may verify from tick
+`T` through `T+20`; a no-context success must use
+`executed_client_tick=verified_client_tick=T`.
+
+The closed terminal classes are:
+
+| Result class | `status` / `ok` / `error_code` | `control_outcome` | Meaning |
+| --- | --- | --- | --- |
+| Verified STOP | `completed` / `true` / `null` | `stopped` | `StopCommand` ran exactly once and the applicable original-command retirement evidence is complete. |
+| Proved no mutation | `rejected` / `false` / `invalid_request` | `rejected` | Profile, session, generation, scope, target fields, or distinct in-flight admission rejected the request without STOP mutation. |
+| Deadline before mutation | `deadline_exceeded` / `false` / `deadline_exceeded` | `rejected` | The bounded control deadline expired before STOP mutation. |
+| Uncertain | `unknown` / `false` / `null` or `internal_error` | `unknown` | Observation, invocation, original-result delivery, or bounded verification could not prove a safe terminal. No automatic replay is allowed. |
+
+Python validates the complete profile and the live tracker identity before
+publishing a terminal response or releasing its STOP barrier. A partial,
+contradictory, unknown-reason, stale, or untracked STOP-marked result is not
+passed to the ordinary result handler. `unknown` is quarantine evidence, not a
+barrier-release authority and not proof that the AI stopped.
+
+### Compatibility Matrix
+
+| Python side | Fabric Java side | Required behavior |
+| --- | --- | --- |
+| STOP-profile aware | Advertises literal `chatclef_stop_control_v1=true` | The guarded STOP-control request/result profile may be used. |
+| STOP-profile aware | Capability absent, `false`, or not literal boolean `true` | Send zero STOP-control frames; return the local capability-unavailable rejection. Ordinary commands remain unchanged. |
+| Legacy/unaware | STOP-profile aware | The capability is ignored. A legacy `command=stop` without marker keys follows the existing ordinary path; Java does not synthesize a control request. |
+| Legacy/unaware | Legacy/unaware | Existing v1 command dispatch remains unchanged. |
+| STOP-profile aware | STOP-profile aware but a control candidate is malformed | The control validator owns the candidate and rejects or quarantines it fail-closed; it never falls through as an ordinary second command. |
+
+The capability and profile are Fabric ChatClef-owned. They do not create a
+Forge/MineMind value, placeholder, transport, queue, session implementation, or
+runtime dependency.
 
 ## Phase 5 GUI Boundary
 
