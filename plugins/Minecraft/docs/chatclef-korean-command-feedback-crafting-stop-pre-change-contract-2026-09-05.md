@@ -52,14 +52,18 @@ COMMIT_PUSH: AUTHORIZED_IN_FOLLOW_UP
 ```
 
 The source, focused behavior, full Python regression, Java tests, and required
-clean forced Gradle build are verified offline. This does not claim deployment,
-Minecraft launch, live-world behavior, release publication, commit, or push.
+clean forced Gradle build were verified during the offline implementation
+phase. That offline evidence alone did not establish deployment, Minecraft
+launch, live-world behavior, release publication, commit, or push; the current
+fields above and the live-runtime update below separately record the later
+matching-JAR evidence.
 
 ### 0.1 Post-offline live-runtime update
 
-The point-in-time `DEPLOYMENT: NOT_RUN` and `MINECRAFT_RUNTIME: NOT_RUN` fields
-above describe the close of the offline implementation ledger. A later
-matching-JAR live run on `2026-09-05` produced this narrower current status:
+The historical Section 1 fields `DEPLOYMENT_IN_THIS_TASK: NOT_PERFORMED` and
+`MINECRAFT_RUNTIME_IN_THIS_TASK: NOT_RUN` below describe the close of the
+documentation-only implementation ledger. A later matching-JAR live run on
+`2026-09-05` produced this narrower current status:
 
 ```text
 POST_LEDGER_STATUS_DATE: 2026-09-06
@@ -1957,6 +1961,7 @@ The required final build command was executed exactly as:
 .\gradlew.bat clean build --rerun-tasks
 ```
 
-Deployment, CurseForge JAR overwrite, Minecraft launch, live-world mutation,
-commit, and push were not part of this implementation verification and remain
-`NOT_RUN` / `NOT_PERFORMED`.
+At the close of this offline implementation verification, deployment,
+CurseForge JAR overwrite, Minecraft launch, live-world mutation, commit, and
+push were `NOT_RUN` / `NOT_PERFORMED`. The later matching-JAR deployment and
+runtime evidence is recorded in Sections 0 and 0.1.

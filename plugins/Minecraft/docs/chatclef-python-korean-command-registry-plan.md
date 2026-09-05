@@ -828,7 +828,7 @@ command snapshots or turn the five crafting phrases into global registry rows.
 The owning implementation contract is
 [ChatClef Korean Command Feedback, Generic Crafting, and Stop Pre-Change Contract](chatclef-korean-command-feedback-crafting-stop-pre-change-contract-2026-09-05.md).
 
-Current worktree status:
+Recorded offline-ledger and initial post-ledger status:
 
 ```text
 OVERALL_FEATURE_STATUS: IMPLEMENTED_VERIFIED_OFFLINE
