@@ -1,12 +1,6 @@
-#20260905_kpopmodder: Binds one stable callback to one immutable descriptor-derived provider policy.
-import secrets
-
-from input_core.input_event.contracts.lavi_input_event import LaviInputEvent
-from input_core.input_event.normalization.input_event_text_normalizer import (
-    InputEventTextNormalizer,
-)
-from input_core.input_event.provenance.input_provider_source_resolver import (
-    InputProviderSourceResolver,
+#20260905_kpopmodder: Preserves the provider-bound input adapter API.
+from .provider_bound import (
+    ProviderBoundInputEventAdapterComponentGraph,
 )
 
 
@@ -20,31 +14,33 @@ class ProviderBoundInputEventAdapter:
         event_id_factory=None,
         text_normalizer=None,
     ):
-        self._output_callback = output_callback
-        self._policy = (source_resolver or InputProviderSourceResolver()).resolve(
-            provider
+        self._components = ProviderBoundInputEventAdapterComponentGraph(
+            provider=provider,
+            output_callback=output_callback,
+            source_resolver=source_resolver,
+            event_id_factory=event_id_factory,
+            text_normalizer=text_normalizer,
         )
-        self._event_id_factory = event_id_factory or self._create_event_id
-        self._text_normalizer = text_normalizer or InputEventTextNormalizer()
+        self._event_factory = self._components.event_factory
+        self._forwarder = self._components.forwarder
+        self._output_callback = self._forwarder.output_callback
+        self._policy = self._event_factory.policy
+        self._event_id_factory = self._event_factory.event_id_factory
+        self._text_normalizer = self._event_factory.text_normalizer
 
     @property
     def policy(self):
         return self._policy
 
     def __call__(self, payload):
-        event = LaviInputEvent(
-            text=self._text_normalizer.normalize(payload),
-            source=self._policy.source,
-            event_id=self._event_id_factory(),
-            event_kind=self._policy.event_kind,
-            final=self._policy.final,
-            provider_id=self._policy.provider_id,
-            fallback_payload=payload,
-        )
-        return self._output_callback(event)
+        event = self.adapt(payload)
+        return self._forwarder.forward(event)
+
+    def adapt(self, payload):
+        return self._event_factory.create(payload)
 
     def _create_event_id(self) -> str:
-        return secrets.token_hex(16)
+        return self._event_factory._create_event_id()
 
 
-__all__ = ["ProviderBoundInputEventAdapter"]
+__all__ = ("ProviderBoundInputEventAdapter",)

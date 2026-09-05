@@ -1,109 +1,97 @@
 #20260717_kpopmodder: Moved Input implementation out of the root legacy facade.
+#20260905_kpopmodder: Keeps Input as the compatibility facade over focused collaborators.
 from plugin_system.interfaces import InputPluginInterface
 from plugin_system.selection import PluginSelectionBase
 
-from core.logger import log_print#20260612_kpopmodder
-from input_core.input_event.adapters import ProviderBoundInputEventAdapter
-from input_core.input_event.normalization import LaviInputEventNormalizer
-from input_core.input_event.provenance import InputProviderSourceResolver
+from input_core.component import InputCompatibilityGraphInstaller
 
 
 class Input(PluginSelectionBase):
     #20260717_kpopmodder: Root Input.py now re-exports this compatibility implementation.
     def __init__(self) -> None:
         super().__init__(InputPluginInterface)
-        self._shutdown = False
-        self.output_event_listeners = []
-        #20260905_kpopmodder: Provider callbacks retain descriptor-bound identity across every listener sync.
-        self._provider_source_resolver = InputProviderSourceResolver()
-        self._input_event_normalizer = LaviInputEventNormalizer()
-        self._provider_input_event_adapters = {}
-        self._sync_provider_listeners()
+        self._get_compatibility_graph_installer().install()
+
+    def _get_compatibility_graph_installer(self):
+        installer = getattr(self, "_input_compatibility_graph_installer", None)
+        if installer is None:
+            installer = InputCompatibilityGraphInstaller(
+                self,
+                create_provider_selection_ui_callback=(
+                    super().create_plugin_selection_ui
+                ),
+                create_all_provider_ui_callback=super().create_all_provider_ui,
+                select_provider_callback=super().on_dropdown_change,
+                base_shutdown_callback=super().shutdown,
+            )
+            self._input_compatibility_graph_installer = installer
+        return installer
+
+    @property
+    def output_event_listeners(self):
+        return self._get_output_dispatcher().listeners
+
+    @output_event_listeners.setter
+    def output_event_listeners(self, value):
+        self._get_output_dispatcher().listeners = value
+
+    def _get_output_dispatcher(self):
+        return (
+            self._get_compatibility_graph_installer()
+            .ensure_output_dispatcher()
+        )
 
     def create_ui(self):
-        import gradio as gr
-
-        with gr.Tab("Input"):
-            with gr.Blocks():
-                super().create_plugin_selection_ui()
-
-            #20260716_kpopmodder: Keep Twitch/Youtube chat panels visible; input providers can run as simultaneous sources.
-            super().create_all_provider_ui()
-            self._sync_provider_listeners()
+        return (
+            self._get_compatibility_graph_installer()
+            .ensure_ui_builder()
+            .build()
+        )
 
     def create_all_provider_ui(self):
-        super().create_all_provider_ui()
-        self._sync_provider_listeners()
+        return (
+            self._get_compatibility_graph_installer()
+            .ensure_provider_selection_coordinator()
+            .create_all_provider_ui()
+        )
 
     def on_dropdown_change(self, provider_name):
-        selected_name = super().on_dropdown_change(provider_name)
-        self._sync_provider_listeners()
-        return selected_name
+        return (
+            self._get_compatibility_graph_installer()
+            .ensure_provider_selection_coordinator()
+            .select_provider(provider_name)
+        )
 
     def _sync_provider_listeners(self):
-        #20260905_kpopmodder: Each constructed provider owns one stable descriptor-bound ingress callback.
-        for provider in list(self.provider_list):
-            plugin = getattr(provider, "plugin", None)
-            if plugin is None:
-                continue
-            listeners = self._provider_listener_list(plugin)
-            while self.send_output in listeners:
-                listeners.remove(self.send_output)
-            adapter = self._provider_input_event_adapters.get(provider)
-            if adapter is None:
-                adapter = ProviderBoundInputEventAdapter(
-                    provider=provider,
-                    output_callback=self.send_output,
-                    source_resolver=self._provider_source_resolver,
-                )
-                self._provider_input_event_adapters[provider] = adapter
-            while adapter in listeners:
-                listeners.remove(adapter)
-            if not getattr(provider, "disabled", False):
-                listeners.append(adapter)
+        self._provider_input_event_binding_lifecycle.sync()
+        self._provider_binding_request_registry.reconcile()
 
-    def _provider_listener_list(self, plugin):
-        listeners = getattr(plugin, "input_event_listeners", None)
-        if listeners is None:
-            listeners = []
-            plugin.input_event_listeners = listeners
-        return listeners
+    def bind_provider_input_event_listener(
+        self,
+        provider_id,
+        listener_factory,
+    ):
+        """Replace one descriptor-identified provider callback with a composed edge."""
+        return self._provider_binding_request_registry.bind(
+            provider_id,
+            listener_factory,
+        )
 
-    def send_output(self, output):
-        event = self._input_event_normalizer.normalize(output)
-        log_print(event.text)#20260612_kpopmodder
-        for subcriber in list(self.output_event_listeners):
-            subcriber(event)
+    def send_output(self, output, *, excluded_listeners=()):
+        return self._get_output_dispatcher().send(
+            output,
+            excluded_listeners=excluded_listeners,
+        )
 
     def add_output_event_listener(self, function):
-        if function in self.output_event_listeners:
-            return
-        self.output_event_listeners.append(function)
+        return self._get_output_dispatcher().add(function)
 
     def remove_output_event_listener(self, function):
-        removed = False
-        while function in self.output_event_listeners:
-            self.output_event_listeners.remove(function)
-            removed = True
-        return removed
+        return self._get_output_dispatcher().remove(function)
 
     def shutdown(self):
-        if self._shutdown:
-            return
-
-        self._shutdown = True
-        #20260623_kpopmodder: Remove provider listener links so rebuilt Input instances do not receive stale events.
-        for provider in list(self.provider_list):
-            plugin = getattr(provider, "plugin", None)
-            listeners = getattr(plugin, "input_event_listeners", None)
-            if listeners is None:
-                continue
-            while self.send_output in listeners:
-                listeners.remove(self.send_output)
-            adapter = self._provider_input_event_adapters.get(provider)
-            while adapter is not None and adapter in listeners:
-                listeners.remove(adapter)
-
-        self._provider_input_event_adapters.clear()
-        self.output_event_listeners.clear()
-        super().shutdown()
+        return (
+            self._get_compatibility_graph_installer()
+            .ensure_lifecycle_coordinator()
+            .shutdown()
+        )
