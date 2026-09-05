@@ -476,10 +476,10 @@ Python Korean command registry planning:
 H5 Korean Chat/microphone pre-change contract:
   chatclef-h5-auto-deposit-trust-korean-chat-microphone-pre-change-contract-2026-09-04.md
 
-Chat/final-microphone Korean command feedback, scoped GET defaults, and STOP contract (implemented and verified offline; pre-fix wooden-button runtime regression recorded; corrected runtime verification pending):
+Chat/final-microphone Korean command feedback, scoped GET defaults, and STOP contract (implemented; matching-JAR generic-button runtime evidence recorded for Chat and final microphone; explicit oak/stone-button comparison pending):
   chatclef-korean-command-feedback-crafting-stop-pre-change-contract-2026-09-05.md
 
-Generic wooden-button StackOverflow root cause, applied correction, and offline-built/runtime-unverified status:
+Generic wooden-button StackOverflow root cause, applied correction, clean-build proof, and matching-JAR `PARTIALLY_VERIFIED` runtime status:
   chatclef-wooden-button-stack-overflow-pre-change-report-2026-09-06.md
 
 Python inventory cleanup preflight contract:
