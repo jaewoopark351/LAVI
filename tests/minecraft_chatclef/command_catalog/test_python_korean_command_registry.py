@@ -203,13 +203,12 @@ class PythonKoreanCommandRegistryTests(unittest.TestCase):
                     spec.confirmation_mode,
                 )
 
-    def test_control_or_lifecycle_open_commands_are_parse_ready_but_not_public(self):
+    def test_lifecycle_open_commands_are_parse_ready_but_not_public(self):
         registry = KoreanChatClefCommandRegistry()
 
         expectations = {
             "follow": ("direct_typed_confirmation_required", ("direct_typed_only",)),
             "idle": ("direct_typed_confirmation_required", ("direct_typed_only",)),
-            "stop": ("none", ("direct_typed",)),
         }
         for command, (confirmation_mode, allowed_sources) in expectations.items():
             with self.subTest(command=command):
@@ -221,6 +220,32 @@ class PythonKoreanCommandRegistryTests(unittest.TestCase):
                 self.assertFalse(spec.readiness_axes.public_korean_enabled)
                 self.assertEqual(confirmation_mode, spec.confirmation_mode)
                 self.assertEqual(allowed_sources, spec.allowed_input_sources)
+
+    #20260905_kpopmodder: STOP is public-ready only through its guarded control lane.
+    def test_stop_has_separate_public_control_readiness(self):
+        spec = KoreanChatClefCommandRegistry().spec("stop")
+
+        self.assertTrue(spec.readiness_axes.source_registered)
+        self.assertTrue(spec.readiness_axes.korean_parse_compile_ready)
+        self.assertTrue(spec.readiness_axes.python_admission_ready)
+        self.assertTrue(spec.readiness_axes.bridge_lifecycle_ready)
+        self.assertTrue(spec.readiness_axes.public_korean_enabled)
+        self.assertEqual("control", spec.lifecycle_kind)
+        self.assertEqual(("lavi_chat_ui", "voice_input_final"), spec.allowed_input_sources)
+
+    def test_registry_metadata_tables_are_immutable(self):
+        registry = KoreanChatClefCommandRegistry()
+
+        for table, key in (
+            (registry._SAFETY_TIERS, "get"),
+            (registry._RESOLVER_DOMAINS, "get"),
+            (registry._SLOT_SCHEMAS, "get"),
+        ):
+            with self.subTest(key=key):
+                with self.assertRaises(TypeError):
+                    table[key] = "changed"
+
+        self.assertEqual("R1", registry.spec("get").safety_tier)
 
 
 if __name__ == "__main__":

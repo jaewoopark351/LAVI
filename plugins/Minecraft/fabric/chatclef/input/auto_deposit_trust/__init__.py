@@ -14,8 +14,9 @@ from .exact_input import (
     AutoDepositTrustExactInputAdapter,
 )
 from .safety import AutoDepositTrustRawInputSafety
+from .routing import AutoDepositTrustRouteCoordinator
 
-__all__ = [
+__all__ = (
     "AutoDepositTrustExactInputAdaptation",
     "AutoDepositTrustExactInputAdapter",
     "AutoDepositTrustInputAdmission",
@@ -25,4 +26,5 @@ __all__ = [
     "AutoDepositTrustInputClaimReceipt",
     "AutoDepositTrustInputEventClaimRegistry",
     "AutoDepositTrustRawInputSafety",
-]
+    "AutoDepositTrustRouteCoordinator",
+)

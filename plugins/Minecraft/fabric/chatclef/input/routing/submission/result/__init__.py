@@ -6,11 +6,11 @@ from .submission_payload_parser import SubmissionPayloadParser
 from .submission_result_factory import SubmissionResultFactory
 from .submission_result_validator import SubmissionResultValidator
 
-__all__ = [
+__all__ = (
     "CanonicalSubmissionResult",
     "CanonicalSubmissionResultFactory",
     "SubmissionOutcomeConsistency",
     "SubmissionPayloadParser",
     "SubmissionResultFactory",
     "SubmissionResultValidator",
-]
+)

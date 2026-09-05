@@ -1,4 +1,5 @@
 #20260819_kpopmodder: Verify ChatClef replies do not overclaim gameplay effects.
+#20260905_kpopmodder: Lock legacy shared wording and prevent scoped-profile leaks.
 from __future__ import annotations
 
 import unittest
@@ -85,20 +86,71 @@ class ChatClefCommandResponseRendererTests(unittest.TestCase):
     def test_precheck_replies_are_korean_and_state_specific(self):
         renderer = ChatClefCommandResponseRenderer()
 
-        self.assertIn(
-            "연결이 끊겨",
+        self.assertEqual(
+            "[Minecraft] 마인크래프트 연결이 끊겨 있어요.",
             renderer.render_precheck_rejection(
                 "minecraft_bridge_disconnected",
                 "not connected",
             ),
         )
-        self.assertIn(
-            "다른 마인크래프트 작업",
+        self.assertEqual(
+            "[Minecraft] 지금 다른 마인크래프트 작업을 하고 있어요.",
             renderer.render_precheck_rejection(
                 "minecraft_command_busy",
                 "already active",
             ),
         )
+
+    def test_unknown_result_preserves_legacy_message_and_no_message_wording(self):
+        renderer = ChatClefCommandResponseRenderer()
+        translation = _translation("diamond", "다이아몬드")
+
+        with_message = renderer.render_submitted(
+            translation,
+            {
+                "ok": False,
+                "status": {"status": "unknown", "ok": False, "data": {}},
+                "message": "connection closed",
+                "details": {},
+            },
+        )
+        without_message = renderer.render_submitted(
+            translation,
+            {
+                "ok": False,
+                "status": {"status": "unknown", "ok": False, "data": {}},
+                "message": "",
+                "details": {},
+            },
+        )
+
+        self.assertEqual(
+            "[Minecraft] 명령 결과를 확정하지 못했어요: connection closed",
+            with_message,
+        )
+        self.assertEqual(
+            "[Minecraft] 명령 결과를 확정하지 못했어요. 자동으로 다시 보내지 않아요.",
+            without_message,
+        )
+
+    def test_serialized_generic_profile_marker_does_not_change_shared_wording(self):
+        translation = _translation("trapdoor", "다락문")
+        translation["data"] = {
+            "resolution": {
+                "data": {"profile_id": "generic_crafting_defaults_v1"}
+            }
+        }
+
+        response = ChatClefCommandResponseRenderer().render_submitted(
+            translation,
+            _result(status="accepted", ok=True),
+        )
+
+        self.assertEqual(
+            "[Minecraft] 다락문 1개 수집 명령을 제출했어요.",
+            response,
+        )
+        self.assertNotIn("준비하도록", response)
 
 
 def _translation(

@@ -27,13 +27,30 @@ class MinecraftInputRouterWiring:
             from plugins.Minecraft.fabric.chatclef.input import (
                 MinecraftChatClefInputRouter,
             )
+            from plugins.Minecraft.fabric.chatclef.input.eligibility import (
+                KoreanChatMicrophoneEligibilityAdmission,
+            )
         except Exception as error:
             raise AppComponentWiringError(
                 "minecraft_input_router_import",
                 f"{type(error).__name__}: {error}",
             ) from error
         try:
-            router = MinecraftChatClefInputRouter(extension=extension)
+            evidence_validator = getattr(
+                llm,
+                "validate_trusted_consumed_ingress_evidence",
+                None,
+            )
+            router = MinecraftChatClefInputRouter(
+                extension=extension,
+                korean_eligibility_admission=(
+                    KoreanChatMicrophoneEligibilityAdmission(
+                        evidence_validator
+                        if callable(evidence_validator)
+                        else None
+                    )
+                ),
+            )
         except Exception as error:
             raise AppComponentWiringError(
                 "minecraft_input_router_construction",
@@ -52,4 +69,4 @@ class MinecraftInputRouterWiring:
         return router
 
 
-__all__ = ["MinecraftInputRouterWiring"]
+__all__ = ("MinecraftInputRouterWiring",)

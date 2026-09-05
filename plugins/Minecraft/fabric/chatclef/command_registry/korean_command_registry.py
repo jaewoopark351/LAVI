@@ -1,10 +1,13 @@
 #20260820_kpopmodder: Keep full ChatClef command registry metadata separate from compilers.
+#20260905_kpopmodder: Register the trusted Chat/final-Voice STOP control readiness profile.
 #20260827_kpopmodder: Register private-rollout STORE_HOME readiness and source policy.
 #20260828_kpopmodder: Public-enable STORE_HOME for user-approved live chat and microphone validation.
 #20260829_openai: Register deposit_all as raw-only shadow metadata without Korean readiness.
 #20260901_kpopmodder: Consume command metadata from its focused contract package.
 #20260905_kpopmodder: Add source-backed H5 rows with independent readiness and migrated ingress sources.
 from __future__ import annotations
+
+from types import MappingProxyType
 
 from plugins.Minecraft.fabric.chatclef.command_registry.contracts import (
     ChatClefCommandReadinessAxes,
@@ -81,6 +84,7 @@ class KoreanChatClefCommandRegistry:
             "give",
             "goto",
             "meat",
+            "stop",
             "store_home",
         }
     )
@@ -110,6 +114,7 @@ class KoreanChatClefCommandRegistry:
             "give",
             "goto",
             "meat",
+            "stop",
             "store_home",
         }
     )
@@ -128,7 +133,7 @@ class KoreanChatClefCommandRegistry:
         }
     )
     _GAMEPLAY_VERIFIABLE_COMMANDS = frozenset({"get", "store_home"})
-    _SAFETY_TIERS = {
+    _SAFETY_TIERS = MappingProxyType({
         "attack": "R3",
         "auto_deposit_trust": "R2",
         "auto_deposit_trusted_list": "R0",
@@ -155,14 +160,14 @@ class KoreanChatClefCommandRegistry:
         "stop": "R0",
         "store_home": "R2",
         "자동보관등록": "R2",
-    }
-    _RESOLVER_DOMAINS = {
+    })
+    _RESOLVER_DOMAINS = MappingProxyType({
         "deposit": "item_target",
         "equip": "equipment_item_target",
         "get": "item_target",
         "give": "player_and_item_target",
-    }
-    _SLOT_SCHEMAS = {
+    })
+    _SLOT_SCHEMAS = MappingProxyType({
         "attack": ("target", "count?"),
         "auto_deposit_trust": (),
         "auto_deposit_trusted_list": (),
@@ -189,7 +194,7 @@ class KoreanChatClefCommandRegistry:
         "stop": (),
         "store_home": (),
         "자동보관등록": (),
-    }
+    })
 
     def __init__(self) -> None:
         missing_parse = self._PUBLIC_KOREAN_COMMANDS - self._PARSER_READY_COMMANDS
@@ -258,6 +263,7 @@ class KoreanChatClefCommandRegistry:
             "follow",
             "food",
             "meat",
+            "stop",
             "store_home",
         }:
             return "task"
@@ -278,6 +284,8 @@ class KoreanChatClefCommandRegistry:
             return ("lavi_chat_ui", "voice_input_final")
         if command == "store_home":
             return ("lavi_chat_ui", "voice_input_final", "direct_typed")
+        if command == "stop":
+            return ("lavi_chat_ui", "voice_input_final")
         if command in self._PUBLIC_KOREAN_COMMANDS:
             return (
                 "lavi_chat_ui",
@@ -285,8 +293,6 @@ class KoreanChatClefCommandRegistry:
                 "direct_typed",
                 "lavi_gui_korean",
             )
-        if command == "stop":
-            return ("direct_typed",)
         if self._SAFETY_TIERS[command] in {"R3", "R4"}:
             return ("direct_typed_only",)
         return ()

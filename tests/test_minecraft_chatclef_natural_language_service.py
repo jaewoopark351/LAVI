@@ -70,6 +70,17 @@ class MinecraftChatClefNaturalLanguageServiceTests(unittest.TestCase):
                 self.assertIsNone(result.command)
                 self.assertEqual(expected_status, result.status)
 
+    def test_item_action_intent_table_is_immutable(self):
+        service = ChatClefNaturalLanguageService()
+
+        with self.assertRaises(AttributeError):
+            service._ITEM_ACTION_INTENTS.add("changed")
+
+        self.assertEqual(
+            "get redstone 5",
+            service.translate("레드스톤 5개 구해줘").command,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

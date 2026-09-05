@@ -1,4 +1,5 @@
 #20260803_kpopmodder: Added Korean item phrase resolution before ChatClef DSL compilation.
+#20260905_kpopmodder: Keep resolver vocabulary immutable across requests.
 from __future__ import annotations
 
 import re
@@ -21,9 +22,9 @@ from plugins.Minecraft.fabric.chatclef.intent.korean_text_normalizer import (
 
 
 class KoreanItemPhraseResolver:
-    _AMBIGUOUS_PHRASES = {"갑옷", "도구", "장비"}
-    _UNKNOWN_PHRASES = {"아무거나"}
-    _UNSUPPORTED_MATERIALS = {"구리", "동"}
+    _AMBIGUOUS_PHRASES = frozenset({"갑옷", "도구", "장비"})
+    _UNKNOWN_PHRASES = frozenset({"아무거나"})
+    _UNSUPPORTED_MATERIALS = frozenset({"구리", "동"})
 
     def __init__(
         self,

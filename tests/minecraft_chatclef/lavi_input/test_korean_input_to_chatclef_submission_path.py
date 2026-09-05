@@ -161,7 +161,7 @@ class KoreanInputToChatClefSubmissionPathTests(unittest.TestCase):
         self.assertEqual([], adapter.requests)
 
     def test_parse_ready_non_public_commands_do_not_reach_adapter(self):
-        for text in ["Steve 따라가", "가만히 있어", "멈춰"]:
+        for text in ["Steve 따라가", "가만히 있어"]:
             with self.subTest(text=text):
                 adapter = _RecordingAdapter()
                 extension = MinecraftFabricChatClefExtension(adapter=adapter)
@@ -177,6 +177,25 @@ class KoreanInputToChatClefSubmissionPathTests(unittest.TestCase):
                 self.assertEqual("invalid_request", decision.result.get("error"))
                 self.assertFalse(decision.result["details"]["public_korean_enabled"])
                 self.assertEqual([], adapter.requests)
+
+    def test_stop_requires_the_separate_trusted_control_lane(self):
+        adapter = _RecordingAdapter()
+        extension = MinecraftFabricChatClefExtension(adapter=adapter)
+        router = MinecraftChatClefInputRouter(
+            extension=extension,
+            log_callback=lambda _message: None,
+        )
+
+        decision = router.route("멈춰")
+
+        self.assertTrue(decision.handled)
+        self.assertEqual("minecraft_command_rejected", decision.reason)
+        self.assertEqual(
+            "stop_control_claim_required",
+            decision.result["details"].get("admission_reason"),
+        )
+        self.assertTrue(decision.result["details"]["public_korean_enabled"])
+        self.assertEqual([], adapter.requests)
 
     def test_connected_precheck_blocks_disconnected_adapter_submission(self):
         adapter = _RecordingAdapter(connected=False)

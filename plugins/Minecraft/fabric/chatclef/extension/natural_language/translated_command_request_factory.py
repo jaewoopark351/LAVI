@@ -1,4 +1,5 @@
 #20260827_kpopmodder: Added this module to keep one project class per Python file.
+#20260905_kpopmodder: Preserve optional exact raw event text in scoped natural-language metadata.
 from __future__ import annotations
 
 import uuid
@@ -23,6 +24,7 @@ class TranslatedCommandRequestFactory:
         translation_input_text = str(
             route_input.get("translation_input_text") or original_text
         )
+        raw_event_text = route_input.get("raw_event_text")
         input_event = metadata.get("input_event")
         if isinstance(input_event, Mapping):
             metadata["input_event"] = {
@@ -37,12 +39,15 @@ class TranslatedCommandRequestFactory:
             }
         else:
             metadata.pop("input_event", None)
-        metadata["natural_language"] = {
+        natural_language = {
             "language": "ko",
             "original_text": original_text,
             "translation_input_text": translation_input_text,
             "translation": translation.to_dict(),
         }
+        if type(raw_event_text) is str:
+            natural_language["raw_event_text"] = raw_event_text
+        metadata["natural_language"] = natural_language
         return CommandRequestDTO(
             request_id=payload.get("request_id", f"lavi-ko-{uuid.uuid4().hex}"),
             command=str(translation.command or ""),

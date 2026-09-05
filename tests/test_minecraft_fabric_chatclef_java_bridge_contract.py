@@ -70,14 +70,26 @@ class MinecraftFabricChatClefJavaBridgeContractTests(unittest.TestCase):
             / "command"
             / "FabricChatClefCommandDispatcher.java"
         ).read_text(encoding="utf-8")
+        ordinary_dispatcher_text = (
+            BRIDGE_ROOT
+            / "command"
+            / "FabricChatClefOrdinaryCommandDispatchCoordinator.java"
+        ).read_text(encoding="utf-8")
+        executor_invocation_text = (
+            BRIDGE_ROOT
+            / "command"
+            / "FabricChatClefOrdinaryCommandExecutorInvocation.java"
+        ).read_text(encoding="utf-8")
         client_text = (
             BRIDGE_ROOT
             / "transport"
             / "FabricChatClefBridgeClient.java"
         ).read_text(encoding="utf-8")
 
-        self.assertIn("CommandExecutor", dispatcher_text)
-        self.assertIn("executor.execute(", dispatcher_text)
+        self.assertIn("ordinaryCommandDispatcher::dispatch", dispatcher_text)
+        self.assertIn("CommandExecutor", ordinary_dispatcher_text)
+        self.assertIn("executorInvocation.invoke", ordinary_dispatcher_text)
+        self.assertIn("executor.execute(", executor_invocation_text)
         self.assertNotIn("CommandExecutor", client_text)
         self.assertNotIn("executor.execute(", client_text)
 
@@ -122,15 +134,36 @@ class MinecraftFabricChatClefJavaBridgeContractTests(unittest.TestCase):
             / "command"
             / "FabricChatClefCommandDispatcher.java"
         ).read_text(encoding="utf-8")
+        ordinary_dispatcher_text = (
+            BRIDGE_ROOT
+            / "command"
+            / "FabricChatClefOrdinaryCommandDispatchCoordinator.java"
+        ).read_text(encoding="utf-8")
+        running_result_publisher_text = (
+            BRIDGE_ROOT
+            / "command"
+            / "FabricChatClefOrdinaryCommandRunningResultPublisher.java"
+        ).read_text(encoding="utf-8")
+        executor_invocation_text = (
+            BRIDGE_ROOT
+            / "command"
+            / "FabricChatClefOrdinaryCommandExecutorInvocation.java"
+        ).read_text(encoding="utf-8")
         execution_root = BRIDGE_ROOT / "command" / "execution"
 
         self.assertTrue(execution_root.exists())
-        self.assertIn("FabricChatClefCommandExecution", dispatcher_text)
-        self.assertIn("execution.runningResult()", dispatcher_text)
-        self.assertNotIn("unknownAfterFinish", dispatcher_text)
-        self.assertIn("completeCommandException", dispatcher_text)
-        self.assertIn("completeDispatchException", dispatcher_text)
-        self.assertNotIn("FabricChatClefCommandResult.completed(", dispatcher_text)
+        self.assertIn("ordinaryCommandDispatcher::dispatch", dispatcher_text)
+        self.assertIn("FabricChatClefCommandExecution", ordinary_dispatcher_text)
+        self.assertIn("runningResultPublisher.publish", ordinary_dispatcher_text)
+        self.assertIn("executorInvocation.invoke", ordinary_dispatcher_text)
+        self.assertIn("execution.runningResult()", running_result_publisher_text)
+        self.assertNotIn("unknownAfterFinish", executor_invocation_text)
+        self.assertIn("completeCommandException", executor_invocation_text)
+        self.assertIn("completeDispatchException", executor_invocation_text)
+        self.assertNotIn(
+            "FabricChatClefCommandResult.completed(",
+            running_result_publisher_text + executor_invocation_text,
+        )
         status_text = (
             BRIDGE_ROOT
             / "command"
@@ -183,18 +216,51 @@ class MinecraftFabricChatClefJavaBridgeContractTests(unittest.TestCase):
         coordinator_text = (
             lifecycle_root / "FabricChatClefCommandLifecycleCoordinator.java"
         ).read_text(encoding="utf-8")
+        terminal_dispatcher_text = (
+            lifecycle_root
+            / "terminal"
+            / "FabricChatClefCommandTerminalResultDispatcher.java"
+        ).read_text(encoding="utf-8")
         outbox_text = (
             lifecycle_root / "FabricChatClefCommandResultOutbox.java"
+        ).read_text(encoding="utf-8")
+        outbox_root = lifecycle_root / "outbox"
+        terminal_submission_text = (
+            outbox_root
+            / "FabricChatClefTerminalResultSubmission.java"
+        ).read_text(encoding="utf-8")
+        terminal_committer_text = (
+            outbox_root / "FabricChatClefTerminalResultCommitter.java"
+        ).read_text(encoding="utf-8")
+        completion_drainer_text = (
+            outbox_root
+            / "FabricChatClefCommandResultCompletionDrainer.java"
+        ).read_text(encoding="utf-8")
+        retirement_text = (
+            outbox_root
+            / "FabricChatClefCommandResultRetirementCommit.java"
         ).read_text(encoding="utf-8")
 
         self.assertIn("components.taskFinishedObserver().register()", entrypoint_text)
         self.assertIn("FabricChatClefCommandLifecycleCoordinator", components_text)
         self.assertIn("onEndClientTick", coordinator_text)
-        self.assertIn("resultOutbox.sendTerminal", coordinator_text)
-        self.assertIn("beginTerminalSend(System.currentTimeMillis())", outbox_text)
+        self.assertIn(
+            "components.tickCoordinator().onEndClientTick(activeContext)",
+            coordinator_text,
+        )
+        self.assertIn("resultOutbox.sendTerminal", terminal_dispatcher_text)
         self.assertIn("drainSendCompletions", outbox_text)
-        self.assertIn("completeTerminalSend(outcome)", outbox_text)
-        self.assertIn("commandQueue.complete(context, \"terminal_result\")", outbox_text)
+        self.assertIn("terminalSubmission.submitActive", outbox_text)
+        self.assertIn(
+            "beginTerminalSend(System.currentTimeMillis())", terminal_committer_text
+        )
+        self.assertIn("committer.commit", terminal_submission_text)
+        self.assertIn("ownershipValidator.validateActive", terminal_submission_text)
+        self.assertIn("transport.submit", terminal_submission_text)
+        self.assertIn("completeTerminalSend(outcome)", completion_drainer_text)
+        self.assertIn(
+            'commandQueue.complete(context, "terminal_result")', retirement_text
+        )
 
     def test_java_bridge_binds_results_to_connection_generation_and_context(self):
         client_text = (
@@ -202,10 +268,67 @@ class MinecraftFabricChatClefJavaBridgeContractTests(unittest.TestCase):
             / "transport"
             / "FabricChatClefBridgeClient.java"
         ).read_text(encoding="utf-8")
+        connection_state_text = (
+            BRIDGE_ROOT
+            / "transport"
+            / "connection"
+            / "FabricChatClefWebSocketConnectionState.java"
+        ).read_text(encoding="utf-8")
+        connection_lifecycle_state_text = (
+            BRIDGE_ROOT
+            / "transport"
+            / "connection"
+            / "FabricChatClefConnectionLifecycleState.java"
+        ).read_text(encoding="utf-8")
+        connection_lifecycle_text = (
+            BRIDGE_ROOT
+            / "transport"
+            / "connection"
+            / "FabricChatClefWebSocketConnectionLifecycle.java"
+        ).read_text(encoding="utf-8")
+        connection_text_receiver_text = (
+            BRIDGE_ROOT
+            / "transport"
+            / "connection"
+            / "FabricChatClefConnectionTextReceiver.java"
+        ).read_text(encoding="utf-8")
+        connection_detach_handler_text = (
+            BRIDGE_ROOT
+            / "transport"
+            / "connection"
+            / "FabricChatClefConnectionDetachHandler.java"
+        ).read_text(encoding="utf-8")
+        connection_detach_notification_text = (
+            BRIDGE_ROOT
+            / "transport"
+            / "connection"
+            / "FabricChatClefConnectionDetachNotification.java"
+        ).read_text(encoding="utf-8")
         queue_text = (
             BRIDGE_ROOT
             / "command"
             / "FabricChatClefCommandQueue.java"
+        ).read_text(encoding="utf-8")
+        ownership_state_text = (
+            BRIDGE_ROOT
+            / "command"
+            / "queue"
+            / "ownership"
+            / "FabricChatClefCommandOwnershipState.java"
+        ).read_text(encoding="utf-8")
+        detach_queue_text = (
+            BRIDGE_ROOT
+            / "command"
+            / "connection"
+            / "detach"
+            / "FabricChatClefConnectionDetachEventQueue.java"
+        ).read_text(encoding="utf-8")
+        result_completion_queue_text = (
+            BRIDGE_ROOT
+            / "command"
+            / "result"
+            / "send"
+            / "FabricChatClefCommandResultSendCompletionQueue.java"
         ).read_text(encoding="utf-8")
         sender_text = (
             BRIDGE_ROOT
@@ -217,33 +340,77 @@ class MinecraftFabricChatClefJavaBridgeContractTests(unittest.TestCase):
             / "command"
             / "FabricChatClefCommandContext.java"
         ).read_text(encoding="utf-8")
+        terminal_state_text = (
+            BRIDGE_ROOT
+            / "command"
+            / "result"
+            / "send"
+            / "FabricChatClefCommandTerminalResultState.java"
+        ).read_text(encoding="utf-8")
+        terminal_send_state_text = (
+            BRIDGE_ROOT
+            / "command"
+            / "result"
+            / "send"
+            / "FabricChatClefCommandResultSendAttemptState.java"
+        ).read_text(encoding="utf-8")
 
-        self.assertIn("AtomicLong connectionGenerations", client_text)
-        self.assertIn("activeConnectionGeneration", client_text)
-        self.assertIn("isCurrentSocket", client_text)
-        self.assertIn("enqueueConnectionDetached(generation", client_text)
-        self.assertNotIn("detachConnection(generation", client_text)
-        self.assertIn("generation != activeConnectionGeneration", client_text)
+        self.assertIn("FabricChatClefConnectionLifecycleState", connection_state_text)
+        self.assertIn("AtomicLong connectionGenerations", connection_lifecycle_state_text)
+        self.assertIn("activeConnectionGeneration", connection_lifecycle_state_text)
+        self.assertIn("isCurrentSocket", connection_state_text)
+        self.assertIn(
+            "enqueueConnectionDetached(generation", connection_detach_notification_text
+        )
+        self.assertNotIn("detachConnection(generation", connection_detach_handler_text)
+        self.assertIn(
+            "generation != connectionState.activeConnectionGeneration()",
+            connection_text_receiver_text,
+        )
+        self.assertIn("textReceiver.onText", connection_lifecycle_text)
+        self.assertIn("detachHandler.onClose", connection_lifecycle_text)
         self.assertIn("FabricChatClefCommandContext context", client_text)
 
         self.assertIn("FabricChatClefCommandContext", sender_text)
-        self.assertIn("Deque<FabricChatClefCommandContext>", queue_text)
-        self.assertIn("Deque<FabricChatClefConnectionDetachedEvent>", queue_text)
-        self.assertIn("Deque<FabricChatClefCommandResultSendCompletion>", queue_text)
+        self.assertIn(
+            "Deque<FabricChatClefCommandContext>", ownership_state_text
+        )
+        self.assertIn(
+            "Deque<FabricChatClefConnectionDetachedEvent>", detach_queue_text
+        )
+        self.assertIn(
+            "Deque<FabricChatClefCommandResultSendCompletion>",
+            result_completion_queue_text,
+        )
         self.assertIn("clearDetachedActive", queue_text)
         self.assertIn("enqueueCommandResultSendCompletion", queue_text)
         self.assertIn("connectionGeneration", context_text)
         self.assertIn("correlationId", context_text)
         self.assertIn("sessionId", context_text)
-        self.assertIn("AtomicBoolean terminalSendInFlight", context_text)
-        self.assertIn("AtomicBoolean terminalSent", context_text)
+        self.assertIn("FabricChatClefCommandTerminalResultState", context_text)
+        self.assertIn("FabricChatClefCommandResultSendAttemptState", terminal_state_text)
+        self.assertIn("AtomicBoolean sendInFlight", terminal_send_state_text)
+        self.assertIn("AtomicBoolean sent", terminal_send_state_text)
         self.assertIn("terminalSendReady", context_text)
 
     def test_disconnect_is_processed_as_client_tick_control_event(self):
-        client_text = (
+        connection_lifecycle_text = (
             BRIDGE_ROOT
             / "transport"
-            / "FabricChatClefBridgeClient.java"
+            / "connection"
+            / "FabricChatClefWebSocketConnectionLifecycle.java"
+        ).read_text(encoding="utf-8")
+        connection_detach_handler_text = (
+            BRIDGE_ROOT
+            / "transport"
+            / "connection"
+            / "FabricChatClefConnectionDetachHandler.java"
+        ).read_text(encoding="utf-8")
+        connection_detach_notification_text = (
+            BRIDGE_ROOT
+            / "transport"
+            / "connection"
+            / "FabricChatClefConnectionDetachNotification.java"
         ).read_text(encoding="utf-8")
         dispatcher_text = (
             BRIDGE_ROOT
@@ -255,46 +422,80 @@ class MinecraftFabricChatClefJavaBridgeContractTests(unittest.TestCase):
             / "command"
             / "FabricChatClefCommandQueue.java"
         ).read_text(encoding="utf-8")
+        detach_coordinator_text = (
+            BRIDGE_ROOT
+            / "command"
+            / "connection"
+            / "FabricChatClefConnectionDetachCoordinator.java"
+        ).read_text(encoding="utf-8")
+        detach_resolver_text = (
+            BRIDGE_ROOT
+            / "command"
+            / "connection"
+            / "detach"
+            / "FabricChatClefConnectionDetachDecisionResolver.java"
+        ).read_text(encoding="utf-8")
+        detach_retirement_text = (
+            BRIDGE_ROOT
+            / "command"
+            / "connection"
+            / "detach"
+            / "FabricChatClefConnectionDetachRetirement.java"
+        ).read_text(encoding="utf-8")
+        cancellation_text = (
+            BRIDGE_ROOT
+            / "command"
+            / "connection"
+            / "detach"
+            / "FabricChatClefAltoClefDetachedCommandCancellation.java"
+        ).read_text(encoding="utf-8")
 
-        self.assertIn("enqueueConnectionDetached(generation, \"websocket_closed\")", client_text)
-        self.assertIn("enqueueConnectionDetached(generation, \"websocket_error\")", client_text)
-        self.assertNotIn("detachConnection", client_text)
-        self.assertIn("processConnectionDetachedEvents()", dispatcher_text)
-        self.assertIn("matchesBoundRootTask(context, currentTask)", dispatcher_text)
         self.assertIn(
-            "private final Consumer<String> detachedCommandCancellationAction;",
-            dispatcher_text,
+            'notifyOwners(generation, "websocket_closed")',
+            connection_detach_notification_text,
         )
-        self.assertIn("? this::cancelUserTaskForDetachedCommand", dispatcher_text)
-        self.assertIn(": detachedCommandCancellationAction;", dispatcher_text)
-        cancellation_delegate = (
-            "detachedCommandCancellationAction.accept(rootMatchReason);"
+        self.assertIn(
+            'notifyOwners(generation, "websocket_error")',
+            connection_detach_notification_text,
         )
-        self.assertEqual(1, dispatcher_text.count(cancellation_delegate))
-        ownership_check_index = dispatcher_text.index(
-            "boolean ownsCurrentTask = "
-            "lifecycleCoordinator.matchesBoundRootTask(context, currentTask);"
+        self.assertIn(
+            "commandQueue.enqueueConnectionDetached(generation, reason)",
+            connection_detach_notification_text,
         )
-        owned_branch_index = dispatcher_text.index(
-            "if (ownsCurrentTask)", ownership_check_index
+        self.assertNotIn("detachConnection", connection_detach_handler_text)
+        self.assertIn("detachHandler.onClose", connection_lifecycle_text)
+        self.assertIn(
+            "connectionDetachCoordinator.processQueuedEvents()", dispatcher_text
         )
-        delegate_index = dispatcher_text.index(
-            cancellation_delegate, owned_branch_index
+        self.assertIn(
+            "matchesBoundRootTask(context, currentTask)", detach_resolver_text
         )
-        unowned_branch_index = dispatcher_text.index("} else {", delegate_index)
-        clear_index = dispatcher_text.index(
-            "lifecycleCoordinator.clearDetachedExecution", unowned_branch_index
+        self.assertIn(
+            "Consumer<String> detachedCommandCancellationAction",
+            detach_coordinator_text,
         )
-        self.assertLess(ownership_check_index, owned_branch_index)
+        self.assertIn(
+            "detachedCommandCancellationAction::accept", detach_coordinator_text
+        )
+        owned_branch_index = detach_retirement_text.index(
+            "if (decision.ownsCurrentTask())"
+        )
+        delegate_index = detach_retirement_text.index(
+            "cancellation.cancel(decision.rootMatchReason())", owned_branch_index
+        )
+        clear_index = detach_retirement_text.index(
+            "lifecycleCoordinator.clearDetachedExecution", delegate_index
+        )
         self.assertLess(owned_branch_index, delegate_index)
-        self.assertLess(delegate_index, unowned_branch_index)
-        self.assertLess(unowned_branch_index, clear_index)
-        self.assertNotIn(
-            "cancelUserTaskForDetachedCommand(rootMatchReason)", dispatcher_text
+        self.assertLess(delegate_index, clear_index)
+        self.assertIn(
+            "connection_detached_task_not_owned", detach_retirement_text
         )
-        self.assertIn("connection_detached_task_not_owned", dispatcher_text)
-        self.assertIn("mod.cancelUserTask()", dispatcher_text)
-        self.assertIn("clearDetachedExecution(context, event.reason() + \":\" + rootMatchReason)", dispatcher_text)
+        self.assertIn("mod.cancelUserTask()", cancellation_text)
+        self.assertIn(
+            'event.reason() + ":" + decision.rootMatchReason()',
+            detach_retirement_text,
+        )
         self.assertIn("clearDetachedActive", queue_text)
 
     def test_command_queue_does_not_read_live_task_state_under_monitor(self):
@@ -303,25 +504,65 @@ class MinecraftFabricChatClefJavaBridgeContractTests(unittest.TestCase):
             / "command"
             / "FabricChatClefCommandQueue.java"
         ).read_text(encoding="utf-8")
+        detach_queue_text = (
+            BRIDGE_ROOT
+            / "command"
+            / "connection"
+            / "detach"
+            / "FabricChatClefConnectionDetachEventQueue.java"
+        ).read_text(encoding="utf-8")
 
         self.assertNotIn("FabricChatClefCommandContextUnbindDiagnostics", queue_text)
         self.assertNotIn("captureOwnershipSnapshot", queue_text)
         self.assertNotIn("AltoClef.getInstance", queue_text)
         self.assertNotIn("getUserTaskChain", queue_text)
         self.assertIn("markConnectionDetached", queue_text)
-        self.assertIn("connectionDetachedEvents.offer", queue_text)
+        self.assertIn("detachEvents.enqueue", queue_text)
+        self.assertIn("events.offer", detach_queue_text)
 
     def test_terminal_result_clear_happens_after_explicit_send_outcome(self):
-        outbox_text = (
+        outbox_root = (
             BRIDGE_ROOT
             / "command"
             / "lifecycle"
-            / "FabricChatClefCommandResultOutbox.java"
+            / "outbox"
+        )
+        terminal_submission_text = (
+            outbox_root / "FabricChatClefTerminalResultSubmission.java"
+        ).read_text(encoding="utf-8")
+        transport_text = (
+            outbox_root / "FabricChatClefTerminalResultTransport.java"
+        ).read_text(encoding="utf-8")
+        completion_text = (
+            outbox_root
+            / "FabricChatClefCommandResultCompletionDrainer.java"
+        ).read_text(encoding="utf-8")
+        retirement_text = (
+            outbox_root
+            / "FabricChatClefCommandResultRetirementCommit.java"
         ).read_text(encoding="utf-8")
         sender_text = (
             BRIDGE_ROOT
             / "transport"
             / "FabricChatClefResultEnvelopeSender.java"
+        ).read_text(encoding="utf-8")
+        transport_submission_text = (
+            BRIDGE_ROOT
+            / "transport"
+            / "result"
+            / "FabricChatClefResultTransportSubmission.java"
+        ).read_text(encoding="utf-8")
+        async_completion_text = (
+            BRIDGE_ROOT
+            / "transport"
+            / "result"
+            / "FabricChatClefResultAsyncCompletion.java"
+        ).read_text(encoding="utf-8")
+        completion_router_text = (
+            BRIDGE_ROOT
+            / "transport"
+            / "result"
+            / "FabricChatClefResultSendCompletionRouter.java"
         ).read_text(encoding="utf-8")
         interface_text = (
             BRIDGE_ROOT
@@ -329,20 +570,34 @@ class MinecraftFabricChatClefJavaBridgeContractTests(unittest.TestCase):
             / "FabricChatClefCommandResultSender.java"
         ).read_text(encoding="utf-8")
 
-        send_index = outbox_text.index("resultSender.sendTerminalCommandResult(context, result)")
-        success_check_index = outbox_text.index("if (!submission.acceptedForAsyncSend())")
-        completion_index = outbox_text.index("context.completeTerminalSend(outcome)")
-        clear_index = outbox_text.index("commandQueue.complete(context, \"terminal_result\")")
+        send_index = transport_text.index(
+            "resultSender.sendTerminalCommandResult(context, result)"
+        )
+        success_check_index = transport_text.index(
+            "if (!submission.acceptedForAsyncSend())"
+        )
+        completion_index = completion_text.index("context.completeTerminalSend(outcome)")
+        retire_index = completion_text.index("retirementCommit.retire(")
 
         self.assertLess(send_index, success_check_index)
-        self.assertLess(completion_index, clear_index)
+        self.assertIn("committer.commit", terminal_submission_text)
+        self.assertIn("ownershipValidator.validate", terminal_submission_text)
+        self.assertIn("transport.submit", terminal_submission_text)
+        self.assertLess(completion_index, retire_index)
+        self.assertIn(
+            'commandQueue.complete(context, "terminal_result")', retirement_text
+        )
         self.assertIn("FabricChatClefCommandResultSendSubmission", interface_text)
         self.assertIn("sendTerminalCommandResult", interface_text)
-        self.assertIn("socket.sendText(message, true)", sender_text)
-        self.assertIn(".whenComplete((ignored, error)", sender_text)
-        self.assertNotIn(".toCompletableFuture().join()", sender_text)
-        self.assertIn("ASYNC_SEND_FAILED", sender_text)
-        self.assertIn("enqueueCompletion(context, outcome)", sender_text)
+        self.assertIn("transportSubmission.submit", sender_text)
+        self.assertIn("socket.sendText(message, true)", transport_submission_text)
+        self.assertIn(".whenComplete(", transport_submission_text)
+        self.assertNotIn(
+            ".toCompletableFuture().join()",
+            sender_text + transport_submission_text,
+        )
+        self.assertIn("ASYNC_SEND_FAILED", async_completion_text)
+        self.assertIn("ordinaryCompletionSink.accept", completion_router_text)
 
     def test_java_dispatcher_checks_active_deadline_before_busy_return(self):
         dispatcher_text = (
@@ -352,7 +607,9 @@ class MinecraftFabricChatClefJavaBridgeContractTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         active_context_index = dispatcher_text.index("commandQueue.activeContext()")
         deadline_index = dispatcher_text.index("completeActiveDeadline(context)")
-        engine_ready_index = dispatcher_text.index("if (!isEngineReady())")
+        engine_ready_index = dispatcher_text.index(
+            "if (!ordinaryCommandDispatcher.isEngineReady())"
+        )
 
         self.assertLess(active_context_index, engine_ready_index)
         self.assertLess(deadline_index, engine_ready_index)
@@ -365,11 +622,76 @@ class MinecraftFabricChatClefJavaBridgeContractTests(unittest.TestCase):
             / "inbound"
             / "FabricChatClefCommandRequestHandler.java"
         ).read_text(encoding="utf-8")
+        command_root = BRIDGE_ROOT / "transport" / "inbound" / "command"
+        admission_text = (
+            command_root
+            / "admission"
+            / "FabricChatClefCommandRequestAdmission.java"
+        ).read_text(encoding="utf-8")
+        session_admission_text = (
+            command_root
+            / "admission"
+            / "FabricChatClefCommandSessionAdmission.java"
+        ).read_text(encoding="utf-8")
+        enqueuer_text = (
+            command_root
+            / "FabricChatClefCommandRequestEnqueuer.java"
+        ).read_text(encoding="utf-8")
+        queue_admission_text = (
+            command_root
+            / "FabricChatClefCommandRequestQueueAdmission.java"
+        ).read_text(encoding="utf-8")
 
-        session_check_index = handler_text.index("command_request session does not match")
-        offer_index = handler_text.index("commandQueue.offer(context)")
+        admission_index = handler_text.index("admission.admitSession")
+        offer_index = handler_text.index("enqueuer.offer")
 
-        self.assertLess(session_check_index, offer_index)
+        self.assertLess(admission_index, offer_index)
+        self.assertIn("sessionAdmission.admit", admission_text)
+        self.assertIn("command_request session does not match", session_admission_text)
+        self.assertIn("queueAdmission.offer(context)", enqueuer_text)
+        self.assertIn("commandQueue.offer(context)", queue_admission_text)
+
+    def test_inbound_and_session_flow_are_split_by_responsibility(self):
+        inbound_root = BRIDGE_ROOT / "transport" / "inbound"
+        inbound_facade_text = (
+            inbound_root / "FabricChatClefInboundMessageHandler.java"
+        ).read_text(encoding="utf-8")
+        inbound_router_text = (
+            inbound_root
+            / "FabricChatClefInboundMessageRouter.java"
+        ).read_text(encoding="utf-8")
+        inbound_decoder_text = (
+            inbound_root
+            / "FabricChatClefInboundEnvelopeDecoder.java"
+        ).read_text(encoding="utf-8")
+        session_root = BRIDGE_ROOT / "transport" / "session"
+        session_facade_text = (
+            session_root / "FabricChatClefSessionGuard.java"
+        ).read_text(encoding="utf-8")
+        session_state_text = (
+            session_root
+            / "FabricChatClefMutableSessionState.java"
+        ).read_text(encoding="utf-8")
+        ack_validator_text = (
+            session_root
+            / "validation"
+            / "FabricChatClefHandshakeAckValidator.java"
+        ).read_text(encoding="utf-8")
+        ack_coordinator_text = (
+            session_root
+            / "FabricChatClefHandshakeAckCoordinator.java"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("router.route(decoder.decodeRaw(message), generation)", inbound_facade_text)
+        stop_index = inbound_router_text.index("stopControlInboundHandler.isCandidate")
+        typed_index = inbound_router_text.index("decoder.decodeTyped(rawEnvelope)")
+        self.assertLess(stop_index, typed_index)
+        self.assertIn("json.decodeTree(message)", inbound_decoder_text)
+        self.assertIn("handshakeCoordinator.accept", session_facade_text)
+        self.assertIn("FabricChatClefAcceptedSessionIdentity acceptedIdentity", session_state_text)
+        self.assertIn("FabricChatClefHandshakeAckValidation validate", ack_validator_text)
+        self.assertNotIn("FabricChatClefBridgeDiagnostics", ack_validator_text)
+        self.assertIn("sessionState.accept(validation.identity())", ack_coordinator_text)
 
 
 if __name__ == "__main__":

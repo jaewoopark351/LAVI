@@ -8,11 +8,11 @@ from .submission_boundary import MinecraftChatClefSubmissionBoundary
 from .submission_precheck import MinecraftChatClefSubmissionPrecheck
 from .translation_boundary import MinecraftChatClefTranslationBoundary
 
-__all__ = [
+__all__ = (
     "MinecraftChatClefRouteDecisionFactory",
     "MinecraftChatClefSubmissionBoundary",
     "MinecraftChatClefSubmissionReconciliationCoordinator",
     "MinecraftChatClefSubmissionRouteLock",
     "MinecraftChatClefSubmissionPrecheck",
     "MinecraftChatClefTranslationBoundary",
-]
+)

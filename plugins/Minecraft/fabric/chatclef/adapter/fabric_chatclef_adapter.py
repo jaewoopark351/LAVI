@@ -1,4 +1,5 @@
 #20260801_kpopmodder: Own the Fabric ChatClef Python bridge lifecycle facade.
+#20260905_kpopmodder: Expose the guarded STOP control facade without changing backend ownership.
 from __future__ import annotations
 
 from plugins.Minecraft.common.dto.command_request_dto import CommandRequestDTO
@@ -62,6 +63,27 @@ class FabricChatClefAdapter:
                 "Fabric ChatClef bridge client is not connected.",
             )
         return self._server.submit_command(command_request)
+
+    #20260905_kpopmodder: Keep STOP on the Fabric-only control lane.
+    def submit_stop_control(
+        self,
+        *,
+        event: object,
+        eligibility_proof: object,
+        receipt: object,
+    ):
+        return self._server.submit_stop_control(
+            event=event,
+            eligibility_proof=eligibility_proof,
+            receipt=receipt,
+        )
+
+    def get_stop_control_claim_registry(self):
+        getter = getattr(self._server, "get_stop_control_claim_registry", None)
+        return getter() if callable(getter) else None
+
+    def set_stop_terminal_response_callback(self, callback) -> None:
+        self._server.set_stop_terminal_response_callback(callback)
 
     def get_status(self) -> StatusSnapshotDTO:
         return self._server.status_snapshot(enabled=self._config.enabled)

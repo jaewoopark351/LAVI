@@ -1,12 +1,15 @@
 #20260803_kpopmodder: Route recognized LAVI chat/mic input into Fabric ChatClef commands.
 #20260819_kpopmodder: Block later Minecraft routes while submission reconciliation is pending.
+#20260905_kpopmodder: Delegate router responsibilities to focused LAVI-owned coordinators.
 from __future__ import annotations
 
-import json
 from typing import Any
 
 from core.logger import log_print
 from input_core.input_event.normalization import LaviInputEventNormalizer
+from plugins.Minecraft.fabric.chatclef.input.aliases.generic_crafting_defaults.generic_crafting_defaults_admission import (
+    GenericCraftingDefaultsAdmission,
+)
 from plugins.Minecraft.fabric.chatclef.input.auto_deposit_trust import (
     AutoDepositTrustExactInputAdapter,
     AutoDepositTrustInputAdmission,
@@ -14,20 +17,17 @@ from plugins.Minecraft.fabric.chatclef.input.auto_deposit_trust import (
     AutoDepositTrustRawInputSafety,
     AutoDepositTrustTranslationAdmission,
 )
+from plugins.Minecraft.fabric.chatclef.input.eligibility import (
+    KoreanChatMicrophoneEligibilityAdmission,
+)
 from plugins.Minecraft.fabric.chatclef.input.gating import (
     MinecraftChatClefInputIntentGate,
-    MinecraftChatClefInputRouteKind,
 )
 from plugins.Minecraft.fabric.chatclef.input.minecraft_chatclef_input_route_decision import (
     MinecraftChatClefInputRouteDecision,
 )
-from plugins.Minecraft.fabric.chatclef.input.routing import (
-    MinecraftChatClefRouteDecisionFactory,
-    MinecraftChatClefSubmissionBoundary,
-    MinecraftChatClefSubmissionPrecheck,
-    MinecraftChatClefSubmissionReconciliationCoordinator,
-    MinecraftChatClefSubmissionRouteLock,
-    MinecraftChatClefTranslationBoundary,
+from plugins.Minecraft.fabric.chatclef.input.routing.composition import (
+    MinecraftChatClefRouterComponentGraph,
 )
 
 
@@ -52,289 +52,105 @@ class MinecraftChatClefInputRouter:
         auto_deposit_trust_claim_registry: (
             AutoDepositTrustInputEventClaimRegistry | None
         ) = None,
+        stop_control_route_owner: Any = None,
+        korean_eligibility_admission: (
+            KoreanChatMicrophoneEligibilityAdmission | None
+        ) = None,
+        generic_crafting_defaults_admission: (
+            GenericCraftingDefaultsAdmission | None
+        ) = None,
+        generic_crafting_defaults_route_owner: Any = None,
+        trusted_korean_command_feedback_facade: Any = None,
+        feature_admission_logger: Any = None,
+        feature_admission_projector: Any = None,
         log_callback: Any = log_print,
     ):
-        self.extension = extension
-        self.intent_gate = intent_gate or MinecraftChatClefInputIntentGate()
-        self._input_event_normalizer = (
-            input_event_normalizer or LaviInputEventNormalizer()
+        self._component_graph = MinecraftChatClefRouterComponentGraph(
+            owner=self,
+            extension=extension,
+            intent_gate=intent_gate,
+            input_event_normalizer=input_event_normalizer,
+            auto_deposit_trust_input_admission=(
+                auto_deposit_trust_input_admission
+            ),
+            auto_deposit_trust_raw_input_safety=(
+                auto_deposit_trust_raw_input_safety
+            ),
+            auto_deposit_trust_exact_input_adapter=(
+                auto_deposit_trust_exact_input_adapter
+            ),
+            auto_deposit_trust_translation_admission=(
+                auto_deposit_trust_translation_admission
+            ),
+            auto_deposit_trust_claim_registry=(
+                auto_deposit_trust_claim_registry
+            ),
+            stop_control_route_owner=stop_control_route_owner,
+            korean_eligibility_admission=korean_eligibility_admission,
+            generic_crafting_defaults_admission=(
+                generic_crafting_defaults_admission
+            ),
+            generic_crafting_defaults_route_owner=(
+                generic_crafting_defaults_route_owner
+            ),
+            trusted_korean_command_feedback_facade=(
+                trusted_korean_command_feedback_facade
+            ),
+            feature_admission_logger=feature_admission_logger,
+            feature_admission_projector=feature_admission_projector,
+            log_callback=log_callback,
         )
-        self._auto_deposit_trust_input_admission = (
-            auto_deposit_trust_input_admission
-            or AutoDepositTrustInputAdmission()
-        )
-        self._auto_deposit_trust_raw_input_safety = (
-            auto_deposit_trust_raw_input_safety
-            or AutoDepositTrustRawInputSafety()
-        )
-        self._auto_deposit_trust_exact_input_adapter = (
-            auto_deposit_trust_exact_input_adapter
-            or AutoDepositTrustExactInputAdapter()
-        )
-        self._auto_deposit_trust_translation_admission = (
-            auto_deposit_trust_translation_admission
-            or AutoDepositTrustTranslationAdmission()
-        )
-        extension_claim_registry = self._extension_claim_registry(extension)
-        if (
-            auto_deposit_trust_claim_registry is not None
-            and extension_claim_registry is not None
-            and auto_deposit_trust_claim_registry is not extension_claim_registry
-        ):
-            raise ValueError(
-                "H5 router and extension must share one claim registry"
-            )
-        if auto_deposit_trust_claim_registry is not None:
-            claim_registry = auto_deposit_trust_claim_registry
-        elif extension_claim_registry is not None:
-            claim_registry = extension_claim_registry
-        else:
-            claim_registry = AutoDepositTrustInputEventClaimRegistry()
-        claim_owner_binder = getattr(claim_registry, "_bind_claim_owner", None)
-        if not callable(claim_owner_binder):
-            raise TypeError("H5 claim registry cannot bind its router owner")
-        claim_owner_binder(self)
-        self.auto_deposit_trust_claim_registry = claim_registry
-        self.log_callback = log_callback
-        self._translation_boundary = MinecraftChatClefTranslationBoundary()
-        self._submission_precheck = MinecraftChatClefSubmissionPrecheck()
-        self._submission_boundary = MinecraftChatClefSubmissionBoundary()
-        self._submission_route_lock = MinecraftChatClefSubmissionRouteLock()
-        self.submission_reconciliation = (
-            MinecraftChatClefSubmissionReconciliationCoordinator(
-                extension,
-                route_lock=self._submission_route_lock,
-            )
-        )
-        self._decision_factory = MinecraftChatClefRouteDecisionFactory()
+        self._component_graph.install_compatibility_seams(self)
 
-    def route(self, value: object) -> MinecraftChatClefInputRouteDecision:
-        event = self._input_event_normalizer.normalize(value)
-        command_text = event.text
-        if not command_text:
-            return MinecraftChatClefInputRouteDecision.not_handled("empty_input")
-        gate_decision = self._inspect_gate(command_text)
-        if not gate_decision.consider:
-            return MinecraftChatClefInputRouteDecision.not_handled(
-                "no_minecraft_trigger"
-            )
-        if (
-            gate_decision.route_kind
-            is MinecraftChatClefInputRouteKind.H5_AUTO_DEPOSIT_TRUST
-        ):
-            return self._route_auto_deposit_trust(event)
-        command_text = command_text.strip()
-        if self.extension is None:
-            self._log("route skipped: extension unavailable")
-            return MinecraftChatClefInputRouteDecision.not_handled(
-                "extension_unavailable"
-            )
-        if not self._translation_boundary.is_available(
-            self.extension
-        ) or not self._submission_boundary.is_available(self.extension):
-            self._log("route skipped: single-pass submission boundary unavailable")
-            return MinecraftChatClefInputRouteDecision.not_handled(
-                "handler_unavailable"
-            )
-        with self._submission_route_lock:
-            return self._route_submission(event, command_text)
+    def route_trusted_user_input(
+        self,
+        value: object,
+        consumed_ingress_evidence: object,
+    ) -> MinecraftChatClefInputRouteDecision:
+        return self._trusted_input_route_coordinator.route(
+            value,
+            consumed_ingress_evidence,
+        )
+
+    def route(
+        self,
+        value: object,
+        *,
+        korean_eligibility_proof: object = None,
+    ) -> MinecraftChatClefInputRouteDecision:
+        return self._route_ordering_coordinator.route(
+            value,
+            korean_eligibility_proof=korean_eligibility_proof,
+        )
 
     def _route_auto_deposit_trust(
         self,
         event: Any,
     ) -> MinecraftChatClefInputRouteDecision:
-        receipt = None
-        try:
-            admission = self._auto_deposit_trust_input_admission.inspect(event)
-            if not admission.allowed:
-                return self._decision_factory.input_rejection(
-                    admission.reason_code,
-                    admission.message,
-                )
-            if not self._auto_deposit_trust_raw_input_safety.is_safe(event.text):
-                return self._decision_factory.input_rejection(
-                    "auto_deposit_trust_input_raw_control_not_allowed",
-                    "Control characters or non-ASCII spacing are not allowed in this command.",
-                )
-
-            with self._submission_route_lock:
-                receipt, claim_error = (
-                    self.auto_deposit_trust_claim_registry.claim(
-                        event,
-                        claim_owner=self,
-                    )
-                )
-                if receipt is None:
-                    return self._decision_factory.input_rejection(
-                        claim_error,
-                        "This input event cannot be claimed for submission.",
-                    )
-                if self.extension is None:
-                    return self._decision_factory.input_rejection(
-                        "auto_deposit_trust_extension_unavailable",
-                        "The Fabric ChatClef extension is unavailable.",
-                    )
-                if not self._translation_boundary.is_available(
-                    self.extension
-                ) or not self._submission_boundary.is_available(self.extension):
-                    return self._decision_factory.input_rejection(
-                        "auto_deposit_trust_handler_unavailable",
-                        "The Fabric ChatClef command handler is unavailable.",
-                    )
-                return self._route_h5_claimed(event, receipt)
-        except Exception as error:
-            self._log(
-                "H5 route failed closed: "
-                f"error={type(error).__name__}: {error}"
-            )
-            return self._decision_factory.input_rejection(
-                "auto_deposit_trust_input_internal_error",
-                "The automatic-deposit registration request failed safely.",
-            )
-        finally:
-            if receipt is not None:
-                try:
-                    self.auto_deposit_trust_claim_registry.abandon_if_issued(
-                        receipt
-                    )
-                except Exception as error:
-                    self._log(
-                        "H5 receipt abandonment failed safely: "
-                        f"error={type(error).__name__}: {error}"
-                    )
+        return self._auto_deposit_trust_route_coordinator.route(event)
 
     def _route_h5_claimed(
         self,
         event: Any,
         receipt: object,
     ) -> MinecraftChatClefInputRouteDecision:
-        unresolved = self.submission_reconciliation.blocking_result()
-        if unresolved is not None:
-            pending_request_id = (
-                self.submission_reconciliation.pending_request_id or ""
-            )
-            if self.submission_reconciliation.reconcile():
-                return self._decision_factory.reconciled_without_submission(
-                    pending_request_id
-                )
-            return self._decision_factory.submitted({}, unresolved)
-
-        readiness = self._submission_precheck.inspect(self.extension)
-        if not readiness.ready:
-            return self._decision_factory.precheck_rejection(readiness)
-
-        adaptation = self._auto_deposit_trust_exact_input_adapter.adapt(
-            event.text
-        )
-        raw_translation = self._translation_boundary.translate_once(
-            self.extension,
-            adaptation.translation_input_text,
-        )
-        translation = self._translation_boundary.validate(raw_translation)
-        if self._translation_boundary.status(translation) != "validated":
-            return self._decision_factory.translation_rejection(translation)
-        translation_admission = (
-            self._auto_deposit_trust_translation_admission.inspect(translation)
-        )
-        if not translation_admission.allowed:
-            return self._decision_factory.input_rejection(
-                translation_admission.reason_code,
-                translation_admission.message,
-            )
-
-        result = self._submission_boundary.submit_once(
-            self.extension,
+        return self._auto_deposit_trust_route_coordinator.route_claimed(
             event,
-            translation,
-            route_claim=receipt,
-            original_text=adaptation.original_text,
-            translation_input_text=adaptation.translation_input_text,
+            receipt,
         )
-        self.submission_reconciliation.observe_submission_result(result)
-        return self._decision_factory.submitted(translation, result)
 
     def _route_submission(
         self,
         event: Any,
         command_text: str,
+        *,
+        korean_eligibility_proof: object = None,
     ) -> MinecraftChatClefInputRouteDecision:
-        unresolved = self.submission_reconciliation.blocking_result()
-        if unresolved is not None:
-            pending_request_id = (
-                self.submission_reconciliation.pending_request_id or ""
-            )
-            if self.submission_reconciliation.reconcile():
-                self._log(
-                    "route blocked after matching terminal reconciliation: "
-                    f"request_id={pending_request_id}"
-                )
-                return self._decision_factory.reconciled_without_submission(
-                    pending_request_id
-                )
-            self._log(
-                "route blocked: a previous submission requires reconciliation"
-            )
-            return self._decision_factory.submitted({}, unresolved)
-
-        try:
-            raw_translation = self._translation_boundary.translate_once(
-                self.extension,
-                command_text,
-            )
-        except Exception as error:
-            return self._operation_failure("translation_failed", error)
-        try:
-            translation = self._translation_boundary.validate(raw_translation)
-        except Exception as error:
-            self._log(
-                "route rejected malformed translation: "
-                f"error={type(error).__name__}: {error}"
-            )
-            return self._decision_factory.malformed_translation(error)
-
-        translation_status = self._translation_boundary.status(translation)
-        if translation_status in {"unknown", "ambiguous", "unsupported"}:
-            return MinecraftChatClefInputRouteDecision.not_handled(
-                f"{translation_status}_intent"
-            )
-        if translation_status != "validated":
-            return self._decision_factory.translation_rejection(translation)
-
-        readiness = self._submission_precheck.inspect(self.extension)
-        if not readiness.ready:
-            self._log(
-                "route rejected by submission precheck: "
-                f"reason={readiness.reason} error={readiness.error} "
-                f"message={readiness.message}"
-            )
-            self._log_active_command_reconciliation(readiness.details)
-            return self._decision_factory.precheck_rejection(readiness)
-
-        try:
-            result = self._submission_boundary.submit_once(
-                self.extension,
-                event,
-                translation,
-                original_text=command_text,
-                translation_input_text=command_text,
-            )
-        except Exception as error:
-            return self._operation_failure(
-                "submission_failed",
-                error,
-                translation,
-            )
-
-        self.submission_reconciliation.observe_submission_result(result)
-
-        self._log(
-            "route handled: "
-            f"translation_status={translation_status} "
-            f"command={translation.get('command')} "
-            f"result_status={self._decision_factory.result_status(result)} "
-            f"ok={result.get('ok')}"
+        return self._ordinary_command_route_coordinator.route_locked(
+            event,
+            command_text,
+            korean_eligibility_proof=korean_eligibility_proof,
         )
-        return self._decision_factory.submitted(translation, result)
 
     def _operation_failure(
         self,
@@ -342,66 +158,88 @@ class MinecraftChatClefInputRouter:
         error: Exception,
         translation: dict[str, Any] | None = None,
     ) -> MinecraftChatClefInputRouteDecision:
-        message = f"{type(error).__name__}: {error}"
-        self._log(f"route failed: reason={reason} error={message}")
-        return self._decision_factory.operation_failure(
+        return self._route_failure_handler.decision(
             reason,
             error,
             translation,
         )
 
     def _log(self, message: str) -> None:
-        try:
-            self.log_callback(f"[MinecraftChatClefInputRouter] {message}")
-        except Exception:
-            pass
+        self._router_logger.log(message)
+
+    def _log_feature_admission(
+        self,
+        event: object,
+        *,
+        eligibility_reason: object,
+        proof_issued: bool,
+        route_decision: object,
+    ) -> None:
+        self._trusted_input_route_coordinator.log_feature_admission(
+            event,
+            eligibility_reason=eligibility_reason,
+            proof_issued=proof_issued,
+            route_decision=route_decision,
+        )
 
     def _log_active_command_reconciliation(
         self,
         details: dict[str, Any],
     ) -> None:
-        diagnostic = details.get("active_command_reconciliation")
-        if not isinstance(diagnostic, dict):
-            return
-        self._log(
-            "active command reconciliation diagnostic "
-            f"{_compact_json(diagnostic)}"
-        )
+        self._router_logger.log_active_command_reconciliation(details)
 
     def _inspect_gate(self, text: str) -> Any:
-        inspect = getattr(self.intent_gate, "inspect", None)
-        if callable(inspect):
-            return inspect(text)
-        if self.intent_gate.should_consider(text):
-            from plugins.Minecraft.fabric.chatclef.input.gating.contracts import (
-                MinecraftChatClefInputGateDecision,
-            )
+        return self._route_ordering_coordinator.inspect_gate(text)
 
-            return MinecraftChatClefInputGateDecision.generic()
-        from plugins.Minecraft.fabric.chatclef.input.gating.contracts import (
-            MinecraftChatClefInputGateDecision,
+    def close_generic_crafting_defaults_dispatch(
+        self,
+        korean_eligibility_proof: object,
+    ) -> None:
+        self._route_ordering_coordinator.close_generic_crafting_defaults_dispatch(
+            korean_eligibility_proof
         )
 
-        return MinecraftChatClefInputGateDecision.none()
+    def _try_optional_route_owner(
+        self,
+        owner: object,
+        event: object,
+        korean_eligibility_proof: object,
+        failure_reason: str,
+    ) -> MinecraftChatClefInputRouteDecision | None:
+        return self._route_ordering_coordinator.try_optional_route_owner(
+            owner,
+            event,
+            korean_eligibility_proof,
+            failure_reason,
+        )
+
+    def _validate_generic_crafting_registry(
+        self,
+        admission: GenericCraftingDefaultsAdmission,
+    ) -> None:
+        self._component_graph.validate_generic_crafting_registry(admission)
 
     def _extension_claim_registry(self, extension: Any) -> Any:
-        getter = getattr(
+        return self._component_graph.extension_registry(
             extension,
             "get_auto_deposit_trust_input_claim_registry",
-            None,
         )
-        if callable(getter):
-            return getter()
-        return None
 
-
-def _compact_json(payload: Any) -> str:
-    try:
-        return json.dumps(
-            payload,
-            ensure_ascii=False,
-            sort_keys=True,
-            separators=(",", ":"),
+    def _extension_generic_crafting_registry(self, extension: Any) -> Any:
+        return self._component_graph.extension_registry(
+            extension,
+            "get_generic_crafting_defaults_activation_registry",
         )
-    except Exception as error:
-        return f"<json failed {type(error).__name__}: {error}>"
+
+    def _extension_stop_claim_registry(self, extension: Any) -> Any:
+        return self._component_graph.extension_registry(
+            extension,
+            "get_stop_control_claim_registry",
+        )
+
+    def _is_live_eligibility_proof(
+        self,
+        proof: object,
+        event: object,
+    ) -> bool:
+        return self._trusted_input_route_coordinator.is_live_proof(proof, event)

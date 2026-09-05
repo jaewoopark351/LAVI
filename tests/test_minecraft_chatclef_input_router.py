@@ -1,5 +1,6 @@
 #20260803_kpopmodder: Cover chat/mic routing from LAVI input into Fabric ChatClef.
 #20260819_kpopmodder: Keep router fakes aligned with the canonical mirrored result contract.
+#20260905_kpopmodder: Lock legacy feedback outside trusted Korean ingress.
 import unittest
 
 from app_core.composition_core.app_component_wiring_service import (
@@ -102,6 +103,61 @@ class MinecraftChatClefInputRouterTests(unittest.TestCase):
         self.assertEqual("unknown_intent", decision.reason)
         self.assertEqual([], extension.submitted)
 
+    def test_direct_and_forged_proof_item_rejections_fall_through(self):
+        text = "구리 검 하나 만들어"
+        extension = _RecordingExtension(
+            translation=_item_translation_rejection(
+                text=text,
+                status="unsupported",
+                reason_code="unsupported_material",
+                item_phrase="구리 검",
+            ),
+        )
+        router = MinecraftChatClefInputRouter(
+            extension=extension,
+            log_callback=lambda _message: None,
+        )
+
+        direct = router.route(_chat_event(text))
+        forged = router.route(
+            _chat_event(text),
+            korean_eligibility_proof=object(),
+        )
+
+        self.assertFalse(direct.handled)
+        self.assertEqual("unsupported_intent", direct.reason)
+        self.assertFalse(forged.handled)
+        self.assertEqual("unsupported_intent", forged.reason)
+        self.assertEqual([], extension.submitted)
+
+    def test_untrusted_ingress_evidence_cannot_receive_scoped_feedback(self):
+        extension = _RecordingExtension(
+            translation=_validated_get_translation(
+                "get diamond 1",
+                "다이아몬드",
+                1,
+                "diamond",
+            ),
+        )
+        router = MinecraftChatClefInputRouter(
+            extension=extension,
+            log_callback=lambda _message: None,
+        )
+
+        decision = router.route_trusted_user_input(
+            _chat_event("다이아몬드 캐줘"),
+            object(),
+        )
+
+        self.assertTrue(decision.handled)
+        self.assertEqual("consumed_ingress_evidence_invalid", decision.reason)
+        self.assertEqual("", decision.response_text)
+        self.assertFalse(decision.publish_external_response)
+        self.assertIsNone(decision.response_emission_capability)
+        self.assertTrue(decision.suppress_response)
+        self.assertEqual([], extension.translated)
+        self.assertEqual([], extension.submitted)
+
     def test_invalid_minecraft_like_input_is_consumed_as_rejection(self):
         extension = _RecordingExtension(
             translation={
@@ -152,7 +208,10 @@ class MinecraftChatClefInputRouterTests(unittest.TestCase):
 
         self.assertTrue(decision.handled)
         self.assertEqual("minecraft_bridge_disconnected", decision.reason)
-        self.assertIn("마인크래프트 연결이 끊겨 있어요", decision.response_text)
+        self.assertEqual(
+            "[Minecraft] 마인크래프트 연결이 끊겨 있어요.",
+            decision.response_text,
+        )
         self.assertEqual([], extension.submitted)
 
     def test_validated_translation_is_rejected_when_command_is_active(self):
@@ -179,7 +238,10 @@ class MinecraftChatClefInputRouterTests(unittest.TestCase):
 
         self.assertTrue(decision.handled)
         self.assertEqual("minecraft_command_busy", decision.reason)
-        self.assertIn("다른 마인크래프트 작업", decision.response_text)
+        self.assertEqual(
+            "[Minecraft] 지금 다른 마인크래프트 작업을 하고 있어요.",
+            decision.response_text,
+        )
         self.assertEqual([], extension.submitted)
 
     def test_app_wiring_injects_router_without_replacing_input_listener(self):
@@ -303,6 +365,39 @@ def _submission_result(
         "error": error_code,
         "message": message,
         "details": dict(data),
+    }
+
+
+def _item_translation_rejection(
+    *,
+    text: str,
+    status: str,
+    reason_code: str,
+    item_phrase: str,
+) -> dict[str, object]:
+    return {
+        "status": status,
+        "executable": False,
+        "command": None,
+        "intent": {
+            "intent_type": "get_item",
+            "quantity": 1,
+            "item_phrase": item_phrase,
+            "original_text": text,
+            "source": "rule",
+            "language": "ko",
+        },
+        "resolved_target": None,
+        "reason_code": reason_code,
+        "message": "Korean item phrase could not be resolved.",
+        "data": {
+            "resolution": {
+                "status": status,
+                "target": None,
+                "reason_code": reason_code,
+                "data": {},
+            }
+        },
     }
 
 

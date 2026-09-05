@@ -14,11 +14,11 @@ from .submission_reconciliation_state import (
 )
 from .submission_route_lock import MinecraftChatClefSubmissionRouteLock
 
-__all__ = [
+__all__ = (
     "MinecraftChatClefBridgeReconciliationObserver",
     "MinecraftChatClefBridgeResultAdapter",
     "MinecraftChatClefSubmissionReconciliationCoordinator",
     "MinecraftChatClefSubmissionReconciliationPolicy",
     "MinecraftChatClefSubmissionReconciliationState",
     "MinecraftChatClefSubmissionRouteLock",
-]
+)

@@ -156,6 +156,77 @@ class InputProviderRoutingTests(unittest.TestCase):
         self.assertNotIn(callbacks[0], voice.input_event_listeners)
         self.assertNotIn(callbacks[1], twitch.input_event_listeners)
 
+    def test_exact_voice_provider_can_bind_trusted_edge_without_plain_llm_duplicate(self):
+        from app_core.composition_core.component_wiring import (
+            TrustedVoiceInputWiring,
+        )
+        from plugin_system.interfaces import InputPluginInterface
+
+        class VoiceInput(InputPluginInterface):
+            pass
+
+        class TwitchChatFetch(InputPluginInterface):
+            pass
+
+        voice = VoiceInput()
+        twitch = TwitchChatFetch()
+        input_component = self._build_input([voice, twitch])
+        llm = _TrustedVoiceLlm()
+        observed = []
+        input_component.add_output_event_listener(llm.receive_input)
+        input_component.add_output_event_listener(observed.append)
+
+        wiring = TrustedVoiceInputWiring()
+        first = wiring.wire(input_component=input_component, llm=llm)
+        second = wiring.wire(input_component=input_component, llm=llm)
+        voice.process_input("voice message")
+        twitch.process_input("twitch message")
+
+        self.assertIs(first, second)
+        self.assertEqual(["voice message"], [event.text for event in llm.trusted])
+        self.assertEqual(["twitch message"], [event.text for event in llm.received])
+        self.assertEqual(
+            ["voice message", "twitch message"],
+            [event.text for event in observed],
+        )
+        self.assertEqual(1, len(voice.input_event_listeners))
+
+    def test_trusted_voice_binding_reconciles_when_provider_appears_late(self):
+        from app_core.composition_core.component_wiring import (
+            TrustedVoiceInputWiring,
+        )
+        from plugin_system.interfaces import InputPluginInterface
+        from plugin_system.selection_core.provider import Provider
+
+        class TwitchChatFetch(InputPluginInterface):
+            pass
+
+        class VoiceInput(InputPluginInterface):
+            pass
+
+        input_component = self._build_input([TwitchChatFetch()])
+        llm = _TrustedVoiceLlm()
+        input_component.add_output_event_listener(llm.receive_input)
+
+        self.assertIsNone(
+            TrustedVoiceInputWiring().wire(
+                input_component=input_component,
+                llm=llm,
+            )
+        )
+
+        voice = VoiceInput()
+        provider = Provider()
+        provider.handle = _ProviderHandle(voice)
+        provider.name = "VoiceInput"
+        input_component.provider_list.append(provider)
+        input_component.create_all_provider_ui()
+        voice.process_input("late voice")
+
+        self.assertEqual(["late voice"], [event.text for event in llm.trusted])
+        self.assertEqual([], llm.received)
+        self.assertEqual(1, len(voice.input_event_listeners))
+
 
 class _ProviderHandle:
     def __init__(self, plugin):
@@ -167,6 +238,33 @@ class _ProviderHandle:
 
     def construct(self, _plugin_type):
         return self._plugin
+
+
+class _TrustedVoiceLlm:
+    def __init__(self):
+        self.received = []
+        self.trusted = []
+
+    def receive_input(self, event):
+        self.received.append(event)
+
+    def create_trusted_voice_input_final_enqueue_coordinator(
+        self,
+        adapter,
+        *,
+        pre_accept_observers=(),
+        post_accept_observers=(),
+    ):
+        def callback(payload):
+            event = adapter.adapt(payload)
+            for observer in pre_accept_observers:
+                observer(event)
+            self.trusted.append(event)
+            for observer in post_accept_observers:
+                observer(event)
+            return object()
+
+        return callback
 
 
 if __name__ == "__main__":

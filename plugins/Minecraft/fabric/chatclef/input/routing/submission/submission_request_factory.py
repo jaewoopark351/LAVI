@@ -1,4 +1,5 @@
 #20260818_kpopmodder: Build one router-owned Fabric ChatClef submission request.
+#20260905_kpopmodder: Preserve exact raw and stripped text separately for scoped Feature-B binding.
 from __future__ import annotations
 
 import uuid
@@ -39,3 +40,17 @@ class MinecraftChatClefSubmissionRequestFactory:
                 },
             },
         }
+
+    def build_generic_crafting_defaults(
+        self,
+        event: LaviInputEvent,
+    ) -> dict[str, object]:
+        request = self.build(
+            event,
+            original_text=event.text,
+            translation_input_text=event.text.strip(),
+        )
+        metadata = request["metadata"]
+        natural_language_input = metadata["natural_language_input"]
+        natural_language_input["raw_event_text"] = event.text
+        return request

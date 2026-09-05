@@ -115,6 +115,21 @@ class MinecraftChatClefItemPhraseResolverTests(unittest.TestCase):
 
         self.assertEqual([], missing)
 
+    def test_classification_phrase_sets_are_immutable(self):
+        resolver = KoreanItemPhraseResolver()
+
+        with self.assertRaises(AttributeError):
+            resolver._AMBIGUOUS_PHRASES.add("변경")
+        with self.assertRaises(AttributeError):
+            resolver._UNKNOWN_PHRASES.add("변경")
+        with self.assertRaises(AttributeError):
+            resolver._UNSUPPORTED_MATERIALS.add("변경")
+
+        self.assertEqual(
+            ChatClefIntentStatus.AMBIGUOUS.value,
+            resolver.resolve("장비")["status"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

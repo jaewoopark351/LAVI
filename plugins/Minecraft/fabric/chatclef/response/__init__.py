@@ -3,4 +3,11 @@ from plugins.Minecraft.fabric.chatclef.response.chatclef_command_response_render
     ChatClefCommandResponseRenderer,
 )
 
-__all__ = ["ChatClefCommandResponseRenderer"]
+from .generic_crafting_defaults_response_renderer import (
+    GenericCraftingDefaultsResponseRenderer,
+)
+
+__all__ = (
+    "ChatClefCommandResponseRenderer",
+    "GenericCraftingDefaultsResponseRenderer",
+)

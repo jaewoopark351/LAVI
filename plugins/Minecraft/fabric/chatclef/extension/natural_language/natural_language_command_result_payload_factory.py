@@ -1,4 +1,5 @@
 #20260827_kpopmodder: Added this module to keep one project class per Python file.
+#20260905_kpopmodder: Render fail-closed scoped-crafting authorization rejection payloads.
 from __future__ import annotations
 
 from typing import Any
@@ -38,7 +39,10 @@ class NaturalLanguageCommandResultPayloadFactory:
         data.update(
             {
                 "blocked_command": decision.command_name,
-                "public_korean_enabled": False,
+                #20260905_kpopmodder: Distinguish public control admission from not-public rollout.
+                "public_korean_enabled": (
+                    decision.reason_code != "korean_command_not_public"
+                ),
             }
         )
         if decision.expose_admission_reason:
@@ -72,6 +76,33 @@ class NaturalLanguageCommandResultPayloadFactory:
             "error": "malformed_translation_result",
             "message": message,
             "details": {},
+        }
+
+    def generic_crafting_defaults_rejection(
+        self,
+        command: Any,
+        reason_code: str,
+        message: str,
+    ) -> dict[str, Any]:
+        rejected_request_id = request_id(command)
+        details = {
+            "reason_code": str(reason_code or "generic_crafting_activation_invalid"),
+            "generic_crafting_defaults": True,
+        }
+        return {
+            "request_id": rejected_request_id,
+            "ok": False,
+            "status": {
+                "request_id": rejected_request_id,
+                "ok": False,
+                "status": CommandResultStatus.REJECTED.value,
+                "error_code": BridgeErrorCode.INVALID_REQUEST.value,
+                "message": str(message or "Feature-B activation is invalid."),
+                "data": dict(details),
+            },
+            "error": BridgeErrorCode.INVALID_REQUEST.value,
+            "message": str(message or "Feature-B activation is invalid."),
+            "details": details,
         }
 
     def operation_failure(

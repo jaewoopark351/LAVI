@@ -1,0 +1,12 @@
+#20260905_kpopmodder: Export focused translation boundary components.
+from plugins.Minecraft.fabric.chatclef.input.routing.translation.minecraft_chatclef_translation_capability_inspector import MinecraftChatClefTranslationCapabilityInspector
+from plugins.Minecraft.fabric.chatclef.input.routing.translation.minecraft_chatclef_translation_boundary_component_graph import MinecraftChatClefTranslationBoundaryComponentGraph
+from plugins.Minecraft.fabric.chatclef.input.routing.translation.minecraft_chatclef_translation_invoker import MinecraftChatClefTranslationInvoker
+from plugins.Minecraft.fabric.chatclef.input.routing.translation.minecraft_chatclef_translation_result_validator import MinecraftChatClefTranslationResultValidator
+
+__all__ = (
+    "MinecraftChatClefTranslationBoundaryComponentGraph",
+    "MinecraftChatClefTranslationCapabilityInspector",
+    "MinecraftChatClefTranslationInvoker",
+    "MinecraftChatClefTranslationResultValidator",
+)

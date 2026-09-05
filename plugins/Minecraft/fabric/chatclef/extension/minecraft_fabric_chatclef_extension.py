@@ -1,30 +1,22 @@
 #20260801_kpopmodder: Register Fabric ChatClef as a LAVI game extension.
 #20260827_kpopmodder: Enforce staged STORE_HOME source admission before bridge submission.
+#20260905_kpopmodder: Preserve the extension API as a thin collaborator facade.
 from __future__ import annotations
 
 from typing import Any
 
 from app_core.extensions.game_extension_interface import GameExtensionInterface
-from plugins.Minecraft.fabric.chatclef.command_registry import (
-    KoreanChatClefCommandRegistry,
-)
-from plugins.Minecraft.fabric.chatclef.command_registry.admission import (
-    AutoDepositTrustClaimedSubmissionAuthorizer,
-    AutoDepositTrustCommandAdmission,
-    KoreanCommandSubmissionAdmission,
-    StoreHomeCommandAdmission,
-)
-from plugins.Minecraft.fabric.chatclef.input.auto_deposit_trust.delivery import (
-    AutoDepositTrustInputEventClaimRegistry,
-)
 from plugins.Minecraft.fabric.chatclef.adapter.fabric_chatclef_adapter import (
     FabricChatClefAdapter,
 )
-from plugins.Minecraft.fabric.chatclef.extension.command import (
-    FabricChatClefCommandSubmissionService,
+from plugins.Minecraft.fabric.chatclef.extension.composition import (
+    MinecraftFabricChatClefExtensionComponentGraph,
 )
-from plugins.Minecraft.fabric.chatclef.extension.natural_language import (
-    NaturalLanguageCommandCoordinator,
+from plugins.Minecraft.fabric.chatclef.input.aliases.generic_crafting_defaults.generic_crafting_defaults_activation_registry import (
+    GenericCraftingDefaultsActivationRegistry,
+)
+from plugins.Minecraft.fabric.chatclef.input.auto_deposit_trust.delivery import (
+    AutoDepositTrustInputEventClaimRegistry,
 )
 from plugins.Minecraft.fabric.chatclef.intent import ChatClefNaturalLanguageService
 
@@ -40,76 +32,79 @@ class MinecraftFabricChatClefExtension(GameExtensionInterface):
         auto_deposit_trust_claim_registry: (
             AutoDepositTrustInputEventClaimRegistry | None
         ) = None,
+        generic_crafting_defaults_activation_registry: (
+            GenericCraftingDefaultsActivationRegistry | None
+        ) = None,
     ):
-        self.plugin = plugin
-        self.adapter = adapter or self._adapter_from_plugin(plugin)
-        self.natural_language_service = (
-            natural_language_service or ChatClefNaturalLanguageService()
-        )
-        self.korean_command_registry = KoreanChatClefCommandRegistry()
-        self.store_home_command_admission = StoreHomeCommandAdmission()
-        self.auto_deposit_trust_input_claim_registry = (
-            auto_deposit_trust_claim_registry
-            or AutoDepositTrustInputEventClaimRegistry()
-        )
-        self.auto_deposit_trust_command_admission = (
-            AutoDepositTrustCommandAdmission(
-                authorizer=AutoDepositTrustClaimedSubmissionAuthorizer(
-                    self.auto_deposit_trust_input_claim_registry
-                )
-            )
-        )
-        self._command_submission = FabricChatClefCommandSubmissionService(
-            adapter=self.adapter,
-            record_command=self.record_command,
-            record_result=lambda payload, action: self.record_result(
-                payload,
-                action=action,
+        self._component_graph = MinecraftFabricChatClefExtensionComponentGraph(
+            owner=self,
+            extension_name=self.EXTENSION_NAME,
+            plugin=plugin,
+            adapter=adapter,
+            natural_language_service=natural_language_service,
+            auto_deposit_trust_claim_registry=(
+                auto_deposit_trust_claim_registry
+            ),
+            generic_crafting_defaults_activation_registry=(
+                generic_crafting_defaults_activation_registry
             ),
         )
-        self._natural_language_commands = NaturalLanguageCommandCoordinator(
-            natural_language_service=self.natural_language_service,
-            registry_provider=lambda: self.korean_command_registry,
-            command_submitter=self.handle_command,
-            result_recorder=lambda payload, action: self.record_result(
-                payload,
-                action=action,
-            ),
-            admission=KoreanCommandSubmissionAdmission(
-                self.store_home_command_admission,
-                self.auto_deposit_trust_command_admission,
-            ),
-        )
-        self.context = None
-        self.runtime_context = None
-        self.event_bus = None
+        self._component_graph.install_compatibility_seams(self)
 
     @property
     def name(self) -> str:
         return self.EXTENSION_NAME
 
     def start(self) -> None:
-        self.adapter.start()
-        status = self.adapter.get_status()
-        self.mark_started(status.enabled and not bool(status.last_error_message))
-        self.publish_event(
-            "minecraft_fabric_chatclef_started",
-            {"status": status.to_dict()},
-        )
+        self._lifecycle.start()
 
     def stop(self) -> None:
-        self.adapter.stop()
-        self.mark_started(False)
-        self.publish_event("minecraft_fabric_chatclef_stopped", {})
+        self._lifecycle.stop()
 
     def handle_command(self, command: Any) -> dict[str, Any]:
         return self._command_submission.submit(command)
+
+    def submit_stop_control(
+        self,
+        *,
+        event: object,
+        eligibility_proof: object,
+        receipt: object,
+    ):
+        return self._stop_facade.submit(
+            event=event,
+            eligibility_proof=eligibility_proof,
+            receipt=receipt,
+        )
+
+    def get_stop_control_claim_registry(self):
+        return self._stop_facade.claim_registry()
+
+    def set_stop_terminal_response_callback(self, callback) -> None:
+        self._stop_facade.set_terminal_response_callback(callback)
 
     def translate_natural_language_command(self, command: Any) -> dict[str, Any]:
         return self._natural_language_commands.translate(command)
 
     def handle_natural_language_command(self, command: Any) -> dict[str, Any]:
         return self._natural_language_commands.handle(command)
+
+    def translate_generic_crafting_defaults_command(
+        self,
+        command: Any,
+        *,
+        input_event: object,
+        item_resolution_profile: object,
+        activation_receipt: object,
+        korean_eligibility_proof: object,
+    ) -> dict[str, Any]:
+        return self._natural_language_commands.translate_generic_crafting_defaults(
+            command,
+            input_event=input_event,
+            item_resolution_profile=item_resolution_profile,
+            activation_receipt=activation_receipt,
+            korean_eligibility_proof=korean_eligibility_proof,
+        )
 
     def submit_translated_command(
         self,
@@ -124,31 +119,38 @@ class MinecraftFabricChatClefExtension(GameExtensionInterface):
             route_claim=route_claim,
         )
 
+    def submit_translated_generic_crafting_defaults_command(
+        self,
+        command: Any,
+        translation: Any,
+        *,
+        activation_receipt: object,
+        korean_eligibility_proof: object,
+    ) -> dict[str, Any]:
+        return (
+            self._natural_language_commands.submit_translated_generic_crafting_defaults(
+                command,
+                translation,
+                activation_receipt=activation_receipt,
+                korean_eligibility_proof=korean_eligibility_proof,
+            )
+        )
+
     def get_auto_deposit_trust_input_claim_registry(
         self,
     ) -> AutoDepositTrustInputEventClaimRegistry:
         return self.auto_deposit_trust_input_claim_registry
 
+    def get_generic_crafting_defaults_activation_registry(
+        self,
+    ) -> GenericCraftingDefaultsActivationRegistry:
+        return self.generic_crafting_defaults_activation_registry
+
     def get_status(self) -> dict[str, Any]:
-        status = self.adapter.get_status().to_dict()
-        return self.apply_status_contract(
-            {
-                "name": self.name,
-                "plugin": self._plugin_status(),
-                "runtime": {"backend_id": self.adapter.backend_id},
-                "details": status,
-                "error": status.get("last_error_message"),
-            }
-        )
+        return self._status_provider.get_status()
 
     def _adapter_from_plugin(self, plugin: Any) -> FabricChatClefAdapter:
-        adapter_factory = getattr(plugin, "create_adapter", None)
-        if callable(adapter_factory):
-            return adapter_factory()
-        return FabricChatClefAdapter()
+        return self._component_graph.adapter_from_plugin(plugin)
 
     def _plugin_status(self) -> dict[str, Any]:
-        status = getattr(self.plugin, "get_status", None)
-        if callable(status):
-            return dict(status())
-        return {"present": self.plugin is not None}
+        return self._status_provider.plugin_status()
