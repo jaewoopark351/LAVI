@@ -176,7 +176,7 @@ The reviewed evidence also excludes the following direct causes:
 
 ## 4. Source-level causal chain
 
-The runtime stack and current source agree at every boundary.
+The runtime stack and the reviewed pre-fix source agreed at every boundary.
 
 1. `CollectWoodenButtonTask.java:27` defines a one-plank recipe:
 
@@ -184,8 +184,8 @@ The runtime stack and current source agree at every boundary.
    new ItemTarget[]{p, null, null, null}
    ```
 
-2. `CollectWoodenButtonTask.java:13` incorrectly marks two slots as the same
-   required material:
+2. `CollectWoodenButtonTask.java:13` in the reviewed pre-fix source incorrectly
+   marked two slots as the same required material:
 
    ```java
    new boolean[]{true, true, false, false}
@@ -410,9 +410,11 @@ verification to prove:
 
 The earlier offline suite proved command registration, translation, admission,
 and build integrity but did not exercise the broad button Task's first
-material-acquisition evaluation. The focused test now closes the exact
-pre-recursion mask/occupied-slot invariant; §9.4 records why the full Task tick
-remains a live-runtime requirement.
+material-acquisition evaluation. The focused test then closed the exact
+pre-recursion mask/occupied-slot invariant. A full Task tick was still a
+live-runtime requirement at the close of that offline stage; the later
+matching-JAR Chat and final-microphone runs in Sections 9.3 and 9.4 satisfied
+the generic-button portion of that requirement.
 
 ### 9.2 Clean build
 
@@ -527,8 +529,10 @@ safe in this Loom unit-test classpath: upstream `ResourceTask` construction
 initializes Minecraft `Blocks`, while the headless test runtime does not apply
 the runtime access-widener boundary and fails during registry bootstrap. The
 test therefore closes the exact pre-recursion invariant without fabricating a
-live client. The actual ChatClef Task lifecycle remains part of the required
-post-deployment Minecraft reproduction.
+live client. At the close of offline verification, the actual ChatClef Task
+lifecycle was still part of the required post-deployment Minecraft
+reproduction. Sections 9.3 and 9.4 record the later matching-JAR Chat and final-
+microphone completion; the explicit oak- and stone-button comparisons remain.
 
 Disassembly of the fresh JAR additionally shows the constructor bytecode stores
 `true` only at boolean-array index 0 and stores `false` at indices 1 through 3;

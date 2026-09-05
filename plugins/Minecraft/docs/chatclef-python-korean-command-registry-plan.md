@@ -30,7 +30,8 @@ This plan owns the Korean command registry contract:
 source-backed Java registered command snapshot: 20 at the reviewed baseline,
   22 at the dated 2026-08-29 closure, and a 26-unique-name target on the
   current collision-free normal activation path including the separate H5 registrar
-production Python registry metadata: 22; activation-aware H5 target 26 remains open
+production Python registry metadata: 26; the activation-aware H5 catalog target
+  is closed offline, while gameplay-effect verifiability remains an independent axis
 command-by-command Korean intent grammar
 Python slot schema
 slot domain

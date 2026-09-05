@@ -2042,8 +2042,8 @@ Divergence category:
   BEHAVIOR_CHANGING_ENGINE_DIVERGENCE
 
 Verified reason:
-  the button recipe occupies only slot 0, but the current mask also selects
-  empty slot 1; the resulting copied zero-match target recursively constructs
+  the button recipe occupied only slot 0, but the pre-fix mask also selected
+  empty slot 1; the resulting copied zero-match target recursively constructed
   CataloguedResourceTask until StackOverflowError
 
 Evidence:

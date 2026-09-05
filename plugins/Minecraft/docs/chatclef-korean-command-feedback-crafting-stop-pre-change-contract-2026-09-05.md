@@ -63,7 +63,7 @@ matching-JAR evidence.
 The historical Section 1 fields `DEPLOYMENT_IN_THIS_TASK: NOT_PERFORMED` and
 `MINECRAFT_RUNTIME_IN_THIS_TASK: NOT_RUN` below describe the close of the
 documentation-only implementation ledger. A later matching-JAR live run on
-`2026-09-05` produced this narrower current status:
+`2026-09-05` produced this initial post-ledger, pre-fix status:
 
 ```text
 POST_LEDGER_STATUS_DATE: 2026-09-06
@@ -75,6 +75,12 @@ GENERIC_WOODEN_PRESSURE_PLATE_RUNTIME: COMPLETED_TWICE
 TRUSTED_STOP_RUNTIME: VERIFIED_STOPPED
 GENERIC_WOODEN_BUTTON_RUNTIME: FAILED_STACK_OVERFLOW_BEFORE_TERMINAL
 WOODEN_BUTTON_ROOT_CAUSE: PROVEN
+```
+
+After the minimum correction, clean rebuild, matching-JAR deployment, and
+later Chat/final-microphone runs, the narrower current button status is:
+
+```text
 WOODEN_BUTTON_FIX: PARTIALLY_VERIFIED
 POST_FIX_TEST_BUILD_DEPLOYMENT_RUNTIME: TEST_BUILD_AND_MATCHING_JAR_RUNTIME_PASSED_GENERIC_BUTTON_CHAT_AND_FINAL_MICROPHONE
 POST_FIX_JAR_SHA256: 488C195B8C87919E349549DD5B0766D05D669222BB63FCCDEDD0E38FDB2861B2
