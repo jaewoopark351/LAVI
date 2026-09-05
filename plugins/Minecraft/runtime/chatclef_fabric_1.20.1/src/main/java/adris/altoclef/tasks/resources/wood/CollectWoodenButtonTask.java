@@ -10,7 +10,10 @@ import net.minecraft.item.Item;
 public class CollectWoodenButtonTask extends CraftWithMatchingPlanksTask {
 
     public CollectWoodenButtonTask(Item[] targets, ItemTarget planks, int count) {
-        super(targets, woodItems -> woodItems.button, createRecipe(planks), new boolean[]{true, true, false, false}, count);
+        //20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
+        // Incident wooden-button-stack-overflow-2026-09-05-235653-kst; see
+        // plugins/Minecraft/docs/chatclef-wooden-button-stack-overflow-pre-change-report-2026-09-06.md.
+        super(targets, woodItems -> woodItems.button, createRecipe(planks), new boolean[]{true, false, false, false}, count);
     }
 
     public CollectWoodenButtonTask(Item target, String plankCatalogueName, int count) {
