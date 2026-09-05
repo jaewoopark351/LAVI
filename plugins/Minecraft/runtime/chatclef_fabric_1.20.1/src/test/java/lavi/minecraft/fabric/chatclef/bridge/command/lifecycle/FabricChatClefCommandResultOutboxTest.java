@@ -19,6 +19,27 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FabricChatClefCommandResultOutboxTest {
     @Test
+    void successfulAsyncCompletionRetiresOnlyTheMatchingActiveContext() {
+        Harness harness = harness(new TestResultSender(SendMode.ACCEPT_ASYNC));
+
+        boolean started = harness.outbox.sendTerminal(
+                harness.execution,
+                harness.execution::unknownFromPreexistingUnchangedIdleRoot
+        );
+        harness.queue.enqueueCommandResultSendCompletion(
+                FabricChatClefCommandResultSendCompletion.of(
+                        harness.context,
+                        FabricChatClefCommandResultSendOutcome.sent()
+                )
+        );
+
+        assertTrue(started);
+        assertTrue(harness.outbox.drainSendCompletions(harness.execution));
+        assertFalse(harness.queue.hasActive());
+        assertTrue(harness.context.terminalSent());
+    }
+
+    @Test
     void immediateTerminalSubmissionFailureLeavesActiveOwnershipUncleared() {
         Harness harness = harness(new TestResultSender(SendMode.IMMEDIATE_FAILURE));
 

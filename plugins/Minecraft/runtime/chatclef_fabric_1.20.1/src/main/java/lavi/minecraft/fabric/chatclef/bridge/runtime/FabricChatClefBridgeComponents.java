@@ -12,6 +12,11 @@ import lavi.minecraft.diagnostics.mining.projection.MiningProjectionObserverRegi
 import lavi.minecraft.diagnostics.session.lifecycle.mode.DiagnosticStateCleanupLifecycleObserver;
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandDispatcher;
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandQueue;
+import lavi.minecraft.fabric.chatclef.bridge.command.control.stop.dispatch.FabricChatClefRegisteredStopCommandExecutor;
+import lavi.minecraft.fabric.chatclef.bridge.command.control.stop.dispatch.FabricChatClefStopControlTickDispatcher;
+import lavi.minecraft.fabric.chatclef.bridge.command.control.stop.queue.ownership.FabricChatClefStopControlAdmissionBarrier;
+import lavi.minecraft.fabric.chatclef.bridge.command.control.stop.queue.ownership.FabricChatClefStopControlDedupeRegistry;
+import lavi.minecraft.fabric.chatclef.bridge.command.control.stop.queue.ownership.FabricChatClefStopControlQueue;
 import lavi.minecraft.fabric.chatclef.bridge.command.diagnostics.FabricChatClefDiagnosticCommandContextProvider;
 import lavi.minecraft.fabric.chatclef.bridge.command.diagnostics.FabricChatClefTaskStateReader;
 import lavi.minecraft.fabric.chatclef.bridge.command.diagnostics.crafting.association.FabricChatClefCraftResourceAssociationScopeDiagnostics;
@@ -38,6 +43,7 @@ import lavi.minecraft.fabric.chatclef.bridge.protocol.FabricChatClefBridgeMessag
 import lavi.minecraft.fabric.chatclef.bridge.state.FabricChatClefBridgeState;
 import lavi.minecraft.fabric.chatclef.bridge.transport.FabricChatClefBridgeClient;
 import lavi.minecraft.fabric.chatclef.bridge.transport.FabricChatClefReconnectScheduler;
+import lavi.minecraft.fabric.chatclef.bridge.transport.session.FabricChatClefSessionGuard;
 
 //20260804_kpopmodder: Keep Fabric ChatClef bridge object graph assembly out of the Fabric entrypoint.
 public final class FabricChatClefBridgeComponents {
@@ -60,7 +66,14 @@ public final class FabricChatClefBridgeComponents {
 
     public static FabricChatClefBridgeComponents create() {
         FabricChatClefBridgeDiagnostics diagnostics = new FabricChatClefBridgeDiagnostics();
-        FabricChatClefCommandQueue commandQueue = new FabricChatClefCommandQueue();
+        //20260905_kpopmodder: Assemble the independent STOP lane and ordinary admission barrier once.
+        FabricChatClefStopControlAdmissionBarrier stopAdmissionBarrier =
+                new FabricChatClefStopControlAdmissionBarrier();
+        FabricChatClefCommandQueue commandQueue = new FabricChatClefCommandQueue(stopAdmissionBarrier);
+        FabricChatClefStopControlQueue stopControlQueue =
+                new FabricChatClefStopControlQueue(stopAdmissionBarrier);
+        FabricChatClefStopControlDedupeRegistry stopControlDedupeRegistry =
+                new FabricChatClefStopControlDedupeRegistry();
         ChatClefDiagnostics.registerCommandContextProvider(new FabricChatClefDiagnosticCommandContextProvider(commandQueue));
         IronPickaxeAcquisitionScopeDiagnostics.installRequirementObserver();
         CraftResourceRequirementSourceEventObserver.install(
@@ -119,14 +132,22 @@ public final class FabricChatClefBridgeComponents {
         );
         FabricChatClefTaskStateReader taskStateReader = new FabricChatClefTaskStateReader();
         FabricChatClefBridgeConfig config = new FabricChatClefBridgeConfigLoader().load();
+        FabricChatClefBridgeState bridgeState = new FabricChatClefBridgeState();
+        FabricChatClefSessionGuard sessionGuard = new FabricChatClefSessionGuard(
+                bridgeState,
+                diagnostics
+        );
         FabricChatClefBridgeClient bridgeClient = new FabricChatClefBridgeClient(
                 config,
                 commandQueue,
-                new FabricChatClefBridgeState(),
+                bridgeState,
                 diagnostics,
                 new FabricChatClefBridgeJson(),
                 new FabricChatClefBridgeMessageFactory(),
-                new FabricChatClefReconnectScheduler()
+                new FabricChatClefReconnectScheduler(),
+                sessionGuard,
+                stopControlQueue,
+                stopControlDedupeRegistry
         );
         FabricChatClefUserTaskFinishedObserver taskFinishedObserver = new FabricChatClefUserTaskFinishedObserver(
                 diagnostics,
@@ -145,12 +166,25 @@ public final class FabricChatClefBridgeComponents {
                 diagnostics,
                 taskStateReader
         );
+        FabricChatClefStopControlTickDispatcher stopControlTickDispatcher =
+                new FabricChatClefStopControlTickDispatcher(
+                        stopControlQueue,
+                        commandQueue,
+                        sessionGuard,
+                        commandLifecycleCoordinator.stopControlLifecycle(),
+                        new FabricChatClefRegisteredStopCommandExecutor(),
+                        bridgeClient.stopControlResultOutbox(),
+                        stopControlDedupeRegistry,
+                        taskStateReader::ownershipEvidence,
+                        diagnostics
+                );
         FabricChatClefCommandDispatcher commandDispatcher = new FabricChatClefCommandDispatcher(
                 commandQueue,
                 bridgeClient,
                 commandLifecycleCoordinator,
                 diagnostics,
-                taskStateReader
+                taskStateReader,
+                stopControlTickDispatcher
         );
         return new FabricChatClefBridgeComponents(
                 diagnostics,

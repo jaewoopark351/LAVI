@@ -1,34 +1,23 @@
 package lavi.minecraft.fabric.chatclef.bridge.command;
 
 import lavi.minecraft.fabric.chatclef.bridge.command.ownership.FabricChatClefCommandOwnershipPayload;
+import lavi.minecraft.fabric.chatclef.bridge.command.result.FabricChatClefCommandResultPayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.result.send.FabricChatClefCommandResultSendOutcome;
 import lavi.minecraft.fabric.chatclef.bridge.command.result.send.FabricChatClefCommandResultSendStatus;
+import lavi.minecraft.fabric.chatclef.bridge.command.result.send.FabricChatClefCommandTerminalResultState;
 
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
 
 //20260801_kpopmodder: Bind one command to its Fabric websocket session, envelope, and connection generation.
 public final class FabricChatClefCommandContext {
-    private static final int MAX_TERMINAL_SEND_ATTEMPTS = 5;
-    private static final long[] TERMINAL_SEND_RETRY_DELAYS_MS = {
-            250L,
-            500L,
-            1000L,
-            2000L,
-            5000L
-    };
-
     private final FabricChatClefCommandRequest request;
     private final String correlationId;
     private final String sessionId;
-    private final long connectionGeneration;
+    private final long serverConnectionGeneration;
+    private final long javaSocketGeneration;
     private final long acceptedAtMs;
-    private final AtomicBoolean terminalSendInFlight = new AtomicBoolean(false);
-    private final AtomicBoolean terminalSent = new AtomicBoolean(false);
-    private volatile int terminalSendAttemptCount;
-    private volatile long nextTerminalSendAttemptAtMs;
-    private volatile boolean terminalSendRetryExhausted;
-    private volatile String lastTerminalSendOutcome = "";
-    private volatile boolean terminalDetachDeferLogged;
+    private final FabricChatClefCommandTerminalResultState terminalResultState =
+            new FabricChatClefCommandTerminalResultState();
     private volatile boolean detached;
     private volatile String detachedReason = "";
 
@@ -38,10 +27,22 @@ public final class FabricChatClefCommandContext {
             String sessionId,
             long connectionGeneration
     ) {
+        this(request, correlationId, sessionId, connectionGeneration, connectionGeneration);
+    }
+
+    //20260905_kpopmodder: Keep wire server generation separate from the local WebSocket fence.
+    public FabricChatClefCommandContext(
+            FabricChatClefCommandRequest request,
+            String correlationId,
+            String sessionId,
+            long serverConnectionGeneration,
+            long javaSocketGeneration
+    ) {
         this.request = request;
         this.correlationId = nullToEmpty(correlationId);
         this.sessionId = nullToEmpty(sessionId);
-        this.connectionGeneration = connectionGeneration;
+        this.serverConnectionGeneration = serverConnectionGeneration;
+        this.javaSocketGeneration = javaSocketGeneration;
         this.acceptedAtMs = System.currentTimeMillis();
     }
 
@@ -62,7 +63,11 @@ public final class FabricChatClefCommandContext {
     }
 
     public long connectionGeneration() {
-        return connectionGeneration;
+        return javaSocketGeneration;
+    }
+
+    public long serverConnectionGeneration() {
+        return serverConnectionGeneration;
     }
 
     public boolean isDeadlineExceeded(long nowMs) {
@@ -73,42 +78,23 @@ public final class FabricChatClefCommandContext {
         return beginTerminalSend(System.currentTimeMillis());
     }
 
+    public FabricChatClefCommandResultPayload commitTerminalPayload(
+            Supplier<FabricChatClefCommandResultPayload> factory
+    ) {
+        return terminalResultState.commitPayload(factory);
+    }
+
+    //20260905_kpopmodder: Let STOP refuse to replace an ordinary terminal classification already committed.
+    public boolean terminalPayloadCommitted() {
+        return terminalResultState.payloadCommitted();
+    }
+
     public boolean beginTerminalSend(long nowMs) {
-        if (terminalSent.get()) {
-            return false;
-        }
-        if (terminalSendRetryExhausted || nowMs < nextTerminalSendAttemptAtMs) {
-            return false;
-        }
-        if (!terminalSendInFlight.compareAndSet(false, true)) {
-            return false;
-        }
-        terminalSendAttemptCount++;
-        lastTerminalSendOutcome = "attempt_" + terminalSendAttemptCount + "_in_flight";
-        return true;
+        return terminalResultState.beginSend(nowMs);
     }
 
     public boolean completeTerminalSend(FabricChatClefCommandResultSendOutcome outcome) {
-        FabricChatClefCommandResultSendOutcome sendOutcome = outcome == null
-                ? FabricChatClefCommandResultSendOutcome.failed(
-                        FabricChatClefCommandResultSendStatus.SEND_FAILED,
-                        "missing send outcome"
-                )
-                : outcome;
-        terminalSendInFlight.set(false);
-        lastTerminalSendOutcome = sendOutcome.diagnosticMessage();
-        if (sendOutcome.succeeded()) {
-            terminalSendRetryExhausted = false;
-            nextTerminalSendAttemptAtMs = 0L;
-            return terminalSent.compareAndSet(false, true);
-        }
-        if (!sendOutcome.retryable() || terminalSendAttemptCount >= MAX_TERMINAL_SEND_ATTEMPTS) {
-            terminalSendRetryExhausted = true;
-            nextTerminalSendAttemptAtMs = Long.MAX_VALUE;
-            return false;
-        }
-        nextTerminalSendAttemptAtMs = System.currentTimeMillis() + terminalRetryDelayMs(terminalSendAttemptCount);
-        return false;
+        return terminalResultState.completeSend(outcome);
     }
 
     public boolean completeTerminalSend(boolean succeeded) {
@@ -124,68 +110,43 @@ public final class FabricChatClefCommandContext {
     }
 
     public void cancelTerminalSendAttempt(String reason) {
-        terminalSendInFlight.set(false);
-        lastTerminalSendOutcome = nullToEmpty(reason);
+        terminalResultState.cancelSendAttempt(reason);
     }
 
     public boolean terminalSendInFlight() {
-        return terminalSendInFlight.get();
+        return terminalResultState.sendInFlight();
     }
 
     public boolean terminalSent() {
-        return terminalSent.get();
+        return terminalResultState.sent();
     }
 
     public boolean terminalSendRetryExhausted() {
-        return terminalSendRetryExhausted;
+        return terminalResultState.sendRetryExhausted();
     }
 
     public long nextTerminalSendAttemptAtMs() {
-        return nextTerminalSendAttemptAtMs;
+        return terminalResultState.nextSendAttemptAtMs();
     }
 
     public int terminalSendAttemptCount() {
-        return terminalSendAttemptCount;
+        return terminalResultState.sendAttemptCount();
     }
 
     public String terminalSendState() {
-        if (terminalSent.get()) {
-            return "sent";
-        }
-        if (terminalSendInFlight.get()) {
-            return "in_flight";
-        }
-        if (terminalSendRetryExhausted) {
-            return "retry_exhausted";
-        }
-        if (nextTerminalSendAttemptAtMs > System.currentTimeMillis()) {
-            return "backoff";
-        }
-        return "ready";
+        return terminalResultState.sendState();
     }
 
     public boolean terminalSendReady(long nowMs) {
-        return !terminalSent.get()
-                && !terminalSendInFlight.get()
-                && !terminalSendRetryExhausted
-                && nowMs >= nextTerminalSendAttemptAtMs;
+        return terminalResultState.sendReady(nowMs);
     }
 
     public String lastTerminalSendOutcome() {
-        return lastTerminalSendOutcome;
+        return terminalResultState.lastSendOutcome();
     }
 
     public boolean markTerminalDetachDeferLogged() {
-        if (terminalDetachDeferLogged) {
-            return false;
-        }
-        terminalDetachDeferLogged = true;
-        return true;
-    }
-
-    private static long terminalRetryDelayMs(int attemptCount) {
-        int index = Math.max(0, Math.min(attemptCount - 1, TERMINAL_SEND_RETRY_DELAYS_MS.length - 1));
-        return TERMINAL_SEND_RETRY_DELAYS_MS[index];
+        return terminalResultState.markDetachDeferLogged();
     }
 
     public void markDetached(String reason) {
@@ -198,7 +159,7 @@ public final class FabricChatClefCommandContext {
                 requestId(),
                 correlationId,
                 sessionId,
-                connectionGeneration,
+                serverConnectionGeneration,
                 acceptedAtMs,
                 detached,
                 detachedReason

@@ -2,6 +2,7 @@ package lavi.minecraft.fabric.chatclef.bridge.command.execution;
 
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandRequest;
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandResult;
+import lavi.minecraft.fabric.chatclef.bridge.command.control.stop.result.FabricChatClefOriginalCancellationResultFactory;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandDeadlinePayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandResultFidelity;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandTerminationObservation;
@@ -17,10 +18,12 @@ import lavi.minecraft.fabric.chatclef.bridge.command.result.storehome.FabricChat
 final class FabricChatClefCommandResultFactory {
     private final FabricChatClefCommandExecutionState state;
     private final FabricChatClefStoreHomeResultProjector storeHomeResultProjector;
+    private final FabricChatClefOriginalCancellationResultFactory originalCancellationResultFactory;
 
     FabricChatClefCommandResultFactory(FabricChatClefCommandExecutionState state) {
         this.state = state;
         this.storeHomeResultProjector = new FabricChatClefStoreHomeResultProjector();
+        this.originalCancellationResultFactory = new FabricChatClefOriginalCancellationResultFactory();
     }
 
     FabricChatClefCommandResultPayload runningResult() {
@@ -120,6 +123,10 @@ final class FabricChatClefCommandResultFactory {
                         observation
                 )
         );
+    }
+
+    FabricChatClefCommandResultPayload cancelledFromUserStop() {
+        return originalCancellationResultFactory.create(state.context());
     }
 
     FabricChatClefCommandResultPayload unknownFromTaskObservation(FabricChatClefCommandTerminationObservation observation) {

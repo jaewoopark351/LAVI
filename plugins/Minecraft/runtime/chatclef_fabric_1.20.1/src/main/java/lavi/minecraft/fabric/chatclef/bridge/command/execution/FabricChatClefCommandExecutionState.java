@@ -3,6 +3,8 @@ package lavi.minecraft.fabric.chatclef.bridge.command.execution;
 import adris.altoclef.tasksystem.Task;
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandContext;
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandRequest;
+import lavi.minecraft.fabric.chatclef.bridge.command.control.stop.queue.ownership.FabricChatClefOrdinaryCommandStopMarker;
+import lavi.minecraft.fabric.chatclef.bridge.command.control.stop.queue.ownership.FabricChatClefStopControlIdentity;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefRootOwnershipClassification;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandTerminationObservation;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.evidence.FabricChatClefStableRequestQuiescenceObservation;
@@ -36,6 +38,8 @@ final class FabricChatClefCommandExecutionState {
     private volatile FabricChatClefTaskSnapshot taskAfterDispatch;
     private volatile FabricChatClefTaskSnapshot terminalTask;
     private volatile FabricChatClefCommandTerminationObservation taskFinishedObservation;
+    private final FabricChatClefOrdinaryCommandStopMarker userStopMarker =
+            new FabricChatClefOrdinaryCommandStopMarker();
 
     FabricChatClefCommandExecutionState(
             FabricChatClefCommandContext context,
@@ -150,6 +154,22 @@ final class FabricChatClefCommandExecutionState {
         return candidateTask != null
                 && boundRootTask != null
                 && candidateTask == boundRootTask;
+    }
+
+    //20260905_kpopmodder: Bind user-stop classification before the registered StopCommand can fire callbacks.
+    boolean bindUserStop(
+            FabricChatClefStopControlIdentity identity,
+            Task candidateTask
+    ) {
+        return userStopMarker.bind(identity, boundRootTask, candidateTask);
+    }
+
+    boolean clearUserStop(FabricChatClefStopControlIdentity identity) {
+        return userStopMarker.clear(identity);
+    }
+
+    boolean userStopBound() {
+        return userStopMarker.bound();
     }
 
     String boundRootMatchReason(Task candidateTask) {

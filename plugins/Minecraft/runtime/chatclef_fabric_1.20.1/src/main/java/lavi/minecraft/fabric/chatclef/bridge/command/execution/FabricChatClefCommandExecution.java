@@ -2,6 +2,7 @@ package lavi.minecraft.fabric.chatclef.bridge.command.execution;
 
 import adris.altoclef.tasksystem.Task;
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandContext;
+import lavi.minecraft.fabric.chatclef.bridge.command.control.stop.queue.ownership.FabricChatClefStopControlIdentity;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefRootOwnershipClassification;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandTerminationObservation;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.evidence.FabricChatClefStableRequestQuiescenceObservation;
@@ -119,6 +120,18 @@ public final class FabricChatClefCommandExecution {
         return state.matchesBoundRootTask(candidateTask);
     }
 
+    public boolean bindUserStop(FabricChatClefStopControlIdentity identity, Task candidateTask) {
+        return state.bindUserStop(identity, candidateTask);
+    }
+
+    public boolean clearUserStop(FabricChatClefStopControlIdentity identity) {
+        return state.clearUserStop(identity);
+    }
+
+    public boolean userStopBound() {
+        return state.userStopBound();
+    }
+
     public String boundRootMatchReason(Task candidateTask) {
         return state.boundRootMatchReason(candidateTask);
     }
@@ -148,6 +161,10 @@ public final class FabricChatClefCommandExecution {
 
     public FabricChatClefCommandResultPayload failedFromStoppedTask(FabricChatClefCommandTerminationObservation observation) {
         return resultFactory.failedFromStoppedTask(observation);
+    }
+
+    public FabricChatClefCommandResultPayload cancelledFromUserStop() {
+        return resultFactory.cancelledFromUserStop();
     }
 
     public FabricChatClefCommandResultPayload unknownFromTaskObservation(FabricChatClefCommandTerminationObservation observation) {

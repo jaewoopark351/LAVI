@@ -50,6 +50,13 @@ public final class FabricChatClefCommandOutcomeClassifier {
             );
         }
         if (observation.taskStopped()) {
+            //20260905_kpopmodder: Reclassify only the exact marker bound before the STOP mutation.
+            if (execution.userStopBound()) {
+                return FabricChatClefCommandTerminalDecision.terminal(
+                        "user_stop_requested",
+                        execution.cancelledFromUserStop()
+                );
+            }
             return FabricChatClefCommandTerminalDecision.terminal(
                     "matching_task_stopped",
                     execution.failedFromStoppedTask(observation)

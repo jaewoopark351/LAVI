@@ -1,56 +1,71 @@
 package lavi.minecraft.fabric.chatclef.bridge.transport.session;
 
+//20260905_kpopmodder: Preserve the session guard API as a synchronized responsibility facade.
+
 import lavi.minecraft.fabric.chatclef.bridge.diagnostics.FabricChatClefBridgeDiagnostics;
 import lavi.minecraft.fabric.chatclef.bridge.protocol.FabricChatClefBridgeEnvelope;
 import lavi.minecraft.fabric.chatclef.bridge.state.FabricChatClefBridgeState;
+import lavi.minecraft.fabric.chatclef.bridge.transport.session.validation.FabricChatClefHandshakeAckValidator;
 
-import java.util.Map;
+import java.util.Optional;
 
-//20260804_kpopmodder: Keep Fabric ChatClef handshake and session checks out of the WebSocket listener.
 public final class FabricChatClefSessionGuard {
-    private final FabricChatClefBridgeState state;
-    private final FabricChatClefBridgeDiagnostics diagnostics;
+    private final FabricChatClefMutableSessionState sessionState;
+    private final FabricChatClefHandshakeAckCoordinator handshakeCoordinator;
 
     public FabricChatClefSessionGuard(
             FabricChatClefBridgeState state,
             FabricChatClefBridgeDiagnostics diagnostics
     ) {
-        this.state = state;
-        this.diagnostics = diagnostics;
+        this.sessionState = new FabricChatClefMutableSessionState(state);
+        this.handshakeCoordinator = new FabricChatClefHandshakeAckCoordinator(
+                sessionState,
+                new FabricChatClefHandshakeAckValidator(),
+                new FabricChatClefSessionDiagnostics(diagnostics)
+        );
     }
 
-    public void acceptHandshake(FabricChatClefBridgeEnvelope envelope) {
-        Object accepted = envelope.payload.get("accepted");
-        if (!Boolean.TRUE.equals(accepted)) {
-            diagnostics.warn("handshake rejected payload=" + envelope.payload);
-            return;
-        }
-        String sessionId = stringPayload(envelope.payload, "session_id");
-        if (sessionId == null) {
-            sessionId = envelope.sessionId;
-        }
-        state.markHandshakeAccepted(sessionId);
-        diagnostics.info("handshake accepted session=" + state.sessionId().orElse("<none>"));
+    public synchronized void beginHandshake(String messageId, long javaSocketGeneration) {
+        handshakeCoordinator.beginHandshake(messageId, javaSocketGeneration);
     }
 
-    public boolean handshakeAccepted() {
-        return state.handshakeAccepted();
+    public synchronized boolean acceptHandshake(FabricChatClefBridgeEnvelope envelope, long javaSocketGeneration) {
+        return handshakeCoordinator.accept(envelope, javaSocketGeneration);
     }
 
-    public boolean isActiveSession(String sessionId) {
-        return sessionId != null && activeSessionId().equals(sessionId);
+    public synchronized void acceptHandshake(FabricChatClefBridgeEnvelope envelope) {
+        handshakeCoordinator.accept(envelope, sessionState.expectedJavaSocketGeneration());
     }
 
-    public String activeSessionId() {
-        return state.sessionId().orElse("");
+    public synchronized boolean handshakeAccepted() {
+        return sessionState.handshakeAccepted();
     }
 
-    private String stringPayload(Map<String, Object> payload, String key) {
-        Object value = payload.get(key);
-        if (value == null) {
-            return null;
-        }
-        String text = value.toString();
-        return text.isBlank() ? null : text;
+    public synchronized boolean isActiveSession(String sessionId) {
+        return sessionState.isActiveSession(sessionId);
+    }
+
+    public synchronized String activeSessionId() {
+        return sessionState.activeSessionId();
+    }
+
+    public synchronized Optional<FabricChatClefAcceptedSessionIdentity> acceptedIdentity() {
+        return sessionState.acceptedIdentity();
+    }
+
+    public synchronized boolean matches(
+            String sessionId,
+            long serverConnectionGeneration,
+            long javaSocketGeneration
+    ) {
+        return sessionState.matches(
+                sessionId,
+                serverConnectionGeneration,
+                javaSocketGeneration
+        );
+    }
+
+    public synchronized void markConnectionDetached(long javaSocketGeneration) {
+        sessionState.markConnectionDetached(javaSocketGeneration);
     }
 }
