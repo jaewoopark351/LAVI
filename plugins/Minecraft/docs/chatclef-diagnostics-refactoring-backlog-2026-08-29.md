@@ -2,10 +2,26 @@
 <!-- 20260829_openai: Linked the separately documented automatic pressure-deposit composition regression without treating documentation as re-enablement approval. -->
 <!-- 20260829_openai: Selectively reconciled the archive-only independent review without deleting the live dirty-worktree implementation evidence or combining diagnostics refactoring with automatic-pressure restoration. -->
 <!-- 20260830_openai: Scoped the dormant activation row to its original snapshot and linked the later automatic-deposit incident diagnostics review. -->
+<!-- 20260907_kpopmodder: Linked the implemented targeted ledger, Slice A test, and residual StoreHome folderization record while preserving this historical snapshot. -->
+<!-- 20260907_kpopmodder: Qualified the follow-up verification as mixed-worktree integration evidence rather than an isolated rollback proof. -->
 
 # ChatClef Diagnostics Refactoring Backlog - Evidence-Gated Revision
 
 Date: 2026-08-29
+
+The current-source 2026-09-07 follow-up for
+`StoreDepositAutomaticLifecycleLedger`,
+`StoreDepositSliceADiagnosticsContractTest`, and the residual
+`StoreHomeTimeoutDiagnostics` work is owned by
+[Targeted Diagnostics Refactoring and Folderization Implementation Record](chatclef-targeted-diagnostics-refactoring-folderization-plan-2026-09-07.md).
+That record does not replace this document's historical evidence. Its recorded
+StoreHome size and partial-extraction status describe the exact pre-change
+source; the same record separately captures the completed refactor and offline
+verification. That verification was performed on the complete dirty worktree,
+whose Gradle source set also contained the separately owned natural-response
+Java GET-effect/result-projection slice; it is cross-unit integration evidence,
+not an isolated diagnostics-only build or a combined source rollback unit.
+Deployment and Minecraft runtime verification remain `NOT_RUN`.
 
 ## Review basis and authority
 
