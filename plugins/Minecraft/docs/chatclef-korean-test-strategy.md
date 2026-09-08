@@ -10,6 +10,7 @@
 <!-- 20260829_openai: Recorded the final focused registry synchronization result without promoting runtime evidence. -->
 <!-- 20260904_kpopmodder: Added the docs-only H5 Korean Chat/microphone test contract and recorded the activation-aware 26-command catalog gap. -->
 <!-- 20260905_kpopmodder: Reconciled H5 receipt-commit race tests and the two distinct Java test-only obligations. -->
+<!-- 20260908_kpopmodder: Linked the contextual active-command STATUS response test contract. -->
 
 # ChatClef Korean Test Strategy
 
@@ -40,6 +41,7 @@ plugins/Minecraft/docs/chatclef-command-lifecycle-and-threading.md
 plugins/Minecraft/docs/fabric-chatclef-bridge-protocol-v1.md
 plugins/Minecraft/docs/fabric-chatclef-live-runtime-preflight-plan.md
 plugins/Minecraft/docs/fabric-chatclef-live-runtime-process-lifecycle-plan.md
+plugins/Minecraft/docs/chatclef-python-contextual-active-command-status-response-pre-change-contract-2026-09-08.md
 ```
 
 The Python Korean command registry plan owns the source-backed Java
@@ -60,6 +62,15 @@ source and hash authority, coverage calculation authority, CI scope, and live
 Minecraft safety gates. The post-review merge-blocker document owns current
 implementation/CI status and the merge decision. The historical analysis is
 diagnosis only, and the README is navigation only.
+
+The contextual active-command STATUS contract owns its exact Chat/final-mic
+question-shape, `마크 AI` addressee, prefixless exact ordinary-context claim,
+all-profile direct-renderer drift coverage, zero-submission, route-order, race,
+prefixless-candidate-without-claim Minecraft-route bypass, UI/output/TTS, and
+Gradio test matrix. It also owns failure injection across the complete STATUS
+permit/acknowledgement custody path and exact deeply immutable emergency-
+sentinel assertions. Trusted STOP remains terminal-only. This strategy retains
+the broader test and live-safety authority.
 
 The 2026-08-19 documentation migration touched seven directly affected files as
 one documentation-only consistency update. Later changes do not have to modify

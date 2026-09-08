@@ -13,6 +13,7 @@
 <!-- 20260907_kpopmodder: Reconciled the applied generalized lifecycle, six closed delivery boundaries, and current cautious-evidence ceiling. -->
 <!-- 20260908_kpopmodder: Linked the pending trusted-STOP terminal-only publication policy and STORE_HOME verified-success rollout without changing orchestration ownership. -->
 <!-- 20260908_kpopmodder: Reconciled the implemented STOP/STORE_HOME rollback units and local-Chat empty-stream completion adapter. -->
+<!-- 20260908_kpopmodder: Reconciled the implemented contextual STATUS-question follow-up while preserving genuine busy-command rejection. -->
 
 # ChatClef Python Command Orchestration Plan
 
@@ -73,6 +74,31 @@ The separately reversible local-Chat completion adapter closes Gradio's normal
 zero-product-response iterator without adding an assistant card. These changes
 add no command authority and do not alter Java, the wire schema, Minecraft
 Tasks, or lifecycle presentation identity.
+
+The subsequent implemented Python-only follow-up in the
+[Python Contextual Active-Command Status Response Pre-Change Contract](chatclef-python-contextual-active-command-status-response-pre-change-contract-2026-09-08.md)
+records the historical design and current reconciliation for a STATUS
+query-ownership correction plus bounded publication-handoff hardening. Common
+progress questions are classified and contextually claimed before ordinary busy,
+then answer from the existing
+immutable active descriptor with zero command submissions. The existing FIFO
+permit and acknowledgement boundary remains implemented; the follow-up also
+closes the failure-only custody gaps from raw-permit diagnostic-custody/wrapper/
+snapshot creation, through optional-result validation and trusted response/proof
+finalization, to both dispatcher decision-resolution calls. A handoff failure
+before wrapper creation resolves the raw permit false through the existing
+locked lifecycle; after wrapper creation, each protected boundary retains and
+fail the original acknowledgement closed before a suppressed emergency outcome.
+The successful FIFO path is unchanged.
+The historical `busy emits one busy reply` and `new user command during
+operation -> busy` rules remain authoritative for genuine imperative commands,
+not for a read-only progress question. A validated prefixless STATUS candidate
+that cannot claim the current context returns a non-`None` unhandled decision
+immediately, skips every later Minecraft owner, and may fall through only to the
+outer conversation path. STOP remains first, and no retry, replay, STATUS LLM
+recall, Java change, or new command authority is introduced. Focused and
+selected Python regressions pass offline; Java/Gradle are not required, and
+deployment plus live Minecraft verification remain `NOT_RUN`.
 
 This document records the design and reviewed-baseline status for the requested
 Fabric ChatClef Python orchestration behaviors:

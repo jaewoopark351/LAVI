@@ -12,6 +12,7 @@
 <!-- 20260908_kpopmodder: Indexed the implemented Python rollout and the distinct live Gradio suppressed-response input-lock investigation. -->
 <!-- 20260908_kpopmodder: Reconciled the applied Gradio-only empty-stream completion adapter and offline verification. -->
 <!-- 20260908_kpopmodder: Reconciled STORE_HOME's verified profile and the final selected Python regression. -->
+<!-- 20260908_kpopmodder: Reconciled the implemented contextual active-command STATUS response without changing command admission. -->
 
 # LAVI Minecraft Plugin
 
@@ -69,6 +70,21 @@ browser smoke and the STORE_HOME post-implementation live retest remain
 [STOP single-response and STORE_HOME verified-terminal contract](docs/chatclef-python-stop-single-response-store-home-verified-terminal-pre-change-contract-2026-09-08.md)
 and the distinct
 [suppressed-response input-lock investigation](docs/chatclef-gradio-suppressed-response-input-lock-investigation-2026-09-08.md).
+
+A later Python-only follow-up implements the narrower STATUS-intent correction.
+The deterministic closed classifier now recognizes the established `마크 AI`
+addressee and contextually safe prefixless progress questions before ordinary
+busy handling. It submits zero commands, reuses the exact immutable active
+descriptor across all ordinary command-lifecycle profiles, preserves trusted
+STOP as terminal-only, and preserves genuine second-command blocking. For
+example, an active diamond-pickaxe craft can answer
+`다이아 곡괭이 만드는 중이야`. A validated prefixless STATUS candidate that
+cannot claim the current exact nonterminal context returns directly to outer
+conversation and skips every later Minecraft translator/submission owner. The
+implementation also closes bounded STATUS permit/acknowledgement custody gaps
+without changing the existing success-path FIFO model. Offline tests pass;
+live LAVI/Minecraft verification remains `NOT_RUN`. See the
+[contextual active-command STATUS response contract](docs/chatclef-python-contextual-active-command-status-response-pre-change-contract-2026-09-08.md).
 
 ## Current Implementation Scope
 
@@ -491,6 +507,15 @@ separate rollback units, read:
 plugins/Minecraft/docs/chatclef-python-stop-single-response-store-home-verified-terminal-pre-change-contract-2026-09-08.md
 ```
 
+For the implemented and offline-verified Python-only follow-up that recognizes
+common addressed and contextually safe prefixless progress questions across all
+ordinary command-lifecycle profiles and item targets already accepted by their
+existing ingress, while trusted STOP remains terminal-only, read:
+
+```text
+plugins/Minecraft/docs/chatclef-python-contextual-active-command-status-response-pre-change-contract-2026-09-08.md
+```
+
 For the later live STOP symptom where `멈췄어` appeared once but the Gradio
 textbox remained in its square-stop state, including non-empty runtime-log
 evidence, the exact empty-stream reproduction, applied Python-only completion
@@ -618,6 +643,9 @@ Trusted Korean STOP terminal-only publication and trusted-translation STORE_HOME
 
 Python/Gradio suppressed-response input lock after terminal-only STOP (failure mechanism reproduced; Python correction verified offline; live-browser smoke pending):
   chatclef-gradio-suppressed-response-input-lock-investigation-2026-09-08.md
+
+Contextual natural active-command STATUS responses for all ordinary command-lifecycle profiles and item targets already accepted by their existing ingress; trusted STOP remains terminal-only (implemented and verified offline; live runtime not run):
+  chatclef-python-contextual-active-command-status-response-pre-change-contract-2026-09-08.md
 
 Generic wooden-button StackOverflow root cause, applied correction, clean-build proof, and matching-JAR `PARTIALLY_VERIFIED` runtime status:
   chatclef-wooden-button-stack-overflow-pre-change-report-2026-09-06.md

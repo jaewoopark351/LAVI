@@ -6,6 +6,7 @@
 <!-- 20260907_kpopmodder: Linked the later verified Gradio async duplicate-presentation defect while preserving this historical pre-change contract. -->
 <!-- 20260908_kpopmodder: Reconciled the Python-only Gradio presentation correction and pending live-browser retest. -->
 <!-- 20260908_kpopmodder: Reconciled the implemented STOP single-response and STORE_HOME strong-evidence follow-up as separate rollback units. -->
+<!-- 20260908_kpopmodder: Reconciled the implemented contextual STATUS-query follow-up that narrowly supersedes the historical prefixless fallthrough rule. -->
 
 # ChatClef General Natural Korean Command Lifecycle Feedback Pre-Change Contract
 
@@ -61,6 +62,23 @@ correlation gates pass. It does not change this document's general requirement
 that ordinary START and TERMINAL presentations have distinct identities, and
 it does not expand Java, wire, command admission, raw/legacy STOP, or Minecraft
 behavior.
+
+The later implemented Python-only follow-up in the
+[Python Contextual Active-Command Status Response Pre-Change Contract](chatclef-python-contextual-active-command-status-response-pre-change-contract-2026-09-08.md)
+narrowly supersedes Section 4.2's historical requirement that every unaddressed
+generic or family-only question fall through. The new exception applies only to
+a trusted LAVI Chat or final-microphone input with one matching exact nonterminal
+ordinary lifecycle context. Trusted STOP remains terminal-only and outside that
+STATUS-query set. The follow-up also requires the established `마크 AI`
+addressee and additional closed conversational forms. The existing all-profile
+renderer and strict running-evidence gate are retained. A validated prefixless
+candidate without a contextual claim must bypass the remaining Minecraft
+owners and return only to outer conversation. Its failure-only hardening also
+closes STATUS permit/acknowledgement custody through trusted response processing
+and dispatcher decision resolution while preserving the implemented FIFO
+success model. The follow-up is implemented and verified offline. It changes no
+Java, wire schema, Minecraft Task behavior, or command authority; live runtime
+and deployment remain `NOT_RUN`.
 
 ## 1. Document status
 

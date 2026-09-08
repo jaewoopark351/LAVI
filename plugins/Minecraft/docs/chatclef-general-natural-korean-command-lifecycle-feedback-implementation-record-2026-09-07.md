@@ -4,6 +4,7 @@
 <!-- 20260908_kpopmodder: Recorded the Python-only Gradio presentation identity correction and offline verification. -->
 <!-- 20260908_kpopmodder: Linked the verified STOP publication-policy and STORE_HOME evidence-profile follow-up without rewriting this historical implementation record. -->
 <!-- 20260908_kpopmodder: Reconciled the implemented STOP/STORE_HOME follow-up and final selected Python regression. -->
+<!-- 20260908_kpopmodder: Reconciled the implemented contextual STATUS-question coverage and retained the evidence/renderer boundary. -->
 
 # ChatClef General Natural Korean Command Lifecycle Feedback Implementation Record
 
@@ -78,6 +79,30 @@ Java STORE_HOME failure; see the
 This later follow-up does not rewrite the historical implementation and
 verification results in this record. Its final selected Python integration run
 passed 1226 tests with two skips and 7052 subtests; Ruff also passed.
+
+A later conversational follow-up is implemented and reconciled in the
+[Python Contextual Active-Command Status Response Pre-Change Contract](chatclef-python-contextual-active-command-status-response-pre-change-contract-2026-09-08.md).
+The current immutable descriptor, all-26-profile STATUS renderer, route
+precedence, lifecycle snapshot, running-evidence gate, FIFO permit,
+acknowledgement boundary, output, and TTS boundaries remain implemented. The
+new Python source expands the closed Korean query-shape coverage, recognizes the
+established `마크 AI` addressee, allows a
+prefixless generic or family question to be claimed only when one matching exact
+nonterminal ordinary command context disambiguates it, and closes the narrow
+STATUS permit/acknowledgement custody gaps from raw diagnostic-custody/wrapper/
+snapshot creation, through optional-result validation and trusted response/proof
+finalization, to the dispatcher's two decision-resolution calls. Before an
+acknowledgement exists, a handoff failure resolves the raw permit false through
+the existing locked lifecycle. After wrapper creation, each protected boundary
+retains the original acknowledgement long enough to fail it closed before a
+suppressed emergency outcome. This is not a replacement for the implemented
+FIFO/acknowledgement success model. Trusted STOP remains terminal-only and
+outside that STATUS-query set. Genuine new commands remain busy and submit zero
+while an operation is active. A validated prefixless STATUS candidate without a
+contextual claim must short-circuit the remaining Minecraft owners and fall
+through only to the outer conversation path. Focused and selected Python
+regressions pass offline; live runtime/deployment remain `NOT_RUN`, no Java or
+Gradle work was required, and this reconciliation performs no commit or push.
 
 The registered response profile set is closed over:
 
