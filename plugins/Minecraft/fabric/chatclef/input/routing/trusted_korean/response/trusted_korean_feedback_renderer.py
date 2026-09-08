@@ -11,9 +11,12 @@ class TrustedKoreanFeedbackRenderer:
     def render(self, decision):
         if not decision.handled:
             return decision
+        response_text = self._feedback_facade.render(decision)
+        if response_text == decision.response_text:
+            return decision
         return replace(
             decision,
-            response_text=self._feedback_facade.render(decision),
+            response_text=response_text,
         )
 
 

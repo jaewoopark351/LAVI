@@ -28,6 +28,7 @@ class CommandFeedbackDeliverySchema:
             "crafting_status_query",
             "command_lifecycle",
             "command_status_query",
+            "command_busy_current_work",
         }
     )
     RESPONSE_KINDS = frozenset(
@@ -50,6 +51,11 @@ class CommandFeedbackDeliverySchema:
             ("command_lifecycle", "command_start", "current_input"),
             ("command_lifecycle", "command_terminal", "non_preempting"),
             ("command_status_query", "command_status", "current_input"),
+            (
+                "command_busy_current_work",
+                "command_status",
+                "current_input",
+            ),
             ("stop_control", "command_start", "current_input"),
             ("stop_control", "immediate", "current_input"),
             ("stop_control", "stop_terminal", "non_preempting"),

@@ -82,6 +82,159 @@ class TrustedKoreanChatVoiceIntegrationTests(unittest.TestCase):
         self.assertEqual(adapter.active_identity, adapter.current_active_identity())
         self.assertEqual(0, len(adapter.command_requests))
 
+    def test_chat_and_final_voice_busy_command_reuse_active_status_without_llm(
+        self,
+    ):
+        adapter = _ActiveStatusLifecycleAdapter()
+        extension = MinecraftFabricChatClefExtension(adapter=adapter)
+        llm, pipeline, outputs = _llm_harness(extension)
+        chat = _chat_coordinator(llm)
+
+        status_yields = list(chat.dispatch("지금 뭐 해?", [], "system"))
+        busy_chat_yields = list(chat.dispatch("호박 파이 만들어줘", [], "system"))
+
+        voice_adapter = ProviderBoundInputEventAdapter(
+            provider=_voice_provider(),
+            output_callback=lambda _event: None,
+            source_resolver=InputProviderSourceResolver(),
+        )
+        voice = llm.create_trusted_voice_input_final_enqueue_coordinator(
+            voice_adapter
+        )
+        self.assertIsNotNone(voice.enqueue("호박 파이 만들어줘"))
+        queued = llm.input_queue_worker.input_queue.get_nowait()
+        busy_voice_yields = list(llm.accept_queued_input(queued, [], "system"))
+
+        expected = "다이아 곡괭이 만드는 중이야"
+        self.assertEqual(1, len(status_yields))
+        self.assertEqual(1, len(busy_chat_yields))
+        self.assertEqual(expected, status_yields[0].content)
+        self.assertEqual(expected, busy_chat_yields[0].content)
+        self.assertEqual([expected], busy_voice_yields)
+        self.assertEqual("Minecraft", busy_chat_yields[0].metadata["title"])
+        self.assertEqual(
+            [expected, expected, expected],
+            [item["text"] for item in outputs],
+        )
+        self.assertEqual(
+            [1, 2, 3],
+            [item["response_generation"] for item in outputs],
+        )
+        self.assertEqual(
+            [
+                "command_status_query",
+                "command_busy_current_work",
+                "command_busy_current_work",
+            ],
+            [item["route_kind"] for item in outputs],
+        )
+        self.assertEqual(
+            ["command_status", "command_status", "command_status"],
+            [item["response_kind"] for item in outputs],
+        )
+        self.assertEqual(
+            [("status", True), ("status", True), ("status", True)],
+            adapter.ack_calls,
+        )
+        self.assertEqual(
+            [adapter.active_identity, adapter.active_identity],
+            [
+                (
+                    identity.active_session_id,
+                    identity.active_generation,
+                    identity.active_request_id,
+                    identity.active_command_message_id,
+                )
+                for identity in adapter.busy_observed_identities
+            ],
+        )
+        for output in outputs[1:]:
+            serialized = repr(output)
+            self.assertNotIn("호박", serialized)
+            self.assertNotIn("pumpkin_pie", serialized)
+        self.assertEqual(0, pipeline.provider_calls)
+        self.assertEqual(adapter.active_identity, adapter.current_active_identity())
+        self.assertEqual([], adapter.command_requests)
+
+    def test_all_busy_route_origins_reuse_active_status_for_chat_and_final_voice(
+        self,
+    ):
+        adapter = _ActiveStatusLifecycleAdapter()
+        extension = MinecraftFabricChatClefExtension(adapter=adapter)
+        llm, pipeline, outputs = _llm_harness(extension)
+        chat = _chat_coordinator(llm)
+        voice_adapter = ProviderBoundInputEventAdapter(
+            provider=_voice_provider(),
+            output_callback=lambda _event: None,
+            source_resolver=InputProviderSourceResolver(),
+        )
+        voice = llm.create_trusted_voice_input_final_enqueue_coordinator(
+            voice_adapter
+        )
+        route_inputs = (
+            "호박 파이 만들어줘",
+            "버튼 만들어줘",
+            "@auto_deposit_trust 반경 16x16",
+        )
+        yielded = []
+
+        with self.assertLogs("LAV", level="INFO") as captured:
+            for text in route_inputs:
+                with self.subTest(source="chat", text=text):
+                    yielded.extend(
+                        value.content
+                        for value in chat.dispatch(text, [], "system")
+                    )
+                with self.subTest(source="final_voice", text=text):
+                    self.assertIsNotNone(voice.enqueue(text))
+                    queued = llm.input_queue_worker.input_queue.get_nowait()
+                    yielded.extend(llm.accept_queued_input(queued, [], "system"))
+
+        expected = "다이아 곡괭이 만드는 중이야"
+        self.assertEqual([expected] * 6, yielded)
+        self.assertEqual([expected] * 6, [item["text"] for item in outputs])
+        self.assertEqual(
+            ["command_busy_current_work"] * 6,
+            [item["route_kind"] for item in outputs],
+        )
+        self.assertEqual(
+            [("status", True)] * 6,
+            adapter.ack_calls,
+        )
+        self.assertEqual(6, len(adapter.busy_observed_identities))
+        self.assertEqual([], adapter.command_requests)
+        self.assertEqual(0, pipeline.provider_calls)
+        self.assertEqual(adapter.active_identity, adapter.current_active_identity())
+        admission_logs = [
+            line
+            for line in captured.output
+            if "event=minecraft_korean_feature_admission" in line
+        ]
+        self.assertEqual(6, len(admission_logs))
+        self.assertEqual(
+            ["A", "A", "B", "B", "A", "A"],
+            [_log_field(line, "feature_scope") for line in admission_logs],
+        )
+        self.assertEqual(
+            [
+                "minecraft_command_feedback_v1",
+                "minecraft_command_feedback_v1",
+                "generic_crafting_defaults_v1",
+                "generic_crafting_defaults_v1",
+                "minecraft_command_feedback_v1",
+                "minecraft_command_feedback_v1",
+            ],
+            [_log_field(line, "feature_policy_id") for line in admission_logs],
+        )
+        self.assertTrue(
+            all(
+                "reason=minecraft_command_busy" in line
+                and "feature_activation_status=handled_without_activation" in line
+                and "feature_scope=none" not in line
+                for line in admission_logs
+            )
+        )
+
     def test_chat_and_final_voice_five_crafting_defaults_publish_once_without_llm(
         self,
     ):
@@ -435,6 +588,14 @@ def _voice_provider():
     return SimpleNamespace(handle=SimpleNamespace(descriptor=descriptor))
 
 
+def _log_field(line: str, name: str) -> str:
+    prefix = f"{name}="
+    for token in line.split():
+        if token.startswith(prefix):
+            return token[len(prefix) :]
+    return ""
+
+
 class _Pipeline:
     def __init__(self):
         self.response_generation = 0
@@ -501,6 +662,7 @@ class _ActiveStatusLifecycleAdapter:
     def __init__(self) -> None:
         self.command_requests = []
         self.ack_calls = []
+        self.busy_observed_identities = []
         self._tracker = CommandFeedbackLifecycleFacade()
         self._ownership = FabricChatClefConnectionOwnership(
             crafting_feedback_tracker=self._tracker,
@@ -526,9 +688,33 @@ class _ActiveStatusLifecycleAdapter:
     def inspect_command_feedback_status(self, query):
         return self._api.inspect_status(query)
 
+    def inspect_command_feedback_busy_status(self, observed_identity):
+        self.busy_observed_identities.append(observed_identity)
+        return self._api.inspect_busy_status(observed_identity)
+
+    def get_status(self):
+        active = self._ownership.active_command_owner
+        return StatusSnapshotDTO(
+            backend_id=self.backend_id,
+            enabled=True,
+            connected=True,
+            lifecycle_state=BridgeLifecycleState.CONNECTED,
+            detail="connected",
+            details={
+                "commands": {
+                    "active_session_id": active.session_id,
+                    "active_generation": active.generation,
+                    "active_request_id": active.request_id,
+                    "active_command_message_id": active.command_message_id,
+                    "active_command": active.command,
+                    "last_result": None,
+                }
+            },
+        )
+
     def submit_command(self, request):
         self.command_requests.append(request)
-        raise AssertionError("a STATUS question submitted a Minecraft command")
+        raise AssertionError("a status/busy response submitted a Minecraft command")
 
     def current_active_identity(self):
         active = self._ownership.active_command_owner

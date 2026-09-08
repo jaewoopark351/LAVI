@@ -5,13 +5,26 @@ from __future__ import annotations
 from ..publication.command_feedback_publication_permit import (
     CommandFeedbackPublicationPermit,
 )
+from .busy import CommandBusyStatusInspector
 
 
 class CommandFeedbackStatusPublicationCoordinator:
-    def __init__(self, *, state, status_coordinator, publication_coordinator) -> None:
+    def __init__(
+        self,
+        *,
+        state,
+        status_coordinator,
+        publication_coordinator,
+        busy_status_inspector=None,
+    ) -> None:
         self._state = state
         self._statuses = status_coordinator
         self._publications = publication_coordinator
+        self._busy = busy_status_inspector or CommandBusyStatusInspector(
+            state=state,
+            status_coordinator=status_coordinator,
+            publication_coordinator=publication_coordinator,
+        )
 
     def inspect(
         self,
@@ -41,6 +54,9 @@ class CommandFeedbackStatusPublicationCoordinator:
             return snapshot, None
         permit = self._publications.issue(CommandFeedbackPublicationPermit.STATUS)
         return snapshot, permit
+
+    def inspect_busy_for_publication(self, **values):
+        return self._busy.inspect_for_publication(**values)
 
 
 __all__ = ("CommandFeedbackStatusPublicationCoordinator",)

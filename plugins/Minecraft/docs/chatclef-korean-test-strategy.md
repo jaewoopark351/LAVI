@@ -11,6 +11,7 @@
 <!-- 20260904_kpopmodder: Added the docs-only H5 Korean Chat/microphone test contract and recorded the activation-aware 26-command catalog gap. -->
 <!-- 20260905_kpopmodder: Reconciled H5 receipt-commit race tests and the two distinct Java test-only obligations. -->
 <!-- 20260908_kpopmodder: Linked the contextual active-command STATUS response test contract. -->
+<!-- 20260909_kpopmodder: Reconciled the implemented and offline-verified contextual busy-response parity and zero-mutation test contract. -->
 
 # ChatClef Korean Test Strategy
 
@@ -42,6 +43,7 @@ plugins/Minecraft/docs/fabric-chatclef-bridge-protocol-v1.md
 plugins/Minecraft/docs/fabric-chatclef-live-runtime-preflight-plan.md
 plugins/Minecraft/docs/fabric-chatclef-live-runtime-process-lifecycle-plan.md
 plugins/Minecraft/docs/chatclef-python-contextual-active-command-status-response-pre-change-contract-2026-09-08.md
+plugins/Minecraft/docs/chatclef-python-contextual-active-command-busy-response-pre-change-contract-2026-09-08.md
 ```
 
 The Python Korean command registry plan owns the source-backed Java
@@ -71,6 +73,27 @@ Gradio test matrix. It also owns failure injection across the complete STATUS
 permit/acknowledgement custody path and exact deeply immutable emergency-
 sentinel assertions. Trusted STOP remains terminal-only. This strategy retains
 the broader test and live-safety authority.
+
+The contextual active-command busy-response contract owns the separate
+imperative-conflict presentation matrix. Its positive cases must prove that a
+trusted command-route input producing the exact typed pre-submit busy decision
+remains rejected and submits zero times while its visible
+text equals the explicit STATUS response only when the two independently frozen
+inspections are equivalent in active identity, descriptor, phrase profile, and
+response-driving lifecycle state. Each input owns a separate snapshot, permit,
+and acknowledgement. Healthy positive cases publish UI and output exactly once
+and TTS at most once. Negative cases must prove unchanged active identity, no
+queue/retry/replay, STOP precedence, preservation of the original nonempty
+generic busy response candidate after a pre-permit evaluation/reinspection
+failure, and either the fixed cautious STATUS text under the same
+acknowledgement or zero-product suppression after permit issuance. Every
+negative sink remains at most once. The exact
+`(command_busy_current_work, command_status, current_input)` tuple must pass both
+delivery diagnostics and the closed TTS lifecycle identity classifier, while
+near misses remain rejected. It does not broaden STATUS question grammar.
+The Python-only policy is implemented and verified offline. It changes no Java
+source; Gradle and live runtime remain `NOT_RUN`, and this implementation task
+performed no commit or push.
 
 The 2026-08-19 documentation migration touched seven directly affected files as
 one documentation-only consistency update. Later changes do not have to modify
@@ -568,6 +591,13 @@ LLM provider call count is 0
 llm.receive_input() recursion count is 0
 ordinary chat history storage is 0 by default
 ```
+
+For the separately documented contextual-busy policy, `busy` proves only that
+the attempted command submitted zero times. It does not prove that the active
+command is running and cannot by itself authorize `…중이야`. Positive wording
+requires the same exact active owner, identity, immutable descriptor, and
+profile-approved lifecycle evidence as an explicit STATUS response. The
+rejected command's translation is never evidence for the response subject.
 
 ## Inventory Cleanup Postcondition Contract
 

@@ -46,6 +46,7 @@ class RoutedInputExternalResponsePublisher:
                 and source == "minecraft_chatclef"
                 and route_kind
                 in {
+                    "command_busy_current_work",
                     "crafting_lifecycle",
                     "crafting_status_query",
                     "command_lifecycle",

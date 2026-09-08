@@ -99,6 +99,7 @@ def _guard():
 
 _STATUS_ROUTE_IDENTITIES = (
     ("command_status_query", "command_status"),
+    ("command_busy_current_work", "command_status"),
     ("crafting_status_query", "immediate"),
 )
 

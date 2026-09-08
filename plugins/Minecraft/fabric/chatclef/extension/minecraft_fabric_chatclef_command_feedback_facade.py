@@ -72,6 +72,14 @@ class MinecraftFabricChatClefCommandFeedbackFacade:
                 return legacy(None)
         return None
 
+    def inspect_busy_status(self, observed_identity: object):
+        callback = getattr(
+            self._adapter,
+            "inspect_command_feedback_busy_status",
+            None,
+        )
+        return callback(observed_identity) if callable(callback) else None
+
     def set_terminal_response_callback(self, callback) -> None:
         setter = getattr(
             self._adapter,

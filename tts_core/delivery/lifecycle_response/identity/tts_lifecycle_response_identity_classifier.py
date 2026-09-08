@@ -25,6 +25,11 @@ class TtsLifecycleResponseIdentityClassifier:
                 "non_preempting",
             ),
             ("command_status_query", "command_status", "current_input"),
+            (
+                "command_busy_current_work",
+                "command_status",
+                "current_input",
+            ),
             ("stop_control", "command_start", "current_input"),
             ("stop_control", "stop_terminal", "non_preempting"),
         }

@@ -11,6 +11,12 @@ from plugins.Minecraft.fabric.chatclef.input.routing.trusted_korean.response imp
     TrustedKoreanFeedbackRenderer,
     TrustedKoreanResponseAuthorizer,
 )
+from plugins.Minecraft.fabric.chatclef.input.routing.trusted_korean.response.contextual_busy import (
+    ContextualBusyResponseCoordinator,
+)
+from plugins.Minecraft.fabric.chatclef.input.routing.trusted_korean.response.contextual_busy.publication import (
+    ContextualBusyPublicationHandoffGuard,
+)
 from plugins.Minecraft.fabric.chatclef.input.routing.trusted_korean.trusted_korean_route_invoker import TrustedKoreanRouteInvoker
 from plugins.Minecraft.fabric.chatclef.input.routing.trusted_korean.trusted_korean_proof_validator import TrustedKoreanProofValidator
 from plugins.Minecraft.fabric.chatclef.input.routing.trusted_korean.publication.status import (
@@ -32,6 +38,8 @@ class TrustedKoreanInputRouteComponentGraph:
         close_feature_dispatch_callback,
         status_publication_custody_policy=None,
         status_publication_emergency_decision=None,
+        contextual_busy_response_coordinator=None,
+        contextual_busy_publication_handoff_guard=None,
     ):
         self.admission = TrustedKoreanInputAdmission(
             owner=owner,
@@ -42,6 +50,14 @@ class TrustedKoreanInputRouteComponentGraph:
         self.route_invoker = TrustedKoreanRouteInvoker(route_callback)
         self.feedback_renderer = TrustedKoreanFeedbackRenderer(feedback_facade)
         self.response_authorizer = TrustedKoreanResponseAuthorizer(owner=owner)
+        self.contextual_busy_response_coordinator = (
+            contextual_busy_response_coordinator
+            or ContextualBusyResponseCoordinator()
+        )
+        self.contextual_busy_publication_handoff_guard = (
+            contextual_busy_publication_handoff_guard
+            or ContextualBusyPublicationHandoffGuard()
+        )
         self.status_publication_custody_guard = (
             CommandStatusPublicationCustodyGuard(
                 custody_policy=status_publication_custody_policy,

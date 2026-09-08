@@ -80,6 +80,25 @@ class CommandFeedbackServerApi:
             publication_acknowledgement=acknowledgement,
         )
 
+    def inspect_busy_status(self, observed_identity: object):
+        with self._command_lock:
+            snapshot, permit = (
+                self._connection_ownership
+                .inspect_command_feedback_busy_status_for_publication(
+                    observed_identity
+                )
+            )
+        if (
+            type(permit) is CommandFeedbackPublicationPermit
+            and permit.kind == CommandFeedbackPublicationPermit.STATUS
+        ):
+            return self._status_publication_handoff.attach(
+                query=None,
+                snapshot=snapshot,
+                permit=permit,
+            )
+        return snapshot
+
     def set_terminal_callback(self, callback) -> None:
         self._terminal_listener.set_callback(callback)
 

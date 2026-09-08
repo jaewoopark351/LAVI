@@ -14,6 +14,12 @@ class TrustedKoreanResponseAuthorizer:
         if not decision.handled:
             return decision
         if not str(decision.response_text or "").strip():
+            if (
+                decision.suppress_response is True
+                and decision.publish_external_response is False
+                and decision.response_emission_capability is None
+            ):
+                return decision
             return self._suppressed(decision)
 
         capability = proof.issue_response_emission_capability(

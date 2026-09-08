@@ -41,6 +41,9 @@ from .state import (
     CommandFeedbackLifecycleState,
 )
 from .status import (
+    CommandBusyObservedIdentity,
+    CommandBusyObservedIdentityFactory,
+    CommandBusyStatusInspector,
     CommandFeedbackStatusCoordinator,
     CommandStatusFailureDiagnosticCustody,
     CommandStatusFailureDiagnosticCustodyFactory,
@@ -63,6 +66,9 @@ from .terminal import (
 __all__ = (
     "CommandFeedbackAdmissionCoordinator",
     "CommandFeedbackAdmissionGrant",
+    "CommandBusyObservedIdentity",
+    "CommandBusyObservedIdentityFactory",
+    "CommandBusyStatusInspector",
     "CommandFeedbackAcceptedSubmissionTerminalCoordinator",
     "CommandFeedbackContext",
     "CommandFeedbackDescriptor",

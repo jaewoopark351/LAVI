@@ -96,6 +96,68 @@ class TtsLifecycleResponseComponentIntegrationTests(unittest.TestCase):
         self.assertNotIn("Minecraft", queued["text"])
         self.assertNotIn("command_name", queued["text"])
 
+    def test_contextual_busy_status_enqueues_and_plays_once_without_badge(self):
+        tts = self._tts()
+        enqueue_receipts = []
+        playback_receipts = []
+        tts.add_lifecycle_response_enqueue_receipt_listener(
+            enqueue_receipts.append
+        )
+        tts.add_lifecycle_response_playback_receipt_listener(
+            playback_receipts.append
+        )
+        payload = {
+            "text": "active task status",
+            "response_generation": 12,
+            "event_id": "2" * 32,
+            "source": "minecraft_chatclef",
+            "route_kind": "command_busy_current_work",
+            "response_kind": "command_status",
+            "delivery_mode": "current_input",
+            "presentation": {
+                "source_kind": "minecraft",
+                "badge_label": "Minecraft",
+                "log": '{"command_name":"get"}',
+            },
+        }
+
+        first = tts.receive_input(payload)
+        duplicate = tts.receive_input(payload)
+        queued = tts.input_queue.get_nowait()
+        playback = tts.observe_lifecycle_response_playback(
+            event_id=queued["lifecycle_event_id"],
+            route_kind=queued["lifecycle_route_kind"],
+            response_kind=queued["lifecycle_response_kind"],
+            delivery_token=queued["lifecycle_delivery_token"],
+            item_index=queued["lifecycle_item_index"],
+            played=True,
+            reason="played",
+        )
+        repeated_playback = tts.observe_lifecycle_response_playback(
+            event_id=queued["lifecycle_event_id"],
+            route_kind=queued["lifecycle_route_kind"],
+            response_kind=queued["lifecycle_response_kind"],
+            delivery_token=queued["lifecycle_delivery_token"],
+            item_index=queued["lifecycle_item_index"],
+            played=True,
+            reason="played",
+        )
+
+        self.assertTrue(first.accepted)
+        self.assertFalse(duplicate.accepted)
+        self.assertEqual("duplicate_event", duplicate.reason)
+        self.assertEqual(1, sum(receipt.accepted for receipt in enqueue_receipts))
+        self.assertEqual(1, len(tts.process_calls))
+        self.assertTrue(tts.input_queue.empty())
+        self.assertEqual("active task status", queued["text"])
+        self.assertNotIn("Minecraft", queued["text"])
+        self.assertNotIn("presentation", queued)
+        self.assertEqual("command_busy_current_work", queued["lifecycle_route_kind"])
+        self.assertIs(playback, playback_receipts[0])
+        self.assertTrue(playback.observed)
+        self.assertIsNone(repeated_playback)
+        self.assertEqual(1, len(playback_receipts))
+
     def test_non_preempting_payload_enqueues_once_without_speaking_badge(self):
         tts = self._tts()
         tts.latest_response_generation = 9

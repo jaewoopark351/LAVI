@@ -255,6 +255,20 @@ class FabricChatClefConnectionOwnership:
             target_item=target_item,
         )
 
+    def inspect_command_feedback_busy_status_for_publication(
+        self,
+        observed_identity: object,
+    ):
+        return self._crafting_feedback_tracker.inspect_busy_for_publication(
+            observed_identity=observed_identity,
+            active_websocket=self._connection_session.active_websocket,
+            active_session_id=self._connection_session.active_session_id,
+            active_generation=self._connection_session.active_generation,
+            active_command=self._command_owner.active_command,
+            connected=self._connection_session.is_connected(),
+            quarantine_active=self._command_owner.state.quarantine.active,
+        )
+
     def acknowledge_crafting_feedback_publication(
         self,
         permit: object,

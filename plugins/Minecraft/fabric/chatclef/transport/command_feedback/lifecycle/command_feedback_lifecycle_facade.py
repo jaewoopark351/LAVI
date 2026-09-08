@@ -159,6 +159,9 @@ class CommandFeedbackLifecycleFacade:
     def inspect_for_publication(self, **values):
         return self._statuses.inspect_for_publication(**values)
 
+    def inspect_busy_for_publication(self, **values):
+        return self._statuses.inspect_busy_for_publication(**values)
+
     def claim_terminal(self, owner_token: object):
         return self._terminals.claim(owner_token)
 

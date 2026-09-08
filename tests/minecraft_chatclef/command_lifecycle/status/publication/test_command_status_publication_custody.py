@@ -22,7 +22,7 @@ from plugins.Minecraft.fabric.chatclef.transport.command_feedback.lifecycle.publ
 
 
 class CommandStatusPublicationCustodyTests(unittest.TestCase):
-    def test_policy_accepts_both_routes_legacy_response_and_subclass(self):
+    def test_policy_accepts_all_status_routes_legacy_response_and_subclass(self):
         policy = CommandStatusPublicationCustodyPolicy()
         acknowledgement = _acknowledgement(CommandFeedbackPublicationPermit.STATUS)
 
@@ -36,10 +36,16 @@ class CommandStatusPublicationCustodyTests(unittest.TestCase):
             route_kind="crafting_status_query",
             response_kind="immediate",
         )
+        contextual_busy = _decision(
+            acknowledgement,
+            route_kind="command_busy_current_work",
+            response_kind="command_status",
+        )
         subclass = _StatusDecisionSubclass(**vars(generalized))
 
         self.assertTrue(policy.matches(generalized))
         self.assertTrue(policy.matches(legacy))
+        self.assertTrue(policy.matches(contextual_busy))
         self.assertTrue(policy.matches(subclass))
 
     def test_policy_rejects_start_lookalike_and_malformed_rows_without_raising(self):

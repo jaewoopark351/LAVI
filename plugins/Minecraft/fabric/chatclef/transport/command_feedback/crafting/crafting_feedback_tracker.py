@@ -43,6 +43,9 @@ class CraftingFeedbackTracker:
     def inspect_for_publication(self, **values):
         return self._lifecycle.inspect_for_publication(**values)
 
+    def inspect_busy_for_publication(self, **values):
+        return self._lifecycle.inspect_busy_for_publication(**values)
+
     def claim_terminal(self, owner_token: object):
         return self._lifecycle.claim_terminal(owner_token)
 

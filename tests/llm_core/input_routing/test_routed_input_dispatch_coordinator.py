@@ -250,6 +250,56 @@ class RoutedInputDispatchCoordinatorTests(unittest.TestCase):
             metadata["presentation_metadata"].detail_log,
         )
 
+    def test_contextual_busy_route_receives_minecraft_presentation_metadata(self):
+        for source, expected_send_ui in (
+            ("lavi_chat_ui", False),
+            ("voice_input_final", True),
+        ):
+            with self.subTest(source=source):
+                response_text = "active task status"
+                publisher = _RecordingPublisher(
+                    SimpleNamespace(output_delivered=True)
+                )
+                event = SimpleNamespace(source=source, event_id="7" * 32)
+                decision = SimpleNamespace(
+                    handled=True,
+                    suppress_response=False,
+                    response_text=response_text,
+                    publish_external_response=True,
+                    response_emission_capability=object(),
+                    response_source="minecraft_chatclef",
+                    route_kind="command_busy_current_work",
+                    response_kind="command_status",
+                    presentation_detail_log='{"command_name":"get"}',
+                )
+                coordinator = RoutedInputDispatchCoordinator(
+                    response_publisher_callback=lambda: publisher,
+                    router=SimpleNamespace(route=lambda _event: decision),
+                    log_callback=lambda _message: None,
+                )
+
+                outcome = coordinator.dispatch(event)
+
+                self.assertTrue(outcome.handled)
+                self.assertEqual(1, len(publisher.emission_calls))
+                published_text, metadata = publisher.emission_calls[0]
+                self.assertEqual(response_text, published_text)
+                self.assertNotIn("[Minecraft]", published_text)
+                self.assertEqual(
+                    "command_busy_current_work",
+                    metadata["route_kind"],
+                )
+                self.assertEqual("command_status", metadata["response_kind"])
+                self.assertEqual(expected_send_ui, metadata["send_ui"])
+                self.assertEqual(
+                    "Minecraft",
+                    metadata["presentation_metadata"].badge_label,
+                )
+                self.assertEqual(
+                    '{"command_name":"get"}',
+                    metadata["presentation_metadata"].detail_log,
+                )
+
     def test_ready_decision_is_resolved_once_after_wait_and_before_publish(self):
         timeline = []
         emission = _typed_emission(

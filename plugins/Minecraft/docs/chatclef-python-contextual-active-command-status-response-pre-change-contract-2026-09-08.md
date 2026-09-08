@@ -2,6 +2,7 @@
 <!-- 20260908_kpopmodder: Preserved STOP precedence, command barriers, lifecycle truth, and existing command/item admission. -->
 <!-- 20260908_kpopmodder: Required responsibility-based classifier folderization while retaining compatibility facades. -->
 <!-- 20260908_kpopmodder: Reconciled the implemented Python-only STATUS route, fail-closed publication custody, and offline verification state. -->
+<!-- 20260909_kpopmodder: Reconciled the separately implemented and offline-verified contextual typed-busy RB6 policy while retaining partial Chat runtime evidence. -->
 
 # ChatClef Python Contextual Active-Command Status Response Pre-Change Contract
 
@@ -17,7 +18,7 @@ work instead of falling through to the generic new-command busy rejection.
 
 ```text
 DOCUMENT_TYPE: PRE_CHANGE_IMPLEMENTATION_CONTRACT
-STATUS: IMPLEMENTED_VERIFIED_OFFLINE_LIVE_NOT_RUN
+STATUS: IMPLEMENTED_VERIFIED_OFFLINE_LIVE_CHAT_SINGLE_ROUND
 REVIEWED_REPOSITORY_ROOT: C:\Vtuber_Souorce_Code\LAVI
 REVIEWED_BRANCH: minecraft-plugin-fix/alto-clef-infinite-loop
 REVIEWED_HEAD: 92ea9e6140395cbe71a734ecc3320b08a9c377d9
@@ -49,7 +50,8 @@ CURRENT_STATUS_FIFO_PERMIT_ACKNOWLEDGEMENT_MODEL: IMPLEMENTED
 REQUESTED_STATUS_POST_PERMIT_CUSTODY_CLOSURE: IMPLEMENTED_FAIL_CLOSED
 CURRENT_GENERIC_BUSY_TEXT: [Minecraft] 다른 마인크래프트 명령을 실행 중이라 지금은 새 명령을 보낼 수 없어요.
 REQUESTED_STATUS_TEXT_EXAMPLE: 다이아 곡괭이 만드는 중이야
-LOCAL_RUNTIME_EVIDENCE: LOCAL_IGNORED_RUNTIME_INPUT
+LOCAL_RUNTIME_EVIDENCE: LAVI_CHAT_PUMPKIN_PIE_STATUS_UI_TTS_STOP_PASSED_ONCE
+FULL_CHAT_AND_FINAL_MIC_LIVE_GATE: NOT_RUN
 
 JAVA_SOURCE_CHANGE: NONE
 WIRE_SCHEMA_CHANGE: NONE
@@ -60,9 +62,35 @@ TEST_SOURCE_CHANGE_AFTER_THIS_PRE_CHANGE_BASELINE: IMPLEMENTED
 READ_ONLY_CLASSIFIER_PROBE: ONE_CURRENT_FORM_MATCHED_FIVE_NATURAL_VARIANTS_MISSED
 OFFLINE_TEST_EXECUTION: PASSED_WITH_EXACT_COUNTS_RECORDED_IN_SECTION_19
 DEPLOYMENT: NOT_RUN
-MINECRAFT_RUNTIME: NOT_RUN
-COMMIT_OR_PUSH: NONE
+MINECRAFT_RUNTIME: PARTIAL_LAVI_CHAT_SINGLE_ROUND_PASSED
+IMPLEMENTATION_COMMIT: a9385a42
+ORIGINAL_STATUS_DOCUMENTATION_COMMIT: d8426f4b
+ORIGINAL_STATUS_COMMITS_REMOTE_PUSH: PASSED_CURRENT_BRANCH
+CURRENT_LIVE_EVIDENCE_RECONCILIATION_COMMIT: NOT_PERFORMED
+CURRENT_LIVE_EVIDENCE_RECONCILIATION_PUSH: NOT_PERFORMED
 ```
+
+A later user-run round provides partial post-implementation runtime evidence in
+`logs/20260908_221407_log.txt`:
+
+- lines 490-499 admit and start `get pumpkin_pie 1`;
+- lines 511-516 classify one LAVI Chat input as
+  `minecraft_command_status_query`, render `호박 파이 만드는 중이야`, and
+  deliver it once to output, Chat UI, and the TTS queue;
+- lines 518, 544, and 545 prove one matching TTS start, finish, and playback
+  receipt;
+- lines 547-557 accept exact trusted STOP and publish only `멈췄어` to the
+  visible sinks;
+- lines 565-566 prove matching STOP TTS completion and playback.
+
+This log is a local, ignored runtime artifact and is not expected to exist in
+another checkout. The sanitized bullets above are the durable repository
+record; the path is retained only so the reviewed machine can reproduce the
+line-level audit while that local log remains available.
+
+This closes one LAVI Chat runtime round only. It does not cover final microphone
+input or the required two-source complete live gate, and it did not prove the
+contextual typed-busy policy that was later implemented and verified offline.
 
 The screenshot supplied with the request proves the user-visible fallback text
 but does not preserve the exact triggering utterance. The bounded local log at
@@ -339,6 +367,11 @@ separate, independently reversible policy. It is not required by this
 status-question contract. The screenshot's generic busy sentence is a defect
 only when the triggering input was a progress question that should have been
 owned by STATUS.
+
+That separate policy is now implemented and verified offline under the
+[Python Contextual Active-Command Busy Response Pre-Change Contract](chatclef-python-contextual-active-command-busy-response-pre-change-contract-2026-09-08.md).
+It preserves `minecraft_command_busy`, zero submission, and active ownership;
+only an evidence-qualified trusted response reuses the exact STATUS text.
 
 ## 5. Meaning of “every command and every item”
 
@@ -1700,7 +1733,8 @@ speech portion as `NOT_RUN` or failed; do not call the full live gate complete.
 4. verify the generic busy sentence is absent for that question;
 5. verify no second Minecraft command was submitted;
 6. submit a genuine different command while still active and verify it remains
-   blocked by busy;
+   blocked by busy; the implemented contextual-busy follow-up keeps admission
+   blocked even though its visible text may be the current-task STATUS sentence;
 7. stop or allow the original command to finish;
 8. verify one terminal response and immediate next-input availability.
 
@@ -1774,7 +1808,8 @@ stage; failed receipts do not satisfy the positive live gate.
 
 ## 16. Independent rollback units
 
-The applied source changes remain independently reversible:
+The STATUS feature rollback map, including implemented and conditional units,
+is:
 
 ```text
 RB1  behavior-preserving generic/family/target matcher extraction
@@ -1782,12 +1817,15 @@ RB2  contextual claim, non-None bypass, complete STATUS permit/ack custody clean
 RB3  generic phrase and longest-match addressee activation plus owning tests
 RB4  any necessary status-renderer responsibility extraction
 RB5  source/delivery regression reinforcement
-RB6  optional context-rich genuine-busy wording, only if separately approved
+RB6  contextual active-command busy response for an exact typed pre-submit busy rejection; IMPLEMENTED_VERIFIED_OFFLINE
 ```
 
-`RB6` is not part of the required behavior in this document. If it is later
-approved, disable that policy first so genuine new commands return to the
-existing generic busy response, then remove its renderer/projection wiring.
+`RB6` is not part of the required behavior in this document. It is now owned by
+the separate
+[Python Contextual Active-Command Busy Response Pre-Change Contract](chatclef-python-contextual-active-command-busy-response-pre-change-contract-2026-09-08.md).
+For rollback, disable `RB6` first so genuine new commands return to the existing
+generic busy response, then remove its evaluator, inspector, handoff,
+renderer/projection, and closed delivery-identity wiring.
 
 For a STATUS-feature rollback, disable `RB3` phrase/addressee activation first.
 Only then remove `RB2` contextual claim/bypass wiring; this prevents a newly
@@ -1809,7 +1847,8 @@ CAS, or Java GET evidence.
   not already frozen in the active descriptor;
 - replacing deterministic matching with an LLM;
 - automatically retrying, queueing, replaying, or resubmitting a command;
-- changing genuine new-command busy policy without a separate decision;
+- changing genuine new-command busy policy inside this STATUS contract; the
+  separate contextual-busy contract is the required independent decision;
 - changing raw/legacy STOP or native in-game command handling;
 - changing STOP tracker, barrier, correlation, terminal validation, or CAS;
 - changing STORE_HOME success evidence or terminal wording;
@@ -1917,8 +1956,14 @@ WIRE_SCHEMA_CHANGE: NONE
 MINECRAFT_TASK_BEHAVIOR_CHANGE: NONE
 GRADLE_BUILD: NOT_REQUIRED_NOT_RUN
 DEPLOYMENT: NOT_RUN
-MINECRAFT_RUNTIME: NOT_RUN
-COMMIT_OR_PUSH: NONE
+MINECRAFT_RUNTIME: PARTIAL_LAVI_CHAT_SINGLE_ROUND_PASSED
+LIVE_LAVI_CHAT_SINGLE_ROUND: PASSED_PUMPKIN_PIE_STATUS_UI_TTS_STOP
+FULL_CHAT_AND_FINAL_MIC_LIVE_GATE: NOT_RUN
+IMPLEMENTATION_COMMIT: a9385a42
+ORIGINAL_STATUS_DOCUMENTATION_COMMIT: d8426f4b
+ORIGINAL_STATUS_COMMITS_REMOTE_PUSH: PASSED_CURRENT_BRANCH
+CURRENT_LIVE_EVIDENCE_RECONCILIATION_COMMIT: NOT_PERFORMED
+CURRENT_LIVE_EVIDENCE_RECONCILIATION_PUSH: NOT_PERFORMED
 ```
 
 The one deselected full-suite assertion is a pre-existing Java HEAD contract-
@@ -1926,6 +1971,7 @@ hash mismatch. This Python-only change did not modify Java source or the Java
 contract hash, and neither Java tests nor Gradle were required or run. The
 deselection is recorded explicitly rather than being counted as a pass.
 
-Live LAVI Chat/final-microphone and Minecraft runtime validation remains a
-separate, explicitly authorized step. Its absence does not weaken the offline
-contract proof and must not be reported as live verification.
+One later user-run LAVI Chat round proved `pumpkin_pie` STATUS text plus UI,
+output, TTS, and STOP delivery. Final-microphone coverage and the required
+two-source complete live gate remain `NOT_RUN`. The single Chat round must be
+reported as partial runtime evidence, not full live verification.

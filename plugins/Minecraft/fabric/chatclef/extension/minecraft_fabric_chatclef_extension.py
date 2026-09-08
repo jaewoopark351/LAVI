@@ -127,6 +127,11 @@ class MinecraftFabricChatClefExtension(GameExtensionInterface):
     def inspect_command_feedback_status(self, query: object):
         return self._command_feedback_facade.inspect_status(query)
 
+    def inspect_command_feedback_busy_status(self, observed_identity: object):
+        return self._command_feedback_facade.inspect_busy_status(
+            observed_identity
+        )
+
     def set_command_lifecycle_terminal_response_callback(self, callback) -> None:
         self._command_feedback_facade.set_terminal_response_callback(callback)
 

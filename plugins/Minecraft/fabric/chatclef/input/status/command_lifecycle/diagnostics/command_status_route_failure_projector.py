@@ -27,6 +27,7 @@ _STAGES = frozenset(
         "presentation_detail_projection",
         "primary_decision_assembly",
         "fallback_decision_assembly",
+        "contextual_busy_custody_handoff",
         "optional_route_result_validation",
         "optional_route_result_acknowledgement_identity",
         "trusted_feedback_rendering",

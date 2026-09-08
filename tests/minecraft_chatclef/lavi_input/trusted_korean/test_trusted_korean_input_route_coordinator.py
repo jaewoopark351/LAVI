@@ -11,6 +11,9 @@ from plugins.Minecraft.fabric.chatclef.input.minecraft_chatclef_input_route_deci
 from plugins.Minecraft.fabric.chatclef.input.routing.trusted_korean import (
     TrustedKoreanInputRouteCoordinator,
 )
+from plugins.Minecraft.fabric.chatclef.input.routing.trusted_korean.response.contextual_busy import (
+    ContextualBusyResponsePreparation,
+)
 from plugins.Minecraft.fabric.chatclef.input.routing.trusted_korean.trusted_korean_proof_lifecycle_closer import (
     TrustedKoreanProofLifecycleCloser,
 )
@@ -244,6 +247,45 @@ class TrustedKoreanInputRouteCoordinatorTests(unittest.TestCase):
         )
         self.assertTrue(proof.closed)
 
+    def test_contextual_decoration_keeps_original_busy_for_admission_diagnostics(self):
+        trace = []
+        diagnostic_decisions = []
+        proof = _Proof(trace, capability=object())
+        original = MinecraftChatClefInputRouteDecision.handled_result(
+            reason="minecraft_command_busy",
+            response_text="generic busy",
+            result={"ok": False, "error": "active_command"},
+            route_kind="generic_crafting_defaults",
+        )
+        decorated = MinecraftChatClefInputRouteDecision.handled_result(
+            reason="minecraft_command_busy",
+            response_text="다이아 곡괭이 만드는 중이야",
+            result={"ok": False, "error": "active_command"},
+            route_kind="command_busy_current_work",
+            response_kind="command_status",
+        )
+        coordinator = _coordinator(
+            trace,
+            proof=proof,
+            reason="eligible",
+            route_callback=lambda _event, **_kwargs: original,
+            rendered_text=decorated.response_text,
+            contextual_busy_response_coordinator=SimpleNamespace(
+                prepare=lambda **_kwargs: ContextualBusyResponsePreparation(
+                    decorated
+                )
+            ),
+            diagnostic_decisions=diagnostic_decisions,
+        )
+
+        decision = coordinator.route("event", object())
+
+        self.assertEqual(decorated.response_text, decision.response_text)
+        self.assertEqual("command_busy_current_work", decision.route_kind)
+        self.assertEqual([original], diagnostic_decisions)
+        self.assertIsNot(original, decision)
+        self.assertTrue(proof.closed)
+
 
 def _coordinator(
     trace,
@@ -252,6 +294,8 @@ def _coordinator(
     reason,
     route_callback,
     rendered_text="rendered",
+    contextual_busy_response_coordinator=None,
+    diagnostic_decisions=None,
 ):
     normalizer = SimpleNamespace(
         normalize=lambda _value: trace.append("normalize") or "normalized-event"
@@ -268,6 +312,8 @@ def _coordinator(
 
     def project(**_kwargs):
         trace.append("diagnostic")
+        if diagnostic_decisions is not None:
+            diagnostic_decisions.append(_kwargs.get("route_decision"))
         return object()
 
     logger = SimpleNamespace(log=lambda _record: trace.append("log"))
@@ -281,6 +327,9 @@ def _coordinator(
         route_callback=route_callback,
         close_feature_dispatch_callback=lambda value: trace.append(
             ("close-feature", value)
+        ),
+        contextual_busy_response_coordinator=(
+            contextual_busy_response_coordinator
         ),
     )
 

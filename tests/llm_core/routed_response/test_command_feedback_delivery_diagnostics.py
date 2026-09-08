@@ -269,6 +269,13 @@ class CommandFeedbackDeliveryDiagnosticsTests(unittest.TestCase):
                 "yielded",
             ),
             (
+                "command_busy_current_work",
+                "command_status",
+                "current_input",
+                "tts_queue",
+                "enqueued",
+            ),
+            (
                 "stop_control",
                 "command_start",
                 "current_input",
@@ -332,6 +339,16 @@ class CommandFeedbackDeliveryDiagnosticsTests(unittest.TestCase):
             ("crafting_lifecycle", "crafting_terminal", "current_input"),
             ("stop_control", "command_terminal", "non_preempting"),
             ("stop_control", "stop_terminal", "current_input"),
+            (
+                "command_busy_current_work",
+                "command_status",
+                "non_preempting",
+            ),
+            (
+                "command_busy_current_work",
+                "immediate",
+                "current_input",
+            ),
         )
 
         for route_kind, response_kind, delivery_mode in invalid_identities:
@@ -352,6 +369,36 @@ class CommandFeedbackDeliveryDiagnosticsTests(unittest.TestCase):
             self.assertEqual("invalid", fields["route_kind"])
             self.assertEqual("invalid", fields["response_kind"])
             self.assertEqual("invalid", fields["delivery_mode"])
+
+    def test_contextual_busy_identity_stays_canonical_at_every_owned_sink(self):
+        logs = []
+        logger = CommandFeedbackDeliveryLogger(logs.append)
+        cases = (
+            ("output_listener", "delivered"),
+            ("chat_ui", "yielded"),
+            ("ui_presentation", "enqueued"),
+            ("tts_queue", "enqueued"),
+            ("tts_playback", "played"),
+        )
+
+        for sink, reason in cases:
+            logger.log(
+                event_id="6" * 32,
+                route_kind="command_busy_current_work",
+                response_kind="command_status",
+                sink=sink,
+                response_generation=14,
+                delivered=True,
+                reason=reason,
+                delivery_mode="current_input",
+            )
+
+        self.assertEqual(len(cases), len(logs))
+        for message in logs:
+            fields = _parse_delivery(message)
+            self.assertEqual("command_busy_current_work", fields["route_kind"])
+            self.assertEqual("command_status", fields["response_kind"])
+            self.assertEqual("current_input", fields["delivery_mode"])
 
     def test_formatter_preserves_non_lifecycle_identity_compatibility(self):
         logs = []

@@ -13,6 +13,7 @@
 <!-- 20260908_kpopmodder: Reconciled the applied Gradio-only empty-stream completion adapter and offline verification. -->
 <!-- 20260908_kpopmodder: Reconciled STORE_HOME's verified profile and the final selected Python regression. -->
 <!-- 20260908_kpopmodder: Reconciled the implemented contextual active-command STATUS response without changing command admission. -->
+<!-- 20260909_kpopmodder: Reconciled the implemented and offline-verified contextual busy-response RB6 policy while preserving rejected admission and zero submission. -->
 
 # LAVI Minecraft Plugin
 
@@ -82,9 +83,23 @@ example, an active diamond-pickaxe craft can answer
 cannot claim the current exact nonterminal context returns directly to outer
 conversation and skips every later Minecraft translator/submission owner. The
 implementation also closes bounded STATUS permit/acknowledgement custody gaps
-without changing the existing success-path FIFO model. Offline tests pass;
-live LAVI/Minecraft verification remains `NOT_RUN`. See the
+without changing the existing success-path FIFO model. Offline tests pass. One
+later user-run LAVI Chat round proved `pumpkin_pie` STATUS text, UI/output/TTS,
+and STOP delivery; the full Chat plus final-microphone live gate remains
+`NOT_RUN`. See the
 [contextual active-command STATUS response contract](docs/chatclef-python-contextual-active-command-status-response-pre-change-contract-2026-09-08.md).
+
+A separately documented Python-only `RB6` follow-up now keeps a trusted
+command-route input that produced the exact typed pre-submit busy decision
+rejected with zero submissions while replacing only its generic busy sentence
+with the exact verified current-task STATUS text. Thus a proven-running diamond-
+pickaxe task answers both `지금 뭐 해?` and a conflicting
+`호박 파이 만들어줘` with `다이아 곡괭이 만드는 중이야`; the attempted
+pumpkin-pie command is not admitted, queued, replayed, or allowed to
+replace the active identity. Only an exact typed pre-submit busy decision from
+an existing trusted route is eligible. This policy is
+`IMPLEMENTED_VERIFIED_OFFLINE_LIVE_NOT_RUN`; see the
+[contextual active-command busy response contract](docs/chatclef-python-contextual-active-command-busy-response-pre-change-contract-2026-09-08.md).
 
 ## Current Implementation Scope
 
@@ -115,10 +130,20 @@ one-shot trusted ingress
   -> STOP-first branch
      | exact safe STOP -> guarded stop_control_v1 priority lane
      | unsafe stop-like input -> deterministic local rejection
-     | unrelated -> ordinary Minecraft-command branch
-  -> ordinary Korean command ownership
-     -> existing command or request-local generic crafting defaults
-     -> deterministic source-correct command feedback
+     | unrelated -> contextual STATUS-question owner
+        | lexical non-STATUS -> remaining Minecraft-command owners
+        | exact active-context claim -> verified active-task response, zero command submissions
+        | addressed unavailable/idle -> existing bounded STATUS response
+        | validated prefixless candidate without a claim -> explicit conversation bypass;
+          skip every later Minecraft-command owner
+  -> remaining command owners in existing order
+     -> request-local generic crafting defaults
+     -> intent gate and trusted H5 where applicable
+     -> ordinary Korean command otherwise
+  -> exact typed busy admission rejects a second command with zero submissions
+     -> strict current active evidence: verified active-task STATUS sentence
+     -> invalid, missing, or stale pre-permit evidence: existing generic busy sentence
+  -> deterministic source-correct command feedback
 ```
 
 Its offline verification status is `IMPLEMENTED_VERIFIED_OFFLINE`. The final
@@ -516,6 +541,14 @@ existing ingress, while trusted STOP remains terminal-only, read:
 plugins/Minecraft/docs/chatclef-python-contextual-active-command-status-response-pre-change-contract-2026-09-08.md
 ```
 
+For the implemented and offline-verified Python-only `RB6` policy that preserves an exact typed pre-
+submit busy rejection and active ownership but presents the same verified
+current-task text that an explicit STATUS question would receive, read:
+
+```text
+plugins/Minecraft/docs/chatclef-python-contextual-active-command-busy-response-pre-change-contract-2026-09-08.md
+```
+
 For the later live STOP symptom where `멈췄어` appeared once but the Gradio
 textbox remained in its square-stop state, including non-empty runtime-log
 evidence, the exact empty-stream reproduction, applied Python-only completion
@@ -644,8 +677,11 @@ Trusted Korean STOP terminal-only publication and trusted-translation STORE_HOME
 Python/Gradio suppressed-response input lock after terminal-only STOP (failure mechanism reproduced; Python correction verified offline; live-browser smoke pending):
   chatclef-gradio-suppressed-response-input-lock-investigation-2026-09-08.md
 
-Contextual natural active-command STATUS responses for all ordinary command-lifecycle profiles and item targets already accepted by their existing ingress; trusted STOP remains terminal-only (implemented and verified offline; live runtime not run):
+Contextual natural active-command STATUS responses for all ordinary command-lifecycle profiles and item targets already accepted by their existing ingress; trusted STOP remains terminal-only (implemented and verified offline; one LAVI Chat runtime round passed, full Chat/final-microphone gate not run):
   chatclef-python-contextual-active-command-status-response-pre-change-contract-2026-09-08.md
+
+Contextual current-task wording for an exact typed pre-submit busy rejection, with rejected admission, zero submission and unchanged active identity (implemented and verified offline; Java/Gradle/live runtime not run; no commit or push performed):
+  chatclef-python-contextual-active-command-busy-response-pre-change-contract-2026-09-08.md
 
 Generic wooden-button StackOverflow root cause, applied correction, clean-build proof, and matching-JAR `PARTIALLY_VERIFIED` runtime status:
   chatclef-wooden-button-stack-overflow-pre-change-report-2026-09-06.md

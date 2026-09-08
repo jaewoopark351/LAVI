@@ -22,6 +22,8 @@ class TrustedKoreanInputRouteCoordinator:
         close_feature_dispatch_callback,
         status_publication_custody_policy=None,
         status_publication_emergency_decision=None,
+        contextual_busy_response_coordinator=None,
+        contextual_busy_publication_handoff_guard=None,
     ):
         self._components = TrustedKoreanInputRouteComponentGraph(
             owner=owner,
@@ -37,6 +39,12 @@ class TrustedKoreanInputRouteCoordinator:
             ),
             status_publication_emergency_decision=(
                 status_publication_emergency_decision
+            ),
+            contextual_busy_response_coordinator=(
+                contextual_busy_response_coordinator
+            ),
+            contextual_busy_publication_handoff_guard=(
+                contextual_busy_publication_handoff_guard
             ),
         )
 
@@ -68,6 +76,7 @@ class TrustedKoreanInputRouteCoordinator:
             return decision
 
         decision = None
+        original_admission_diagnostic_decision = None
         custody = None
         failure = None
         try:
@@ -75,7 +84,24 @@ class TrustedKoreanInputRouteCoordinator:
                 admission.event,
                 admission.proof,
             )
-            custody = components.status_publication_custody_guard.claim(decision)
+            original_admission_diagnostic_decision = decision
+            preparation = (
+                components.contextual_busy_response_coordinator.prepare(
+                    decision=decision,
+                    event=admission.event,
+                    proof=admission.proof,
+                    live_proof_validator=components.proof_validator.is_live,
+                )
+            )
+            decision, custody = (
+                components.contextual_busy_publication_handoff_guard
+                .claim_and_transfer(
+                    preparation,
+                    outer_claim=(
+                        components.status_publication_custody_guard.claim
+                    ),
+                )
+            )
             try:
                 decision = components.feedback_renderer.render(decision)
             except Exception as error:
@@ -111,7 +137,7 @@ class TrustedKoreanInputRouteCoordinator:
                     admission.event,
                     eligibility_reason=admission.reason,
                     proof_issued=True,
-                    route_decision=decision,
+                    route_decision=original_admission_diagnostic_decision,
                 )
                 components.proof_lifecycle_closer.close(admission.proof)
             else:
@@ -121,7 +147,9 @@ class TrustedKoreanInputRouteCoordinator:
                             admission.event,
                             eligibility_reason=admission.reason,
                             proof_issued=True,
-                            route_decision=decision,
+                            route_decision=(
+                                original_admission_diagnostic_decision
+                            ),
                         )
                     except Exception as error:
                         failure = (

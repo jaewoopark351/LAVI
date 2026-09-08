@@ -7,6 +7,7 @@
 <!-- 20260908_kpopmodder: Reconciled the Python-only Gradio presentation correction and pending live-browser retest. -->
 <!-- 20260908_kpopmodder: Reconciled the implemented STOP single-response and STORE_HOME strong-evidence follow-up as separate rollback units. -->
 <!-- 20260908_kpopmodder: Reconciled the implemented contextual STATUS-query follow-up that narrowly supersedes the historical prefixless fallthrough rule. -->
+<!-- 20260909_kpopmodder: Reconciled the later implemented and offline-verified contextual busy-response RB6 policy while retaining this historical baseline. -->
 
 # ChatClef General Natural Korean Command Lifecycle Feedback Pre-Change Contract
 
@@ -77,8 +78,22 @@ owners and return only to outer conversation. Its failure-only hardening also
 closes STATUS permit/acknowledgement custody through trusted response processing
 and dispatcher decision resolution while preserving the implemented FIFO
 success model. The follow-up is implemented and verified offline. It changes no
-Java, wire schema, Minecraft Task behavior, or command authority; live runtime
-and deployment remain `NOT_RUN`.
+Java, wire schema, Minecraft Task behavior, or command authority. One later
+LAVI Chat round passed `pumpkin_pie` STATUS, UI/output/TTS, and STOP delivery;
+deployment and the complete Chat plus final-microphone live gate remain
+`NOT_RUN`.
+
+The separately documented
+[Python Contextual Active-Command Busy Response Pre-Change Contract](chatclef-python-contextual-active-command-busy-response-pre-change-contract-2026-09-08.md)
+adopts only the optional context-rich exact typed-busy presentation policy. A
+trusted imperative command-route input remains owned by its original route, is
+rejected by the exact typed pre-submit busy admission gate, submits zero times,
+and cannot replace the active owner. When strict active lifecycle evidence is
+available, only its visible wording reuses the exact current-task STATUS
+renderer. This policy is `IMPLEMENTED_VERIFIED_OFFLINE` and does not rewrite
+the historical contract below. It changes no Java source; Gradle, deployment,
+and live runtime remain `NOT_RUN`, and the implementation performed no commit
+or push.
 
 ## 1. Document status
 

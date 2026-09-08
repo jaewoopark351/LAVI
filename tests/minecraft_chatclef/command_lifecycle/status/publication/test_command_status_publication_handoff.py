@@ -252,8 +252,9 @@ class CommandStatusPublicationHandoffTests(unittest.TestCase):
         self.assertEqual("status_rendering", attempts[0].stage)
         self.assertEqual("RuntimeError", attempts[0].exception_class)
 
-    def test_diagnostic_custody_accepts_new_dispatch_publication_stages(self):
+    def test_diagnostic_custody_accepts_publication_custody_stages(self):
         for stage in (
+            "contextual_busy_custody_handoff",
             "dispatcher_external_response_publication",
             "dispatcher_publication_commit_inspection",
         ):

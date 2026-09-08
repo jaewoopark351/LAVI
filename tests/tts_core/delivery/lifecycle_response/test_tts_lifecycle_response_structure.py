@@ -77,6 +77,21 @@ class TtsLifecycleResponseStructureTests(unittest.TestCase):
             ),
             identity.as_tuple(),
         )
+        contextual_busy = {
+            **valid,
+            "event_id": "b" * 32,
+            "route_kind": "command_busy_current_work",
+            "response_kind": "command_status",
+        }
+        self.assertEqual(
+            (
+                "b" * 32,
+                "command_busy_current_work",
+                "command_status",
+                "current_input",
+            ),
+            classifier.classify(contextual_busy).as_tuple(),
+        )
         for changed in (
             {**valid, "source": "other"},
             {**valid, "delivery_mode": "non_preempting"},
@@ -84,6 +99,15 @@ class TtsLifecycleResponseStructureTests(unittest.TestCase):
             {**valid, "event_id": None},
         ):
             with self.subTest(changed=changed):
+                self.assertIsNone(classifier.classify(changed))
+        for changed in (
+            {**contextual_busy, "source": "other"},
+            {**contextual_busy, "route_kind": "command_busy"},
+            {**contextual_busy, "response_kind": "immediate"},
+            {**contextual_busy, "delivery_mode": "non_preempting"},
+            {**contextual_busy, "event_id": None},
+        ):
+            with self.subTest(contextual_busy_changed=changed):
                 self.assertIsNone(classifier.classify(changed))
 
     def test_extracted_orchestrators_add_no_second_lock(self):

@@ -126,10 +126,11 @@ class CommandStatusRouteFailureDiagnosticsTests(unittest.TestCase):
             )
         )
 
-    def test_dispatch_publication_stages_are_closed_bounded_atoms(self):
+    def test_publication_custody_stages_are_closed_bounded_atoms(self):
         projector = CommandStatusRouteFailureProjector()
 
         for stage in (
+            "contextual_busy_custody_handoff",
             "dispatcher_external_response_publication",
             "dispatcher_publication_commit_inspection",
         ):

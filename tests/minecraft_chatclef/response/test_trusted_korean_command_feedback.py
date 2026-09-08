@@ -49,6 +49,22 @@ class TrustedKoreanCommandFeedbackTests(unittest.TestCase):
             TrustedKoreanCommandFeedbackFacade().render(decision),
         )
 
+    def test_contextual_busy_route_preserves_rendered_or_suppressed_text(self):
+        facade = TrustedKoreanCommandFeedbackFacade()
+
+        for response_text in ("active task status", ""):
+            with self.subTest(response_text=response_text):
+                decision = MinecraftChatClefInputRouteDecision.handled_result(
+                    reason="minecraft_command_busy",
+                    response_text=response_text,
+                    result={"ok": False, "error": "active_command"},
+                    route_kind="command_busy_current_work",
+                    response_kind="command_status",
+                    suppress_response=not response_text,
+                )
+
+                self.assertEqual(response_text, facade.render(decision))
+
     def test_serialized_profile_marker_cannot_select_feature_b_wording(self):
         decision = MinecraftChatClefInputRouteDecision.handled_result(
             reason="minecraft_command_routed",

@@ -49,6 +49,12 @@ from plugins.Minecraft.fabric.chatclef.input.routing.translation_boundary import
 from plugins.Minecraft.fabric.chatclef.input.routing.trusted_korean import (
     TrustedKoreanInputRouteCoordinator,
 )
+from plugins.Minecraft.fabric.chatclef.input.routing.trusted_korean.response.contextual_busy import (
+    ContextualBusyResponseCoordinator,
+)
+from plugins.Minecraft.fabric.chatclef.input.routing.trusted_korean.response.contextual_busy.diagnostics import (
+    ContextualBusyResponseFailureLogger,
+)
 from plugins.Minecraft.fabric.chatclef.input.status.command_lifecycle import (
     CommandStatusQueryClassifier,
     CommandStatusRouteOwner,
@@ -65,6 +71,9 @@ from plugins.Minecraft.fabric.chatclef.input.status.command_lifecycle.routing im
 )
 from plugins.Minecraft.fabric.chatclef.response.command_lifecycle import (
     CommandLifecycleResponseRenderer,
+)
+from plugins.Minecraft.fabric.chatclef.presentation.command_lifecycle import (
+    CommandLifecyclePresentationDetailProjector,
 )
 from plugins.Minecraft.fabric.chatclef.response.trusted_korean import (
     TrustedKoreanCommandFeedbackFacade,
@@ -181,6 +190,28 @@ class MinecraftChatClefRouterComponentGraph:
         self.command_status_route_failure_diagnostics = (
             CommandStatusRouteFailureDiagnostics(self.router_logger.log)
         )
+        self.command_lifecycle_response_renderer = (
+            CommandLifecycleResponseRenderer()
+        )
+        self.command_lifecycle_presentation_detail_projector = (
+            CommandLifecyclePresentationDetailProjector()
+        )
+        self.contextual_busy_response_coordinator = (
+            ContextualBusyResponseCoordinator(
+                inspect_busy_status_callback=getattr(
+                    extension,
+                    "inspect_command_feedback_busy_status",
+                    None,
+                ),
+                response_renderer=self.command_lifecycle_response_renderer,
+                presentation_detail_projector=(
+                    self.command_lifecycle_presentation_detail_projector
+                ),
+                failure_logger=ContextualBusyResponseFailureLogger(
+                    self.router_logger.log
+                ),
+            )
+        )
         self.korean_eligibility_admission = (
             korean_eligibility_admission
             or KoreanChatMicrophoneEligibilityAdmission()
@@ -204,6 +235,9 @@ class MinecraftChatClefRouterComponentGraph:
             status_publication_emergency_decision=(
                 self.command_status_emergency_decision
             ),
+            contextual_busy_response_coordinator=(
+                self.contextual_busy_response_coordinator
+            ),
         )
         self.stop_control_route_owner = self._dependency_resolver.stop_route_owner(
             provided=stop_control_route_owner,
@@ -219,7 +253,10 @@ class MinecraftChatClefRouterComponentGraph:
                     self.trusted_input_route_coordinator.is_live_proof
                 ),
                 classifier=CommandStatusQueryClassifier(),
-                response_renderer=CommandLifecycleResponseRenderer(),
+                response_renderer=self.command_lifecycle_response_renderer,
+                presentation_detail_projector=(
+                    self.command_lifecycle_presentation_detail_projector
+                ),
                 failure_diagnostics=(
                     self.command_status_route_failure_diagnostics
                 ),

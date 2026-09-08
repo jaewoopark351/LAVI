@@ -10,9 +10,16 @@ class TrustedKoreanFeedbackRouteSelector:
     ITEM_REJECTION = "item_rejection"
     CRAFTING_REJECTION = "crafting_rejection"
     CRAFTING_SUBMITTED = "crafting_submitted"
+    _CONTEXTUAL_BUSY_ROUTE_KIND = "command_busy_current_work"
 
     def select(self, decision: object) -> str:
         if getattr(decision, "handled", False) is not True:
+            return self.EXISTING
+        #20260909_kpopmodder: Preserve the already rendered current-work STATUS text before generic busy wording.
+        if (
+            str(getattr(decision, "route_kind", "") or "").strip()
+            == self._CONTEXTUAL_BUSY_ROUTE_KIND
+        ):
             return self.EXISTING
         reason = str(getattr(decision, "reason", "") or "").strip()
         direct = {

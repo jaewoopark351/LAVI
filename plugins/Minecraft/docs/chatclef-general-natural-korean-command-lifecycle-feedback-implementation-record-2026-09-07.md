@@ -5,6 +5,7 @@
 <!-- 20260908_kpopmodder: Linked the verified STOP publication-policy and STORE_HOME evidence-profile follow-up without rewriting this historical implementation record. -->
 <!-- 20260908_kpopmodder: Reconciled the implemented STOP/STORE_HOME follow-up and final selected Python regression. -->
 <!-- 20260908_kpopmodder: Reconciled the implemented contextual STATUS-question coverage and retained the evidence/renderer boundary. -->
+<!-- 20260909_kpopmodder: Reconciled the later implemented and offline-verified contextual busy-response RB6 policy without rewriting this historical implementation record. -->
 
 # ChatClef General Natural Korean Command Lifecycle Feedback Implementation Record
 
@@ -37,7 +38,7 @@ CLEAN_FORCED_BUILD: PASS_171_TASKS_EXECUTED_EXIT_0
 BUILD_PROVENANCE: MIXED_PROVENANCE
 DEPLOYMENT_IN_ORIGINAL_IMPLEMENTATION_TASK: NOT_RUN
 MINECRAFT_RUNTIME_IN_ORIGINAL_IMPLEMENTATION_TASK: NOT_RUN
-COMMIT_OR_PUSH: NONE
+COMMIT_OR_PUSH_IN_ORIGINAL_IMPLEMENTATION_TASK: NONE
 ```
 
 A later user-run runtime observation does not rewrite the historical offline
@@ -82,8 +83,9 @@ passed 1226 tests with two skips and 7052 subtests; Ruff also passed.
 
 A later conversational follow-up is implemented and reconciled in the
 [Python Contextual Active-Command Status Response Pre-Change Contract](chatclef-python-contextual-active-command-status-response-pre-change-contract-2026-09-08.md).
-The current immutable descriptor, all-26-profile STATUS renderer, route
-precedence, lifecycle snapshot, running-evidence gate, FIFO permit,
+The current immutable descriptor, 26-profile registry-backed STATUS renderer
+(25 non-STOP active profiles, with STOP excluded from active STATUS ownership),
+route precedence, lifecycle snapshot, running-evidence gate, FIFO permit,
 acknowledgement boundary, output, and TTS boundaries remain implemented. The
 new Python source expands the closed Korean query-shape coverage, recognizes the
 established `마크 AI` addressee, allows a
@@ -101,8 +103,23 @@ outside that STATUS-query set. Genuine new commands remain busy and submit zero
 while an operation is active. A validated prefixless STATUS candidate without a
 contextual claim must short-circuit the remaining Minecraft owners and fall
 through only to the outer conversation path. Focused and selected Python
-regressions pass offline; live runtime/deployment remain `NOT_RUN`, no Java or
-Gradle work was required, and this reconciliation performs no commit or push.
+regressions pass offline; at that reconciliation checkpoint live runtime and
+deployment were `NOT_RUN`, no Java or Gradle work was required, and the
+reconciliation itself performed no commit or push. One later LAVI Chat round
+passed `pumpkin_pie` STATUS, UI/output/TTS, and STOP delivery, while the complete
+Chat plus final-microphone live gate remains `NOT_RUN`.
+
+A later Python-only presentation follow-up is implemented and verified offline
+under the contract recorded in the
+[Python Contextual Active-Command Busy Response Pre-Change Contract](chatclef-python-contextual-active-command-busy-response-pre-change-contract-2026-09-08.md).
+It preserves the implemented busy rejection, command barrier, zero-submit rule,
+and active identity while requiring an eligible trusted command-route input
+that produced the exact typed pre-submit busy decision to show the same verified
+current-task text as an explicit STATUS question. That policy is a separate
+`RB6` rollback unit and does not rewrite the historical implementation or
+verification claims above. It changes no Java source; Gradle, deployment, and
+live runtime remain `NOT_RUN`, and this implementation task performed no commit
+or push.
 
 The registered response profile set is closed over:
 

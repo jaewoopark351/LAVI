@@ -12,7 +12,11 @@ from plugins.Minecraft.fabric.chatclef.transport.command_feedback.lifecycle.publ
 
 class CommandStatusPublicationCustodyPolicy:
     _ROUTE_KINDS = frozenset(
-        {"command_status_query", "crafting_status_query"}
+        {
+            "command_busy_current_work",
+            "command_status_query",
+            "crafting_status_query",
+        }
     )
 
     def matches(self, decision: object) -> bool:

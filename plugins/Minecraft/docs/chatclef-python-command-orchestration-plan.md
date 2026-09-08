@@ -14,6 +14,7 @@
 <!-- 20260908_kpopmodder: Linked the pending trusted-STOP terminal-only publication policy and STORE_HOME verified-success rollout without changing orchestration ownership. -->
 <!-- 20260908_kpopmodder: Reconciled the implemented STOP/STORE_HOME rollback units and local-Chat empty-stream completion adapter. -->
 <!-- 20260908_kpopmodder: Reconciled the implemented contextual STATUS-question follow-up while preserving genuine busy-command rejection. -->
+<!-- 20260909_kpopmodder: Reconciled the implemented and offline-verified contextual busy-response RB6 policy without changing busy admission. -->
 
 # ChatClef Python Command Orchestration Plan
 
@@ -40,10 +41,12 @@ return a cautious terminal sentence unless separately proven.
 The historical 2026-09-07 offline integration run and its unrelated
 pre-existing repository `HEAD`-hash contract failure are recorded in the
 implementation record. The later selected final regression passed 1226 tests
-with two skips and 7052 subtests, and Ruff passed. Deployment and Minecraft
-runtime verification for this generalized implementation remain `NOT_RUN`. The older
-baseline and planning sections below remain useful historical design context;
-their `planned` wording does not override this reconciliation.
+with two skips and 7052 subtests, and Ruff passed. At that original generalized
+implementation checkpoint, deployment and Minecraft runtime verification were
+`NOT_RUN`. One later partial LAVI Chat round is recorded below; it does not
+close the formal Chat plus final-microphone live matrix. The older baseline and
+planning sections below remain useful historical design context; their
+`planned` wording does not override this reconciliation.
 
 The exact 2026-09-07 `diamond_pickaxe` quantity-one craft-intent start,
 read-only progress-query, and gameplay-effect-verified completion wording is
@@ -88,8 +91,9 @@ snapshot creation, through optional-result validation and trusted response/proof
 finalization, to both dispatcher decision-resolution calls. A handoff failure
 before wrapper creation resolves the raw permit false through the existing
 locked lifecycle; after wrapper creation, each protected boundary retains and
-fail the original acknowledgement closed before a suppressed emergency outcome.
+fails the original acknowledgement closed before a suppressed emergency outcome.
 The successful FIFO path is unchanged.
+
 The historical `busy emits one busy reply` and `new user command during
 operation -> busy` rules remain authoritative for genuine imperative commands,
 not for a read-only progress question. A validated prefixless STATUS candidate
@@ -97,8 +101,25 @@ that cannot claim the current context returns a non-`None` unhandled decision
 immediately, skips every later Minecraft owner, and may fall through only to the
 outer conversation path. STOP remains first, and no retry, replay, STATUS LLM
 recall, Java change, or new command authority is introduced. Focused and
-selected Python regressions pass offline; Java/Gradle are not required, and
-deployment plus live Minecraft verification remain `NOT_RUN`.
+selected Python regressions pass offline; Java/Gradle are not required. One
+later user-run LAVI Chat round passed `pumpkin_pie` STATUS, UI/output/TTS, and
+STOP delivery; deployment and the complete Chat plus final-microphone live gate
+remain `NOT_RUN`.
+
+The separately documented
+[Python Contextual Active-Command Busy Response Pre-Change Contract](chatclef-python-contextual-active-command-busy-response-pre-change-contract-2026-09-08.md)
+implements the earlier STATUS contract's optional `RB6` as a Python-only policy.
+The historical `new command during operation -> busy` rule remains the command
+admission truth: the second command is rejected, submits zero times, and cannot
+replace, queue behind, cancel, or preempt the active command. Only its trusted
+user-facing response changes from the generic busy sentence to the exact
+verified current-task STATUS text. The imperative input remains owned by its
+original command route, not a STATUS classifier match. Eligibility requires the
+route's exact typed pre-submit `minecraft_command_busy` result; free-form error
+text and post-submit rejection messages are never reclassified. This follow-up
+is `IMPLEMENTED_VERIFIED_OFFLINE` and required no Java or Gradle work. Live
+runtime remains `NOT_RUN`, and this implementation task performed no commit or
+push.
 
 This document records the design and reviewed-baseline status for the requested
 Fabric ChatClef Python orchestration behaviors:
@@ -1815,6 +1836,14 @@ primary unknown:
   철 수집 결과를 확인하지 못했어요.
 ```
 
+The generic `already busy` sentence above remains the fail-closed fallback.
+Under the implemented contextual-busy policy, and only when the exact active
+descriptor and nonterminal lifecycle evidence pass the existing STATUS gate,
+this presentation becomes that active task's deterministic STATUS text.
+If evidence is missing, stale, mismatched, malformed, or terminal, the generic
+busy sentence remains the fail-closed fallback. Admission and zero-submit
+semantics do not change.
+
 The initial reply path uses deterministic templates only. Normal external
 dispatch to Translate, TTS, or other LAVI output listeners remains a separate
 planned integration step for the generic orchestration design. The exact
@@ -1977,6 +2006,11 @@ exactly-once start and terminal replies
 automatic replay prevention
 busy response while an operation is active
 ```
+
+The implemented contextual-busy presentation remains under this Python ownership,
+but its active-task projection and Korean rendering must be delegated to focused
+collaborators and the shared lifecycle STATUS renderer. The orchestrator must
+not infer the active task, mutate its identity, or resubmit the rejected input.
 
 It must not own:
 
@@ -2434,6 +2468,8 @@ Required reply/output tests:
 accepted primary emits one start reply
 immediate rejected does not emit "going" phrasing
 busy emits one busy reply
+implemented RB6: eligible busy reply text equals explicit STATUS only for equivalent separately captured active identity, descriptor, phrase profile and response-driving lifecycle state
+implemented RB6: different B-only target/count never appears; duplicate B uses instrumented provenance checks proving only A's frozen projection is rendered
 disconnected emits one connection error reply
 routed response reaches Translate listener exactly once
 routed response reaches TTS listener exactly once through existing path
@@ -2471,6 +2507,7 @@ primary completed -> terminal reply once
 primary failed/cancelled/deadline/unknown -> terminal reply once, no replay
 primary inventory-full -> no replay, manual recovery required
 new user command during operation -> busy, no concurrent submit
+implemented RB6: active identity/descriptor unchanged and rejected command START/TERMINAL count is 0
 cleanup attempts capped at one
 app restart does not replay prior operation
 ```
