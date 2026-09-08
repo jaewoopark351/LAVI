@@ -42,13 +42,63 @@ class RoutedInputDispatchCoordinator:
 
         resolution = components.decision_resolver.resolve(decision)
         if resolution.terminal_outcome is not None:
+            components.publication_acknowledger.acknowledge(
+                decision,
+                published=False,
+            )
+            return resolution.terminal_outcome
+        if not components.publication_acknowledger.wait_for_turn(decision):
+            return components.outcome_factory.suppressed()
+        ready_decision = (
+            components.publication_acknowledger.resolve_ready_decision(
+                decision
+            )
+        )
+        if ready_decision is None:
+            components.publication_acknowledger.acknowledge(
+                decision,
+                published=False,
+            )
+            return components.outcome_factory.suppressed()
+        decision = ready_decision
+        resolution = components.decision_resolver.resolve(decision)
+        if resolution.terminal_outcome is not None:
+            components.publication_acknowledger.acknowledge(
+                decision,
+                published=False,
+            )
             return resolution.terminal_outcome
         emission = components.external_response_publisher.publish(
             message=message,
             decision=decision,
             response_text=resolution.response_text,
         )
-        if emission is None:
+        acknowledgement_present = (
+            getattr(
+                decision,
+                "response_publication_acknowledgement",
+                None,
+            )
+            is not None
+        )
+        delivered = bool(
+            emission is not None
+            and (
+                not acknowledgement_present
+                or getattr(emission, "output_delivered", False) is True
+            )
+        )
+        if not delivered:
+            components.publication_acknowledger.acknowledge(
+                decision,
+                published=False,
+            )
+            return components.outcome_factory.suppressed()
+        acknowledged = components.publication_acknowledger.acknowledge(
+            decision,
+            published=True,
+        )
+        if acknowledgement_present and not acknowledged:
             return components.outcome_factory.suppressed()
         return components.outcome_factory.handled(emission)
 

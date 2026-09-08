@@ -5,7 +5,10 @@ from .decision import RoutedInputDecisionResolver
 from .diagnostics import RoutedInputDispatchDiagnosticLogger
 from .invocation import RoutedInputRouterInvocationCoordinator
 from .outcomes import RoutedInputDispatchOutcomeFactory
-from .publication import RoutedInputExternalResponsePublisher
+from .publication import (
+    RoutedInputExternalResponsePublisher,
+    RoutedInputPublicationAcknowledger,
+)
 from .yielding import RoutedInputChatUiYieldAdapter
 
 
@@ -32,6 +35,9 @@ class RoutedInputDispatchComponentGraph:
                 response_publisher_callback=response_publisher_callback,
                 diagnostics=self.diagnostics,
             )
+        )
+        self.publication_acknowledger = RoutedInputPublicationAcknowledger(
+            self.diagnostics
         )
         self.chat_ui_yield_adapter = RoutedInputChatUiYieldAdapter(
             response_publisher_callback
