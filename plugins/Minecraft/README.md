@@ -3,6 +3,15 @@
 <!-- 20260905_kpopmodder: Indexed the Chat/final-microphone Korean-only feedback, GET-alias, and trusted-stop pre-change contract. -->
 <!-- 20260905_kpopmodder: Reconciled the Korean feedback, scoped crafting defaults, and STOP implementation verification status. -->
 <!-- 20260906_kpopmodder: Reconciled the applied wooden-button engine hunk, refreshed clean-build artifact, and remaining runtime status. -->
+<!-- 20260907_kpopmodder: Indexed the exact and generalized lifecycle-feedback records with their source-identified delivery gaps. -->
+<!-- 20260907_kpopmodder: Qualified the targeted diagnostics refactor as mixed-worktree offline integration evidence. -->
+<!-- 20260907_kpopmodder: Reconciled the applied generalized command lifecycle and its current single-target GET evidence ceiling. -->
+<!-- 20260907_kpopmodder: Indexed the verified Python/Gradio async duplicate-presentation investigation. -->
+<!-- 20260908_kpopmodder: Reconciled the applied Python-only Gradio identity correction and pending live-browser smoke. -->
+<!-- 20260908_kpopmodder: Indexed the pending trusted-STOP terminal-only policy and STORE_HOME verified-success rollout contract. -->
+<!-- 20260908_kpopmodder: Indexed the implemented Python rollout and the distinct live Gradio suppressed-response input-lock investigation. -->
+<!-- 20260908_kpopmodder: Reconciled the applied Gradio-only empty-stream completion adapter and offline verification. -->
+<!-- 20260908_kpopmodder: Reconciled STORE_HOME's verified profile and the final selected Python regression. -->
 
 # LAVI Minecraft Plugin
 
@@ -12,6 +21,54 @@ This document is the first reading point for Minecraft work. It is
 documentation only. It does not approve Java changes, Python behavior changes,
 Gradle changes, dependency changes, Minecraft launch, runtime reproduction,
 cache deletion, commit, or push.
+
+### 2026-09-07 natural lifecycle-feedback reconciliation
+
+Deterministic Korean lifecycle feedback is now implemented for all 26
+registered response profiles when an existing LAVI-owned interactive ingress
+actually accepts the command, including bounded wording for item/forms already
+admitted by that ingress. It changes neither command admission nor Minecraft
+Task behavior. The six earlier exact-crafting boundary gaps are closed in
+source and focused tests: initial progress sequencing, STOP terminal
+arbitration, TTS enqueue/play receipts, non-preempting late terminal delivery,
+UI-only Minecraft provenance, and diagnostic-kind coverage.
+
+The current Python worktree's strong positive terminal evidence covers
+generalized single-target GET and the later strictly verified
+trusted-translation STORE_HOME `COMPLETED`/zero-work slice. Multi-target/bracket
+GET and every other gameplay-effect profile remain cautious unless separately
+proven. Final selected Python integration verification passed 1226 tests with
+two skips and 7052 subtests, and Ruff passed. The implementation record retains
+the earlier repository-wide run's unrelated pre-existing `HEAD`-hash contract
+failure as historical evidence. Deployment and the formal full 26-profile
+runtime matrix in the original generalized implementation checkpoint are
+`NOT_RUN`. See the
+[implementation record](docs/chatclef-general-natural-korean-command-lifecycle-feedback-implementation-record-2026-09-07.md).
+
+A later user-run runtime passed command execution, authoritative single-target
+GET effect, terminal correlation, output, and TTS once, but exposed a Chatbot
+exactly-once defect: Gradio-normalized history could not confirm and remove the
+queued terminal presentation, so the 0.25-second UI timer appended it
+repeatedly. The Python-only presentation fix is implemented and verified
+offline through Gradio postprocess/JSON/preprocess; a live browser smoke retest
+remains `NOT_RUN`. This was not repeated Minecraft execution. See the
+[duplicate-presentation investigation](docs/chatclef-gradio-routed-response-duplicate-presentation-investigation-2026-09-07.md).
+
+A subsequent user-run review found a different pair of Python lifecycle
+boundaries. The Python worktree now suppresses the accepted trusted-STOP START
+response and adds proof-gated STORE_HOME success rendering as separate rollback
+units. Offline verification passed without a Java build. A later live STOP run
+showed only one terminal `멈췄어`, proving the visible response policy, but the
+empty current-input generator exposed a separate Gradio 6.18.0 input lock: the
+terminal arrived through the asynchronous UI sink while the textbox remained
+in its square-stop state. A Gradio-only Python completion adapter is now
+implemented and verified offline: it produces no assistant card, completes the
+queue iterator, and accepts an immediate second submit. The post-fix live
+browser smoke and the STORE_HOME post-implementation live retest remain
+`NOT_RUN`. See the
+[STOP single-response and STORE_HOME verified-terminal contract](docs/chatclef-python-stop-single-response-store-home-verified-terminal-pre-change-contract-2026-09-08.md)
+and the distinct
+[suppressed-response input-lock investigation](docs/chatclef-gradio-suppressed-response-input-lock-investigation-2026-09-08.md).
 
 ## Current Implementation Scope
 
@@ -295,6 +352,21 @@ implementation status, read:
 plugins/Minecraft/docs/chatclef-bare-deposit-diagnostics-plan.md
 ```
 
+For the implemented responsibility split and folderization record for
+`StoreDepositSliceADiagnosticsContractTest`,
+`StoreDepositAutomaticLifecycleLedger`, and the residual
+`StoreHomeTimeoutDiagnostics`, read:
+
+```text
+plugins/Minecraft/docs/chatclef-targeted-diagnostics-refactoring-folderization-plan-2026-09-07.md
+```
+
+Its offline Java test/build result is mixed-dirty-worktree integration evidence
+that also includes the separately owned natural-response Java GET-effect and
+result-projection slice; it is not an isolated diagnostics-only build or a
+combined source rollback unit. Deployment and Minecraft runtime verification
+for this refactor remain `NOT_RUN`.
+
 For the first live prefix captured with the partial diagnostics JAR, read:
 
 ```text
@@ -380,6 +452,55 @@ wooden-button regression status, read:
 plugins/Minecraft/docs/chatclef-korean-command-feedback-crafting-stop-pre-change-contract-2026-09-05.md
 ```
 
+For the historical exact `diamond_pickaxe` quantity-one natural craft-intent
+baseline and its migration into the generalized lifecycle, read:
+
+```text
+plugins/Minecraft/docs/chatclef-natural-korean-crafting-lifecycle-feedback-pre-change-contract-2026-09-07.md
+```
+
+For the historical pre-change contract that defines natural START, read-only
+STATUS, and proof-gated TERMINAL responses for every accepted registered
+command and every item target already admitted by its existing action policy,
+read:
+
+```text
+plugins/Minecraft/docs/chatclef-general-natural-korean-command-lifecycle-feedback-pre-change-contract-2026-09-07.md
+```
+
+For the applied generalized implementation, current evidence ceiling,
+responsibility split, and final offline integration verification, read:
+
+```text
+plugins/Minecraft/docs/chatclef-general-natural-korean-command-lifecycle-feedback-implementation-record-2026-09-07.md
+```
+
+For the verified Python/Gradio async UI duplicate-presentation root cause,
+sanitized runtime evidence, applied Python-only correction, offline real-Gradio
+round-trip verification, and remaining live-browser smoke requirement, read:
+
+```text
+plugins/Minecraft/docs/chatclef-gradio-routed-response-duplicate-presentation-investigation-2026-09-07.md
+```
+
+For the implemented Python-only trusted-STOP terminal policy, STORE_HOME
+verified-success rollout, responsibility split, offline verification, and
+separate rollback units, read:
+
+```text
+plugins/Minecraft/docs/chatclef-python-stop-single-response-store-home-verified-terminal-pre-change-contract-2026-09-08.md
+```
+
+For the later live STOP symptom where `멈췄어` appeared once but the Gradio
+textbox remained in its square-stop state, including non-empty runtime-log
+evidence, the exact empty-stream reproduction, applied Python-only completion
+adapter, offline queue/serialization verification, and remaining live-browser
+smoke, read:
+
+```text
+plugins/Minecraft/docs/chatclef-gradio-suppressed-response-input-lock-investigation-2026-09-08.md
+```
+
 For the exact `get wooden_button 1` StackOverflow reproduction, source-proven
 one-plank recipe/two-slot mask mismatch, applied one-value engine hunk, offline
 verification evidence, remaining runtime contract, and rollback unit, read:
@@ -450,6 +571,7 @@ Diagnostic runbooks:
 
 Diagnostics-only design and implementation status:
   chatclef-bare-deposit-diagnostics-plan.md
+  chatclef-targeted-diagnostics-refactoring-folderization-plan-2026-09-07.md
 
 Diagnostics reproduction evidence:
   chatclef-bare-deposit-diagnostics-reproduction-2026-08-19-r1.md
@@ -478,6 +600,24 @@ H5 Korean Chat/microphone pre-change contract:
 
 Chat/final-microphone Korean command feedback, scoped GET defaults, and STOP contract (implemented; matching-JAR generic-button runtime evidence recorded for Chat and final microphone; explicit oak/stone-button comparison pending):
   chatclef-korean-command-feedback-crafting-stop-pre-change-contract-2026-09-05.md
+
+Exact diamond-pickaxe quantity-one natural Korean crafting lifecycle feedback (historical exact-slice baseline; later command/effect runtime passed; shared async UI fix verified offline, live browser retest pending):
+  chatclef-natural-korean-crafting-lifecycle-feedback-pre-change-contract-2026-09-07.md
+
+All-item/all-command natural Korean lifecycle feedback generalization (implemented and verified offline; Python UI correction also verified offline, live browser retest pending):
+  chatclef-general-natural-korean-command-lifecycle-feedback-pre-change-contract-2026-09-07.md
+
+All-item/all-command natural Korean lifecycle feedback implementation record (single-target GET plus strict trusted STORE_HOME strong evidence; remaining effect profiles cautious; browser defects corrected offline, live retest pending):
+  chatclef-general-natural-korean-command-lifecycle-feedback-implementation-record-2026-09-07.md
+
+Python/Gradio asynchronous routed-response duplicate presentation (root cause verified; Python correction verified offline; live browser smoke not run):
+  chatclef-gradio-routed-response-duplicate-presentation-investigation-2026-09-07.md
+
+Trusted Korean STOP terminal-only publication and trusted-translation STORE_HOME verified-success rollout (Python worktree implemented and verified offline; live STOP visible response passed; STORE_HOME live retest pending):
+  chatclef-python-stop-single-response-store-home-verified-terminal-pre-change-contract-2026-09-08.md
+
+Python/Gradio suppressed-response input lock after terminal-only STOP (failure mechanism reproduced; Python correction verified offline; live-browser smoke pending):
+  chatclef-gradio-suppressed-response-input-lock-investigation-2026-09-08.md
 
 Generic wooden-button StackOverflow root cause, applied correction, clean-build proof, and matching-JAR `PARTIALLY_VERIFIED` runtime status:
   chatclef-wooden-button-stack-overflow-pre-change-report-2026-09-06.md
