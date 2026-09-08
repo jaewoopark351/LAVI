@@ -4,11 +4,16 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from plugins.Minecraft.fabric.chatclef.presentation.command_lifecycle import (
+    CommandLifecyclePresentationDetailLogPolicy,
+)
+
 
 @dataclass(frozen=True, slots=True)
 class StopControlTerminalResponse:
     text: str
     event_id: str
+    presentation_detail_log: str = ""
 
     ROUTE_KIND = "stop_control"
     RESPONSE_KIND = "stop_terminal"
@@ -22,6 +27,9 @@ class StopControlTerminalResponse:
             or self._EVENT_ID.fullmatch(self.event_id) is None
         ):
             raise ValueError("STOP terminal response event_id is invalid")
+        CommandLifecyclePresentationDetailLogPolicy.validate(
+            self.presentation_detail_log
+        )
 
     @property
     def route_kind(self) -> str:

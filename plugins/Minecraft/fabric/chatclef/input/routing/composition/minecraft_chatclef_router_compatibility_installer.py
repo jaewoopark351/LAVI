@@ -42,6 +42,9 @@ class MinecraftChatClefRouterCompatibilityInstaller:
         )
         owner._korean_eligibility_admission = graph.korean_eligibility_admission
         owner._stop_control_route_owner = graph.stop_control_route_owner
+        #20260907_kpopmodder: Retain the focused crafting-status owner compatibility attribute.
+        owner._crafting_status_route_owner = graph.crafting_status_route_owner
+        owner._command_status_route_owner = graph.command_status_route_owner
         owner._generic_crafting_defaults_route_owner = (
             graph.generic_crafting_defaults_route_owner
         )

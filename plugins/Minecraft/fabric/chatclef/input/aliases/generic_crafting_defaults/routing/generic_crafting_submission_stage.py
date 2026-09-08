@@ -22,6 +22,9 @@ class GenericCraftingSubmissionStage:
         delivery=None,
         reconciliation_observer=None,
         result_projector=None,
+        command_feedback=None,
+        descriptor_factory=None,
+        start_decision_decorator=None,
     ):
         self._extension = extension
         self._submission_precheck = submission_precheck
@@ -53,6 +56,9 @@ class GenericCraftingSubmissionStage:
             result_projector
             or GenericCraftingSubmissionResultProjector(decision_factory)
         )
+        self._command_feedback = command_feedback
+        self._descriptor_factory = descriptor_factory
+        self._start_decision_decorator = start_decision_decorator
 
     def submit(
         self,
@@ -65,14 +71,49 @@ class GenericCraftingSubmissionStage:
         rejection = self._readiness_stage.rejection_if_unready()
         if rejection is not None:
             return rejection
-        result = self._delivery.deliver(
+        descriptor = self._descriptor(
             event=event,
             translation=translation,
-            activation_receipt=activation_receipt,
-            korean_eligibility_proof=korean_eligibility_proof,
         )
-        self._reconciliation_observer.observe(result)
-        return self._result_projector.project(translation, result)
+        grant = (
+            self._command_feedback.prepare_descriptor(descriptor)
+            if self._command_feedback is not None
+            else None
+        )
+        try:
+            result = self._delivery.deliver(
+                event=event,
+                translation=translation,
+                activation_receipt=activation_receipt,
+                korean_eligibility_proof=korean_eligibility_proof,
+            )
+            self._reconciliation_observer.observe(result)
+            decision = self._result_projector.project(translation, result)
+            if self._command_feedback is None or self._start_decision_decorator is None:
+                return decision
+            acknowledgement = self._command_feedback.claim_start(grant, result)
+            return self._start_decision_decorator.decorate(
+                decision,
+                descriptor=getattr(grant, "descriptor", None),
+                start_claimed=acknowledgement not in (None, False),
+                publication_acknowledgement=(
+                    None if acknowledgement is True else acknowledgement
+                ),
+            )
+        finally:
+            if self._command_feedback is not None:
+                self._command_feedback.abandon(grant)
+
+    def _descriptor(self, *, event: object, translation: object):
+        if self._descriptor_factory is None:
+            return None
+        try:
+            return self._descriptor_factory.from_trusted_translation(
+                event=event,
+                translation=translation,
+            )
+        except Exception:
+            return None
 
 
 __all__ = ("GenericCraftingSubmissionStage",)

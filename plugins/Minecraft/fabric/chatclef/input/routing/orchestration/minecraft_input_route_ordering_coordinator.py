@@ -15,6 +15,7 @@ class MinecraftInputRouteOrderingCoordinator:
         input_event_normalizer,
         intent_gate,
         stop_control_route_owner,
+        crafting_status_route_owner,
         generic_crafting_defaults_route_owner,
         auto_deposit_trust_route_coordinator,
         ordinary_command_route_coordinator,
@@ -23,6 +24,8 @@ class MinecraftInputRouteOrderingCoordinator:
         self._input_event_normalizer = input_event_normalizer
         self._intent_gate = intent_gate
         self._stop_control_route_owner = stop_control_route_owner
+        #20260907_kpopmodder: Keep read-only crafting status distinct from later busy routing.
+        self._crafting_status_route_owner = crafting_status_route_owner
         self._generic_crafting_defaults_route_owner = (
             generic_crafting_defaults_route_owner
         )
@@ -37,6 +40,7 @@ class MinecraftInputRouteOrderingCoordinator:
             input_event_normalizer=input_event_normalizer,
             intent_gate=intent_gate,
             stop_control_route_owner=stop_control_route_owner,
+            crafting_status_route_owner=crafting_status_route_owner,
             generic_crafting_defaults_route_owner=(
                 generic_crafting_defaults_route_owner
             ),

@@ -49,6 +49,13 @@ from plugins.Minecraft.fabric.chatclef.input.routing.translation_boundary import
 from plugins.Minecraft.fabric.chatclef.input.routing.trusted_korean import (
     TrustedKoreanInputRouteCoordinator,
 )
+from plugins.Minecraft.fabric.chatclef.input.status.command_lifecycle import (
+    CommandStatusQueryClassifier,
+    CommandStatusRouteOwner,
+)
+from plugins.Minecraft.fabric.chatclef.response.command_lifecycle import (
+    CommandLifecycleResponseRenderer,
+)
 from plugins.Minecraft.fabric.chatclef.response.trusted_korean import (
     TrustedKoreanCommandFeedbackFacade,
 )
@@ -75,6 +82,8 @@ class MinecraftChatClefRouterComponentGraph:
         auto_deposit_trust_translation_admission=None,
         auto_deposit_trust_claim_registry=None,
         stop_control_route_owner=None,
+        crafting_status_route_owner=None,
+        command_status_route_owner=None,
         korean_eligibility_admission=None,
         generic_crafting_defaults_admission=None,
         generic_crafting_defaults_route_owner=None,
@@ -169,6 +178,20 @@ class MinecraftChatClefRouterComponentGraph:
             provided=stop_control_route_owner,
             log_callback=log_callback,
         )
+        #20260907_kpopmodder: Assemble the trusted zero-command generalized status route.
+        self.command_status_route_owner = (
+            command_status_route_owner
+            or crafting_status_route_owner
+            or CommandStatusRouteOwner(
+                extension=extension,
+                live_proof_validator=(
+                    self.trusted_input_route_coordinator.is_live_proof
+                ),
+                classifier=CommandStatusQueryClassifier(),
+                response_renderer=CommandLifecycleResponseRenderer(),
+            )
+        )
+        self.crafting_status_route_owner = self.command_status_route_owner
         self.generic_crafting_defaults_route_owner = (
             self._dependency_resolver.generic_crafting_route_owner(
                 provided_admission=generic_crafting_defaults_admission,
@@ -233,6 +256,7 @@ class MinecraftChatClefRouterComponentGraph:
             input_event_normalizer=self.input_event_normalizer,
             intent_gate=self.intent_gate,
             stop_control_route_owner=self.stop_control_route_owner,
+            crafting_status_route_owner=self.crafting_status_route_owner,
             generic_crafting_defaults_route_owner=(
                 self.generic_crafting_defaults_route_owner
             ),

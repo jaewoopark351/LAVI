@@ -3,6 +3,15 @@ from plugins.Minecraft.fabric.chatclef.input.routing.ordinary.submission.ordinar
 from plugins.Minecraft.fabric.chatclef.input.routing.ordinary.submission.ordinary_submission_result_diagnostics import OrdinarySubmissionResultDiagnostics
 from plugins.Minecraft.fabric.chatclef.input.routing.ordinary.submission.ordinary_submission_result_reconciler import OrdinarySubmissionResultReconciler
 from plugins.Minecraft.fabric.chatclef.input.routing.ordinary.submission.ordinary_submission_transport import OrdinarySubmissionTransport
+from plugins.Minecraft.fabric.chatclef.response.command_lifecycle import (
+    CommandFeedbackStartDecisionDecorator,
+    CommandLifecycleResponseRenderer,
+)
+from plugins.Minecraft.fabric.chatclef.transport.command_feedback.lifecycle import (
+    CommandFeedbackAdmissionCoordinator,
+    CommandFeedbackDescriptorFactory,
+    CommandFeedbackSubmissionObserver,
+)
 
 
 class OrdinarySubmissionResultComponentGraph:
@@ -13,6 +22,7 @@ class OrdinarySubmissionResultComponentGraph:
         submission_boundary,
         submission_reconciliation,
         decision_factory,
+        live_proof_validator,
         failure_handler,
         router_logger,
     ) -> None:
@@ -30,6 +40,19 @@ class OrdinarySubmissionResultComponentGraph:
         )
         self.decision_builder = OrdinarySubmissionDecisionBuilder(
             decision_factory
+        )
+        #20260907_kpopmodder: Assemble generalized admission without changing route authority.
+        response_renderer = CommandLifecycleResponseRenderer()
+        self.command_feedback = CommandFeedbackSubmissionObserver(
+            extension=extension,
+            admission_coordinator=CommandFeedbackAdmissionCoordinator(
+                live_proof_validator=live_proof_validator,
+                descriptor_factory=CommandFeedbackDescriptorFactory(),
+            ),
+        )
+        self.crafting_feedback = self.command_feedback
+        self.start_decision_decorator = CommandFeedbackStartDecisionDecorator(
+            response_renderer
         )
 
 

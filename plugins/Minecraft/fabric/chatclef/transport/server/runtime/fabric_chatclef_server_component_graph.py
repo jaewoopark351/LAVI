@@ -4,6 +4,12 @@ from __future__ import annotations
 import threading
 
 from plugins.Minecraft.fabric.chatclef.input.stop import StopControlClaimRegistry
+from plugins.Minecraft.fabric.chatclef.response.command_lifecycle import (
+    CommandLifecycleResponseRenderer,
+)
+from plugins.Minecraft.fabric.chatclef.response.command_lifecycle.terminal import (
+    CraftingFeedbackTerminalPresenter,
+)
 
 from ...command_submission import (
     FabricChatClefCommandResultHandler,
@@ -19,6 +25,19 @@ from ...control.stop import (
 from ...fabric_chatclef_connection_ownership import (
     FabricChatClefConnectionOwnership,
 )
+from ...command_feedback.crafting import (
+    CraftingFeedbackEffectVerifier,
+    CraftingFeedbackResultCoordinator,
+    CraftingFeedbackTerminalDelivery,
+    CraftingFeedbackTerminalListener,
+    CraftingFeedbackTerminalPublication,
+    CraftingFeedbackTracker,
+)
+from ...command_feedback.lifecycle import (
+    CommandFeedbackServerApi,
+    CommandTerminalEvidenceFailureReporter,
+)
+from ...command_feedback.lifecycle.terminal import CommandStopTerminalArbitrator
 from ..fabric_chatclef_client_handler import FabricChatClefClientHandler
 from ..fabric_chatclef_envelope_transport import FabricChatClefEnvelopeTransport
 from ..fabric_chatclef_status_snapshot_builder import (
@@ -44,23 +63,74 @@ class FabricChatClefServerComponentGraph:
         now_ms,
     ) -> None:
         self.command_lock = threading.RLock()
+        self.crafting_feedback_tracker = CraftingFeedbackTracker()
+        # The STOP registry must exist before ordinary-result arbitration is wired.
+        self.stop_control_tracker_registry = StopControlTrackerRegistry()
         self.connection_ownership = FabricChatClefConnectionOwnership(
             reconcile_stale_deposit_to_unknown_requested=(
                 config.reconcile_stale_deposit_to_unknown_enabled
             ),
+            crafting_feedback_tracker=self.crafting_feedback_tracker,
         )
         self.envelope_transport = FabricChatClefEnvelopeTransport(
             message_id_factory=message_id_factory,
             now_ms=now_ms,
         )
+        #20260907_kpopmodder: Assemble one command-locked crafting feedback lifecycle.
+        self.crafting_feedback_terminal_listener = (
+            CraftingFeedbackTerminalListener()
+        )
+        response_renderer = CommandLifecycleResponseRenderer()
+        self.crafting_feedback_terminal_presenter = (
+            CraftingFeedbackTerminalPresenter(
+                response_renderer=response_renderer,
+            )
+        )
+        self.crafting_feedback_result_coordinator = (
+            CraftingFeedbackResultCoordinator(
+                tracker=self.crafting_feedback_tracker,
+                effect_verifier=CraftingFeedbackEffectVerifier(),
+                response_renderer=self.crafting_feedback_terminal_presenter,
+                stop_terminal_arbitrator=CommandStopTerminalArbitrator(
+                    self.stop_control_tracker_registry
+                ),
+                evidence_failure_reporter=(
+                    CommandTerminalEvidenceFailureReporter(diagnostics)
+                ),
+            )
+        )
+        self.crafting_feedback_terminal_delivery = (
+            CraftingFeedbackTerminalDelivery(
+                terminal_listener=self.crafting_feedback_terminal_listener,
+                diagnostics=diagnostics,
+            )
+        )
+        self.crafting_feedback_terminal_publication = (
+            CraftingFeedbackTerminalPublication(
+                terminal_presenter=self.crafting_feedback_terminal_presenter,
+                terminal_delivery=self.crafting_feedback_terminal_delivery,
+            )
+        )
         self.command_result_handler = FabricChatClefCommandResultHandler(
             connection_ownership=self.connection_ownership,
             command_lock=self.command_lock,
             diagnostics=diagnostics,
+            crafting_feedback_result_coordinator=(
+                self.crafting_feedback_result_coordinator
+            ),
+            crafting_feedback_terminal_delivery=(
+                self.crafting_feedback_terminal_delivery
+            ),
         )
+        self.command_feedback_api = CommandFeedbackServerApi(
+            connection_ownership=self.connection_ownership,
+            command_lock=self.command_lock,
+            terminal_listener=self.crafting_feedback_terminal_listener,
+            terminal_delivery=self.crafting_feedback_terminal_publication,
+        )
+        self.crafting_feedback_api = self.command_feedback_api
         self.stop_control_claim_registry = StopControlClaimRegistry()
         self.stop_control_admission_barrier = StopControlAdmissionBarrier()
-        self.stop_control_tracker_registry = StopControlTrackerRegistry()
         self.stop_control_terminal_listener = StopControlTerminalListener()
         self.stop_control_result_demultiplexer = StopControlResultDemultiplexer(
             command_lock=self.command_lock,

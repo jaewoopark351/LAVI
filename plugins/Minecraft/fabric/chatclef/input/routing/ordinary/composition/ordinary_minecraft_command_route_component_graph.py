@@ -79,11 +79,13 @@ class OrdinaryMinecraftCommandRouteComponentGraph:
             decision_factory=decision_factory,
             router_logger=router_logger,
         )
+        #20260907_kpopmodder: Pass the live trusted proof only to exact feedback admission.
         self.submission_result_stage = OrdinarySubmissionResultStage(
             extension=extension,
             submission_boundary=submission_boundary,
             submission_reconciliation=submission_reconciliation,
             decision_factory=decision_factory,
+            live_proof_validator=live_proof_validator,
             failure_handler=failure_handler,
             router_logger=router_logger,
         )

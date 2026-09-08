@@ -13,6 +13,10 @@ from plugins.Minecraft.fabric.chatclef.command_registry.admission import (
 from plugins.Minecraft.fabric.chatclef.extension.command import (
     FabricChatClefCommandSubmissionService,
 )
+from plugins.Minecraft.fabric.chatclef.extension.command_feedback import (
+    FabricChatClefUiCommandFeedbackCoordinator,
+    FabricChatClefUiFeedbackStartListener,
+)
 from plugins.Minecraft.fabric.chatclef.extension.minecraft_fabric_chatclef_extension_lifecycle import (
     MinecraftFabricChatClefExtensionLifecycle,
 )
@@ -24,6 +28,9 @@ from plugins.Minecraft.fabric.chatclef.extension.minecraft_fabric_chatclef_statu
 )
 from plugins.Minecraft.fabric.chatclef.extension.minecraft_fabric_chatclef_stop_facade import (
     MinecraftFabricChatClefStopFacade,
+)
+from plugins.Minecraft.fabric.chatclef.extension.minecraft_fabric_chatclef_command_feedback_facade import (
+    MinecraftFabricChatClefCommandFeedbackFacade,
 )
 from plugins.Minecraft.fabric.chatclef.input.aliases.generic_crafting_defaults.generic_crafting_defaults_activation_registry import (
     GenericCraftingDefaultsActivationRegistry,
@@ -112,6 +119,18 @@ class MinecraftFabricChatClefExtensionComponentGraph:
             ),
         )
         self.stop_facade = MinecraftFabricChatClefStopFacade(self.adapter)
+        #20260907_kpopmodder: Assemble one generalized Fabric-only feedback facade.
+        self.command_feedback_facade = MinecraftFabricChatClefCommandFeedbackFacade(
+            self.adapter
+        )
+        self.crafting_feedback_facade = self.command_feedback_facade
+        self.ui_feedback_start_listener = FabricChatClefUiFeedbackStartListener()
+        self.ui_command_feedback = FabricChatClefUiCommandFeedbackCoordinator(
+            command_submission=self.command_submission,
+            natural_language_commands=self.natural_language_commands,
+            command_feedback_facade=self.command_feedback_facade,
+            start_listener=self.ui_feedback_start_listener,
+        )
         self.status_provider = MinecraftFabricChatClefStatusProvider(
             extension_name=extension_name,
             plugin=self.plugin,

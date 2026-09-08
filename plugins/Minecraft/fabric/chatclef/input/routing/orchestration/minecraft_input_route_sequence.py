@@ -17,12 +17,14 @@ class MinecraftInputRouteSequence:
         *,
         input_event_normalizer,
         stop_control_route_owner,
+        crafting_status_route_owner,
         generic_crafting_defaults_route_owner,
         auto_deposit_trust_route_coordinator,
         ordinary_command_route_coordinator,
     ) -> None:
         self._input_event_normalizer = input_event_normalizer
         self._stop_control_route_owner = stop_control_route_owner
+        self._crafting_status_route_owner = crafting_status_route_owner
         self._generic_crafting_defaults_route_owner = (
             generic_crafting_defaults_route_owner
         )
@@ -53,6 +55,17 @@ class MinecraftInputRouteSequence:
             )
             if stop_decision is not None:
                 return replace(stop_decision, route_kind="stop_control")
+            #20260907_kpopmodder: Route status after STOP and before crafting/busy handling.
+            status_decision = optional_route_callback(
+                self._crafting_status_route_owner,
+                event,
+                korean_eligibility_proof,
+                "command_status_query_failed",
+            )
+            if status_decision is not None:
+                # The owner selects either the generalized command-status
+                # identity or the intentionally retained exact-craft identity.
+                return status_decision
             crafting_decision = optional_route_callback(
                 self._generic_crafting_defaults_route_owner,
                 event,
@@ -60,10 +73,12 @@ class MinecraftInputRouteSequence:
                 "generic_crafting_defaults_failed",
             )
             if crafting_decision is not None:
-                return replace(
-                    crafting_decision,
-                    route_kind="generic_crafting_defaults",
-                )
+                if crafting_decision.route_kind == "minecraft_chatclef":
+                    return replace(
+                        crafting_decision,
+                        route_kind="generic_crafting_defaults",
+                    )
+                return crafting_decision
         gate_decision = gate_inspection_callback(command_text)
         if not gate_decision.consider:
             return MinecraftChatClefInputRouteDecision.not_handled(
@@ -81,7 +96,9 @@ class MinecraftInputRouteSequence:
             korean_eligibility_proof=korean_eligibility_proof,
         )
         if korean_eligibility_proof is not None:
-            return replace(decision, route_kind="minecraft_command")
+            if decision.route_kind == "minecraft_chatclef":
+                return replace(decision, route_kind="minecraft_command")
+            return decision
         return decision
 
 __all__ = ("MinecraftInputRouteSequence",)

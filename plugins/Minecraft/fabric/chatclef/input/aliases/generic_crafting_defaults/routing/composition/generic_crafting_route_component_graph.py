@@ -2,6 +2,15 @@
 from plugins.Minecraft.fabric.chatclef.input.ownership.item_command import (
     ItemCommandOwnershipClassifier,
 )
+from plugins.Minecraft.fabric.chatclef.response.command_lifecycle import (
+    CommandFeedbackStartDecisionDecorator,
+    CommandLifecycleResponseRenderer,
+)
+from plugins.Minecraft.fabric.chatclef.transport.command_feedback.lifecycle import (
+    CommandFeedbackAdmissionCoordinator,
+    CommandFeedbackDescriptorFactory,
+    CommandFeedbackSubmissionObserver,
+)
 
 from ...generic_crafting_defaults_candidate_detector import (
     GenericCraftingDefaultsCandidateDetector,
@@ -155,6 +164,19 @@ class GenericCraftingRouteComponentGraph:
         self.submission_result_projector = (
             GenericCraftingSubmissionResultProjector(self.decision_factory)
         )
+        self.command_feedback_descriptor_factory = CommandFeedbackDescriptorFactory()
+        self.command_feedback_observer = CommandFeedbackSubmissionObserver(
+            extension=self.extension,
+            admission_coordinator=CommandFeedbackAdmissionCoordinator(
+                live_proof_validator=lambda _proof, _event: False,
+                descriptor_factory=self.command_feedback_descriptor_factory,
+            ),
+        )
+        self.command_feedback_start_decorator = (
+            CommandFeedbackStartDecisionDecorator(
+                CommandLifecycleResponseRenderer()
+            )
+        )
         self.submission_stage = GenericCraftingSubmissionStage(
             extension=self.extension,
             submission_precheck=self.submission_precheck,
@@ -167,6 +189,9 @@ class GenericCraftingRouteComponentGraph:
                 self.submission_reconciliation_observer
             ),
             result_projector=self.submission_result_projector,
+            command_feedback=self.command_feedback_observer,
+            descriptor_factory=self.command_feedback_descriptor_factory,
+            start_decision_decorator=self.command_feedback_start_decorator,
         )
         self.receipt_cleanup = GenericCraftingReceiptCleanup(
             self.admission.activation_registry

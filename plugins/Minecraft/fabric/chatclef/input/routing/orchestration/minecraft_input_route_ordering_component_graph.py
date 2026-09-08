@@ -12,6 +12,7 @@ class MinecraftInputRouteOrderingComponentGraph:
         input_event_normalizer,
         intent_gate,
         stop_control_route_owner,
+        crafting_status_route_owner,
         generic_crafting_defaults_route_owner,
         auto_deposit_trust_route_coordinator,
         ordinary_command_route_coordinator,
@@ -24,9 +25,11 @@ class MinecraftInputRouteOrderingComponentGraph:
         self.crafting_dispatch_cleanup = MinecraftGenericCraftingDispatchCleanup(
             generic_crafting_defaults_route_owner
         )
+        #20260907_kpopmodder: Carry the status owner into the shared route sequence.
         self.route_sequence = MinecraftInputRouteSequence(
             input_event_normalizer=input_event_normalizer,
             stop_control_route_owner=stop_control_route_owner,
+            crafting_status_route_owner=crafting_status_route_owner,
             generic_crafting_defaults_route_owner=(
                 generic_crafting_defaults_route_owner
             ),

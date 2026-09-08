@@ -16,6 +16,9 @@ class AutoDepositTrustRouteSequence:
         submission_boundary: object,
         submission_reconciliation: object,
         decision_factory: object,
+        command_feedback: object = None,
+        descriptor_factory: object = None,
+        start_decision_decorator: object = None,
     ):
         self._extension = extension
         self._input_admission = input_admission
@@ -27,6 +30,9 @@ class AutoDepositTrustRouteSequence:
         self._submission_boundary = submission_boundary
         self._submission_reconciliation = submission_reconciliation
         self._decision_factory = decision_factory
+        self._command_feedback = command_feedback
+        self._descriptor_factory = descriptor_factory
+        self._start_decision_decorator = start_decision_decorator
 
     def inspect_input(self, event: object) -> object | None:
         admission = self._input_admission.inspect(event)
@@ -88,16 +94,48 @@ class AutoDepositTrustRouteSequence:
                 translation_admission.message,
             )
 
-        result = self._submission_boundary.submit_once(
-            self._extension,
-            event,
-            translation,
-            route_claim=receipt,
-            original_text=adaptation.original_text,
-            translation_input_text=adaptation.translation_input_text,
+        descriptor = self._descriptor(event=event, translation=translation)
+        grant = (
+            self._command_feedback.prepare_descriptor(descriptor)
+            if self._command_feedback is not None
+            else None
         )
-        self._submission_reconciliation.observe_submission_result(result)
-        return self._decision_factory.submitted(translation, result)
+        try:
+            result = self._submission_boundary.submit_once(
+                self._extension,
+                event,
+                translation,
+                route_claim=receipt,
+                original_text=adaptation.original_text,
+                translation_input_text=adaptation.translation_input_text,
+            )
+            self._submission_reconciliation.observe_submission_result(result)
+            decision = self._decision_factory.submitted(translation, result)
+            if self._command_feedback is None or self._start_decision_decorator is None:
+                return decision
+            acknowledgement = self._command_feedback.claim_start(grant, result)
+            return self._start_decision_decorator.decorate(
+                decision,
+                descriptor=getattr(grant, "descriptor", None),
+                start_claimed=acknowledgement not in (None, False),
+                publication_acknowledgement=(
+                    None if acknowledgement is True else acknowledgement
+                ),
+            )
+        finally:
+            if self._command_feedback is not None:
+                self._command_feedback.abandon(grant)
+
+    def _descriptor(self, *, event: object, translation: object):
+        if self._descriptor_factory is None:
+            return None
+        try:
+            return self._descriptor_factory.from_trusted_translation(
+                event=event,
+                translation=translation,
+            )
+        except Exception:
+            return None
 
 
 __all__ = ("AutoDepositTrustRouteSequence",)

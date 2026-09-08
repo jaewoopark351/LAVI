@@ -9,6 +9,7 @@ from plugins.Minecraft.common.dto.command_result_dto import CommandResultDTO
 from plugins.Minecraft.common.protocol.command_result_status import CommandResultStatus
 
 from .fabric_chatclef_active_command import FabricChatClefActiveCommand
+from .command_feedback.crafting import CraftingFeedbackTracker
 from .ownership import (
     FabricChatClefConnectionSession,
     FabricChatClefOrdinaryCommandOwner,
@@ -45,6 +46,7 @@ class FabricChatClefConnectionOwnership:
         reconciliation_runtime_capability: (
             ReconciliationRuntimeCapability | None
         ) = None,
+        crafting_feedback_tracker: CraftingFeedbackTracker | None = None,
     ) -> None:
         self._connection_session = FabricChatClefConnectionSession()
         self._command_owner = FabricChatClefOrdinaryCommandOwner(
@@ -63,6 +65,9 @@ class FabricChatClefConnectionOwnership:
             connection_session=self._connection_session,
             command_owner=self._command_owner,
             now_ms=lambda: self._now_ms(),
+        )
+        self._crafting_feedback_tracker = (
+            crafting_feedback_tracker or CraftingFeedbackTracker()
         )
 
     @property
@@ -86,6 +91,14 @@ class FabricChatClefConnectionOwnership:
         return self._command_owner.active_command
 
     @property
+    def crafting_feedback_tracker(self) -> CraftingFeedbackTracker:
+        return self._crafting_feedback_tracker
+
+    @property
+    def command_feedback_tracker(self) -> CraftingFeedbackTracker:
+        return self._crafting_feedback_tracker
+
+    @property
     def _reconciliation(self):
         return self._command_owner.reconciliation
 
@@ -99,6 +112,7 @@ class FabricChatClefConnectionOwnership:
     def is_active_websocket(self, websocket: Any) -> bool:
         return self._connection_session.is_active_websocket(websocket)
 
+    #20260907_kpopmodder: Retire crafting feedback with every connection-owner reset.
     def try_activate(self, *, websocket: Any, session_id: str):
         was_connected = self._connection_session.is_connected()
         admission = self._connection_session.try_activate(
@@ -107,6 +121,7 @@ class FabricChatClefConnectionOwnership:
         )
         if admission.accepted and not was_connected:
             self._command_owner.clear()
+            self._crafting_feedback_tracker.clear()
         return admission
 
     def clear_if_active(self, *, websocket: Any, session_id: str | None) -> bool:
@@ -116,11 +131,13 @@ class FabricChatClefConnectionOwnership:
         )
         if cleared:
             self._command_owner.clear()
+            self._crafting_feedback_tracker.clear()
         return cleared
 
     def clear(self) -> None:
         self._connection_session.clear()
         self._command_owner.clear()
+        self._crafting_feedback_tracker.clear()
 
     def begin_command(
         self,
@@ -129,8 +146,9 @@ class FabricChatClefConnectionOwnership:
         command_message_id: str,
         command: str = "",
         source: str = "",
+        metadata: Mapping[str, Any] | None = None,
     ) -> FabricChatClefActiveCommand | None:
-        return self._command_owner.begin(
+        active_command = self._command_owner.begin(
             websocket=self.active_websocket,
             session_id=self.active_session_id,
             generation=self.active_generation,
@@ -139,9 +157,20 @@ class FabricChatClefConnectionOwnership:
             command=command,
             source=source,
         )
+        if active_command is not None:
+            #20260907_kpopmodder: Bind the reserved feedback owner in the command ownership commit.
+            self._crafting_feedback_tracker.bind_reserved(
+                active_command,
+                metadata or {},
+            )
+        return active_command
 
+    #20260907_kpopmodder: Clear only feedback bound to the ordinary owner being cleared.
     def clear_command_if_current(self, command: FabricChatClefActiveCommand) -> bool:
-        return self._command_owner.clear_if_current(command)
+        cleared = self._command_owner.clear_if_current(command)
+        if cleared:
+            self._crafting_feedback_tracker.clear_if_owner(command)
+        return cleared
 
     def clear_command_if_identity(
         self,
@@ -152,13 +181,107 @@ class FabricChatClefConnectionOwnership:
         server_connection_generation: int,
         owner_token: object,
     ) -> bool:
-        return self._command_owner.clear_if_identity(
+        command = self._command_owner.active_command
+        cleared = self._command_owner.clear_if_identity(
             request_id=request_id,
             command_message_id=command_message_id,
             session_id=session_id,
             server_connection_generation=server_connection_generation,
             owner_token=owner_token,
         )
+        if cleared and command is not None:
+            self._crafting_feedback_tracker.clear_if_owner(command)
+        return cleared
+
+    #20260907_kpopmodder: Expose tracker operations only under the server command lock.
+    def reserve_crafting_feedback(self, grant: object) -> bool:
+        return self.reserve_command_feedback(grant)
+
+    def abandon_crafting_feedback(self, grant: object) -> bool:
+        return self.abandon_command_feedback(grant)
+
+    def claim_crafting_feedback_start(
+        self,
+        grant: object,
+        result: object,
+    ):
+        return self.claim_command_feedback_start(grant, result)
+
+    def inspect_crafting_feedback_status(self, target_item: str | None):
+        return self.inspect_command_feedback_status(target_item=target_item)
+
+    def inspect_crafting_feedback_status_for_publication(
+        self,
+        target_item: str | None,
+    ):
+        return self.inspect_command_feedback_status_for_publication(
+            target_item=target_item
+        )
+
+    def reserve_command_feedback(self, grant: object) -> bool:
+        return self._crafting_feedback_tracker.reserve(grant)
+
+    def abandon_command_feedback(self, grant: object) -> bool:
+        return self._crafting_feedback_tracker.abandon_reservation(grant)
+
+    def claim_command_feedback_start(self, grant: object, result: object):
+        return self._crafting_feedback_tracker.claim_start(grant, result)
+
+    def inspect_command_feedback_status(
+        self,
+        *,
+        query: object = None,
+        target_item: str | None = None,
+    ):
+        return self._crafting_feedback_tracker.inspect(
+            active_command=self._command_owner.active_command,
+            connected=self._connection_session.is_connected(),
+            quarantine_active=self._command_owner.state.quarantine.active,
+            query=query,
+            target_item=target_item,
+        )
+
+    def inspect_command_feedback_status_for_publication(
+        self,
+        *,
+        query: object = None,
+        target_item: str | None = None,
+    ):
+        return self._crafting_feedback_tracker.inspect_for_publication(
+            active_command=self._command_owner.active_command,
+            connected=self._connection_session.is_connected(),
+            quarantine_active=self._command_owner.state.quarantine.active,
+            query=query,
+            target_item=target_item,
+        )
+
+    def acknowledge_crafting_feedback_publication(
+        self,
+        permit: object,
+        published: bool,
+    ):
+        return self.acknowledge_command_feedback_publication(
+            permit,
+            published,
+        )
+
+    def acknowledge_command_feedback_publication(
+        self,
+        permit: object,
+        published: bool,
+    ):
+        return self._crafting_feedback_tracker.acknowledge_publication(
+            permit,
+            published,
+        )
+
+    def select_command_feedback_coalesced_terminal(self, permit: object):
+        return self._crafting_feedback_tracker.select_coalesced_terminal(
+            permit
+        )
+
+    def select_crafting_feedback_coalesced_terminal(self, permit: object):
+        return self.select_command_feedback_coalesced_terminal(permit)
 
     def accept_result(
         self,

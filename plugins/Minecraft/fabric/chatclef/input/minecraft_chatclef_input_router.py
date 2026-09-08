@@ -53,6 +53,9 @@ class MinecraftChatClefInputRouter:
             AutoDepositTrustInputEventClaimRegistry | None
         ) = None,
         stop_control_route_owner: Any = None,
+        #20260907_kpopmodder: Inject the read-only status owner without changing ordinary routing.
+        crafting_status_route_owner: Any = None,
+        command_status_route_owner: Any = None,
         korean_eligibility_admission: (
             KoreanChatMicrophoneEligibilityAdmission | None
         ) = None,
@@ -86,6 +89,8 @@ class MinecraftChatClefInputRouter:
                 auto_deposit_trust_claim_registry
             ),
             stop_control_route_owner=stop_control_route_owner,
+            crafting_status_route_owner=crafting_status_route_owner,
+            command_status_route_owner=command_status_route_owner,
             korean_eligibility_admission=korean_eligibility_admission,
             generic_crafting_defaults_admission=(
                 generic_crafting_defaults_admission

@@ -5,6 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from plugins.Minecraft.fabric.chatclef.presentation.command_lifecycle import (
+    CommandLifecyclePresentationDetailLogPolicy,
+)
+
 
 @dataclass(frozen=True)
 class MinecraftChatClefInputRouteDecision:
@@ -19,6 +23,13 @@ class MinecraftChatClefInputRouteDecision:
     suppress_response: bool = False
     route_kind: str = "minecraft_chatclef"
     response_kind: str = "immediate"
+    response_publication_acknowledgement: Any = None
+    presentation_detail_log: str = ""
+
+    def __post_init__(self) -> None:
+        CommandLifecyclePresentationDetailLogPolicy.validate(
+            self.presentation_detail_log
+        )
 
     @classmethod
     def not_handled(cls, reason: str) -> "MinecraftChatClefInputRouteDecision":
@@ -38,6 +49,8 @@ class MinecraftChatClefInputRouteDecision:
         suppress_response: bool = False,
         route_kind: str = "minecraft_chatclef",
         response_kind: str = "immediate",
+        response_publication_acknowledgement: Any = None,
+        presentation_detail_log: str = "",
     ) -> "MinecraftChatClefInputRouteDecision":
         return cls(
             handled=True,
@@ -51,4 +64,12 @@ class MinecraftChatClefInputRouteDecision:
             suppress_response=suppress_response,
             route_kind=str(route_kind or "minecraft_chatclef"),
             response_kind=str(response_kind or "immediate"),
+            response_publication_acknowledgement=(
+                response_publication_acknowledgement
+            ),
+            presentation_detail_log=(
+                CommandLifecyclePresentationDetailLogPolicy.validate(
+                    presentation_detail_log
+                )
+            ),
         )

@@ -21,6 +21,11 @@ class MinecraftFabricChatClefExtensionCompatibilityInstaller:
         owner._natural_language_commands = graph.natural_language_commands
         owner._lifecycle = graph.lifecycle
         owner._stop_facade = graph.stop_facade
+        #20260907_kpopmodder: Preserve the thin crafting-feedback compatibility seam.
+        owner._crafting_feedback_facade = graph.crafting_feedback_facade
+        owner._command_feedback_facade = graph.command_feedback_facade
+        owner._ui_command_feedback = graph.ui_command_feedback
+        owner._ui_feedback_start_listener = graph.ui_feedback_start_listener
         owner._status_provider = graph.status_provider
         owner.context = None
         owner.runtime_context = None

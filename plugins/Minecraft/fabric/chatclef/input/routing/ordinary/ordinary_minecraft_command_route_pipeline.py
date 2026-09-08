@@ -45,11 +45,13 @@ class OrdinaryMinecraftCommandRoutePipeline:
         if rejection is not None:
             return rejection
 
+        #20260907_kpopmodder: Preserve trusted proof through the final submission boundary.
         return self._submission_result_stage.submit(
             event=event,
             command_text=command_text,
             translation=translation,
             translation_status=translation_status,
+            korean_eligibility_proof=korean_eligibility_proof,
         )
 
 

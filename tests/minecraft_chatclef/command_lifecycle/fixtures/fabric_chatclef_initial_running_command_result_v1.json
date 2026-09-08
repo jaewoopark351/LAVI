@@ -1,0 +1,86 @@
+{
+  "protocol_version": 1,
+  "message_type": "command_result",
+  "message_id": "fabric-chatclef-result-fixture",
+  "correlation_id": "command-message-fixture",
+  "session_id": "session-fixture",
+  "timestamp_ms": 1700000000000,
+  "payload": {
+    "request_id": "request-fixture",
+    "ok": true,
+    "status": "running",
+    "error_code": null,
+    "message": "Fabric ChatClef command dispatch started.",
+    "data": {
+      "result_fidelity": "dispatch_started_only",
+      "result_reason": "dispatch_started",
+      "dispatch_started_ms": 1700000000000,
+      "dispatch_returned": false,
+      "dispatch_thread": "fixture-thread",
+      "normalized_command_length": 22,
+      "finish_callback_received": false,
+      "failure_type": "",
+      "failure_message": "",
+      "ownership": {
+        "request_id": "request-fixture",
+        "correlation_id": "command-message-fixture",
+        "session_id": "session-fixture",
+        "connection_generation": 1,
+        "accepted_at_ms": 1700000000000,
+        "detached": false,
+        "detached_reason": ""
+      },
+      "task_before_dispatch": {
+        "available": false,
+        "class_name": "",
+        "description": "",
+        "identity": "",
+        "error": "",
+        "task_state_available": false,
+        "task_active": false,
+        "task_stopped": false,
+        "this_or_child_timed_out": false,
+        "task_state_error": ""
+      },
+      "task_after_dispatch": {
+        "available": false,
+        "class_name": "",
+        "description": "",
+        "identity": "",
+        "error": "",
+        "task_state_available": false,
+        "task_active": false,
+        "task_stopped": false,
+        "this_or_child_timed_out": false,
+        "task_state_error": ""
+      },
+      "terminal_task": {
+        "available": false,
+        "class_name": "",
+        "description": "",
+        "identity": "",
+        "error": "",
+        "task_state_available": false,
+        "task_active": false,
+        "task_stopped": false,
+        "this_or_child_timed_out": false,
+        "task_state_error": ""
+      },
+      "bound_root_task": {
+        "available": false,
+        "class_name": "",
+        "description": "",
+        "identity": "",
+        "error": "",
+        "task_state_available": false,
+        "task_active": false,
+        "task_stopped": false,
+        "this_or_child_timed_out": false,
+        "task_state_error": ""
+      },
+      "task_finished_event_received": false,
+      "task_finished_observation": {},
+      "evidence_sequence": 1
+    }
+  }
+}

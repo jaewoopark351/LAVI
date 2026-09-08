@@ -49,6 +49,8 @@ class FabricChatClefWebSocketServer:
         self._status_builder = self._components.status_builder
         self._client_handler = self._components.client_handler
         self._command_submitter = self._components.command_submitter
+        self._crafting_feedback_api = self._components.crafting_feedback_api
+        self._command_feedback_api = self._components.command_feedback_api
         self._stop_control_claim_registry = (
             self._components.stop_control_claim_registry
         )
@@ -111,6 +113,44 @@ class FabricChatClefWebSocketServer:
 
     def set_stop_terminal_response_callback(self, callback) -> None:
         self._components.stop_api.set_terminal_response_callback(callback)
+
+    #20260907_kpopmodder: Keep crafting lifecycle access behind its command-locked API.
+    def reserve_crafting_feedback(self, grant: object) -> bool:
+        return self.reserve_command_feedback(grant)
+
+    def abandon_crafting_feedback(self, grant: object) -> bool:
+        return self.abandon_command_feedback(grant)
+
+    def claim_crafting_feedback_start(
+        self,
+        grant: object,
+        result: object,
+    ):
+        return self.claim_command_feedback_start(grant, result)
+
+    def inspect_crafting_feedback_status(self, target_item: str | None):
+        return self._crafting_feedback_api.inspect_status(target_item)
+
+    def set_crafting_terminal_response_callback(self, callback) -> None:
+        self.set_command_lifecycle_terminal_response_callback(callback)
+
+    def reserve_command_feedback(self, grant: object) -> bool:
+        return self._command_feedback_api.reserve(grant)
+
+    def abandon_command_feedback(self, grant: object) -> bool:
+        return self._command_feedback_api.abandon(grant)
+
+    def claim_command_feedback_start(self, grant: object, result: object):
+        return self._command_feedback_api.claim_start(grant, result)
+
+    def inspect_command_feedback_status(self, query: object):
+        return self._command_feedback_api.inspect_status(query)
+
+    def set_command_lifecycle_terminal_response_callback(self, callback) -> None:
+        self._command_feedback_api.set_terminal_callback(callback)
+
+    def set_command_terminal_response_callback(self, callback) -> None:
+        self.set_command_lifecycle_terminal_response_callback(callback)
 
     def _record_client_error(self, message: str) -> None:
         self._lifecycle.record_client_error(message)

@@ -18,11 +18,20 @@ class StopControlResponseRendererTests(unittest.TestCase):
             renderer._WIRE["deadline_exceeded"] = "changed"
 
         self.assertEqual(
-            "[Minecraft] 마크 AI에게 멈춤을 요청했어요.",
+            "마크 AI에게 멈춤을 요청했어요.",
             renderer.render_local("accepted"),
         )
+        self.assertEqual("멈출게", renderer.render_start())
         self.assertEqual(
-            "[Minecraft] 중지 요청 시간이 지나 실행하지 않았어요.",
+            "멈췄어",
+            renderer.render_terminal(
+                status="completed",
+                control_outcome="stopped",
+                reason="stopped",
+            ),
+        )
+        self.assertEqual(
+            "중지 요청 시간이 지나 실행하지 않았어요.",
             renderer.render_terminal(
                 status="deadline_exceeded",
                 control_outcome="rejected",

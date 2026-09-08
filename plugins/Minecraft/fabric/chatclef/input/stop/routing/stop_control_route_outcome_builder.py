@@ -4,11 +4,18 @@ from __future__ import annotations
 from plugins.Minecraft.fabric.chatclef.input.minecraft_chatclef_input_route_decision import (
     MinecraftChatClefInputRouteDecision,
 )
+from plugins.Minecraft.fabric.chatclef.presentation.stop_control import (
+    StopControlPresentationDetailProjector,
+)
 
 
 class StopControlRouteOutcomeBuilder:
-    def __init__(self, renderer: object):
+    def __init__(self, renderer: object, presentation_detail_projector=None):
         self._renderer = renderer
+        self._presentation_details = (
+            presentation_detail_projector
+            or StopControlPresentationDetailProjector()
+        )
 
     def not_handled(self, reason: str) -> MinecraftChatClefInputRouteDecision:
         return MinecraftChatClefInputRouteDecision.not_handled(reason)
@@ -39,10 +46,14 @@ class StopControlRouteOutcomeBuilder:
                 else "control_send_rejected"
             )
         result = getattr(outcome, "result", {})
+        response_text = self._renderer.render_local(reason)
         return MinecraftChatClefInputRouteDecision.handled_result(
             reason=f"stop_control_{reason}",
-            response_text=self._renderer.render_local(reason),
+            response_text=response_text,
             result=dict(result) if isinstance(result, dict) else {},
+            route_kind="stop_control",
+            response_kind=("command_start" if reason == "accepted" else "immediate"),
+            presentation_detail_log=self._presentation_details.project(),
         )
 
 

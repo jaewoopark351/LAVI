@@ -85,6 +85,44 @@ class FabricChatClefAdapter:
     def set_stop_terminal_response_callback(self, callback) -> None:
         self._server.set_stop_terminal_response_callback(callback)
 
+    #20260907_kpopmodder: Expose only the Fabric crafting-feedback server facade.
+    def reserve_crafting_feedback(self, grant: object) -> bool:
+        return self.reserve_command_feedback(grant)
+
+    def abandon_crafting_feedback(self, grant: object) -> bool:
+        return self.abandon_command_feedback(grant)
+
+    def claim_crafting_feedback_start(
+        self,
+        grant: object,
+        result: object,
+    ):
+        return self.claim_command_feedback_start(grant, result)
+
+    def inspect_crafting_feedback_status(self, target_item: str | None):
+        return self._server.inspect_crafting_feedback_status(target_item)
+
+    def set_crafting_terminal_response_callback(self, callback) -> None:
+        self.set_command_lifecycle_terminal_response_callback(callback)
+
+    def reserve_command_feedback(self, grant: object) -> bool:
+        return self._server.reserve_command_feedback(grant)
+
+    def abandon_command_feedback(self, grant: object) -> bool:
+        return self._server.abandon_command_feedback(grant)
+
+    def claim_command_feedback_start(self, grant: object, result: object):
+        return self._server.claim_command_feedback_start(grant, result)
+
+    def inspect_command_feedback_status(self, query: object):
+        return self._server.inspect_command_feedback_status(query)
+
+    def set_command_lifecycle_terminal_response_callback(self, callback) -> None:
+        self._server.set_command_lifecycle_terminal_response_callback(callback)
+
+    def set_command_terminal_response_callback(self, callback) -> None:
+        self.set_command_lifecycle_terminal_response_callback(callback)
+
     def get_status(self) -> StatusSnapshotDTO:
         return self._server.status_snapshot(enabled=self._config.enabled)
 

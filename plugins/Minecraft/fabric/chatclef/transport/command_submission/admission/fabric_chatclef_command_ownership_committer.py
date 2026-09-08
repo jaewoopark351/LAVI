@@ -15,6 +15,8 @@ class FabricChatClefCommandOwnershipCommitter:
             command_message_id=message_id,
             command=request.command,
             source=request.source,
+            #20260907_kpopmodder: Bind crafting feedback to the exact admitted input metadata.
+            metadata=request.metadata,
         )
 
     def snapshot_locked(self) -> dict[str, Any]:

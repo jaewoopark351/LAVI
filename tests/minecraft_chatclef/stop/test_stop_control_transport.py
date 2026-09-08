@@ -307,7 +307,7 @@ class StopControlTransportTests(unittest.TestCase):
         self.assertIsNone(self.trackers.current())
         self.assertEqual(
             [response.text for response in self.published],
-            ["[Minecraft] 마크 AI를 멈췄어요."],
+            ["멈췄어"],
         )
         self.assertEqual(self.published[0].event_id, "a" * 32)
         self.assertEqual(self.published[0].route_kind, "stop_control")
@@ -393,7 +393,7 @@ class StopControlTransportTests(unittest.TestCase):
         self.assertFalse(self.barrier.closed)
         self.assertEqual(
             [response.text for response in self.published],
-            ["[Minecraft] 마크 AI를 멈췄어요."],
+            ["멈췄어"],
         )
 
     def test_terminal_release_wins_not_scheduled_retirement_race(self):
@@ -429,7 +429,7 @@ class StopControlTransportTests(unittest.TestCase):
         self.assertFalse(self.barrier.closed)
         self.assertEqual(
             [response.text for response in self.published],
-            ["[Minecraft] 마크 AI를 멈췄어요."],
+            ["멈췄어"],
         )
 
     def test_wire_unknown_quarantine_absorbs_late_completed_result(self):
@@ -470,7 +470,7 @@ class StopControlTransportTests(unittest.TestCase):
         self.assertEqual(self.connection.cleared, [])
         self.assertEqual(
             [response.text for response in self.published],
-            ["[Minecraft] 중지 결과를 확인하지 못했어요. 자동으로 다시 보내지 않아요."],
+            ["중지 결과를 확인하지 못했어요. 자동으로 다시 보내지 않아요."],
         )
 
     def test_submitter_rejects_receipt_from_non_authoritative_registry(self):

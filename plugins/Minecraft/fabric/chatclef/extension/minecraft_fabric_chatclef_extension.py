@@ -83,6 +83,82 @@ class MinecraftFabricChatClefExtension(GameExtensionInterface):
     def set_stop_terminal_response_callback(self, callback) -> None:
         self._stop_facade.set_terminal_response_callback(callback)
 
+    #20260907_kpopmodder: Delegate crafting lifecycle authority through its focused facade.
+    def reserve_crafting_feedback(self, grant: object) -> bool:
+        return self._crafting_feedback_facade.reserve(grant)
+
+    def abandon_crafting_feedback(self, grant: object) -> bool:
+        return self._crafting_feedback_facade.abandon(grant)
+
+    def claim_crafting_feedback_start(
+        self,
+        grant: object,
+        result: object,
+    ):
+        return self._crafting_feedback_facade.claim_start(grant, result)
+
+    def inspect_crafting_feedback_status(self, target_item: str | None):
+        return self._crafting_feedback_facade.inspect_status(target_item)
+
+    def set_crafting_terminal_response_callback(self, callback) -> None:
+        self._crafting_feedback_facade.set_terminal_response_callback(callback)
+
+    #20260907_kpopmodder: Expose generalized lifecycle ports without granting execution authority.
+    def create_command_name_only_feedback_grant(
+        self,
+        command: object,
+        *,
+        input_event: object,
+    ):
+        return self._command_feedback_facade.command_name_only_grant(
+            command,
+            input_event=input_event,
+        )
+
+    def reserve_command_feedback(self, grant: object) -> bool:
+        return self._command_feedback_facade.reserve(grant)
+
+    def abandon_command_feedback(self, grant: object) -> bool:
+        return self._command_feedback_facade.abandon(grant)
+
+    def claim_command_feedback_start(self, grant: object, result: object):
+        return self._command_feedback_facade.claim_start(grant, result)
+
+    def inspect_command_feedback_status(self, query: object):
+        return self._command_feedback_facade.inspect_status(query)
+
+    def set_command_lifecycle_terminal_response_callback(self, callback) -> None:
+        self._command_feedback_facade.set_terminal_response_callback(callback)
+
+    def set_command_terminal_response_callback(self, callback) -> None:
+        self.set_command_lifecycle_terminal_response_callback(callback)
+
+    #20260907_kpopmodder: Keep direct-GUI feedback on its provenance-bound adapter.
+    def handle_ui_command_with_feedback(
+        self,
+        command: Any,
+        *,
+        input_event: object,
+    ) -> dict[str, Any]:
+        return self._ui_command_feedback.submit_raw(
+            command,
+            input_event=input_event,
+        )
+
+    def handle_ui_natural_language_command_with_feedback(
+        self,
+        command: Any,
+        *,
+        input_event: object,
+    ) -> dict[str, Any]:
+        return self._ui_command_feedback.submit_korean(
+            command,
+            input_event=input_event,
+        )
+
+    def set_command_lifecycle_start_response_callback(self, callback) -> None:
+        self._ui_feedback_start_listener.set_callback(callback)
+
     def translate_natural_language_command(self, command: Any) -> dict[str, Any]:
         return self._natural_language_commands.translate(command)
 

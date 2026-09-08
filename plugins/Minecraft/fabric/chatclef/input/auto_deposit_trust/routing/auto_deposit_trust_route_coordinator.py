@@ -4,6 +4,15 @@ from __future__ import annotations
 from plugins.Minecraft.fabric.chatclef.input.minecraft_chatclef_input_route_decision import (
     MinecraftChatClefInputRouteDecision,
 )
+from plugins.Minecraft.fabric.chatclef.response.command_lifecycle import (
+    CommandFeedbackStartDecisionDecorator,
+    CommandLifecycleResponseRenderer,
+)
+from plugins.Minecraft.fabric.chatclef.transport.command_feedback.lifecycle import (
+    CommandFeedbackAdmissionCoordinator,
+    CommandFeedbackDescriptorFactory,
+    CommandFeedbackSubmissionObserver,
+)
 
 from plugins.Minecraft.fabric.chatclef.input.auto_deposit_trust.routing.auto_deposit_trust_route_execution_lifecycle import AutoDepositTrustRouteExecutionLifecycle
 from plugins.Minecraft.fabric.chatclef.input.auto_deposit_trust.routing.auto_deposit_trust_route_sequence import AutoDepositTrustRouteSequence
@@ -42,6 +51,14 @@ class AutoDepositTrustRouteCoordinator:
         self._submission_reconciliation = submission_reconciliation
         self._decision_factory = decision_factory
         self._router_logger = router_logger
+        feedback_descriptors = CommandFeedbackDescriptorFactory()
+        feedback_observer = CommandFeedbackSubmissionObserver(
+            extension=extension,
+            admission_coordinator=CommandFeedbackAdmissionCoordinator(
+                live_proof_validator=lambda _proof, _event: False,
+                descriptor_factory=feedback_descriptors,
+            ),
+        )
         self._route_sequence = AutoDepositTrustRouteSequence(
             extension=extension,
             input_admission=input_admission,
@@ -53,6 +70,11 @@ class AutoDepositTrustRouteCoordinator:
             submission_boundary=submission_boundary,
             submission_reconciliation=submission_reconciliation,
             decision_factory=decision_factory,
+            command_feedback=feedback_observer,
+            descriptor_factory=feedback_descriptors,
+            start_decision_decorator=CommandFeedbackStartDecisionDecorator(
+                CommandLifecycleResponseRenderer()
+            ),
         )
         self._execution_lifecycle = AutoDepositTrustRouteExecutionLifecycle(
             claim_owner=claim_owner,

@@ -21,6 +21,7 @@ class TrustedKoreanResponseAuthorizer:
             self._owner,
             text=str(decision.response_text),
             source=self._RESPONSE_SOURCE,
+            response_kind=str(decision.response_kind or "immediate"),
         )
         if capability is None:
             return self._suppressed(decision, clear_text=True)
