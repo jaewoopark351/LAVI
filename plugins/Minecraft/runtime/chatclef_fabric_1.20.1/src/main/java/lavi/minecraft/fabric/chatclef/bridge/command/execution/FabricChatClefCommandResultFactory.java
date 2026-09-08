@@ -6,6 +6,7 @@ import lavi.minecraft.fabric.chatclef.bridge.command.control.stop.result.FabricC
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandDeadlinePayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandResultFidelity;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandTerminationObservation;
+import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.evidence.FabricChatClefLifecycleEvidenceSequencePayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.evidence.FabricChatClefNonterminalLifecycleEvidencePayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.evidence.FabricChatClefStableRequestQuiescenceObservation;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskSnapshot;
@@ -30,7 +31,10 @@ final class FabricChatClefCommandResultFactory {
         return FabricChatClefCommandResult.running(
                 request().requestId,
                 "Fabric ChatClef command dispatch started.",
-                data("dispatch_started")
+                FabricChatClefLifecycleEvidenceSequencePayload.of(
+                        data("dispatch_started"),
+                        state.initialLifecycleEvidenceSequence()
+                )
         );
     }
 
@@ -94,10 +98,13 @@ final class FabricChatClefCommandResultFactory {
         return FabricChatClefCommandResult.completed(
                 request().requestId,
                 "ChatClef user task reached natural completion.",
-                storeHomeResultProjector.fromMatchingTask(
-                        data("matching_task_finished", observation),
-                        state.normalizedCommand(),
-                        observation
+                //20260907_kpopmodder: Project family-specific read-only evidence only after matching Task completion.
+                state.commandEffectTracker().fromMatchingCompletion(
+                        storeHomeResultProjector.fromMatchingTask(
+                                data("matching_task_finished", observation),
+                                state.normalizedCommand(),
+                                observation
+                        )
                 )
         );
     }

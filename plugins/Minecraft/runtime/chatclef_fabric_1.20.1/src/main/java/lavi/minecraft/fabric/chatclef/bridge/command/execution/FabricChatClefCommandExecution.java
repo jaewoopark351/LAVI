@@ -12,6 +12,9 @@ import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefT
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskSnapshot;
 import lavi.minecraft.fabric.chatclef.bridge.command.result.FabricChatClefCommandResultDataPayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.result.FabricChatClefCommandResultPayload;
+import lavi.minecraft.fabric.chatclef.bridge.command.result.effect.FabricChatClefCommandEffectTracker;
+
+import java.util.function.Function;
 
 //20260801_kpopmodder: Keep bridge result fidelity separate from ChatClef command callbacks.
 public final class FabricChatClefCommandExecution {
@@ -27,8 +30,27 @@ public final class FabricChatClefCommandExecution {
         this.resultFactory = new FabricChatClefCommandResultFactory(state);
     }
 
+    FabricChatClefCommandExecution(
+            FabricChatClefCommandContext context,
+            String normalizedCommand,
+            FabricChatClefTaskOwnershipEvidence taskBeforeDispatchEvidence,
+            Function<String, FabricChatClefCommandEffectTracker> effectTrackerFactory
+    ) {
+        this.state = new FabricChatClefCommandExecutionState(
+                context,
+                normalizedCommand,
+                taskBeforeDispatchEvidence,
+                effectTrackerFactory
+        );
+        this.resultFactory = new FabricChatClefCommandResultFactory(state);
+    }
+
     public FabricChatClefCommandResultPayload runningResult() {
         return resultFactory.runningResult();
+    }
+
+    public int nextLifecycleEvidenceSequence() {
+        return state.nextLifecycleEvidenceSequence();
     }
 
     public FabricChatClefCommandResultPayload runningLifecycleEvidenceResult(

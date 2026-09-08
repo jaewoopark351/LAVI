@@ -7,11 +7,17 @@ import lavi.minecraft.fabric.chatclef.bridge.command.control.stop.queue.ownershi
 import lavi.minecraft.fabric.chatclef.bridge.command.control.stop.queue.ownership.FabricChatClefStopControlIdentity;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefRootOwnershipClassification;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandTerminationObservation;
+import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.evidence.FabricChatClefLifecycleEvidenceSequence;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.evidence.FabricChatClefStableRequestQuiescenceObservation;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefBoundRootTaskRelationshipPayload;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefFinishCallbackObservation;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskOwnershipEvidence;
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskSnapshot;
+import lavi.minecraft.fabric.chatclef.bridge.command.result.effect.FabricChatClefCommandEffectTracker;
+import lavi.minecraft.fabric.chatclef.bridge.command.result.effect.FabricChatClefCommandEffectTrackerFactory;
+import lavi.minecraft.fabric.chatclef.bridge.command.result.effect.FabricChatClefNoEffectTracker;
+
+import java.util.function.Function;
 
 //20260804_kpopmodder: Keep mutable ChatClef command execution state out of result orchestration.
 final class FabricChatClefCommandExecutionState {
@@ -22,6 +28,9 @@ final class FabricChatClefCommandExecutionState {
     private final String dispatchThreadName;
     private final FabricChatClefTaskOwnershipEvidence taskBeforeDispatchEvidence;
     private final FabricChatClefTaskSnapshot taskBeforeDispatch;
+    private final FabricChatClefLifecycleEvidenceSequence lifecycleEvidenceSequence =
+            new FabricChatClefLifecycleEvidenceSequence();
+    private final FabricChatClefCommandEffectTracker commandEffectTracker;
     private volatile boolean executorExecuteInvocationOpen;
     private volatile boolean dispatchReturned;
     private volatile boolean finishCallbackReceived;
@@ -46,6 +55,36 @@ final class FabricChatClefCommandExecutionState {
             String normalizedCommand,
             FabricChatClefTaskOwnershipEvidence taskBeforeDispatchEvidence
     ) {
+        this(
+                context,
+                normalizedCommand,
+                taskBeforeDispatchEvidence,
+                FabricChatClefCommandEffectTrackerFactory::capture
+        );
+    }
+
+    FabricChatClefCommandExecutionState(
+            FabricChatClefCommandContext context,
+            String normalizedCommand,
+            FabricChatClefTaskOwnershipEvidence taskBeforeDispatchEvidence,
+            Function<String, FabricChatClefCommandEffectTracker> effectTrackerFactory
+    ) {
+        this(
+                context,
+                normalizedCommand,
+                taskBeforeDispatchEvidence,
+                effectTrackerFactory == null
+                        ? FabricChatClefNoEffectTracker.instance()
+                        : effectTrackerFactory.apply(normalizedCommand)
+        );
+    }
+
+    private FabricChatClefCommandExecutionState(
+            FabricChatClefCommandContext context,
+            String normalizedCommand,
+            FabricChatClefTaskOwnershipEvidence taskBeforeDispatchEvidence,
+            FabricChatClefCommandEffectTracker commandEffectTracker
+    ) {
         this.context = context;
         this.request = context.request();
         this.normalizedCommand = normalizedCommand;
@@ -55,6 +94,9 @@ final class FabricChatClefCommandExecutionState {
         this.taskBeforeDispatch = this.taskBeforeDispatchEvidence.rootTaskSnapshot();
         this.dispatchStartedMs = System.currentTimeMillis();
         this.dispatchThreadName = Thread.currentThread().getName();
+        this.commandEffectTracker = commandEffectTracker == null
+                ? FabricChatClefNoEffectTracker.instance()
+                : commandEffectTracker;
         this.taskAfterDispatchEvidence = FabricChatClefTaskOwnershipEvidence.empty();
         this.taskAfterDispatch = FabricChatClefTaskSnapshot.capture(null);
         this.terminalTask = FabricChatClefTaskSnapshot.capture(null);
@@ -271,6 +313,18 @@ final class FabricChatClefCommandExecutionState {
 
     FabricChatClefTaskSnapshot boundRootTask() {
         return FabricChatClefTaskSnapshot.capture(boundRootTask);
+    }
+
+    int initialLifecycleEvidenceSequence() {
+        return lifecycleEvidenceSequence.initialDispatchSequence();
+    }
+
+    int nextLifecycleEvidenceSequence() {
+        return lifecycleEvidenceSequence.nextSequence();
+    }
+
+    FabricChatClefCommandEffectTracker commandEffectTracker() {
+        return commandEffectTracker;
     }
 
     long elapsedMs() {

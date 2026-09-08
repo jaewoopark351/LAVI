@@ -59,6 +59,7 @@ class FabricChatClefNonterminalLifecycleEvidencePublisherTest {
                         }
                 );
 
+        Map<?, ?> dispatchData = data(execution.runningResult().toMap());
         publisher.publishIfEligible(execution, "waiting_for_task_finished_event", execution.context());
         publisher.publishIfEligible(execution, "waiting_for_task_finished_event", execution.context());
         publisher.publishIfEligible(execution, "waiting_for_task_finished_event", execution.context());
@@ -80,15 +81,23 @@ class FabricChatClefNonterminalLifecycleEvidencePublisherTest {
         assertEquals(2, sender.payloads.size());
         Map<?, ?> finishData = data(sender.payloads.get(0).toMap());
         Map<?, ?> stableData = data(sender.payloads.get(1).toMap());
+        Map<?, ?> finishLifecycleEvidence =
+                (Map<?, ?>) finishData.get("lifecycle_evidence");
+        Map<?, ?> stableLifecycleEvidence =
+                (Map<?, ?>) stableData.get("lifecycle_evidence");
         Map<?, ?> stableQuiescence = (Map<?, ?>) stableData.get("stable_request_quiescence");
 
+        assertEquals("dispatch_started", dispatchData.get("result_reason"));
+        assertEquals(1, dispatchData.get("evidence_sequence"));
         assertEquals("finish_callback_observed_nonterminal", finishData.get("result_reason"));
         assertEquals("finish_callback_observed_nonterminal", finishData.get("lifecycle_evidence_stage"));
-        assertEquals(1, finishData.get("evidence_sequence"));
+        assertEquals(2, finishData.get("evidence_sequence"));
+        assertEquals(2, finishLifecycleEvidence.get("evidence_sequence"));
         assertEquals("callback_without_matching_user_task_event", finishData.get("result_fidelity"));
         assertEquals("stable_request_quiescence_observed", stableData.get("result_reason"));
         assertEquals("stable_request_quiescence_observed", stableData.get("lifecycle_evidence_stage"));
-        assertEquals(2, stableData.get("evidence_sequence"));
+        assertEquals(3, stableData.get("evidence_sequence"));
+        assertEquals(3, stableLifecycleEvidence.get("evidence_sequence"));
         assertEquals("callback_without_matching_user_task_event", stableData.get("result_fidelity"));
         assertEquals(true, stableQuiescence.get("qualified"));
         assertEquals("OBSERVED_AND_GONE", stableQuiescence.get("request_root_observation_state"));

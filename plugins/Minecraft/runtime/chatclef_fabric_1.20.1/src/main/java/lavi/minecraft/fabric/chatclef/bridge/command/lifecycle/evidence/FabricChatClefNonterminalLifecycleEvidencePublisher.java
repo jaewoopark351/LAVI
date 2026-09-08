@@ -28,7 +28,6 @@ public final class FabricChatClefNonterminalLifecycleEvidencePublisher {
     private FabricChatClefCommandExecution trackedExecution;
     private boolean finishEvidenceSent;
     private boolean stableEvidenceSent;
-    private int evidenceSequence;
 
     public FabricChatClefNonterminalLifecycleEvidencePublisher(
             FabricChatClefCommandResultSender resultSender,
@@ -62,7 +61,6 @@ public final class FabricChatClefNonterminalLifecycleEvidencePublisher {
         trackedExecution = null;
         finishEvidenceSent = false;
         stableEvidenceSent = false;
-        evidenceSequence = 0;
         quiescenceTracker.reset();
     }
 
@@ -119,7 +117,6 @@ public final class FabricChatClefNonterminalLifecycleEvidencePublisher {
         trackedExecution = execution;
         finishEvidenceSent = false;
         stableEvidenceSent = false;
-        evidenceSequence = 0;
         quiescenceTracker.reset();
     }
 
@@ -130,7 +127,7 @@ public final class FabricChatClefNonterminalLifecycleEvidencePublisher {
             FabricChatClefTaskSnapshot currentTaskSnapshot,
             FabricChatClefStableRequestQuiescenceObservation quiescence
     ) {
-        int sequence = ++evidenceSequence;
+        int sequence = execution.nextLifecycleEvidenceSequence();
         FabricChatClefCommandResultSendSubmission submission = resultSender.sendCommandResult(
                 execution.context(),
                 execution.runningLifecycleEvidenceResult(

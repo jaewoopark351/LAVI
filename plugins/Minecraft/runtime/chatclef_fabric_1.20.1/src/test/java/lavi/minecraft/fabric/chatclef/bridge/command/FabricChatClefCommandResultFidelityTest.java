@@ -23,6 +23,21 @@ class FabricChatClefCommandResultFidelityTest {
 
         assertEquals("dispatch_started", data.get("result_reason"));
         assertEquals("dispatch_started_only", data.get("result_fidelity"));
+        assertEquals(1, data.get("evidence_sequence"));
+    }
+
+    @Test
+    void lifecycleEvidenceSequenceIsMonotonicPerExecutionAndDispatchSerializationIsStable() {
+        FabricChatClefCommandExecution first = execution();
+
+        assertEquals(1, data(first.runningResult().toMap()).get("evidence_sequence"));
+        assertEquals(1, data(first.runningResult().toMap()).get("evidence_sequence"));
+        assertEquals(2, first.nextLifecycleEvidenceSequence());
+        assertEquals(3, first.nextLifecycleEvidenceSequence());
+
+        FabricChatClefCommandExecution second = execution();
+        assertEquals(1, data(second.runningResult().toMap()).get("evidence_sequence"));
+        assertEquals(2, second.nextLifecycleEvidenceSequence());
     }
 
     @Test
@@ -132,7 +147,7 @@ class FabricChatClefCommandResultFidelityTest {
     void finishCallbackObservedNonterminalUsesCallbackWithoutMatchingEventFidelity() {
         Map<?, ?> data = data(execution().runningLifecycleEvidenceResult(
                 "finish_callback_observed_nonterminal",
-                1,
+                2,
                 "waiting_for_task_finished_event",
                 FabricChatClefTaskSnapshot.capture(null),
                 quiescence(false)
@@ -146,7 +161,7 @@ class FabricChatClefCommandResultFidelityTest {
     void stableRequestQuiescenceObservedUsesCallbackWithoutMatchingEventFidelity() {
         Map<?, ?> data = data(execution().runningLifecycleEvidenceResult(
                 "stable_request_quiescence_observed",
-                2,
+                3,
                 "waiting_for_task_finished_event",
                 FabricChatClefTaskSnapshot.capture(null),
                 quiescence(true)
