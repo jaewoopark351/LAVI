@@ -36,7 +36,7 @@ _EVIDENCE = {
     "resetmemory": ("cautious", "cautious_terminal"),
     "scan": ("cautious", "cautious_terminal"),
     "stop": ("cautious", "specialized_stop_control"),
-    "store_home": ("cautious", "cautious_terminal"),
+    "store_home": ("verified", "store_home_completion"),
     "자동보관등록": ("cautious", "cautious_terminal"),
 }
 
