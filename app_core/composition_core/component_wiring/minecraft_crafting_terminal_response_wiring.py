@@ -1,8 +1,8 @@
-#20260905_kpopmodder: Route verified asynchronous STOP terminals to output/TTS only.
+#20260907_kpopmodder: Route crafting terminal feedback to output/TTS without history.
 from __future__ import annotations
 
-from plugins.Minecraft.fabric.chatclef.response.stop import (
-    StopControlTerminalResponse,
+from plugins.Minecraft.fabric.chatclef.response.crafting_lifecycle import (
+    CraftingLifecycleTerminalResponse,
 )
 from llm_core.routed_response import (
     RoutedResponseNonPreemptingDeliveryPolicy,
@@ -10,14 +10,18 @@ from llm_core.routed_response import (
 )
 
 
-class MinecraftStopTerminalResponseWiring:
-    def __init__(self):
+class MinecraftCraftingTerminalResponseWiring:
+    def __init__(self) -> None:
         self._callbacks = {}
 
     def wire(self, *, llm, extension=None):
         if extension is None:
             return None
-        setter = getattr(extension, "set_stop_terminal_response_callback", None)
+        setter = getattr(
+            extension,
+            "set_crafting_terminal_response_callback",
+            None,
+        )
         emitter = getattr(llm, "emit_external_response", None)
         if not callable(setter) or not callable(emitter):
             return None
@@ -26,7 +30,7 @@ class MinecraftStopTerminalResponseWiring:
         if callback is None:
 
             def callback(response):
-                if type(response) is not StopControlTerminalResponse:
+                if type(response) is not CraftingLifecycleTerminalResponse:
                     return None
                 return emitter(
                     response.text,
@@ -53,4 +57,4 @@ class MinecraftStopTerminalResponseWiring:
         return callback
 
 
-__all__ = ("MinecraftStopTerminalResponseWiring",)
+__all__ = ("MinecraftCraftingTerminalResponseWiring",)

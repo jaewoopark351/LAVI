@@ -11,8 +11,21 @@ from app_core.composition_core.component_wiring.direct_game_input_wiring import 
 from app_core.composition_core.component_wiring.minecraft_stop_terminal_response_wiring import (
     MinecraftStopTerminalResponseWiring,
 )
+#20260907_kpopmodder: Export the separate crafting terminal output/TTS wiring.
+from app_core.composition_core.component_wiring.minecraft_crafting_terminal_response_wiring import (
+    MinecraftCraftingTerminalResponseWiring,
+)
+from app_core.composition_core.component_wiring.minecraft_command_lifecycle_terminal_response_wiring import (
+    MinecraftCommandLifecycleTerminalResponseWiring,
+)
+from app_core.composition_core.component_wiring.minecraft_command_lifecycle_start_response_wiring import (
+    MinecraftCommandLifecycleStartResponseWiring,
+)
 from app_core.composition_core.component_wiring.minecraft_input_router_wiring import (
     MinecraftInputRouterWiring,
+)
+from app_core.composition_core.component_wiring.minecraft_lifecycle_tts_receipt_wiring import (
+    MinecraftLifecycleTtsReceiptWiring,
 )
 from app_core.composition_core.component_wiring.optional_plugin_callback_wiring import (
     OptionalPluginCallbackWiring,
@@ -27,7 +40,11 @@ __all__ = (
     "ComponentEventListenerWiring",
     "DirectGameInputWiring",
     "MinecraftStopTerminalResponseWiring",
+    "MinecraftCraftingTerminalResponseWiring",
+    "MinecraftCommandLifecycleStartResponseWiring",
+    "MinecraftCommandLifecycleTerminalResponseWiring",
     "MinecraftInputRouterWiring",
+    "MinecraftLifecycleTtsReceiptWiring",
     "OptionalPluginCallbackWiring",
     "TrustedVoiceInputWiring",
 )

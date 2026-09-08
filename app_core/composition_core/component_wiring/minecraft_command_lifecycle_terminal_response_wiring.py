@@ -1,23 +1,30 @@
-#20260905_kpopmodder: Route verified asynchronous STOP terminals to output/TTS only.
+#20260907_kpopmodder: Route generalized command terminals through typed non-preempting presentation.
 from __future__ import annotations
 
-from plugins.Minecraft.fabric.chatclef.response.stop import (
-    StopControlTerminalResponse,
-)
 from llm_core.routed_response import (
     RoutedResponseNonPreemptingDeliveryPolicy,
     RoutedResponsePresentationMetadata,
 )
+from plugins.Minecraft.fabric.chatclef.response.command_lifecycle import (
+    CommandLifecycleTerminalResponse,
+)
+from plugins.Minecraft.fabric.chatclef.response.crafting_lifecycle import (
+    CraftingLifecycleTerminalResponse,
+)
 
 
-class MinecraftStopTerminalResponseWiring:
-    def __init__(self):
+class MinecraftCommandLifecycleTerminalResponseWiring:
+    def __init__(self) -> None:
         self._callbacks = {}
 
     def wire(self, *, llm, extension=None):
         if extension is None:
             return None
-        setter = getattr(extension, "set_stop_terminal_response_callback", None)
+        setter = getattr(
+            extension,
+            "set_command_lifecycle_terminal_response_callback",
+            None,
+        )
         emitter = getattr(llm, "emit_external_response", None)
         if not callable(setter) or not callable(emitter):
             return None
@@ -26,7 +33,10 @@ class MinecraftStopTerminalResponseWiring:
         if callback is None:
 
             def callback(response):
-                if type(response) is not StopControlTerminalResponse:
+                if type(response) not in {
+                    CommandLifecycleTerminalResponse,
+                    CraftingLifecycleTerminalResponse,
+                }:
                     return None
                 return emitter(
                     response.text,
@@ -53,4 +63,4 @@ class MinecraftStopTerminalResponseWiring:
         return callback
 
 
-__all__ = ("MinecraftStopTerminalResponseWiring",)
+__all__ = ("MinecraftCommandLifecycleTerminalResponseWiring",)

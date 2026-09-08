@@ -180,10 +180,11 @@ class CommandFeedbackDeliveryDiagnosticsTests(unittest.TestCase):
         callback(response)
 
         self.assertIs(callback, extension.callback)
-        self.assertEqual(
-            [{"text": response.text, "response_generation": 1}],
-            outputs,
-        )
+        self.assertEqual(0, pipeline.response_generation)
+        self.assertEqual(response.text, outputs[0]["text"])
+        self.assertIsNone(outputs[0]["response_generation"])
+        self.assertEqual("non_preempting", outputs[0]["delivery_mode"])
+        self.assertEqual("Minecraft", outputs[0]["presentation"]["badge_label"])
         fields = _parse_delivery(logs[0])
         self.assertEqual("2" * 32, fields["event_id"])
         self.assertEqual("stop_control", fields["route_kind"])
@@ -220,6 +221,157 @@ class CommandFeedbackDeliveryDiagnosticsTests(unittest.TestCase):
             },
         )
         self.assertNotIn("SECRET", logs[0])
+
+    def test_formatter_accepts_lifecycle_ui_and_tts_delivery_values(self):
+        logs = []
+        logger = CommandFeedbackDeliveryLogger(logs.append)
+        cases = (
+            (
+                "crafting_lifecycle",
+                "crafting_terminal",
+                "non_preempting",
+                "tts_queue",
+                "enqueued",
+            ),
+            (
+                "crafting_status_query",
+                "immediate",
+                "current_input",
+                "ui_presentation",
+                "yielded",
+            ),
+            (
+                "command_lifecycle",
+                "command_coalesced",
+                "current_input",
+                "ui_presentation",
+                "yielded",
+            ),
+            (
+                "command_lifecycle",
+                "command_start",
+                "current_input",
+                "output_listener",
+                "delivered",
+            ),
+            (
+                "command_lifecycle",
+                "command_terminal",
+                "non_preempting",
+                "tts_playback",
+                "played",
+            ),
+            (
+                "command_status_query",
+                "command_status",
+                "current_input",
+                "chat_ui",
+                "yielded",
+            ),
+            (
+                "stop_control",
+                "command_start",
+                "current_input",
+                "output_listener",
+                "delivered",
+            ),
+            (
+                "stop_control",
+                "immediate",
+                "current_input",
+                "chat_ui",
+                "yielded",
+            ),
+            (
+                "stop_control",
+                "stop_terminal",
+                "non_preempting",
+                "tts_queue",
+                "enqueued",
+            ),
+        )
+
+        for route_kind, response_kind, delivery_mode, sink, reason in cases:
+            logger.log(
+                event_id="3" * 32,
+                route_kind=route_kind,
+                response_kind=response_kind,
+                sink=sink,
+                response_generation=None,
+                delivered=True,
+                reason=reason,
+                delivery_mode=delivery_mode,
+            )
+
+        self.assertEqual(len(cases), len(logs))
+        self.assertTrue(all("invalid" not in message for message in logs))
+
+        logger.log(
+            event_id="3" * 32,
+            route_kind="command_lifecycle",
+            response_kind="command_terminal",
+            sink="tts_queue",
+            response_generation=None,
+            delivered=True,
+            reason="enqueued",
+            delivery_mode="unknown_mode",
+        )
+        self.assertEqual(
+            "invalid",
+            _parse_delivery(logs[-1])["delivery_mode"],
+        )
+
+    def test_formatter_rejects_cross_paired_and_wrong_mode_lifecycle_identities(self):
+        logs = []
+        logger = CommandFeedbackDeliveryLogger(logs.append)
+        invalid_identities = (
+            ("command_lifecycle", "crafting_terminal", "non_preempting"),
+            ("command_lifecycle", "command_coalesced", "non_preempting"),
+            ("command_lifecycle", "command_terminal", "current_input"),
+            ("crafting_lifecycle", "command_terminal", "non_preempting"),
+            ("crafting_lifecycle", "crafting_terminal", "current_input"),
+            ("stop_control", "command_terminal", "non_preempting"),
+            ("stop_control", "stop_terminal", "current_input"),
+        )
+
+        for route_kind, response_kind, delivery_mode in invalid_identities:
+            logger.log(
+                event_id="4" * 32,
+                route_kind=route_kind,
+                response_kind=response_kind,
+                sink="output_listener",
+                response_generation=None,
+                delivered=True,
+                reason="delivered",
+                delivery_mode=delivery_mode,
+            )
+
+        self.assertEqual(len(invalid_identities), len(logs))
+        for message in logs:
+            fields = _parse_delivery(message)
+            self.assertEqual("invalid", fields["route_kind"])
+            self.assertEqual("invalid", fields["response_kind"])
+            self.assertEqual("invalid", fields["delivery_mode"])
+
+    def test_formatter_preserves_non_lifecycle_identity_compatibility(self):
+        logs = []
+        logger = CommandFeedbackDeliveryLogger(logs.append)
+
+        logger.log(
+            event_id="5" * 32,
+            route_kind="minecraft_chatclef",
+            response_kind="external",
+            sink="output_listener",
+            response_generation=None,
+            delivered=True,
+            reason="delivered",
+            delivery_mode="non_preempting",
+        )
+
+        fields = _parse_delivery(logs[0])
+        self.assertEqual("minecraft_chatclef", fields["route_kind"])
+        self.assertEqual("external", fields["response_kind"])
+        self.assertEqual("non_preempting", fields["delivery_mode"])
 
 
 def _capability(*, event_id, event_source, response_text):

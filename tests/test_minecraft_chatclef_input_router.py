@@ -286,6 +286,10 @@ class _RecordingExtension:
         )
         self.translated = []
         self.submitted = []
+        self.stop_terminal_callback = None
+
+    def set_stop_terminal_response_callback(self, callback):
+        self.stop_terminal_callback = callback
 
     def translate_natural_language_command(self, text):
         self.translated.append(str(text))
@@ -419,6 +423,9 @@ class _FakeLLM(_ListenerSource):
 
     def set_input_router(self, router):
         self.input_router = router
+
+    def emit_external_response(self, _text, **_values):
+        return None
 
 
 if __name__ == "__main__":

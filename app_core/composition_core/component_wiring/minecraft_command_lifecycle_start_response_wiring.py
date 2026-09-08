@@ -1,23 +1,25 @@
-#20260905_kpopmodder: Route verified asynchronous STOP terminals to output/TTS only.
+#20260907_kpopmodder: Present direct-GUI command START responses with typed Minecraft metadata.
 from __future__ import annotations
 
-from plugins.Minecraft.fabric.chatclef.response.stop import (
-    StopControlTerminalResponse,
-)
-from llm_core.routed_response import (
-    RoutedResponseNonPreemptingDeliveryPolicy,
-    RoutedResponsePresentationMetadata,
+from llm_core.routed_response import RoutedResponsePresentationMetadata
+from plugins.Minecraft.fabric.chatclef.response.command_lifecycle import (
+    CommandLifecycleCoalescedResponse,
+    CommandLifecycleStartResponse,
 )
 
 
-class MinecraftStopTerminalResponseWiring:
-    def __init__(self):
+class MinecraftCommandLifecycleStartResponseWiring:
+    def __init__(self) -> None:
         self._callbacks = {}
 
     def wire(self, *, llm, extension=None):
         if extension is None:
             return None
-        setter = getattr(extension, "set_stop_terminal_response_callback", None)
+        setter = getattr(
+            extension,
+            "set_command_lifecycle_start_response_callback",
+            None,
+        )
         emitter = getattr(llm, "emit_external_response", None)
         if not callable(setter) or not callable(emitter):
             return None
@@ -26,7 +28,10 @@ class MinecraftStopTerminalResponseWiring:
         if callback is None:
 
             def callback(response):
-                if type(response) is not StopControlTerminalResponse:
+                if type(response) not in {
+                    CommandLifecycleCoalescedResponse,
+                    CommandLifecycleStartResponse,
+                }:
                     return None
                 return emitter(
                     response.text,
@@ -37,9 +42,7 @@ class MinecraftStopTerminalResponseWiring:
                     event_id=response.event_id,
                     route_kind=response.route_kind,
                     response_kind=response.response_kind,
-                    delivery_mode=(
-                        RoutedResponseNonPreemptingDeliveryPolicy.NON_PREEMPTING
-                    ),
+                    delivery_mode="current_input",
                     presentation_metadata=(
                         RoutedResponsePresentationMetadata.minecraft(
                             detail_log=response.presentation_detail_log,
@@ -53,4 +56,4 @@ class MinecraftStopTerminalResponseWiring:
         return callback
 
 
-__all__ = ("MinecraftStopTerminalResponseWiring",)
+__all__ = ("MinecraftCommandLifecycleStartResponseWiring",)
