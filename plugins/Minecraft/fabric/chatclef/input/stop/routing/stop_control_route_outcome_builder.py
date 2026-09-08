@@ -46,7 +46,10 @@ class StopControlRouteOutcomeBuilder:
                 else "control_send_rejected"
             )
         result = getattr(outcome, "result", {})
-        response_text = self._renderer.render_local(reason)
+        #20260908_kpopmodder: Let the verified terminal own the sole visible response for an accepted trusted STOP.
+        response_text = (
+            "" if reason == "accepted" else self._renderer.render_local(reason)
+        )
         return MinecraftChatClefInputRouteDecision.handled_result(
             reason=f"stop_control_{reason}",
             response_text=response_text,

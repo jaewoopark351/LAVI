@@ -175,10 +175,49 @@ class TrustedKoreanChatVoiceIntegrationTests(unittest.TestCase):
         queued = llm.input_queue_worker.input_queue.get_nowait()
         voice_yields = list(llm.accept_queued_input(queued, [], "system"))
 
-        expected = "[Minecraft] 마인크래프트 연결이 끊겨 있어 중지 요청을 보내지 못했어요."
-        self.assertEqual([expected], chat_yields)
+        expected = "마인크래프트 연결이 끊겨 있어 중지 요청을 보내지 못했어요."
+        self.assertEqual(1, len(chat_yields))
+        self.assertEqual(expected, chat_yields[0].content)
+        self.assertEqual("Minecraft", chat_yields[0].metadata["title"])
         self.assertEqual([expected], voice_yields)
         self.assertEqual([expected, expected], [item["text"] for item in outputs])
+        self.assertTrue(
+            all(
+                item["presentation"]["badge_label"] == "Minecraft"
+                for item in outputs
+            )
+        )
+        self.assertEqual(0, pipeline.provider_calls)
+
+    def test_chat_and_final_voice_accepted_stop_publish_no_start_response(self):
+        adapter = _RecordingMinecraftAdapter()
+        extension = MinecraftFabricChatClefExtension(adapter=adapter)
+        llm, pipeline, outputs = _llm_harness(extension)
+
+        chat_yields = list(
+            _chat_coordinator(llm).dispatch("멈춰", [], "system")
+        )
+        voice_adapter = ProviderBoundInputEventAdapter(
+            provider=_voice_provider(),
+            output_callback=lambda _event: None,
+            source_resolver=InputProviderSourceResolver(),
+        )
+        voice = llm.create_trusted_voice_input_final_enqueue_coordinator(
+            voice_adapter
+        )
+        self.assertIsNotNone(voice.enqueue("마크 AI 멈춰줘"))
+        queued = llm.input_queue_worker.input_queue.get_nowait()
+        voice_yields = list(llm.accept_queued_input(queued, [], "system"))
+
+        self.assertEqual([], chat_yields)
+        self.assertEqual([], voice_yields)
+        self.assertEqual([], outputs)
+        self.assertEqual([], adapter.requests)
+        self.assertEqual(2, len(adapter.stop_requests))
+        self.assertEqual(
+            ["lavi_chat_ui", "voice_input_final"],
+            [request["event"].source for request in adapter.stop_requests],
+        )
         self.assertEqual(0, pipeline.provider_calls)
 
     def test_chat_and_final_voice_owned_item_rejections_publish_once_without_llm(self):
@@ -369,6 +408,7 @@ class _RecordingMinecraftAdapter:
 
     def __init__(self):
         self.requests = []
+        self.stop_requests = []
 
     def submit_command(self, request):
         self.requests.append(request)
@@ -379,6 +419,14 @@ class _RecordingMinecraftAdapter:
             error_code=None,
             message="accepted",
             data={"command": request.command},
+        )
+
+    def submit_stop_control(self, **values):
+        self.stop_requests.append(values)
+        return SimpleNamespace(
+            accepted=True,
+            reason="accepted",
+            result={"ok": True, "status": "accepted"},
         )
 
     def get_status(self):

@@ -140,6 +140,52 @@ class TrustedKoreanInputRouteCoordinatorTests(unittest.TestCase):
         self.assertIsNone(decision.response_emission_capability)
         self.assertTrue(proof.closed)
 
+    def test_empty_handled_response_suppresses_without_issuing_capability(self):
+        trace = []
+        proof = _Proof(trace, capability=object())
+        coordinator = _coordinator(
+            trace,
+            proof=proof,
+            reason="eligible",
+            route_callback=lambda _event, **_kwargs: (
+                MinecraftChatClefInputRouteDecision.handled_result(
+                    reason="stop_control_accepted",
+                    response_text="",
+                    route_kind="stop_control",
+                    response_kind="command_start",
+                )
+            ),
+            rendered_text="",
+        )
+
+        decision = coordinator.route("event", object())
+
+        self.assertEqual("", decision.response_text)
+        self.assertFalse(decision.publish_external_response)
+        self.assertTrue(decision.suppress_response)
+        self.assertIsNone(decision.response_emission_capability)
+        self.assertFalse(
+            any(
+                isinstance(entry, tuple) and entry[0] == "authorize"
+                for entry in trace
+            )
+        )
+        self.assertTrue(proof.closed)
+
+        publisher_requests = []
+        outcome = RoutedInputDispatchCoordinator(
+            response_publisher_callback=lambda: publisher_requests.append(
+                "publisher_requested"
+            ),
+            router=SimpleNamespace(route=lambda _event: decision),
+            log_callback=lambda _message: None,
+        ).dispatch("event")
+
+        self.assertTrue(outcome.handled)
+        self.assertTrue(outcome.suppress_response)
+        self.assertIsNone(outcome.response)
+        self.assertEqual([], publisher_requests)
+
     def test_trusted_route_exception_closes_proof_and_outer_dispatch_fails_closed(self):
         trace = []
         proof = _Proof(trace, capability=object())
@@ -252,6 +298,7 @@ class _Proof:
         *,
         text,
         source,
+        response_kind="immediate",
     ):
         self._trace.append(("authorize", event, text, source))
         return self._capability
