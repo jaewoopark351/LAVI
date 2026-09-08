@@ -3,6 +3,9 @@ from queue import Empty
 import threading
 
 from core.logger import log_print
+from tts_core.delivery.lifecycle_response import (
+    TtsLifecycleQueueItemPlaybackObserver,
+)
 
 
 class TTSInterruptController:#20260621_kpopmodder
@@ -110,7 +113,13 @@ class TTSInterruptController:#20260621_kpopmodder
     def clear_queue(self, queue):
         while True:
             try:
-                queue.get_nowait()
+                item = queue.get_nowait()
+                TtsLifecycleQueueItemPlaybackObserver.observe(
+                    self.owner,
+                    item,
+                    played=False,
+                    reason="interrupted",
+                )
             except Empty:
                 break
             except Exception as e:

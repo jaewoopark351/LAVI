@@ -24,6 +24,7 @@ class FakeTTSOwner:
         self.process_queue_live_textbox = FakeLiveTextbox()
         self.audio_player = mock.Mock()
         self.mouth_animator = mock.Mock()
+        self.lifecycle_playback_observations = []
 
     def get_queue_generation(self):
         return self.queue_generation
@@ -64,6 +65,9 @@ class FakeTTSOwner:
         self.played_audio.append(audio_result)
         return True
 
+    def observe_lifecycle_response_playback(self, **values):
+        self.lifecycle_playback_observations.append(values)
+
 
 class FakeLiveTextbox:
     def __init__(self):
@@ -79,6 +83,69 @@ class FakeTextProcessor:
 
 
 class TTSQueueWorkerTests(unittest.TestCase):
+    def test_lifecycle_queue_item_reports_observed_playback_to_its_owner(self):
+        owner = FakeTTSOwner()
+        owner.input_queue.put(
+            {
+                "queue_generation": owner.queue_generation,
+                "response_generation": None,
+                "text": "완료했어",
+                "lifecycle_event_id": "a" * 32,
+                "lifecycle_delivery_token": 7,
+                "lifecycle_item_index": 0,
+                "lifecycle_item_count": 1,
+            }
+        )
+        worker = TTSQueueWorker(owner)
+
+        worker.worker_loop(
+            synthesize_function=lambda text: text.encode("utf-8"),
+            worker_generation=owner.queue_generation,
+        )
+
+        self.assertEqual(
+            [
+                {
+                    "event_id": "a" * 32,
+                    "delivery_token": 7,
+                    "item_index": 0,
+                    "played": True,
+                    "reason": "played",
+                }
+            ],
+            owner.lifecycle_playback_observations,
+        )
+
+    def test_unexpected_worker_failure_retires_active_lifecycle_item(self):
+        owner = FakeTTSOwner()
+        owner.input_queue.put(
+            {
+                "queue_generation": owner.queue_generation,
+                "response_generation": None,
+                "text": "terminal",
+                "lifecycle_event_id": "b" * 32,
+                "lifecycle_delivery_token": 8,
+                "lifecycle_item_index": 0,
+                "lifecycle_item_count": 1,
+            }
+        )
+
+        def fail_subtitle(_text):
+            raise RuntimeError("subtitle unavailable")
+
+        owner.update_subtitle_file = fail_subtitle
+
+        TTSQueueWorker(owner).worker_loop(
+            synthesize_function=lambda text: text.encode("utf-8"),
+            worker_generation=owner.queue_generation,
+        )
+
+        self.assertEqual(1, len(owner.lifecycle_playback_observations))
+        observation = owner.lifecycle_playback_observations[0]
+        self.assertFalse(observation["played"])
+        self.assertEqual("delivery_failed", observation["reason"])
+        self.assertEqual(8, observation["delivery_token"])
+
     def test_pending_interrupt_does_not_dequeue_first_new_sentence(self):
         owner = FakeTTSOwner()
         first_item = (owner.queue_generation, "첫 문장")

@@ -4,6 +4,9 @@ import time
 
 from core.global_state import global_state, GlobalKeys
 from core.logger import log_print, debug_print
+from tts_core.delivery.lifecycle_response import (
+    TtsLifecycleQueueItemPlaybackObserver,
+)
 
 
 class TTSQueueWorker:#20260621_kpopmodder
@@ -28,6 +31,7 @@ class TTSQueueWorker:#20260621_kpopmodder
 
     def worker_loop(self, synthesize_function, worker_generation):
         tts = self.owner
+        queued_item = None
         self.start_speaking_state()
         try:
             while True:
@@ -40,6 +44,7 @@ class TTSQueueWorker:#20260621_kpopmodder
                     log_print("[TTS QUEUE] interrupt detected before dequeue")
                     break
 
+                queued_item = None
                 queued_item = self.get_next_input_item(worker_generation)
                 if queued_item is None:
                     break
@@ -49,12 +54,22 @@ class TTSQueueWorker:#20260621_kpopmodder
                 # dequeue 직후 새 인터럽트가 발생한 경우에는 현재 문장을 폐기한다.
                 if tts.interrupt_event.is_set():
                     log_print("[TTS QUEUE] interrupt detected before synthesize")
+                    self.observe_lifecycle_playback(
+                        queued_item,
+                        played=False,
+                        reason="interrupted",
+                    )
                     break
 
                 if self.is_stale_response_generation(response_generation):#20260623_kpopmodder
                     log_print(
                         "[TTS QUEUE] dropped stale response sentence before synthesize: "
                         f"response_generation={response_generation}, text={input_text}"
+                    )
+                    self.observe_lifecycle_playback(
+                        queued_item,
+                        played=False,
+                        reason="stale",
                     )
                     continue
 
@@ -70,15 +85,30 @@ class TTSQueueWorker:#20260621_kpopmodder
                     log_print(
                         f"[TTS QUEUE] synthesize finally failed or stale: {input_text}"
                     )
+                    self.observe_lifecycle_playback(
+                        queued_item,
+                        played=False,
+                        reason="synthesis_failed",
+                    )
                     continue
 
                 if tts.interrupt_event.is_set() or self.is_stale_generation(worker_generation):
                     log_print("[TTS QUEUE] interrupt/stale detected after synthesize")
+                    self.observe_lifecycle_playback(
+                        queued_item,
+                        played=False,
+                        reason="interrupted",
+                    )
                     break
                 if self.is_stale_response_generation(response_generation):#20260623_kpopmodder
                     log_print(
                         "[TTS QUEUE] stale response detected after synthesize: "
                         f"response_generation={response_generation}, text={input_text}"
+                    )
+                    self.observe_lifecycle_playback(
+                        queued_item,
+                        played=False,
+                        reason="stale",
                     )
                     continue
 
@@ -93,11 +123,21 @@ class TTSQueueWorker:#20260621_kpopmodder
 
                 if tts.interrupt_event.is_set() or self.is_stale_generation(worker_generation):
                     log_print("[TTS QUEUE] interrupt/stale detected during playback")
+                    self.observe_lifecycle_playback(
+                        queued_item,
+                        played=False,
+                        reason="interrupted",
+                    )
                     break
                 if self.is_stale_response_generation(response_generation):#20260623_kpopmodder
                     log_print(
                         "[TTS QUEUE] stale response detected during playback: "
                         f"response_generation={response_generation}, text={input_text}"
+                    )
+                    self.observe_lifecycle_playback(
+                        queued_item,
+                        played=False,
+                        reason="stale",
                     )
                     break
 
@@ -105,11 +145,27 @@ class TTSQueueWorker:#20260621_kpopmodder
                     log_print(
                         f"[TTS QUEUE] playback finally failed. force skip: {input_text}"
                     )
+                    self.observe_lifecycle_playback(
+                        queued_item,
+                        played=False,
+                        reason="playback_failed",
+                    )
                     continue
 
                 log_print(f"[TTS QUEUE] finished sentence: {input_text}")
+                self.observe_lifecycle_playback(
+                    queued_item,
+                    played=True,
+                    reason="played",
+                )
                 tts.process_queue_live_textbox.set(tts.get_queue_display_items())
         except Exception as e:
+            if queued_item is not None:
+                self.observe_lifecycle_playback(
+                    queued_item,
+                    played=False,
+                    reason="delivery_failed",
+                )
             log_print(f"[TTS process_input_queue error] {e}")
         finally:
             self.finish_speaking_state(worker_generation, synthesize_function)
@@ -181,12 +237,22 @@ class TTSQueueWorker:#20260621_kpopmodder
                     "[TTS QUEUE] dropped stale queued sentence: "
                     f"item_generation={item_generation}, worker_generation={worker_generation}, text={input_text}"
                 )
+                self.observe_lifecycle_playback(
+                    item,
+                    played=False,
+                    reason="stale",
+                )
                 continue
 
             if self.is_stale_response_generation(response_generation):#20260623_kpopmodder
                 log_print(
                     "[TTS QUEUE] dropped stale response sentence: "
                     f"response_generation={response_generation}, text={input_text}"
+                )
+                self.observe_lifecycle_playback(
+                    item,
+                    played=False,
+                    reason="stale",
                 )
                 continue
 
@@ -196,7 +262,40 @@ class TTSQueueWorker:#20260621_kpopmodder
             return {
                 "text": input_text,
                 "response_generation": response_generation,
+                "lifecycle_event_id": (
+                    item.get("lifecycle_event_id")
+                    if isinstance(item, dict)
+                    else None
+                ),
+                "lifecycle_item_index": (
+                    item.get("lifecycle_item_index")
+                    if isinstance(item, dict)
+                    else None
+                ),
+                "lifecycle_route_kind": (
+                    item.get("lifecycle_route_kind")
+                    if isinstance(item, dict)
+                    else None
+                ),
+                "lifecycle_response_kind": (
+                    item.get("lifecycle_response_kind")
+                    if isinstance(item, dict)
+                    else None
+                ),
+                "lifecycle_delivery_token": (
+                    item.get("lifecycle_delivery_token")
+                    if isinstance(item, dict)
+                    else None
+                ),
             }
+
+    def observe_lifecycle_playback(self, queued_item, *, played, reason):
+        return TtsLifecycleQueueItemPlaybackObserver.observe(
+            self.owner,
+            queued_item,
+            played=played,
+            reason=reason,
+        )
 
     def synthesize_with_retry(
         self,

@@ -44,6 +44,10 @@ from tts_core.winsound_player import WinSoundAudioPlayer#20260617_kpopmodder
 from tts_core.tts_queue_worker import TTSQueueWorker#20260617_kpopmodder
 
 from tts_core.tts_interrupt_controller import TTSInterruptController#20260617_kpopmodder
+from tts_core.delivery.lifecycle_response import (
+    TtsLifecycleQueueItemPlaybackObserver,
+    TtsLifecycleResponseFacade,
+)
 
 class TTS(PluginSelectionBase):#20260615_kpopmodder
     #output_event_listeners = []#20260616_kpopmodder
@@ -102,6 +106,11 @@ class TTS(PluginSelectionBase):#20260615_kpopmodder
         self.text_processor = TTSTextProcessor()#20260616_kpopmodder
 
         self.queue_worker = TTSQueueWorker(self)#20260617_kpopmodder
+
+        self.lifecycle_response_enqueue_receipt_listeners = []
+        self.lifecycle_response_playback_receipt_listeners = []
+        self._lifecycle_response_facade = TtsLifecycleResponseFacade(self)
+        self._lifecycle_response_facade.delivery_adapter()
 
         self.interrupt_controller = TTSInterruptController(self)#20260617_kpopmodder
 
@@ -169,8 +178,17 @@ class TTS(PluginSelectionBase):#20260615_kpopmodder
         return result
 
     def receive_input(self, text):
-        text, response_generation = self.unpack_input_payload(text)#20260623_kpopmodder
+        payload = text
+        text, response_generation = self.unpack_input_payload(payload)#20260623_kpopmodder
         items = self.prepare_input_items(text)
+
+        lifecycle = self._get_lifecycle_response_facade().receive(
+            payload=payload,
+            items=items,
+            response_generation=response_generation,
+        )
+        if lifecycle.handled:
+            return lifecycle.receipt
 
         if not items:
             return
@@ -298,7 +316,21 @@ class TTS(PluginSelectionBase):#20260615_kpopmodder
     #         LAV_utils.queue_to_list(self.input_queue)
     #     )
 
-    def enqueue_input_items(self, items, response_generation=None):#20260621_kpopmodder
+    def enqueue_input_items(
+        self,
+        items,
+        response_generation=None,
+        *,
+        lifecycle_event_id=None,
+        lifecycle_route_kind=None,
+        lifecycle_response_kind=None,
+        lifecycle_delivery_token=None,
+        lifecycle_items_prevalidated=False,
+    ):#20260621_kpopmodder
+        enqueued_count = 0
+        lifecycle_item_count = (
+            len(items) if lifecycle_event_id is not None else None
+        )
         with self.queue_lock:
             generation = self.get_queue_generation()#20260621_kpopmodder
             if self.is_stale_response_generation(response_generation):#20260623_kpopmodder
@@ -306,7 +338,7 @@ class TTS(PluginSelectionBase):#20260615_kpopmodder
                     "[TTS QUEUE] dropped stale response items before enqueue: "
                     f"response_generation={response_generation}, items={items}"
                 )
-                return
+                return 0
 
             if self.update_latest_response_generation(response_generation):#20260623_kpopmodder
                 dropped_count = self.drop_queued_older_response_items(
@@ -320,7 +352,10 @@ class TTS(PluginSelectionBase):#20260615_kpopmodder
             for item in items:#20260616_kpopmodder
                 if not item:
                     continue
-                if self.text_processor.is_tts_skippable(item):#20260616_kpopmodder
+                if (
+                    not lifecycle_items_prevalidated
+                    and self.text_processor.is_tts_skippable(item)
+                ):#20260616_kpopmodder
                     log_print(f"[TTS QUEUE] skipped non-speech text: {item}")
                     continue
                 #20260621_kpopmodder: 인터럽트 이후 이전 세대 문장이 재생되지 않도록 세대 번호와 함께 저장한다.
@@ -329,9 +364,45 @@ class TTS(PluginSelectionBase):#20260615_kpopmodder
                         generation,
                         item,
                         response_generation=response_generation,
+                        lifecycle_event_id=lifecycle_event_id,
+                        lifecycle_route_kind=lifecycle_route_kind,
+                        lifecycle_response_kind=lifecycle_response_kind,
+                        lifecycle_delivery_token=lifecycle_delivery_token,
+                        lifecycle_item_index=enqueued_count,
+                        lifecycle_item_count=lifecycle_item_count,
                     )
                 )
-            self.process_queue_live_textbox.set(self.get_queue_display_items())
+                enqueued_count += 1
+            try:
+                self.process_queue_live_textbox.set(
+                    self.get_queue_display_items()
+                )
+            except Exception:
+                if lifecycle_event_id is None:
+                    raise
+                log_print("[TTS QUEUE] queue display update failed")
+        return enqueued_count
+
+    def enqueue_lifecycle_response_items(
+        self,
+        items,
+        *,
+        event_id,
+        route_kind,
+        response_kind,
+        response_generation=None,
+        delivery_mode="current_input",
+        delivery_token=None,
+    ):
+        return self.enqueue_input_items(
+            items,
+            response_generation=response_generation,
+            lifecycle_event_id=event_id,
+            lifecycle_route_kind=route_kind,
+            lifecycle_response_kind=response_kind,
+            lifecycle_delivery_token=delivery_token,
+            lifecycle_items_prevalidated=True,
+        )
 
     def process_input_queue(self, function):
         #self.start_tts_worker_if_needed(function)#20260617_kpopmodder
@@ -1330,6 +1401,7 @@ class TTS(PluginSelectionBase):#20260615_kpopmodder
         self.stop_stop_hotkey_polling()#20260705_kpopmodder
 
         self.output_event_listeners.clear()
+        self._get_lifecycle_response_facade().shutdown()
         super().shutdown()
 
     def unpack_input_payload(self, payload):#20260623_kpopmodder
@@ -1342,6 +1414,52 @@ class TTS(PluginSelectionBase):#20260615_kpopmodder
         except (TypeError, ValueError):
             response_generation = None
         return payload.get("text"), response_generation
+
+    def get_lifecycle_response_identity(self, payload):
+        return self._get_lifecycle_response_facade().identity(payload)
+
+    def _get_lifecycle_response_facade(self):
+        facade = getattr(self, "_lifecycle_response_facade", None)
+        if facade is None:
+            facade = TtsLifecycleResponseFacade(self)
+            self._lifecycle_response_facade = facade
+        return facade
+
+    def _get_lifecycle_response_delivery_adapter(self):
+        return self._get_lifecycle_response_facade().delivery_adapter()
+
+    def add_lifecycle_response_enqueue_receipt_listener(self, callback):
+        self._get_lifecycle_response_facade().add_enqueue_listener(callback)
+
+    def add_lifecycle_response_playback_receipt_listener(self, callback):
+        self._get_lifecycle_response_facade().add_playback_listener(callback)
+
+    def notify_lifecycle_response_enqueue_receipt(self, receipt):
+        self._get_lifecycle_response_facade().notify_enqueue(receipt)
+
+    def observe_lifecycle_response_playback(
+        self,
+        *,
+        event_id,
+        item_index,
+        played,
+        reason,
+        route_kind=None,
+        response_kind=None,
+        delivery_token=None,
+    ):
+        return self._get_lifecycle_response_facade().observe_playback(
+            event_id=event_id,
+            item_index=item_index,
+            played=played,
+            reason=reason,
+            route_kind=route_kind,
+            response_kind=response_kind,
+            delivery_token=delivery_token,
+        )
+
+    def notify_lifecycle_response_playback_receipt(self, receipt):
+        self._get_lifecycle_response_facade().notify_playback(receipt)
 
     def update_latest_response_generation(self, response_generation):#20260623_kpopmodder
         if response_generation is None:
@@ -1373,14 +1491,32 @@ class TTS(PluginSelectionBase):#20260615_kpopmodder
         queue_generation,
         text,
         response_generation=None,
+        lifecycle_event_id=None,
+        lifecycle_route_kind=None,
+        lifecycle_response_kind=None,
+        lifecycle_delivery_token=None,
+        lifecycle_item_index=None,
+        lifecycle_item_count=None,
     ):#20260623_kpopmodder
-        if response_generation is None:
+        if response_generation is None and lifecycle_event_id is None:
             return (queue_generation, text)
-        return {
+        item = {
             "queue_generation": queue_generation,
             "response_generation": response_generation,
             "text": text,
         }
+        if lifecycle_event_id is not None:
+            item.update(
+                {
+                    "lifecycle_event_id": lifecycle_event_id,
+                    "lifecycle_route_kind": lifecycle_route_kind,
+                    "lifecycle_response_kind": lifecycle_response_kind,
+                    "lifecycle_delivery_token": lifecycle_delivery_token,
+                    "lifecycle_item_index": lifecycle_item_index,
+                    "lifecycle_item_count": lifecycle_item_count,
+                }
+            )
+        return item
 
     def parse_queue_item(self, item, default_queue_generation=None):#20260623_kpopmodder
         if isinstance(item, dict):
@@ -1415,6 +1551,12 @@ class TTS(PluginSelectionBase):#20260615_kpopmodder
                 and response_generation < min_response_generation
             ):
                 dropped_count += 1
+                TtsLifecycleQueueItemPlaybackObserver.observe(
+                    self,
+                    item,
+                    played=False,
+                    reason="stale",
+                )
                 continue
             kept_items.append(item)
 
