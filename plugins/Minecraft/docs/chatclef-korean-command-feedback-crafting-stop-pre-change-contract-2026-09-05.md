@@ -5,8 +5,32 @@
 <!-- 20260906_kpopmodder: Linked the proven live wooden-button StackOverflow regression and its initial pre-change one-hunk correction record. -->
 <!-- 20260906_kpopmodder: Reconciled the subsequently applied wooden-button hunk, offline verification, and remaining post-fix runtime scope. -->
 <!-- 20260906_kpopmodder: Recorded matching-JAR generic-button success from Chat and exact final-microphone input, including one-shot TTS delivery. -->
+<!-- 20260907_kpopmodder: Linked the implemented/offline-tested exact diamond-pickaxe quantity-one response contract and its source-identified progress, STOP-arbitration, TTS, and UI gaps. -->
+<!-- 20260907_kpopmodder: Linked the docs-only all-item/all-command natural lifecycle-feedback generalization without changing current admission or runtime status. -->
+<!-- 20260908_kpopmodder: Reconciled the generalized lifecycle closure and later terminal-only trusted STOP policy. -->
 
 # ChatClef Korean Command Feedback, Generic Crafting, and Stop Pre-Change Contract
+
+The 2026-09-07 exact `diamond_pickaxe` quantity-one natural crafting lifecycle
+follow-up is owned by
+[Natural Korean Crafting Lifecycle Feedback Contract](chatclef-natural-korean-crafting-lifecycle-feedback-pre-change-contract-2026-09-07.md).
+That narrow follow-up is implemented and offline-tested. Its formerly
+source-identified initial-running wire, STOP-response arbitration, TTS
+receipt/playback, UI badge, lifecycle response-generation non-preemption, and
+delivery diagnostic-kind gaps are closed in source and focused tests.
+Deployment, Minecraft launch, and live-world verification remain `NOT_RUN`.
+For that profile only, it explicitly narrows Section 7.3's embedded
+`[Minecraft]` prefix and Section 17's ordinary terminal-TTS exclusion. This
+document's rule that submission is not completion remains authoritative, and
+every other response, historical status, verification-ledger, and STOP rule
+below remains unchanged.
+
+The requested broader behavior for every accepted registered command and every
+item target already admitted by its action policy is owned by
+[General Natural Korean Command Lifecycle Feedback Pre-Change Contract](chatclef-general-natural-korean-command-lifecycle-feedback-pre-change-contract-2026-09-07.md).
+That generalized lifecycle is now implemented. The later accepted trusted-STOP
+START suppression and strictly verified STORE_HOME success profile are separate
+Python rollback units recorded by their dedicated follow-up contract.
 
 ## 0. Current implementation status
 

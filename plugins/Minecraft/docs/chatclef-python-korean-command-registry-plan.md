@@ -8,12 +8,38 @@
 <!-- 20260905_kpopmodder: Reconciled STOP's guarded control-lane readiness and kept generic crafting defaults outside the global alias registry. -->
 <!-- 20260905_kpopmodder: Recorded final offline regression and clean-build verification without changing gameplay verifiability. -->
 <!-- 20260906_kpopmodder: Reconciled the later matching-JAR runtime and isolated the generic wooden-button engine regression from registry readiness. -->
+<!-- 20260907_kpopmodder: Linked the docs-only natural lifecycle-feedback coverage contract for all 26 registered names without changing exposure axes. -->
+<!-- 20260907_kpopmodder: Reconciled applied lifecycle narration without changing registry exposure or gameplay-effect readiness axes. -->
+<!-- 20260908_kpopmodder: Reconciled STORE_HOME's narrow verified-success profile without changing registry exposure. -->
 
 # ChatClef Python Korean Command Registry Plan
 
 Date: 2026-08-20
 
-This document records the docs-only plan for making the registered ChatClef
+## 2026-09-07 lifecycle-feedback reconciliation
+
+The registry remains the authority for command names, slot domains, safety,
+confirmation, allowed ingress, and public exposure. Separately, deterministic
+lifecycle narration has now been implemented for all 26 response profiles when
+one of those existing ingresses actually accepts the command. See the
+[General Natural Korean Command Lifecycle Feedback Implementation Record](chatclef-general-natural-korean-command-lifecycle-feedback-implementation-record-2026-09-07.md).
+Response coverage does not make a dormant or raw-only command public and does
+not admit an additional item.
+
+The six previously open exact-crafting delivery boundaries are closed in
+source and focused tests. Gameplay-effect readiness remains independently
+fail-closed: generalized single-target GET and the strictly verified
+trusted-translation STORE_HOME `COMPLETED`/zero-work slice are the current
+strong positive terminal oracles; multi-target/bracket GET and all remaining
+profiles use cautious terminal wording unless separately proven. Final selected
+Python integration verification passed 1226 tests with two skips and 7052
+subtests, and Ruff passed;
+deployment plus Minecraft runtime verification for this generalized change are
+`NOT_RUN`.
+The dated baseline tables below remain historical registry evidence rather
+than the current lifecycle-feedback implementation status.
+
+This document records the historical docs-only plan for making the registered ChatClef
 command surface understandable from Korean natural language without changing
 Java, ChatClef, AltoClef, Baritone, DTOs, or the v1 wire payload.
 
@@ -21,6 +47,12 @@ It is documentation only. It does not approve Python behavior changes, Java
 changes, DTO changes, wire-protocol changes, build execution, Minecraft launch,
 runtime reproduction, tests, commit, push, automatic replay, broad refactoring,
 or public exposure of a command family.
+
+Natural Korean response coverage for every accepted registered command
+originated in
+[General Natural Korean Command Lifecycle Feedback Pre-Change Contract](chatclef-general-natural-korean-command-lifecycle-feedback-pre-change-contract-2026-09-07.md).
+That coverage is now implemented and consumes this registry's command names
+and readiness axes; it does not make a dormant or raw-only row public.
 
 ## Authority
 

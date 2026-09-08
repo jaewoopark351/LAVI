@@ -8,10 +8,71 @@
 <!-- 20260904_kpopmodder: Linked the docs-only H5 Korean Chat/microphone command contract to the existing single-pass, no-replay and response-evidence owners. -->
 <!-- 20260905_kpopmodder: Reconciled H5 bridge lifecycle readiness after test-only Java coverage and the clean forced build. -->
 <!-- 20260905_kpopmodder: Reconciled H5 shared-registry ownership and non-consuming inspection versus atomic submission commit. -->
+<!-- 20260907_kpopmodder: Linked the implemented/offline-tested natural Korean crafting lifecycle response follow-up and its source-identified delivery gaps without broadening generic command completion claims. -->
+<!-- 20260907_kpopmodder: Linked the docs-only all-item/all-command natural lifecycle-feedback generalization and its per-command effect-proof requirement. -->
+<!-- 20260907_kpopmodder: Reconciled the applied generalized lifecycle, six closed delivery boundaries, and current cautious-evidence ceiling. -->
+<!-- 20260908_kpopmodder: Linked the pending trusted-STOP terminal-only publication policy and STORE_HOME verified-success rollout without changing orchestration ownership. -->
+<!-- 20260908_kpopmodder: Reconciled the implemented STOP/STORE_HOME rollback units and local-Chat empty-stream completion adapter. -->
 
 # ChatClef Python Command Orchestration Plan
 
 Date: 2026-08-15
+
+## 2026-09-07 lifecycle-feedback reconciliation
+
+The generalized natural Korean lifecycle layer described by the later
+contracts is now implemented for all 26 registered response profiles whenever
+an existing LAVI-owned ingress actually accepts a command. The current source,
+ownership boundaries, and verification status are recorded in the
+[General Natural Korean Command Lifecycle Feedback Implementation Record](chatclef-general-natural-korean-command-lifecycle-feedback-implementation-record-2026-09-07.md).
+This adds no execution authority and does not alter Minecraft Task behavior.
+
+The six formerly open exact-crafting boundaries are closed in source and
+focused tests: positive-integer initial progress evidence, STOP terminal
+arbitration, separate TTS enqueue/play receipts, non-preempting late terminal
+delivery, UI-only Minecraft provenance, and diagnostic-kind coverage. Strong
+positive terminal evidence currently exists for generalized single-target GET
+and the narrow strictly verified trusted-translation STORE_HOME
+`COMPLETED`/zero-work slice. Multi-target/bracket GET and all remaining profiles
+return a cautious terminal sentence unless separately proven.
+
+The historical 2026-09-07 offline integration run and its unrelated
+pre-existing repository `HEAD`-hash contract failure are recorded in the
+implementation record. The later selected final regression passed 1226 tests
+with two skips and 7052 subtests, and Ruff passed. Deployment and Minecraft
+runtime verification for this generalized implementation remain `NOT_RUN`. The older
+baseline and planning sections below remain useful historical design context;
+their `planned` wording does not override this reconciliation.
+
+The exact 2026-09-07 `diamond_pickaxe` quantity-one craft-intent start,
+read-only progress-query, and gameplay-effect-verified completion wording is
+now narrowed by
+[Natural Korean Crafting Lifecycle Feedback Contract](chatclef-natural-korean-crafting-lifecycle-feedback-pre-change-contract-2026-09-07.md).
+That exact profile has been migrated into the generalized implementation, and
+its six former running/STOP/TTS/non-preemption/UI/diagnostic boundaries are
+closed in source and focused tests. Deployment and live-runtime status remain
+`NOT_RUN`.
+That dated contract does not weaken this plan's rule that `accepted`,
+`running`, or terminal `completed` alone cannot prove the requested gameplay
+effect.
+
+The generalization across the full registered command catalog and all
+currently admitted item targets is specified in
+[General Natural Korean Command Lifecycle Feedback Pre-Change Contract](chatclef-general-natural-korean-command-lifecycle-feedback-pre-change-contract-2026-09-07.md).
+It preserves this plan's single-pass, exact-correlation, no-replay, and
+effect-before-success rules and is now implemented and verified offline. Its
+exact result is owned by the implementation record.
+
+A later 2026-09-08 user-run review is reconciled by the
+[Python STOP Single-Response and STORE_HOME Verified-Terminal Pre-Change Contract](chatclef-python-stop-single-response-store-home-verified-terminal-pre-change-contract-2026-09-08.md).
+It records two separate implemented Python lifecycle-feedback changes:
+suppressing the accepted trusted-STOP START publication while retaining its
+correlated terminal, and promoting only strictly verified trusted-translation
+STORE_HOME `COMPLETED` or zero-work evidence to count-bearing success wording.
+The separately reversible local-Chat completion adapter closes Gradio's normal
+zero-product-response iterator without adding an assistant card. These changes
+add no command authority and do not alter Java, the wire schema, Minecraft
+Tasks, or lifecycle presentation identity.
 
 This document records the design and reviewed-baseline status for the requested
 Fabric ChatClef Python orchestration behaviors:
@@ -1730,8 +1791,12 @@ primary unknown:
 
 The initial reply path uses deterministic templates only. Normal external
 dispatch to Translate, TTS, or other LAVI output listeners remains a separate
-planned integration step. A future LLM paraphraser may be added behind the same
-interface, but it must receive only confirmed facts and may change tone only. It
+planned integration step for the generic orchestration design. The exact
+2026-09-07 diamond-pickaxe lifecycle profile is the implemented narrow
+exception and uses the existing external output-dispatch composition boundary
+without recalling the LLM; downstream TTS receipt/playback is not thereby
+proven. A future LLM paraphraser may be added behind the same interface, but it
+must receive only confirmed facts and may change tone only. It
 must not change command status, command text, lifecycle state, retry policy, or
 cleanup policy.
 

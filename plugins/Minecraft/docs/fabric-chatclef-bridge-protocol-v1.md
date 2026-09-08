@@ -5,6 +5,10 @@
 <!-- 20260906_kpopmodder: Distinguished the later verified STOP/bridge runtime from the downstream wooden-button engine StackOverflow. -->
 <!-- 20260906_kpopmodder: Recorded the downstream button fix's offline-built/runtime-unverified follow-up without changing the bridge contract. -->
 <!-- 20260906_kpopmodder: Recorded matching-JAR generic-button success from Chat and final microphone without changing the bridge contract. -->
+<!-- 20260907_kpopmodder: Implemented and offline-verified additive exact GET inventory-delta evidence for natural crafting feedback. -->
+<!-- 20260907_kpopmodder: Linked the docs-only all-command effect-profile proposal without changing the current v1 wire or exact GET projection. -->
+<!-- 20260907_kpopmodder: Documented the existing STORE_HOME data profile and the source-known initial-running sequence compatibility gap. -->
+<!-- 20260908_kpopmodder: Reconciled Python's strict STORE_HOME success consumer without changing the v1 wire profile. -->
 
 # Fabric ChatClef Bridge Protocol V1
 
@@ -200,6 +204,127 @@ a new top-level DTO field, not required on terminal results, and not a wire
 authorization for active release. Python-local sequence ordering, lifecycle
 fingerprints, CAS, tombstones, and admission quarantine remain implementation
 details outside this v1 wire contract.
+
+Current compatibility note: Java now publishes the initial exact
+`running/dispatch_started` result with `evidence_sequence=1`, and the same
+execution-wide sequence source assigns `2+` to later finish/quiescence
+observations. Python still rejects missing, boolean, zero, negative, duplicate,
+or decreasing values. A shared serialized-envelope fixture is consumed by both
+the Java producer test and the Python DTO/reconciliation test, so this rule is
+verified at the real wire shape rather than only through hand-built Python
+snapshots.
+
+### Existing STORE_HOME Result Data Profile
+
+The current Java bridge may decorate an ordinary STORE_HOME result's
+`CommandResultDTO.data` with these exact six operation-specific fields in
+addition to generic lifecycle data:
+
+```text
+operation=store_home
+store_home_result=<closed result name>
+stored_items=<nonnegative exact integer>
+remaining_stacks=<nonnegative exact integer>
+reason=<nonempty bounded stable reason>
+goal_satisfied=<literal boolean>
+```
+
+The Python parser recognizes this specialized claim when either
+`operation=store_home` or `store_home_result` is present. A malformed claim is
+owned by the STORE_HOME validator and must not fall through to a generic
+success renderer. It requires a known closed result, rejects booleans as
+integers, requires `goal_satisfied == (store_home_result == COMPLETED)`, requires
+`remaining_stacks=0` for COMPLETED, and requires `stored_items>0` for every
+`PARTIAL_` result. A COMPLETED result with `stored_items=0` means there was
+nothing to store; cursor, stale-manifest, context-change, unavailable-target,
+unconfirmed-transfer, and interrupted outcomes are not success.
+
+The extension may mirror the same fields in `status.data` and `details`. If
+both locations claim STORE_HOME, all six values must agree exactly. The current
+typed parser/renderer is not a dedicated asynchronous STORE_HOME lifecycle
+tracker and does not by itself validate the entire outer DTO. Any natural
+terminal publisher must first pass ordinary active-owner reconciliation. A
+strong COMPLETED success additionally requires DTO `status=completed`,
+`ok=true`, and `error_code=null`; if it consumes the extension wrapper,
+top-level `error` must also be null. Typed non-success outcomes follow a closed
+outcome/status matrix instead—`CURSOR_NOT_EMPTY`, for example, may accompany
+the pre-existing-unchanged-idle-root UNKNOWN path—and must never be rendered as
+success.
+
+### Single-Target GET Effect Evidence
+
+The current Java bridge implements an observation-only effect projection for a
+closed, prefixless or single-`@`, single-target `get <target> <positive-count>`
+request. It resolves the target through the existing TaskCatalogue matcher,
+captures the sum across inventory and cursor stacks, and decorates the existing
+matching-task terminal result. Bracket-list/multi-target GET forms, malformed
+forms, and non-GET commands do not receive positive effect evidence.
+
+The authoritative v1 profile is nested under the existing
+`CommandResultDTO.data` map:
+
+```text
+effect_profile_id=fabric_chatclef_get_acquire_delta
+effect_profile_version=1
+effect_kind=get_acquisition_delta
+effect_payload:
+  target_item=<validated command target>
+  target_match_ids=<sorted, unique minecraft:item ids; 1..2048 entries>
+  quantity_semantics=ACQUIRE_DELTA
+  requested_delta=<positive exact integer>
+  before_target_count=<nonnegative integer or null>
+  after_target_count=<nonnegative integer or null>
+  target_count_delta=<integer or null>
+  effect_observation_status=authoritative
+      | before_unavailable
+      | after_unavailable
+      | stale_world_binding
+      | unavailable
+  effect_observation_reason=<bounded stable reason>
+```
+
+For backward compatibility only, the exact normalized command
+`get diamond_pickaxe 1` also mirrors these legacy flat fields:
+
+```text
+effect_kind=get_acquisition_delta
+target_item=diamond_pickaxe
+requested_count=1
+before_target_count=<integer or null>
+after_target_count=<integer or null>
+target_count_delta=<integer or null>
+effect_observation_status=authoritative
+    | before_unavailable
+    | after_unavailable
+    | stale_world_binding
+    | unavailable
+effect_observation_reason=<bounded stable reason>
+```
+
+The before observation is captured on the Minecraft client thread before the
+command executor can mutate inventory. The after observation is captured once
+when the matching Task-finished completion payload is constructed. Both counts
+must refer to the same live world and player object identity for the status to
+be `authoritative`; unavailable reads and a changed binding use null for any
+unproven count or delta instead of fabricating zero. The match-id set is copied,
+sorted, deduplicated, and bounded before it is emitted.
+
+These fields are additive evidence, not a new status or success decision.
+Python may say a strong GET completion sentence only after its existing
+websocket/session/generation/request/message reconciliation accepts the result,
+the lifecycle reason and fidelity are exact, the descriptor agrees with the
+entire closed profile, and the authoritative delta is at least the requested
+quantity. If nested and legacy flat fields coexist, every duplicated value must
+agree. The separate Python STORE_HOME evaluator now consumes the existing typed
+STORE_HOME profile for only its strictly verified trusted-translation
+`COMPLETED`/zero-work slice. Every other non-GET profile remains cautious at
+terminal unless its own typed effect oracle is added; this does not make those
+accepted commands silent. No Java Task selection, completion rule, retry,
+input, path, or command action is changed by this observation.
+
+The all-item/all-command response implementation and the boundary between
+strong GET/STORE_HOME evidence and cautious terminal narration are recorded in
+[General Natural Korean Command Lifecycle Feedback Pre-Change Contract](chatclef-general-natural-korean-command-lifecycle-feedback-pre-change-contract-2026-09-07.md).
 
 ## Status Snapshot
 
