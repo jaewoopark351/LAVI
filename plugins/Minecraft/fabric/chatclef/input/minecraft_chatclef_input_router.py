@@ -204,6 +204,28 @@ class MinecraftChatClefInputRouter:
             korean_eligibility_proof
         )
 
+    def claims_routed_input_publication_custody(
+        self,
+        decision: object,
+    ) -> bool:
+        return (
+            self._component_graph.command_status_publication_custody_policy
+            .matches(decision)
+        )
+
+    def observe_routed_input_publication_failure(
+        self,
+        decision: object,
+        *,
+        stage: object,
+        exception_class: object,
+    ) -> None:
+        self._component_graph.command_status_publication_failure_adapter.observe(
+            decision,
+            stage=stage,
+            exception_class=exception_class,
+        )
+
     def _try_optional_route_owner(
         self,
         owner: object,

@@ -1,6 +1,7 @@
 #20260905_kpopmodder: Verify trusted Chat/final-Voice routing, replies, and no LLM recursion end to end.
 from __future__ import annotations
 
+import threading
 import unittest
 from types import SimpleNamespace
 
@@ -30,9 +31,57 @@ from plugins.Minecraft.common.protocol.command_result_status import (
 from plugins.Minecraft.fabric.chatclef.extension import (
     MinecraftFabricChatClefExtension,
 )
+from plugins.Minecraft.fabric.chatclef.transport.command_feedback.lifecycle import (
+    CommandFeedbackAdmissionCoordinator,
+    CommandFeedbackDescriptorFactory,
+    CommandFeedbackLifecycleFacade,
+    CommandFeedbackServerApi,
+)
+from plugins.Minecraft.fabric.chatclef.transport.fabric_chatclef_connection_ownership import (
+    FabricChatClefConnectionOwnership,
+)
 
 
 class TrustedKoreanChatVoiceIntegrationTests(unittest.TestCase):
+    def test_chat_and_final_voice_contextual_status_publish_once_without_llm(self):
+        adapter = _ActiveStatusLifecycleAdapter()
+        extension = MinecraftFabricChatClefExtension(adapter=adapter)
+        llm, pipeline, outputs = _llm_harness(extension)
+
+        chat_yields = list(
+            _chat_coordinator(llm).dispatch("지금 뭐 해?", [], "system")
+        )
+        voice_adapter = ProviderBoundInputEventAdapter(
+            provider=_voice_provider(),
+            output_callback=lambda _event: None,
+            source_resolver=InputProviderSourceResolver(),
+        )
+        voice = llm.create_trusted_voice_input_final_enqueue_coordinator(
+            voice_adapter
+        )
+        self.assertIsNotNone(voice.enqueue("지금 뭐 해?"))
+        queued = llm.input_queue_worker.input_queue.get_nowait()
+        voice_yields = list(llm.accept_queued_input(queued, [], "system"))
+
+        expected = "다이아 곡괭이 만드는 중이야"
+        self.assertEqual(1, len(chat_yields))
+        self.assertEqual(expected, chat_yields[0].content)
+        self.assertEqual("Minecraft", chat_yields[0].metadata["title"])
+        self.assertEqual([expected], voice_yields)
+        self.assertEqual([expected, expected], [item["text"] for item in outputs])
+        self.assertEqual(
+            ["command_status_query", "command_status_query"],
+            [item["route_kind"] for item in outputs],
+        )
+        self.assertEqual(
+            ["command_status", "command_status"],
+            [item["response_kind"] for item in outputs],
+        )
+        self.assertEqual([("status", True), ("status", True)], adapter.ack_calls)
+        self.assertEqual(0, pipeline.provider_calls)
+        self.assertEqual(adapter.active_identity, adapter.current_active_identity())
+        self.assertEqual(0, len(adapter.command_requests))
+
     def test_chat_and_final_voice_five_crafting_defaults_publish_once_without_llm(
         self,
     ):
@@ -444,6 +493,129 @@ class _RecordingMinecraftAdapter:
                 }
             },
         )
+
+
+class _ActiveStatusLifecycleAdapter:
+    backend_id = "fabric_chatclef"
+
+    def __init__(self) -> None:
+        self.command_requests = []
+        self.ack_calls = []
+        self._tracker = CommandFeedbackLifecycleFacade()
+        self._ownership = FabricChatClefConnectionOwnership(
+            crafting_feedback_tracker=self._tracker,
+        )
+        self._bind_running_craft()
+        original_acknowledge = (
+            self._ownership.acknowledge_command_feedback_publication
+        )
+
+        def acknowledge(permit, published):
+            self.ack_calls.append((permit.kind, published))
+            return original_acknowledge(permit, published)
+
+        self._ownership.acknowledge_command_feedback_publication = acknowledge
+        self._api = CommandFeedbackServerApi(
+            connection_ownership=self._ownership,
+            command_lock=threading.RLock(),
+            terminal_listener=SimpleNamespace(set_callback=lambda _callback: None),
+            terminal_delivery=SimpleNamespace(publish=lambda _terminal: None),
+        )
+        self.active_identity = self.current_active_identity()
+
+    def inspect_command_feedback_status(self, query):
+        return self._api.inspect_status(query)
+
+    def submit_command(self, request):
+        self.command_requests.append(request)
+        raise AssertionError("a STATUS question submitted a Minecraft command")
+
+    def current_active_identity(self):
+        active = self._ownership.active_command_owner
+        return (
+            active.session_id,
+            active.generation,
+            active.request_id,
+            active.command_message_id,
+        )
+
+    def _bind_running_craft(self) -> None:
+        factory = CommandFeedbackDescriptorFactory()
+        event = LocalChatInputEventAdapter(
+            event_id_factory=lambda: "1" * 32,
+        ).adapt("다이아 곡괭이 만들어줘")
+        descriptor = factory.from_trusted_translation(
+            event=event,
+            translation={
+                "status": "validated",
+                "executable": True,
+                "command": "get diamond_pickaxe 1",
+                "resolved_target": "diamond_pickaxe",
+                "intent": {
+                    "language": "ko",
+                    "intent_type": "get_item",
+                    "original_text": event.text,
+                    "item_phrase": "다이아 곡괭이",
+                    "quantity": 1,
+                },
+            },
+        )
+        grant = CommandFeedbackAdmissionCoordinator(
+            live_proof_validator=lambda _proof, _event: False,
+            descriptor_factory=factory,
+        ).issue_descriptor(descriptor)
+        websocket = object()
+        if (
+            grant is None
+            or not self._ownership.try_activate(
+                websocket=websocket,
+                session_id="status-session",
+            ).accepted
+            or not self._ownership.reserve_command_feedback(grant)
+        ):
+            raise AssertionError("STATUS lifecycle fixture admission failed")
+        active = self._ownership.begin_command(
+            request_id="status-request",
+            command_message_id="status-message",
+            command=descriptor.command,
+            source=descriptor.command_source,
+            metadata={
+                "input_event": {
+                    "source": descriptor.input_source,
+                    "provider_id": descriptor.provider_id,
+                    "event_kind": descriptor.event_kind,
+                    "final": True,
+                    "event_id": descriptor.event_id,
+                }
+            },
+        )
+        if active is None:
+            raise AssertionError("STATUS lifecycle fixture binding failed")
+        start_permit = self._tracker.claim_start(
+            grant,
+            {
+                "ok": True,
+                "status": {
+                    "request_id": active.request_id,
+                    "ok": True,
+                    "status": "accepted",
+                    "data": {
+                        "session_id": active.session_id,
+                        "connection_generation": active.generation,
+                        "command_message_id": active.command_message_id,
+                    },
+                },
+            },
+        )
+        if start_permit is None:
+            raise AssertionError("STATUS lifecycle START fixture failed")
+        self._tracker.acknowledge_publication(start_permit, True)
+        if not self._tracker.record_nonterminal(
+            status="running",
+            result_reason="dispatch_started",
+            evidence_sequence=1,
+        ):
+            raise AssertionError("STATUS running evidence fixture failed")
 
 
 if __name__ == "__main__":

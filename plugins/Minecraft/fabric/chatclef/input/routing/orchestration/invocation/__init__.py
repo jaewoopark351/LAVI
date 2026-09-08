@@ -12,10 +12,12 @@ from .minecraft_optional_route_owner_component_graph import (
 from .minecraft_optional_route_owner_failure_converter import (
     MinecraftOptionalRouteOwnerFailureConverter,
 )
+from .publication import AcknowledgedOptionalRouteResultGuard
 
 __all__ = (
     "MinecraftOptionalRouteOwnerInvoker",
     "MinecraftOptionalRouteOwnerCall",
     "MinecraftOptionalRouteOwnerComponentGraph",
     "MinecraftOptionalRouteOwnerFailureConverter",
+    "AcknowledgedOptionalRouteResultGuard",
 )

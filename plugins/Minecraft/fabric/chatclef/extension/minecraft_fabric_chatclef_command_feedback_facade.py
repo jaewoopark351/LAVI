@@ -63,7 +63,10 @@ class MinecraftFabricChatClefCommandFeedbackFacade:
         callback = getattr(self._adapter, "inspect_command_feedback_status", None)
         if callable(callback):
             return callback(query)
-        if getattr(query, "requested_family", "") == "item_get":
+        if (
+            getattr(query, "requested_family", "") == "item_get"
+            and getattr(query, "target_text", None) == ""
+        ):
             legacy = getattr(self._adapter, "inspect_crafting_feedback_status", None)
             if callable(legacy):
                 return legacy(None)

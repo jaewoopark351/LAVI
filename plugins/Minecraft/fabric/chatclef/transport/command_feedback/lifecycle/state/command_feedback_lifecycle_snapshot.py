@@ -1,4 +1,5 @@
 #20260907_kpopmodder: Return one immutable read-only generalized lifecycle snapshot.
+#20260908_kpopmodder: Freeze the synchronized terminal claim state used by bounded STATUS diagnostics.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -29,6 +30,7 @@ class CommandFeedbackLifecycleSnapshot:
         compare=False,
         repr=False,
     )
+    terminal_state: str = "none"
 
 
 __all__ = ("CommandFeedbackLifecycleSnapshot",)

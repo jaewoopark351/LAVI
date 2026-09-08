@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import unittest
+from types import SimpleNamespace
 
 from plugins.Minecraft.fabric.chatclef.input import (
     MinecraftChatClefInputRouteDecision,
@@ -53,6 +54,10 @@ from plugins.Minecraft.fabric.chatclef.input.routing.orchestration.invocation im
 )
 from plugins.Minecraft.fabric.chatclef.input.routing.trusted_korean import (
     TrustedKoreanInputRouteCoordinator,
+)
+from plugins.Minecraft.fabric.chatclef.transport.command_feedback.lifecycle.publication import (
+    CommandFeedbackPublicationAcknowledgement,
+    CommandFeedbackPublicationPermit,
 )
 
 
@@ -142,6 +147,43 @@ class MinecraftChatClefInputRouterDelegationTests(unittest.TestCase):
             router._ordinary_command_route_coordinator._submission_reconciliation,
         )
 
+    def test_one_status_custody_policy_is_shared_across_every_router_boundary(self):
+        router = MinecraftChatClefInputRouter(
+            extension=None,
+            log_callback=lambda _message: None,
+        )
+        graph = router._component_graph
+        policy = graph.command_status_publication_custody_policy
+
+        self.assertIs(
+            policy,
+            graph.command_status_publication_failure_adapter._custody_policy,
+        )
+        self.assertIs(
+            policy,
+            graph.command_status_route_owner._publication_custody_policy,
+        )
+        self.assertIs(
+            policy,
+            graph.trusted_input_route_coordinator
+            ._components.status_publication_custody_guard._custody_policy,
+        )
+        self.assertIs(
+            policy,
+            graph.route_ordering_coordinator
+            ._optional_route_owner_invoker._result_guard._custody_policy,
+        )
+        self.assertIs(
+            graph.command_status_emergency_decision,
+            graph.trusted_input_route_coordinator
+            ._components.status_publication_custody_guard._emergency_decision,
+        )
+        self.assertIs(
+            graph.command_status_emergency_decision,
+            graph.route_ordering_coordinator
+            ._optional_route_owner_invoker._result_guard._emergency_decision,
+        )
+
     def test_public_route_delegates_without_changing_arguments_or_result(self):
         router = MinecraftChatClefInputRouter(
             extension=None,
@@ -169,6 +211,47 @@ class MinecraftChatClefInputRouterDelegationTests(unittest.TestCase):
 
         self.assertIs(coordinator.decision, decision)
         self.assertEqual([("멈춰", evidence)], coordinator.calls)
+
+    def test_public_status_custody_ports_delegate_to_the_shared_policy_and_adapter(self):
+        router = MinecraftChatClefInputRouter(
+            extension=None,
+            log_callback=lambda _message: None,
+        )
+        records = []
+        acknowledgement = CommandFeedbackPublicationAcknowledgement(
+            permit=CommandFeedbackPublicationPermit(
+                lifecycle_token=object(),
+                sequence=1,
+                kind=CommandFeedbackPublicationPermit.STATUS,
+            ),
+            callback=lambda _permit, _published: True,
+            publication_failure_diagnostic_custody=SimpleNamespace(
+                record_once=lambda stage, exception_class: records.append(
+                    (stage, exception_class)
+                )
+            ),
+        )
+        decision = MinecraftChatClefInputRouteDecision.handled_result(
+            reason="minecraft_command_status_query",
+            response_text="작업 중이야",
+            route_kind="command_status_query",
+            response_kind="command_status",
+            response_publication_acknowledgement=acknowledgement,
+        )
+
+        self.assertTrue(
+            router.claims_routed_input_publication_custody(decision)
+        )
+        router.observe_routed_input_publication_failure(
+            decision,
+            stage="dispatcher_initial_decision_resolution",
+            exception_class="RuntimeError",
+        )
+
+        self.assertEqual(
+            [("dispatcher_initial_decision_resolution", "RuntimeError")],
+            records,
+        )
 
     def test_ordinary_route_locked_delegates_exact_inputs_to_pipeline(self):
         router = MinecraftChatClefInputRouter(

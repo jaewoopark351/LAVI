@@ -91,7 +91,7 @@ class CommandFeedbackAdmissionGrant:
             command=str(values.get("command") or "get diamond_pickaxe 1"),
             command_source=str(values.get("command_source") or "lavi_chat_ui"),
             lifecycle_kind="task",
-            phrase_profile_id="get_item_phrase_v1",
+            phrase_profile_id="get_phrase_v1",
             evidence_profile_id="get_terminal_evidence_v1",
             rollout_state="verified",
             event_id=str(values.get("event_id") or ""),

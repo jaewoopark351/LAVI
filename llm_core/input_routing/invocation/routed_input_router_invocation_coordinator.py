@@ -11,10 +11,26 @@ class RoutedInputRouterInvocationCoordinator:
     def set_router(self, router) -> None:
         self._router = router
 
+    def capture_router(self):
+        return self._router
+
     def invoke(self, message, *, trusted_ingress_evidence=None):
-        route = getattr(self._router, "route", None)
-        trusted_route = getattr(
+        return self.invoke_captured(
             self._router,
+            message,
+            trusted_ingress_evidence=trusted_ingress_evidence,
+        )
+
+    def invoke_captured(
+        self,
+        router: object,
+        message,
+        *,
+        trusted_ingress_evidence=None,
+    ):
+        route = getattr(router, "route", None)
+        trusted_route = getattr(
+            router,
             "route_trusted_user_input",
             None,
         )

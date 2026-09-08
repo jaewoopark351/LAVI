@@ -55,15 +55,15 @@ class CommandStatusMatchingAndRouteTests(unittest.TestCase):
         self.assertTrue(query.addressed)
         self.assertTrue(self.resolver.resolve(query, self.goto).claimed)
 
-    def test_prefixless_generic_any_falls_through(self):
+    def test_prefixless_generic_any_is_a_contextual_claim_candidate(self):
         query = self.classifier.classify("뭐 하고 있어?")
 
-        self.assertIsNone(query)
+        self.assertEqual(CommandStatusQuery("any", False), query)
 
-    def test_prefixless_explicit_family_without_target_falls_through(self):
+    def test_prefixless_explicit_family_is_a_contextual_claim_candidate(self):
         query = self.classifier.classify("뭐 만드는 중이야?")
 
-        self.assertIsNone(query)
+        self.assertEqual(CommandStatusQuery("item_get", False), query)
 
     def test_addressing_does_not_override_family_or_target_mismatch(self):
         family_query = self.classifier.classify("마크 뭐 만드는 중이야?")
@@ -81,6 +81,9 @@ class CommandStatusMatchingAndRouteTests(unittest.TestCase):
         owner = object()
         coordinator = CommandFeedbackStatusCoordinator(
             evidence_profiles=CommandTerminalEvidenceProfileRegistry(),
+            descriptor_validator=SimpleNamespace(
+                accepts=lambda _value, **_context: True
+            ),
         )
         state = SimpleNamespace(
             context=SimpleNamespace(descriptor=self.craft, owner_token=owner),
@@ -155,6 +158,9 @@ class CommandStatusMatchingAndRouteTests(unittest.TestCase):
         coordinator = CommandFeedbackStatusCoordinator(
             evidence_profiles=SimpleNamespace(),
             target_resolver=resolver,
+            descriptor_validator=SimpleNamespace(
+                accepts=lambda _value, **_context: True
+            ),
         )
         owner = object()
         state = SimpleNamespace(
@@ -186,6 +192,8 @@ class CommandStatusMatchingAndRouteTests(unittest.TestCase):
             target_item="diamond_pickaxe",
             requested_count=1,
             result_reason="dispatch_started",
+            owner_present=True,
+            terminal_state="unclaimed",
         )
         owner = CommandStatusRouteOwner(
             extension=SimpleNamespace(
@@ -280,7 +288,13 @@ class CommandStatusMatchingAndRouteTests(unittest.TestCase):
                     event_id="b" * 32,
                     fallback_payload="지금 뭐 하고 있어?",
                 )
-                self.assertIsNone(owner.try_route(prefixless, prefixless.event_id))
+                fallthrough = owner.try_route(prefixless, prefixless.event_id)
+                self.assertIsNotNone(fallthrough)
+                self.assertFalse(fallthrough.handled)
+                self.assertEqual(
+                    "command_status_conversational_fallthrough",
+                    fallthrough.reason,
+                )
 
 
 class _RejectingResolver:
@@ -314,6 +328,7 @@ def _descriptor(
         player_name="",
         coordinates=coordinates,
         detail_level="typed",
+        response_lifecycle_kind="finite_task",
     )
 
 

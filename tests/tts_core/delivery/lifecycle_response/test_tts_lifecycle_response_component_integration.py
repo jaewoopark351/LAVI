@@ -47,6 +47,55 @@ class TtsLifecycleResponseComponentIntegrationTests(unittest.TestCase):
         self.assertNotIn("presentation", queued)
         self.assertNotIn("command_name", queued["text"])
 
+    def test_current_input_status_enqueues_and_observes_one_exact_playback(self):
+        tts = self._tts()
+        enqueue_receipts = []
+        playback_receipts = []
+        tts.add_lifecycle_response_enqueue_receipt_listener(
+            enqueue_receipts.append
+        )
+        tts.add_lifecycle_response_playback_receipt_listener(
+            playback_receipts.append
+        )
+        payload = {
+            "text": "다이아 곡괭이 만드는 중이야",
+            "response_generation": 11,
+            "event_id": "9" * 32,
+            "source": "minecraft_chatclef",
+            "route_kind": "command_status_query",
+            "response_kind": "command_status",
+            "delivery_mode": "current_input",
+            "presentation": {
+                "source_kind": "minecraft",
+                "badge_label": "Minecraft",
+                "log": '{"command_name":"get"}',
+            },
+        }
+
+        receipt = tts.receive_input(payload)
+        queued = tts.input_queue.get_nowait()
+        playback = tts.observe_lifecycle_response_playback(
+            event_id=queued["lifecycle_event_id"],
+            route_kind=queued["lifecycle_route_kind"],
+            response_kind=queued["lifecycle_response_kind"],
+            delivery_token=queued["lifecycle_delivery_token"],
+            item_index=queued["lifecycle_item_index"],
+            played=True,
+            reason="played",
+        )
+
+        self.assertTrue(receipt.accepted)
+        self.assertEqual(1, receipt.item_count)
+        self.assertEqual(1, len(enqueue_receipts))
+        self.assertIs(receipt, enqueue_receipts[0])
+        self.assertEqual(1, len(playback_receipts))
+        self.assertIs(playback, playback_receipts[0])
+        self.assertTrue(playback.observed)
+        self.assertEqual(receipt.item_count, playback.played_item_count)
+        self.assertEqual("다이아 곡괭이 만드는 중이야", queued["text"])
+        self.assertNotIn("Minecraft", queued["text"])
+        self.assertNotIn("command_name", queued["text"])
+
     def test_non_preempting_payload_enqueues_once_without_speaking_badge(self):
         tts = self._tts()
         tts.latest_response_generation = 9

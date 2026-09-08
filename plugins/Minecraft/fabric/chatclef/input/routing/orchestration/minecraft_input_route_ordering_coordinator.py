@@ -20,6 +20,8 @@ class MinecraftInputRouteOrderingCoordinator:
         auto_deposit_trust_route_coordinator,
         ordinary_command_route_coordinator,
         failure_handler,
+        status_publication_custody_policy=None,
+        status_publication_emergency_decision=None,
     ):
         self._input_event_normalizer = input_event_normalizer
         self._intent_gate = intent_gate
@@ -51,6 +53,12 @@ class MinecraftInputRouteOrderingCoordinator:
                 ordinary_command_route_coordinator
             ),
             failure_handler=failure_handler,
+            status_publication_custody_policy=(
+                status_publication_custody_policy
+            ),
+            status_publication_emergency_decision=(
+                status_publication_emergency_decision
+            ),
         )
         self._input_gate_inspector = self._component_graph.input_gate_inspector
         self._optional_route_owner_invoker = (

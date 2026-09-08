@@ -53,6 +53,16 @@ from plugins.Minecraft.fabric.chatclef.input.status.command_lifecycle import (
     CommandStatusQueryClassifier,
     CommandStatusRouteOwner,
 )
+from plugins.Minecraft.fabric.chatclef.input.status.command_lifecycle.diagnostics import (
+    CommandStatusPublicationFailureAdapter,
+    CommandStatusRouteFailureDiagnostics,
+)
+from plugins.Minecraft.fabric.chatclef.input.status.command_lifecycle.publication import (
+    CommandStatusPublicationCustodyPolicy,
+)
+from plugins.Minecraft.fabric.chatclef.input.status.command_lifecycle.routing import (
+    COMMAND_STATUS_EMERGENCY_DECISION,
+)
 from plugins.Minecraft.fabric.chatclef.response.command_lifecycle import (
     CommandLifecycleResponseRenderer,
 )
@@ -156,6 +166,21 @@ class MinecraftChatClefRouterComponentGraph:
         self.item_command_rejection_evidence_parser = (
             ItemCommandTranslationRejectionEvidenceParser()
         )
+        #20260908_kpopmodder: Share one STATUS acknowledgement-custody policy across every publication boundary.
+        self.command_status_publication_custody_policy = (
+            CommandStatusPublicationCustodyPolicy()
+        )
+        self.command_status_emergency_decision = (
+            COMMAND_STATUS_EMERGENCY_DECISION
+        )
+        self.command_status_publication_failure_adapter = (
+            CommandStatusPublicationFailureAdapter(
+                custody_policy=self.command_status_publication_custody_policy,
+            )
+        )
+        self.command_status_route_failure_diagnostics = (
+            CommandStatusRouteFailureDiagnostics(self.router_logger.log)
+        )
         self.korean_eligibility_admission = (
             korean_eligibility_admission
             or KoreanChatMicrophoneEligibilityAdmission()
@@ -173,6 +198,12 @@ class MinecraftChatClefRouterComponentGraph:
                     proof
                 )
             ),
+            status_publication_custody_policy=(
+                self.command_status_publication_custody_policy
+            ),
+            status_publication_emergency_decision=(
+                self.command_status_emergency_decision
+            ),
         )
         self.stop_control_route_owner = self._dependency_resolver.stop_route_owner(
             provided=stop_control_route_owner,
@@ -189,6 +220,12 @@ class MinecraftChatClefRouterComponentGraph:
                 ),
                 classifier=CommandStatusQueryClassifier(),
                 response_renderer=CommandLifecycleResponseRenderer(),
+                failure_diagnostics=(
+                    self.command_status_route_failure_diagnostics
+                ),
+                publication_custody_policy=(
+                    self.command_status_publication_custody_policy
+                ),
             )
         )
         self.crafting_status_route_owner = self.command_status_route_owner
@@ -267,6 +304,12 @@ class MinecraftChatClefRouterComponentGraph:
                 self.ordinary_command_route_coordinator
             ),
             failure_handler=self.failure_handler,
+            status_publication_custody_policy=(
+                self.command_status_publication_custody_policy
+            ),
+            status_publication_emergency_decision=(
+                self.command_status_emergency_decision
+            ),
         )
 
     def install_compatibility_seams(self, owner: object) -> None:

@@ -17,10 +17,14 @@ class MinecraftInputRouteOrderingComponentGraph:
         auto_deposit_trust_route_coordinator,
         ordinary_command_route_coordinator,
         failure_handler,
+        status_publication_custody_policy=None,
+        status_publication_emergency_decision=None,
     ) -> None:
         self.input_gate_inspector = MinecraftInputGateInspector(intent_gate)
         self.optional_route_owner_invoker = MinecraftOptionalRouteOwnerInvoker(
-            failure_handler
+            failure_handler,
+            publication_custody_policy=status_publication_custody_policy,
+            emergency_decision=status_publication_emergency_decision,
         )
         self.crafting_dispatch_cleanup = MinecraftGenericCraftingDispatchCleanup(
             generic_crafting_defaults_route_owner

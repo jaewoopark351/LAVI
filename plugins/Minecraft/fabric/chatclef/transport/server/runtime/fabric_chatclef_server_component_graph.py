@@ -4,6 +4,10 @@ from __future__ import annotations
 import threading
 
 from plugins.Minecraft.fabric.chatclef.input.stop import StopControlClaimRegistry
+from plugins.Minecraft.fabric.chatclef.input.status.command_lifecycle.diagnostics import (
+    CommandStatusRouteFailureFormatter,
+    CommandStatusRouteFailureProjector,
+)
 from plugins.Minecraft.fabric.chatclef.response.command_lifecycle import (
     CommandLifecycleResponseRenderer,
 )
@@ -36,6 +40,10 @@ from ...command_feedback.crafting import (
 from ...command_feedback.lifecycle import (
     CommandFeedbackServerApi,
     CommandTerminalEvidenceFailureReporter,
+)
+from ...command_feedback.lifecycle.status import (
+    CommandStatusFailureDiagnosticCustodyFactory,
+    CommandStatusPublicationHandoffFailureObserver,
 )
 from ...command_feedback.lifecycle.terminal import CommandStopTerminalArbitrator
 from ..fabric_chatclef_client_handler import FabricChatClefClientHandler
@@ -111,6 +119,33 @@ class FabricChatClefServerComponentGraph:
                 terminal_delivery=self.crafting_feedback_terminal_delivery,
             )
         )
+        #20260908_kpopmodder: Freeze STATUS diagnostics before post-lock custody handoff.
+        self.command_status_failure_diagnostic_projector = (
+            CommandStatusRouteFailureProjector()
+        )
+        self.command_status_failure_diagnostic_formatter = (
+            CommandStatusRouteFailureFormatter()
+        )
+        def status_failure_record_callback(record):
+            diagnostics.warning(
+                self.command_status_failure_diagnostic_formatter.format(record)
+            )
+        self.command_status_failure_diagnostic_custody_factory = (
+            CommandStatusFailureDiagnosticCustodyFactory(
+                projection_callback=(
+                    self.command_status_failure_diagnostic_projector.project
+                ),
+                record_callback=status_failure_record_callback,
+            )
+        )
+        self.command_status_publication_handoff_failure_observer = (
+            CommandStatusPublicationHandoffFailureObserver(
+                projection_callback=(
+                    self.command_status_failure_diagnostic_projector.project
+                ),
+                record_callback=status_failure_record_callback,
+            )
+        )
         self.command_result_handler = FabricChatClefCommandResultHandler(
             connection_ownership=self.connection_ownership,
             command_lock=self.command_lock,
@@ -127,6 +162,12 @@ class FabricChatClefServerComponentGraph:
             command_lock=self.command_lock,
             terminal_listener=self.crafting_feedback_terminal_listener,
             terminal_delivery=self.crafting_feedback_terminal_publication,
+            status_publication_failure_diagnostic_custody_factory=(
+                self.command_status_failure_diagnostic_custody_factory.create
+            ),
+            status_publication_handoff_failure_observer=(
+                self.command_status_publication_handoff_failure_observer.observe
+            ),
         )
         self.crafting_feedback_api = self.command_feedback_api
         self.stop_control_claim_registry = StopControlClaimRegistry()

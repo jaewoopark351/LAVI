@@ -20,6 +20,8 @@ class TrustedKoreanInputRouteCoordinator:
         feature_admission_projector,
         route_callback,
         close_feature_dispatch_callback,
+        status_publication_custody_policy=None,
+        status_publication_emergency_decision=None,
     ):
         self._components = TrustedKoreanInputRouteComponentGraph(
             owner=owner,
@@ -30,6 +32,12 @@ class TrustedKoreanInputRouteCoordinator:
             feature_admission_projector=feature_admission_projector,
             route_callback=route_callback,
             close_feature_dispatch_callback=close_feature_dispatch_callback,
+            status_publication_custody_policy=(
+                status_publication_custody_policy
+            ),
+            status_publication_emergency_decision=(
+                status_publication_emergency_decision
+            ),
         )
 
     def route(
@@ -60,26 +68,87 @@ class TrustedKoreanInputRouteCoordinator:
             return decision
 
         decision = None
+        custody = None
+        failure = None
         try:
             decision = components.route_invoker.route_trusted(
                 admission.event,
                 admission.proof,
             )
-            decision = components.feedback_renderer.render(decision)
-            decision = components.response_authorizer.authorize(
-                decision=decision,
-                event=admission.event,
-                proof=admission.proof,
-            )
-            return decision
+            custody = components.status_publication_custody_guard.claim(decision)
+            try:
+                decision = components.feedback_renderer.render(decision)
+            except Exception as error:
+                if custody is None:
+                    raise
+                failure = components.status_publication_custody_guard.capture_exception(
+                    custody,
+                    failure,
+                    stage="trusted_feedback_rendering",
+                    error=error,
+                )
+            if failure is None:
+                try:
+                    decision = components.response_authorizer.authorize(
+                        decision=decision,
+                        event=admission.event,
+                        proof=admission.proof,
+                    )
+                except Exception as error:
+                    if custody is None:
+                        raise
+                    failure = (
+                        components.status_publication_custody_guard.capture_exception(
+                            custody,
+                            failure,
+                            stage="response_capability_authorization",
+                            error=error,
+                        )
+                    )
         finally:
-            self.log_feature_admission(
-                admission.event,
-                eligibility_reason=admission.reason,
-                proof_issued=True,
-                route_decision=decision,
-            )
-            components.proof_lifecycle_closer.close(admission.proof)
+            if custody is None:
+                self.log_feature_admission(
+                    admission.event,
+                    eligibility_reason=admission.reason,
+                    proof_issued=True,
+                    route_decision=decision,
+                )
+                components.proof_lifecycle_closer.close(admission.proof)
+            else:
+                try:
+                    try:
+                        self.log_feature_admission(
+                            admission.event,
+                            eligibility_reason=admission.reason,
+                            proof_issued=True,
+                            route_decision=decision,
+                        )
+                    except Exception as error:
+                        failure = (
+                            components.status_publication_custody_guard.capture_exception(
+                                custody,
+                                failure,
+                                stage="feature_admission_finalization",
+                                error=error,
+                            )
+                        )
+                finally:
+                    try:
+                        components.proof_lifecycle_closer.close(admission.proof)
+                    except Exception as error:
+                        failure = (
+                            components.status_publication_custody_guard.capture_exception(
+                                custody,
+                                failure,
+                                stage="proof_lifecycle_close",
+                                error=error,
+                            )
+                        )
+        return components.status_publication_custody_guard.complete(
+            custody=custody,
+            decision=decision,
+            failure=failure,
+        )
 
     def is_live_proof(self, proof: object, event: object) -> bool:
         return self._components.proof_validator.is_live(proof, event)

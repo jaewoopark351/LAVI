@@ -11,7 +11,14 @@ class RoutedInputExternalResponsePublisher:
         self._response_publisher_callback = response_publisher_callback
         self._diagnostics = diagnostics
 
-    def publish(self, *, message, decision, response_text: str):
+    def publish(
+        self,
+        *,
+        message,
+        decision,
+        response_text: str,
+        raise_failure: bool = False,
+    ):
         try:
             publisher = self._response_publisher_callback()
             route_kind = str(
@@ -86,6 +93,8 @@ class RoutedInputExternalResponsePublisher:
                 ),
             )
         except Exception:
+            if raise_failure:
+                raise
             self._diagnostics.log_failure("publication")
             return None
 

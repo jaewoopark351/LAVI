@@ -13,6 +13,7 @@ class CommandFeedbackPublicationAcknowledgement:
         permit: CommandFeedbackPublicationPermit,
         callback,
         coalesced_terminal_selector=None,
+        publication_failure_diagnostic_custody=None,
     ) -> None:
         if type(permit) is not CommandFeedbackPublicationPermit:
             raise TypeError("command feedback publication permit must be exact")
@@ -26,6 +27,10 @@ class CommandFeedbackPublicationAcknowledgement:
         self._permit = permit
         self._callback = callback
         self._coalesced_terminal_selector = coalesced_terminal_selector
+        #20260908_kpopmodder: Carry opaque STATUS failure custody without interpreting it.
+        self._publication_failure_diagnostic_custody = (
+            publication_failure_diagnostic_custody
+        )
         self._lock = threading.Lock()
         self._spent = False
         self._wait_claimed = False
@@ -34,6 +39,10 @@ class CommandFeedbackPublicationAcknowledgement:
     @property
     def kind(self) -> str:
         return self._permit.kind
+
+    @property
+    def publication_failure_diagnostic_custody(self):
+        return self._publication_failure_diagnostic_custody
 
     def wait_until_ready(self, *, timeout_seconds: float) -> bool:
         with self._lock:

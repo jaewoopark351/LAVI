@@ -8,6 +8,7 @@ from .outcomes import RoutedInputDispatchOutcomeFactory
 from .publication import (
     RoutedInputExternalResponsePublisher,
     RoutedInputPublicationAcknowledger,
+    RoutedInputPublicationCustodyGuard,
 )
 from .yielding import RoutedInputChatUiYieldAdapter
 
@@ -30,14 +31,18 @@ class RoutedInputDispatchComponentGraph:
         self.decision_resolver = RoutedInputDecisionResolver(
             self.outcome_factory
         )
+        self.publication_acknowledger = RoutedInputPublicationAcknowledger(
+            self.diagnostics
+        )
+        self.publication_custody_guard = RoutedInputPublicationCustodyGuard(
+            publication_acknowledger=self.publication_acknowledger,
+            router=router,
+        )
         self.external_response_publisher = (
             RoutedInputExternalResponsePublisher(
                 response_publisher_callback=response_publisher_callback,
                 diagnostics=self.diagnostics,
             )
-        )
-        self.publication_acknowledger = RoutedInputPublicationAcknowledger(
-            self.diagnostics
         )
         self.chat_ui_yield_adapter = RoutedInputChatUiYieldAdapter(
             response_publisher_callback

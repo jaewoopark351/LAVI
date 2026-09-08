@@ -169,6 +169,24 @@ class _CraftingFeedbackAdapter:
             return False
         return grant.bind()
 
+    def inspect_command_feedback_status(self, _query):
+        descriptor = self._grant.descriptor if self._grant is not None else None
+        return CraftingFeedbackStatusSnapshot(
+            state=CraftingFeedbackStatusSnapshot.RUNNING,
+            descriptor=descriptor,
+            command_name=(
+                descriptor.command_name if descriptor is not None else None
+            ),
+            requested_family=(
+                descriptor.requested_family if descriptor is not None else None
+            ),
+            target_item="diamond_pickaxe",
+            requested_count=1,
+            result_reason="dispatch_started",
+            owner_present=descriptor is not None,
+            terminal_state="unclaimed" if descriptor is not None else "none",
+        )
+
     def inspect_crafting_feedback_status(self, _target_item):
         return CraftingFeedbackStatusSnapshot(
             state=CraftingFeedbackStatusSnapshot.RUNNING,

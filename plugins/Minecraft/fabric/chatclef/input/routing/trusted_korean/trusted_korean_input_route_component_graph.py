@@ -13,6 +13,9 @@ from plugins.Minecraft.fabric.chatclef.input.routing.trusted_korean.response imp
 )
 from plugins.Minecraft.fabric.chatclef.input.routing.trusted_korean.trusted_korean_route_invoker import TrustedKoreanRouteInvoker
 from plugins.Minecraft.fabric.chatclef.input.routing.trusted_korean.trusted_korean_proof_validator import TrustedKoreanProofValidator
+from plugins.Minecraft.fabric.chatclef.input.routing.trusted_korean.publication.status import (
+    CommandStatusPublicationCustodyGuard,
+)
 
 
 class TrustedKoreanInputRouteComponentGraph:
@@ -27,6 +30,8 @@ class TrustedKoreanInputRouteComponentGraph:
         feature_admission_projector,
         route_callback,
         close_feature_dispatch_callback,
+        status_publication_custody_policy=None,
+        status_publication_emergency_decision=None,
     ):
         self.admission = TrustedKoreanInputAdmission(
             owner=owner,
@@ -37,6 +42,12 @@ class TrustedKoreanInputRouteComponentGraph:
         self.route_invoker = TrustedKoreanRouteInvoker(route_callback)
         self.feedback_renderer = TrustedKoreanFeedbackRenderer(feedback_facade)
         self.response_authorizer = TrustedKoreanResponseAuthorizer(owner=owner)
+        self.status_publication_custody_guard = (
+            CommandStatusPublicationCustodyGuard(
+                custody_policy=status_publication_custody_policy,
+                emergency_decision=status_publication_emergency_decision,
+            )
+        )
         self.proof_lifecycle_closer = TrustedKoreanProofLifecycleCloser(
             close_feature_dispatch_callback
         )

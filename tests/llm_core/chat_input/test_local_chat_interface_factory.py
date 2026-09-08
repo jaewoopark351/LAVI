@@ -172,6 +172,90 @@ class LocalChatInterfaceFactoryTests(unittest.TestCase):
         self.assertIsNone(next_completed["iterator"])
         self.assertEqual(["STOP", "GET"], callback_messages)
 
+    def test_nonempty_minecraft_status_round_trips_and_allows_next_submit(self):
+        callback_messages = []
+
+        def predict(event, _history, _system_prompt):
+            callback_messages.append(event.text)
+            yield gr.ChatMessage(
+                content="다이아 곡괭이 만드는 중이야",
+                metadata={"title": "Minecraft"},
+            )
+
+        entrypoint = self._entrypoint(predict)
+
+        async def submit_twice():
+            chat = self._chat_interface(entrypoint)
+            first = [
+                output
+                async for output in chat._stream_fn(
+                    "지금 뭐 해?",
+                    [],
+                    "system",
+                )
+            ]
+            second = [
+                output
+                async for output in chat._stream_fn(
+                    "다음 질문",
+                    first[-1][1],
+                    "system",
+                )
+            ]
+            return chat, first, second
+
+        chat, first, second = asyncio.run(submit_twice())
+
+        self.assertEqual(
+            ["지금 뭐 해?", "다음 질문"],
+            callback_messages,
+        )
+        self.assertEqual(1, len(first))
+        self.assertEqual(1, len(second))
+        self.assertEqual(
+            ["user", "assistant"],
+            [item["role"] for item in first[-1][1]],
+        )
+        self.assertEqual(
+            ["user", "assistant", "user", "assistant"],
+            [item["role"] for item in second[-1][1]],
+        )
+        self.assertEqual(
+            "다이아 곡괭이 만드는 중이야",
+            second[-1][1][-1]["content"],
+        )
+        self.assertEqual(
+            "Minecraft",
+            second[-1][1][-1]["metadata"]["title"],
+        )
+        postprocessed = chat.chatbot.postprocess(second[-1][1])
+        round_tripped = type(postprocessed).model_validate_json(
+            postprocessed.model_dump_json()
+        )
+        preprocessed = chat.chatbot.preprocess(round_tripped)
+        assistants = [
+            item for item in preprocessed if item["role"] == "assistant"
+        ]
+        self.assertEqual(2, len(assistants))
+        self.assertEqual(
+            [
+                [
+                    {
+                        "text": "다이아 곡괭이 만드는 중이야",
+                        "type": "text",
+                    }
+                ],
+                [
+                    {
+                        "text": "다이아 곡괭이 만드는 중이야",
+                        "type": "text",
+                    }
+                ],
+            ],
+            [item["content"] for item in assistants],
+        )
+        self.assertTrue(all(item["content"] for item in preprocessed))
+
     def test_factory_rejects_non_generator_prediction_method(self):
         class NonStreamingEntrypoint:
             def predict(self, _message, _history, _system_prompt):

@@ -33,7 +33,12 @@ class RoutedInputPublicationAcknowledger:
             self.acknowledge(decision, published=False)
         return ready
 
-    def resolve_ready_decision(self, decision: object):
+    def resolve_ready_decision(
+        self,
+        decision: object,
+        *,
+        custody_protected: bool = False,
+    ):
         acknowledgement = getattr(
             decision,
             "response_publication_acknowledgement",
@@ -49,10 +54,13 @@ class RoutedInputPublicationAcknowledger:
         try:
             resolved = resolver(decision)
         except Exception:
+            if custody_protected:
+                raise
             self._diagnostics.log_failure("publication_ready_resolution")
             return None
         if resolved is None:
-            self._diagnostics.log_failure("publication_ready_resolution")
+            if not custody_protected:
+                self._diagnostics.log_failure("publication_ready_resolution")
             return None
         if (
             getattr(
@@ -62,6 +70,8 @@ class RoutedInputPublicationAcknowledger:
             )
             is not acknowledgement
         ):
+            if custody_protected:
+                return resolved
             self._diagnostics.log_failure("publication_ready_resolution")
             return None
         return resolved
