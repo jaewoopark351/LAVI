@@ -1,70 +1,81 @@
 #20260818_kpopmodder: Own matching Fabric ChatClef command-result acceptance.
 from __future__ import annotations
 
-import json
-from typing import Any, Mapping
+from typing import Any
 
-from plugins.Minecraft.common.dto.command_result_dto import CommandResultDTO
+from .result_handling.delivery import (
+    FabricChatClefCommandResultTerminalDelivery,
+)
+from .result_handling.diagnostics import (
+    FabricChatClefCommandResultDiagnostics,
+)
+from .result_handling.lifecycle import (
+    FabricChatClefCommandResultLifecycleProjector,
+)
+from .result_handling.parsing import FabricChatClefCommandResultParser
 
 
 class FabricChatClefCommandResultHandler:
-    def __init__(self, *, connection_ownership, command_lock, diagnostics):
+    def __init__(
+        self,
+        *,
+        connection_ownership,
+        command_lock,
+        diagnostics,
+        crafting_feedback_result_coordinator=None,
+        crafting_feedback_terminal_delivery=None,
+    ):
         self._connection_ownership = connection_ownership
         self._command_lock = command_lock
-        self._diagnostics = diagnostics
+        #20260907_kpopmodder: Keep this facade as result-flow orchestration only.
+        self._result_parser = FabricChatClefCommandResultParser()
+        self._result_diagnostics = FabricChatClefCommandResultDiagnostics(
+            diagnostics
+        )
+        self._lifecycle_projector = FabricChatClefCommandResultLifecycleProjector(
+            crafting_feedback_result_coordinator
+        )
+        self._terminal_delivery = FabricChatClefCommandResultTerminalDelivery(
+            crafting_feedback_terminal_delivery
+        )
 
     def handle(self, websocket: Any, envelope: Any) -> None:
-        raw_payload = (
-            dict(envelope.payload) if isinstance(envelope.payload, Mapping) else {}
-        )
+        raw_payload = self._result_parser.extract_payload(envelope)
         try:
-            result = CommandResultDTO.from_mapping(raw_payload)
+            result = self._result_parser.parse_payload(raw_payload)
         except Exception as error:
-            self._diagnostics.warning(
-                "ignored malformed command result "
-                f"error={type(error).__name__}: {error}"
-            )
+            self._result_diagnostics.report_malformed(error)
             return
+
         with self._command_lock:
+            #20260907_kpopmodder: Freeze lifecycle facts inside the accepted-result transaction.
+            expected_active = self._connection_ownership.active_command_owner
             outcome = self._connection_ownership.accept_result_and_reconcile(
                 websocket=websocket,
                 envelope=envelope,
                 result=result,
                 raw_payload=raw_payload,
             )
+            terminal_projection = self._lifecycle_projector.capture(
+                websocket=websocket,
+                envelope=envelope,
+                result=result,
+                outcome=outcome,
+                expected_active=expected_active,
+            )
+
+        # Rendering deliberately occurs after releasing command_lock.
+        terminal_response = self._lifecycle_projector.render(terminal_projection)
         if not outcome.accepted:
-            self._diagnostics.warning(
-                "ignored command result "
-                f"request={result.request_id} "
-                f"status={result.status.value} "
-                f"reason={outcome.reason} "
-                f"session={envelope.session_id} "
-                f"correlation={envelope.correlation_id} "
-                f"before={_compact_json(outcome.before_snapshot)} "
-                f"after={_compact_json(outcome.after_snapshot)} "
-                f"data={_compact_json(result.data)}"
-                f" audit={_compact_json(outcome.audit)}"
+            self._result_diagnostics.report_rejected(
+                envelope=envelope,
+                result=result,
+                outcome=outcome,
             )
             return
-        self._diagnostics.info(
-            "command result "
-            f"request={result.request_id} status={result.status.value} ok={result.ok} "
-            f"error_code={result.error_code} "
-            f"message={result.message} "
-            f"before={_compact_json(outcome.before_snapshot)} "
-            f"after={_compact_json(outcome.after_snapshot)} "
-            f"data={_compact_json(result.data)}"
-            f" audit={_compact_json(outcome.audit)}"
+        self._result_diagnostics.report_accepted(
+            result=result,
+            outcome=outcome,
         )
-
-
-def _compact_json(payload: Any) -> str:
-    try:
-        return json.dumps(
-            payload,
-            ensure_ascii=False,
-            sort_keys=True,
-            separators=(",", ":"),
-        )
-    except Exception as error:
-        return f"<json failed {type(error).__name__}: {error}>"
+        #20260907_kpopmodder: Deliver outside the lock through the fault-contained publisher.
+        self._terminal_delivery.publish(terminal_response)
