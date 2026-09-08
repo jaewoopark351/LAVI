@@ -3,7 +3,6 @@ package lavi.minecraft.diagnostics.container.home.timeout.candidate;
 import adris.altoclef.util.Dimension;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 import lavi.minecraft.diagnostics.container.home.timeout.StoreHomeTimeoutDiagnostics;
-import lavi.minecraft.diagnostics.container.home.timeout.state.StoreHomeDiagnosticCandidateProgressLifecycle;
 import lavi.minecraft.task.container.deposit.auto.trusted.AutoDepositTrustedDestination;
 import lavi.minecraft.task.container.deposit.auto.trusted.AutoDepositTrustedDestinationCandidate;
 import lavi.minecraft.task.container.deposit.auto.trusted.interaction.AutoDepositExactOpenContainerBinding;
@@ -31,18 +30,14 @@ import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 //20260902_kpopmodder: Characterize ordered STORE_HOME candidate boundary emission.
@@ -72,22 +67,17 @@ class StoreHomeCandidateBoundaryDiagnosticsContractTest {
     }
 
     @Test
-    void candidateBoundariesPreserveSequencePayloadAndRejectionClear()
-            throws Exception {
+    void candidateBoundariesPreserveSequencePayloadAndRejectionClear() {
         StoreHomeTimeoutPolicy policy = StoreHomeTimeoutPolicy.standard();
         StoreHomeTimeoutDiagnostics diagnostics = diagnostics(91L, policy);
         StoreHomeOperationProgress operation =
                 StoreHomeOperationProgress.start(91L);
-        StoreHomeDiagnosticCandidateProgressLifecycle progress =
-                candidateProgress(diagnostics);
         AutoDepositTrustedDestinationCandidate first = candidate(1);
         AutoDepositTrustedDestinationCandidate second = candidate(2);
         AutoDepositTrustedDestinationCandidate third = candidate(3);
         StoreHomeCandidateAttempt secondAttempt = attempt(second);
         StoreHomeCandidateAttempt thirdAttempt = attempt(third);
         HomeStorageContainerSession thirdSession = session(third, 7L);
-        AtomicBoolean activeDuringRejectionEmission = new AtomicBoolean();
-
         String output = captureOutput(() -> {
             diagnostics.recordCandidateCatalog(3);
             diagnostics.recordCandidateRejectedBeforeAttempt(
@@ -116,7 +106,6 @@ class StoreHomeCandidateBoundaryDiagnosticsContractTest {
                     null, second, null, 2400, 1,
                     "candidate_navigation_no_progress", "UNAVAILABLE", null
             );
-            assertNull(progress.activeCandidate());
             diagnostics.recordCandidateStarted(
                     null, null, StoreHomePhase.OPEN_AND_BIND_CANDIDATE, operation,
                     candidateObservation(policy, 0, 0, 0,
@@ -129,13 +118,6 @@ class StoreHomeCandidateBoundaryDiagnosticsContractTest {
                             "OPEN_AND_BIND_CANDIDATE"),
                     null, thirdAttempt, thirdSession, 1
             );
-        }, line -> {
-            if (line.contains(CANDIDATE_REJECTED)
-                    && line.contains("rejectionStage=ACTIVE_ATTEMPT")) {
-                activeDuringRejectionEmission.set(
-                        progress.activeCandidate() != null
-                );
-            }
         });
 
         assertEventOrder(
@@ -153,8 +135,6 @@ class StoreHomeCandidateBoundaryDiagnosticsContractTest {
         assertEquals(2, eventLines(output, CANDIDATE_STARTED).size());
         assertEquals(1, eventLines(output, CANDIDATE_TIMEOUT).size());
         assertEquals(1, eventLines(output, CANDIDATE_ACTIVATED).size());
-        assertTrue(activeDuringRejectionEmission.get());
-
         assertOrdered(
                 eventLines(output, CANDIDATE_REJECTED).get(0),
                 "phase=SELECT_DESTINATION",
@@ -217,6 +197,57 @@ class StoreHomeCandidateBoundaryDiagnosticsContractTest {
                 "manifestRevision=7",
                 "candidateActivated=true",
                 "activationResult=EXACT_SESSION_INSTALLED"
+        );
+    }
+
+    @Test
+    void rejectionEmitsKnownCandidateEvidenceBeforeClearingItsLifecycle() {
+        StoreHomeTimeoutPolicy policy = StoreHomeTimeoutPolicy.standard();
+        StoreHomeTimeoutDiagnostics diagnostics = diagnostics(93L, policy);
+        StoreHomeOperationProgress operation =
+                StoreHomeOperationProgress.start(93L);
+        AutoDepositTrustedDestinationCandidate candidate = candidate(5);
+        StoreHomeCandidateAttempt attempt = attempt(candidate);
+
+        String output = captureOutput(() -> {
+            diagnostics.recordCandidateCatalog(1);
+            diagnostics.recordCandidateStarted(
+                    null, null, StoreHomePhase.NAVIGATE_TO_CANDIDATE, operation,
+                    candidateObservation(policy, 0, 0, 0,
+                            "NAVIGATE_TO_CANDIDATE"),
+                    null, attempt, 1
+            );
+            diagnostics.recordCandidateRejected(
+                    null, null, StoreHomePhase.SELECT_DESTINATION, operation,
+                    candidateObservation(policy, 8, 8, 0,
+                            "NAVIGATE_TO_CANDIDATE"),
+                    null, candidate, null, 8, 0,
+                    "candidate_navigation_no_progress", "UNAVAILABLE", null
+            );
+            diagnostics.recordProgress(
+                    null, null, StoreHomePhase.NAVIGATE_TO_CANDIDATE, operation,
+                    candidateObservation(policy, 9, 9, 0,
+                            "NAVIGATE_TO_CANDIDATE"),
+                    null, attempt, null, 1, null
+            );
+        });
+
+        List<String> started = eventLines(output, CANDIDATE_STARTED);
+        assertEquals(2, started.size());
+        int rejectionOffset = output.indexOf(CANDIDATE_REJECTED);
+        int lateAttachOffset = output.indexOf(CANDIDATE_STARTED,
+                output.indexOf(CANDIDATE_STARTED) + CANDIDATE_STARTED.length());
+        assertTrue(lateAttachOffset > rejectionOffset);
+        assertTrue(started.get(1).contains(
+                "reason=candidate_attempt_observed_after_diagnostics_attach"
+        ));
+        assertTrue(started.get(1).contains("candidateOrdinal=2"));
+        assertTrue(started.get(1).contains("candidateAttemptOrdinal=2"));
+        assertOrdered(
+                eventLines(output, CANDIDATE_REJECTED).get(0),
+                "candidateOrdinal=1",
+                "diagnosticBoundaryKind=STORE_HOME_CANDIDATE_REJECTED",
+                "rejectionStage=ACTIVE_ATTEMPT"
         );
     }
 
@@ -369,40 +400,18 @@ class StoreHomeCandidateBoundaryDiagnosticsContractTest {
         );
     }
 
-    private static StoreHomeDiagnosticCandidateProgressLifecycle candidateProgress(
-            StoreHomeTimeoutDiagnostics diagnostics) throws Exception {
-        Field field = StoreHomeTimeoutDiagnostics.class.getDeclaredField(
-                "candidateProgress"
-        );
-        field.setAccessible(true);
-        return (StoreHomeDiagnosticCandidateProgressLifecycle) field.get(diagnostics);
-    }
-
     private static String captureOutput(Runnable action) {
-        return captureOutput(action, ignored -> {
-        });
-    }
-
-    private static String captureOutput(
-            Runnable action,
-            Consumer<String> lineObserver) {
         PrintStream original = System.out;
         ByteArrayOutputStream output = new ByteArrayOutputStream();
-        PrintStream observingOutput = new PrintStream(
+        PrintStream captured = new PrintStream(
                 output, true, StandardCharsets.UTF_8
-        ) {
-            @Override
-            public void println(String value) {
-                lineObserver.accept(value);
-                super.println(value);
-            }
-        };
-        System.setOut(observingOutput);
+        );
+        System.setOut(captured);
         try {
             action.run();
         } finally {
             System.setOut(original);
-            observingOutput.close();
+            captured.close();
         }
         return new String(output.toByteArray(), StandardCharsets.UTF_8);
     }

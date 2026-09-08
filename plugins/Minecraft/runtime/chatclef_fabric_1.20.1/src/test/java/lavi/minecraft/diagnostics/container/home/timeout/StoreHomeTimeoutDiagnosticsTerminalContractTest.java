@@ -1,27 +1,29 @@
 package lavi.minecraft.diagnostics.container.home.timeout;
 
+import adris.altoclef.util.Dimension;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
-import lavi.minecraft.diagnostics.container.home.timeout.progress.StoreHomeCandidateProgressState;
-import lavi.minecraft.diagnostics.container.home.timeout.state.StoreHomeDiagnosticCandidateProgressLifecycle;
+import lavi.minecraft.task.container.deposit.auto.trusted.AutoDepositTrustedDestination;
+import lavi.minecraft.task.container.deposit.auto.trusted.AutoDepositTrustedDestinationCandidate;
 import lavi.minecraft.task.container.deposit.auto.trusted.interaction.AutoDepositExactOpenContainerBinding;
+import lavi.minecraft.task.container.home.execution.HomeStorageScreenSlotResolver;
 import lavi.minecraft.task.container.home.execution.HomeStorageTransferExecutor;
 import lavi.minecraft.task.container.home.execution.StoreHomePhase;
 import lavi.minecraft.task.container.home.execution.StoreHomeResult;
+import lavi.minecraft.task.container.home.execution.candidate.StoreHomeCandidateAttempt;
 import lavi.minecraft.task.container.home.execution.operation.StoreHomeOperationProgress;
 import lavi.minecraft.task.container.home.execution.timeout.StoreHomeTimeoutObservation;
 import lavi.minecraft.task.container.home.execution.timeout.StoreHomeTimeoutPolicy;
 import lavi.minecraft.testsupport.TestObjects;
+import net.minecraft.util.math.BlockPos;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
-import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 //20260902_kpopmodder: Characterize STORE_HOME terminal ordering and ordered payload segments.
@@ -30,6 +32,8 @@ class StoreHomeTimeoutDiagnosticsTerminalContractTest {
             "event=STORE_HOME_OPERATION_STARTED";
     private static final String OPERATION_TERMINAL =
             "event=STORE_HOME_OPERATION_TERMINAL_SUMMARY";
+    private static final String CANDIDATE_STARTED =
+            "event=STORE_HOME_CANDIDATE_ATTEMPT_STARTED";
 
     @BeforeEach
     void enableFreshDiagnosticSession() {
@@ -45,8 +49,7 @@ class StoreHomeTimeoutDiagnosticsTerminalContractTest {
     }
 
     @Test
-    void terminalEmissionFollowsOperationStartAndPreservesPayloadSegmentOrder()
-            throws Exception {
+    void terminalEmissionFollowsOperationStartAndPreservesPayloadSegmentOrder() {
         StoreHomeTimeoutPolicy policy = StoreHomeTimeoutPolicy.standard();
         StoreHomeTimeoutDiagnostics diagnostics = new StoreHomeTimeoutDiagnostics(
                 73L,
@@ -57,13 +60,6 @@ class StoreHomeTimeoutDiagnosticsTerminalContractTest {
         StoreHomeOperationProgress operation = StoreHomeOperationProgress.start(73L)
                 .withLatestRemainingStacks(4)
                 .capacityFailure();
-        StoreHomeDiagnosticCandidateProgressLifecycle progress =
-                candidateProgress(diagnostics);
-        progress.activate(
-                TestObjects.allocate(StoreHomeCandidateProgressState.class),
-                null
-        );
-
         String output = captureOutput(() -> diagnostics.recordTerminal(
                 null,
                 null,
@@ -107,7 +103,104 @@ class StoreHomeTimeoutDiagnosticsTerminalContractTest {
                 "budgetSummaryCapturedBeforeTerminalEmission=true",
                 "operationDiagnosticAcceptedCount="
         );
-        assertNull(progress.activeCandidate());
+    }
+
+    @Test
+    void terminalEmissionPrecedesCandidateLifecycleClear() {
+        StoreHomeTimeoutPolicy policy = StoreHomeTimeoutPolicy.standard();
+        StoreHomeTimeoutDiagnostics diagnostics = new StoreHomeTimeoutDiagnostics(
+                74L,
+                policy,
+                AutoDepositExactOpenContainerBinding.UNAVAILABLE,
+                new HomeStorageTransferExecutor(
+                        new HomeStorageScreenSlotResolver()
+                )
+        );
+        StoreHomeOperationProgress operation =
+                StoreHomeOperationProgress.start(74L);
+        StoreHomeCandidateAttempt attempt = attempt(candidate(1));
+
+        String output = captureOutput(() -> {
+            diagnostics.recordCandidateCatalog(1);
+            diagnostics.recordCandidateStarted(
+                    null,
+                    null,
+                    StoreHomePhase.NAVIGATE_TO_CANDIDATE,
+                    operation,
+                    StoreHomeTimeoutObservation.initial(policy),
+                    null,
+                    attempt,
+                    1
+            );
+            diagnostics.recordTerminal(
+                    null,
+                    null,
+                    StoreHomePhase.TERMINAL,
+                    operation,
+                    StoreHomeTimeoutObservation.initial(policy),
+                    null,
+                    attempt,
+                    null,
+                    1,
+                    StoreHomeResult.INTERRUPTED,
+                    "test_terminal_clear"
+            );
+            diagnostics.recordProgress(
+                    null,
+                    null,
+                    StoreHomePhase.NAVIGATE_TO_CANDIDATE,
+                    operation,
+                    StoreHomeTimeoutObservation.initial(policy),
+                    null,
+                    attempt,
+                    null,
+                    1,
+                    null
+            );
+        });
+
+        assertEquals(2, occurrences(output, CANDIDATE_STARTED));
+        int terminalOffset = output.indexOf(OPERATION_TERMINAL);
+        int secondStartOffset = output.indexOf(
+                CANDIDATE_STARTED,
+                output.indexOf(CANDIDATE_STARTED) + CANDIDATE_STARTED.length()
+        );
+        assertTrue(secondStartOffset > terminalOffset);
+        String secondStart = output.lines()
+                .filter(line -> line.contains(CANDIDATE_STARTED))
+                .skip(1)
+                .findFirst()
+                .orElseThrow();
+        assertTrue(secondStart.contains(
+                "reason=candidate_attempt_observed_after_diagnostics_attach"
+        ));
+    }
+
+    private static AutoDepositTrustedDestinationCandidate candidate(int x) {
+        return new AutoDepositTrustedDestinationCandidate(
+                new AutoDepositTrustedDestination(
+                        "test-world",
+                        Dimension.OVERWORLD,
+                        new BlockPos(x, 64, 0),
+                        true
+                ),
+                0,
+                x * x,
+                "test"
+        );
+    }
+
+    private static StoreHomeCandidateAttempt attempt(
+            AutoDepositTrustedDestinationCandidate candidate) {
+        StoreHomeCandidateAttempt attempt =
+                TestObjects.allocate(StoreHomeCandidateAttempt.class);
+        TestObjects.setField(
+                attempt,
+                StoreHomeCandidateAttempt.class,
+                "candidate",
+                candidate
+        );
+        return attempt;
     }
 
     private static String captureOutput(Runnable action) {
@@ -141,12 +234,4 @@ class StoreHomeTimeoutDiagnosticsTerminalContractTest {
         return count;
     }
 
-    private static StoreHomeDiagnosticCandidateProgressLifecycle candidateProgress(
-            StoreHomeTimeoutDiagnostics diagnostics) throws Exception {
-        Field field = StoreHomeTimeoutDiagnostics.class.getDeclaredField(
-                "candidateProgress"
-        );
-        field.setAccessible(true);
-        return (StoreHomeDiagnosticCandidateProgressLifecycle) field.get(diagnostics);
-    }
 }

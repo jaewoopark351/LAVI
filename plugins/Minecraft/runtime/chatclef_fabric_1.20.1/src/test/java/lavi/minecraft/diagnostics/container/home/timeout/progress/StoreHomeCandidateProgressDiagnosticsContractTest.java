@@ -3,13 +3,13 @@ package lavi.minecraft.diagnostics.container.home.timeout.progress;
 import adris.altoclef.util.Dimension;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 import lavi.minecraft.diagnostics.container.home.timeout.StoreHomeTimeoutDiagnostics;
-import lavi.minecraft.diagnostics.container.home.timeout.state.StoreHomeDiagnosticCandidateProgressLifecycle;
 import lavi.minecraft.task.container.deposit.auto.trusted.AutoDepositTrustedDestination;
 import lavi.minecraft.task.container.deposit.auto.trusted.AutoDepositTrustedDestinationCandidate;
 import lavi.minecraft.task.container.deposit.auto.trusted.interaction.AutoDepositExactOpenContainerBinding;
 import lavi.minecraft.task.container.home.execution.HomeStorageScreenSlotResolver;
 import lavi.minecraft.task.container.home.execution.HomeStorageTransferExecutor;
 import lavi.minecraft.task.container.home.execution.StoreHomePhase;
+import lavi.minecraft.task.container.home.execution.StoreHomeResult;
 import lavi.minecraft.task.container.home.execution.candidate.StoreHomeCandidateAttempt;
 import lavi.minecraft.task.container.home.execution.operation.StoreHomeOperationProgress;
 import lavi.minecraft.task.container.home.execution.timeout.StoreHomeTimeoutObservation;
@@ -22,7 +22,6 @@ import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.nio.charset.StandardCharsets;
@@ -37,6 +36,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class StoreHomeCandidateProgressDiagnosticsContractTest {
     private static final String PROGRESS_EVENT =
             "event=STORE_HOME_CANDIDATE_PROGRESS_SUMMARY";
+    private static final String TERMINAL_EVENT =
+            "event=STORE_HOME_OPERATION_TERMINAL_SUMMARY";
 
     @BeforeEach
     void enableFreshDiagnosticSession() {
@@ -52,8 +53,7 @@ class StoreHomeCandidateProgressDiagnosticsContractTest {
     }
 
     @Test
-    void semanticSuppressionIsReportedBeforeEmissionAndResetAfterAdmission()
-            throws Exception {
+    void semanticSuppressionIsReportedBeforeEmissionAndResetAfterAdmission() {
         StoreHomeTimeoutPolicy policy = StoreHomeTimeoutPolicy.standard();
         StoreHomeTimeoutDiagnostics diagnostics = diagnostics(101L, policy);
         StoreHomeOperationProgress operation =
@@ -66,31 +66,32 @@ class StoreHomeCandidateProgressDiagnosticsContractTest {
                 observation(policy, StoreHomePhase.NAVIGATE_TO_CANDIDATE, 0),
                 null, attempt, 1
         );
-        StoreHomeCandidateProgressState active =
-                candidateProgress(diagnostics).activeCandidate();
-
         String output = captureOutput(() -> {
             diagnostics.recordProgress(
                     null, null, StoreHomePhase.NAVIGATE_TO_CANDIDATE, operation,
                     observation(policy, StoreHomePhase.NAVIGATE_TO_CANDIDATE, 1),
                     null, attempt, null, 1, null
             );
-            assertEquals(1, active.suppressedRepeatCount());
             diagnostics.recordProgress(
                     null, null, StoreHomePhase.OPEN_AND_BIND_CANDIDATE, operation,
                     observation(policy, StoreHomePhase.OPEN_AND_BIND_CANDIDATE, 5),
                     null, attempt, null, 1, null
             );
-            assertEquals(0, active.suppressedRepeatCount());
             diagnostics.recordProgress(
                     null, null, StoreHomePhase.OPEN_AND_BIND_CANDIDATE, operation,
                     observation(policy, StoreHomePhase.OPEN_AND_BIND_CANDIDATE, 6),
                     null, attempt, null, 1, null
             );
+            diagnostics.recordTerminal(
+                    null, null, StoreHomePhase.TERMINAL, operation,
+                    observation(policy, StoreHomePhase.TERMINAL, 6),
+                    null, attempt, null, 1,
+                    StoreHomeResult.INTERRUPTED,
+                    "test_progress_suppression_terminal"
+            );
         });
 
         assertEquals(1, occurrences(output, PROGRESS_EVENT));
-        assertEquals(1, active.suppressedRepeatCount());
         String progressLine = eventLine(output, PROGRESS_EVENT);
         assertTrue(progressLine.contains("reason=no_new_progress"));
         assertOrdered(
@@ -105,10 +106,17 @@ class StoreHomeCandidateProgressDiagnosticsContractTest {
                 "suppressedRepeatCountBeforeEmission=1",
                 "containerSessionActive=false"
         );
+        String terminalLine = eventLine(output, TERMINAL_EVENT);
+        assertTrue(terminalLine.contains(
+                "operationDiagnosticSuppressedEventCount=2"
+        ));
+        assertTrue(terminalLine.contains(
+                "operationSuppressedByEvent={STORE_HOME_CANDIDATE_PROGRESS_SUMMARY%3D2}"
+        ));
     }
 
     @Test
-    void candidateProgressCapSuppressesTheNinthSemanticChange() throws Exception {
+    void candidateProgressCapSuppressesTheNinthSemanticChange() {
         StoreHomeTimeoutPolicy policy = StoreHomeTimeoutPolicy.standard();
         StoreHomeTimeoutDiagnostics diagnostics = diagnostics(102L, policy);
         StoreHomeOperationProgress operation =
@@ -121,9 +129,6 @@ class StoreHomeCandidateProgressDiagnosticsContractTest {
                 observation(policy, StoreHomePhase.NAVIGATE_TO_CANDIDATE, 0),
                 null, attempt, 1
         );
-        StoreHomeCandidateProgressState active =
-                candidateProgress(diagnostics).activeCandidate();
-
         String output = captureOutput(() -> {
             for (int index = 0; index < 9; index++) {
                 StoreHomePhase phase = index % 2 == 0
@@ -135,10 +140,23 @@ class StoreHomeCandidateProgressDiagnosticsContractTest {
                         null, attempt, null, 1, null
                 );
             }
+            diagnostics.recordTerminal(
+                    null, null, StoreHomePhase.TERMINAL, operation,
+                    observation(policy, StoreHomePhase.TERMINAL, 9),
+                    null, attempt, null, 1,
+                    StoreHomeResult.INTERRUPTED,
+                    "test_progress_cap_terminal"
+            );
         });
 
         assertEquals(8, occurrences(output, PROGRESS_EVENT));
-        assertEquals(1, active.suppressedRepeatCount());
+        String terminalLine = eventLine(output, TERMINAL_EVENT);
+        assertTrue(terminalLine.contains(
+                "operationDiagnosticSuppressedEventCount=1"
+        ));
+        assertTrue(terminalLine.contains(
+                "operationSuppressedByEvent={STORE_HOME_CANDIDATE_PROGRESS_SUMMARY%3D1}"
+        ));
     }
 
     @Test
@@ -218,15 +236,6 @@ class StoreHomeCandidateProgressDiagnosticsContractTest {
                 policy.movementJitterBlocks(),
                 policy.bestDistanceImprovementEpsilonBlocks()
         );
-    }
-
-    private static StoreHomeDiagnosticCandidateProgressLifecycle candidateProgress(
-            StoreHomeTimeoutDiagnostics diagnostics) throws Exception {
-        Field field = StoreHomeTimeoutDiagnostics.class.getDeclaredField(
-                "candidateProgress"
-        );
-        field.setAccessible(true);
-        return (StoreHomeDiagnosticCandidateProgressLifecycle) field.get(diagnostics);
     }
 
     private static String captureOutput(Runnable action) {

@@ -2,24 +2,9 @@ package lavi.minecraft.diagnostics.container.home.timeout;
 
 import adris.altoclef.AltoClef;
 import adris.altoclef.tasksystem.Task;
-import lavi.minecraft.diagnostics.ChatClefDiagnostics;
-import lavi.minecraft.diagnostics.container.home.timeout.artifact.StoreHomeRunManifestDiagnostics;
-import lavi.minecraft.diagnostics.container.home.timeout.candidate.StoreHomeCandidateBoundaryDiagnostics;
-import lavi.minecraft.diagnostics.container.home.timeout.event.StoreHomeDiagnosticEmitter;
 import lavi.minecraft.diagnostics.container.home.timeout.guard.StoreHomeDiagnosticBookkeepingGuard;
 import lavi.minecraft.diagnostics.container.home.timeout.guard.StoreHomeDiagnosticBoundary;
-import lavi.minecraft.diagnostics.container.home.timeout.operation.StoreHomeOperationDiagnostics;
-import lavi.minecraft.diagnostics.container.home.timeout.progress.StoreHomeCandidateProgressDiagnostics;
-import lavi.minecraft.diagnostics.container.home.timeout.progress.StoreHomeCandidateProgressState;
-import lavi.minecraft.diagnostics.container.home.timeout.progress.StoreHomeCandidateProgressObservation;
-import lavi.minecraft.diagnostics.container.home.timeout.progress.StoreHomePlayerPositionSnapshot;
-import lavi.minecraft.diagnostics.container.home.timeout.progress.StoreHomeProgressFingerprint;
-import lavi.minecraft.diagnostics.container.home.timeout.progress.StoreHomeProgressSnapshot;
-import lavi.minecraft.diagnostics.container.home.timeout.progress.StoreHomeProgressSnapshotReader;
-import lavi.minecraft.diagnostics.container.home.timeout.state.StoreHomeDiagnosticCandidateCatalogState;
-import lavi.minecraft.diagnostics.container.home.timeout.state.StoreHomeDiagnosticCandidateProgressLifecycle;
-import lavi.minecraft.diagnostics.container.home.timeout.state.StoreHomeDiagnosticOperationState;
-import lavi.minecraft.diagnostics.container.home.timeout.terminal.StoreHomeTerminalSummaryEmitter;
+import lavi.minecraft.diagnostics.container.home.timeout.operation.StoreHomeTimeoutLifecycleCoordinator;
 import lavi.minecraft.task.container.deposit.auto.trusted.AutoDepositTrustedDestinationCandidate;
 import lavi.minecraft.task.container.deposit.auto.trusted.interaction.AutoDepositExactOpenContainerBinding;
 import lavi.minecraft.task.container.home.execution.HomeStorageOperationContext;
@@ -33,64 +18,21 @@ import lavi.minecraft.task.container.home.execution.timeout.StoreHomeTimeoutObse
 import lavi.minecraft.task.container.home.execution.timeout.StoreHomeTimeoutPolicy;
 import lavi.minecraft.task.container.home.execution.timeout.StoreHomeTimeoutReason;
 
-import java.util.Objects;
-
-//20260828_kpopmodder: Observe STORE_HOME lifecycle and timeout boundaries without changing Task decisions.
+//20260828_kpopmodder: Preserve the STORE_HOME diagnostics API and strict-OFF boundary while delegating lifecycle ownership.
 public final class StoreHomeTimeoutDiagnostics {
-    private static final String OPERATION_STARTED = "STORE_HOME_OPERATION_STARTED";
-    private static final String CANDIDATE_STARTED =
-            "STORE_HOME_CANDIDATE_ATTEMPT_STARTED";
-    private static final String CANDIDATE_PROGRESS =
-            "STORE_HOME_CANDIDATE_PROGRESS_SUMMARY";
-    private static final String CANDIDATE_TIMEOUT =
-            "STORE_HOME_CANDIDATE_TIMEOUT_DECISION";
-    private static final String OPERATION_TIMEOUT =
-            "STORE_HOME_OPERATION_TIMEOUT_DECISION";
-    private static final String CANDIDATE_REJECTED =
-            "STORE_HOME_CANDIDATE_REJECTED";
-    private static final String CANDIDATE_ACTIVATED =
-            "STORE_HOME_CANDIDATE_ACTIVATED";
-    private static final String OPERATION_TERMINAL =
-            "STORE_HOME_OPERATION_TERMINAL_SUMMARY";
-
-    private final long operationId;
-    private final StoreHomeDiagnosticEmitter emitter;
-    private final StoreHomeProgressSnapshotReader snapshotReader;
-    private final String topLevelTaskRunId;
-
-    private final StoreHomeDiagnosticOperationState operationState;
-    private final StoreHomeDiagnosticCandidateCatalogState candidateCatalog =
-            new StoreHomeDiagnosticCandidateCatalogState();
-    private final StoreHomeDiagnosticCandidateProgressLifecycle candidateProgress =
-            new StoreHomeDiagnosticCandidateProgressLifecycle();
-    //20260902_kpopmodder: Delegate event-family payload assembly while retaining one mutable timeout state owner.
-    private final StoreHomeCandidateBoundaryDiagnostics candidateBoundaryDiagnostics =
-            new StoreHomeCandidateBoundaryDiagnostics();
-    private final StoreHomeCandidateProgressDiagnostics progressDiagnostics =
-            new StoreHomeCandidateProgressDiagnostics();
-    private final StoreHomeOperationDiagnostics operationDiagnostics =
-            new StoreHomeOperationDiagnostics();
-    private final StoreHomeTerminalSummaryEmitter terminalSummaryEmitter =
-            new StoreHomeTerminalSummaryEmitter();
+    private final StoreHomeTimeoutLifecycleCoordinator lifecycleCoordinator;
 
     public StoreHomeTimeoutDiagnostics(
             long operationId,
             StoreHomeTimeoutPolicy timeoutPolicy,
             AutoDepositExactOpenContainerBinding exactBinding,
             HomeStorageTransferExecutor transferExecutor) {
-        this.operationId = operationId;
-        this.operationState = new StoreHomeDiagnosticOperationState(
-                Objects.requireNonNull(timeoutPolicy, "timeoutPolicy")
-        );
-        this.emitter = new StoreHomeDiagnosticEmitter(
+        this.lifecycleCoordinator = new StoreHomeTimeoutLifecycleCoordinator(
                 operationId,
-                StoreHomeRunManifestDiagnostics::currentRunManifestId
+                timeoutPolicy,
+                exactBinding,
+                transferExecutor
         );
-        this.snapshotReader = new StoreHomeProgressSnapshotReader(
-                Objects.requireNonNull(exactBinding, "exactBinding"),
-                Objects.requireNonNull(transferExecutor, "transferExecutor")
-        );
-        this.topLevelTaskRunId = "store-home-operation-" + operationId;
     }
 
     public void recordOperationStarted(
@@ -98,16 +40,19 @@ public final class StoreHomeTimeoutDiagnostics {
             StoreHomePhase phase,
             StoreHomeOperationProgress operation,
             StoreHomeTimeoutObservation timeout) {
-        StoreHomeDiagnosticBoundary.runIfEnabled(() -> {
-            observeTimeout(timeout);
-            ensureOperationStarted(owner, phase, operation);
-        });
+        StoreHomeDiagnosticBoundary.runIfEnabled(() ->
+                lifecycleCoordinator.recordOperationStarted(
+                        owner, phase, timeout
+                )
+        );
     }
 
     public void recordCandidateCatalog(int candidateCount) {
         StoreHomeDiagnosticBoundary.runIfEnabled(() ->
                 StoreHomeDiagnosticBookkeepingGuard.runSafely(
-                        () -> candidateCatalog.captureCatalog(candidateCount)
+                        () -> lifecycleCoordinator.recordCandidateCatalog(
+                                candidateCount
+                        )
                 )
         );
     }
@@ -123,30 +68,19 @@ public final class StoreHomeTimeoutDiagnostics {
             int remainingAfterRejection,
             String reason,
             String failureKind) {
-        StoreHomeDiagnosticBoundary.runIfEnabled(() -> {
-            observeTimeout(timeout);
-            int candidateOrdinal = candidateCatalog.reserveCandidateOrdinal(
-                    remainingAfterRejection + 1
-            );
-            ensureOperationStarted(owner, phase, operation);
-            long clientTickId = currentClientTickId();
-            candidateBoundaryDiagnostics.emitRejectedBeforeAttempt(
-                    emitter,
-                    CANDIDATE_REJECTED,
-                    reason,
-                    owner,
-                    operationFields(owner, phase, clientTickId),
-                    operationId,
-                    context,
-                    candidate,
-                    candidateOrdinal,
-                    candidateCatalog.effectiveCandidateCount(
-                            remainingAfterRejection + 1
-                    ),
-                    remainingAfterRejection,
-                    failureKind
-            );
-        });
+        StoreHomeDiagnosticBoundary.runIfEnabled(() ->
+                lifecycleCoordinator.recordCandidateRejectedBeforeAttempt(
+                        owner,
+                        mod,
+                        phase,
+                        timeout,
+                        context,
+                        candidate,
+                        remainingAfterRejection,
+                        reason,
+                        failureKind
+                )
+        );
     }
 
     public void recordCandidateStarted(
@@ -158,25 +92,17 @@ public final class StoreHomeTimeoutDiagnostics {
             HomeStorageOperationContext context,
             StoreHomeCandidateAttempt attempt,
             int remainingCandidateCountIncludingCurrent) {
-        StoreHomeDiagnosticBoundary.runIfEnabled(() -> {
-            observeTimeout(timeout);
-            candidateCatalog.rememberAttempt(
-                    attempt, remainingCandidateCountIncludingCurrent
-            );
-            ensureOperationStarted(owner, phase, operation);
-            startCandidate(
-                    owner,
-                    mod,
-                    phase,
-                    operation,
-                    context,
-                    attempt,
-                    remainingCandidateCountIncludingCurrent,
-                    "candidate_attempt_created",
-                    candidateCatalog.knownCandidateOrdinal(),
-                    candidateCatalog.knownCandidateAttemptOrdinal()
-            );
-        });
+        StoreHomeDiagnosticBoundary.runIfEnabled(() ->
+                lifecycleCoordinator.recordCandidateStarted(
+                        owner,
+                        mod,
+                        phase,
+                        timeout,
+                        context,
+                        attempt,
+                        remainingCandidateCountIncludingCurrent
+                )
+        );
     }
 
     public void recordProgress(
@@ -190,75 +116,19 @@ public final class StoreHomeTimeoutDiagnostics {
             HomeStorageContainerSession session,
             int remainingCandidateCountIncludingCurrent,
             Task activeChildTask) {
-        StoreHomeDiagnosticBoundary.runIfEnabled(() -> {
-            observeTimeout(timeout);
-            ensureOperationStarted(owner, phase, operation);
-            if (attempt == null) {
-                return;
-            }
-            ensureActiveCandidate(
-                    owner,
-                    mod,
-                    phase,
-                    operation,
-                    context,
-                    attempt,
-                    remainingCandidateCountIncludingCurrent
-            );
-            StoreHomeCandidateProgressState active =
-                    candidateProgress.activeCandidate();
-            long clientTickId = currentClientTickId();
-            if (!progressDiagnostics.admitsSnapshotCapture(
-                    emitter, active.candidateId())) {
-                StoreHomePlayerPositionSnapshot player = snapshotReader.capturePlayer(
-                        mod, attempt.candidate()
-                );
-                active.observePlayerOnly(
-                        clientTickId, player, activeChildTask
-                );
-                active.recordSuppressedRepeat();
-                progressDiagnostics.recordSuppressed(emitter, CANDIDATE_PROGRESS);
-                return;
-            }
-            StoreHomeProgressSnapshot snapshot = snapshotReader.capture(
-                    mod, attempt.candidate(), session
-            );
-            StoreHomeCandidateProgressObservation observation =
-                    active.observe(
-                            clientTickId, phase, snapshot, activeChildTask
-                    );
-            if (!progressDiagnostics.admitsSemanticEmission(observation)) {
-                active.recordSuppressedRepeat();
-                progressDiagnostics.recordSuppressed(emitter, CANDIDATE_PROGRESS);
-                return;
-            }
-            int suppressedBefore = active.suppressedRepeatCount();
-            boolean emitted = progressDiagnostics.emitProgress(
-                    emitter,
-                    CANDIDATE_PROGRESS,
-                    observation.progressKind().toLowerCase(),
-                    active.candidateId(),
-                    owner,
-                    operationFields(owner, phase, clientTickId),
-                    context,
-                    attempt.candidate(),
-                    active,
-                    remainingCandidateCountIncludingCurrent,
-                    candidateTicks(),
-                    clientTickId,
-                    snapshot,
-                    observation,
-                    suppressedBefore,
-                    session
-            );
-            if (emitted) {
-                active.markProgressEmitted(
-                        clientTickId, observation.fingerprint()
-                );
-            } else {
-                active.recordSuppressedRepeat();
-            }
-        });
+        StoreHomeDiagnosticBoundary.runIfEnabled(() ->
+                lifecycleCoordinator.recordProgress(
+                        owner,
+                        mod,
+                        phase,
+                        timeout,
+                        context,
+                        attempt,
+                        session,
+                        remainingCandidateCountIncludingCurrent,
+                        activeChildTask
+                )
+        );
     }
 
     public void recordOperationTimeoutDecision(
@@ -277,46 +147,22 @@ public final class StoreHomeTimeoutDiagnostics {
         String stableReason = timeoutReason == null
                 ? "unavailable_timeout_reason"
                 : timeoutReason.stableReason();
-        StoreHomeDiagnosticBoundary.runIfEnabled(() -> {
-            observeTimeout(timeout);
-            ensureOperationStarted(owner, phase, operation);
-            long clientTickId = currentClientTickId();
-            Object candidateTicksObserved = attempt == null
-                    ? "unavailable_no_active_candidate"
-                    : candidateTicks();
-            Object[] evidence = candidateEvidence(
-                    owner,
-                    mod,
-                    phase,
-                    operation,
-                    context,
-                    attempt,
-                    session,
-                    remainingCandidateCountIncludingCurrent,
-                    activeChildTask,
-                    clientTickId,
-                    OPERATION_TIMEOUT,
-                    stableReason
-            );
-            boolean sessionPending = session != null
-                    && session.pendingTransfer().isPresent();
-            operationDiagnostics.emitTimeoutDecision(
-                    emitter,
-                    OPERATION_TIMEOUT,
-                    stableReason,
-                    owner,
-                    operationFields(owner, phase, clientTickId),
-                    evidence,
-                    attempt != null,
-                    clientTickId,
-                    candidateTicksObserved,
-                    operationDecisionTicks(timeoutReason),
-                    timeoutReason,
-                    operationState.observation(),
-                    pendingAtDecision,
-                    sessionPending
-            );
-        });
+        StoreHomeDiagnosticBoundary.runIfEnabled(() ->
+                lifecycleCoordinator.recordOperationTimeoutDecision(
+                        owner,
+                        mod,
+                        phase,
+                        timeout,
+                        context,
+                        attempt,
+                        session,
+                        remainingCandidateCountIncludingCurrent,
+                        timeoutReason,
+                        stableReason,
+                        pendingAtDecision,
+                        activeChildTask
+                )
+        );
     }
 
     public void recordCandidateTimeoutDecision(
@@ -335,51 +181,22 @@ public final class StoreHomeTimeoutDiagnostics {
         String stableReason = timeoutReason == null
                 ? "unavailable_timeout_reason"
                 : timeoutReason.stableReason();
-        StoreHomeDiagnosticBoundary.runIfEnabled(() -> {
-            observeTimeout(timeout);
-            ensureOperationStarted(owner, phase, operation);
-            ensureActiveCandidate(
-                    owner,
-                    mod,
-                    phase,
-                    operation,
-                    context,
-                    attempt,
-                    remainingCandidateCountIncludingCurrent
-            );
-            long clientTickId = currentClientTickId();
-            boolean sessionPending = session != null
-                    && session.pendingTransfer().isPresent();
-            Object[] evidence = candidateEvidence(
-                    owner,
-                    mod,
-                    phase,
-                    operation,
-                    context,
-                    attempt,
-                    session,
-                    remainingCandidateCountIncludingCurrent,
-                    activeChildTask,
-                    clientTickId,
-                    CANDIDATE_TIMEOUT,
-                    stableReason
-            );
-            candidateBoundaryDiagnostics.emitTimeoutDecision(
-                    emitter,
-                    CANDIDATE_TIMEOUT,
-                    stableReason,
-                    owner,
-                    operationFields(owner, phase, clientTickId),
-                    evidence,
-                    clientTickId,
-                    candidateTicks(),
-                    operationTicks(),
-                    timeoutReason,
-                    operationState.observation(),
-                    pendingAtDecision,
-                    sessionPending
-            );
-        });
+        StoreHomeDiagnosticBoundary.runIfEnabled(() ->
+                lifecycleCoordinator.recordCandidateTimeoutDecision(
+                        owner,
+                        mod,
+                        phase,
+                        timeout,
+                        context,
+                        attempt,
+                        session,
+                        remainingCandidateCountIncludingCurrent,
+                        timeoutReason,
+                        stableReason,
+                        pendingAtDecision,
+                        activeChildTask
+                )
+        );
     }
 
     public void recordCandidateRejected(
@@ -396,65 +213,22 @@ public final class StoreHomeTimeoutDiagnostics {
             String reason,
             String failureKind,
             Task activeChildTask) {
-        StoreHomeDiagnosticBoundary.runIfEnabled(() -> {
-            observeTimeout(timeout);
-            ensureOperationStarted(owner, phase, operation);
-            StoreHomeCandidateProgressState active =
-                    candidateProgress.activeCandidate();
-            if (active != null && active.candidate() != candidate) {
-                candidateProgress.clearActive();
-                active = null;
-            }
-            if (active == null && candidateCatalog.knownCandidateMatches(candidate)) {
-                attachCandidateState(
+        StoreHomeDiagnosticBoundary.runIfEnabled(() ->
+                lifecycleCoordinator.recordCandidateRejected(
+                        owner,
                         mod,
                         phase,
-                        candidateCatalog.knownAttemptReference(),
-                        remainingCandidateCountAfterRejection + 1,
-                        candidateCatalog.knownCandidateOrdinal(),
-                        candidateCatalog.knownCandidateAttemptOrdinal()
-                );
-                active = candidateProgress.activeCandidate();
-            }
-            long clientTickId = currentClientTickId();
-            Object[] evidence = active == null
-                    ? candidateBoundaryDiagnostics.unobservedRejectionEvidence(
-                            context,
-                            candidate,
-                            candidateCatalog.effectiveCandidateCount(
-                                    remainingCandidateCountAfterRejection + 1
-                            ),
-                            remainingCandidateCountAfterRejection,
-                            candidateTicks()
-                    )
-                    : candidateEvidenceForKnownState(
-                    mod,
-                    phase,
-                    context,
-                    candidate,
-                    session,
-                    candidateTicks(),
-                    remainingCandidateCountAfterRejection,
-                    false,
-                    activeChildTask,
-                    clientTickId,
-                    CANDIDATE_REJECTED,
-                    reason
-            );
-            candidateBoundaryDiagnostics.emitRejected(
-                    emitter,
-                    CANDIDATE_REJECTED,
-                    reason,
-                    owner,
-                    operationFields(owner, phase, clientTickId),
-                    evidence,
-                    candidateActiveTicksAtRejection,
-                    remainingCandidateCountAfterRejection,
-                    failureKind
-            );
-            candidateProgress.clearActive();
-            candidateCatalog.clearKnownAttempt();
-        });
+                        timeout,
+                        context,
+                        candidate,
+                        session,
+                        candidateActiveTicksAtRejection,
+                        remainingCandidateCountAfterRejection,
+                        reason,
+                        failureKind,
+                        activeChildTask
+                )
+        );
     }
 
     public void recordCandidateActivated(
@@ -467,42 +241,18 @@ public final class StoreHomeTimeoutDiagnostics {
             StoreHomeCandidateAttempt attempt,
             HomeStorageContainerSession session,
             int remainingCandidateCountIncludingCurrent) {
-        StoreHomeDiagnosticBoundary.runIfEnabled(() -> {
-            observeTimeout(timeout);
-            ensureOperationStarted(owner, phase, operation);
-            ensureActiveCandidate(
-                    owner,
-                    mod,
-                    phase,
-                    operation,
-                    context,
-                    attempt,
-                    remainingCandidateCountIncludingCurrent
-            );
-            long clientTickId = currentClientTickId();
-            Object[] evidence = candidateEvidenceForKnownState(
-                    mod,
-                    phase,
-                    context,
-                    attempt.candidate(),
-                    session,
-                    candidateTicks(),
-                    remainingCandidateCountIncludingCurrent,
-                    true,
-                    null,
-                    clientTickId,
-                    CANDIDATE_ACTIVATED,
-                    "exact_trusted_container_session_activated"
-            );
-            candidateBoundaryDiagnostics.emitActivated(
-                    emitter,
-                    CANDIDATE_ACTIVATED,
-                    "exact_trusted_container_session_activated",
-                    owner,
-                    operationFields(owner, phase, clientTickId),
-                    evidence
-            );
-        });
+        StoreHomeDiagnosticBoundary.runIfEnabled(() ->
+                lifecycleCoordinator.recordCandidateActivated(
+                        owner,
+                        mod,
+                        phase,
+                        timeout,
+                        context,
+                        attempt,
+                        session,
+                        remainingCandidateCountIncludingCurrent
+                )
+        );
     }
 
     public void recordTerminal(
@@ -517,335 +267,20 @@ public final class StoreHomeTimeoutDiagnostics {
             int remainingCandidateCountIncludingCurrent,
             StoreHomeResult result,
             String reason) {
-        StoreHomeDiagnosticBoundary.runIfEnabled(() -> {
-            observeTimeout(timeout);
-            ensureOperationStarted(owner, phase, operation);
-            long clientTickId = currentClientTickId();
-            Object[] evidence = attempt == null
-                    ? candidateBoundaryDiagnostics.unavailableEvidence(
-                            context,
-                            null,
-                            candidateCatalog.effectiveCandidateCount(
-                                    remainingCandidateCountIncludingCurrent
-                            ),
-                            remainingCandidateCountIncludingCurrent,
-                            session
-                    )
-                    : candidateEvidence(
-                    owner,
-                    mod,
-                    phase,
-                    operation,
-                    context,
-                    attempt,
-                    session,
-                    remainingCandidateCountIncludingCurrent,
-                    session == null ? attempt.currentOpenTask() : null,
-                    clientTickId,
-                    OPERATION_TERMINAL,
-                    reason
-            );
-            terminalSummaryEmitter.emit(
-                    emitter,
-                    OPERATION_TERMINAL,
-                    reason,
-                    owner,
-                    operationFields(owner, phase, clientTickId),
-                    evidence,
-                    result,
-                    operation
-            );
-            candidateProgress.clearActive();
-        });
-    }
-
-    private void startCandidate(
-            Task owner,
-            AltoClef mod,
-            StoreHomePhase phase,
-            StoreHomeOperationProgress operation,
-            HomeStorageOperationContext context,
-            StoreHomeCandidateAttempt attempt,
-            int remainingCandidateCountIncludingCurrent,
-            String reason,
-            int candidateOrdinal,
-            int candidateAttemptOrdinal) {
-        long clientTickId = currentClientTickId();
-        StoreHomeProgressSnapshot snapshot = attachCandidateState(
-                mod,
-                phase,
-                attempt,
-                remainingCandidateCountIncludingCurrent,
-                candidateOrdinal,
-                candidateAttemptOrdinal
-        );
-        StoreHomeCandidateProgressState active =
-                candidateProgress.activeCandidate();
-        String fingerprint = StoreHomeProgressFingerprint.create(
-                CANDIDATE_STARTED,
-                operationId,
-                active.candidateAttemptOrdinal(),
-                attempt.candidate().destinationId(),
-                phase,
-                "NO_NEW_PROGRESS",
-                reason,
-                active.childTaskClass(),
-                active.childTaskRunOrdinal(),
-                snapshot
-        );
-        StoreHomeCandidateProgressObservation startObservation =
-                new StoreHomeCandidateProgressObservation(
-                        "NO_NEW_PROGRESS", fingerprint, true, false
-                );
-        candidateBoundaryDiagnostics.emitStarted(
-                emitter,
-                CANDIDATE_STARTED,
-                reason,
-                owner,
-                operationFields(owner, phase, clientTickId),
-                context,
-                attempt.candidate(),
-                active,
-                remainingCandidateCountIncludingCurrent,
-                candidateTicks(),
-                clientTickId,
-                snapshot,
-                startObservation
+        StoreHomeDiagnosticBoundary.runIfEnabled(() ->
+                lifecycleCoordinator.recordTerminal(
+                        owner,
+                        mod,
+                        phase,
+                        operation,
+                        timeout,
+                        context,
+                        attempt,
+                        session,
+                        remainingCandidateCountIncludingCurrent,
+                        result,
+                        reason
+                )
         );
     }
-
-    private StoreHomeProgressSnapshot attachCandidateState(
-            AltoClef mod,
-            StoreHomePhase phase,
-            StoreHomeCandidateAttempt attempt,
-            int remainingCandidateCountIncludingCurrent,
-            int candidateOrdinal,
-            int candidateAttemptOrdinal) {
-        long clientTickId = currentClientTickId();
-        StoreHomeProgressSnapshot snapshot = snapshotReader.capture(
-                mod, attempt.candidate(), null
-        );
-        StoreHomeCandidateProgressState active =
-                new StoreHomeCandidateProgressState(
-                operationId,
-                attempt.candidate(),
-                candidateOrdinal,
-                candidateAttemptOrdinal,
-                candidateCatalog.effectiveCandidateCount(
-                        remainingCandidateCountIncludingCurrent
-                ),
-                clientTickId,
-                operationState.observation().candidateActiveTicks() == 0,
-                phase,
-                snapshot,
-                attempt.currentOpenTask()
-        );
-        candidateProgress.activate(active, attempt);
-        return snapshot;
-    }
-
-    private void ensureActiveCandidate(
-            Task owner,
-            AltoClef mod,
-            StoreHomePhase phase,
-            StoreHomeOperationProgress operation,
-            HomeStorageOperationContext context,
-            StoreHomeCandidateAttempt attempt,
-            int remainingCandidateCountIncludingCurrent) {
-        if (attempt == null) {
-            return;
-        }
-        if (candidateProgress.activeMatches(attempt)) {
-            return;
-        }
-        if (candidateCatalog.knownAttemptReference() != attempt) {
-            candidateCatalog.rememberAttempt(
-                    attempt, remainingCandidateCountIncludingCurrent
-            );
-        }
-        startCandidate(
-                owner,
-                mod,
-                phase,
-                operation,
-                context,
-                attempt,
-                remainingCandidateCountIncludingCurrent,
-                "candidate_attempt_observed_after_diagnostics_attach",
-                candidateCatalog.knownCandidateOrdinal(),
-                candidateCatalog.knownCandidateAttemptOrdinal()
-        );
-    }
-
-    private Object[] candidateEvidence(
-            Task owner,
-            AltoClef mod,
-            StoreHomePhase phase,
-            StoreHomeOperationProgress operation,
-            HomeStorageOperationContext context,
-            StoreHomeCandidateAttempt attempt,
-            HomeStorageContainerSession session,
-            int remainingCandidateCountIncludingCurrent,
-            Task activeChildTask,
-            long clientTickId,
-            String diagnosticBoundaryKind,
-            String diagnosticBoundaryReason) {
-        if (attempt == null) {
-            return candidateBoundaryDiagnostics.unavailableEvidence(
-                    context,
-                    null,
-                    candidateCatalog.effectiveCandidateCount(
-                            remainingCandidateCountIncludingCurrent
-                    ),
-                    remainingCandidateCountIncludingCurrent,
-                    session
-            );
-        }
-        ensureActiveCandidate(
-                owner,
-                mod,
-                phase,
-                operation,
-                context,
-                attempt,
-                remainingCandidateCountIncludingCurrent
-        );
-        return candidateEvidenceForKnownState(
-                mod,
-                phase,
-                context,
-                attempt.candidate(),
-                session,
-                candidateTicks(),
-                remainingCandidateCountIncludingCurrent,
-                true,
-                activeChildTask,
-                clientTickId,
-                diagnosticBoundaryKind,
-                diagnosticBoundaryReason
-        );
-    }
-
-    private Object[] candidateEvidenceForKnownState(
-            AltoClef mod,
-            StoreHomePhase phase,
-            HomeStorageOperationContext context,
-            AutoDepositTrustedDestinationCandidate candidate,
-            HomeStorageContainerSession session,
-            int candidateTicks,
-            int candidateQueueRemaining,
-            boolean candidateIncludedInQueue,
-            Task activeChildTask,
-            long clientTickId,
-            String diagnosticBoundaryKind,
-            String diagnosticBoundaryReason) {
-        StoreHomeProgressSnapshot snapshot = snapshotReader.capture(
-                mod, candidate, session
-        );
-        StoreHomeCandidateProgressState active =
-                candidateProgress.activeCandidate();
-        StoreHomeCandidateProgressObservation observed =
-                active.observe(
-                        clientTickId, phase, snapshot, activeChildTask
-                );
-        String fingerprint = StoreHomeProgressFingerprint.create(
-                diagnosticBoundaryKind,
-                operationId,
-                active.candidateAttemptOrdinal(),
-                candidate.destinationId(),
-                phase,
-                observed.progressKind(),
-                diagnosticBoundaryReason,
-                active.childTaskClass(),
-                active.childTaskRunOrdinal(),
-                snapshot
-        );
-        StoreHomeCandidateProgressObservation boundaryObservation =
-                new StoreHomeCandidateProgressObservation(
-                        observed.progressKind(),
-                        fingerprint,
-                        observed.semanticStateChanged(),
-                        observed.sampleDue()
-                );
-        return candidateBoundaryDiagnostics.observedEvidence(
-                context,
-                candidate,
-                active,
-                session,
-                snapshot,
-                boundaryObservation,
-                candidateQueueRemaining,
-                candidateIncludedInQueue,
-                candidateTicks,
-                clientTickId,
-                diagnosticBoundaryKind,
-                diagnosticBoundaryReason
-        );
-    }
-
-    private void ensureOperationStarted(
-            Task owner,
-            StoreHomePhase phase,
-            StoreHomeOperationProgress operation) {
-        if (operationState.started()) {
-            return;
-        }
-        operationState.markStarted(currentClientTickId());
-        StoreHomeRunManifestDiagnostics.emitOnce(owner, emitter);
-        boolean operationStartClientTickKnown =
-                operationState.startClientTickKnown();
-        Object[] startedOperationFields = operationFields(
-                owner,
-                phase,
-                operationState.startClientTickId()
-        );
-        boolean candidateCatalogCaptured = candidateCatalog.catalogCaptured();
-        operationDiagnostics.emitStarted(
-                emitter,
-                OPERATION_STARTED,
-                owner,
-                startedOperationFields,
-                operationStartClientTickKnown,
-                candidateCatalogCaptured,
-                candidateCatalogCaptured
-                        ? candidateCatalog.totalCandidateCount()
-                        : "unavailable_not_built"
-        );
-    }
-
-    private Object[] operationFields(
-            Task owner,
-            StoreHomePhase phase,
-            long clientTickId) {
-        return operationDiagnostics.operationFields(
-                owner,
-                topLevelTaskRunId,
-                phase,
-                clientTickId,
-                operationState.startClientTickId(),
-                operationState.startClientTickKnown(),
-                operationState.observation()
-        );
-    }
-
-    private void observeTimeout(StoreHomeTimeoutObservation timeout) {
-        operationState.observe(timeout);
-    }
-
-    private int operationTicks() {
-        return operationState.timeoutTicks();
-    }
-
-    private int candidateTicks() {
-        return operationState.observation().activeCandidateTimeoutTicks();
-    }
-
-    private int operationDecisionTicks(StoreHomeTimeoutReason reason) {
-        return operationState.decisionTicks(reason);
-    }
-
-    private static long currentClientTickId() {
-        return ChatClefDiagnostics.currentClientTickId();
-    }
-
 }
