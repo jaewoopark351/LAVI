@@ -19,6 +19,9 @@ from plugins.Minecraft.fabric.chatclef.ui.fabric_chatclef_json_formatter import 
 from plugins.Minecraft.fabric.chatclef.ui.fabric_chatclef_status_presenter import (
     FabricChatClefStatusPresenter,
 )
+from plugins.Minecraft.fabric.chatclef.ui.feedback import (
+    FabricChatClefUiFeedbackSubmissionRouter,
+)
 
 
 class FabricChatClefCommandController:
@@ -28,12 +31,16 @@ class FabricChatClefCommandController:
         extension: Any = None,
         status_presenter: FabricChatClefStatusPresenter | None = None,
         formatter: FabricChatClefJsonFormatter | None = None,
+        ui_feedback_router: FabricChatClefUiFeedbackSubmissionRouter | None = None,
     ):
         self.plugin = plugin
         self.extension = extension
         self.formatter = formatter or FabricChatClefJsonFormatter()
         self._submission_result_normalizer = (
             MinecraftChatClefSubmissionResultNormalizer()
+        )
+        self._ui_feedback_router = (
+            ui_feedback_router or FabricChatClefUiFeedbackSubmissionRouter()
         )
         self.status_presenter = status_presenter or FabricChatClefStatusPresenter(
             plugin=plugin,
@@ -67,12 +74,11 @@ class FabricChatClefCommandController:
             "source": "lavi_gui",
             "metadata": {"ui": "fabric_chatclef"},
         }
-        handler = None
-        if self.extension is not None:
-            handler = getattr(self.extension, "handle_command", None)
-        if callable(handler):
+        if self._ui_feedback_router.can_submit_raw(self.extension):
             try:
-                return self.formatter.mapping_payload(handler(request))
+                return self.formatter.mapping_payload(
+                    self._ui_feedback_router.submit_raw(self.extension, request)
+                )
             except Exception as error:
                 return self.submission_exception_result(
                     request["request_id"],
@@ -87,17 +93,16 @@ class FabricChatClefCommandController:
             "source": "lavi_gui_korean",
             "metadata": {"ui": "fabric_chatclef", "language": "ko"},
         }
-        handler = None
-        if self.extension is not None:
-            handler = getattr(self.extension, "handle_natural_language_command", None)
-        if not callable(handler):
+        if not self._ui_feedback_router.can_submit_korean(self.extension):
             return self.error_result(
                 request["request_id"],
                 BridgeErrorCode.NOT_IMPLEMENTED,
                 "Fabric ChatClef Korean command handler is unavailable.",
             )
         try:
-            return self.formatter.mapping_payload(handler(request))
+            return self.formatter.mapping_payload(
+                self._ui_feedback_router.submit_korean(self.extension, request)
+            )
         except Exception as error:
             return self.submission_exception_result(
                 request["request_id"],
