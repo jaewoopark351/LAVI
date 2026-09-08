@@ -3,6 +3,8 @@ import inspect
 
 import gradio as gr
 
+from llm_core.chat_input.gradio import GradioLocalChatStreamCompletionAdapter
+
 
 class LocalChatInterfaceFactory:
     def __init__(self, *, prediction_entrypoint):
@@ -13,6 +15,9 @@ class LocalChatInterfaceFactory:
             )
 
         self._prediction_callback = prediction_callback
+        self._stream_completion_adapter = GradioLocalChatStreamCompletionAdapter(
+            prediction_callback=prediction_callback,
+        )
 
     def create(
         self,
@@ -22,7 +27,7 @@ class LocalChatInterfaceFactory:
         autofocus,
     ):
         return gr.ChatInterface(
-            self._prediction_callback,
+            self._stream_completion_adapter.predict,
             additional_inputs=[system_prompt],
             examples=examples,
             autofocus=autofocus,

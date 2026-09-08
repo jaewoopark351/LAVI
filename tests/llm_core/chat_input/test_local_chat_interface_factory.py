@@ -4,12 +4,14 @@ import inspect
 import unittest
 
 import gradio as gr
+from gradio.state_holder import SessionState
 
 from input_core.input_event.adapters import LocalChatInputEventAdapter
 from llm_core.chat_input import (
     LocalChatInterfaceFactory,
     LocalChatPredictionEntrypoint,
 )
+from llm_core.chat_input.gradio import GradioLocalChatStreamCompletionAdapter
 
 
 class LocalChatInterfaceFactoryTests(unittest.TestCase):
@@ -21,7 +23,10 @@ class LocalChatInterfaceFactoryTests(unittest.TestCase):
         async def assert_gradio_contract():
             chat = self._chat_interface(entrypoint)
             self.assertTrue(chat.is_generator)
-            self.assertIs(entrypoint, chat.fn.__self__)
+            self.assertIsInstance(
+                chat.fn.__self__,
+                GradioLocalChatStreamCompletionAdapter,
+            )
 
         self.assertTrue(inspect.isgeneratorfunction(entrypoint.predict))
         asyncio.run(assert_gradio_contract())
@@ -58,6 +63,114 @@ class LocalChatInterfaceFactoryTests(unittest.TestCase):
             [message["role"] for message in outputs[-1][1]],
         )
         self.assertEqual("second", outputs[-1][1][-1]["content"])
+
+    def test_empty_product_stream_completes_without_an_assistant_card(self):
+        callback_messages = []
+
+        def predict(event, _history, _system_prompt):
+            callback_messages.append(event.text)
+            return
+            yield
+
+        entrypoint = self._entrypoint(predict)
+
+        async def collect_stream():
+            chat = self._chat_interface(entrypoint)
+            outputs = [
+                output
+                async for output in chat._stream_fn("STOP", [], "system")
+            ]
+            return chat, outputs
+
+        chat, outputs = asyncio.run(collect_stream())
+
+        self.assertEqual(["STOP"], callback_messages)
+        self.assertEqual(1, len(outputs))
+        self.assertEqual([], outputs[0][0])
+        self.assertEqual(["user"], [item["role"] for item in outputs[0][1]])
+        self.assertEqual("STOP", outputs[0][1][0]["content"])
+
+        postprocessed = chat.chatbot.postprocess(outputs[0][1])
+        round_tripped = type(postprocessed).model_validate_json(
+            postprocessed.model_dump_json()
+        )
+        preprocessed = chat.chatbot.preprocess(round_tripped)
+
+        self.assertEqual(["user"], [item["role"] for item in preprocessed])
+
+    def test_empty_stream_finishes_queue_iterator_and_accepts_next_submit(self):
+        callback_messages = []
+
+        def predict(event, _history, _system_prompt):
+            callback_messages.append(event.text)
+            if event.text == "STOP":
+                return
+            yield "next response"
+
+        entrypoint = self._entrypoint(predict)
+
+        async def submit_twice():
+            chat = self._chat_interface(entrypoint)
+            submit_index = next(
+                index
+                for index, block_fn in chat.fns.items()
+                if block_fn.api_name == "_submit_fn"
+            )
+            state = SessionState(chat)
+            state[chat.saved_input._id] = "STOP"
+            state[chat.chatbot_state._id] = []
+
+            first = await chat.process_api(
+                submit_index,
+                [None, None, "system"],
+                state=state,
+                iterator=None,
+                session_hash="completion-test",
+            )
+            completed = await chat.process_api(
+                submit_index,
+                [],
+                state=state,
+                iterator=first["iterator"],
+                session_hash="completion-test",
+            )
+
+            state[chat.saved_input._id] = "GET"
+            state[chat.chatbot_state._id] = []
+            next_submit = await chat.process_api(
+                submit_index,
+                [None, None, "system"],
+                state=state,
+                iterator=None,
+                session_hash="completion-test",
+            )
+            next_completed = await chat.process_api(
+                submit_index,
+                [],
+                state=state,
+                iterator=next_submit["iterator"],
+                session_hash="completion-test",
+            )
+            return first, completed, next_submit, next_completed
+
+        first, completed, next_submit, next_completed = asyncio.run(
+            submit_twice()
+        )
+
+        self.assertTrue(first["is_generating"])
+        self.assertIsNotNone(first["iterator"])
+        self.assertIsNone(first["data"][0])
+        self.assertEqual(
+            ["user"],
+            [item["role"] for item in first["data"][1]],
+        )
+        self.assertFalse(completed["is_generating"])
+        self.assertIsNone(completed["iterator"])
+        self.assertTrue(next_submit["is_generating"])
+        self.assertIsNotNone(next_submit["iterator"])
+        self.assertFalse(next_completed["is_generating"])
+        self.assertIsNone(next_completed["iterator"])
+        self.assertEqual(["STOP", "GET"], callback_messages)
 
     def test_factory_rejects_non_generator_prediction_method(self):
         class NonStreamingEntrypoint:
