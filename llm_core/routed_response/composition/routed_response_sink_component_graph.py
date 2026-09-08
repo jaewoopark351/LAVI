@@ -10,6 +10,10 @@ from ..routed_response_history_sink_delivery import (
 from ..routed_response_output_sink_delivery import (
     RoutedResponseOutputSinkDelivery,
 )
+from ..presentation.ui import (
+    RoutedResponseUiPresentationAdapter,
+    RoutedResponseUiSinkDelivery,
+)
 
 
 class RoutedResponseSinkComponentGraph:
@@ -20,6 +24,7 @@ class RoutedResponseSinkComponentGraph:
         send_output_callback,
         send_full_output_callback,
         remember_history_callback,
+        ui_presentation_callback,
         observer,
     ):
         self.output_delivery = RoutedResponseOutputSinkDelivery(
@@ -33,6 +38,11 @@ class RoutedResponseSinkComponentGraph:
         )
         self.history_delivery = RoutedResponseHistorySinkDelivery(
             remember_history_callback=remember_history_callback,
+            observer=observer,
+        )
+        self.ui_delivery = RoutedResponseUiSinkDelivery(
+            adapter=RoutedResponseUiPresentationAdapter(),
+            presentation_callback=ui_presentation_callback,
             observer=observer,
         )
 

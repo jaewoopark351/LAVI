@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .presentation import RoutedResponsePresentationMetadata
+
 
 @dataclass(frozen=True, slots=True)
 class RoutedResponseRequest:
@@ -14,6 +16,9 @@ class RoutedResponseRequest:
     event_id: object
     route_kind: str
     response_kind: str
+    delivery_mode: str = "current_input"
+    presentation_metadata: RoutedResponsePresentationMetadata | None = None
+    send_ui: bool = False
 
 
 __all__ = ("RoutedResponseRequest",)

@@ -23,6 +23,7 @@ class RoutedExternalResponseComponentGraph:
         send_output_callback,
         send_full_output_callback,
         remember_history_callback,
+        ui_presentation_callback,
         emission_capability_consumer,
         delivery_logger,
         log_callback,
@@ -43,6 +44,7 @@ class RoutedExternalResponseComponentGraph:
             send_output_callback=send_output_callback,
             send_full_output_callback=send_full_output_callback,
             remember_history_callback=remember_history_callback,
+            ui_presentation_callback=ui_presentation_callback,
             observer=self.delivery_observer,
         )
         self.publication_coordinator = RoutedResponsePublicationCoordinator(

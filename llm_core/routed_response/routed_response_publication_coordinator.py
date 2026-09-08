@@ -43,6 +43,9 @@ class RoutedResponsePublicationCoordinator:
         event_id,
         route_kind,
         response_kind,
+        delivery_mode,
+        presentation_metadata,
+        send_ui,
     ) -> RoutedResponseEmission:
         request = self._request_validator.validate(
             text,
@@ -53,6 +56,9 @@ class RoutedResponsePublicationCoordinator:
             event_id=event_id,
             route_kind=route_kind,
             response_kind=response_kind,
+            delivery_mode=delivery_mode,
+            presentation_metadata=presentation_metadata,
+            send_ui=send_ui,
         )
         return self._sink_delivery.deliver(request)
 
@@ -68,6 +74,9 @@ class RoutedResponsePublicationCoordinator:
         send_output,
         send_full_output,
         remember_history,
+        delivery_mode,
+        presentation_metadata,
+        send_ui,
     ) -> RoutedResponseEmission | None:
         request = self._request_validator.validate(
             text,
@@ -78,6 +87,9 @@ class RoutedResponsePublicationCoordinator:
             event_id=getattr(event, "event_id", None),
             route_kind=route_kind,
             response_kind=response_kind,
+            delivery_mode=delivery_mode,
+            presentation_metadata=presentation_metadata,
+            send_ui=send_ui,
         )
         authorized, rejection_reason = self._capability_authorizer.authorize(
             request,

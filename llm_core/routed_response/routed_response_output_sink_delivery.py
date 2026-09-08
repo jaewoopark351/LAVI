@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from .routed_response_delivery_observer import RoutedResponseDeliveryObserver
 from .routed_response_request import RoutedResponseRequest
+from .presentation import RoutedResponseOutputPayloadAdapter
 
 
 class RoutedResponseOutputSinkDelivery:
@@ -19,7 +20,9 @@ class RoutedResponseOutputSinkDelivery:
             raise TypeError("send_output_callback must be callable")
         if type(observer) is not RoutedResponseDeliveryObserver:
             raise TypeError("observer must be an exact RoutedResponseDeliveryObserver")
-        self._build_output_payload_callback = build_output_payload_callback
+        self._payload_adapter = RoutedResponseOutputPayloadAdapter(
+            build_output_payload_callback
+        )
         self._send_output_callback = send_output_callback
         self._observer = observer
 
@@ -33,8 +36,8 @@ class RoutedResponseOutputSinkDelivery:
         if not request.send_output:
             return False
         try:
-            payload = self._build_output_payload_callback(
-                request.text,
+            payload = self._payload_adapter.build(
+                request,
                 response_generation,
             )
             self._send_output_callback(payload)

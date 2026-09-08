@@ -152,6 +152,9 @@ class LlmCompatibilityGraphInstaller:
             .ensure_routed_external_response_publisher()
         )
 
+    def ensure_ui_presentation_queue(self):
+        return self._generation_output_graph.ensure_ui_presentation_queue()
+
     def ensure_prediction_dispatch_coordinator(self):
         return (
             self._trusted_ingress_graph.ensure_prediction_dispatch_coordinator()

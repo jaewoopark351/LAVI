@@ -19,6 +19,9 @@ class RoutedExternalResponseRuntime:
         event_id=None,
         route_kind="minecraft_chatclef_external",
         response_kind="external",
+        delivery_mode="current_input",
+        presentation_metadata=None,
+        send_ui=False,
     ) -> RoutedResponseEmission:
         return self._publication_coordinator.emit_external_response(
             text,
@@ -29,6 +32,9 @@ class RoutedExternalResponseRuntime:
             event_id=event_id,
             route_kind=route_kind,
             response_kind=response_kind,
+            delivery_mode=delivery_mode,
+            presentation_metadata=presentation_metadata,
+            send_ui=send_ui,
         )
 
     def emit_capability_response(
@@ -43,6 +49,9 @@ class RoutedExternalResponseRuntime:
         send_output=True,
         send_full_output=False,
         remember_history=False,
+        delivery_mode="current_input",
+        presentation_metadata=None,
+        send_ui=False,
     ) -> RoutedResponseEmission | None:
         return self._publication_coordinator.emit_capability_response(
             text,
@@ -54,6 +63,9 @@ class RoutedExternalResponseRuntime:
             remember_history=remember_history,
             route_kind=route_kind,
             response_kind=response_kind,
+            delivery_mode=delivery_mode,
+            presentation_metadata=presentation_metadata,
+            send_ui=send_ui,
         )
 
 

@@ -6,9 +6,51 @@ from types import SimpleNamespace
 from unittest import mock
 
 from llm_core.ui import LlmChatUiBuilder
+from llm_core.routed_response import RoutedResponseUiPresentationQueue
 
 
 class LlmChatUiBuilderTests(unittest.TestCase):
+    def test_build_binds_bounded_async_presentation_drain_to_chatbot(self):
+        fake_gradio = _FakeGradio()
+        host = SimpleNamespace()
+        calls = []
+        chatbot = object()
+        local_factory = _LocalChatFactory(
+            calls,
+            chat_interface=SimpleNamespace(chatbot=chatbot),
+        )
+        presentation_queue = RoutedResponseUiPresentationQueue()
+        builder = LlmChatUiBuilder(
+            host=host,
+            create_plugin_selection_ui_callback=lambda: None,
+            create_plugin_ui_callback=lambda: None,
+            local_chat_interface_factory_callback=lambda: local_factory,
+            load_content_callback=lambda: "prompt",
+            update_content_callback=lambda value: value,
+            speech_style_labels_callback=lambda: {"polite": "polite"},
+            speech_style_label_callback=lambda: "polite",
+            update_speech_style_callback=lambda value: value,
+            reset_history_callback=lambda: None,
+            live_textbox=_LiveTextbox("console"),
+            queue_live_textbox=_LiveTextbox("queue"),
+            ui_presentation_queue_callback=lambda: presentation_queue,
+        )
+
+        with mock.patch("llm_core.ui.llm_chat_ui_builder.gr", fake_gradio):
+            builder.build()
+
+        timer = host.routed_response_ui_presentation_timer
+        tick = timer.tick_calls[0]
+        self.assertEqual((0.25,), timer.args)
+        self.assertEqual([chatbot], tick[1])
+        self.assertEqual([chatbot], tick[2])
+        self.assertFalse(tick[3])
+        self.assertFalse(tick[4])
+        self.assertIs(
+            presentation_queue,
+            host.routed_response_ui_presentation_drain._presentation_queue,
+        )
+
     def test_build_preserves_chat_callbacks_examples_and_timer_outputs(self):
         fake_gradio = _FakeGradio()
         host = SimpleNamespace()
@@ -57,8 +99,8 @@ class LlmChatUiBuilderTests(unittest.TestCase):
         self.assertEqual(["존댓말", "반말"], radio.kwargs["choices"])
         self.assertEqual([(update_style, radio)], radio.change_calls)
         self.assertEqual([(reset, [], [])], button.click_calls)
-        self.assertEqual([host.console_box], timers[0].tick_calls[0][1])
-        self.assertEqual([host.queue_console_box], timers[1].tick_calls[0][1])
+        self.assertEqual([host.console_box], timers[0].tick_calls[0][2])
+        self.assertEqual([host.queue_console_box], timers[1].tick_calls[0][2])
         self.assertEqual("selection", calls[0])
         self.assertEqual("local_chat", calls[1][0])
         self.assertEqual("plugin_ui", calls[-1])
@@ -89,8 +131,8 @@ class _Component:
     def click(self, *, fn, inputs, outputs):
         self.click_calls.append((fn, inputs, outputs))
 
-    def tick(self, *, fn, outputs, show_progress, queue):
-        self.tick_calls.append((fn, outputs, show_progress, queue))
+    def tick(self, *, fn, outputs, show_progress, queue, inputs=None):
+        self.tick_calls.append((fn, inputs, outputs, show_progress, queue))
 
 
 class _FakeGradio:
@@ -130,13 +172,15 @@ class _FakeGradio:
 
 
 class _LocalChatFactory:
-    def __init__(self, calls):
+    def __init__(self, calls, chat_interface=None):
         self._calls = calls
+        self._chat_interface = chat_interface
 
     def create(self, *, system_prompt, examples, autofocus):
         self._calls.append(
             ("local_chat", system_prompt, examples, autofocus)
         )
+        return self._chat_interface
 
 
 class _LiveTextbox:

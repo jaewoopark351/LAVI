@@ -74,6 +74,7 @@ class RoutedResponseDeliveryObserver:
             response_generation=response_generation,
             delivered=delivered,
             reason=reason,
+            delivery_mode=request.delivery_mode,
         )
 
     def observe_chat_ui(
@@ -94,6 +95,32 @@ class RoutedResponseDeliveryObserver:
             response_generation=emission.response_generation,
             delivered=delivered,
             reason=reason,
+            delivery_mode=emission.delivery_mode,
+        )
+
+    def observe_delivery_fact(
+        self,
+        *,
+        source: str,
+        event_id: object,
+        route_kind: str,
+        response_kind: str,
+        sink: str,
+        response_generation: object,
+        delivered: bool,
+        reason: str,
+        delivery_mode: str = "current_input",
+    ) -> bool:
+        return self._log_command_delivery(
+            source=source,
+            event_id=event_id,
+            route_kind=route_kind,
+            response_kind=response_kind,
+            sink=sink,
+            response_generation=response_generation,
+            delivered=delivered,
+            reason=reason,
+            delivery_mode=delivery_mode,
         )
 
     def observe_internal_failure(self, boundary: str) -> None:
@@ -119,6 +146,7 @@ class RoutedResponseDeliveryObserver:
         response_generation: object,
         delivered: bool,
         reason: str,
+        delivery_mode: str = "current_input",
     ) -> bool:
         if source != "minecraft_chatclef":
             return False
@@ -131,6 +159,7 @@ class RoutedResponseDeliveryObserver:
                 response_generation=response_generation,
                 delivered=delivered,
                 reason=reason,
+                delivery_mode=delivery_mode,
             )
         except Exception:
             return False

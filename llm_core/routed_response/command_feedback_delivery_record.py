@@ -13,6 +13,7 @@ class CommandFeedbackDeliveryRecord:
     response_generation: object
     delivered: object
     reason: object
+    delivery_mode: object = "current_input"
 
 
 __all__ = ("CommandFeedbackDeliveryRecord",)

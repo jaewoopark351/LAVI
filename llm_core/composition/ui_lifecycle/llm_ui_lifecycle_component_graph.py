@@ -73,6 +73,11 @@ class LlmUiLifecycleComponentGraph:
         if resetter is None:
             resetter = LlmChatHistoryResetter(
                 history_callback=lambda: facade.history,
+                clear_pending_presentations_callback=(
+                    facade._get_compatibility_graph_installer()
+                    .ensure_ui_presentation_queue()
+                    .clear
+                ),
             )
             facade.chat_history_resetter = resetter
         return resetter
@@ -98,6 +103,10 @@ class LlmUiLifecycleComponentGraph:
                 reset_history_callback=facade.reset_chat,
                 live_textbox=facade.liveTextbox,
                 queue_live_textbox=facade.process_queue_live_textbox,
+                ui_presentation_queue_callback=(
+                    facade._get_compatibility_graph_installer()
+                    .ensure_ui_presentation_queue
+                ),
             )
             facade.chat_ui_builder = builder
         return builder
@@ -152,6 +161,11 @@ class LlmUiLifecycleComponentGraph:
                     None,
                 ),
                 base_shutdown_callback=self._base_shutdown_callback,
+                clear_pending_presentations_callback=(
+                    facade._get_compatibility_graph_installer()
+                    .ensure_ui_presentation_queue()
+                    .clear
+                ),
             )
             facade.runtime_lifecycle_coordinator = coordinator
         return coordinator

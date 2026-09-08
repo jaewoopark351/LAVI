@@ -63,6 +63,7 @@ PUBLIC_INSTALLER_METHODS = (
     "set_input_router",
     "ensure_routed_input_dispatch_coordinator",
     "ensure_routed_external_response_publisher",
+    "ensure_ui_presentation_queue",
     "ensure_prediction_dispatch_coordinator",
     "ensure_text_only_generation_helper",
     "ensure_input_queue_display_updater",

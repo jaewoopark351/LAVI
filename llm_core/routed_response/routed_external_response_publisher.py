@@ -18,6 +18,7 @@ class RoutedExternalResponsePublisher:
         send_output_callback,
         send_full_output_callback,
         remember_history_callback=None,
+        ui_presentation_callback=None,
         emission_capability_consumer=None,
         delivery_logger=None,
         log_callback=log_print,
@@ -28,6 +29,7 @@ class RoutedExternalResponsePublisher:
             send_output_callback=send_output_callback,
             send_full_output_callback=send_full_output_callback,
             remember_history_callback=remember_history_callback,
+            ui_presentation_callback=ui_presentation_callback,
             emission_capability_consumer=emission_capability_consumer,
             delivery_logger=delivery_logger,
             log_callback=log_callback,
@@ -64,6 +66,9 @@ class RoutedExternalResponsePublisher:
         event_id=None,
         route_kind="minecraft_chatclef_external",
         response_kind="external",
+        delivery_mode="current_input",
+        presentation_metadata=None,
+        send_ui=False,
     ) -> RoutedResponseEmission:
         return self._components.runtime.emit_external_response(
             text,
@@ -74,6 +79,9 @@ class RoutedExternalResponsePublisher:
             event_id=event_id,
             route_kind=route_kind,
             response_kind=response_kind,
+            delivery_mode=delivery_mode,
+            presentation_metadata=presentation_metadata,
+            send_ui=send_ui,
         )
 
     def emit_capability_response(
@@ -88,6 +96,9 @@ class RoutedExternalResponsePublisher:
         send_output=True,
         send_full_output=False,
         remember_history=False,
+        delivery_mode="current_input",
+        presentation_metadata=None,
+        send_ui=False,
     ) -> RoutedResponseEmission | None:
         return self._components.runtime.emit_capability_response(
             text,
@@ -99,6 +110,9 @@ class RoutedExternalResponsePublisher:
             remember_history=remember_history,
             route_kind=route_kind,
             response_kind=response_kind,
+            delivery_mode=delivery_mode,
+            presentation_metadata=presentation_metadata,
+            send_ui=send_ui,
         )
 
     def log_chat_ui_delivery(
@@ -112,6 +126,31 @@ class RoutedExternalResponsePublisher:
             emission,
             delivered=delivered,
             reason=reason,
+        )
+
+    def log_sink_delivery(
+        self,
+        *,
+        source,
+        event_id,
+        route_kind,
+        response_kind,
+        sink,
+        response_generation,
+        delivered,
+        reason,
+        delivery_mode="current_input",
+    ) -> bool:
+        return self._components.delivery_observer.observe_delivery_fact(
+            source=source,
+            event_id=event_id,
+            route_kind=route_kind,
+            response_kind=response_kind,
+            sink=sink,
+            response_generation=response_generation,
+            delivered=delivered,
+            reason=reason,
+            delivery_mode=delivery_mode,
         )
 
 

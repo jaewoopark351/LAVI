@@ -24,6 +24,7 @@ class CommandFeedbackDeliveryLogger:
         response_generation: object,
         delivered: object,
         reason: object,
+        delivery_mode: object = "current_input",
     ) -> bool:
         record = CommandFeedbackDeliveryRecord(
             event_id=event_id,
@@ -33,6 +34,7 @@ class CommandFeedbackDeliveryLogger:
             response_generation=response_generation,
             delivered=delivered,
             reason=reason,
+            delivery_mode=delivery_mode,
         )
         try:
             self._callback(self._formatter.format(record))

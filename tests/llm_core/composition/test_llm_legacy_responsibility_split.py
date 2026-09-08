@@ -20,6 +20,7 @@ from llm_core.event_dispatcher import LLMEventDispatcher
 from llm_core.generation import LlmGenerationFacade
 from llm_core.llm_component import LLM
 from llm_core.output import LlmOutputListenerRegistry
+from llm_core.routed_response import RoutedResponseUiPresentationQueue
 from llm_core.speech_configuration import (
     LlmEffectiveSystemPromptBuilder,
     LlmSpeechStylePersistence,
@@ -119,12 +120,28 @@ class LlmLegacyResponsibilitySplitTests(unittest.TestCase):
         ):
             self.assertTrue(hasattr(llm, field_name), field_name)
 
+        llm.routed_response_ui_presentation_queue.enqueue("before reset")
+        llm.reset_chat()
+        self.assertEqual(
+            (),
+            llm.routed_response_ui_presentation_queue.snapshot()[1],
+        )
+        llm.routed_response_ui_presentation_queue.enqueue("before shutdown")
         llm.shutdown()
         self.assertTrue(subscription.unsubscribed)
+        self.assertEqual(
+            (),
+            llm.routed_response_ui_presentation_queue.snapshot()[1],
+        )
 
     def test_history_content_and_output_have_independent_owners(self):
         history = [["user", "answer"]]
-        resetter = LlmChatHistoryResetter(lambda: history)
+        presentation_queue = RoutedResponseUiPresentationQueue()
+        presentation_queue.enqueue("late terminal")
+        resetter = LlmChatHistoryResetter(
+            lambda: history,
+            clear_pending_presentations_callback=presentation_queue.clear,
+        )
         manager = _ContentManager("initial")
         synchronized = []
         repository = LlmSystemPromptContentRepository(
@@ -145,6 +162,7 @@ class LlmLegacyResponsibilitySplitTests(unittest.TestCase):
         registry.send_full_output("complete")
 
         self.assertEqual([], history)
+        self.assertEqual((), presentation_queue.snapshot()[1])
         self.assertEqual(["initial", "updated"], synchronized)
         self.assertEqual(["chunk"], outputs)
         self.assertEqual(["complete"], full_outputs)

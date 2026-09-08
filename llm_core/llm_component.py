@@ -528,6 +528,9 @@ class LLM(PluginSelectionBase):
         event_id=None,
         route_kind="minecraft_chatclef_external",
         response_kind="external",
+        delivery_mode="current_input",
+        presentation_metadata=None,
+        send_ui=False,
     ):
         return self._get_routed_external_response_publisher().emit_external_response(
             text,
@@ -538,6 +541,14 @@ class LLM(PluginSelectionBase):
             event_id=event_id,
             route_kind=route_kind,
             response_kind=response_kind,
+            delivery_mode=delivery_mode,
+            presentation_metadata=presentation_metadata,
+            send_ui=send_ui,
+        )
+
+    def log_routed_response_sink_delivery(self, **values):
+        return self._get_routed_external_response_publisher().log_sink_delivery(
+            **values
         )
 
     def add_output_event_listener(self, function, full_response = False):

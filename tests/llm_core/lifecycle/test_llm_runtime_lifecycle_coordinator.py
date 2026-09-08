@@ -25,6 +25,9 @@ class LlmRuntimeLifecycleCoordinatorTests(unittest.TestCase):
                 None,
             ),
             base_shutdown_callback=lambda: calls.append("base_shutdown"),
+            clear_pending_presentations_callback=(
+                lambda: calls.append("clear_presentations")
+            ),
         )
 
         coordinator.shutdown()
@@ -34,6 +37,7 @@ class LlmRuntimeLifecycleCoordinatorTests(unittest.TestCase):
             [
                 "unsubscribe",
                 "clear_queue",
+                "clear_presentations",
                 "interrupt",
                 "clear_listeners",
                 "base_shutdown",

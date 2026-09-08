@@ -6,7 +6,10 @@ from llm_core.event_dispatcher import LLMEventDispatcher
 from llm_core.generation import LlmGenerationFacade
 from llm_core.output import LlmOutputListenerRegistry
 from llm_core.response_pipeline import LLMResponsePipeline
-from llm_core.routed_response import RoutedExternalResponsePublisher
+from llm_core.routed_response import (
+    RoutedExternalResponsePublisher,
+    RoutedResponseUiPresentationQueue,
+)
 from llm_core.streaming_chunker import LLMStreamingChunker
 from llm_core.text_only_generation import LLMTextOnlyGenerationHelper
 
@@ -90,6 +93,7 @@ class LlmGenerationOutputComponentGraph:
 
     def ensure_routed_external_response_publisher(self):
         facade = self._facade
+        ui_presentation_queue = self.ensure_ui_presentation_queue()
         publisher = getattr(
             facade,
             "routed_external_response_publisher",
@@ -105,6 +109,7 @@ class LlmGenerationOutputComponentGraph:
                 ),
                 send_output_callback=facade.send_output,
                 send_full_output_callback=facade.send_full_output,
+                ui_presentation_callback=ui_presentation_queue.enqueue,
                 emission_capability_consumer=(
                     self._trusted_ingress_graph_callback()
                     .registry.consume_routed_response_emission_capability
@@ -112,6 +117,18 @@ class LlmGenerationOutputComponentGraph:
             )
             facade.routed_external_response_publisher = publisher
         return publisher
+
+    def ensure_ui_presentation_queue(self):
+        facade = self._facade
+        presentation_queue = getattr(
+            facade,
+            "routed_response_ui_presentation_queue",
+            None,
+        )
+        if presentation_queue is None:
+            presentation_queue = RoutedResponseUiPresentationQueue()
+            facade.routed_response_ui_presentation_queue = presentation_queue
+        return presentation_queue
 
 
 __all__ = ("LlmGenerationOutputComponentGraph",)

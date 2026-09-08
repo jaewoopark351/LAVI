@@ -19,6 +19,7 @@ class RoutedResponseSinkDelivery:
         send_output_callback,
         send_full_output_callback,
         remember_history_callback=None,
+        ui_presentation_callback=None,
         observer,
     ) -> None:
         if not callable(begin_generation_callback):
@@ -30,6 +31,7 @@ class RoutedResponseSinkDelivery:
             send_output_callback=send_output_callback,
             send_full_output_callback=send_full_output_callback,
             remember_history_callback=remember_history_callback,
+            ui_presentation_callback=ui_presentation_callback,
             observer=observer,
         )
         self._runtime = RoutedResponseMultiSinkDelivery(
@@ -49,6 +51,10 @@ class RoutedResponseSinkDelivery:
     @property
     def _history_delivery(self):
         return self._components.history_delivery
+
+    @property
+    def _ui_delivery(self):
+        return self._components.ui_delivery
 
     def deliver(self, request: RoutedResponseRequest) -> RoutedResponseEmission:
         return self._runtime.deliver(request)

@@ -18,6 +18,7 @@ class LlmRuntimeLifecycleCoordinator:
         interrupt_subscription_callback,
         clear_interrupt_subscription_callback,
         base_shutdown_callback,
+        clear_pending_presentations_callback=None,
     ) -> None:
         self._components = LlmRuntimeLifecycleComponentGraph(
             clear_pending_inputs_callback=clear_pending_inputs_callback,
@@ -32,6 +33,9 @@ class LlmRuntimeLifecycleCoordinator:
                 clear_interrupt_subscription_callback
             ),
             base_shutdown_callback=base_shutdown_callback,
+            clear_pending_presentations_callback=(
+                clear_pending_presentations_callback
+            ),
         )
 
     def handle_interrupt(self) -> None:

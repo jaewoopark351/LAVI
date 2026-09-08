@@ -17,6 +17,7 @@ class LlmShutdownLifecycleHandler:
         interrupt_subscription_callback,
         clear_interrupt_subscription_callback,
         base_shutdown_callback,
+        clear_pending_presentations_callback=None,
     ):
         callbacks = (
             ("clear_pending_inputs_callback", clear_pending_inputs_callback),
@@ -38,6 +39,13 @@ class LlmShutdownLifecycleHandler:
         for name, callback in callbacks:
             if not callable(callback):
                 raise TypeError(f"{name} must be callable")
+        if (
+            clear_pending_presentations_callback is not None
+            and not callable(clear_pending_presentations_callback)
+        ):
+            raise TypeError(
+                "clear_pending_presentations_callback must be callable"
+            )
         self._clear_pending_inputs_callback = clear_pending_inputs_callback
         self._request_interrupt_callback = request_interrupt_callback
         self._clear_listeners_callback = clear_listeners_callback
@@ -49,6 +57,9 @@ class LlmShutdownLifecycleHandler:
             clear_interrupt_subscription_callback
         )
         self._base_shutdown_callback = base_shutdown_callback
+        self._clear_pending_presentations_callback = (
+            clear_pending_presentations_callback
+        )
 
     def shutdown(self) -> None:
         if self._shutdown_state_callback():
@@ -59,6 +70,8 @@ class LlmShutdownLifecycleHandler:
             subscription.unsubscribe()
             self._clear_interrupt_subscription_callback()
         self._clear_pending_inputs_callback()
+        if self._clear_pending_presentations_callback is not None:
+            self._clear_pending_presentations_callback()
         self._request_interrupt_callback()
         self._clear_listeners_callback()
         input_thread = self._input_thread_callback()
