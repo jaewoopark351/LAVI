@@ -14,6 +14,8 @@
 <!-- 20260908_kpopmodder: Reconciled STORE_HOME's verified profile and the final selected Python regression. -->
 <!-- 20260908_kpopmodder: Reconciled the implemented contextual active-command STATUS response without changing command admission. -->
 <!-- 20260909_kpopmodder: Reconciled the implemented and offline-verified contextual busy-response RB6 policy while preserving rejected admission and zero submission. -->
+<!-- 20260909_kpopmodder: Indexed the docs-only Korean GOTO, new FIND, and full registered-command input-coverage contract. -->
+<!-- 20260909_kpopmodder: Clarified GOTO ownership, FIND's loaded-scope report-only base, semantic alias counting, and dependency-ordered rollout. -->
 
 # LAVI Minecraft Plugin
 
@@ -100,6 +102,19 @@ replace the active identity. Only an exact typed pre-submit busy decision from
 an existing trusted route is eligible. This policy is
 `IMPLEMENTED_VERIFIED_OFFLINE_LIVE_NOT_RUN`; see the
 [contextual active-command busy response contract](docs/chatclef-python-contextual-active-command-busy-response-pre-change-contract-2026-09-08.md).
+
+The next requested command-input expansion is documented but not implemented.
+It separates three workstreams with dependency-ordered, separately revertible
+units: broader Korean XYZ ownership/grammar compiled to the existing canonical
+`@goto`; a new LAVI-owned Java `@find` command whose safe base only reports a
+terminally revalidated target from a bounded loaded/known scope, with approach
+and exploration still unapproved; and command-by-command Korean
+Chat/final-microphone exposure. The current 26 registered names represent 25
+semantic capabilities because `자동보관등록` is a compatibility alias; the
+target after FIND is 27 names and 26 semantic Korean routes. Current source
+still has no `@find` or `@go`, and only 10 commands are public Korean input
+commands. See the
+[Korean GOTO, FIND, and all-command coverage contract](docs/chatclef-korean-goto-find-and-all-command-coverage-pre-change-contract-2026-09-09.md).
 
 ## Current Implementation Scope
 
@@ -682,6 +697,9 @@ Contextual natural active-command STATUS responses for all ordinary command-life
 
 Contextual current-task wording for an exact typed pre-submit busy rejection, with rejected admission, zero submission and unchanged active identity (implemented and verified offline; Java/Gradle/live runtime not run; no commit or push performed):
   chatclef-python-contextual-active-command-busy-response-pre-change-contract-2026-09-08.md
+
+Korean coordinate GOTO ownership/grammar, bounded loaded-scope LAVI-owned FIND behavior, and Korean Chat/final-microphone coverage for every registered command (documentation only; implementation, Java build, deployment, and runtime not run):
+  chatclef-korean-goto-find-and-all-command-coverage-pre-change-contract-2026-09-09.md
 
 Generic wooden-button StackOverflow root cause, applied correction, clean-build proof, and matching-JAR `PARTIALLY_VERIFIED` runtime status:
   chatclef-wooden-button-stack-overflow-pre-change-report-2026-09-06.md
