@@ -139,24 +139,65 @@ A later 2026-09-11 reproduction used an active-instance JAR matching the build
 artifact by size and SHA-256. `goto -500 80 16` moved from `(-490,64,8)` to the
 target vicinity but did not arrive, repeated failed calculations, wander, and
 blacklist attempts, and ended only at the 12,000-active-tick overall limit. The
-reported finite counters did not represent those events. Current unit status is:
+required finite early terminal did not occur. The no-path/no-progress counters
+are consecutive; wander/recalculation are filtered edge/generation counts; and
+all four can reset. Their exact mapping to raw engine events was not proven.
+Current unit status is:
 
 ```text
 KOREAN_TRANSLATION_ADMISSION_AND_ROOT_BINDING: VERIFIED_RUNTIME
-A3_F_FINITE_EARLY_FAILURE: FAILED_RUNTIME_ACCEPTANCE
-A2_EXACT_ARRIVAL: NOT_EXERCISED
-A4_ROUTE_AND_MATERIAL_READINESS: NOT_PROVEN_RUNTIME
-A5_BOUNDED_MATERIAL_ACQUISITION: NOT_EXERCISED_NO_OPT_IN
-NAVIGATION_ROOT_CAUSE: UNKNOWN
-EXACT_SAFE_ROLLBACK_SCOPE: NOT_PROVEN
+GOTO_LIVE_ACCEPTANCE_STATUS: FAILED_RUNTIME_ACCEPTANCE
+NAVIGATION_ROOT_CAUSE_STATUS: UNKNOWN
+GOTO_A3_F_FINITE_EARLY_FAILURE_STATUS: FAILED_RUNTIME_ACCEPTANCE
+GOTO_TERMINAL_COUNTER_EVENT_MAPPING_STATUS: NOT_PROVEN_RUNTIME
+GOTO_COUNTER_SEMANTIC_GAPS_EVIDENCE: SOURCE_PROVEN
+GOTO_FINITE_COUNTER_EXACT_TICK_CAUSAL_CHAIN_STATUS: UNKNOWN
+GOTO_A2_EXACT_ARRIVAL_STATUS: NOT_EXERCISED
+GOTO_BUILD_REQUIREMENT_EMISSION_STATUS: VERIFIED_RUNTIME
+GOTO_BUILD_REQUIREMENT_EVENT_COUNT: 240
+GOTO_BUILD_REQUIREMENT_EVIDENCE_STATUS: NOT_PROVEN_RUNTIME
+GOTO_BUILDING_MATERIAL_READINESS_EMISSION_STATUS: VERIFIED_RUNTIME
+GOTO_BUILDING_MATERIAL_READINESS_EVENT_COUNT: 16
+GOTO_BUILDING_MATERIAL_READINESS_EVIDENCE_STATUS: NOT_PROVEN_RUNTIME
+GOTO_EXECUTION_TRANSITION_EMISSION_STATUS: FAILED_RUNTIME_ACCEPTANCE
+GOTO_EXECUTION_TRANSITION_OBSERVED_EVENT_COUNT: 0
+GOTO_EXECUTION_TRANSITION_BUDGET_STARVATION_EVIDENCE: SOURCE_PROVEN
+NONTERMINAL_EMISSIONS_BEFORE_TERMINAL_PHASE_CHANGE: 256
+NONTERMINAL_EMISSION_COUNT_EVIDENCE: DERIVED_FROM_OPERATION_SCOPED_EVENT_COUNTS
+GOTO_TERMINAL_DECISION_EMISSION_STATUS: VERIFIED_RUNTIME
+GOTO_TERMINAL_DECISION_EVENT_COUNT: 1
+GOTO_TERMINAL_DECISION_VERIFIED_SCOPE: OVERALL_TIMEOUT_DELIVERY_ONLY
+GOTO_A4_BEHAVIOR_GATE_STATUS: NOT_EXERCISED
+GOTO_A4_BEHAVIOR_GATE_REASON: TERMINAL_PAYLOAD_MATERIAL_STATE_REMAINED_NULL_AND_NO_FINITE_FAILURE_BRANCH_COMMITTED
+GOTO_A5_MATERIAL_ACQUISITION_STATUS: NOT_EXERCISED
+GOTO_A5_MATERIAL_ACQUISITION_REASON: NO_PER_COMMAND_OPT_IN
+EVENT_COUNT_LOG_SOURCE: ACTIVE_INSTANCE_LATEST_LOG
+EVENT_COUNT_OPERATION_ID: goto-23bd64e9-118b-4c3f-8b21-649cabf0afb2
+EXACT_SAFE_ROLLBACK_SCOPE: UNKNOWN
+RESTORATION_SALVAGE_AUDIT_STATUS: NOT_RUN
 ```
+
+The A3D readiness records were observation-only emissions with incomplete
+evidence; they do not prove that the later A4 behavior gate ran. A4 non-entry is
+instead established by the final timeout payload's null usable/required material
+state together with the controller data flow: A4 first assigns that state, a
+`READY` branch would preserve complete/proven non-null counts through a later
+timeout, and every non-`READY` branch in this no-opt-in run would commit a sticky
+non-timeout terminal. A5 was independently ineligible because the accepted
+command had no per-command opt-in. The zero execution-transition count is a
+separate diagnostics-delivery failure caused by the local 256-record
+nonterminal budget being exhausted before the controller's
+terminal-quiescing transition could be recorded. It does not establish the
+navigation root cause.
 
 Do not reuse or salvage the failed behavior, introduce replacement behavior, or
 describe it as verified until the incident's diagnostics-first gate is met. A
 narrow removal/restoration of exact failed hunks is a separate
 `RECOVERY_ROLLBACK` path requiring the completed strict provenance audit, exact
-inverse hunks, preservation of unrelated changes, and explicit user approval of
-the exact paths and action. See the
+inverse hunks, preservation of unrelated changes, and explicit user approval
+recorded as `USER_APPROVED_EXACT_ROLLBACK_UNIT` for each exact method/hunk or an
+exact whole-file removal with its expected impact. Path-only or generic rollback
+approval is insufficient. See the
 [GOTO diagnostics-before-behavior incident record](docs/chatclef-goto-diagnostics-before-behavior-incident-2026-09-11.md).
 
 ## Current Implementation Scope

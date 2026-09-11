@@ -129,24 +129,39 @@ Required GOTO incident and recurrence-prevention record:
 
 Codex must read and apply this record before proposing, salvaging, restoring,
 modifying, building, deploying, or evaluating Fabric ChatClef GOTO behavior.
-The record and the gate below define the maximum permissible change
-classification; they do not authorize a source edit, build, deployment,
-Minecraft launch, runtime reproduction, external-instance copy, Baritone cache
-mutation, commit, or push. The active user request must separately authorize
-each applicable action. An explicit read-only, audit-only, no-edit, or
-documentation-only request keeps the effective classification at `NONE`.
+This incident gate applies to the failed navigation implementation, A2, A3D,
+A3-F, A4, A5, their dispatch/execution/result/packaging attachments, and any
+hunk that salvages or reuses them. A pure Korean input-grammar change may follow
+its separate contract only after read-only provenance proves that it does not
+touch or package those behavior boundaries. If that independence is unknown, or
+if the change reaches dispatch, route execution, terminal projection, packaging,
+or failed-work reuse, this incident gate applies.
+The record and the gate below define the maximum normal source-change
+classification; they do not authorize a source edit, recovery rollback, build,
+deployment, Minecraft launch, runtime reproduction, external-instance copy,
+live-world execution, live-world block mutation, manual Baritone cache mutation,
+commit, or push. The active user request must separately authorize each
+applicable action. An explicit read-only, audit-only, no-edit, or
+documentation-only request keeps production, test, configuration, and runtime
+action classification at `NONE`; it does not prevent the documentation edits
+that the user explicitly requested.
 
 Until a controlled runtime reproduction proves the exact last successful
 boundary, first failing boundary, triggering state, expected and observed
 transition, and retry/wander/path owner, the maximum normal source-change
-classification is bounded diagnostics-only. Focused tests, a successful build,
+classification is `DIAGNOSTICS_ONLY`. Focused tests, a successful build,
 matching JAR identity, or a terminal timeout do not prove the root cause or
 verify a behavior fix. The exact container GUI-open stabilization exception
 applies only to its enumerated GUI-open hunks. It never authorizes a GOTO hunk,
 including when GUI and GOTO changes appear in the same diff or work request.
 
-Before any GOTO source edit, `RECOVERY_ROLLBACK`, build, deployment, runtime
-reproduction, or cache mutation, report this gate explicitly:
+Before any in-scope GOTO source edit, `RECOVERY_ROLLBACK`, build, deployment,
+Minecraft launch, external-instance copy, runtime reproduction, live-world
+execution, live-world block mutation, manual cache mutation, Task stop, world
+exit, Minecraft process control, or source-bearing commit or push, report this
+gate explicitly. A docs-only commit or push remains outside this source gate only
+after its exact staged path list proves that no source, test, resource,
+configuration, runtime artifact, or unrelated file is included.
 
 ```text
 GOTO_INCIDENT_RECORD_READ: YES
@@ -154,9 +169,14 @@ REPRODUCTION_ID:
 ACTIVE_ARTIFACT_SHA256:
 COMMAND_CORRELATION_ID:
 OPERATION_ID:
-ROOT_CAUSE_STATUS: VERIFIED_RUNTIME or UNKNOWN
+NAVIGATION_ROOT_CAUSE_STATUS: VERIFIED_RUNTIME or UNKNOWN
 PARENT_TASK:
 CHILD_TASK:
+FINITE_COUNTER_OWNER:
+TERMINAL_DECISION_OWNER:
+DIAGNOSTIC_BUDGET_OWNER:
+FIRST_REQUIRED_PHASE_TRANSITION_EMISSION_STATUS:
+DIAGNOSTIC_SUPPRESSION_REASON:
 PATH_OR_GOAL_OWNER:
 LAST_SUCCESSFUL_BOUNDARY:
 FIRST_FAILING_BOUNDARY:
@@ -169,23 +189,59 @@ EXACT_FILES_AND_HUNKS_PROPOSED:
 EXACT_PROPOSED_FIX_BOUNDARY:
 FAILED_IMPLEMENTATION_ROLLBACK_SCOPE:
 PROPOSED_CHANGE_EXACT_ROLLBACK_UNIT:
-NEXT_ALLOWED_CHANGE_CLASSIFICATION: NONE, DIAGNOSTICS_ONLY, RECOVERY_ROLLBACK, or BEHAVIOR
+USER_APPROVED_EXACT_ROLLBACK_UNIT:
+PROPOSED_CHANGE_CLASSIFICATION: NONE, DIAGNOSTICS_ONLY, RECOVERY_ROLLBACK, or BEHAVIOR
+MAXIMUM_NORMAL_SOURCE_CHANGE_CLASSIFICATION: NONE, DIAGNOSTICS_ONLY, or BEHAVIOR
+ACTIVE_WORLD_IDENTITY:
+ACTIVE_WORLD_SAVE_PATH:
+WORLD_COPY_RESTORE_REPLACE_RENAME_HISTORY:
+BARITONE_CACHE_EVIDENCE:
+CACHE_TARGET_ABSOLUTE_PATH:
+CACHE_ACTION: NONE, INSPECT_ONLY, or exact manual mutation
+TASK_STOPPED: YES, NO, UNKNOWN, or NOT_APPLICABLE
+TASK_STOPPED_EVIDENCE_STATUS: VERIFIED_RUNTIME, UNKNOWN, or NOT_APPLICABLE
+WORLD_EXITED: YES, NO, UNKNOWN, or NOT_APPLICABLE
+WORLD_EXITED_EVIDENCE_STATUS: VERIFIED_RUNTIME, UNKNOWN, or NOT_APPLICABLE
+MINECRAFT_PROCESS_CLOSED: YES, NO, UNKNOWN, or NOT_APPLICABLE
+MINECRAFT_PROCESS_CLOSED_EVIDENCE_STATUS: VERIFIED_RUNTIME, UNKNOWN, or NOT_APPLICABLE
+NOT_APPLICABLE_REASON:
 ACTIVE_REQUEST_AUTHORIZES_SOURCE_EDIT: YES or NO
+ACTIVE_REQUEST_AUTHORIZES_RECOVERY_ROLLBACK: YES or NO
 ACTIVE_REQUEST_AUTHORIZES_BUILD: YES or NO
 ACTIVE_REQUEST_AUTHORIZES_DEPLOYMENT: YES or NO
-ACTIVE_REQUEST_AUTHORIZES_RUNTIME: YES or NO
-ACTIVE_REQUEST_AUTHORIZES_CACHE_MUTATION: YES or NO
+ACTIVE_REQUEST_AUTHORIZES_MINECRAFT_LAUNCH: YES or NO
+ACTIVE_REQUEST_AUTHORIZES_EXTERNAL_INSTANCE_COPY: YES or NO
+ACTIVE_REQUEST_AUTHORIZES_RUNTIME_REPRODUCTION: YES or NO
+ACTIVE_REQUEST_AUTHORIZES_LIVE_WORLD_EXECUTION: YES or NO
+ACTIVE_REQUEST_AUTHORIZES_LIVE_WORLD_BLOCK_MUTATION: YES or NO
+ACTIVE_REQUEST_AUTHORIZES_TASK_STOP: YES or NO
+ACTIVE_REQUEST_AUTHORIZES_WORLD_EXIT: YES or NO
+ACTIVE_REQUEST_AUTHORIZES_MINECRAFT_PROCESS_CONTROL: YES or NO
+ACTIVE_REQUEST_AUTHORIZES_MANUAL_CACHE_MUTATION: YES or NO
+ACTIVE_REQUEST_AUTHORIZES_COMMIT: YES or NO
+ACTIVE_REQUEST_AUTHORIZES_PUSH: YES or NO
 ```
 
-The causal evidence set is `ROOT_CAUSE_STATUS`, `REPRODUCTION_ID`,
+Every authorization field must be `YES` or `NO`; one authorization never
+implies another, and no authorization field may be `NOT_APPLICABLE`. Only a
+non-authorization evidence/state field about a phase genuinely outside the
+selected action may be `NOT_APPLICABLE`, and only with
+`NOT_APPLICABLE_REASON`. Do not use it for the causal source/behavior fields
+when proposing a source or behavior edit, or for rollback/provenance fields when
+proposing `RECOVERY_ROLLBACK`.
+
+The causal evidence set is `NAVIGATION_ROOT_CAUSE_STATUS`, `REPRODUCTION_ID`,
 `ACTIVE_ARTIFACT_SHA256`, `COMMAND_CORRELATION_ID`, `OPERATION_ID`,
-`PARENT_TASK`, `CHILD_TASK`, `PATH_OR_GOAL_OWNER`, `LAST_SUCCESSFUL_BOUNDARY`,
+`PARENT_TASK`, `CHILD_TASK`, `FINITE_COUNTER_OWNER`,
+`TERMINAL_DECISION_OWNER`, `DIAGNOSTIC_BUDGET_OWNER`,
+`FIRST_REQUIRED_PHASE_TRANSITION_EMISSION_STATUS`,
+`DIAGNOSTIC_SUPPRESSION_REASON`, `PATH_OR_GOAL_OWNER`, `LAST_SUCCESSFUL_BOUNDARY`,
 `FIRST_FAILING_BOUNDARY`, `TRIGGERING_STATE`, `EXPECTED_TRANSITION`,
 `OBSERVED_TRANSITION`, `RETRY_OWNER`, `WANDER_OWNER`, and
 `EXACT_PROPOSED_FIX_BOUNDARY`. For a new or replacement behavior change,
-`ROOT_CAUSE_STATUS` must be `VERIFIED_RUNTIME`. If it is not, or if any other
-field in that set is unknown, the normal classification must not exceed
-`DIAGNOSTICS_ONLY`; that behavior change is prohibited.
+`NAVIGATION_ROOT_CAUSE_STATUS` must be `VERIFIED_RUNTIME`. If it is not, or if
+any other field in that set is unknown, the normal classification must not
+exceed `DIAGNOSTICS_ONLY`; that behavior change is prohibited.
 `RECOVERY_ROLLBACK` is evaluated separately under the exception below and is
 not ordered above or below `DIAGNOSTICS_ONLY`.
 
@@ -205,9 +261,41 @@ failed hunks and their exact inverse hunks, and proves how every unrelated user
 change will be preserved. If the baseline is described as the latest remote or
 GitHub state, current read-only remote-freshness evidence is required; otherwise
 that freshness must remain `UNKNOWN`. The user must then explicitly approve the
-exact paths and rollback action, and the rollback must remain an independently
+exact method and hunk, or an exact whole-file removal with its expected impact;
+path-only or generic rollback approval is insufficient. Record that approval in
+`USER_APPROVED_EXACT_ROLLBACK_UNIT`. The rollback must remain an independently
 reviewable unit without replacement behavior. If any condition is missing,
 rollback remains blocked.
+For this GOTO gate, `strict read-only provenance audit` imports only the generic
+no-write, evidence-label, complete-transcript, working-tree inventory,
+untracked-provenance, and exact method/diff-hunk invariants from the later
+restoration protocol. It does not import that protocol's Carry On-specific
+commit `76026f8`, branch list, file list, marker, evidence checklist, or report
+template. The GOTO comparison baseline and target evidence must be identified
+for this incident under Gate G/G.1; never substitute the hard-coded Carry On
+baseline.
+`ACTIVE_REQUEST_AUTHORIZES_SOURCE_EDIT: YES` does not authorize rollback;
+`ACTIVE_REQUEST_AUTHORIZES_RECOVERY_ROLLBACK: YES` and a matching
+`USER_APPROVED_EXACT_ROLLBACK_UNIT` for the exact method/hunk or impact-specified
+whole-file removal are independently required.
+
+An untracked path's absence from a comparison baseline proves only that the path
+was not tracked there. It does not prove who created it, that it belongs to the
+failed implementation, or that deleting it is safe. Without independent
+creation provenance, do not classify an untracked path as a rollback or deletion
+target. Any approved removal must name the exact file, method/hunk or whole-file
+impact, preservation plan, and user-approved action.
+Immediately before applying an approved rollback, repeat read-only checks of
+`HEAD`, the exact target hashes, hunk context, staged/unstaged state, and relevant
+untracked paths. They must match the audit snapshot and
+`USER_APPROVED_EXACT_ROLLBACK_UNIT`. Any intervening target change, overlapping
+hunk, ref change, index change, or relevant worktree change invalidates the
+rollback unit and its approval; stop, repeat the strict audit, and obtain approval
+for the newly identified exact unit.
+If the approved unit depends on a claim about the latest remote or GitHub ref,
+repeat the exact read-only `git ls-remote` query immediately before application
+and require the remote object ID to match the audited value. A moved ref or an
+unavailable freshness check invalidates that remote-dependent unit and approval.
 During the strict restoration/salvage audit, report the proposed rollback scope
 in conversation only; do not save a manifest or modify a file. A persisted
 manifest may be created only after that audit has ended and a separate explicit
@@ -220,6 +308,18 @@ Baritone cache evidence. Cache presence or use alone does not prove staleness or
 causality. Renaming, deleting, or otherwise mutating a cache requires explicit
 user approval, a stopped task, exit from the world, a fully closed Minecraft
 process, and verification of the exact cache path.
+Immediately before a manual cache mutation, `TASK_STOPPED`, `WORLD_EXITED`, and
+`MINECRAFT_PROCESS_CLOSED` must each be `YES` with evidence status
+`VERIFIED_RUNTIME`, and `ACTIVE_REQUEST_AUTHORIZES_MANUAL_CACHE_MUTATION` must be
+`YES`. If Codex must stop the Task, exit the world, or control the process to
+establish those states, the matching action-authorization field must also be
+`YES` before that action.
+Ordinary Minecraft or Baritone runtime may automatically read or write its own
+cache; record that as a runtime side effect, not as authorization for a manual
+rename, deletion, reset, replacement, or other cache mutation. Because GOTO and
+its optional acquisition path may move, break, or place blocks, Minecraft
+launch, runtime reproduction, live-world execution, and live-world block
+mutation remain separate authorizations.
 
 Reading the companion document alone is not a work request. A direct user
 request to implement a Fabric ChatClef change defines the repository-local
@@ -1396,7 +1496,18 @@ For unknown-cause work, if the exact failure boundary is still unknown, remain a
 
 #### Read-only restoration baseline audit and failed-work salvage protocol
 
-This protocol applies when the user asks for either or both of the following:
+This section contains a generic strict read-only audit shell and a
+Carry On-specific restoration/salvage profile. The generic shell consists only
+of the no-write rules, evidence labels, complete command transcript,
+working-tree inventory, untracked-provenance protection, and exact
+method/diff-hunk analysis rules. The hard-coded commit `76026f8`, branch names,
+required files, ChatClef `0.18.23`/Carry On evidence, Java marker, and final
+report template belong only to the Carry On profile described here. They must
+not be used as a GOTO baseline or imported into another incident merely because
+that incident requires a strict read-only audit.
+
+The Carry On-specific profile applies when the user asks for either or both of
+the following for that failed or destabilizing Carry On work:
 
 * confirmation of a clean restored baseline
 * identification of the smallest reusable ideas from a previous failed or destabilizing implementation
@@ -1420,13 +1531,18 @@ Do not:
 * run a build, compiler, Gradle task, test task, application startup, or runtime reproduction
 * install, remove, upgrade, downgrade, or resolve dependencies
 * download or generate Gradle wrapper files
-* run `git commit`, `git push`, `git fetch`, `git pull`, `git merge`, `git rebase`, `git cherry-pick`, `git am`, or `git apply`
-* switch, create, delete, reset, rewrite, or force-update branches
-* stash, restore, reset, checkout, clean, or otherwise alter the working tree or index
+* run `git add`, `git update-index`, `git commit`, `git push`, `git fetch`, `git pull`, `git merge`, `git rebase`, `git cherry-pick`, `git am`, or `git apply`
+* create, remove, move, repair, lock, unlock, or prune a Git worktree
+* switch, create, delete, reset, rewrite, or force-update branches, tags, notes, or refs
+* stash, restore, reset, checkout, clean, or otherwise alter the working tree, index, refs, object database, or any other `.git` state
 
-Read-only commands such as `git status`, `git show`, `git diff`, `git ls-files`, `git check-ignore`, `git rev-parse`, `git branch -vv`, and `git ls-remote` are allowed. `git ls-remote` may query the remote without updating local refs; it must not be replaced with `fetch` merely to make remote state easier to inspect.
+Read-only commands such as `git status`, `git show`, `git diff`, `git ls-files`, `git check-ignore`, `git rev-parse`, `git branch -vv`, and `git ls-remote` are allowed only with optional repository writes disabled. Prefer the global form `git --no-optional-locks <command>` for every local audit command. A process-scoped `GIT_OPTIONAL_LOCKS=0` is an alternative when the installed Git does not support that form; do not persist it in Git, Windows, shell-profile, or repository configuration. If neither method is available, do not claim bit-for-bit `.git` immutability. `git ls-remote` may query the remote without updating local refs; it must not be replaced with `fetch` merely to make remote state easier to inspect.
 
 If a requested fact cannot be established without a prohibited operation, report it as `[확인 불가]` and explain the exact missing evidence. Do not perform the prohibited operation.
+If a needed commit, tree, blob, or remote branch content is absent locally,
+finish the current strict audit with that fact as `UNKNOWN`. Request separate
+authorization for any state-changing retrieval, then start a new audit after the
+retrieval; never fetch or otherwise mutate `.git` during the strict audit itself.
 
 ##### Mandatory evidence labels
 
@@ -1483,20 +1599,20 @@ Recommended baseline commands for Windows CMD are:
 ```bat
 cd /d C:\Vtuber_Souorce_Code\LAVI
 cd
-git rev-parse --show-toplevel
-git status --short --branch
-git status --porcelain=v1 --untracked-files=all
-git branch -vv
-git rev-parse --abbrev-ref HEAD
-git rev-parse HEAD
-git rev-parse "76026f8^{commit}"
-git show -s --decorate=full --format=fuller HEAD
-git rev-parse --abbrev-ref --symbolic-full-name "@{upstream}"
-git rev-list --left-right --count HEAD..."@{upstream}"
-git remote -v
-git ls-remote --heads origin refs/heads/minecraft-plugin-fix/alto-clef-infinite-loop refs/heads/p1a-plugin-lifecycle
-git diff --name-status
-git diff --cached --name-status
+git --no-optional-locks rev-parse --show-toplevel
+git --no-optional-locks status --short --branch
+git --no-optional-locks status --porcelain=v1 --untracked-files=all
+git --no-optional-locks branch -vv
+git --no-optional-locks rev-parse --abbrev-ref HEAD
+git --no-optional-locks rev-parse HEAD
+git --no-optional-locks rev-parse "76026f8^{commit}"
+git --no-optional-locks show -s --decorate=full --format=fuller HEAD
+git --no-optional-locks rev-parse --abbrev-ref --symbolic-full-name "@{upstream}"
+git --no-optional-locks rev-list --left-right --count HEAD..."@{upstream}"
+git --no-optional-locks remote -v
+git --no-optional-locks ls-remote --heads origin refs/heads/minecraft-plugin-fix/alto-clef-infinite-loop refs/heads/p1a-plugin-lifecycle
+git --no-optional-locks diff --name-status
+git --no-optional-locks diff --cached --name-status
 ```
 
 A command that is unsupported, unavailable, fails because an upstream is not configured, or cannot reach the remote must remain in the report with its actual error. Do not hide a failed command and do not substitute a state-changing command.
@@ -1504,8 +1620,8 @@ A command that is unsupported, unavailable, fails because an upstream is not con
 For the expected baseline commit `76026f8`, compare the full object ID resolved by:
 
 ```bat
-git rev-parse HEAD
-git rev-parse "76026f8^{commit}"
+git --no-optional-locks rev-parse HEAD
+git --no-optional-locks rev-parse "76026f8^{commit}"
 ```
 
 Classify the result precisely:
@@ -1539,6 +1655,13 @@ Report separately:
 * ignored files only when directly relevant to Gradle wrapper, required JAR, build input, or the current audit
 
 Preserve exact repository-relative paths. If the working tree is clean, support the claim with the exact `git status` output. Do not modify, stash, restore, or hide any item to obtain a clean result.
+
+An untracked file's absence from a comparison commit is not creation provenance
+and does not prove that it belongs to failed work or is safe to delete. Without
+independent origin evidence, classify its rollback/delete eligibility as
+`UNKNOWN`. Any later removal requires the exact path, method/hunk or whole-file
+impact, preservation plan, and explicit user approval after this strict audit
+has ended.
 
 ##### Required files and line-level evidence
 
@@ -1610,8 +1733,8 @@ where gradle
 rem Run gradle --version only when it is confirmed not to create files or caches.
 gradle --version
 dir /a:-d /b C:\Vtuber_Souorce_Code\LAVI\plugins\Minecraft\runtime\chatclef_fabric_1.20.1\gradle\wrapper
-git ls-files --stage -- plugins/Minecraft/runtime/chatclef_fabric_1.20.1/gradle/wrapper/gradle-wrapper.jar
-git check-ignore -v --no-index plugins/Minecraft/runtime/chatclef_fabric_1.20.1/gradle/wrapper/gradle-wrapper.jar
+git --no-optional-locks ls-files --stage -- plugins/Minecraft/runtime/chatclef_fabric_1.20.1/gradle/wrapper/gradle-wrapper.jar
+git --no-optional-locks check-ignore -v --no-index plugins/Minecraft/runtime/chatclef_fabric_1.20.1/gradle/wrapper/gradle-wrapper.jar
 ```
 
 A `git check-ignore` exit code indicating no matching ignore rule is evidence of no match for that exact path, not proof that all JARs are safe. Evaluate each relevant broad rule and each required JAR path separately.
@@ -1708,6 +1831,9 @@ Then:
 A user-supplied archive outside the repository may be inspected read-only when its exact path is provided. Do not extract it into the current baseline. Prefer archive listing and in-memory or stream-based content comparison. Do not create temporary extracted files during strict read-only mode.
 
 A previous Git branch must be inspected with read-only operations such as `git show`, `git diff`, or `git log`. Do not checkout, merge, rebase, cherry-pick, or fetch it. If the branch is only on a remote that is not already locally available, `git ls-remote` may establish existence, but content comparison remains `[확인 불가]` unless the content is already accessible without a prohibited operation.
+The same restriction applies when `git ls-remote` proves a newer remote object
+exists: remote existence or freshness does not make its contents locally
+available and does not authorize fetching it during the audit.
 
 For every supplied previous-work source, report this validation record before comparison:
 

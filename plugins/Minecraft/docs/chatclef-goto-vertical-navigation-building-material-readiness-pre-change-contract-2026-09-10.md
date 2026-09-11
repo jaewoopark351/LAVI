@@ -16,8 +16,10 @@ Date: 2026-09-10
 > Current status override, 2026-09-11: the later matching-JAR live-runtime
 > acceptance failed. The command did not reach `(-500, 80, 16)`; repeated
 > Baritone failure and wander activity ended only at the 12,000-active-tick
-> overall limit, while the terminal counters did not represent those events.
-> The navigation root cause and an exact safe rollback unit remain unproven.
+> overall limit without the required early typed terminal. The counter-specific,
+> resettable terminal fields were not reconciled to owner events; raw event
+> counts are not assumed to map 1:1. The navigation root cause and exact safe
+> rollback unit remain `UNKNOWN`.
 > Read the
 > [ChatClef GOTO Diagnostics-Before-Behavior Incident Record](chatclef-goto-diagnostics-before-behavior-incident-2026-09-11.md)
 > before using any implementation-readiness statement below. The source and
@@ -45,7 +47,8 @@ remain incomplete; the GOTO implementation does not conceal that reserve defect.
 DOCUMENT_TYPE: HISTORICAL_INCIDENT_INVESTIGATION_IMPLEMENTATION_LEDGER_AND_BEHAVIOR_CONTRACT
 STATUS: SUPERSEDED_BY_FAILED_RUNTIME_ACCEPTANCE_ROOT_CAUSE_UNPROVEN
 CURRENT_INCIDENT_RECORD: chatclef-goto-diagnostics-before-behavior-incident-2026-09-11.md
-CURRENT_IMPLEMENTATION_DISPOSITION: REFERENCE_ONLY_PENDING_HUNK_SALVAGE_AUDIT
+CURRENT_IMPLEMENTATION_DISPOSITION: REFERENCE_ONLY
+RESTORATION_SALVAGE_AUDIT_STATUS: NOT_RUN
 STATUS_FIELDS_BELOW: HISTORICAL_PRE_RUNTIME_LEDGER_NOT_CURRENT_ACCEPTANCE
 HISTORICAL_SOURCE_IMPLEMENTED_AT_PRE_RUNTIME_SNAPSHOT: GOTO-A3-S,GOTO-A2,GOTO-A3D-CORE,GOTO-A3-F,GOTO-A3-ATTACH,GOTO-A4,GOTO-A5
 SOURCE_EVIDENCE_GAPS: GOTO-A3D-UPSTREAM-PROGRESS-WANDER-BLACKLIST-CORRELATION,GOTO-A3D-JOIN-CLOCK-RUNTIME-MIRROR
@@ -94,8 +97,8 @@ DEPLOYMENT_IN_THIS_TASK: NOT_RUN
 LIVE_RUNTIME_VERIFICATION_IN_THIS_TASK: NOT_RUN
 MINECRAFT_RUN_STARTED_BY_THIS_TASK: NO
 USER_RUN_RUNTIME_LOGS: REVIEWED
-COMMIT: NOT_PERFORMED
-PUSH: NOT_PERFORMED
+COMMIT_AT_PRE_RUNTIME_SNAPSHOT: NOT_RUN
+PUSH_AT_PRE_RUNTIME_SNAPSHOT: NOT_RUN
 ```
 
 The reviewed worktree already contained unrelated or preceding user work in
@@ -654,8 +657,10 @@ reviewed GOTO owner value or use a separate GOTO event. The
 existing `BARITONE_GOAL_PATH_TRANSITION` event may be reused only with all of
 its authoritative required fields and semantic values unchanged. The
 `GOTO_MATERIAL_ACQUISITION_TRANSITION` event was dormant in the 2026-09-10
-pre-change state; it is active after the A5 source implementation and its exact
-behavior-audit fields are canonical in Task Lifecycle Diagnostics.
+pre-change state; its source hook was present in the later mixed-worktree
+A3-F/A4/A5 source snapshot, but the incident's operation-scoped physical
+emission count was zero. Its exact behavior-audit field spelling is recorded in
+Task Lifecycle Diagnostics.
 
 If Baritone does not expose an exact placement requirement through an existing
 read-only boundary, record `placementRequirement=UNAVAILABLE`. Do not inspect
@@ -926,9 +931,11 @@ GOTO-A2 event join:
 
 GOTO-A3D schema:
     the canonical event names, fields, values, unavailable reasons, dedupe,
-        200-tick unchanged-summary interval, 256-record operation cap,
-        32-record terminal reservation, and 8192-byte event cap are fixed in
-        chatclef-task-lifecycle-diagnostics.md
+        200-tick unchanged-summary interval, 256-record local nonterminal cap,
+        separate local 32-record terminal cap, and 8192-byte event cap are
+        fixed in chatclef-task-lifecycle-diagnostics.md; the terminal cap is
+        not a reservation inside the nonterminal pool, and physical emission
+        remains subject to shared session/family admission
 ```
 
 The version-1 `effect_payload` is an exact closed map. Its required keys and
@@ -1008,7 +1015,7 @@ the first three units in Section 8.3. AUTO-DEPOSIT-RESERVE-F remains separate
 and unimplemented. Neither decision record claims deployment, a live Minecraft
 run, cache deletion, commit, or push.
 
-### 8.3 2026-09-11 A3-F, A4, and A5 implementation decision closure
+### 8.3 Historical source-recorded 2026-09-11 A3-F, A4, and A5 decision closure
 
 <!-- 20260911_kpopmodder: Record the exact user-selected finite and destructive-policy bounds implemented in the LAVI-owned GOTO parent. -->
 
@@ -1275,7 +1282,7 @@ JAR copy, Minecraft launch, and live-world verification were all explicitly
 `NOT_RUN`. The later matching-JAR runtime failure supersedes any readiness
 inference from this snapshot.
 
-## 9. Ownership ledger for implemented and remaining units
+## 9. Historical source-recorded ownership ledger and remaining units
 
 ```text
 Implemented owner:
@@ -1456,7 +1463,7 @@ its own reserve contract.
   consistently by Python Chat and final-microphone paths, with unknown versions
   and missing required fields failing closed.
 
-### 11.2 Implemented diagnostic core and remaining A3D acceptance
+### 11.2 Historical source-recorded diagnostic core and remaining A3D acceptance
 
 - same-level ordinary GOTO remains unchanged;
 - high-Y target with a natural stair/terrain route performs no acquisition;
@@ -1465,13 +1472,13 @@ its own reserve contract.
 - an unpopulated empty executor, a computed zero, `UNAVAILABLE`, and a stale
   generation are distinguishable; none is fabricated as a route shortage;
 - unchanged observations are rate-limited and do not create per-tick log spam;
-- the implemented diagnostic admission gate exits before runtime, Baritone, or
+- the source-recorded diagnostic admission gate exits before runtime, Baritone, or
   inventory reads when diagnostics are disabled;
 - remaining A3D work must correlate a positive, fresh current-path-generation
   placement set, upstream progress/wander/blacklist ownership, and the immutable
   event-join serial mirror without turning any diagnostic into behavior authority.
 
-### 11.3 Implemented GOTO-A3-F finite-lifecycle acceptance
+### 11.3 Historical source-recorded GOTO-A3-F finite-lifecycle contract
 
 - repeated no-progress/wander states reach one finite typed terminal;
 - overall active ticks 12000, consecutive no-path ticks 200, consecutive no-
@@ -1487,9 +1494,9 @@ its own reserve contract.
   movement-input release, and custom/explore `onLostControl` effects, and must
   prove the new parent adds no second global cleanup path.
 
-These are implemented source requirements, not a runtime-verification claim.
+These were source-recorded requirements, not a runtime-verification claim.
 
-### 11.4 Implemented GOTO-A4 already-available-material behavior
+### 11.4 Historical source-recorded GOTO-A4 already-available-material behavior
 
 - sufficient accepted cobblestone permits the existing Baritone movement path;
 - the final effective placement set is captured after settings load; retained
@@ -1515,7 +1522,7 @@ These are implemented source requirements, not a runtime-verification claim.
 - incidental inventory, path, executor, world, or dimension changes invalidate
   and recalculate readiness before any behavior decision.
 
-### 11.5 Implemented GOTO-A5 bounded recovery and strict fail-closed boundary
+### 11.5 Historical source-recorded GOTO-A5 bounded recovery and strict fail-closed boundary
 
 - the strict planner can classify only a positive, fresh, exact current-
   executor/path-generation shortage signal, but the execution controller never
@@ -1611,13 +1618,15 @@ These are implemented source requirements, not a runtime-verification claim.
 
 ### 11.7 Cache and reproduction decision
 
-If the world was copied, restored, replaced, or renamed, apply the documented
-Baritone cache troubleshooting flow before attributing a repeated path to LAVI
-GOTO behavior. Do not delete or rename cache while Minecraft is running. A
-cache-reset reproduction and a non-reset reproduction are separate evidence.
-The cache/history decision and a controlled reproduction remain required before
-using new runtime evidence to claim that A3-F fixed this particular incident;
-the bounded feature's explicit 2026-09-11 implementation is recorded separately.
+Current operational cache requirements are owned by Gate H of the
+[GOTO diagnostics-before-behavior incident record](chatclef-goto-diagnostics-before-behavior-incident-2026-09-11.md),
+which supersedes this historical ledger. Record world identity, exact save path,
+copy/restore/replace/rename history, cache evidence, exact cache target/action,
+Task stop, world exit, and closed-process state before any approved manual cache
+mutation. A normal Minecraft/Baritone runtime may automatically read or write
+cache as an expected runtime side effect; that does not authorize manual rename,
+delete, reset, replacement, or other mutation. Cache-reset and non-reset runs
+remain separate reproduction IDs and evidence.
 
 ## 12. Historical intended implementation units — not a proven rollback manifest
 
@@ -1646,7 +1655,7 @@ policy. Focused Java verification passed; the required clean build was
 The closed non-destructive LAVI bridge ATTACH follows A3-S and A2/A3D and does
 not require A3-F. It leaves native, XZ, Y, NONE, malformed, and compound forms
 on the ordinary executor.
-The original incident's single cause remains unproven; the implemented finite
+The original incident's single cause remains unproven; the source-recorded finite
 policy is the later explicit bounded feature contract, not a claim that cache
 or material state was the sole incident cause.
 GOTO-A3D precedes every behavior-changing material decision.
@@ -1664,9 +1673,10 @@ engine changes, deployment, or live-world execution.
 
 Outside the separately specified exact GUI workflow, a documentation,
 investigate/diagnose, or source-implementation request does not implicitly
-authorize a clean build. If the active request separately includes build or
-verification and the unit is to receive a Java `VERIFIED` claim, run its
-focused tests and one clean forced build from the exact runtime root:
+authorize a clean build. Only when the active request explicitly authorizes the
+exact clean forced build—not merely generic "verification"—may the following
+command run from the exact runtime root. Focused tests require their own active
+request scope when they are not otherwise explicitly included:
 
 ```powershell
 Set-Location -LiteralPath 'C:\Vtuber_Souorce_Code\LAVI\plugins\Minecraft\runtime\chatclef_fabric_1.20.1'
@@ -1681,6 +1691,11 @@ explicit scopes.
 Rollback must use the exact files/hunks or independently revertible commits for
 the affected unit. Do not use broad checkout, reset, clean, cache deletion, or
 rollback of the user's unrelated Korean GOTO worktree changes.
+This historical ordering is not approval or an executable rollback manifest.
+Current recovery additionally requires the incident record's Gate G/G.1,
+including explicit `USER_APPROVED_EXACT_ROLLBACK_UNIT` approval for each exact
+method/hunk or impact-specified whole-file removal; path-only approval is
+insufficient.
 
 ## 13. Completion criteria
 

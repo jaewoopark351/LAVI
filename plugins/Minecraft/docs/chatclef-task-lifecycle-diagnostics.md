@@ -3028,35 +3028,47 @@ do not call side-effecting Minecraft, Baritone, Carry On, input, or container AP
   merely to fill a log field
 ```
 
-### GOTO A3D diagnostic field spelling and failed-runtime status
+### GOTO A3D incident status ledger and diagnostic wire spelling
 
 <!-- 20260910_kpopmodder: Recorded the bounded GOTO observation vocabulary before adding Java emitters. -->
 
-The names and serialized values below preserve the spelling used by the current
-mixed-worktree source and reviewed logs. `Canonical` in this subsection means
-field/value spelling compatibility only. It does not mean that the diagnostics
-are complete, that their counters are authoritative, or that the observed GOTO
-behavior passed runtime acceptance.
+The first block below is a documentation-only status ledger for the reviewed
+incident. Its keys are not Java event fields or serialized wire/log fields and
+must not be implemented or emitted merely because they appear here. The actual
+diagnostic wire vocabulary begins with the required operation fields after the
+incident explanation.
 
 ```text
 GOTO_LIVE_ACCEPTANCE_STATUS: FAILED_RUNTIME_ACCEPTANCE
-DOCUMENTED_SCHEMA_ROLE: REFERENCE_ONLY
-CANONICAL_SCOPE: FIELD_NAMES_AND_SERIALIZED_VALUE_SPELLING_ONLY
+LEDGER_ROLE: CURRENT_INCIDENT_STATUS_SUMMARY
+LEDGER_KEY_SCOPE: DOCUMENTATION_ONLY_NOT_LOG_OR_WIRE_FIELDS
+DIAGNOSTIC_WIRE_SCHEMA_START: REQUIRED_OPERATION_FIELDS_BELOW
 NAVIGATION_ROOT_CAUSE_STATUS: UNKNOWN
 GOTO_BUILD_REQUIREMENT_EMISSION_STATUS: VERIFIED_RUNTIME
+GOTO_BUILD_REQUIREMENT_EVENT_COUNT: 240
 GOTO_BUILD_REQUIREMENT_EVIDENCE_STATUS: NOT_PROVEN_RUNTIME
 GOTO_BUILDING_MATERIAL_READINESS_EMISSION_STATUS: VERIFIED_RUNTIME
+GOTO_BUILDING_MATERIAL_READINESS_EVENT_COUNT: 16
 GOTO_BUILDING_MATERIAL_READINESS_EVIDENCE_STATUS: NOT_PROVEN_RUNTIME
-GOTO_TERMINAL_DECISION_STATUS: VERIFIED_RUNTIME
+GOTO_TERMINAL_DECISION_EMISSION_STATUS: VERIFIED_RUNTIME
+GOTO_TERMINAL_DECISION_EVENT_COUNT: 1
 GOTO_TERMINAL_DECISION_VERIFIED_SCOPE: OVERALL_TIMEOUT_DELIVERY_ONLY
-GOTO_FINITE_COUNTER_ACCURACY: FAILED_RUNTIME_ACCEPTANCE
+GOTO_A3_F_FINITE_EARLY_FAILURE_STATUS: FAILED_RUNTIME_ACCEPTANCE
+GOTO_TERMINAL_COUNTER_EVENT_MAPPING_STATUS: NOT_PROVEN_RUNTIME
+GOTO_COUNTER_SEMANTIC_GAPS_EVIDENCE: SOURCE_PROVEN
+GOTO_FINITE_COUNTER_EXACT_TICK_CAUSAL_CHAIN_STATUS: UNKNOWN
 GOTO_A2_EXACT_ARRIVAL_STATUS: NOT_EXERCISED
+GOTO_A4_BEHAVIOR_GATE_STATUS: NOT_EXERCISED
+GOTO_A4_BEHAVIOR_GATE_REASON: TERMINAL_PAYLOAD_MATERIAL_STATE_REMAINED_NULL_AND_NO_FINITE_FAILURE_BRANCH_COMMITTED
 GOTO_A5_MATERIAL_ACQUISITION_STATUS: NOT_EXERCISED
 GOTO_A5_MATERIAL_ACQUISITION_REASON: NO_PER_COMMAND_OPT_IN
 GOTO_EXECUTION_TRANSITION_EMISSION_STATUS: FAILED_RUNTIME_ACCEPTANCE
 GOTO_EXECUTION_TRANSITION_OBSERVED_EVENT_COUNT: 0
-NONTERMINAL_EMISSIONS_AT_TERMINAL_TRANSITION: 256
-BUDGET_STARVATION_MECHANISM_EVIDENCE: SOURCE_PROVEN
+NONTERMINAL_EMISSIONS_BEFORE_TERMINAL_PHASE_CHANGE: 256
+NONTERMINAL_EMISSION_COUNT_EVIDENCE: DERIVED_FROM_OPERATION_SCOPED_EVENT_COUNTS
+EVENT_COUNT_LOG_SOURCE: ACTIVE_INSTANCE_LATEST_LOG
+EVENT_COUNT_OPERATION_ID: goto-23bd64e9-118b-4c3f-8b21-649cabf0afb2
+GOTO_EXECUTION_TRANSITION_BUDGET_STARVATION_EVIDENCE: SOURCE_PROVEN
 RESTORATION_SALVAGE_AUDIT_STATUS: NOT_RUN
 EXACT_SAFE_ROLLBACK_SCOPE: UNKNOWN
 ```
@@ -3064,16 +3076,35 @@ EXACT_SAFE_ROLLBACK_SCOPE: UNKNOWN
 The matching-JAR 2026-09-11 incident emitted build-requirement and readiness
 records with `observationComplete=false` and missing authoritative path,
 calculation, inventory, whole-route, and wander-owner evidence. Its one terminal
-path proved delivery of the 12,000-active-tick overall timeout, not the accuracy
-of the reported finite counters. The accepted command had no
-`주변 블록 채굴 허용` suffix, so A5 material-acquisition behavior was not
-exercised.
+path proved delivery of the 12,000-active-tick overall timeout, not a documented
+mapping from counter-specific finite fields to raw engine events. No-path and
+no-progress are consecutive counters; wander and recalculation are filtered
+edge/generation counters; and all four can reset. The
+required A3-F early typed terminal did not occur, so its live acceptance failed;
+the exact tick-level counter chain remains unknown.
+
+The readiness records came from the observation-only tick-snapshot path, not
+from the later A4 behavior branch. `GotoExecutionController.tickNavigation`
+checks overall timeout before finite navigation failure. On A4 entry it assigns
+`latestMaterials` and `latestReadiness`; a `READY` result requires complete and
+proven evidence whose non-null usable/required counts persist into any later
+timeout, while a non-`READY` result in this no-opt-in upward run commits a sticky
+non-timeout terminal. The actual terminal was the overall timeout with both
+material counts null, zero acquisition attempts, and only one operation-scoped
+`GetToBlockTask` identity in the lifecycle log. This combined source/runtime
+evidence establishes A4 as `NOT_EXERCISED`. The accepted command independently
+made A5 ineligible because it had no `주변 블록 채굴 허용` suffix, so A5
+material-acquisition behavior was `NOT_EXERCISED` with reason
+`NO_PER_COMMAND_OPT_IN`.
 
 The execution-transition event is a separate failure. Despite its historical
-name, `GOTO_MATERIAL_ACQUISITION_TRANSITION` observes every
-`GotoExecutionPhase` change, including quiescing for a terminal. The reviewed
-log snapshot contains 240 build-requirement and 16 readiness records, exactly
-exhausting the shared 256-record nonterminal cap, and zero transition records.
+name, `GOTO_MATERIAL_ACQUISITION_TRANSITION` observes only phase changes made by
+`executionController.tick()` across the enclosing before/after hook, including
+quiescing for a terminal. It does not observe every `GotoExecutionPhase` change.
+The reviewed operation-scoped `latest.log` snapshot contains 240
+build-requirement and 16 readiness records, exactly exhausting the shared
+256-record local nonterminal cap, and zero transition records. `stdout-logs.txt`
+duplicates the console stream and must not be added to these counts.
 Source calls the tick-snapshot observers before the controller tick and admits
 the later transition through that same exhausted nonterminal pool. Thus the
 overall-timeout phase transition could not publish its first transition record.
@@ -3087,6 +3118,12 @@ timeout, input, goal/path, placement, mining, blacklist, or cleanup behavior.
 The later `GOTO_MATERIAL_ACQUISITION_TRANSITION` record audits a phase change
 already made by the behavior-owning controller. It does not choose or drive the
 change.
+
+Beginning here, field names and serialized values preserve the spelling used by
+the current mixed-worktree source and reviewed logs. `Canonical` below means
+wire spelling compatibility only. It does not mean that the diagnostics are
+complete, that their counters are authoritative, or that the observed GOTO
+behavior passed runtime acceptance.
 
 Every GOTO A3D record uses these required operation fields:
 
@@ -3115,11 +3152,12 @@ missingBoundaries
 taskBehaviorAffected
 ```
 
-`taskBehaviorAffected` is `false` for the three observation-only A3D records
-and was serialized as `true` only when
-`GOTO_MATERIAL_ACQUISITION_TRANSITION` observed a transition made by the
-behavior-owning controller. The name describes the observed transition, not an
-effect caused by diagnostic emission. The event itself must remain
+`taskBehaviorAffected` is `false` for the three observation-only A3D records.
+The source configures it as `true` for
+`GOTO_MATERIAL_ACQUISITION_TRANSITION` when that event would observe a transition
+made by the behavior-owning controller; the incident physically emitted zero
+such records. The name describes the observed transition, not an effect caused
+by diagnostic emission. The event itself must remain
 side-effect-free.
 `routeRootAssignmentToken` and `routeRootGeneration` belong to the LAVI route
 invocation; the diagnostic
@@ -3263,8 +3301,10 @@ arrival proof.
 
 `GOTO_MATERIAL_ACQUISITION_TRANSITION` was source-attached to the failed
 mixed-worktree A3-F/A4/A5 controller and, despite its name, was intended to
-observe every execution-phase change. Its incident emission path failed runtime
-acceptance because shared-budget exhaustion suppressed the terminal transition.
+observe controller-tick-owned execution-phase changes across that one hook. Its
+incident emission path failed runtime acceptance because shared-budget
+exhaustion suppressed the terminal transition. Arrival freeze and phase changes
+made through other lifecycle methods are outside that hook.
 If retained for a future evidence-backed controller, emit it only after an
 actual behavior-owned execution-phase change; the event must remain an observer
 and never authorize mining, restart navigation, commit a terminal, or own
@@ -3325,8 +3365,10 @@ semantic transition without allowing unchanged summaries to starve those
 boundaries. The failed snapshot attempted at most one unchanged summary per 200
 distinct client ticks and used one shared 256-record nonterminal cap, but that
 cap did not reserve transition capacity and therefore did not guarantee first
-transition delivery. Terminal records had a separate 32-record reserve before
-the shared session hard cap. The semantic dedupe key excludes game/client ticks,
+transition delivery. Terminal records had a separate local cap of 32; this was
+not a reservation inside the 256-record nonterminal pool and did not guarantee
+physical emission, which remained subject to the shared session/family
+admission limits. The semantic dedupe key excludes game/client ticks,
 timestamps, runtime object identities, and random IDs. Each encoded event is
 capped at 8192 UTF-8 bytes. Required unavailable values use an uppercase typed
 reason such as `UNAVAILABLE_NO_CURRENT_EXECUTOR`,

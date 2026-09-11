@@ -34,27 +34,58 @@ UNTRACKED_COUNT_COMMAND: git ls-files --others --exclude-standard
 UNTRACKED_GOTO_OR_MOVEMENT_RELATED_FILES_AT_REVIEW: 270
 RELATED_COUNT_FILTER: case-insensitive path regex goto|navigation|movement
 BEHAVIOR_CHANGE_BEFORE_RUNTIME_CAUSE_PROOF: YES
-DIAGNOSTICS_FIRST_RULE_COMPLIANCE: FAILED
-FOCUSED_TEST_STATUS: PASSED_BUT_NOT_PROOF_OF_LIVE_FAILURE_MECHANISM
-DEPLOYED_JAR_IDENTITY_STATUS: MATCHED_BUILD_ARTIFACT_BY_SIZE_AND_SHA256
-LIVE_RUNTIME_ACCEPTANCE: FAILED
-NAVIGATION_FAILURE_ROOT_CAUSE_STATUS: UNKNOWN
-FINITE_COUNTER_OBSERVATION_STATUS: RUNTIME_MISMATCH_AND_SOURCE_CONTRACT_DEFECT_CONFIRMED_EXACT_TICK_CAUSAL_CHAIN_UNKNOWN
-EXACT_SAFE_ROLLBACK_SCOPE: NOT_PROVEN
-FAILED_IMPLEMENTATION_ROLLBACK_SCOPE: NOT_PROVEN
-RESTORATION_SALVAGE_AUDIT_STATUS: NOT_RUN_PENDING
+DIAGNOSTICS_FIRST_RULE_COMPLIANCE: CONFIRMED_PROCESS_FAILURE
+FOCUSED_TEST_OUTCOME: PASSED
+FOCUSED_TEST_LIVE_FAILURE_MECHANISM_EVIDENCE_STATUS: NOT_PROVEN_RUNTIME
+DEPLOYED_JAR_IDENTITY_STATUS: VERIFIED_ARTIFACT
+DEPLOYED_JAR_IDENTITY_SCOPE: MATCHED_BUILD_ARTIFACT_BY_SIZE_AND_SHA256
+GOTO_LIVE_ACCEPTANCE_STATUS: FAILED_RUNTIME_ACCEPTANCE
+NAVIGATION_ROOT_CAUSE_STATUS: UNKNOWN
+GOTO_A3_F_FINITE_EARLY_FAILURE_STATUS: FAILED_RUNTIME_ACCEPTANCE
+GOTO_TERMINAL_COUNTER_EVENT_MAPPING_STATUS: NOT_PROVEN_RUNTIME
+GOTO_COUNTER_SEMANTIC_GAPS_EVIDENCE: SOURCE_PROVEN
+GOTO_FINITE_COUNTER_EXACT_TICK_CAUSAL_CHAIN_STATUS: UNKNOWN
+GOTO_A2_EXACT_ARRIVAL_STATUS: NOT_EXERCISED
+GOTO_BUILD_REQUIREMENT_EMISSION_STATUS: VERIFIED_RUNTIME
+GOTO_BUILD_REQUIREMENT_EVENT_COUNT: 240
+GOTO_BUILD_REQUIREMENT_EVIDENCE_STATUS: NOT_PROVEN_RUNTIME
+GOTO_BUILDING_MATERIAL_READINESS_EMISSION_STATUS: VERIFIED_RUNTIME
+GOTO_BUILDING_MATERIAL_READINESS_EVENT_COUNT: 16
+GOTO_BUILDING_MATERIAL_READINESS_EVIDENCE_STATUS: NOT_PROVEN_RUNTIME
+GOTO_EXECUTION_TRANSITION_EMISSION_STATUS: FAILED_RUNTIME_ACCEPTANCE
+GOTO_EXECUTION_TRANSITION_OBSERVED_EVENT_COUNT: 0
+NONTERMINAL_EMISSIONS_BEFORE_TERMINAL_PHASE_CHANGE: 256
+NONTERMINAL_EMISSION_COUNT_EVIDENCE: DERIVED_FROM_OPERATION_SCOPED_EVENT_COUNTS
+GOTO_EXECUTION_TRANSITION_BUDGET_STARVATION_EVIDENCE: SOURCE_PROVEN
+GOTO_TERMINAL_DECISION_EMISSION_STATUS: VERIFIED_RUNTIME
+GOTO_TERMINAL_DECISION_EVENT_COUNT: 1
+GOTO_TERMINAL_DECISION_VERIFIED_SCOPE: OVERALL_TIMEOUT_DELIVERY_ONLY
+GOTO_A4_BEHAVIOR_GATE_STATUS: NOT_EXERCISED
+GOTO_A4_BEHAVIOR_GATE_REASON: TERMINAL_PAYLOAD_MATERIAL_STATE_REMAINED_NULL_AND_NO_FINITE_FAILURE_BRANCH_COMMITTED
+GOTO_A5_MATERIAL_ACQUISITION_STATUS: NOT_EXERCISED
+GOTO_A5_MATERIAL_ACQUISITION_REASON: NO_PER_COMMAND_OPT_IN
+EVENT_COUNT_LOG_SOURCE: ACTIVE_INSTANCE_LATEST_LOG
+EVENT_COUNT_OPERATION_ID: goto-23bd64e9-118b-4c3f-8b21-649cabf0afb2
+EXACT_SAFE_ROLLBACK_SCOPE: UNKNOWN
+FAILED_IMPLEMENTATION_ROLLBACK_SCOPE: UNKNOWN
+RESTORATION_SALVAGE_AUDIT_STATUS: NOT_RUN
 BLANKET_RESET_RESTORE_CHECKOUT_CLEAN: PROHIBITED
-FAILED_WORK_DISPOSITION: REFERENCE_ONLY_PENDING_HUNK_SALVAGE_AUDIT
-MAXIMUM_NEXT_SOURCE_CHANGE_CLASSIFICATION: BOUNDED_DIAGNOSTICS_ONLY
-SOURCE_CHANGE_AUTHORIZATION_FROM_THIS_DOCUMENT: NONE
+FAILED_WORK_DISPOSITION: REFERENCE_ONLY
+MAXIMUM_NORMAL_SOURCE_CHANGE_CLASSIFICATION: DIAGNOSTICS_ONLY
+CLASSIFICATION_IS_NOT_AUTHORIZATION: YES
+SOURCE_CHANGE_AUTHORIZATION_FROM_THIS_DOCUMENT: NO
 NEXT_ALLOWED_BEHAVIOR_CHANGE: BLOCKED_PENDING_RUNTIME_BOUNDARY_PROOF
 PRODUCTION_CODE_CHANGE_IN_THIS_DOCUMENTATION_TASK: NONE
 BUILD_IN_THIS_DOCUMENTATION_TASK: NOT_RUN
 DEPLOYMENT_IN_THIS_DOCUMENTATION_TASK: NOT_RUN
 RUNTIME_IN_THIS_DOCUMENTATION_TASK: NOT_RUN
-COMMIT: NOT_PERFORMED
-PUSH: NOT_PERFORMED
+COMMIT_AT_INITIAL_DOCUMENTATION_CAPTURE: NOT_RUN
+PUSH_AT_INITIAL_DOCUMENTATION_CAPTURE: NOT_RUN
 ```
+
+위 commit/push field는 이 문서의 최초 작성 직전 snapshot만 뜻한다. 이후 문서 전용
+commit `0897d846`이 이 기록을 추가했고 `049d61b2`가 관련 상태 문서를 조정했다. 이
+문서 commit 이력은 GOTO source, build 또는 runtime 검증 근거가 아니다.
 
 현재 구현 판정은 `FAILED_RUNTIME_ACCEPTANCE`이다. 이는 저장소가 복구 불가능하다는
 뜻이 아니라, 현재 GOTO 행동 구현을 검증된 기반으로 인정할 수 없다는 뜻이다.
@@ -63,10 +94,12 @@ PUSH: NOT_PERFORMED
 
 1. 진단보다 행동을 먼저 구현한 절차 위반은
    `CONFIRMED_PROCESS_FAILURE`이다.
-2. 실제 failed-calculation/wander lifecycle이 terminal counter에 표현되지 않은
-   모순은 `[VERIFIED_RUNTIME]`이고, reader/state의 의미 계약 mismatch는
-   `[SOURCE_PROVEN]`이다. 최종 counter를 만든 정확한 tick별 인과 사슬은
-   `[UNKNOWN]`이다.
+2. 실제 failed-calculation, wander, blacklist 반복과 조기 typed terminal의 부재는
+   `[VERIFIED_RUNTIME]`이고, reader/state의 의미 계약 gap은 `[SOURCE_PROVEN]`이다.
+   terminal의 no-path/no-progress counter는 consecutive 값이고, wander/recalculation은
+   각각 filtered rising-edge/generation 값이며, 네 값 모두 reset될 수 있다. 따라서 raw
+   engine event와 1:1로 대응한다고 가정할 수 없다. 정확한 event-to-counter mapping과
+   최종 counter를 만든 tick별 인과 사슬은 `[UNKNOWN]`이다.
 3. Baritone이 목표 부근의 남은 상승 구간 `(-501,70,17) -> (-500,80,16)`을
    완성하지 못한 단일 원인은 여전히 `UNKNOWN`이다. X/Z도 각각 1블록 다르므로 이
    구간을 순수 수직 경로로 단정하지 않는다.
@@ -95,10 +128,13 @@ PUSH: NOT_PERFORMED
 
 ## 3. 사용자 요청과 기대된 처리
 
-사용자는 다음 파일들이 0바이트가 아니라고 명시하고, 코드를 수정하지 말고 로그를
-확인해 달라고 요청했다.
+사용자는 다음 wildcard discovery 경로와 exact active-instance 경로의 로그가
+0바이트가 아니라고 명시하고, 코드를 수정하지 말고 로그를 확인해 달라고 요청했다.
 
 ```text
+C:\Users\jaewo\curseforge\minecraft\Instances\*\logs\latest.log
+C:\Users\jaewo\curseforge\minecraft\Instances\*\logs\instance_audit.txt
+C:\Users\jaewo\curseforge\minecraft\Instances\*\logs\stdout-logs.txt
 C:\Users\jaewo\curseforge\minecraft\Instances\LAVI_TEST_Fabric01\logs\latest.log
 C:\Users\jaewo\curseforge\minecraft\Instances\LAVI_TEST_Fabric01\logs\instance_audit.txt
 C:\Users\jaewo\curseforge\minecraft\Instances\LAVI_TEST_Fabric01\logs\stdout-logs.txt
@@ -131,7 +167,8 @@ C:\Vtuber_Souorce_Code\LAVI\logs
 | 이후 | `(-490,64,8)`에서 X/Z 목표 부근을 거쳐 `(-501,70,17)`까지 이동 | `[VERIFIED_RUNTIME]` |
 | 이후 | 목표 부근의 남은 상승 구간 `(-501,70,17) -> (-500,80,16)`에서 path failure, `TimeoutWanderTask`, blacklist attempt가 반복됨 | `[VERIFIED_RUNTIME]` |
 | 12:39:23 | 12,000 active ticks, 약 601.7초 후 전체 active-tick limit만 작동 | `[VERIFIED_RUNTIME]` |
-| 로그 감사 후 | 실제 반복과 terminal counter의 모순을 확인하고, observer가 descendant 존재를 간접 표본화할 뿐 authoritative episode transition·identity·attempt·reset cause를 기록하지 않음을 확인 | `[VERIFIED_RUNTIME]` + `[SOURCE_PROVEN]` |
+| 로그 감사 후 | 실제 반복에도 조기 typed terminal이 없었고, observer가 descendant 존재를 간접 표본화할 뿐 authoritative episode transition·identity·attempt·reset cause를 기록하지 않아 raw event와 terminal counter의 mapping을 재구성할 수 없음을 확인 | `[VERIFIED_RUNTIME]` + `[SOURCE_PROVEN]` + `[UNKNOWN]` |
+| 로그·소스 교차검사 후 | 같은 operation의 build 240건과 readiness 16건이 local nonterminal cap 256을 먼저 소진해 controller tick이 만든 terminal-quiescing transition 기록이 0건이 된 별도 진단 전달 결함을 확인 | `[VERIFIED_RUNTIME]` + `[SOURCE_PROVEN]` |
 | 대화 후반 | exact inverse hunk와 provenance 없이 선택 원복을 먼저 권고함 | `CONFIRMED_PROCESS_FAILURE` |
 | 현재 | reset, restore, checkout, clean, 캐시 변경 및 코드 원복은 실행하지 않음 | `[NOT_RUN]` |
 
@@ -194,9 +231,9 @@ Minecraft launch와 명령 실행 시각은 그 뒤였으므로 이번 런타임
 | `latest.log:1169,1220` | calculation generation 1과 2의 `SUCCESS_SEGMENT` 및 각 segment 종점 |
 | `latest.log:1276,1319,1343,1366,1390,1414` | calculation generation 3~8의 `FAILURE`와 no-path non-adoption |
 | `latest.log:1438` | calculation generation 9의 `CANCELLATION` |
-| `stdout-logs.txt:4075` | 첫 `Failed to make progress`, `TimeoutWanderTask` episode와 `Try 1 / 4` 시작 |
+| `stdout-logs.txt:4075` | 첫 `Failed to make progress`, `TimeoutWanderTask` episode와 `Try 1 / 4` 시작. raw stdout 행 자체에는 correlation ID가 없으며, 같은 active GOTO 시간 구간·target과 인접한 correlated lifecycle 기록으로 사건에 연결됨 |
 | `stdout-logs.txt:4157` | 실제 Task path `LaviGotoTask > GetToBlockTask > TimeoutWanderTask` |
-| `stdout-logs.txt:7144` | 같은 target에 `Try 15 / 4` 기록 |
+| `stdout-logs.txt:7144` | 같은 active GOTO 시간 구간과 target에 `Try 15 / 4` 기록. raw 행 자체에는 correlation ID가 없음 |
 | `latest.log:2492` | `OVERALL_ACTIVE_TICK_LIMIT_REACHED`, 최종 위치 `(-428,62,7)` |
 | `logs/20260911_122344_log.txt:288` | 12,000 ticks, 601.7초, 최종 counter와 `deadline_exceeded` payload |
 | `logs/20260911_122344_log.txt:289-293` | UI와 TTS failure feedback 전달 |
@@ -228,16 +265,20 @@ Minecraft launch와 명령 실행 시각은 그 뒤였으므로 이번 런타임
 | 한국어 입력 변환, command 접수와 root binding | `VERIFIED_RUNTIME` | 같은 request/correlation의 변환·dispatch·root 연결 |
 | build JAR과 active-instance JAR 동일성 | `VERIFIED_ARTIFACT` | 동일 size와 SHA-256 |
 | 12,000-active-tick terminal projection 및 UI/TTS 전달 | `VERIFIED_RUNTIME` | 같은 operation의 terminal payload와 feedback |
-| A3-F 유한 조기 실패 counter와 terminal | `FAILED_RUNTIME_ACCEPTANCE` | 실제 반복과 `0/11/0/1` counter가 불일치하고 전체 timeout만 작동 |
+| A3-F 유한 조기 실패와 typed terminal | `FAILED_RUNTIME_ACCEPTANCE` | failed-calculation/wander/blacklist 반복 뒤에도 요구된 조기 terminal 없이 전체 timeout만 작동 |
+| A3-F terminal counter와 engine event mapping | `NOT_PROVEN_RUNTIME` | no-path/no-progress는 consecutive, wander/recalculation은 filtered edge/generation이며 모두 reset 가능; raw failure/`Try` 횟수와 1:1 대응하지 않고 owner transition/reset log도 없음 |
 | A2 exact arrival | `NOT_EXERCISED` | 목표에 도착하지 못해 arrival commit 경계 미실행 |
-| A4 route/material readiness | `NOT_PROVEN_RUNTIME` | `observationComplete=false`; route usability, reserve, authoritative placement와 inventory 증거 불완전 |
-| A5 bounded material acquisition | `NOT_EXERCISED` | 접수 명령은 plain GOTO이고 metadata `data={}`; `주변 블록 채굴 허용` opt-in 없음 |
+| A3D build-requirement/readiness 진단 방출 | `VERIFIED_RUNTIME` | operation-scoped `latest.log`에 각각 240건과 16건 |
+| A3D material-readiness 증거 | `NOT_PROVEN_RUNTIME` | `observationComplete=false`; route usability, reserve, authoritative placement와 inventory 증거 불완전 |
+| A3D execution-transition 진단 방출 | `FAILED_RUNTIME_ACCEPTANCE` | 같은 operation에서 0건; 256개 local nonterminal cap이 transition 전에 소진됨 |
+| A4 material-readiness 행동 gate | `NOT_EXERCISED` | terminal payload의 usable/required material state가 `null`로 남았고 finite-failure branch terminal도 없었음; Section 8.8의 source/runtime data-flow 증거 참조 |
+| A5 bounded material acquisition | `NOT_EXERCISED` | accepted command에 per-command opt-in이 없었음 |
 
 따라서 확인된 plumbing 단위를 보존해 기록할 수는 있지만, 이를 합쳐 GOTO 행동
 전체를 성공이나 부분 성공으로 판정할 수 없다. 사용자가 요구한 도착 동작과 유한
 실패 판정의 전체 live acceptance는 `FAILED_RUNTIME_ACCEPTANCE`이다.
 
-## 7. 유한 종료 계수의 직접적인 모순
+## 7. 유한 조기 종료 실패와 counter mapping 미입증
 
 최종 effect payload에는 다음 값이 기록됐다.
 
@@ -251,14 +292,19 @@ terminal_result=TIMEOUT
 evidence_reason=OVERALL_ACTIVE_TICK_LIMIT_REACHED
 ```
 
-그러나 같은 correlation의 로그에는 generation 3~8의 path failure,
-`TimeoutWanderTask`, `Try 1 / 4`부터 `Try 15 / 4`까지의 반복이 존재한다.
+같은 사건 시간 구간에는 generation 3~8의 path failure, `TimeoutWanderTask`,
+`Try 1 / 4`부터 `Try 15 / 4`까지의 반복이 존재한다. 그러나 no-path/no-progress는
+consecutive counter이고, wander/recalculation은 각각 filtered rising-edge/generation
+counter이며, 네 값 모두 reset될 수 있다. 누계 raw event 수가 아니므로 두 숫자 집합을
+직접 동일시하거나 불일치 자체를 1:1 모순으로 단정하지 않는다.
 
-따라서 terminal counter는 실제 엔진의 retry, wander, calculation lifecycle을
-대표하지 못한다. 이 모순 하나만으로도 현재 유한 종료 구현의 runtime acceptance는
-실패다.
+확정된 acceptance 실패는 반복이 계속됐는데도 요구된
+`PATH_UNREACHABLE`/`MOVEMENT_STALLED` 조기 terminal이 발생하지 않고 전체 timeout만
+작동했다는 점이다. source에는 실제 lifecycle을 놓치거나 reset할 수 있는 의미 gap이
+있지만, 정확한 event-to-counter mapping과 tick별 인과 사슬은 owner 경계 로그가 없어
+`UNKNOWN`이다.
 
-## 8. 소스로 확인된 관찰 설계 오류
+## 8. 소스로 확인된 counter 관찰·필터·reset 계약 gap
 
 ### 8.1 실제 no-path를 `CALCULATING`으로 가림
 
@@ -291,8 +337,9 @@ progress가 참이면 wander와 recalculation counter도 초기화된다. 위치
 종료 transition이 아니라 `movementChild.thisOrChildAreTimedOut()`를 wander 상태로
 사용한다. 이 값은 descendant에 `TimeoutWanderTask`가 존재하는지를 간접 표본화한다.
 실제 Task path에 `TimeoutWanderTask`가 있었지만 terminal `wander_count`는 0이었다.
-이 간접 값만으로는 authoritative episode transition, identity, attempt 또는 reset
-cause를 증명할 수 없다.
+최종값 0은 중간 reset이 있었다면 가능하므로 그 자체가 raw event와의 수치 모순은
+아니다. 다만 이 간접 값만으로는 authoritative episode transition, identity, attempt,
+increment 또는 reset cause를 증명하거나 terminal 값까지 reconcile할 수 없다.
 
 현재 `Task.thisOrChildAreTimedOut()` 구현은 실제 descendant 중
 `TimeoutWanderTask`가 있는지를 반환한다. 하지만 persistent wander child의 동일
@@ -304,11 +351,12 @@ rising-edge counter의 권위 있는 attempt source가 되지 못한다.
 reader가 유한 상태에 전달하는 generation은 실제 Baritone calculation generation이
 아니라 `placementRequirement.pathGeneration()`이다. 실패 계산에는 채택된 path가
 없을 수 있으므로 실제 generation 3~8을 이 값으로 셀 수 없다. 실제 다수 계산과
-terminal `recalculation_count=1`의 불일치는 이 ownership mismatch와 일치한다.
+terminal `recalculation_count=1`을 1:1 비교할 수 없으며, 문서화된 mapping과 reset
+경계가 없다는 사실은 이 ownership mismatch와 일치한다.
 
-위 소스 조건들은 실제 event를 누락하거나 counter를 초기화할 수 있는 잘못된 의미
-계약을 직접 증명한다. 다만 각 runtime tick에서 어느 조건이 최종값 `0/11/0/1`을
-만들었는지는 owner transition log가 없어 아직 완전히 재구성되지 않았다.
+위 소스 조건들은 raw engine lifecycle과 다른 counter-specific 관찰·필터·reset 계약과
+coverage gap을 직접 보여 준다. 다만 각 runtime tick에서 어느 조건이 최종값
+`0/11/0/1`을 만들었는지는 owner transition log가 없어 아직 완전히 재구성되지 않았다.
 
 ### 8.5 blacklist 표시 한도는 Task 종료 조건이 아님
 
@@ -327,6 +375,64 @@ terminal `recalculation_count=1`의 불일치는 이 ownership mismatch와 일�
 않은 failed calculation generation, `Try 15 / 4` 상황을 함께 재현하지 않는다.
 
 테스트가 구현된 가정을 확인했을 뿐 실제 엔진 실패 lifecycle을 확인하지 못했다.
+
+### 8.7 execution-transition 진단은 local budget에 의해 누락됨
+
+사건 operation `goto-23bd64e9-118b-4c3f-8b21-649cabf0afb2`만 대상으로
+`latest.log`를 집계하면 다음과 같다. `stdout-logs.txt`는 같은 console stream의
+복제이므로 이 수치에 더하지 않는다.
+
+```text
+GOTO_BUILD_REQUIREMENT_OBSERVED: 240
+GOTO_BUILDING_MATERIAL_READINESS: 16
+GOTO_MATERIAL_ACQUISITION_TRANSITION: 0
+GOTO_TERMINAL_DECISION: 1
+LOCAL_NONTERMINAL_EMISSIONS_BEFORE_TERMINAL_PHASE_CHANGE: 256
+COUNT_EVIDENCE: DERIVED_FROM_OPERATION_SCOPED_LATEST_LOG_EVENTS
+```
+
+`LaviGotoTask.onTick`은 A3D tick snapshot을 `executionController.tick()`보다 먼저
+호출한다. build-requirement와 readiness observer, 그리고 controller tick 뒤의
+execution-transition observer는 모두 같은 `GotoA3dEmissionBudget.admitNonterminal`
+pool을 사용한다. 이 pool은 256건 뒤 거부하며 transition용 slot을 따로 보존하지
+않는다. controller가 overall timeout을 commit하며 phase를
+`QUIESCING_FOR_TERMINAL`로 바꾼 뒤 transition observer가 호출됐을 때는 이미
+`240 + 16 = 256`이었다. 따라서 이 terminal-quiescing transition의 물리 방출이
+막힌 mechanism은 `[SOURCE_PROVEN]`이고, 0건은 `[VERIFIED_RUNTIME]`이다.
+
+이 hook은 모든 `GotoExecutionPhase` 변경을 포괄하지 않는다. 오직
+`executionController.tick()` 전후에 관찰되는 controller-tick-owned 변경만 보며,
+그 전에 return하는 arrival freeze와 다른 lifecycle 경로의 resume/stop 변경은 이
+hook 범위 밖이다. local `TERMINAL_CAP=32`는 256개 nonterminal pool 안의 예약분이
+아니라 별도 local cap이고, 실제 terminal 방출은 공용 session/family admission에도
+종속된다. 이 진단 전달 결함은 navigation 실패의 단일 원인과 별개이며, navigation
+root cause는 계속 `UNKNOWN`이다.
+
+### 8.8 readiness 진단 방출은 A4 행동 실행 증거가 아님
+
+`GotoExecutionController.tickNavigation`은 overall timeout을 먼저 검사하고, 그
+검사를 통과한 tick에서만 finite navigation failure를 계산한다. non-null failure가
+있으면 A4 최초 진입 전에 `latestMaterials`와 `latestReadiness`를 설정한다. `READY`는
+complete material snapshot과 proven positive requirement를 모두 요구하므로, 이
+branch가 한 번이라도 실행된 뒤 timeout에 도달했다면 terminal payload의
+`usable_building_material_count`와 `required_building_material_count`가 둘 다
+non-null이어야 한다. controller에는 이 두 A4 state를 다시 null로 초기화하는 retry
+경로가 없고, `READY` retry는 새 navigation child generation도 만든다. 반대로 이
+no-opt-in upward run에서 non-`READY` A4 결과는 즉시 sticky non-timeout terminal을
+commit한다.
+
+실제 최종 payload는 `TIMEOUT`, `OVERALL_ACTIVE_TICK_LIMIT_REACHED`,
+`usable_building_material_count=null`, `required_building_material_count=null`,
+`material_acquisition_attempts=0`이었고, operation-scoped lifecycle log에는
+`GetToBlockTask#63795af6` 하나만 나타났다. 따라서 timeout의 순서만이 아니라 이
+source/runtime data flow 전체를 근거로 A4 behavior gate를 `NOT_EXERCISED`로 판정한다.
+
+반면 16개의 `GOTO_BUILDING_MATERIAL_READINESS`는 controller와 독립된 A3D tick
+snapshot observer가 방출했고 모두 `observationComplete=false`였다. 그러므로 진단
+방출은 `VERIFIED_RUNTIME`, material-readiness evidence는 `NOT_PROVEN_RUNTIME`, A4
+행동 branch는 `NOT_EXERCISED`로 서로 분리한다. A5는 accepted command의
+per-command opt-in 부재만으로도 독립적으로 `NOT_EXERCISED`였으며, A4 미진입은 추가
+경로 증거일 뿐 A5 status의 필수 근거로 합치지 않는다.
 
 ## 9. 아직 확인되지 않은 사실
 
@@ -407,10 +513,10 @@ untracked path에 case-insensitive `goto|navigation|movement` regex를 적용하
 - building-material readiness와 acquisition behavior
 - 테스트와 문서
 
-현재 `HEAD`와 로컬 upstream tracking ref는
-`92760206652ce155b482f3ddc85505702f9d811e`로 일치한다. 이 커밋은 비교 가능한 clean
-committed point이지만, 이번 조사에서는 remote fetch를 수행하지 않았으므로 최신
-GitHub 상태라고 확장해 주장하지 않는다.
+사고 감사 snapshot 당시 `HEAD`와 로컬 upstream tracking ref는
+`92760206652ce155b482f3ddc85505702f9d811e`로 일치했다. 이 값은 당시 비교 가능한
+committed point일 뿐 이 문서를 읽는 현재 시점의 `HEAD`, tracking ref 또는 최신
+GitHub 상태를 뜻하지 않는다. 그 감사에서는 remote fetch도 수행하지 않았다.
 
 이 지점으로 현재 worktree를 직접 되돌리면 사용자 변경과 확인된 중립 plumbing도
 함께 손실될 수 있다. 따라서 다음 명령과 동등한 광범위 원복은 금지한다.
@@ -447,7 +553,8 @@ git clean -fd
 
 ```text
 INVESTIGATION_STATUS: UNKNOWN_ROOT_CAUSE
-NEXT_ALLOWED_CHANGE: BOUNDED_DIAGNOSTICS_ONLY
+MAXIMUM_NORMAL_SOURCE_CHANGE_CLASSIFICATION: DIAGNOSTICS_ONLY
+CLASSIFICATION_IS_NOT_AUTHORIZATION: YES
 NEW_OR_REPLACEMENT_BEHAVIOR_CHANGE: PROHIBITED
 RECOVERY_ROLLBACK: ONLY_PER_GATE_G.1
 ```
@@ -456,34 +563,41 @@ RECOVERY_ROLLBACK: ONLY_PER_GATE_G.1
 `VERIFIED_RUNTIME`이 아니면 새 행동 또는 replacement behavior를 변경하지 않는다.
 
 ```text
-Root cause status:
-Reproduction ID:
-Active artifact SHA-256:
-Command correlation ID:
-Operation ID:
-Parent Task:
-Child Task:
-Retry owner:
-Wander owner:
-Path/goal owner:
-Last successful boundary:
-First failing boundary:
-Triggering state/value:
-Expected transition:
-Observed transition:
-Exact proposed fix boundary:
+NAVIGATION_ROOT_CAUSE_STATUS:
+REPRODUCTION_ID:
+ACTIVE_ARTIFACT_SHA256:
+COMMAND_CORRELATION_ID:
+OPERATION_ID:
+PARENT_TASK:
+CHILD_TASK:
+FINITE_COUNTER_OWNER:
+TERMINAL_DECISION_OWNER:
+DIAGNOSTIC_BUDGET_OWNER:
+FIRST_REQUIRED_PHASE_TRANSITION_EMISSION_STATUS:
+DIAGNOSTIC_SUPPRESSION_REASON:
+RETRY_OWNER:
+WANDER_OWNER:
+PATH_OR_GOAL_OWNER:
+LAST_SUCCESSFUL_BOUNDARY:
+FIRST_FAILING_BOUNDARY:
+TRIGGERING_STATE:
+EXPECTED_TRANSITION:
+OBSERVED_TRANSITION:
+EXACT_FILES_AND_HUNKS_PROPOSED:
+EXACT_PROPOSED_FIX_BOUNDARY:
 ```
 
 모든 source 변경은 별도로 다음 rollback evidence가 필요하다.
 
 ```text
-Proposed change exact rollback unit:
+PROPOSED_CHANGE_EXACT_ROLLBACK_UNIT:
 ```
 
 `RECOVERY_ROLLBACK`은 추가로 다음 recovery evidence가 필요하다.
 
 ```text
-Failed implementation rollback scope:
+FAILED_IMPLEMENTATION_ROLLBACK_SCOPE:
+USER_APPROVED_EXACT_ROLLBACK_UNIT:
 ```
 
 위 제한은 새 행동 또는 replacement behavior의 정상 gate다. 이미 실패한 행동만
@@ -504,6 +618,8 @@ retry, wander, timeout, path generation을 주변 snapshot으로 추정하지 �
 - target feet, support, head와 제한된 인접 접근 칸 상태
 - relevant `allowBreak`, `allowPlace`와 실제 사용 가능한 material 수량
 - 모든 finite counter의 before/after와 terminal candidates
+- local diagnostic budget의 event별 admission count, suppression reason과 첫
+  controller-tick-owned phase transition 보존 여부
 
 로그는 state change, counter change, threshold 접근과 terminal에 한정하고 기존 bounded
 diagnostics budget을 따라야 한다. 관찰을 위해 Task, input, goal, path, retry, timeout,
@@ -511,14 +627,24 @@ fallback 또는 결과를 변경하면 안 된다.
 
 ### Gate D — counter 일관성 검사
 
-다음 모순이 하나라도 발생하면 runtime verification은 즉시 실패다.
+다음 mapping-aware 불일치가 하나라도 발생하면 runtime verification은 즉시 실패다.
+raw Baritone event 수와 resettable command counter가 단순히 다르다는 이유만으로
+실패를 선언하지 않는다. 먼저 문서화된 increment/filter/reset mapping을 적용한다.
 
 ```text
-actual wander transitions > 0 && reported wander_count == 0
-actual calculation generations > reported recalculation_count without a documented mapping
-repeated completed no-path results && no_path_ticks remains 0 without an explicit reason
-target distance increased && progress is true only because blockChanged is true
+mapped wander episode increment observed
+    && no mapped reset/progress occurred afterward
+    && reported wander_count omits the increment
+mapped calculation-generation increment observed
+    && no mapped reset/progress occurred afterward
+    && reported recalculation_count omits the increment
+mapped consecutive no-path sample observed
+    && no mapped reset occurred afterward
+    && no_path_ticks omits the sample without an explicit reason
 ```
+
+`targetDistanceIncreased=true`인데 `blockChanged=true`만으로 progress가 되는 경우는 raw
+count 모순이 아니라 원하는 progress semantics의 별도 acceptance 실패로 검사한다.
 
 ### Gate E — 실제 사건을 재현하는 테스트
 
@@ -537,7 +663,8 @@ fixture 내부에서 만든 가정을 확인하는 것만으로 실제 engine be
 
 ### Gate F — 검증 상태 언어
 
-모든 보고와 ledger는 다음 중 하나를 사용한다.
+evidence-strength field는 다음 canonical base token 중 하나만 사용한다. count, scope,
+reason, role 또는 시점은 token에 접미사로 합치지 않고 별도 field에 기록한다.
 
 ```text
 VERIFIED_RUNTIME
@@ -547,10 +674,36 @@ CONFIRMED_PROCESS
 INFERENCE
 UNKNOWN
 NOT_RUN
+```
+
+live feature outcome field는 다음 중 하나만 사용한다.
+
+```text
 NOT_EXERCISED
 NOT_PROVEN_RUNTIME
 FAILED_RUNTIME_ACCEPTANCE
-CONFIRMED_PROCESS_FAILURE
+```
+
+`NOT_PROVEN_RUNTIME`은 의도적으로 두 문맥에서 사용할 수 있는 공통 token이다. runtime
+관찰은 있지만 요구된 증거 계약이 불완전한 `_EVIDENCE_STATUS`에도 사용할 수 있고,
+실행 관련 관찰만으로 기능 계약을 입증하지 못한 live feature outcome에도 사용할 수
+있다. field 이름과 별도 reason/scope로 두 문맥을 구분하며 `VERIFIED_RUNTIME`으로
+간주하지 않는다.
+
+process outcome과 action classification/authorization은 별도 enum이다.
+
+```text
+PROCESS_OUTCOME: CONFIRMED_PROCESS_FAILURE
+PROPOSED_CHANGE_CLASSIFICATION: NONE, DIAGNOSTICS_ONLY, RECOVERY_ROLLBACK, or BEHAVIOR
+MAXIMUM_NORMAL_SOURCE_CHANGE_CLASSIFICATION: NONE, DIAGNOSTICS_ONLY, or BEHAVIOR
+AUTHORIZATION: YES or NO
+```
+
+예를 들어 `NOT_EXERCISED_NO_OPT_IN`을 한 값으로 쓰지 않고 다음처럼 분리한다.
+
+```text
+STATUS: NOT_EXERCISED
+REASON: NO_PER_COMMAND_OPT_IN
 ```
 
 focused tests 통과, build 성공, matching JAR, terminal feedback는 각각 별도로 기록한다.
@@ -572,11 +725,23 @@ provenance 또는 rollback unit이 불명확하면 현재 worktree에서 원복�
 clean worktree 또는 branch 사용도 사용자 승인과 repository safety gate를 먼저
 충족해야 한다.
 
+untracked path가 baseline에 없다는 사실은 작성 주체, 실패 구현 소속 또는 삭제
+안전성을 증명하지 않는다. 독립적인 creation provenance가 없으면 rollback/delete
+대상으로 분류하지 않는다. 제거를 검토할 때도 exact path, method/hunk 또는 whole-file
+impact, unrelated-change 보존법과 사용자의 명시적 exact-action 승인이 필요하다.
+
 #### Gate G.1 — 좁은 recovery rollback 예외
 
 `RECOVERY_ROLLBACK`은 이미 실패한 행동 hunk를 제거하는 복구 분류이며 새 행동 수정이
 아니다. root cause를 안다고 가장하지 않고도 사용할 수 있지만, 다음 조건을 모두
 충족해야 한다.
+
+여기서 strict read-only audit는 `AGENTS.md` restoration protocol의 generic no-write,
+evidence-label, complete-transcript, worktree inventory, untracked-provenance와 exact
+method/diff-hunk 규칙만 재사용한다. 그 protocol의 Carry On 전용 commit `76026f8`,
+branch/file 목록, marker, evidence checklist와 report template는 이 GOTO baseline이
+아니다. GOTO comparison baseline과 target evidence는 이 Gate G/G.1에서 별도로
+입증해야 한다.
 
 - strict read-only provenance/restoration audit가 먼저 완료됨
 - known committed comparison baseline과 intended reference의 관계가 입증됨
@@ -584,13 +749,24 @@ clean worktree 또는 branch 사용도 사용자 승인과 repository safety gat
   있으며, 그렇지 않으면 freshness를 `UNKNOWN`으로 유지함
 - failed implementation의 exact file/method/hunk와 exact inverse hunk가 확인됨
 - 모든 unrelated 사용자 변경을 보존하는 방법이 확인됨
-- 사용자가 exact path와 rollback action을 명시적으로 승인함
+- 사용자가 exact method/hunk 또는 expected impact가 명시된 whole-file removal을
+  `USER_APPROVED_EXACT_ROLLBACK_UNIT`으로 승인함; path-only 승인은 불충분함
+- active request에 recovery rollback 승인이 source-edit 승인과 별도로 기록됨
 - rollback 자체가 독립적으로 review/revert 가능한 unit이며 replacement behavior가 없음
 
 strict audit 중에는 rollback scope를 대화 보고서로만 제시하고 repository에 manifest를
 저장하지 않는다. audit가 종료된 뒤 별도의 명시적 문서화 요청이 있을 때만 manifest를
 파일로 남길 수 있다. 이 사고 문서는 completed restoration/salvage audit 또는 rollback
 manifest가 아니다. 위 조건 하나라도 충족되지 않으면 recovery rollback도 blocked다.
+
+승인된 rollback을 적용하기 직전에 `HEAD`, exact target hash, hunk context,
+staged/unstaged 상태와 관련 untracked path를 다시 read-only로 확인한다. audit snapshot
+또는 `USER_APPROVED_EXACT_ROLLBACK_UNIT`과 달라졌거나 hunk overlap이 생기면 기존
+rollback unit과 승인은 무효다. 적용을 중단하고 strict audit과 exact-unit 승인을 다시
+받는다.
+latest remote/GitHub ref라는 주장에 의존하는 unit은 적용 직전 동일한 read-only
+`git ls-remote` query로 remote object ID도 다시 확인한다. ref가 이동했거나 freshness
+확인이 불가능하면 그 remote-dependent unit과 승인은 무효다.
 
 ### Gate H — 월드와 Baritone cache provenance
 
@@ -603,9 +779,53 @@ cache rename, delete 또는 다른 mutation은 사용자가 exact cache path와 
 Minecraft process의 완전 종료와 exact resolved path 재확인이다. cache-reset run과
 non-reset run은 별도 reproduction ID와 evidence로 유지한다.
 
-cache path/action 승인은 Task stop, world exit, Minecraft process control 또는 runtime
-reproduction 권한을 자동으로 포함하지 않는다. 각 동작도 active user request의 명시적
-범위여야 한다.
+manual cache path/action 승인은 Task stop, world exit, Minecraft process control 또는
+runtime reproduction 권한을 자동으로 포함하지 않는다. 각 동작도 active user
+request의 명시적 범위여야 한다.
+
+재현 또는 cache 변경 전에는 최소한 다음 ledger를 채운다.
+
+```text
+ACTIVE_WORLD_IDENTITY:
+ACTIVE_WORLD_SAVE_PATH:
+WORLD_COPY_RESTORE_REPLACE_RENAME_HISTORY:
+BARITONE_CACHE_EVIDENCE:
+CACHE_TARGET_ABSOLUTE_PATH:
+CACHE_ACTION: NONE, INSPECT_ONLY, or exact manual mutation
+TASK_STOPPED: YES, NO, UNKNOWN, or NOT_APPLICABLE
+TASK_STOPPED_EVIDENCE_STATUS: VERIFIED_RUNTIME, UNKNOWN, or NOT_APPLICABLE
+WORLD_EXITED: YES, NO, UNKNOWN, or NOT_APPLICABLE
+WORLD_EXITED_EVIDENCE_STATUS: VERIFIED_RUNTIME, UNKNOWN, or NOT_APPLICABLE
+MINECRAFT_PROCESS_CLOSED: YES, NO, UNKNOWN, or NOT_APPLICABLE
+MINECRAFT_PROCESS_CLOSED_EVIDENCE_STATUS: VERIFIED_RUNTIME, UNKNOWN, or NOT_APPLICABLE
+NOT_APPLICABLE_REASON:
+ACTIVE_REQUEST_AUTHORIZES_MINECRAFT_LAUNCH: YES or NO
+ACTIVE_REQUEST_AUTHORIZES_RUNTIME_REPRODUCTION: YES or NO
+ACTIVE_REQUEST_AUTHORIZES_LIVE_WORLD_EXECUTION: YES or NO
+ACTIVE_REQUEST_AUTHORIZES_LIVE_WORLD_BLOCK_MUTATION: YES or NO
+ACTIVE_REQUEST_AUTHORIZES_TASK_STOP: YES or NO
+ACTIVE_REQUEST_AUTHORIZES_WORLD_EXIT: YES or NO
+ACTIVE_REQUEST_AUTHORIZES_MINECRAFT_PROCESS_CONTROL: YES or NO
+ACTIVE_REQUEST_AUTHORIZES_MANUAL_CACHE_MUTATION: YES or NO
+```
+
+authorization field는 항상 `YES` 또는 `NO`이며 `NOT_APPLICABLE`을 사용할 수 없다.
+state/evidence field만 선택한 action과 무관한 phase일 때
+`NOT_APPLICABLE_REASON`과 함께 `NOT_APPLICABLE`을 사용할 수 있다. manual cache
+mutation에서는 세 prerequisite state/evidence가 모두 `YES`/`VERIFIED_RUNTIME`이어야
+하므로 `NOT_APPLICABLE`일 수 없다.
+
+Minecraft 또는 Baritone이 정상 runtime 중 자체 cache를 자동 read/write하는 것은 예상
+runtime side effect로 기록한다. 이는 manual rename, delete, reset, replacement 또는
+다른 cache mutation 승인이 아니다. GOTO/A5는 이동뿐 아니라 block break/place까지
+일으킬 수 있으므로 launch, reproduction, live-world execution과 live-world block
+mutation 승인을 합치지 않는다.
+
+manual cache mutation 직전에는 `TASK_STOPPED`, `WORLD_EXITED`,
+`MINECRAFT_PROCESS_CLOSED`가 각각 `YES`이고 각 evidence status가
+`VERIFIED_RUNTIME`이어야 하며 manual cache mutation authorization도 `YES`여야 한다.
+Codex가 이 상태를 만들기 위해 Task stop, world exit 또는 process control을 수행해야
+한다면 해당 action authorization도 먼저 `YES`여야 한다.
 
 ## 13. 기계적 강제 장치 제안
 
@@ -622,7 +842,8 @@ MECHANICAL_GUARDS_STATUS: PROPOSED_NOT_IMPLEMENTED
 - diagnostics와 behavior change를 별도 branch 또는 commit으로 요구하는 review gate
 - exact rollback unit이 없는 behavior change를 거부하는 check
 - `UNKNOWN` evidence field가 하나라도 있으면 behavior phase 진입을 거부하는 check
-- actual event count와 terminal counter를 비교하는 integration assertion
+- 문서화된 increment/filter/reset mapping에 따라 owner event와 terminal counter를
+  reconcile하는 integration assertion
 
 이 문서 작성만으로 위 강제 장치가 구현됐다고 주장하지 않는다.
 
@@ -631,14 +852,16 @@ MECHANICAL_GUARDS_STATUS: PROPOSED_NOT_IMPLEMENTED
 현재 허용되는 결론은 다음과 같다.
 
 ```text
-CURRENT_IMPLEMENTATION: FAILED_REFERENCE_ONLY
-NAVIGATION_ROOT_CAUSE: UNKNOWN
-ROLLBACK_MANIFEST: NOT_READY
-RESTORATION_SALVAGE_AUDIT_STATUS: NOT_RUN_PENDING
+CURRENT_IMPLEMENTATION_RUNTIME_OUTCOME: FAILED_RUNTIME_ACCEPTANCE
+CURRENT_IMPLEMENTATION_DISPOSITION: REFERENCE_ONLY
+NAVIGATION_ROOT_CAUSE_STATUS: UNKNOWN
+ROLLBACK_MANIFEST_STATUS: UNKNOWN
+RESTORATION_SALVAGE_AUDIT_STATUS: NOT_RUN
 IN_PLACE_DESTRUCTIVE_ROLLBACK: PROHIBITED
 BEHAVIOR_PATCH: BLOCKED
-MAXIMUM_NEXT_SOURCE_CHANGE_CLASSIFICATION: BOUNDED_DIAGNOSTICS_ONLY
-ACTIVE_DOCUMENTATION_REQUEST_SOURCE_AUTHORITY: NONE
+MAXIMUM_NORMAL_SOURCE_CHANGE_CLASSIFICATION: DIAGNOSTICS_ONLY
+CLASSIFICATION_IS_NOT_AUTHORIZATION: YES
+ACTIVE_DOCUMENTATION_REQUEST_SOURCE_AUTHORIZATION: NO
 ```
 
 다음 순서는 제안 상태이며 아직 실행 승인을 받거나 수행한 작업이 아니다. 각 source,
@@ -651,20 +874,25 @@ rollback, build, external instance 또는 runtime 단계는 active user request�
    behavior, neutral plumbing, tests, docs로 file/hunk 단위 분류한다.
 3. known committed baseline, failed hunk, exact inverse hunk와 unrelated-change 보존법을
    확인한다. strict audit 중에는 manifest 파일을 만들지 않는다.
-4. exact scope가 입증되고 사용자가 exact path/action을 명시적으로 승인하면 실패한
-   행동만 독립 `RECOVERY_ROLLBACK` unit으로 제거할 수 있다. 입증되지 않으면 원복하지
-   않는다.
+4. exact scope가 입증되고 사용자가 exact method/hunk 또는 expected impact가 명시된
+   whole-file removal을 `USER_APPROVED_EXACT_ROLLBACK_UNIT`으로 승인하면 실패한 행동만
+   독립 `RECOVERY_ROLLBACK` unit으로 제거할 수 있다. path-only 또는 generic rollback
+   승인은 불충분하다. 입증되지 않으면 원복하지 않는다. 이 완료는 failed hunk 제거만
+   뜻하며 behavior fix, build 또는 runtime verification을 뜻하지 않는다.
 5. audit 종료 뒤 사용자가 별도로 문서화를 요청한 경우에만 rollback manifest를
    저장한다.
 6. 새로운 source 조사가 승인됐다면 behavior change 없이 bounded diagnostics만
    추가한다.
-7. runtime 재현이 승인됐다면 먼저 world/save/cache provenance를 기록한 뒤 같은 월드,
-   좌표와 명령으로 별도 reproduction ID를 사용해 재현한다.
+7. Minecraft launch, runtime reproduction, live-world execution과 live-world block
+   mutation이 각각 승인됐다면 먼저 world/save/cache provenance를 기록한 뒤 같은
+   월드, 좌표와 명령으로 별도 reproduction ID를 사용해 재현한다.
 8. first failing owner가 확인되지 않으면 bounded log만 보강하고, 승인된 범위에서 다시
    재현한다.
 9. 증명된 최초 실패 경계에만 최소 behavior 수정을 검토한다.
-10. build와 runtime verification이 각각 승인됐을 때 clean forced build, artifact hash,
-    동일 재현과 event/counter 일치를 검증한다.
+10. active request가 exact clean forced build를 명시적으로 승인하고 runtime 관련 각
+    동작도 별도로 승인했을 때만 clean forced build, artifact hash, 동일 재현과
+    mapping-aware event/counter reconciliation을 검증한다. 일반적인 "검증" 요청만으로
+    clean build 권한을 추론하지 않는다.
 
 ## 15. 사고 종료 조건
 
@@ -672,7 +900,9 @@ rollback, build, external instance 또는 runtime 단계는 active user request�
 
 - navigation failure의 exact last successful boundary와 first failing boundary 확인
 - triggering state와 retry/wander/path owner 확인
-- 실제 event와 terminal counter의 일치 확인
+- 문서화된 increment/filter/reset mapping에 따른 owner event와 terminal counter의
+  reconciliation 확인
+- 첫 controller-tick-owned phase transition이 summary budget 고갈로 누락되지 않음을 확인
 - 사용자 변경과 실패한 GOTO 변경의 file/hunk provenance 분류 완료
 - exact rollback unit 문서화
 - 추정 기반 행동 로직의 제거 또는 evidence-backed 최소 교체
@@ -689,14 +919,16 @@ rollback, build, external instance 또는 runtime 단계는 active user request�
 `AGENTS.md`에도 unknown-cause 작업에서는 diagnostics가 행동보다 먼저라는 규칙이
 명시돼 있었다.
 
-실패 원인은 제공된 증거와 규칙을 먼저 적용하지 않고 정적 추정을 행동 구현으로
-바꾼 데 있다. 이후 exact rollback 범위를 모르는 상태에서 원복을 권고한 것도 같은
-증거 선행 원칙 위반이었다. 이 기록은 그 책임을 사용자, 로그, Minecraft 또는
-Baritone에 전가하지 않는다.
+작업 절차 실패 원인은 제공된 증거와 규칙을 먼저 적용하지 않고 정적 추정을 행동
+구현으로 바꾼 데 있다. 이후 exact rollback 범위를 모르는 상태에서 원복을 권고한
+것도 같은 증거 선행 원칙 위반이었다. 이 기록은 그 책임을 사용자, 로그, Minecraft
+또는 Baritone에 전가하지 않는다. navigation 실패의 기술적 단일 원인은 여전히
+`UNKNOWN`이다.
 
 ## 17. 관련 문서
 
 - [GOTO vertical navigation and building-material readiness historical ledger](chatclef-goto-vertical-navigation-building-material-readiness-pre-change-contract-2026-09-10.md)
+- [Korean GOTO, FIND, and all-command coverage historical contract](chatclef-korean-goto-find-and-all-command-coverage-pre-change-contract-2026-09-09.md)
 - [ChatClef / Baritone cache troubleshooting](chatclef-baritone-cache-troubleshooting.md)
 - [ChatClef / Carry On integration direction](chatclef-carryon-integration-direction.md)
 - [Task lifecycle diagnostics](chatclef-task-lifecycle-diagnostics.md)

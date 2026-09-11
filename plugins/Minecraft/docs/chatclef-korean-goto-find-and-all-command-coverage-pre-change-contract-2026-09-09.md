@@ -10,13 +10,14 @@ Date: 2026-09-09
 
 ## 1. Document status
 
-This document records the requested behavior before implementation. It does
-not claim that `@find`, direct `@go`, or Korean input for every registered
-command currently works.
+This document records the requested behavior against the historical reviewed
+HEAD before implementation. It does not claim that `@find`, direct `@go`, or
+Korean input for every registered command works in the present worktree.
 
 ```text
 DOCUMENT_TYPE: PRE_CHANGE_IMPLEMENTATION_CONTRACT
-STATUS: DOCUMENTED_NOT_IMPLEMENTED
+HISTORICAL_REVIEWED_HEAD_STATUS: DOCUMENTED_NOT_IMPLEMENTED
+CURRENT_STATUS_OVERRIDE: SECTION_1_1_IMPLEMENTATION_ADDENDUM
 REVIEWED_REPOSITORY_ROOT: C:\Vtuber_Souorce_Code\LAVI
 REVIEWED_BRANCH: minecraft-plugin-fix/alto-clef-infinite-loop
 REVIEWED_HEAD: d84ff7ccf2bc7a8b1cfae0baed21c929efe478f2
@@ -27,25 +28,26 @@ FORGE_MINEMIND_SCOPE: NONE
 WORKSTREAM_A: KOREAN_GOTO_COORDINATE_GRAMMAR_RECOVERY
 WORKSTREAM_B: NEW_LAVI_OWNED_FIND_COMMAND
 WORKSTREAM_C: KOREAN_INPUT_COVERAGE_FOR_ALL_REGISTERED_COMMANDS
-CURRENT_REGISTERED_COMMAND_COUNT: 26
-CURRENT_PUBLIC_KOREAN_INPUT_COMMAND_COUNT: 10
-CURRENT_PARSER_READY_COMMAND_COUNT: 12
-CURRENT_GAMEPLAY_EFFECT_VERIFIABLE_COMMAND_COUNT: 2
-CURRENT_FEEDBACK_PHRASE_PROFILE_COUNT: 26
-CURRENT_FIND_COMMAND: ABSENT
-CURRENT_GO_COMMAND_ALIAS: ABSENT
-CURRENT_CANONICAL_COORDINATE_COMMAND: goto
+REVIEWED_HEAD_REGISTERED_COMMAND_COUNT: 26
+REVIEWED_HEAD_PUBLIC_KOREAN_INPUT_COMMAND_COUNT: 10
+REVIEWED_HEAD_PARSER_READY_COMMAND_COUNT: 12
+REVIEWED_HEAD_GAMEPLAY_EFFECT_VERIFIABLE_COMMAND_COUNT: 2
+REVIEWED_HEAD_FEEDBACK_PHRASE_PROFILE_COUNT: 26
+REVIEWED_HEAD_FIND_COMMAND: ABSENT
+REVIEWED_HEAD_GO_COMMAND_ALIAS: ABSENT
+REVIEWED_HEAD_CANONICAL_COORDINATE_COMMAND: goto
 TARGET_REGISTERED_COMMAND_COUNT_WITH_FIND_AND_WITHOUT_GO_ALIAS: 27
 
 PRODUCTION_SOURCE_CHANGE_IN_THIS_DOCUMENTATION_TASK: NONE
 TEST_SOURCE_CHANGE_IN_THIS_DOCUMENTATION_TASK: NONE
 DOCUMENTATION_CHANGE: README_AND_THIS_PRE_CHANGE_CONTRACT
-JAVA_BUILD_IN_THIS_DOCUMENTATION_TASK: NOT_RUN_NOT_REQUIRED
+JAVA_BUILD_IN_THIS_DOCUMENTATION_TASK: NOT_RUN
+JAVA_BUILD_REASON: DOCUMENTATION_ONLY_NO_JAVA_CHANGE
 PYTHON_TESTS_IN_THIS_DOCUMENTATION_TASK: NOT_RUN
 DEPLOYMENT: NOT_RUN
 MINECRAFT_RUNTIME: NOT_RUN
-COMMIT: NOT_PERFORMED
-PUSH: NOT_PERFORMED
+COMMIT_AT_INITIAL_DOCUMENTATION_CAPTURE: NOT_RUN
+PUSH_AT_INITIAL_DOCUMENTATION_CAPTURE: NOT_RUN
 ```
 
 ### 1.1 Implementation addendum
@@ -58,13 +60,45 @@ GOTO navigation. Its current evidence classification is:
 ```text
 IMPLEMENTATION_ADDENDUM_STATUS: MIXED_WORKTREE_REFERENCE_ONLY
 WORKSTREAM_A_GRAMMAR_SOURCE_STATUS: PRESENT_IN_MIXED_UNCOMMITTED_WORKTREE
-WORKSTREAM_A_TRANSLATION_RUNTIME_STATUS: VERIFIED_RUNTIME_FOR_INCIDENT_COMMAND
-WORKSTREAM_A_FOCUSED_TEST_STATUS: REPORTED_PASSED_NOT_REPRODUCED_IN_THIS_DOCUMENT_REVIEW
-WORKSTREAM_B_STATUS: FUTURE_NOT_IMPLEMENTED
-WORKSTREAM_C_STATUS: FUTURE_NOT_IMPLEMENTED
-CURRENT_GAMEPLAY_EFFECT_VERIFIABLE_COMMAND_COUNT: NOT_RECOUNTED_DO_NOT_INCREMENT_FROM_HISTORICAL_2
-GOTO_NAVIGATION_RUNTIME_ACCEPTANCE: FAILED
-GOTO_NAVIGATION_ROOT_CAUSE_STATUS: UNKNOWN
+WORKSTREAM_A_TRANSLATION_RUNTIME_STATUS: VERIFIED_RUNTIME
+WORKSTREAM_A_TRANSLATION_VERIFIED_SCOPE: INCIDENT_COMMAND_ONLY
+WORKSTREAM_A_FOCUSED_TEST_STATUS: NOT_RUN
+WORKSTREAM_A_FOCUSED_TEST_HISTORICAL_REPORT: PASSED_NOT_REPRODUCED_IN_THIS_DOCUMENT_REVIEW
+WORKSTREAM_B_STATUS: DOCUMENTED_NOT_IMPLEMENTED
+WORKSTREAM_B_PHASE: FUTURE_WORK
+WORKSTREAM_C_STATUS: DOCUMENTED_NOT_IMPLEMENTED
+WORKSTREAM_C_PHASE: FUTURE_WORK
+CURRENT_GAMEPLAY_EFFECT_VERIFIABLE_COMMAND_COUNT_STATUS: NOT_RUN
+CURRENT_GAMEPLAY_EFFECT_VERIFIABLE_COMMAND_COUNT_REASON: NOT_RECOUNTED_DO_NOT_INCREMENT_FROM_HISTORICAL_2
+GOTO_LIVE_ACCEPTANCE_STATUS: FAILED_RUNTIME_ACCEPTANCE
+NAVIGATION_ROOT_CAUSE_STATUS: UNKNOWN
+GOTO_A3_F_FINITE_EARLY_FAILURE_STATUS: FAILED_RUNTIME_ACCEPTANCE
+GOTO_TERMINAL_COUNTER_EVENT_MAPPING_STATUS: NOT_PROVEN_RUNTIME
+GOTO_COUNTER_SEMANTIC_GAPS_EVIDENCE: SOURCE_PROVEN
+GOTO_FINITE_COUNTER_EXACT_TICK_CAUSAL_CHAIN_STATUS: UNKNOWN
+GOTO_A2_EXACT_ARRIVAL_STATUS: NOT_EXERCISED
+GOTO_BUILD_REQUIREMENT_EMISSION_STATUS: VERIFIED_RUNTIME
+GOTO_BUILD_REQUIREMENT_EVENT_COUNT: 240
+GOTO_BUILD_REQUIREMENT_EVIDENCE_STATUS: NOT_PROVEN_RUNTIME
+GOTO_BUILDING_MATERIAL_READINESS_EMISSION_STATUS: VERIFIED_RUNTIME
+GOTO_BUILDING_MATERIAL_READINESS_EVENT_COUNT: 16
+GOTO_BUILDING_MATERIAL_READINESS_EVIDENCE_STATUS: NOT_PROVEN_RUNTIME
+GOTO_EXECUTION_TRANSITION_EMISSION_STATUS: FAILED_RUNTIME_ACCEPTANCE
+GOTO_EXECUTION_TRANSITION_OBSERVED_EVENT_COUNT: 0
+GOTO_EXECUTION_TRANSITION_BUDGET_STARVATION_EVIDENCE: SOURCE_PROVEN
+NONTERMINAL_EMISSIONS_BEFORE_TERMINAL_PHASE_CHANGE: 256
+NONTERMINAL_EMISSION_COUNT_EVIDENCE: DERIVED_FROM_OPERATION_SCOPED_EVENT_COUNTS
+GOTO_TERMINAL_DECISION_EMISSION_STATUS: VERIFIED_RUNTIME
+GOTO_TERMINAL_DECISION_EVENT_COUNT: 1
+GOTO_TERMINAL_DECISION_VERIFIED_SCOPE: OVERALL_TIMEOUT_DELIVERY_ONLY
+GOTO_A4_BEHAVIOR_GATE_STATUS: NOT_EXERCISED
+GOTO_A4_BEHAVIOR_GATE_REASON: TERMINAL_PAYLOAD_MATERIAL_STATE_REMAINED_NULL_AND_NO_FINITE_FAILURE_BRANCH_COMMITTED
+GOTO_A5_MATERIAL_ACQUISITION_STATUS: NOT_EXERCISED
+GOTO_A5_MATERIAL_ACQUISITION_REASON: NO_PER_COMMAND_OPT_IN
+EVENT_COUNT_LOG_SOURCE: ACTIVE_INSTANCE_LATEST_LOG
+EVENT_COUNT_OPERATION_ID: goto-23bd64e9-118b-4c3f-8b21-649cabf0afb2
+EXACT_SAFE_ROLLBACK_SCOPE: UNKNOWN
+RESTORATION_SALVAGE_AUDIT_STATUS: NOT_RUN
 CURRENT_FIND_COMMAND: ABSENT
 CURRENT_GO_COMMAND_ALIAS: ABSENT
 ```
@@ -73,8 +107,12 @@ The 2026-09-11 incident directly verifies only that one trusted Korean XYZ input
 was compiled to the existing canonical `goto x y z`, admitted, dispatched, and
 bound to its root Task. It did not reach the target. Exact arrival was not
 exercised, finite early-failure handling failed runtime acceptance, material
-readiness was not proven, and bounded material acquisition was not exercised
-because the command had no opt-in suffix. See the
+readiness diagnostic emission occurred but its evidence was incomplete. A4
+non-entry is established separately by the final timeout payload's null
+usable/required material state and the controller's persistent A4 state/terminal
+data flow, not by the observation-only readiness records. Bounded material
+acquisition was independently ineligible because the command had no opt-in
+suffix. See the
 [GOTO diagnostics-before-behavior incident record](chatclef-goto-diagnostics-before-behavior-incident-2026-09-11.md).
 
 The working-tree grammar unit did not add a direct `@go` alias. Workstreams B
@@ -82,11 +120,21 @@ and C retain the future sequence below and do not become authorized or
 implemented from this narrow translation evidence. Exact file/hunk provenance
 and an independently executable rollback unit have not been established.
 
-The three workstreams are deliberately separate. A small Python GOTO input
-fix must not silently authorize every raw command, and the new FIND behavior
-must not be hidden inside `@attack`, `@scan`, or a generic Baritone lifecycle
-change. Each workstream has its own tests, implementation boundary, rollout,
-and rollback.
+The three workstreams were designed as conceptually separate future units. A
+small Python GOTO input fix must not silently authorize every raw command, and
+the new FIND behavior must not be hidden inside `@attack`, `@scan`, or a generic
+Baritone lifecycle change. Their intended tests, implementation boundaries,
+rollout, and rollback ordering are not an executable rollback manifest for the
+current mixed worktree.
+
+> [!IMPORTANT]
+> Unless Section 1.1 explicitly overrides a fact, every use of "current",
+> "currently", "existing", or "today" in Sections 2 through 16 describes the
+> historical `REVIEWED_HEAD` `d84ff7ccf2bc7a8b1cfae0baed21c929efe478f2`
+> snapshot and its intended future contract, not the present worktree or live
+> runtime. Section 1.1 and the linked incident record own the later status.
+> Section 17 remains a current normative decision gate, but factual baseline
+> statements inside it are explicitly scoped to `REVIEWED_HEAD`.
 
 ## 2. Requested user-visible behavior
 
@@ -212,9 +260,9 @@ store_home
 자동보관등록
 ```
 
-`find` and `go` appear in none of the current Java command constructors,
-Python registry rows, registry snapshots, or support-matrix rows. The canonical
-coordinate command is `goto`.
+At `REVIEWED_HEAD`, `find` and `go` appeared in none of the Java command
+constructors, Python registry rows, registry snapshots, or support-matrix rows.
+The canonical coordinate command was `goto`.
 
 ### 4.2 Independent readiness axes
 
@@ -304,9 +352,9 @@ prompt's allowed command-name list.
 
 ## 5. Workstream A — Korean GOTO coordinate grammar
 
-### 5.1 Verified failure boundary
+### 5.1 Historical reviewed-HEAD failure boundary
 
-The existing Python rule parser recognizes three signed integers separated by
+At `REVIEWED_HEAD`, the Python rule parser recognized three signed integers separated by
 whitespace, immediately followed by an optional direction particle and an
 `이동`/`가` verb. The text normalizer converts commas to spaces, so the rule
 parser alone recognizes this form:
@@ -315,10 +363,10 @@ parser alone recognizes this form:
 100, 64, -30으로 가줘
 ```
 
-It does not currently work end to end from trusted Chat/final microphone. The
-input-intent ownership gate recognizes `이동` and `좌표`, but does not claim a
+It did not work end to end from trusted Chat/final microphone at that snapshot.
+The input-intent ownership gate recognized `이동` and `좌표`, but did not claim a
 bare coordinate phrase followed only by `가`/`가줘`. In that case the parser's
-GOTO result is never reached by the Minecraft command route.
+GOTO result was never reached by the Minecraft command route.
 
 The following requested forms do not match because `좌표` or axis labels occur
 inside the coordinate phrase:
@@ -330,11 +378,11 @@ x=100, y=64, z=-30 좌표로 가줘
 100 64 -30 좌표로 이동해
 ```
 
-`좌표 100 64 -30으로 가줘` may match today only because the current regular
-expression searches for the numeric tail. That incidental behavior is not a
-complete grammar contract.
+At that reviewed HEAD, `좌표 100 64 -30으로 가줘` could match only because the
+regular expression searched for the numeric tail. That incidental behavior was
+not a complete grammar contract.
 
-The downstream path is already present:
+The downstream path already present at that snapshot was:
 
 ```text
 typed GOTO intent {x, y, z}
@@ -1356,10 +1404,10 @@ Deleting cache data is not authorized by this contract.
 
 ### 12.1 GOTO tests
 
-Characterize the current accepted form, then add:
+Against the historical reviewed HEAD, characterize the then-accepted form, then add:
 
 - prove that the rule parser alone accepts `100, 64, -30으로 가줘` while the
-  current Chat/final-microphone ownership gate does not claim it, then cover
+  then-current Chat/final-microphone ownership gate does not claim it, then cover
   the focused gate correction;
 - spaces, compact commas, spaced commas, parentheses, leading `좌표`, trailing
   `좌표로`, ASCII X/Y/Z labels, Korean `엑스/와이/제트` labels, and closed
@@ -1536,9 +1584,11 @@ Each build record names the Java/JDK and Gradle JVM, relevant dirty inputs,
 executed test/build unit, artifact absolute path, size, modification time, and
 SHA-256. A build from a mixed worktree is labelled mixed-provenance evidence.
 
-## 14. Rollout and rollback units
+## 14. Historical intended rollout decomposition — not an executable rollback manifest
 
-Keep these dependency-ordered and separately revertible:
+The following table records the intended dependency ordering and conceptual
+isolation of future units. It does not prove current file/hunk provenance,
+identify exact inverse hunks, or authorize rollback of the mixed worktree.
 
 | Unit | Contents | Java build |
 | --- | --- | --- |
@@ -1551,7 +1601,11 @@ Keep these dependency-ordered and separately revertible:
 | C4 | GAMMA authoritative terminal/active-owner retirement, sequential-admission tests, then Korean exposure; strong effect proof remains separate | yes for any Java correction |
 | D | optional direct `@go` delegation plus every exact-name closure; with FIND active, the catalog changes from 27 to 28 | yes |
 
-Rollback rules:
+Intended future rollback ordering, applicable only after a strict provenance
+audit establishes independently executable units and the user explicitly
+approves each exact method/hunk or impact-specified whole-file unit. Path-only
+or generic approval is insufficient; any failed GOTO recovery also remains
+subject to the current incident record's Gate G/G.1:
 
 - disable public exposure before removing a parser, resolver, evaluator, or
   renderer;
@@ -1676,19 +1730,19 @@ Decide:
    registry gains a tested mode-specific policy extension, without allowing
    approach mode to bypass the base command's admission;
 4. whether both modes use one compatible finite-operation lifecycle or a
-   validated descriptor-mode lifecycle dispatcher, because the current
-   registry is keyed only by command name.
+   validated descriptor-mode lifecycle dispatcher, because the
+   `REVIEWED_HEAD` registry was keyed only by command name.
 
 ### 17.4 Before numeric/settings public exposure
 
 Decide and test each command's exact integer/decimal bounds, accepted closed
 Korean numeral forms, units, and genuine omitted-value defaults. GAMMA's
-semantic minimum/maximum is not fixed by the current Java source and must be
-recorded before public Korean exposure.
+semantic minimum/maximum was not fixed by the `REVIEWED_HEAD` Java source and
+must be recorded before public Korean exposure.
 
-GAMMA has a separate mandatory lifecycle gate. Its current Java command does
-not call the finish callback, and Python's accepted-submission cautious fact
-does not authoritatively reconcile and release the active ordinary-command
+GAMMA has a separate mandatory lifecycle gate. At `REVIEWED_HEAD`, its Java
+command did not call the finish callback, and Python's accepted-submission
+cautious fact does not authoritatively reconcile and release the active ordinary-command
 owner. Before `public_korean=true`, a focused unit must produce one
 authoritative bridge terminal/reconciliation, clear that owner once, and admit
 the immediate next command. Strong gamma-effect proof is a different optional
