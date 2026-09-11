@@ -5,6 +5,7 @@
 <!-- 20260903_openai: Aligned the GUI gate with open-child quiescence, one-shot interaction correlation, full reachable-path suppression, exact route types, explicit boundary serials, and one-time permission consumption. -->
 <!-- 20260903_kpopmodder: Defined bounded source-to-hub-to-coordinator diagnostics for the live inter-tick ScreenOpenEvent TAIL gap. -->
 <!-- 20260903_kpopmodder: Corrected runtime evidence and made the screen-dispatch schema, budgets, summaries, and test isolation implementable. -->
+<!-- 20260911_kpopmodder: Recorded the provisional GOTO field-spelling schema, failed-runtime status, and missing authoritative owner boundaries. -->
 
 # ChatClef Task Lifecycle Diagnostics
 
@@ -3026,6 +3027,345 @@ do not change Task selection, isFinished, isEqual, return values, or ordering
 do not call side-effecting Minecraft, Baritone, Carry On, input, or container APIs
   merely to fill a log field
 ```
+
+### GOTO A3D diagnostic field spelling and failed-runtime status
+
+<!-- 20260910_kpopmodder: Recorded the bounded GOTO observation vocabulary before adding Java emitters. -->
+
+The names and serialized values below preserve the spelling used by the current
+mixed-worktree source and reviewed logs. `Canonical` in this subsection means
+field/value spelling compatibility only. It does not mean that the diagnostics
+are complete, that their counters are authoritative, or that the observed GOTO
+behavior passed runtime acceptance.
+
+```text
+GOTO_LIVE_ACCEPTANCE_STATUS: FAILED_RUNTIME_ACCEPTANCE
+DOCUMENTED_SCHEMA_ROLE: REFERENCE_ONLY
+CANONICAL_SCOPE: FIELD_NAMES_AND_SERIALIZED_VALUE_SPELLING_ONLY
+NAVIGATION_ROOT_CAUSE_STATUS: UNKNOWN
+GOTO_BUILD_REQUIREMENT_EMISSION_STATUS: VERIFIED_RUNTIME
+GOTO_BUILD_REQUIREMENT_EVIDENCE_STATUS: NOT_PROVEN_RUNTIME
+GOTO_BUILDING_MATERIAL_READINESS_EMISSION_STATUS: VERIFIED_RUNTIME
+GOTO_BUILDING_MATERIAL_READINESS_EVIDENCE_STATUS: NOT_PROVEN_RUNTIME
+GOTO_TERMINAL_DECISION_STATUS: VERIFIED_RUNTIME
+GOTO_TERMINAL_DECISION_VERIFIED_SCOPE: OVERALL_TIMEOUT_DELIVERY_ONLY
+GOTO_FINITE_COUNTER_ACCURACY: FAILED_RUNTIME_ACCEPTANCE
+GOTO_A2_EXACT_ARRIVAL_STATUS: NOT_EXERCISED
+GOTO_A5_MATERIAL_ACQUISITION_STATUS: NOT_EXERCISED
+GOTO_A5_MATERIAL_ACQUISITION_REASON: NO_PER_COMMAND_OPT_IN
+GOTO_EXECUTION_TRANSITION_EMISSION_STATUS: FAILED_RUNTIME_ACCEPTANCE
+GOTO_EXECUTION_TRANSITION_OBSERVED_EVENT_COUNT: 0
+NONTERMINAL_EMISSIONS_AT_TERMINAL_TRANSITION: 256
+BUDGET_STARVATION_MECHANISM_EVIDENCE: SOURCE_PROVEN
+RESTORATION_SALVAGE_AUDIT_STATUS: NOT_RUN
+EXACT_SAFE_ROLLBACK_SCOPE: UNKNOWN
+```
+
+The matching-JAR 2026-09-11 incident emitted build-requirement and readiness
+records with `observationComplete=false` and missing authoritative path,
+calculation, inventory, whole-route, and wander-owner evidence. Its one terminal
+path proved delivery of the 12,000-active-tick overall timeout, not the accuracy
+of the reported finite counters. The accepted command had no
+`주변 블록 채굴 허용` suffix, so A5 material-acquisition behavior was not
+exercised.
+
+The execution-transition event is a separate failure. Despite its historical
+name, `GOTO_MATERIAL_ACQUISITION_TRANSITION` observes every
+`GotoExecutionPhase` change, including quiescing for a terminal. The reviewed
+log snapshot contains 240 build-requirement and 16 readiness records, exactly
+exhausting the shared 256-record nonterminal cap, and zero transition records.
+Source calls the tick-snapshot observers before the controller tick and admits
+the later transition through that same exhausted nonterminal pool. Thus the
+overall-timeout phase transition could not publish its first transition record.
+See the
+[GOTO diagnostics-before-behavior incident record](chatclef-goto-diagnostics-before-behavior-incident-2026-09-11.md).
+
+The GOTO A3D observation records are diagnostics-only. They may read the active
+LAVI GOTO parent, its composed `GetToBlockTask`, the player, inventory, and
+public Baritone state. They must not change Task selection, completion, retry,
+timeout, input, goal/path, placement, mining, blacklist, or cleanup behavior.
+The later `GOTO_MATERIAL_ACQUISITION_TRANSITION` record audits a phase change
+already made by the behavior-owning controller. It does not choose or drive the
+change.
+
+Every GOTO A3D record uses these required operation fields:
+
+```text
+commandRequestId
+commandCorrelationId
+commandSessionId
+commandConnectionGeneration
+operationId
+routeRootAssignmentToken
+routeRootGeneration
+phase
+gameTick
+clientTickId
+currentBlockPos
+targetBlockPos
+worldSessionIdentity
+worldSessionEvidence
+currentDimension
+targetDimension
+verticalDelta
+activeParentTask
+activeChildTask
+observationComplete
+missingBoundaries
+taskBehaviorAffected
+```
+
+`taskBehaviorAffected` is `false` for the three observation-only A3D records
+and was serialized as `true` only when
+`GOTO_MATERIAL_ACQUISITION_TRANSITION` observed a transition made by the
+behavior-owning controller. The name describes the observed transition, not an
+effect caused by diagnostic emission. The event itself must remain
+side-effect-free.
+`routeRootAssignmentToken` and `routeRootGeneration` belong to the LAVI route
+invocation; the diagnostic
+`UserTaskChainDiagnosticLedger` is not their authority. `worldSessionIdentity`
+is an observation token only. `worldSessionEvidence` must say
+`OBJECT_IDENTITY_ONLY` until an authoritative world-session generation exists.
+Cross-dimension GOTO may freeze a new arrival-world identity; it must not claim
+that the pre-transition `ClientWorld` object remained the same.
+
+`gameTick` and `clientTickId` are diagnostic audit values used only for
+observation ordering and bounded rate limiting. `clientTickId` may be
+`UNAVAILABLE_DIAGNOSTIC_CLIENT_TICK`, and the wire-level
+`arrival_client_tick` may be null, without changing an ARRIVED decision. These
+values never own GOTO-A2 event eligibility, expiry, or terminal projection.
+That behavior is owned by a separate non-static lifecycle `END_CLIENT_TICK`
+clock and the operation-local GOTO event-join gate.
+
+Use this event for public path/executor and placement-requirement observation:
+
+```text
+GOTO_BUILD_REQUIREMENT_OBSERVED
+```
+
+Additional required fields:
+
+```text
+baritonePathing
+customGoalActive
+pathPresent
+currentExecutorPresent
+currentExecutorIdentity
+currentPathIdentity
+currentPathPosition
+pathMovementCount
+currentMovementType
+currentPathToPlaceCount
+placementRequirement
+placementRequirementFreshness
+wholeRoutePlacementCount
+pathSnapshotGeneration
+calculationSnapshotGeneration
+inventorySnapshotGeneration
+wanderState
+```
+
+Canonical `placementRequirementFreshness` values are:
+
+```text
+CURRENT_EXECUTOR_SNAPSHOT_ONLY
+UNAVAILABLE_NO_CURRENT_EXECUTOR
+UNAVAILABLE_NO_STANDALONE_FRESHNESS
+OBSERVATION_FAILED
+```
+
+The concrete `PathExecutor.toPlace()` count is only the remaining set exposed
+by the currently observed executor. Until the executor/path/position can be
+bound to an authoritative generation with a standalone freshness marker,
+`placementRequirement` is `UNPROVEN_CURRENT_EXECUTOR_SNAPSHOT` even when that
+count is positive, and `wholeRoutePlacementCount` is
+`UNAVAILABLE_NOT_EXPOSED_BY_BARITONE`. A zero count never means that the whole
+route needs no placement.
+
+Use this event for the read-only inventory view:
+
+```text
+GOTO_BUILDING_MATERIAL_READINESS
+```
+
+Additional required fields:
+
+```text
+effectiveAcceptableBuildingMaterialCount
+routeUsableBuildingMaterialCount
+protectedReservedCount
+eligibleBuildingMaterialSummary
+materialReadinessDecision
+placementRequirement
+placementRequirementFreshness
+currentPathToPlaceCount
+```
+
+Canonical `materialReadinessDecision` values are:
+
+```text
+SUFFICIENT_FOR_FRESH_CURRENT_PATH
+NO_MATERIAL_FOR_FRESH_CURRENT_PATH
+INSUFFICIENT_FOR_FRESH_CURRENT_PATH
+UNAVAILABLE_REQUIREMENT_UNPROVEN
+UNAVAILABLE_ROUTE_POLICY_INCOMPLETE
+OBSERVATION_FAILED
+```
+
+A3D must use `UNAVAILABLE_REQUIREMENT_UNPROVEN` while the current executor
+snapshot lacks authoritative freshness. It may count actual `BlockItem`
+stacks that are in Baritone's final effective acceptable-throwaway set, but
+that count is not the route-usable count until protection, reservation, and
+route hazard policies are also complete. `eligibleBuildingMaterialSummary` is
+limited to 16 sorted item IDs and 256 UTF-8 bytes. Reading material state must
+not select a slot or move an item.
+
+Use this event for task-local candidate, interruption, and post-event join
+boundaries:
+
+```text
+GOTO_TERMINAL_DECISION
+```
+
+Additional required fields:
+
+```text
+terminalResult
+terminalDecisionAuthority
+arrivalCandidatePresent
+completionKind
+childQuiescentBeforeFinish
+naturalTaskFinishedJoined
+terminalReason
+```
+
+Canonical phases are `ARRIVAL_CANDIDATE_FROZEN`, `INTERRUPTED`,
+`TASK_FINISHED_JOINED`, and `ARRIVAL_EVIDENCE_INCOMPLETE`. Canonical
+`completionKind` values are `NATURAL_ARRIVAL`, `INTERRUPTED`, and
+`NOT_DECIDED`. `terminalDecisionAuthority` is `LAVI_GOTO_ROUTE_PARENT` for the
+task-local envelope and `LAVI_GOTO_RESULT_PROJECTOR` for the later exact event
+join. A diagnostic event never creates or changes the authoritative result.
+
+The failed source snapshot and focused fixture specify that the intended
+lifecycle join clock would freeze the first finish-callback boundary serial
+`C`; relative ordinals `C+1` through `C+3` would be eligible and `C+4` would
+freeze missing evidence before observation drain. Duplicate callbacks would not
+refresh `C`, and non-END retirement drains would not advance it. The A3D
+terminal record in that snapshot mirrors the final result and reason but does
+not carry the immutable callback/current/freeze serial snapshot. Until that
+bounded mirror exists and is exercised, the fixture encodes intended ordering
+only. Do not infer those serials from `clientTickId`, GUI stabilization counters,
+or the legacy synchronous-finish idle buffer.
+
+The 2026-09-11 failure did not reach an arrival candidate, so the A2 join-clock
+contract was `NOT_EXERCISED`. Its source shape and focused fixture are not live
+arrival proof.
+
+`GOTO_MATERIAL_ACQUISITION_TRANSITION` was source-attached to the failed
+mixed-worktree A3-F/A4/A5 controller and, despite its name, was intended to
+observe every execution-phase change. Its incident emission path failed runtime
+acceptance because shared-budget exhaustion suppressed the terminal transition.
+If retained for a future evidence-backed controller, emit it only after an
+actual behavior-owned execution-phase change; the event must remain an observer
+and never authorize mining, restart navigation, commit a terminal, or own
+cleanup. It uses the common operation fields above, serializes
+`taskBehaviorAffected=true` with the meaning clarified above, and adds exactly:
+
+```text
+previousPhase
+currentPhase
+transitionReason
+activeTicks
+noPathTicks
+noProgressTicks
+wanderCount
+recalculationCount
+movementChildGeneration
+materialAcquisitionAuthorized
+materialAcquisitionMode
+materialSearchRadius
+materialCandidateCap
+materialBatchSize
+materialMaxAttempts
+materialAttemptTickBudget
+materialAcquisitionAttempts
+materialAcquiredCount
+usableBuildingMaterialCount
+requiredBuildingMaterialCount
+materialScanGeneration
+terminalResult
+```
+
+Canonical phase values are:
+
+```text
+NAVIGATING
+QUIESCING_NAVIGATION_FOR_RETRY
+QUIESCING_NAVIGATION_FOR_ACQUISITION
+ACQUIRING_MATERIAL
+QUIESCING_ACQUISITION_FOR_NAVIGATION
+QUIESCING_ACQUISITION_FOR_RETRY_OR_TERMINAL
+QUIESCING_FOR_TERMINAL
+ARRIVAL_CANDIDATE_FROZEN
+```
+
+Counts are nonnegative. An unavailable usable or required count is serialized
+as `UNAVAILABLE_NOT_PROVEN`, never as zero. `terminalResult` is `NOT_DECIDED`
+until the controller has committed one of the canonical typed GOTO non-arrival
+results. `materialAcquisitionMode` records the operation's configured mode even
+when `materialAcquisitionAuthorized=false`; the boolean is the authorization
+fact. The failed source snapshot configured radius 6, candidate cap 128, batch
+16, maximum attempts 2, and 600 ticks per attempt. These are source values, not
+runtime-validated policy. Phase-change fingerprints omit ticks and runtime
+object identities, so the shared bounded logging rules still apply without
+per-tick emission.
+
+A future corrected design must emit the first observation and every owner-level
+semantic transition without allowing unchanged summaries to starve those
+boundaries. The failed snapshot attempted at most one unchanged summary per 200
+distinct client ticks and used one shared 256-record nonterminal cap, but that
+cap did not reserve transition capacity and therefore did not guarantee first
+transition delivery. Terminal records had a separate 32-record reserve before
+the shared session hard cap. The semantic dedupe key excludes game/client ticks,
+timestamps, runtime object identities, and random IDs. Each encoded event is
+capped at 8192 UTF-8 bytes. Required unavailable values use an uppercase typed
+reason such as `UNAVAILABLE_NO_CURRENT_EXECUTOR`,
+`UNAVAILABLE_NOT_EXPOSED_BY_BARITONE`, `UNAVAILABLE_NOT_BOUND`, or
+`OBSERVATION_FAILED_<BOUNDARY>`; blank strings and fabricated zeroes are not
+valid substitutes.
+
+#### Missing authoritative GOTO failure-boundary evidence
+
+The current schema did not reveal the first failing owner or reconstruct the
+terminal counters. Before any new or replacement behavior change, a bounded
+diagnostics-only pass must observe the following concepts at their actual
+owners:
+
+- calculation episode identity, authoritative generation, result, start/end,
+  and whether a path was adopted;
+- active parent and child Task class plus instance/run/generation identity, and
+  every child start, stop, replacement, interruption, and cleanup transition;
+- custom goal/path owner identity and its create, submit, adopt, cancel,
+  replace, and terminal lifecycle;
+- wander episode owner, identity, attempt, start/end, transition reason, and
+  reset cause;
+- blacklist owner, target, attempt before/after, allowed count, and reset cause;
+- command-level retry owner and mapping, or explicit independence, between
+  blacklist attempts, wander episodes, calculation episodes, and terminal
+  counters;
+- previous/current player position, target distance, each progress predicate
+  component, the resulting decision, and every counter reset cause;
+- the authority for every finite counter, its before/after value, increment or
+  reset reason, terminal candidates, and terminal precedence;
+- owner-transition-specific reserved capacity or a typed cap-drop summary that
+  proves the exact event, owner, phase, and reason suppressed by any budget;
+- the exact last successful boundary, first failing boundary, triggering state,
+  expected transition, and observed transition.
+
+The exact serialized names for these missing concepts are not frozen here.
+They must be assigned only after the source owner and bounded correlation path
+are established. Unavailable observations remain typed unavailable values and
+must not be converted to zero, progress, or success.
 
 Use the same request and correlation identifiers across command, root task,
 child task, path operation, click observation, exception, and terminal events.

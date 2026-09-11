@@ -2,6 +2,7 @@
 <!-- 20260909_kpopmodder: Separated Python grammar recovery, LAVI-owned Java FIND behavior, and per-command public rollout into dependency-ordered rollback units. -->
 <!-- 20260909_kpopmodder: Bounded "all targets" by runtime registries, command capability, observation scope, and fail-closed ambiguity handling. -->
 <!-- 20260909_kpopmodder: Reconciled GOTO ownership, finite FIND lifecycle proof, Fabric result projection, public-coverage metrics, and rollout dependencies after source review. -->
+<!-- 20260911_kpopmodder: Reclassified the mixed-worktree GOTO grammar addendum after live navigation failure and linked the diagnostics-first incident gate. -->
 
 # ChatClef Korean GOTO, FIND, and All-Command Coverage Pre-Change Contract
 
@@ -46,6 +47,40 @@ MINECRAFT_RUNTIME: NOT_RUN
 COMMIT: NOT_PERFORMED
 PUSH: NOT_PERFORMED
 ```
+
+### 1.1 Implementation addendum
+
+The status block above remains the historical snapshot for the reviewed HEAD
+and its documentation-only task. The later mixed, uncommitted working-tree
+snapshot must not be read as a committed implementation unit or as successful
+GOTO navigation. Its current evidence classification is:
+
+```text
+IMPLEMENTATION_ADDENDUM_STATUS: MIXED_WORKTREE_REFERENCE_ONLY
+WORKSTREAM_A_GRAMMAR_SOURCE_STATUS: PRESENT_IN_MIXED_UNCOMMITTED_WORKTREE
+WORKSTREAM_A_TRANSLATION_RUNTIME_STATUS: VERIFIED_RUNTIME_FOR_INCIDENT_COMMAND
+WORKSTREAM_A_FOCUSED_TEST_STATUS: REPORTED_PASSED_NOT_REPRODUCED_IN_THIS_DOCUMENT_REVIEW
+WORKSTREAM_B_STATUS: FUTURE_NOT_IMPLEMENTED
+WORKSTREAM_C_STATUS: FUTURE_NOT_IMPLEMENTED
+CURRENT_GAMEPLAY_EFFECT_VERIFIABLE_COMMAND_COUNT: NOT_RECOUNTED_DO_NOT_INCREMENT_FROM_HISTORICAL_2
+GOTO_NAVIGATION_RUNTIME_ACCEPTANCE: FAILED
+GOTO_NAVIGATION_ROOT_CAUSE_STATUS: UNKNOWN
+CURRENT_FIND_COMMAND: ABSENT
+CURRENT_GO_COMMAND_ALIAS: ABSENT
+```
+
+The 2026-09-11 incident directly verifies only that one trusted Korean XYZ input
+was compiled to the existing canonical `goto x y z`, admitted, dispatched, and
+bound to its root Task. It did not reach the target. Exact arrival was not
+exercised, finite early-failure handling failed runtime acceptance, material
+readiness was not proven, and bounded material acquisition was not exercised
+because the command had no opt-in suffix. See the
+[GOTO diagnostics-before-behavior incident record](chatclef-goto-diagnostics-before-behavior-incident-2026-09-11.md).
+
+The working-tree grammar unit did not add a direct `@go` alias. Workstreams B
+and C retain the future sequence below and do not become authorized or
+implemented from this narrow translation evidence. Exact file/hunk provenance
+and an independently executable rollback unit have not been established.
 
 The three workstreams are deliberately separate. A small Python GOTO input
 fix must not silently authorize every raw command, and the new FIND behavior
@@ -1441,7 +1476,11 @@ be weakened to accept arbitrary count drift.
 
 ## 13. Implementation and verification order
 
-The future implementation order is:
+The implementation order is retained below. Before the failed live run, steps 1
+and 2 were recorded as source-complete with focused tests in the mixed worktree;
+this document review did not rerun those tests or prove an executable rollback
+unit. Runtime evidence now verifies the narrow Korean translation/admission path
+but not navigation or a gameplay effect. Steps 3 onward remain future work:
 
 1. Freeze current GOTO failures, 26-command readiness axes, and absent
    `find`/`go` registrations with characterization tests.

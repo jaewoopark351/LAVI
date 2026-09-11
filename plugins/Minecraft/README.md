@@ -16,6 +16,12 @@
 <!-- 20260909_kpopmodder: Reconciled the implemented and offline-verified contextual busy-response RB6 policy while preserving rejected admission and zero submission. -->
 <!-- 20260909_kpopmodder: Indexed the docs-only Korean GOTO, new FIND, and full registered-command input-coverage contract. -->
 <!-- 20260909_kpopmodder: Clarified GOTO ownership, FIND's loaded-scope report-only base, semantic alias counting, and dependency-ordered rollout. -->
+<!-- 20260910_kpopmodder: Indexed the reviewed high-Y GOTO material-readiness investigation and bounded-acquisition pre-change direction. -->
+<!-- 20260911_kpopmodder: Reconciled the source-implemented finite GOTO, read-only material readiness, and exact-suffix bounded acquisition contract. -->
+<!-- 20260911_kpopmodder: Reconciled focused GOTO verification and its exact fail-closed material-acquisition boundaries without claiming clean-build or runtime proof. -->
+<!-- 20260911_kpopmodder: Reconciled A5 with its LAVI-owned exact in-reach vanilla-mining and task-local input-lease boundary. -->
+<!-- 20260911_kpopmodder: Reconciled exact ranked-slot, queued-input, captured-resource, and revocable-child A5 safety closure. -->
+<!-- 20260911_kpopmodder: Superseded the pre-runtime GOTO readiness summary with the matching-JAR failed-runtime incident status. -->
 
 # LAVI Minecraft Plugin
 
@@ -103,18 +109,55 @@ an existing trusted route is eligible. This policy is
 `IMPLEMENTED_VERIFIED_OFFLINE_LIVE_NOT_RUN`; see the
 [contextual active-command busy response contract](docs/chatclef-python-contextual-active-command-busy-response-pre-change-contract-2026-09-08.md).
 
-The next requested command-input expansion is documented but not implemented.
-It separates three workstreams with dependency-ordered, separately revertible
-units: broader Korean XYZ ownership/grammar compiled to the existing canonical
-`@goto`; a new LAVI-owned Java `@find` command whose safe base only reports a
-terminally revalidated target from a bounded loaded/known scope, with approach
-and exploration still unapproved; and command-by-command Korean
-Chat/final-microphone exposure. The current 26 registered names represent 25
-semantic capabilities because `자동보관등록` is a compatibility alias; the
-target after FIND is 27 names and 26 semantic Korean routes. Current source
-still has no `@find` or `@go`, and only 10 commands are public Korean input
-commands. See the
+The next requested command-input expansion has three conceptually separated
+workstreams. At the 2026-09-11 incident audit, the local mixed, uncommitted
+worktree was observed to contain broader Korean XYZ ownership/grammar for the
+existing canonical `@goto`; one live incident verifies the narrow translation,
+admission, dispatch, and root-binding path, not navigation success. The new
+LAVI-owned Java `@find` command and command-by-
+command Korean Chat/final-microphone exposure remain documented but not
+implemented. FIND's safe base only reports a terminally revalidated target from
+a bounded loaded/known scope, with approach and exploration still unapproved.
+The 26 registered names represent 25 semantic capabilities because
+`자동보관등록` is a compatibility alias; the target after FIND is 27 names and
+26 semantic Korean routes. At the 2026-09-11 audit, comparison commit
+`92760206652ce155b482f3ddc85505702f9d811e` had no `@find` or `@go`, and only
+10 commands were public Korean input commands. See the
 [Korean GOTO, FIND, and all-command coverage contract](docs/chatclef-korean-goto-find-and-all-command-coverage-pre-change-contract-2026-09-09.md).
+
+A historical 2026-09-10 user-run GOTO investigation recorded repeated
+high-cost path calculation, wander, and blacklist handling until STOP after
+about 29.6 minutes. Its material-shortage and automatic-deposit observations
+remain hypotheses or separate evidence; they did not prove the GOTO root cause.
+The subsequent pre-runtime ledger recorded a large A3-F/A4/A5 source contract
+and focused-test results in the mixed worktree. Those descriptions are now
+historical reference only, not accepted implementation or an executable
+rollback manifest. See the
+[historical GOTO vertical-navigation ledger](docs/chatclef-goto-vertical-navigation-building-material-readiness-pre-change-contract-2026-09-10.md).
+
+A later 2026-09-11 reproduction used an active-instance JAR matching the build
+artifact by size and SHA-256. `goto -500 80 16` moved from `(-490,64,8)` to the
+target vicinity but did not arrive, repeated failed calculations, wander, and
+blacklist attempts, and ended only at the 12,000-active-tick overall limit. The
+reported finite counters did not represent those events. Current unit status is:
+
+```text
+KOREAN_TRANSLATION_ADMISSION_AND_ROOT_BINDING: VERIFIED_RUNTIME
+A3_F_FINITE_EARLY_FAILURE: FAILED_RUNTIME_ACCEPTANCE
+A2_EXACT_ARRIVAL: NOT_EXERCISED
+A4_ROUTE_AND_MATERIAL_READINESS: NOT_PROVEN_RUNTIME
+A5_BOUNDED_MATERIAL_ACQUISITION: NOT_EXERCISED_NO_OPT_IN
+NAVIGATION_ROOT_CAUSE: UNKNOWN
+EXACT_SAFE_ROLLBACK_SCOPE: NOT_PROVEN
+```
+
+Do not reuse or salvage the failed behavior, introduce replacement behavior, or
+describe it as verified until the incident's diagnostics-first gate is met. A
+narrow removal/restoration of exact failed hunks is a separate
+`RECOVERY_ROLLBACK` path requiring the completed strict provenance audit, exact
+inverse hunks, preservation of unrelated changes, and explicit user approval of
+the exact paths and action. See the
+[GOTO diagnostics-before-behavior incident record](docs/chatclef-goto-diagnostics-before-behavior-incident-2026-09-11.md).
 
 ## Current Implementation Scope
 
@@ -698,8 +741,14 @@ Contextual natural active-command STATUS responses for all ordinary command-life
 Contextual current-task wording for an exact typed pre-submit busy rejection, with rejected admission, zero submission and unchanged active identity (implemented and verified offline; Java/Gradle/live runtime not run; no commit or push performed):
   chatclef-python-contextual-active-command-busy-response-pre-change-contract-2026-09-08.md
 
-Korean coordinate GOTO ownership/grammar, bounded loaded-scope LAVI-owned FIND behavior, and Korean Chat/final-microphone coverage for every registered command (documentation only; implementation, Java build, deployment, and runtime not run):
+Korean coordinate GOTO ownership/grammar, bounded loaded-scope LAVI-owned FIND behavior, and Korean Chat/final-microphone coverage for every registered command (mixed-worktree GOTO grammar; one incident verifies translation/admission/root binding only; navigation failed; FIND and full coverage remain unimplemented):
   chatclef-korean-goto-find-and-all-command-coverage-pre-change-contract-2026-09-09.md
+
+Historical GOTO high-Y material-readiness and pre-runtime implementation ledger (reference-only after matching-JAR failed runtime acceptance; root cause and exact safe rollback scope unproven):
+  chatclef-goto-vertical-navigation-building-material-readiness-pre-change-contract-2026-09-10.md
+
+GOTO diagnostics-before-behavior process incident, matching-JAR failed runtime acceptance, unit-by-unit evidence, and mandatory re-entry/recovery gates:
+  chatclef-goto-diagnostics-before-behavior-incident-2026-09-11.md
 
 Generic wooden-button StackOverflow root cause, applied correction, clean-build proof, and matching-JAR `PARTIALLY_VERIFIED` runtime status:
   chatclef-wooden-button-stack-overflow-pre-change-report-2026-09-06.md
