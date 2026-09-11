@@ -121,6 +121,106 @@ routes, wrong-target movement, mining stalls, or world-replacement regressions
 as a LAVI behavior bug. This is especially important after a Minecraft test
 world is copied, restored, replaced, or renamed.
 
+<!-- 20260911_kpopmodder: Added the failed GOTO implementation incident record and an evidence-first re-entry gate. -->
+
+Required GOTO incident and recurrence-prevention record:
+
+[ChatClef GOTO Diagnostics-Before-Behavior Incident Record](plugins/Minecraft/docs/chatclef-goto-diagnostics-before-behavior-incident-2026-09-11.md)
+
+Codex must read and apply this record before proposing, salvaging, restoring,
+modifying, building, deploying, or evaluating Fabric ChatClef GOTO behavior.
+The record and the gate below define the maximum permissible change
+classification; they do not authorize a source edit, build, deployment,
+Minecraft launch, runtime reproduction, external-instance copy, Baritone cache
+mutation, commit, or push. The active user request must separately authorize
+each applicable action. An explicit read-only, audit-only, no-edit, or
+documentation-only request keeps the effective classification at `NONE`.
+
+Until a controlled runtime reproduction proves the exact last successful
+boundary, first failing boundary, triggering state, expected and observed
+transition, and retry/wander/path owner, the maximum normal source-change
+classification is bounded diagnostics-only. Focused tests, a successful build,
+matching JAR identity, or a terminal timeout do not prove the root cause or
+verify a behavior fix. The exact container GUI-open stabilization exception
+applies only to its enumerated GUI-open hunks. It never authorizes a GOTO hunk,
+including when GUI and GOTO changes appear in the same diff or work request.
+
+Before any GOTO source edit, `RECOVERY_ROLLBACK`, build, deployment, runtime
+reproduction, or cache mutation, report this gate explicitly:
+
+```text
+GOTO_INCIDENT_RECORD_READ: YES
+REPRODUCTION_ID:
+ACTIVE_ARTIFACT_SHA256:
+COMMAND_CORRELATION_ID:
+OPERATION_ID:
+ROOT_CAUSE_STATUS: VERIFIED_RUNTIME or UNKNOWN
+PARENT_TASK:
+CHILD_TASK:
+PATH_OR_GOAL_OWNER:
+LAST_SUCCESSFUL_BOUNDARY:
+FIRST_FAILING_BOUNDARY:
+TRIGGERING_STATE:
+EXPECTED_TRANSITION:
+OBSERVED_TRANSITION:
+RETRY_OWNER:
+WANDER_OWNER:
+EXACT_FILES_AND_HUNKS_PROPOSED:
+EXACT_PROPOSED_FIX_BOUNDARY:
+FAILED_IMPLEMENTATION_ROLLBACK_SCOPE:
+PROPOSED_CHANGE_EXACT_ROLLBACK_UNIT:
+NEXT_ALLOWED_CHANGE_CLASSIFICATION: NONE, DIAGNOSTICS_ONLY, RECOVERY_ROLLBACK, or BEHAVIOR
+ACTIVE_REQUEST_AUTHORIZES_SOURCE_EDIT: YES or NO
+ACTIVE_REQUEST_AUTHORIZES_BUILD: YES or NO
+ACTIVE_REQUEST_AUTHORIZES_DEPLOYMENT: YES or NO
+ACTIVE_REQUEST_AUTHORIZES_RUNTIME: YES or NO
+ACTIVE_REQUEST_AUTHORIZES_CACHE_MUTATION: YES or NO
+```
+
+The causal evidence set is `ROOT_CAUSE_STATUS`, `REPRODUCTION_ID`,
+`ACTIVE_ARTIFACT_SHA256`, `COMMAND_CORRELATION_ID`, `OPERATION_ID`,
+`PARENT_TASK`, `CHILD_TASK`, `PATH_OR_GOAL_OWNER`, `LAST_SUCCESSFUL_BOUNDARY`,
+`FIRST_FAILING_BOUNDARY`, `TRIGGERING_STATE`, `EXPECTED_TRANSITION`,
+`OBSERVED_TRANSITION`, `RETRY_OWNER`, `WANDER_OWNER`, and
+`EXACT_PROPOSED_FIX_BOUNDARY`. For a new or replacement behavior change,
+`ROOT_CAUSE_STATUS` must be `VERIFIED_RUNTIME`. If it is not, or if any other
+field in that set is unknown, the normal classification must not exceed
+`DIAGNOSTICS_ONLY`; that behavior change is prohibited.
+`RECOVERY_ROLLBACK` is evaluated separately under the exception below and is
+not ordered above or below `DIAGNOSTICS_ONLY`.
+
+`PROPOSED_CHANGE_EXACT_ROLLBACK_UNIT` must be concrete before any source edit.
+`FAILED_IMPLEMENTATION_ROLLBACK_SCOPE` is additionally required for
+`RECOVERY_ROLLBACK`. Treat the failed implementation as reference-only. Do not
+use broad restore, reset, checkout, or clean against the mixed dirty worktree,
+and do not recommend an in-place rollback before exact file/hunk provenance and
+an inverse rollback unit exist.
+
+`RECOVERY_ROLLBACK` is a narrow exception for removing already failed behavior;
+it is not a speculative fix and does not require pretending that the root cause
+is known. It is allowed only after a completed strict read-only provenance audit
+identifies a known committed comparison baseline, proves that baseline's
+provenance and relationship to the intended reference, identifies the exact
+failed hunks and their exact inverse hunks, and proves how every unrelated user
+change will be preserved. If the baseline is described as the latest remote or
+GitHub state, current read-only remote-freshness evidence is required; otherwise
+that freshness must remain `UNKNOWN`. The user must then explicitly approve the
+exact paths and rollback action, and the rollback must remain an independently
+reviewable unit without replacement behavior. If any condition is missing,
+rollback remains blocked.
+During the strict restoration/salvage audit, report the proposed rollback scope
+in conversation only; do not save a manifest or modify a file. A persisted
+manifest may be created only after that audit has ended and a separate explicit
+documentation request authorizes it. The incident record itself is not proof
+that this restoration/salvage audit has been completed.
+
+Before any GOTO reproduction, record the active world identity, save path, and
+whether it was copied, restored, replaced, or renamed, together with the exact
+Baritone cache evidence. Cache presence or use alone does not prove staleness or
+causality. Renaming, deleting, or otherwise mutating a cache requires explicit
+user approval, a stopped task, exit from the world, a fully closed Minecraft
+process, and verification of the exact cache path.
+
 Reading the companion document alone is not a work request. A direct user
 request to implement a Fabric ChatClef change defines the repository-local
 source, resource, test, documentation, bounded-logging, and verification scope
