@@ -8,6 +8,9 @@ import adris.altoclef.tasks.movement.GetToXZTask;
 import adris.altoclef.tasks.movement.GetToYTask;
 import adris.altoclef.tasksystem.Task;
 import net.minecraft.util.math.BlockPos;
+//#if MC == 12001
+import lavi.minecraft.task.movement.gotopreflight.PreparedGotoTask;
+//#endif
 
 /**
  * Out of all the commands, this one probably demonstrates
@@ -38,6 +41,10 @@ public class GotoCommand extends Command {
     @Override
     protected void call(AltoClef mod, ArgParser parser) throws CommandException {
         GotoTarget target = parser.get(GotoTarget.class);
-        mod.runUserTask(getMovementTaskFor(target), this::finish);
+        Task task = getMovementTaskFor(target);
+        //#if MC == 12001
+        task = PreparedGotoTask.forCommand(mod, target, task);
+        //#endif
+        mod.runUserTask(task, this::finish);
     }
 }
