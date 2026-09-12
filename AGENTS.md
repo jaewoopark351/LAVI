@@ -122,13 +122,31 @@ as a LAVI behavior bug. This is especially important after a Minecraft test
 world is copied, restored, replaced, or renamed.
 
 <!-- 20260911_kpopmodder: Added the failed GOTO implementation incident record and an evidence-first re-entry gate. -->
+<!-- 20260912_kpopmodder: Linked the current upward direct-XYZ GOTO material-preflight contract without authorizing behavior work. -->
 
 Required GOTO incident and recurrence-prevention record:
 
 [ChatClef GOTO Diagnostics-Before-Behavior Incident Record](plugins/Minecraft/docs/chatclef-goto-diagnostics-before-behavior-incident-2026-09-11.md)
 
-Codex must read and apply this record before proposing, salvaging, restoring,
-modifying, building, deploying, or evaluating Fabric ChatClef GOTO behavior.
+Required current upward direct-XYZ GOTO behavior contract:
+
+[ChatClef Direct-XYZ GOTO Upward Material Preflight Contract](plugins/Minecraft/docs/chatclef-goto-upward-material-preflight-contract-2026-09-12.md)
+
+For direct XYZ GOTO that requires no dimension transition, the current
+user-visible requirement is a pre-navigation material preflight:
+freeze the positive Y delta; only when it is greater than zero, freeze the
+target usable held count at that delta plus exactly three reserve blocks, read the
+canonical usable placement-material count and safely acquire a proven shortage
+before starting coordinate navigation, then hand off
+once to the existing `GetToBlockTask`. It is not the historical
+zero-material-only fallback after no-path. This documentation amendment does
+not implement the feature. A separately requested fresh implementation follows
+the exact material-preflight feature exception below; the incident evidence
+gate remains unchanged outside that exception.
+
+Codex must read and apply both the incident record and the current contract
+before proposing, salvaging, restoring, modifying, building, deploying, or
+evaluating Fabric ChatClef GOTO behavior.
 This incident gate applies to the failed navigation implementation, A2, A3D,
 A3-F, A4, A5, their dispatch/execution/result/packaging attachments, and any
 hunk that salvages or reuses them. A pure Korean input-grammar change may follow
@@ -146,7 +164,8 @@ documentation-only request keeps production, test, configuration, and runtime
 action classification at `NONE`; it does not prevent the documentation edits
 that the user explicitly requested.
 
-Until a controlled runtime reproduction proves the exact last successful
+Outside the exact material-preflight feature exception below, until a
+controlled runtime reproduction proves the exact last successful
 boundary, first failing boundary, triggering state, expected and observed
 transition, and retry/wander/path owner, the maximum normal source-change
 classification is `DIAGNOSTICS_ONLY`. Focused tests, a successful build,
@@ -154,6 +173,55 @@ matching JAR identity, or a terminal timeout do not prove the root cause or
 verify a behavior fix. The exact container GUI-open stabilization exception
 applies only to its enumerated GUI-open hunks. It never authorizes a GOTO hunk,
 including when GUI and GOTO changes appear in the same diff or work request.
+
+<!-- 20260911_kpopmodder: Defined the GOTO diagnostics-coupled phased re-entry rule without authorizing source or runtime work. -->
+
+#### GOTO diagnostics-coupled phased re-entry
+
+The exact material-preflight feature follows its separate exception below.
+For an unknown-cause GOTO navigation fix or historical failed-work reuse, a
+request to "implement with reinforced logs" does not merge an unknown-cause
+diagnostic pass with a behavior change. While the root cause is
+`UNKNOWN`, the first separately authorized source-bearing unit must be
+`DIAGNOSTICS_ONLY`, behavior-preserving, and independently reviewable and
+revertible. Separately authorized build/deployment/runtime evidence plus
+artifact and source reconciliation must then complete every causal evidence
+field defined below in the GOTO gate ledger and establish
+`NAVIGATION_ROOT_CAUSE_STATUS: VERIFIED_RUNTIME` before a separate behavior
+unit may begin. If any required boundary remains unknown, reinforce only the
+missing owner-boundary diagnostics and repeat the evidence pass; do not add or
+replace behavior.
+
+The later behavior unit must be the smallest exact hunk, or the smallest
+independently reviewable set of hunks strictly required at the verified first
+failing boundary, and must add or retain bounded companion logs for each new or
+changed state transition, decision, counter/reset, and terminal outcome. Those
+logs observe a decision already made by the authoritative behavior owner.
+Diagnostic mode, counters, admission, suppression, formatting, or emission
+failure must never select behavior, authorize retry, establish success, alter
+cleanup, or change a terminal result. Each entry in
+`REQUIRED_CAUSAL_OWNER_BOUNDARY_SET` must identify an exact required boundary
+signature: owner + event family + semantic transition/result/reason, plus a
+generation or phase role when needed to distinguish causal boundaries. Runtime
+or random identifiers remain correlation metadata and are excluded from that
+signature. The first occurrence of every exact required boundary signature and
+the operation terminal must be physically emitted through reserved capacity
+that unchanged summaries cannot consume; a suppression summary cannot replace
+any of those events.
+Logs added in the behavior unit cannot retroactively satisfy the prerequisite
+runtime cause proof. The diagnostics-only unit and the later behavior unit
+require separate exact rollback units and must not be mixed in one commit or
+rollback unit.
+
+Outside the exact material-preflight feature exception below, this is one
+evidence-gated sequence, not an authorization bundle. One future
+request may explicitly authorize several named actions, but each action must
+still be recorded separately and the evidence gate must pass before behavior is
+changed. This does not waive the exact-scope approval or safety confirmation
+required for `RECOVERY_ROLLBACK`, manual cache mutation, or another destructive
+action. An explanation-only or documentation-only request authorizes none of
+the source, test, configuration, build, deployment, runtime, live-world, cache,
+commit, or push actions in that sequence.
 
 Before any in-scope GOTO source edit, `RECOVERY_ROLLBACK`, build, deployment,
 Minecraft launch, external-instance copy, runtime reproduction, live-world
@@ -175,7 +243,10 @@ CHILD_TASK:
 FINITE_COUNTER_OWNER:
 TERMINAL_DECISION_OWNER:
 DIAGNOSTIC_BUDGET_OWNER:
-FIRST_REQUIRED_PHASE_TRANSITION_EMISSION_STATUS:
+REQUIRED_CAUSAL_OWNER_BOUNDARY_SET:
+REQUIRED_CAUSAL_OWNER_BOUNDARY_EMISSION_STATUS: VERIFIED_RUNTIME or UNKNOWN
+REQUIRED_TERMINAL_EMISSION_STATUS: VERIFIED_RUNTIME or UNKNOWN
+FIRST_REQUIRED_PHASE_TRANSITION_EMISSION_STATUS: VERIFIED_RUNTIME, UNKNOWN, or ABSENT_IN_ACTIVE_SOURCE
 DIAGNOSTIC_SUPPRESSION_REASON:
 PATH_OR_GOAL_OWNER:
 LAST_SUCCESSFUL_BOUNDARY:
@@ -234,16 +305,45 @@ The causal evidence set is `NAVIGATION_ROOT_CAUSE_STATUS`, `REPRODUCTION_ID`,
 `ACTIVE_ARTIFACT_SHA256`, `COMMAND_CORRELATION_ID`, `OPERATION_ID`,
 `PARENT_TASK`, `CHILD_TASK`, `FINITE_COUNTER_OWNER`,
 `TERMINAL_DECISION_OWNER`, `DIAGNOSTIC_BUDGET_OWNER`,
+`REQUIRED_CAUSAL_OWNER_BOUNDARY_SET`,
+`REQUIRED_CAUSAL_OWNER_BOUNDARY_EMISSION_STATUS`,
+`REQUIRED_TERMINAL_EMISSION_STATUS`,
 `FIRST_REQUIRED_PHASE_TRANSITION_EMISSION_STATUS`,
 `DIAGNOSTIC_SUPPRESSION_REASON`, `PATH_OR_GOAL_OWNER`, `LAST_SUCCESSFUL_BOUNDARY`,
 `FIRST_FAILING_BOUNDARY`, `TRIGGERING_STATE`, `EXPECTED_TRANSITION`,
 `OBSERVED_TRANSITION`, `RETRY_OWNER`, `WANDER_OWNER`, and
-`EXACT_PROPOSED_FIX_BOUNDARY`. For a new or replacement behavior change,
-`NAVIGATION_ROOT_CAUSE_STATUS` must be `VERIFIED_RUNTIME`. If it is not, or if
-any other field in that set is unknown, the normal classification must not
-exceed `DIAGNOSTICS_ONLY`; that behavior change is prohibited.
+`EXACT_PROPOSED_FIX_BOUNDARY`. Except for the exact fresh material-preflight
+feature unit defined below, for a new or replacement behavior change,
+`NAVIGATION_ROOT_CAUSE_STATUS` and
+`REQUIRED_CAUSAL_OWNER_BOUNDARY_EMISSION_STATUS` and
+`REQUIRED_TERMINAL_EMISSION_STATUS` must all be `VERIFIED_RUNTIME`, and
+`DIAGNOSTIC_SUPPRESSION_REASON` must not report suppression of a required owner
+boundary or terminal. `FIRST_REQUIRED_PHASE_TRANSITION_EMISSION_STATUS` is a
+historical/applicable-owner field: it must be `VERIFIED_RUNTIME` when that phase
+owner exists in the active source, while source-proven
+`ABSENT_IN_ACTIVE_SOURCE` is a complete provenance fact when it does not. That
+absence is not runtime emission proof and never authorizes restoring the old
+owner. A suppression summary for repeated noncritical detail is not evidence
+that a required event was emitted. Outside the exact fresh feature exception,
+if these conditions are not met, or if any other field in the set is unknown,
+the normal classification must not exceed
+`DIAGNOSTICS_ONLY`; that behavior change is prohibited.
 `RECOVERY_ROLLBACK` is evaluated separately under the exception below and is
 not ordered above or below `DIAGNOSTICS_ONLY`.
+
+For an owner field whose historical owner is absent from active source, a
+source-proven `ABSENT_IN_ACTIVE_SOURCE` value completes the provenance fact; it
+is not runtime emission proof and never authorizes restoring that owner. It does
+not by itself block a fix at a different, runtime-proven current owner boundary.
+The diagnostics-only unit must define `REQUIRED_CAUSAL_OWNER_BOUNDARY_SET` from
+the actual active-source owners and physically emit each listed exact boundary
+signature's first occurrence. A broad event-family name alone is insufficient:
+the set must distinguish the first causally required success, failure,
+transition, result, or reason at the same family when those meanings differ. If
+the later behavior unit proposes a new owner, define its
+ownership and exact rollback unit before editing and verify its runtime behavior
+and companion logs only in the post-fix evidence pass; do not present them as
+pre-fix proof.
 
 `PROPOSED_CHANGE_EXACT_ROLLBACK_UNIT` must be concrete before any source edit.
 `FAILED_IMPLEMENTATION_ROLLBACK_SCOPE` is additionally required for
@@ -329,6 +429,99 @@ not require a new confirmation between its implementation, logging, test, and
 clean-build stages. Commit, push, deployment, external-instance mutation, and
 live-world execution remain outside that scope unless the active request names
 them explicitly.
+
+<!-- 20260912_kpopmodder: Allowed the exact upward direct-XYZ material-preflight feature independently of the unresolved navigation root cause, with three reserve blocks and all other safety gates preserved. -->
+
+#### Fabric ChatClef Direct-XYZ Upward Material-Preflight Feature Exception
+
+This is an explicitly specified new command feature, not a root-cause fix for
+the existing unresolved GOTO path failure. When the user requests its
+implementation, the exact fresh feature unit may be classified as `BEHAVIOR`
+without first proving the old navigation root cause at runtime. Do not
+reclassify that feature as an unknown-cause fix or substitute another
+diagnostics-only patch merely because the old navigation cause is `UNKNOWN`.
+
+The exception is limited to Fabric ChatClef 1.20.1 direct XYZ GOTO that requires
+no dimension transition, with this exact contract:
+
+1. At command admission, bind the original XYZ target, nullable dimension
+   request, command/root ownership, world/dimension, and player block Y. Freeze
+   `deltaY = targetY - admissionPlayerBlockY` once.
+2. If `deltaY <= 0`, perform no material-inventory check or acquisition and apply
+   no reserve. Preserve the existing navigation behavior.
+3. If `deltaY > 0`, freeze `targetUsableHeldCount = deltaY + 3`. Count accessible
+   placement-material items using the actual Baritone usable-selection rules,
+   not all `BlockItem` instances or the `planHasThrowaway` existence boolean.
+   Acquire only `max(0, targetUsableHeldCount - canonicalUsableHeldCount)`.
+   Count-unavailable is a typed failure, never an assumed zero. Movement during
+   acquisition must not change the frozen target.
+4. Acquire only safe, exact-position candidates in loaded, bounded areas.
+   Revalidate block state, protection, expected usable drop, mining/tool
+   preconditions, settings, and inventory capacity immediately before breaking.
+   Do not discard unrelated items to make room. Verify actual usable inventory
+   and source-to-drop-to-pickup provenance before claiming mining progress.
+   Freeze finite search, attempt, tick, and no-progress limits before source
+   implementation; exhaustion ends with a typed failure, not a Wander loop.
+5. After enough material is held, stop further acquisition, make the child and
+   its descendants quiescent, and complete operation-owned cleanup. No former
+   child may continue attacking, collecting, issuing input, or changing paths.
+6. Give external STOP/root replacement priority, then revalidate binding and
+   phase-specific settings; revalidate material count only when `deltaY > 0`.
+   Only after successful cleanup
+   and revalidation, start exactly one existing `GetToBlockTask` with the
+   original coordinates and nullable dimension request. For `deltaY > 0`, a
+   shortage at handoff fails without starting navigation or returning to
+   acquisition.
+7. Preserve existing movement/pathfinding/placement ownership and authoritative
+   non-success reasons. Arrival requires the actual target predicate, movement
+   child cleanup, and binding revalidation before a one-time `ARRIVED` commit.
+   No new pathfinder, pillar algorithm, or movement-time reacquisition loop is
+   included. XZ-only, Y-only, dimension-only, cross-dimension, and unrelated
+   command paths retain their existing behavior.
+
+For example, admission Y 65 and target Y 80 require 18 usable held blocks:
+with zero usable blocks acquire 18; with five acquire 13; with at least 18
+start navigation without mining. The reserve is exactly three blocks on the
+positive-delta target, not three more blocks on every acquisition attempt.
+
+For this exact feature only, this subsection takes precedence over the old
+delta-only/no-reserve target and diagnostics-only prerequisite in the linked
+current contract, and over conflicting pre-fix navigation-cause prerequisites
+in the incident record, GOTO phased re-entry/causal-evidence rules, Section 0
+diagnostics-before-behavior/diagnostic-only/unknown-cause rules, and Section 21.1.
+All other contract safeguards remain mandatory. Reconcile the current contract
+with this amendment within a later implementation request's documentation
+scope; do not rewrite historical logs, hashes, or evidence as new acceptance.
+This AGENTS.md-only amendment changes no companion document.
+
+Before source changes, inspect the actual command entry, placement selector,
+child lifecycle, and owned cleanup boundaries; record exact files/hunks,
+ownership, unrelated dirty changes, and the independently reversible unit.
+New or touched LAVI-owned code with two or more independent responsibilities
+must be split into focused files and meaningful packages. Keep upstream-derived
+changes minimal; do not move or broadly refactor upstream engine classes.
+Bounded companion logs and focused tests must accompany the feature. Logs
+observe decisions and never control behavior, cleanup, or terminal results.
+
+Keep reporting the full GOTO gate and all explicit action-authorizations. Also
+identify `GOTO_FEATURE_EXCEPTION: DIRECT_XYZ_UPWARD_MATERIAL_PREFLIGHT` and the
+source-proven feature boundaries and exact rollback unit. Old navigation-cause
+and emission evidence may remain `UNKNOWN` for this exception; report it
+honestly, never relabel it `VERIFIED_RUNTIME` or `NOT_APPLICABLE` to pass a gate.
+New-feature verification cannot retroactively prove the old path-failure cause.
+
+Historical A2/A3D/A3-F/A4/A5 salvage, restoration, or failed-behavior reuse,
+recovery rollback, speculative navigation retry/Wander/blacklist/path/terminal
+fixes, and newly discovered unknown-cause defects remain under the unchanged
+incident evidence gate. No scheduler redesign, global input/path policy,
+backend/dependency/version change, or automatic setting change is included.
+
+This amendment is policy only. It authorizes no production/test/configuration
+edit, build, deployment, Minecraft launch, external-instance copy, runtime
+reproduction, live-world execution/block mutation, Task stop, world exit,
+process control, manual cache mutation, commit, or push. Each selected action
+still requires the corresponding active user request and safety checks; a
+documentation-only request remains documentation-only.
 
 <!-- 20260903_kpopmodder: Replaced repeated GUI-gate approval stops with one continuous implementation, bounded-log, and verification workflow. -->
 
@@ -858,6 +1051,9 @@ Compare previous work against the restored baseline at method and diff-hunk leve
 
 #### Diagnostic-only first pass
 
+The exact upward direct-XYZ material-preflight feature follows its Section 0
+exception above; the rules here still apply to unknown-cause defect fixes.
+
 When the root cause is not already proven, the first change in this tree must be diagnostic-only and must not alter runtime behavior.
 
 The diagnostic pass should make the following observable when applicable:
@@ -924,6 +1120,9 @@ This standing authorization:
 When the required observation boundary exists only inside upstream-derived ChatClef or AltoClef code, Codex may add one minimal method-level or diff-hunk-level diagnostic block. Outside the exact GUI workflow, a wider observation or behavior scope must be reported before it is expanded. Inside the exact GUI workflow, record the route-local scope and continue only with minimal independently reversible hunks; do not restructure an upstream class.
 
 ##### Unknown-cause behavior gate
+
+The exact fresh material-preflight feature is governed by its Section 0
+exception above. No other unknown-cause behavior gate is relaxed.
 
 If the exact last successful boundary, first failing boundary, and triggering state are not proven, behavior changes are prohibited.
 
@@ -3131,6 +3330,12 @@ Do not reduce or silence investigation logs until the root cause has been verifi
 ---
 
 ## 21.1 Diagnostic Logging First Rule
+
+The exact upward direct-XYZ material-preflight feature also follows its
+higher-priority Section 0 exception: implement the specified source-owned
+contract with bounded companion logs, then verify it. The unresolved old GOTO
+navigation cause does not require a diagnostics-only first unit for that
+feature; newly discovered unknown-cause defects still follow the rules below.
 
 The exact Fabric ChatClef container GUI-open stabilization contract follows the
 higher-priority continuous workflow in Section 0: implement the source-proven
@@ -6184,7 +6389,8 @@ Before editing:
    The Fabric ChatClef container GUI-open stabilization contract uses its
    higher-priority continuous order: implement, reinforce bounded logs, then
    verify. The failure-investigation ordering below applies to unknown-cause
-   defects, not to that explicitly specified feature.
+   defects, not to that explicitly specified feature or the exact Section 0
+   upward direct-XYZ material-preflight feature exception.
 4. For a failure or unexpected behavior, inspect the existing logs, stack traces, compiler output, tests, and reproduction evidence.
 5. If the root cause is not proven, state that it is unknown and add structured diagnostic logs before changing behavior.
 6. Reproduce the problem and inspect the new trace.
