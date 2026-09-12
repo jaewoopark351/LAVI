@@ -132,6 +132,36 @@ Required current upward direct-XYZ GOTO behavior contract:
 
 [ChatClef Direct-XYZ GOTO Upward Material Preflight Contract](plugins/Minecraft/docs/chatclef-goto-upward-material-preflight-contract-2026-09-12.md)
 
+
+#### Current V3.1 GOTO handoff scope (2026-09-13)
+
+For the user-requested follow-up to checkpoint
+`3a97f8ec76fb02ddaf047849afeebe2b869dae7f`, this subsection takes precedence
+ONLY over conflicting admission-delta, unconditional pre-mining, exact approach
+waypoint, and handoff re-estimation requirements below and in the historical V2
+contract. All ownership, cleanup, safety, provenance, and action boundaries remain.
+
+- Preserve the checkpoint's native XYZ navigation first, including underground
+  excavation. Select optional local aerial preparation with the existing geometry
+  and preparation-area checks, not a new timeout or positive-Y preflight gate.
+- Freeze `placementDemand` and `plan.requiredHeld()` at preparation selection.
+  After acquisition has started, handoff requires `plan.requiredHeld()`; when no
+  acquisition was started, it requires only `placementDemand` (no reserve-only mining).
+- Recount actual usable inventory at handoff. Do not raise or lower the frozen
+  minimum using the geometric `remainingEstimate` after the player has moved.
+  Keep that estimate as diagnostic information, not as the quantity threshold.
+- Preserve child quiescence, root/world/player/settings checks and stable dry exit.
+  Actual held count below the frozen minimum remains `HANDOFF_SHORTAGE`.
+- Resume one fresh `GetToBlockTask` for the original XYZ and dimension in the same
+  parent operation. Do not inject another command, reacquire after final navigation,
+  restore `foundation.up()` as an exact waypoint, or modify the native engine.
+- This is a scoped handoff fix, not proof of the old general path-failure cause.
+  The initial patch is a source candidate with isolated tests; full Gradle build,
+  JAR deployment, and live Minecraft acceptance must be reported independently.
+
+The admission-delta material specification below is historical for this V3.1
+follow-up. Do not restore it to resolve a documentation-versus-code mismatch.
+
 For direct XYZ GOTO that requires no dimension transition, the current
 user-visible requirement is a pre-navigation material preflight:
 freeze the positive Y delta; only when it is greater than zero, freeze the

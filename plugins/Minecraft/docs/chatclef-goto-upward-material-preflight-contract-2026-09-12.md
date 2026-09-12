@@ -1,3 +1,68 @@
+# Direct-XYZ GOTO: V3.1 frozen-target handoff
+
+Date: 2026-09-13
+Base checkpoint: `3a97f8ec76fb02ddaf047849afeebe2b869dae7f`
+Status: SOURCE_CANDIDATE; ISOLATED_TESTS_PASSED; FULL_BUILD_NOT_RUN; RUNTIME_NOT_RUN
+
+## Current contract
+
+This section supersedes only the conflicting navigation order, exact approach,
+and material threshold statements in the historical V2 record below. It records
+the user's later V3.1 agreement; it does not rewrite any historical evidence or
+establish the root cause of unrelated navigation failures.
+
+1. Preserve `GotoCommand.call()` admission and the existing native-first
+   `PreparedGotoTask` phases. Existing terrain navigation and underground staircase
+   excavation run before optional local material acquisition. A positive Y delta
+   alone must not force separate mining.
+2. Preserve V3.1 loaded aerial-column classification, nearby preparation-area
+   checks, selected anchor, and bounded mining/drop/pickup implementation. No exact
+   `foundation.up()` waypoint is required before mining. Geometry is not proof of
+   an optimal path or of a native navigation failure's cause.
+3. At preparation selection, freeze `placementDemand` and `plan.requiredHeld()`.
+   If acquisition starts, collect to the plan's placement estimate plus three
+   reserve blocks. If the placement demand is already held before acquisition,
+   skip acquisition instead of mining just for the reserve.
+4. At handoff, keep operation-owned child cleanup and two consecutive quiet ticks,
+   root/world/player/target/settings validation, usable inventory recount, aerial
+   evidence revalidation, and the stable dry exit requirement.
+5. Set `minimum = collected ? plan.requiredHeld() : placementDemand`.
+   A changed `remainingEstimate` must not raise or lower that minimum. Log held
+   count, frozen minimum, live estimate, policy, and quantity result. Actual held
+   count below the frozen minimum still fails without starting navigation.
+6. On successful validation, construct one fresh existing `GetToBlockTask` for
+   the original XYZ and nullable dimension. Keep the same parent and operation.
+   No command-string retry, new parent operation, final-to-preparation loop, new
+   timeout, cache modification, Mixin change, or dependency change is included.
+7. Preserve exact arrival after child cleanup and binding revalidation. A
+   successful handoff or a child FINISHED message is not itself arrival.
+
+## Evidence boundaries for this patch
+
+- The uploaded original log records target 34 / held 34 / re-estimate 43 and
+  target 32 / held 32 / re-estimate 33 handoff failures. Later manual requests
+  arrive under different operation IDs; this is not automatic handoff acceptance.
+- Original production code fails both focused regression cases in an isolated
+  harness. Patched production parent/lifecycle/plan/inventory code passes 49
+  isolated cases (257 assertions) against explicit API and engine doubles.
+- Geometry, mining, GetToBlockTask pathfinding, game physics, and the complete
+  scheduler are not live-tested by the doubles. Isolated compilation is not a
+  full dependency-backed Gradle/Loom build or Mixin verification.
+- Full clean build, installed JAR identity, deployment, live Minecraft execution,
+  Windows worktree writes, commit and push: NOT_RUN by this artifact task.
+- Real acceptance still requires one user command and one operation through
+  ACQUIRE_START -> PREPARED -> HANDOFF_CHECK -> RESUME_ORIGINAL -> ARRIVED,
+  plus sufficient-material, underground, and STOP regression checks.
+- The patch does not guarantee the frozen estimate is sufficient for every real
+  route. Real final-navigation failures remain separate evidence to investigate.
+
+## Historical V2 record (verbatim; not the current behavior contract)
+
+The original record below is preserved for provenance. Its status, build attempt,
+harness counts, approach waypoint, and timeout statements describe V2 only.
+
+---
+
 # Direct-XYZ GOTO: Navigation-first revision (V2)
 
 Date: 2026-09-12

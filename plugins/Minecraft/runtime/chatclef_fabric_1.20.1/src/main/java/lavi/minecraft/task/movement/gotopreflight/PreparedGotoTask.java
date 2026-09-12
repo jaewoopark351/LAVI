@@ -278,13 +278,29 @@ public final class PreparedGotoTask extends Task {
         }
 
         int held = inventory.count(mod);
+        // Acquisition may move the player. Preserve the preparation-time threshold;
+        // a geometric re-estimate is diagnostic, not a new acquisition requirement.
+        int minimum = collected ? plan.requiredHeld() : placementDemand;
         int remainingEstimate = GotoFallbackProbe.materialBudgetFrom(player.getBlockPos(), aerial);
-        int minimum = Math.max(collected ? plan.requiredHeld() : placementDemand, remainingEstimate);
+        String budgetPolicy = collected
+                ? "FROZEN_ACQUISITION_TARGET"
+                : "FROZEN_PLACEMENT_DEMAND";
+        log("HANDOFF_CHECK"
+                + " held=" + held
+                + " minimum=" + minimum
+                + " remainingEstimate=" + remainingEstimate
+                + " collected=" + collected
+                + " quantityReady=" + (held >= minimum)
+                + " budgetPolicy=" + budgetPolicy
+                + " anchor=" + acquisitionAnchor
+                + " player=" + player.getBlockPos()
+                + " target=" + target);
         if (held < minimum) {
             throw new Failure(FailureReason.HANDOFF_SHORTAGE,
                     "held=" + held + " minimum=" + minimum
                             + " anchor=" + acquisitionAnchor + " player=" + player.getBlockPos()
-                            + " remainingEstimate=" + remainingEstimate);
+                            + " remainingEstimate=" + remainingEstimate
+                            + " budgetPolicy=" + budgetPolicy);
         }
 
         navigation = new GetToBlockTask(target, dimension);
