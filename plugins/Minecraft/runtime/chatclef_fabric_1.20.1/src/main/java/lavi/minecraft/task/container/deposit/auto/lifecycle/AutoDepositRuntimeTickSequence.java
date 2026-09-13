@@ -1,5 +1,6 @@
 package lavi.minecraft.task.container.deposit.auto.lifecycle;
 
+import lavi.minecraft.diagnostics.container.store.deposit.pressure.AutoDepositBoundaryDiagnostics;
 import lavi.minecraft.task.container.deposit.auto.DepositAllInventoryPressureChain;
 import lavi.minecraft.task.container.deposit.auto.trusted.interaction.AutoDepositOpenContainerBindingTracker;
 
@@ -33,6 +34,9 @@ public final class AutoDepositRuntimeTickSequence {
                 "pressureChainTick"
         );
         bindingTrackerTick.run();
+        //20260913_kpopmodder: Record the actual binding return; never rerun a skipped callback for logging.
+        AutoDepositBoundaryDiagnostics.log("AUTO_DEPOSIT_BINDING_RETURN", "binding_tick_returned", null);
         checkedPressureTick.run();
+        AutoDepositBoundaryDiagnostics.log("AUTO_DEPOSIT_PRESSURE_RETURN", "pressure_tick_returned", null);
     }
 }

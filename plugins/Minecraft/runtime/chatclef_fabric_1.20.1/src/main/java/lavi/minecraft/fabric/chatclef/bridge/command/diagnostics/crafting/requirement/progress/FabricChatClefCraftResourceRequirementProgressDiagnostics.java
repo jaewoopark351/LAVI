@@ -1,5 +1,6 @@
 package lavi.minecraft.fabric.chatclef.bridge.command.diagnostics.crafting.requirement.progress;
 
+import lavi.minecraft.fabric.chatclef.bridge.command.diagnostics.crafting.lifecycle.FabricChatClefCraftResourceDiagnosticLifecycle;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.ItemTarget;
 import lavi.minecraft.diagnostics.crafting.acquisition.event.CraftResourceAcquisitionEventContract;
@@ -31,12 +32,24 @@ public final class FabricChatClefCraftResourceRequirementProgressDiagnostics {
     }
 
     public static void observeActivation(IronPickaxeAcquisitionScopeBinding binding) {
+        //20260913_kpopmodder: Serialize passive capture with owner invalidation.
+        FabricChatClefCraftResourceDiagnosticLifecycle.runIfAvailable(() -> observeActivationWhileAvailable(binding));
+    }
+
+    private static void observeActivationWhileAvailable(IronPickaxeAcquisitionScopeBinding binding) {
         if (binding != null) {
             REGISTRY.activate(binding.key());
         }
     }
 
     public static void observeInitialDecision(
+            IronPickaxeAcquisitionScopeBinding binding,
+            boolean sourceEmissionCompleted) {
+        //20260913_kpopmodder: Serialize passive capture with owner invalidation.
+        FabricChatClefCraftResourceDiagnosticLifecycle.runIfAvailable(() -> observeInitialDecisionWhileAvailable(binding, sourceEmissionCompleted));
+    }
+
+    private static void observeInitialDecisionWhileAvailable(
             IronPickaxeAcquisitionScopeBinding binding,
             boolean sourceEmissionCompleted) {
         if (binding == null) {
@@ -64,6 +77,16 @@ public final class FabricChatClefCraftResourceRequirementProgressDiagnostics {
             String currentGate,
             int materialsNeeded,
             boolean sourceEmissionCompleted) {
+        //20260913_kpopmodder: Serialize passive capture with owner invalidation.
+        FabricChatClefCraftResourceDiagnosticLifecycle.runIfAvailable(() -> observeMaterialProgressWhileAvailable(task, materialTarget, currentGate, materialsNeeded, sourceEmissionCompleted));
+    }
+
+    private static void observeMaterialProgressWhileAvailable(
+            Task task,
+            ItemTarget materialTarget,
+            String currentGate,
+            int materialsNeeded,
+            boolean sourceEmissionCompleted) {
         FabricChatClefCraftResourceAssociationSnapshot association =
                 FabricChatClefCraftResourceAssociationReader.capture(task);
         if (association.binding().isEmpty()) {
@@ -83,6 +106,15 @@ public final class FabricChatClefCraftResourceRequirementProgressDiagnostics {
     }
 
     public static void observeOperationGate(
+            Task task,
+            String currentGate,
+            int materialsNeeded,
+            boolean sourceEmissionCompleted) {
+        //20260913_kpopmodder: Serialize passive capture with owner invalidation.
+        FabricChatClefCraftResourceDiagnosticLifecycle.runIfAvailable(() -> observeOperationGateWhileAvailable(task, currentGate, materialsNeeded, sourceEmissionCompleted));
+    }
+
+    private static void observeOperationGateWhileAvailable(
             Task task,
             String currentGate,
             int materialsNeeded,

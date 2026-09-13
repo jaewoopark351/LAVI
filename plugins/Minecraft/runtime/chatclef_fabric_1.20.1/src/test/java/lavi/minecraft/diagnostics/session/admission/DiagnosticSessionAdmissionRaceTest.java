@@ -49,7 +49,7 @@ class DiagnosticSessionAdmissionRaceTest {
             assertEquals(1, capTokens);
             assertEquals(1, authority.snapshot()
                     .family(DiagnosticEventFamily.CANONICAL_CAP).admittedRequests());
-            assertEquals(4_937, authority.snapshot().admittedSlots());
+            assertEquals(DiagnosticSessionLimits.ORDINARY_CEILING + 1, authority.snapshot().admittedSlots());
             assertEquals(contenders, authority.snapshot()
                     .family(DiagnosticEventFamily.ORDINARY_DETAIL).suppressedRequests());
         } finally {
@@ -72,6 +72,18 @@ class DiagnosticSessionAdmissionRaceTest {
         admitTimes(authority, DiagnosticEventFamily.AGGREGATE_CHECKPOINT, 8);
         admitTimes(authority, DiagnosticEventFamily.NON_STORE_TERMINAL, 8);
         admitTimes(authority, DiagnosticEventFamily.SUPPRESSION_CONTROL, 6);
+        admitTimes(authority, DiagnosticEventFamily.RESOURCE_MINING_FIRST, 128);
+        admitTimes(authority, DiagnosticEventFamily.RESOURCE_DEPOSIT_FIRST, 128);
+        admitTimes(authority, DiagnosticEventFamily.RESOURCE_BUILDER_FIRST, 128);
+        admitTimes(authority, DiagnosticEventFamily.RESOURCE_OBSERVATION_TERMINAL, 12);
+        admitTimes(authority, DiagnosticEventFamily.RESOURCE_MINING_SUMMARY, 128);
+        admitTimes(authority, DiagnosticEventFamily.RESOURCE_DEPOSIT_SUMMARY, 128);
+        admitTimes(authority, DiagnosticEventFamily.RESOURCE_BUILDER_SUMMARY, 128);
+        admitTimes(authority, DiagnosticEventFamily.BLOCK_COLLECTION_FIRST, 64);
+        admitTimes(authority, DiagnosticEventFamily.BLOCK_COLLECTION_SUMMARY, 32);
+        admitTimes(authority, DiagnosticEventFamily.TOOL_EQUIP_FIRST, 128);
+        admitTimes(authority, DiagnosticEventFamily.TOOL_PLACEMENT_TERMINAL, 4);
+        admitTimes(authority, DiagnosticEventFamily.BLOCK_PROTECTION_BOUNDARY, 64);
         assertEquals(4_998, authority.snapshot().admittedSlots());
 
         ExecutorService executor = Executors.newFixedThreadPool(2);

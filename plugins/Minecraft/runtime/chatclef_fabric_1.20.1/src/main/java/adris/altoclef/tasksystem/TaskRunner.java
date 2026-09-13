@@ -3,6 +3,7 @@ package adris.altoclef.tasksystem;
 import adris.altoclef.AltoClef;
 import adris.altoclef.Debug;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.diagnostics.container.store.deposit.pressure.AutoDepositSchedulerDiagnostics;
 
 import java.util.ArrayList;
 
@@ -45,8 +46,14 @@ public class TaskRunner {
         TaskChain maxChain = null;
         float maxPriority = Float.NEGATIVE_INFINITY;
         for (TaskChain chain : chains) {
-            if (!chain.isActive()) continue;
+            //20260913_kpopmodder: Pass only the original scheduler evaluation results to passive diagnostics.
+            boolean chainActive = chain.isActive();
+            if (!chainActive) {
+                AutoDepositSchedulerDiagnostics.evaluated(chain, false, null);
+                continue;
+            }
             float priority = chain.getPriority();
+            AutoDepositSchedulerDiagnostics.evaluated(chain, true, priority);
             ChatClefDiagnostics.logEvent("TASK_RUNNER", "CHAIN_PRIORITY", "chain_priority_observed", null,
                     "chain", ChatClefDiagnostics.chainName(chain),
                     "priority", priority);
@@ -55,6 +62,7 @@ public class TaskRunner {
                 maxChain = chain;
             }
         }
+        AutoDepositSchedulerDiagnostics.selected(maxChain, maxPriority, cachedCurrentTaskChain);
         if (cachedCurrentTaskChain != null && maxChain != cachedCurrentTaskChain) {
             ChatClefDiagnostics.logEvent("TASK_RUNNER", "CHAIN_INTERRUPT", "current_chain_interrupted_by_new_chain", null,
                     "previousChain", ChatClefDiagnostics.chainName(cachedCurrentTaskChain),

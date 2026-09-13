@@ -149,6 +149,13 @@ public class MobDefenseChain extends SingleTaskChain {
         return shielding || killAura.isShielding();
     }
 
+    //#if MC == 12001
+    //20260913_kpopmodder: Read the already evaluated defense demand; never evaluate defense again for tool placement.
+    public boolean isToolInputClaimed() {
+        return cachedLastPriority > 0 || killAura.attackedLastTick || isShielding() || doingFunkyStuff;
+    }
+    //#endif
+
     private boolean escapeDragonBreath(AltoClef mod) {
         dragonBreathTracker.updateBreath(mod);
         for (BlockPos playerIn : WorldHelper.getBlocksTouchingPlayer()) {

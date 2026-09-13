@@ -4,6 +4,9 @@ import adris.altoclef.AltoClef;
 import adris.altoclef.tasks.InteractWithBlockTask;
 import adris.altoclef.tasks.container.StoreInContainerTask;
 import adris.altoclef.tasksystem.Task;
+import lavi.minecraft.diagnostics.container.store.deposit.pressure.AutoDepositObservationOwner;
+import lavi.minecraft.diagnostics.container.store.deposit.pressure.AutoDepositOperationObservation;
+import lavi.minecraft.diagnostics.observation.ObservationScope;
 import adris.altoclef.util.ItemTarget;
 import lavi.minecraft.task.container.deposit.auto.DepositAllAutoDiagnostics;
 import lavi.minecraft.task.container.deposit.auto.policy.AutoDepositContextSnapshot;
@@ -17,7 +20,7 @@ import java.util.List;
 import java.util.Objects;
 
 //20260827_kpopmodder: Own sequential trusted-candidate execution without a general-container fallback.
-public final class AutoDepositTrustedStoreTask extends Task {
+public final class AutoDepositTrustedStoreTask extends Task implements AutoDepositObservationOwner {
     private static final int MAX_CANDIDATE_TICKS = 2400;
     private static final int MAX_OPEN_NO_PROGRESS_TICKS = 200;
     private static final int MAX_OPERATION_TICKS = 6000;
@@ -38,6 +41,8 @@ public final class AutoDepositTrustedStoreTask extends Task {
     private int lastConfirmedCount;
     private int operationTicks;
     private boolean liveAcceptanceLogged;
+    //20260913_kpopmodder: Bind delayed candidate/transfer results to their original command observation.
+    private final AutoDepositOperationObservation observation;
 
     public AutoDepositTrustedStoreTask(
             AutoDepositContextSnapshot context,
@@ -58,6 +63,12 @@ public final class AutoDepositTrustedStoreTask extends Task {
                 context.dimension(),
                 exactOpenContainerBinding
         );
+        observation = new AutoDepositOperationObservation(context.userTaskRoot());
+    }
+
+    @Override
+    public ObservationScope diagnosticObservationScope() {
+        return observation == null ? ObservationScope.NOOP : observation.scope();
     }
 
     @Override
@@ -106,7 +117,7 @@ public final class AutoDepositTrustedStoreTask extends Task {
         candidateTicks++;
         int confirmedCount = confirmedCount();
         if (confirmedCount > lastConfirmedCount) {
-            DepositAllAutoDiagnostics.logTrustedTransferProgress(
+            DepositAllAutoDiagnostics.logTrustedTransferProgress(this,
                     context.epoch(),
                     activeCandidate,
                     confirmedCount - lastConfirmedCount,
@@ -129,7 +140,7 @@ public final class AutoDepositTrustedStoreTask extends Task {
         if (acceptance == AutoDepositTrustedContainerAcceptanceInspector.Result.CAN_ACCEPT) {
             if (!liveAcceptanceLogged) {
                 liveAcceptanceLogged = true;
-                DepositAllAutoDiagnostics.logTrustedCandidateAccepted(
+                DepositAllAutoDiagnostics.logTrustedCandidateAccepted(this,
                         context.epoch(), activeCandidate, remaining.length
                 );
             }
@@ -177,7 +188,7 @@ public final class AutoDepositTrustedStoreTask extends Task {
             }
             String refusal = preflightRefusal(mod, candidate);
             if (refusal != null) {
-                DepositAllAutoDiagnostics.logTrustedCandidateTerminal(
+                DepositAllAutoDiagnostics.logTrustedCandidateTerminal(this,
                         context.epoch(), candidate, refusal, remaining.length,
                         candidateQueue.remainingCandidateCount() - 1
                 );
@@ -194,7 +205,7 @@ public final class AutoDepositTrustedStoreTask extends Task {
             liveAcceptanceLogged = false;
             lastConfirmedCount = confirmedCount();
             transferTracker.observeCandidate(candidate.position());
-            DepositAllAutoDiagnostics.logTrustedCandidateSelected(
+            DepositAllAutoDiagnostics.logTrustedCandidateSelected(this,
                     context.epoch(), candidate, remaining.length,
                     candidateQueue.remainingCandidateCount()
             );
@@ -221,7 +232,7 @@ public final class AutoDepositTrustedStoreTask extends Task {
 
     private void rejectActive(String reason, int remainingTargetTypes) {
         AutoDepositTrustedDestinationCandidate rejected = activeCandidate;
-        DepositAllAutoDiagnostics.logTrustedCandidateTerminal(
+        DepositAllAutoDiagnostics.logTrustedCandidateTerminal(this,
                 context.epoch(), rejected, reason, remainingTargetTypes,
                 Math.max(0, candidateQueue.remainingCandidateCount() - 1)
         );
@@ -263,7 +274,7 @@ public final class AutoDepositTrustedStoreTask extends Task {
             return;
         }
         outcome = terminalOutcome;
-        DepositAllAutoDiagnostics.logTrustedCandidateTerminal(
+        DepositAllAutoDiagnostics.logTrustedCandidateTerminal(this,
                 context.epoch(), activeCandidate, reason,
                 remainingTargetTypeCount(), candidateQueue.remainingCandidateCount()
         );

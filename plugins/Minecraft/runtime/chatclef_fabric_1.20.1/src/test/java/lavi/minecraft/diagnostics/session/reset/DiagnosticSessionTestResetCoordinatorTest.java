@@ -145,6 +145,18 @@ class DiagnosticSessionTestResetCoordinatorTest {
         admitAndComplete(authority, DiagnosticEventFamily.AGGREGATE_CHECKPOINT, 8);
         admitAndComplete(authority, DiagnosticEventFamily.NON_STORE_TERMINAL, 8);
         admitAndComplete(authority, DiagnosticEventFamily.SUPPRESSION_CONTROL, 6);
+        admitAndComplete(authority, DiagnosticEventFamily.RESOURCE_MINING_FIRST, 128);
+        admitAndComplete(authority, DiagnosticEventFamily.RESOURCE_DEPOSIT_FIRST, 128);
+        admitAndComplete(authority, DiagnosticEventFamily.RESOURCE_BUILDER_FIRST, 128);
+        admitAndComplete(authority, DiagnosticEventFamily.RESOURCE_OBSERVATION_TERMINAL, 12);
+        admitAndComplete(authority, DiagnosticEventFamily.RESOURCE_MINING_SUMMARY, 128);
+        admitAndComplete(authority, DiagnosticEventFamily.RESOURCE_DEPOSIT_SUMMARY, 128);
+        admitAndComplete(authority, DiagnosticEventFamily.RESOURCE_BUILDER_SUMMARY, 128);
+        admitAndComplete(authority, DiagnosticEventFamily.BLOCK_COLLECTION_FIRST, 64);
+        admitAndComplete(authority, DiagnosticEventFamily.BLOCK_COLLECTION_SUMMARY, 32);
+        admitAndComplete(authority, DiagnosticEventFamily.TOOL_EQUIP_FIRST, 128);
+        admitAndComplete(authority, DiagnosticEventFamily.TOOL_PLACEMENT_TERMINAL, 4);
+        admitAndComplete(authority, DiagnosticEventFamily.BLOCK_PROTECTION_BOUNDARY, 64);
     }
 
     private static void admitAndComplete(DiagnosticSessionAdmissionAuthority authority,

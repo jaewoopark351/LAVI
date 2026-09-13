@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.function.BooleanSupplier;
 
 //20260901_kpopmodder: Own bounded target ledgers without creating state for unbound observations.
 public final class CraftResourceTargetDiagnosticsRegistry {
@@ -33,9 +34,19 @@ public final class CraftResourceTargetDiagnosticsRegistry {
             new CraftResourceMismatchAdmissionTracker();
     private CraftResourceExceptionEvidenceTracker exceptionTracker =
             new CraftResourceExceptionEvidenceTracker();
+    private final BooleanSupplier ownerAvailable;
+
+    public CraftResourceTargetDiagnosticsRegistry() {
+        this(() -> true);
+    }
+
+    //20260913_kpopmodder: An escaped production registry cannot create new state after owner rejection.
+    public CraftResourceTargetDiagnosticsRegistry(BooleanSupplier ownerAvailable) {
+        this.ownerAvailable = ownerAvailable;
+    }
 
     public synchronized boolean activateScope(IronPickaxeAcquisitionScopeKey scopeKey) {
-        if (!isValidScopeKey(scopeKey)) {
+        if (!ownerAvailable.getAsBoolean() || !isValidScopeKey(scopeKey)) {
             return false;
         }
         if (targetLedgers.containsKey(scopeKey)) {

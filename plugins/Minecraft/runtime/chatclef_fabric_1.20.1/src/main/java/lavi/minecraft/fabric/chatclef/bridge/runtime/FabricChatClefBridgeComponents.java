@@ -9,7 +9,7 @@ import lavi.minecraft.diagnostics.crafting.acquisition.source.container.reconcil
 import lavi.minecraft.diagnostics.crafting.acquisition.source.craftingtable.CraftResourceCraftingTableSourceEventObserver;
 import lavi.minecraft.diagnostics.crafting.acquisition.source.furnace.CraftResourceFurnaceSourceEventObserver;
 import lavi.minecraft.diagnostics.mining.projection.MiningProjectionObserverRegistry;
-import lavi.minecraft.diagnostics.session.lifecycle.mode.DiagnosticStateCleanupLifecycleObserver;
+import lavi.minecraft.fabric.chatclef.bridge.command.diagnostics.crafting.lifecycle.FabricChatClefCraftResourceDiagnosticLifecycle;
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandDispatcher;
 import lavi.minecraft.fabric.chatclef.bridge.command.FabricChatClefCommandQueue;
 import lavi.minecraft.fabric.chatclef.bridge.command.control.stop.dispatch.FabricChatClefRegisteredStopCommandExecutor;
@@ -75,6 +75,7 @@ public final class FabricChatClefBridgeComponents {
         FabricChatClefStopControlDedupeRegistry stopControlDedupeRegistry =
                 new FabricChatClefStopControlDedupeRegistry();
         ChatClefDiagnostics.registerCommandContextProvider(new FabricChatClefDiagnosticCommandContextProvider(commandQueue));
+        FabricChatClefCraftResourceDiagnosticLifecycle.register();
         IronPickaxeAcquisitionScopeDiagnostics.installRequirementObserver();
         CraftResourceRequirementSourceEventObserver.install(
                 FabricChatClefIronPickaxeRequirementProjectionDiagnostics::observeVisibleTaskReturn
@@ -99,36 +100,6 @@ public final class FabricChatClefBridgeComponents {
         );
         ChatClefDiagnostics.registerBlockInteractionObserver(
                 new FabricChatClefCraftResourceInteractionObserver()
-        );
-        ChatClefDiagnostics.registerSessionLifecycleObserver(
-                new DiagnosticStateCleanupLifecycleObserver(
-                        IronPickaxeAcquisitionScopeDiagnostics::clearForModeOff
-                )
-        );
-        ChatClefDiagnostics.registerSessionLifecycleObserver(
-                new DiagnosticStateCleanupLifecycleObserver(
-                        FabricChatClefCraftResourceAssociationScopeDiagnostics::clearForModeOff
-                )
-        );
-        ChatClefDiagnostics.registerSessionLifecycleObserver(
-                new DiagnosticStateCleanupLifecycleObserver(
-                        FabricChatClefCraftResourceTargetScopeDiagnostics::clearForModeOff
-                )
-        );
-        ChatClefDiagnostics.registerSessionLifecycleObserver(
-                new DiagnosticStateCleanupLifecycleObserver(
-                        FabricChatClefCraftResourceContainerProjectionSupport::clearForModeOff
-                )
-        );
-        ChatClefDiagnostics.registerSessionLifecycleObserver(
-                new DiagnosticStateCleanupLifecycleObserver(
-                        FabricChatClefIronPickaxeRequirementProjectionDiagnostics::clearForModeOff
-                )
-        );
-        ChatClefDiagnostics.registerSessionLifecycleObserver(
-                new DiagnosticStateCleanupLifecycleObserver(
-                        FabricChatClefCraftResourceTerminalDiagnostics::clearForModeOff
-                )
         );
         FabricChatClefTaskStateReader taskStateReader = new FabricChatClefTaskStateReader();
         FabricChatClefBridgeConfig config = new FabricChatClefBridgeConfigLoader().load();

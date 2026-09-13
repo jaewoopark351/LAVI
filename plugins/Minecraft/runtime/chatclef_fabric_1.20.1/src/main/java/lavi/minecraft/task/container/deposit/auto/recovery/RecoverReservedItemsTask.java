@@ -2,6 +2,9 @@ package lavi.minecraft.task.container.deposit.auto.recovery;
 
 import adris.altoclef.AltoClef;
 import adris.altoclef.tasksystem.Task;
+import lavi.minecraft.diagnostics.container.store.deposit.pressure.AutoDepositObservationOwner;
+import lavi.minecraft.diagnostics.container.store.deposit.pressure.AutoDepositOperationObservation;
+import lavi.minecraft.diagnostics.observation.ObservationScope;
 import adris.altoclef.util.helpers.WorldHelper;
 import lavi.minecraft.task.container.deposit.auto.DepositAllAutoDiagnostics;
 import lavi.minecraft.task.container.deposit.auto.working.PlayerInventorySnapshotReader;
@@ -14,7 +17,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Queue;
 
-public final class RecoverReservedItemsTask extends Task {
+public final class RecoverReservedItemsTask extends Task implements AutoDepositObservationOwner {
     private static final int CANDIDATE_TIMEOUT_TICKS = 600;
 
     private final WorkingSetSnapshot snapshot;
@@ -28,11 +31,19 @@ public final class RecoverReservedItemsTask extends Task {
     private Terminal terminal = Terminal.RUNNING;
     private int candidateTicks;
     private boolean queueInitialized;
+    //20260913_kpopmodder: Preserve original diagnostic provenance through delayed recovery termination.
+    private final AutoDepositOperationObservation observation;
 
     public RecoverReservedItemsTask(WorkingSetSnapshot snapshot,
                                     AutoDepositDestinationManifest manifest) {
         this.snapshot = Objects.requireNonNull(snapshot, "snapshot");
         this.manifest = Objects.requireNonNull(manifest, "manifest");
+        observation = new AutoDepositOperationObservation(snapshot.userTaskRoot());
+    }
+
+    @Override
+    public ObservationScope diagnosticObservationScope() {
+        return observation == null ? ObservationScope.NOOP : observation.scope();
     }
 
     @Override
@@ -43,7 +54,7 @@ public final class RecoverReservedItemsTask extends Task {
             List<AutoDepositRecoveryCandidate> selected = selector.select(mod, snapshot, deficits, manifest);
             candidates.addAll(selected);
             queueInitialized = true;
-            DepositAllAutoDiagnostics.logRecoveryQueue(snapshot.epoch(), deficits.size(), selected.size());
+            DepositAllAutoDiagnostics.logRecoveryQueue(this, snapshot.epoch(), deficits.size(), selected.size());
         }
     }
 
@@ -63,7 +74,7 @@ public final class RecoverReservedItemsTask extends Task {
         if (currentPickup != null) {
             candidateTicks++;
             if (currentPickup.isFinished()) {
-                DepositAllAutoDiagnostics.logRecoveryCandidateTerminal(
+                DepositAllAutoDiagnostics.logRecoveryCandidateTerminal(this,
                         snapshot.epoch(),
                         currentCandidate,
                         currentPickup.result().name(),
@@ -75,7 +86,7 @@ public final class RecoverReservedItemsTask extends Task {
                 return null;
             }
             if (candidateTicks >= CANDIDATE_TIMEOUT_TICKS) {
-                DepositAllAutoDiagnostics.logRecoveryCandidateTerminal(
+                DepositAllAutoDiagnostics.logRecoveryCandidateTerminal(this,
                         snapshot.epoch(),
                         currentCandidate,
                         "TIMEOUT",
@@ -110,7 +121,7 @@ public final class RecoverReservedItemsTask extends Task {
                 transferPlan.withdrawalLimits()
         );
         candidateTicks = 0;
-        DepositAllAutoDiagnostics.logRecoveryCandidateSelected(
+        DepositAllAutoDiagnostics.logRecoveryCandidateSelected(this,
                 snapshot.epoch(), currentCandidate, deficits.size()
         );
         return currentPickup;

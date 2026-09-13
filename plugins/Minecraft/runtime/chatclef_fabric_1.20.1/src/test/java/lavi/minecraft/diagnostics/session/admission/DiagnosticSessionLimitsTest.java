@@ -8,11 +8,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DiagnosticSessionLimitsTest {
     @Test
-    void fixedCriticalPartitionSumsToSixtyFourWithoutBorrowing() {
+    void fixedCriticalPartitionPreservesOldPoolsAndReservesResourceBoundaries() {
         assertEquals(5_000, DiagnosticSessionLimits.HARD_CAP);
-        assertEquals(4_936, DiagnosticSessionLimits.ORDINARY_CEILING);
-        assertEquals(64, DiagnosticSessionLimits.CRITICAL_RESERVE);
-        assertEquals(64, DiagnosticSessionLimits.criticalPartitionTotal());
+        assertEquals(3_864, DiagnosticSessionLimits.ORDINARY_CEILING);
+        assertEquals(1_136, DiagnosticSessionLimits.CRITICAL_RESERVE);
+        assertEquals(1_136, DiagnosticSessionLimits.criticalPartitionTotal());
+        assertEquals(128, DiagnosticEventFamily.TOOL_EQUIP_FIRST.slotQuota());
+        assertEquals(4, DiagnosticEventFamily.TOOL_PLACEMENT_TERMINAL.slotQuota());
+        assertEquals(64, DiagnosticEventFamily.BLOCK_PROTECTION_BOUNDARY.slotQuota());
 
         assertEquals(1, DiagnosticEventFamily.CANONICAL_CAP.slotQuota());
         assertEquals(1, DiagnosticEventFamily.FINAL_SNAPSHOT.slotQuota());
@@ -22,6 +25,15 @@ class DiagnosticSessionLimitsTest {
         assertEquals(8, DiagnosticEventFamily.AGGREGATE_CHECKPOINT.slotQuota());
         assertEquals(8, DiagnosticEventFamily.NON_STORE_TERMINAL.slotQuota());
         assertEquals(6, DiagnosticEventFamily.SUPPRESSION_CONTROL.slotQuota());
+        assertEquals(128, DiagnosticEventFamily.RESOURCE_MINING_FIRST.slotQuota());
+        assertEquals(128, DiagnosticEventFamily.RESOURCE_DEPOSIT_FIRST.slotQuota());
+        assertEquals(128, DiagnosticEventFamily.RESOURCE_BUILDER_FIRST.slotQuota());
+        assertEquals(12, DiagnosticEventFamily.RESOURCE_OBSERVATION_TERMINAL.slotQuota());
+        assertEquals(128, DiagnosticEventFamily.RESOURCE_MINING_SUMMARY.slotQuota());
+        assertEquals(128, DiagnosticEventFamily.RESOURCE_DEPOSIT_SUMMARY.slotQuota());
+        assertEquals(128, DiagnosticEventFamily.RESOURCE_BUILDER_SUMMARY.slotQuota());
+        assertEquals(64, DiagnosticEventFamily.BLOCK_COLLECTION_FIRST.slotQuota());
+        assertEquals(32, DiagnosticEventFamily.BLOCK_COLLECTION_SUMMARY.slotQuota());
     }
 
     @Test

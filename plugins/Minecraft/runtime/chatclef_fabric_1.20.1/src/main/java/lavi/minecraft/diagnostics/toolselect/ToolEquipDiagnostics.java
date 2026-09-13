@@ -7,7 +7,11 @@ import adris.altoclef.util.slots.CursorSlot;
 import adris.altoclef.util.slots.Slot;
 import baritone.utils.ToolSet;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.diagnostics.session.lifecycle.registration.DiagnosticOwnerRegistration;
+import lavi.minecraft.diagnostics.mining.gold.GoldMiningToolObservers;
+import lavi.minecraft.diagnostics.mining.gold.GoldToolSnapshot;
 import lavi.minecraft.diagnostics.toolselect.lifecycle.ToolSelectionDiagnosticStateObserver;
+import lavi.minecraft.diagnostics.toolselect.lifecycle.ToolEquipAttemptState;
 import lavi.minecraft.diagnostics.toolselect.shaping.ToolSelectionDiagnosticShaper;
 import lavi.minecraft.diagnostics.toolselect.shaping.ToolSelectionSemanticFingerprint;
 import lavi.minecraft.diagnostics.toolselect.shaping.ToolSelectionShapingDecision;
@@ -26,6 +30,7 @@ import net.minecraft.util.math.BlockPos;
 
 import java.util.List;
 import java.util.StringJoiner;
+import java.util.function.Supplier;
 
 //20260801_kpopmodder: Added tool equip boundary diagnostics without changing ChatClef engine behavior.
 public final class ToolEquipDiagnostics {
@@ -33,14 +38,31 @@ public final class ToolEquipDiagnostics {
     private static final ToolSelectionDiagnosticShaper SELECTION_SHAPER =
             new ToolSelectionDiagnosticShaper();
     private static final DiagnosticDeduplicator DEDUPLICATOR = new DiagnosticDeduplicator();
+    private static final ToolEquipAttemptState ATTEMPTS = new ToolEquipAttemptState();
     private static final ToolSelectionDiagnosticStateObserver OFF_STATE_OBSERVER =
             new ToolSelectionDiagnosticStateObserver(ToolEquipDiagnostics::clearDiagnosticStateForModeOff);
+    private static final DiagnosticOwnerRegistration OWNER =
+            new DiagnosticOwnerRegistration("tool_equip", ToolEquipDiagnostics::clearDiagnosticStateForModeOff);
 
     static {
-        ChatClefDiagnostics.registerSessionLifecycleObserver(OFF_STATE_OBSERVER);
+        ChatClefDiagnostics.registerSessionLifecycleOwner(OWNER, OFF_STATE_OBSERVER);
     }
 
     private ToolEquipDiagnostics() {
+    }
+
+    public static void disableOwner(String reason) {
+        OWNER.disable(reason);
+    }
+
+    // The call facade enters this lease before evaluating diagnostic-only snapshot arguments.
+    public static <T> T withAvailableOwner(Supplier<T> diagnostic, T fallback) {
+        return ChatClefDiagnostics.callIfDiagnosticsEligible(
+                () -> OWNER.callIfAvailable(diagnostic, fallback), fallback);
+    }
+
+    public static <T> T withCurrentAttempt(long attemptId, Supplier<T> diagnostic, T fallback) {
+        return withAvailableOwner(() -> ATTEMPTS.isCurrent(attemptId) ? diagnostic.get() : fallback, fallback);
     }
 
     public static long logSelectionDecision(AltoClef mod,
@@ -52,7 +74,7 @@ public final class ToolEquipDiagnostics {
                                             ItemStack chosenStack,
                                             String decisionReason) {
         long[] equipAttemptId = {-1L};
-        ChatClefDiagnostics.runIfDiagnosticsEligible(() -> equipAttemptId[0] =
+        ChatClefDiagnostics.runIfDiagnosticsEligible(() -> OWNER.runIfAvailable(() -> equipAttemptId[0] =
                 logSelectionDecisionEligible(
                         mod,
                         targetPosition,
@@ -62,7 +84,7 @@ public final class ToolEquipDiagnostics {
                         chosenSlot,
                         chosenStack,
                         decisionReason
-                ));
+                )));
         return equipAttemptId[0];
     }
 
@@ -75,6 +97,14 @@ public final class ToolEquipDiagnostics {
                                                       ItemStack chosenStack,
                                                       String decisionReason) {
         long equipAttemptId = ChatClefDiagnostics.nextOperationId();
+        //20260913_kpopmodder: Preserve gold-parent selection evidence before ordinary dedup or shared admission.
+        if ("EQUIP_REQUEST".equals(decisionReason)) {
+            ATTEMPTS.begin(equipAttemptId);
+            GoldMiningToolObservers.selection(mod, equipAttemptId, targetPosition,
+                    "actualSelectorOwner", "PlayerInteractionFixChain", "actualSelectionBoundary", "destroyBlock",
+                    "currentSlot", ChatClefDiagnostics.slotSummary(currentSlot), "chosenSlot", ChatClefDiagnostics.slotSummary(chosenSlot),
+                    "currentStack", GoldToolSnapshot.stack(currentStack), "chosenStack", GoldToolSnapshot.stack(chosenStack));
+        }
         String fingerprint = selectionFingerprint(
                 targetState,
                 currentSlot,
@@ -116,6 +146,7 @@ public final class ToolEquipDiagnostics {
                     "foodChainEating", ChatClefDiagnostics.safeValue(() -> mod.getFoodChain().isTryingToEat()),
                     "cursorStack", ChatClefDiagnostics.safeValue(() -> ToolDiagnosticFormatter.basicStackDetails(StorageHelper.getItemStackInSlot(CursorSlot.SLOT))),
                     "candidateSummary", candidateSummary(mod, targetState),
+                    "candidateSummaryEvidenceSource", "DIAGNOSTIC_RECOMPUTATION_NOT_ACTUAL_SELECTOR_DECISIONS",
                     "priorSuppressedRepeatCount", shaping.suppressedRepeatCount(),
                     "priorSuppressionFirstObservedTick", shaping.firstObservedTick(),
                     "priorSuppressionLastObservedTick", shaping.lastObservedTick(),
@@ -146,7 +177,8 @@ public final class ToolEquipDiagnostics {
         if (equipAttemptId < 0L) {
             return;
         }
-        ChatClefDiagnostics.runIfDiagnosticsEligible(() -> logEquipResultEligible(
+        withCurrentAttempt(equipAttemptId, () -> {
+            logEquipResultEligible(
                 mod,
                 requestedItem,
                 equipAttemptId,
@@ -162,7 +194,10 @@ public final class ToolEquipDiagnostics {
                 mainHandAfter,
                 forceEquipReportedSuccess,
                 resultReason
-        ));
+            );
+            ATTEMPTS.finish(equipAttemptId);
+            return null;
+        }, null);
     }
 
     private static void logEquipResultEligible(AltoClef mod,
@@ -182,6 +217,14 @@ public final class ToolEquipDiagnostics {
                                                String resultReason) {
         boolean postconditionItemMatched = mainHandAfter != null && mainHandAfter.getItem() == requestedItem;
         boolean postconditionExactStackMatched = expectedSourceStack != null && ItemStack.areEqual(mainHandAfter, expectedSourceStack);
+        GoldMiningToolObservers.equip(mod, equipAttemptId, resultReason, hotbarSlot1Before,
+                "expectedSourceSlot", ChatClefDiagnostics.slotSummary(expectedSourceSlot),
+                "destinationHotbarIndex", 1, "selectedSlotBefore", selectedSlotBefore, "selectedSlotAfter", selectedSlotAfter,
+                "hotbarBefore", GoldToolSnapshot.stack(hotbarSlot1Before), "hotbarAfter", GoldToolSnapshot.stack(hotbarSlot1After),
+                "mainHandBefore", GoldToolSnapshot.stack(mainHandBefore), "mainHandAfter", GoldToolSnapshot.stack(mainHandAfter),
+                "actualSourceSlotsObservedBeforeSwap", ToolDiagnosticFormatter.slotListSummary(actualMatchingSlots),
+                "forceEquipItemReportedSuccess", forceEquipReportedSuccess, "sameItemType", postconditionItemMatched,
+                "sameStackValue", postconditionExactStackMatched, "exactStackIdentity", "UNPROVEN_EQUAL_VALUES_DO_NOT_IDENTIFY_STACK");
         String resultFingerprint = equipResultFingerprint(requestedItem, expectedSourceSlot, actualMatchingSlots,
                 selectedSlotBefore, selectedSlotAfter, mainHandBefore, mainHandAfter, forceEquipReportedSuccess,
                 postconditionItemMatched, postconditionExactStackMatched, resultReason);
@@ -224,6 +267,7 @@ public final class ToolEquipDiagnostics {
     private static void clearDiagnosticStateForModeOff() {
         SELECTION_SHAPER.clearForModeOff();
         DEDUPLICATOR.clearForModeOff();
+        ATTEMPTS.clear();
     }
 
     private static void logEquipRequest(long equipAttemptId,

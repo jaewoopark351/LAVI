@@ -3,6 +3,7 @@ package lavi.minecraft.diagnostics.toolselect;
 import adris.altoclef.AltoClef;
 import adris.altoclef.util.slots.Slot;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.diagnostics.session.lifecycle.registration.DiagnosticOwnerRegistration;
 import lavi.minecraft.diagnostics.toolselect.lifecycle.ToolSelectionDiagnosticStateObserver;
 import lavi.minecraft.diagnostics.toolselect.shaping.ToolSelectionDiagnosticShaper;
 import lavi.minecraft.diagnostics.toolselect.shaping.ToolSelectionSemanticFingerprint;
@@ -28,23 +29,30 @@ public final class BestToolSlotDiagnostics {
             new ToolSelectionDiagnosticShaper();
     private static final ToolSelectionDiagnosticStateObserver OFF_STATE_OBSERVER =
             new ToolSelectionDiagnosticStateObserver(SHAPER::clearForModeOff);
+    private static final DiagnosticOwnerRegistration OWNER =
+            new DiagnosticOwnerRegistration("best_tool_slot", SHAPER::clearForModeOff);
 
     static {
-        ChatClefDiagnostics.registerSessionLifecycleObserver(OFF_STATE_OBSERVER);
+        ChatClefDiagnostics.registerSessionLifecycleOwner(OWNER, OFF_STATE_OBSERVER);
     }
 
     private BestToolSlotDiagnostics() {
     }
 
+    public static void disableOwner(String reason) {
+        OWNER.disable(reason);
+    }
+
     public static Scan start(BlockState targetState) {
-        if (!ChatClefDiagnostics.isBoundaryEnabled()) {
-            return Scan.disabled();
-        }
-        return new Scan(true, targetState);
+        Scan[] result = {Scan.disabled()};
+        ChatClefDiagnostics.runIfDiagnosticsEligible(() -> OWNER.runIfAvailable(
+                () -> result[0] = new Scan(true, targetState, OFF_STATE_OBSERVER.generation())));
+        return result[0];
     }
 
     public static final class Scan {
         private final boolean enabled;
+        private final long generation;
         private final BlockState targetState;
         private final StringJoiner candidates = new StringJoiner(",", "[", "]");
         private int candidateCount;
@@ -56,13 +64,14 @@ public final class BestToolSlotDiagnostics {
         private int shearsCandidateCount;
         private int effectiveShearsCount;
 
-        private Scan(boolean enabled, BlockState targetState) {
+        private Scan(boolean enabled, BlockState targetState, long generation) {
             this.enabled = enabled;
             this.targetState = targetState;
+            this.generation = generation;
         }
 
         private static Scan disabled() {
-            return new Scan(false, null);
+            return new Scan(false, null, -1L);
         }
 
         public void observeToolCandidate(AltoClef mod,
@@ -72,9 +81,12 @@ public final class BestToolSlotDiagnostics {
                                          boolean shouldSave,
                                          double speed,
                                          boolean becameBest) {
-            if (!enabled) {
-                return;
-            }
+            runCurrent(() -> observeToolCandidateEligible(mod, slot, stack, defaultSuitable, shouldSave, speed, becameBest));
+        }
+
+        private void observeToolCandidateEligible(AltoClef mod, Slot slot, ItemStack stack,
+                                                  boolean defaultSuitable, boolean shouldSave,
+                                                  double speed, boolean becameBest) {
             candidateCount++;
             toolCandidateCount++;
             if (defaultSuitable) {
@@ -106,9 +118,10 @@ public final class BestToolSlotDiagnostics {
         }
 
         public void observeShearsCandidate(Slot slot, ItemStack stack, boolean effective, boolean selected) {
-            if (!enabled) {
-                return;
-            }
+            runCurrent(() -> observeShearsCandidateEligible(slot, stack, effective, selected));
+        }
+
+        private void observeShearsCandidateEligible(Slot slot, ItemStack stack, boolean effective, boolean selected) {
             candidateCount++;
             shearsCandidateCount++;
             if (effective) {
@@ -126,12 +139,18 @@ public final class BestToolSlotDiagnostics {
         }
 
         public void logReturn(Slot bestToolSlot, String decisionReason, double highestSpeed) {
+            runCurrent(() -> logReturnEligible(bestToolSlot, decisionReason, highestSpeed));
+        }
+
+        private void runCurrent(Runnable diagnostic) {
             if (!enabled) {
                 return;
             }
-            ChatClefDiagnostics.runIfDiagnosticsEligible(
-                    () -> logReturnEligible(bestToolSlot, decisionReason, highestSpeed)
-            );
+            ChatClefDiagnostics.runIfDiagnosticsEligible(() -> OWNER.runIfAvailable(() -> {
+                if (generation == OFF_STATE_OBSERVER.generation()) {
+                    diagnostic.run();
+                }
+            }));
         }
 
         private void logReturnEligible(Slot bestToolSlot,

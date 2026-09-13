@@ -31,6 +31,12 @@ public final class FabricChatClefCommandOutcomeClassifier {
             default:
                 return FabricChatClefCommandTerminalDecision.waiting("root_ownership_unclassified");
         }
+        //#if MC == 12001
+        //20260913_kpopmodder: Preserve matching completion and GOTO projection; qualify only missing-handoff retirement.
+        FabricChatClefCommandTerminalDecision retirement =
+                lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.root.decision.RootRetirementClassifier.classify(execution);
+        if (retirement != null) return retirement;
+        //#endif
         if (observation == null) {
             return FabricChatClefCommandTerminalDecision.waiting("waiting_for_task_finished_event");
         }

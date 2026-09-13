@@ -5,6 +5,8 @@ import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.ItemTarget;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 import lavi.minecraft.diagnostics.container.store.deposit.StoreDepositDiagnostics;
+import lavi.minecraft.diagnostics.container.store.deposit.pressure.AutoDepositOperationObservation;
+import lavi.minecraft.diagnostics.observation.ObservationScope;
 import lavi.minecraft.task.container.deposit.auto.DepositAllAutoDiagnostics;
 import lavi.minecraft.task.container.deposit.auto.maintenance.AutoDepositMaintenancePhase;
 import lavi.minecraft.task.container.deposit.auto.maintenance.relief.AutoDepositFreeSlotVerdict;
@@ -18,12 +20,17 @@ public final class AutoDepositMaintenanceDiagnostics {
     private final boolean automaticRunEnabled;
     private Task registeredChild;
     private boolean terminalRecorded;
+    //20260913_kpopmodder: Preserve exact command provenance when maintenance ends after root replacement.
+    private final AutoDepositOperationObservation observation;
 
     public AutoDepositMaintenanceDiagnostics(AutoDepositPlan plan) {
         Objects.requireNonNull(plan, "plan");
         automaticRunEnabled = plan.diagnosticPolicyObservationRetained()
                 && ChatClefDiagnostics.isBoundaryEnabled();
+        observation = new AutoDepositOperationObservation(plan.context().userTaskRoot());
     }
+
+    public ObservationScope observationScope() { return observation.scope(); }
 
     public boolean automaticRunEnabled() {
         return automaticRunEnabled;

@@ -38,6 +38,10 @@ public final class FabricChatClefCommandTerminationObservation {
     private final FabricChatClefTaskSnapshot taskSnapshot;
     private final FabricChatClefTaskOwnershipSnapshot ownershipAtObserve;
     private final FabricChatClefTaskOwnershipSnapshot ownershipAtDequeue;
+    //#if MC == 12001
+    private final Object rootLifetime;
+    public Object rootLifetime() { return rootLifetime; }
+    //#endif
 
     private FabricChatClefCommandTerminationObservation(
             Task task,
@@ -65,8 +69,15 @@ public final class FabricChatClefCommandTerminationObservation {
             FabricChatClefTaskSnapshot taskSnapshot,
             FabricChatClefTaskOwnershipSnapshot ownershipAtObserve,
             FabricChatClefTaskOwnershipSnapshot ownershipAtDequeue
+            //#if MC == 12001
+            , Object rootLifetime
+            //#endif
     ) {
         this.task = task;
+        //#if MC == 12001
+        //20260913_kpopmodder: Freeze event ownership separately from current/dequeue root observations.
+        this.rootLifetime = rootLifetime;
+        //#endif
         this.taskPresent = taskPresent;
         this.taskStopped = taskStopped;
         this.stopStateAvailable = stopStateAvailable;
@@ -162,6 +173,9 @@ public final class FabricChatClefCommandTerminationObservation {
                 taskSnapshot,
                 ownershipAtObserve,
                 FabricChatClefTaskOwnershipSnapshot.empty()
+                //#if MC == 12001
+                , event == null ? null : event.rootLifetime()
+                //#endif
         );
     }
 
@@ -197,6 +211,9 @@ public final class FabricChatClefCommandTerminationObservation {
                 taskSnapshot,
                 ownershipAtObserve,
                 ownershipAtDequeue
+                //#if MC == 12001
+                , rootLifetime
+                //#endif
         );
     }
 

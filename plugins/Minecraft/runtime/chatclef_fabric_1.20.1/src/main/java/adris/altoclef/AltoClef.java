@@ -327,6 +327,10 @@ public class AltoClef implements ModInitializer {
         miscBlockTracker.tick();
         trackerManager.tick();
         blockScanner.tick();
+        //#if MC == 12001
+        //20260913_kpopmodder: Publish complete world-bound block protection before normal Task evaluation.
+        userBlockRangeTracker.onClientTick();
+        //#endif
         taskRunner.tick();
 
         messageSender.tick();
@@ -348,6 +352,15 @@ public class AltoClef implements ModInitializer {
             setPlayerMode(!getAiBridge().getPlayerMode());
         }
     }
+
+    //#if MC == 12001
+    //20260913_kpopmodder: Client world block notifications update only the existing user-block protection predicate.
+    public void onUserProtectionBlockChanged(net.minecraft.world.World world, net.minecraft.util.math.BlockPos pos,
+                                             net.minecraft.block.BlockState state) {
+        if (userBlockRangeTracker != null) userBlockRangeTracker.onBlockChanged(world, pos, state);
+    }
+
+    //#endif
 
     /// GETTERS AND SETTERS
 

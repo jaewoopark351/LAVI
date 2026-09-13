@@ -1,5 +1,6 @@
 package lavi.minecraft.fabric.chatclef.bridge.command.diagnostics.crafting.container.activation;
 
+import lavi.minecraft.fabric.chatclef.bridge.command.diagnostics.crafting.lifecycle.FabricChatClefCraftResourceDiagnosticLifecycle;
 import adris.altoclef.tasksystem.Task;
 import lavi.minecraft.diagnostics.crafting.acquisition.association.CraftResourceAssociationStatus;
 import lavi.minecraft.diagnostics.crafting.acquisition.event.CraftResourceAcquisitionEventEmitter;
@@ -45,6 +46,16 @@ public final class FabricChatClefCraftResourceContainerActivationDiagnostics
             Task candidateTask,
             CraftResourceTargetTuple targetTuple,
             CraftResourceSourceEventName candidateSourceEventName) {
+        //20260913_kpopmodder: Serialize passive capture with owner invalidation.
+        FabricChatClefCraftResourceDiagnosticLifecycle.runIfAvailable(() -> observeCandidateWhileAvailable(association, parentTask, candidateTask, targetTuple, candidateSourceEventName));
+    }
+
+    private static void observeCandidateWhileAvailable(
+            FabricChatClefCraftResourceAssociationSnapshot association,
+            Task parentTask,
+            Task candidateTask,
+            CraftResourceTargetTuple targetTuple,
+            CraftResourceSourceEventName candidateSourceEventName) {
         if (association == null
                 || association.binding().isEmpty()
                 || association.decision().status()
@@ -69,6 +80,23 @@ public final class FabricChatClefCraftResourceContainerActivationDiagnostics
 
     @Override
     public void onChildReconciliation(
+            Task parent,
+            Task activeChildBefore,
+            Task candidateChild,
+            boolean isEqualResult,
+            boolean canInterruptEvaluated,
+            boolean canInterruptPreviousChild,
+            boolean replacementApplied,
+            boolean previousChildStopCalled,
+            Task activeChildAfter,
+            boolean candidateDiscardedBecauseEqual,
+            boolean childCleared,
+            boolean sourceEmissionCompleted) {
+        //20260913_kpopmodder: Serialize passive capture with owner invalidation.
+        FabricChatClefCraftResourceDiagnosticLifecycle.runIfAvailable(() -> onChildReconciliationWhileAvailable(parent, activeChildBefore, candidateChild, isEqualResult, canInterruptEvaluated, canInterruptPreviousChild, replacementApplied, previousChildStopCalled, activeChildAfter, candidateDiscardedBecauseEqual, childCleared, sourceEmissionCompleted));
+    }
+
+    private void onChildReconciliationWhileAvailable(
             Task parent,
             Task activeChildBefore,
             Task candidateChild,
@@ -131,6 +159,13 @@ public final class FabricChatClefCraftResourceContainerActivationDiagnostics
     }
 
     public static FabricChatClefCraftResourceContainerOwnerExitDecision observeOwnerExit(
+            Task owner,
+            boolean sourceEmissionCompleted) {
+        //20260913_kpopmodder: Serialize passive capture with owner invalidation.
+        return FabricChatClefCraftResourceDiagnosticLifecycle.callIfAvailable(() -> observeOwnerExitWhileAvailable(owner, sourceEmissionCompleted), new FabricChatClefCraftResourceContainerOwnerExitDecision(Optional.empty(), Optional.empty(), false, false, false, java.util.List.of()));
+    }
+
+    private static FabricChatClefCraftResourceContainerOwnerExitDecision observeOwnerExitWhileAvailable(
             Task owner,
             boolean sourceEmissionCompleted) {
         return ACTIVATIONS.observeOwnerExit(owner, sourceEmissionCompleted);

@@ -1,6 +1,33 @@
 package lavi.minecraft.diagnostics.session.admission;
 
 public enum DiagnosticEventFamily {
+    //#if MC == 12001
+    //20260913_kpopmodder: Separate new behavior evidence from ordinary repeats and the historical diagnostic pools.
+    TOOL_EQUIP_FIRST(DiagnosticAdmissionTier.CRITICAL,
+            DiagnosticSessionLimits.TOOL_EQUIP_FIRST_SLOTS, 1, false),
+    TOOL_PLACEMENT_TERMINAL(DiagnosticAdmissionTier.CRITICAL,
+            DiagnosticSessionLimits.TOOL_PLACEMENT_TERMINAL_SLOTS, 1, false),
+    BLOCK_PROTECTION_BOUNDARY(DiagnosticAdmissionTier.CRITICAL,
+            DiagnosticSessionLimits.BLOCK_PROTECTION_BOUNDARY_SLOTS, 1, false),
+    //#endif
+    RESOURCE_MINING_FIRST(DiagnosticAdmissionTier.CRITICAL,
+            DiagnosticSessionLimits.RESOURCE_FIRST_SLOTS_PER_DOMAIN, 1, false),
+    RESOURCE_DEPOSIT_FIRST(DiagnosticAdmissionTier.CRITICAL,
+            DiagnosticSessionLimits.RESOURCE_FIRST_SLOTS_PER_DOMAIN, 1, false),
+    RESOURCE_BUILDER_FIRST(DiagnosticAdmissionTier.CRITICAL,
+            DiagnosticSessionLimits.RESOURCE_FIRST_SLOTS_PER_DOMAIN, 1, false),
+    RESOURCE_OBSERVATION_TERMINAL(DiagnosticAdmissionTier.CRITICAL,
+            DiagnosticSessionLimits.RESOURCE_TERMINAL_SLOTS, 1, false),
+    RESOURCE_MINING_SUMMARY(DiagnosticAdmissionTier.CRITICAL,
+            DiagnosticSessionLimits.RESOURCE_SUMMARY_SLOTS_PER_DOMAIN, 1, false),
+    RESOURCE_DEPOSIT_SUMMARY(DiagnosticAdmissionTier.CRITICAL,
+            DiagnosticSessionLimits.RESOURCE_SUMMARY_SLOTS_PER_DOMAIN, 1, false),
+    RESOURCE_BUILDER_SUMMARY(DiagnosticAdmissionTier.CRITICAL,
+            DiagnosticSessionLimits.RESOURCE_SUMMARY_SLOTS_PER_DOMAIN, 1, false),
+    BLOCK_COLLECTION_FIRST(DiagnosticAdmissionTier.CRITICAL,
+            DiagnosticSessionLimits.BLOCK_COLLECTION_FIRST_SLOTS, 1, false),
+    BLOCK_COLLECTION_SUMMARY(DiagnosticAdmissionTier.CRITICAL,
+            DiagnosticSessionLimits.BLOCK_COLLECTION_SUMMARY_SLOTS, 1, false),
     ORDINARY_DETAIL(
             DiagnosticAdmissionTier.ORDINARY,
             DiagnosticSessionLimits.ORDINARY_CEILING,

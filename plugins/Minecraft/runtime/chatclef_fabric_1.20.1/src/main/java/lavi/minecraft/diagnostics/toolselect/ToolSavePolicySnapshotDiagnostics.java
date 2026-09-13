@@ -1,6 +1,7 @@
 package lavi.minecraft.diagnostics.toolselect;
 
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.diagnostics.session.lifecycle.registration.DiagnosticOwnerRegistration;
 import lavi.minecraft.diagnostics.toolselect.lifecycle.ToolSelectionDiagnosticStateObserver;
 import lavi.minecraft.diagnostics.toolselect.support.ToolMiningDiagnosticFieldValues;
 import lavi.minecraft.integration.toolselect.snapshot.ToolSavePolicySnapshot;
@@ -23,19 +24,25 @@ public final class ToolSavePolicySnapshotDiagnostics {
             new ToolSelectionDiagnosticStateObserver(
                     ToolSavePolicySnapshotDiagnostics::clearDiagnosticStateForModeOff
             );
+    private static final DiagnosticOwnerRegistration OWNER = new DiagnosticOwnerRegistration(
+            "tool_save_policy_snapshot", ToolSavePolicySnapshotDiagnostics::clearDiagnosticStateForModeOff);
 
     static {
-        ChatClefDiagnostics.registerSessionLifecycleObserver(OFF_STATE_OBSERVER);
+        ChatClefDiagnostics.registerSessionLifecycleOwner(OWNER, OFF_STATE_OBSERVER);
     }
 
     private ToolSavePolicySnapshotDiagnostics() {
+    }
+
+    public static void disableOwner(String reason) {
+        OWNER.disable(reason);
     }
 
     public static void logPublished(ToolSavePolicySnapshot snapshot) {
         if (snapshot == null) {
             return;
         }
-        ChatClefDiagnostics.runIfDiagnosticsEligible(() -> logPublishedEligible(snapshot));
+        ChatClefDiagnostics.runIfDiagnosticsEligible(() -> OWNER.runIfAvailable(() -> logPublishedEligible(snapshot)));
     }
 
     private static void logPublishedEligible(ToolSavePolicySnapshot snapshot) {
@@ -69,7 +76,7 @@ public final class ToolSavePolicySnapshotDiagnostics {
             return;
         }
         ChatClefDiagnostics.runIfDiagnosticsEligible(
-                () -> logConsumedEligible(snapshot, block, stack, decisionReason, shouldSave)
+                () -> OWNER.runIfAvailable(() -> logConsumedEligible(snapshot, block, stack, decisionReason, shouldSave))
         );
     }
 

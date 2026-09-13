@@ -1,6 +1,7 @@
 package lavi.minecraft.task.container.deposit.auto;
 
 import adris.altoclef.AltoClef;
+import lavi.minecraft.diagnostics.container.store.deposit.pressure.AutoDepositBoundaryDiagnostics;
 import lavi.minecraft.task.container.deposit.auto.composition.AutoDepositRuntimePreparation;
 import lavi.minecraft.task.container.deposit.auto.lifecycle.AutoDepositRuntimeTickSequence;
 import lavi.minecraft.task.container.deposit.auto.policy.AutoDepositPolicyEngine;
@@ -57,6 +58,8 @@ public final class AutoDepositRuntime {
     }
 
     public void onEndClientTick() {
+        //20260913_kpopmodder: Mark the actual runtime entry before registration/binding work.
+        AutoDepositBoundaryDiagnostics.log("AUTO_DEPOSIT_RUNTIME_ENTRY", "end_client_tick_entered", null);
         trustedCommandRegistrar.register(mod);
         storeHomeCommandRegistrar.register(mod);
         openContainerBindingTracker.start();

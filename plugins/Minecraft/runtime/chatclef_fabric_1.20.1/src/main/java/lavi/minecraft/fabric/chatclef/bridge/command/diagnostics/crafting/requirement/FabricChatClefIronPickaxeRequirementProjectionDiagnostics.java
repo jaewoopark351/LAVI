@@ -1,5 +1,6 @@
 package lavi.minecraft.fabric.chatclef.bridge.command.diagnostics.crafting.requirement;
 
+import lavi.minecraft.fabric.chatclef.bridge.command.diagnostics.crafting.lifecycle.FabricChatClefCraftResourceDiagnosticLifecycle;
 import lavi.minecraft.diagnostics.crafting.acquisition.event.CraftResourceAcquisitionEventContract;
 import lavi.minecraft.diagnostics.crafting.acquisition.event.CraftResourceAcquisitionEventEmitter;
 import lavi.minecraft.diagnostics.crafting.acquisition.event.CraftResourceSourceEventName;
@@ -26,7 +27,12 @@ public final class FabricChatClefIronPickaxeRequirementProjectionDiagnostics {
     private FabricChatClefIronPickaxeRequirementProjectionDiagnostics() {
     }
 
-    public static synchronized void observeActivation(IronPickaxeAcquisitionActivation activation) {
+    public static void observeActivation(IronPickaxeAcquisitionActivation activation) {
+        //20260913_kpopmodder: Serialize passive capture with owner invalidation.
+        FabricChatClefCraftResourceDiagnosticLifecycle.runIfAvailable(() -> observeActivationWhileAvailable(activation));
+    }
+
+    private static synchronized void observeActivationWhileAvailable(IronPickaxeAcquisitionActivation activation) {
         if (activation == null || activation.binding().isEmpty()) {
             return;
         }
@@ -36,6 +42,11 @@ public final class FabricChatClefIronPickaxeRequirementProjectionDiagnostics {
     }
 
     public static void observeVisibleTaskReturn(Object sourceTask) {
+        //20260913_kpopmodder: Serialize passive capture with owner invalidation.
+        FabricChatClefCraftResourceDiagnosticLifecycle.runIfAvailable(() -> observeVisibleTaskReturnWhileAvailable(sourceTask));
+    }
+
+    private static void observeVisibleTaskReturnWhileAvailable(Object sourceTask) {
         if (!(sourceTask instanceof Task task)) {
             return;
         }

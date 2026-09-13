@@ -21,6 +21,10 @@ public final class FabricChatClefTaskTerminationObservationHandler {
     private final FabricChatClefTaskStateReader taskStateReader;
     private final FabricChatClefPreexistingIdleRootStabilityObserver stabilityObserver;
     private final FabricChatClefCommandTerminalEvaluator terminalEvaluator;
+    //#if MC == 12001
+    private final lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.root.diagnostics.RootTerminationTrace rootTrace =
+            new lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.root.diagnostics.RootTerminationTrace();
+    //#endif
 
     public FabricChatClefTaskTerminationObservationHandler(
             FabricChatClefActiveExecutionStore executionStore,
@@ -58,6 +62,19 @@ public final class FabricChatClefTaskTerminationObservationHandler {
             logUnbound(execution, observation, "ownership_unknown_audit_only");
             return;
         }
+        //#if MC == 12001
+        //20260913_kpopmodder: Validate enqueue-owner identity before changing the current execution.
+        if (execution.rootTermination().bound()) {
+            var environment = new lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.root.capture.UserRootSnapshotReader().capture();
+            String rejection = !execution.rootTermination().acceptsEnvironment(environment) ? "event_environment_unavailable"
+                    : !execution.rootTermination().accepts(observation.task(), observation.rootLifetime())
+                    ? "event_lifetime_mismatch" : execution.taskFinishedObservation() != null ? "matching_event_already_recorded" : "";
+            if (!rejection.isEmpty()) {
+                rootTrace.rejectedEvent(commandDiagnostics, execution, rejection, observation.task(), observation.rootLifetime());
+                return;
+            }
+        }
+        //#endif
         execution.markTaskFinishedObservation(observation);
         FabricChatClefTaskFinishedEventDetailsPayload details = FabricChatClefTaskFinishedEventDetailsPayload.of(
                 observation,

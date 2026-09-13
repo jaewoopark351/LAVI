@@ -1,5 +1,6 @@
 package lavi.minecraft.fabric.chatclef.bridge.command.diagnostics.crafting.target;
 
+import lavi.minecraft.fabric.chatclef.bridge.command.diagnostics.crafting.lifecycle.FabricChatClefCraftResourceDiagnosticLifecycle;
 import lavi.minecraft.diagnostics.crafting.acquisition.scope.IronPickaxeAcquisitionActivation;
 import lavi.minecraft.diagnostics.crafting.acquisition.scope.IronPickaxeAcquisitionScopeKey;
 import lavi.minecraft.diagnostics.crafting.acquisition.association.CraftResourceAssociationStatus;
@@ -10,12 +11,17 @@ import lavi.minecraft.diagnostics.crafting.acquisition.target.CraftResourceTarge
 //20260901_kpopmodder: Own target-ledger activation separately from target event projection.
 public final class FabricChatClefCraftResourceTargetScopeDiagnostics {
     private static final CraftResourceTargetDiagnosticsRegistry REGISTRY =
-            new CraftResourceTargetDiagnosticsRegistry();
+            new CraftResourceTargetDiagnosticsRegistry(FabricChatClefCraftResourceDiagnosticLifecycle::isAvailable);
 
     private FabricChatClefCraftResourceTargetScopeDiagnostics() {
     }
 
     public static void observeActivation(IronPickaxeAcquisitionActivation activation) {
+        //20260913_kpopmodder: Serialize passive capture with owner invalidation.
+        FabricChatClefCraftResourceDiagnosticLifecycle.runIfAvailable(() -> observeActivationWhileAvailable(activation));
+    }
+
+    private static void observeActivationWhileAvailable(IronPickaxeAcquisitionActivation activation) {
         if (activation != null && activation.binding().isPresent()) {
             REGISTRY.activateScope(activation.binding().get().key());
         }
@@ -26,6 +32,11 @@ public final class FabricChatClefCraftResourceTargetScopeDiagnostics {
     }
 
     public static void closeForCommandTerminal(IronPickaxeAcquisitionScopeKey key) {
+        //20260913_kpopmodder: Serialize passive capture with owner invalidation.
+        FabricChatClefCraftResourceDiagnosticLifecycle.runIfAvailable(() -> closeForCommandTerminalWhileAvailable(key));
+    }
+
+    private static void closeForCommandTerminalWhileAvailable(IronPickaxeAcquisitionScopeKey key) {
         if (key == null) {
             return;
         }

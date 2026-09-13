@@ -1,5 +1,7 @@
 package adris.altoclef.tasks.construction;
 
+import lavi.minecraft.diagnostics.mining.gold.GoldMiningToolObservers;
+
 import adris.altoclef.AltoClef;
 import adris.altoclef.Debug;
 import adris.altoclef.multiversion.ToolMaterialVer;
@@ -230,6 +232,8 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
     @Override
     protected void onStart() {
         AltoClef mod = AltoClef.getInstance();
+        //20260913_kpopmodder: Observe descendant runs without changing the existing cancellation or input lifecycle.
+        GoldMiningToolObservers.childStarted(mod, this, pos);
         VisibleTaskDiagnostics.logLifecycle(mod, this, "START", "destroy_block_start",
                 "targetPosition", ChatClefDiagnostics.blockPos(pos),
                 "targetBlockState", ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(pos)),
@@ -607,6 +611,7 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
     @Override
     protected void onStop(Task interruptTask) {
         AltoClef mod = AltoClef.getInstance();
+        GoldMiningToolObservers.childStopped(mod, this, pos, interruptTask);
         VisibleTaskDiagnostics.logLifecycle(mod, this, "STOP_BEGIN", "destroy_block_stop",
                 "targetPosition", ChatClefDiagnostics.blockPos(pos),
                 "targetBlockState", ChatClefDiagnostics.safeValue(() -> mod.getWorld().getBlockState(pos)),

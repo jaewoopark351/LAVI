@@ -1,5 +1,6 @@
 package lavi.minecraft.fabric.chatclef.bridge.command.diagnostics.crafting.container.common;
 
+import lavi.minecraft.fabric.chatclef.bridge.command.diagnostics.crafting.lifecycle.FabricChatClefCraftResourceDiagnosticLifecycle;
 import adris.altoclef.tasksystem.Task;
 import lavi.minecraft.diagnostics.crafting.acquisition.event.CraftResourceAcquisitionEventEmitter;
 import lavi.minecraft.diagnostics.crafting.acquisition.event.CraftResourceSourceEventName;
@@ -29,6 +30,20 @@ public final class FabricChatClefCraftResourceContainerProjectionSupport {
     }
 
     public static void observeReference(
+            Task emittingTask,
+            Task candidateTask,
+            CraftResourceTargetTuple referenceTuple,
+            CraftResourceSourceEventName sourceEventName,
+            String observationBoundary,
+            String semanticAuthority,
+            String parentTaskClass,
+            String childTaskClass,
+            Map<String, Object> optionalFields) {
+        //20260913_kpopmodder: Serialize passive capture with owner invalidation.
+        FabricChatClefCraftResourceDiagnosticLifecycle.runIfAvailable(() -> observeReferenceWhileAvailable(emittingTask, candidateTask, referenceTuple, sourceEventName, observationBoundary, semanticAuthority, parentTaskClass, childTaskClass, optionalFields));
+    }
+
+    private static void observeReferenceWhileAvailable(
             Task emittingTask,
             Task candidateTask,
             CraftResourceTargetTuple referenceTuple,

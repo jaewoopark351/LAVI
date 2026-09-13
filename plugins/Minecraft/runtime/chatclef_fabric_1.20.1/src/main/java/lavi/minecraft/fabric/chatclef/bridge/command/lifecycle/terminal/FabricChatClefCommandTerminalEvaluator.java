@@ -43,6 +43,13 @@ public final class FabricChatClefCommandTerminalEvaluator {
         if (executionStore.current() != execution) {
             return;
         }
+        //#if MC == 12001
+        //20260913_kpopmodder: A late callback cannot reuse an earlier world/engine observation to commit a result.
+        if (execution.rootTermination().bound()) {
+            execution.rootTermination().validateEnvironment(
+                    new lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.root.capture.UserRootSnapshotReader().capture());
+        }
+        //#endif
         if (publishNonterminalEvidence) {
             stabilityObserver.update(execution, activeContext);
         }

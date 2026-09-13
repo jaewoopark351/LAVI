@@ -8,6 +8,19 @@ ChatClef / AltoClef with Baritone.
 It is documentation only. It does not approve a Java behavior change, Baritone
 patch, build, runtime reproduction, deletion, commit, or push.
 
+<!-- 20260913_kpopmodder: Separate the empty-movement BuilderProcess crash from disk-cache and BlockOptionalMeta incidents. -->
+The 2026-09-13 16:28:23 `IndexOutOfBoundsException` in
+`BuilderProcess.updateMovement:801` (index 0 with a movement-list size of 0)
+has its own [diagnostics plan](chatclef-baritone-builder-empty-movements-diagnostics-plan-2026-09-13.md).
+It is separate from disk-cache staleness and the historical `BlockOptionalMeta`
+NPE below; current evidence establishes neither cache staleness nor
+`autoDeposit` as its cause. Logging-only source is now implemented; see the
+[implementation and verification record](chatclef-resource-observation-implementation-2026-09-13.md).
+It adds no empty-list guard/early return, fallback, retry, or behavior fix.
+Existing automatic defense remains unchanged. Deployment and live-runtime verification
+are `NOT_RUN`. The older NPE patch directions below do
+not authorize a behavior patch for this new incident.
+
 ## Scope
 
 This applies when LAVI is using the Fabric ChatClef runtime:

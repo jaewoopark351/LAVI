@@ -5,8 +5,25 @@ package lavi.minecraft.diagnostics.session.admission;
  */
 public final class DiagnosticSessionLimits {
     public static final int HARD_CAP = 5_000;
-    public static final int ORDINARY_CEILING = 4_936;
-    public static final int CRITICAL_RESERVE = 64;
+    //#if MC == 12001
+    //20260913_kpopmodder: New behavior-boundary evidence has its own reserve; existing first/summary pools are unchanged.
+    public static final int ORDINARY_CEILING = 3_864;
+    public static final int CRITICAL_RESERVE = 1_136;
+    public static final int TOOL_EQUIP_FIRST_SLOTS = 128;
+    public static final int TOOL_PLACEMENT_TERMINAL_SLOTS = 4;
+    public static final int BLOCK_PROTECTION_BOUNDARY_SLOTS = 64;
+    //#else
+    //$$ public static final int ORDINARY_CEILING = 4_060;
+    //$$ public static final int CRITICAL_RESERVE = 940;
+    //#endif
+
+    //20260913_kpopmodder: Preserve four operations' first 32 meanings per investigation domain.
+    public static final int RESOURCE_FIRST_SLOTS_PER_DOMAIN = 128;
+    public static final int RESOURCE_TERMINAL_SLOTS = 12;
+    //20260913_kpopmodder: Reserve coarse post-ceiling checkpoints independently of first evidence and terminals.
+    public static final int RESOURCE_SUMMARY_SLOTS_PER_DOMAIN = 128;
+    public static final int BLOCK_COLLECTION_FIRST_SLOTS = 64;
+    public static final int BLOCK_COLLECTION_SUMMARY_SLOTS = 32;
 
     public static final int CANONICAL_CAP_SLOTS = 1;
     public static final int FINAL_SNAPSHOT_SLOTS = 1;
@@ -43,6 +60,17 @@ public final class DiagnosticSessionLimits {
                 + EXCEPTION_COVERAGE_SLOTS
                 + AGGREGATE_CHECKPOINT_SLOTS
                 + NON_STORE_TERMINAL_SLOTS
-                + SUPPRESSION_CONTROL_SLOTS;
+                + SUPPRESSION_CONTROL_SLOTS
+                + 3 * RESOURCE_FIRST_SLOTS_PER_DOMAIN
+                + RESOURCE_TERMINAL_SLOTS
+                + 3 * RESOURCE_SUMMARY_SLOTS_PER_DOMAIN
+                + BLOCK_COLLECTION_FIRST_SLOTS
+                + BLOCK_COLLECTION_SUMMARY_SLOTS
+                //#if MC == 12001
+                + TOOL_EQUIP_FIRST_SLOTS
+                + TOOL_PLACEMENT_TERMINAL_SLOTS
+                + BLOCK_PROTECTION_BOUNDARY_SLOTS
+                //#endif
+                ;
     }
 }

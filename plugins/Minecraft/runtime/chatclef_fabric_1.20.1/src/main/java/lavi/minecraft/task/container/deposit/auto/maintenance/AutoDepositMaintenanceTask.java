@@ -3,6 +3,8 @@ package lavi.minecraft.task.container.deposit.auto.maintenance;
 import adris.altoclef.AltoClef;
 import adris.altoclef.tasks.container.DepositAllTask;
 import adris.altoclef.tasksystem.Task;
+import lavi.minecraft.diagnostics.container.store.deposit.pressure.AutoDepositObservationOwner;
+import lavi.minecraft.diagnostics.observation.ObservationScope;
 import lavi.minecraft.task.container.deposit.auto.DepositAllInventoryPressureReader;
 import lavi.minecraft.task.container.deposit.auto.maintenance.child.AutoDepositGeneralTaskFactory;
 import lavi.minecraft.task.container.deposit.auto.maintenance.child.AutoDepositTrustedTaskFactory;
@@ -25,7 +27,7 @@ import java.util.List;
 import java.util.Objects;
 
 //20260827_kpopmodder: Execute one immutable auto-deposit plan and verify working-set and slot relief.
-public final class AutoDepositMaintenanceTask extends Task {
+public final class AutoDepositMaintenanceTask extends Task implements AutoDepositObservationOwner {
     private final AutoDepositPlan plan;
     private final AutoDepositGeneralTaskFactory generalTaskFactory;
     private final AutoDepositTrustedTaskFactory trustedTaskFactory;
@@ -283,6 +285,12 @@ public final class AutoDepositMaintenanceTask extends Task {
 
     public AutoDepositPlan plan() {
         return plan;
+    }
+
+    //20260913_kpopmodder: Expose only the already-captured diagnostic handle, never re-evaluate Task state.
+    @Override
+    public ObservationScope diagnosticObservationScope() {
+        return diagnostics == null ? ObservationScope.NOOP : diagnostics.observationScope();
     }
 
     public boolean diagnosticAutomaticRunEnabled() {

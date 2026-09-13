@@ -1,7 +1,7 @@
 package lavi.minecraft.integration.toolselect.snapshot;
 
 import adris.altoclef.AltoClef;
-import lavi.minecraft.diagnostics.toolselect.ToolSavePolicySnapshotDiagnostics;
+import lavi.minecraft.diagnostics.toolselect.call.ToolSavePolicyDiagnosticCall;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.item.Items;
 
@@ -39,7 +39,7 @@ public final class ToolSavePolicySnapshotPublisher {
                 playerKey
         );
         ToolSavePolicySnapshotProvider.publish(snapshot);
-        ToolSavePolicySnapshotDiagnostics.logPublished(snapshot);
+        ToolSavePolicyDiagnosticCall.logPublished(snapshot);
     }
 
     public void onClientStopping() {
@@ -53,7 +53,7 @@ public final class ToolSavePolicySnapshotPublisher {
                 "unavailable"
         );
         ToolSavePolicySnapshotProvider.publish(snapshot);
-        ToolSavePolicySnapshotDiagnostics.logPublished(snapshot);
+        ToolSavePolicyDiagnosticCall.logPublished(snapshot);
     }
 
     private void publishUnavailable(String status, String worldKey, String playerKey) {
@@ -66,7 +66,7 @@ public final class ToolSavePolicySnapshotPublisher {
                 playerKey
         );
         ToolSavePolicySnapshotProvider.publish(snapshot);
-        ToolSavePolicySnapshotDiagnostics.logPublished(snapshot);
+        ToolSavePolicyDiagnosticCall.logPublished(snapshot);
     }
 
     private void updateGeneration(String contextKey) {

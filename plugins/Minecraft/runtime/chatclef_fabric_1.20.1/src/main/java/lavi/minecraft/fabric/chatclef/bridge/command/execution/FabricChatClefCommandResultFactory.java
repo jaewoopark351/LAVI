@@ -130,8 +130,44 @@ final class FabricChatClefCommandResultFactory {
         );
     }
 
+    //#if MC == 12001
+    //20260913_kpopmodder: Reuse the existing FAILED/UNKNOWN wire contract and immutable outbox commit.
+    FabricChatClefCommandResultPayload failedFromRootRetirement(String reason) {
+        if (state.rootTermination().completion() != null && state.rootTermination().completion().stopStateAvailable()
+                && state.rootTermination().completion().stopped()) {
+            FabricChatClefCommandResultPayload miningFailure = miningToolFailure();
+            if (miningFailure != null) return miningFailure;
+        }
+        return FabricChatClefCommandResult.failed(request().requestId,
+                "ChatClef command lost its user task ownership before verified completion.",
+                lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.root.payload.RootRetirementPayload.attach(
+                        data(reason), state.rootTermination()));
+    }
+    FabricChatClefCommandResultPayload unknownFromRootCompletion(String reason) {
+        return FabricChatClefCommandResult.unknown(request().requestId,
+                "ChatClef user task completion was observed, but the complete result handoff was unavailable.",
+                lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.root.payload.RootRetirementPayload.attach(
+                        data(reason), state.rootTermination()));
+    }
+    private FabricChatClefCommandResultPayload miningToolFailure() {
+        var completion = state.rootTermination().completion();
+        String reason = completion == null ? "" : completion.miningToolFailureReason();
+        if (reason.isEmpty()) return null;
+        var values = new java.util.LinkedHashMap<String, Object>(data("mining_tool_preparation_failed").toMap());
+        values.put("mining_tool_failure_reason", reason);
+        return FabricChatClefCommandResult.failed(request().requestId, "Mining tool preparation failed: " + reason,
+                FabricChatClefCommandResultDataPayload.fromMap(values));
+    }
+    //#endif
+
 
     FabricChatClefCommandResultPayload failedFromStoppedTask(FabricChatClefCommandTerminationObservation observation) {
+        //#if MC == 12001
+        if (observation != null && observation.taskStopped() && state.matchesBoundRootTask(observation)) {
+            FabricChatClefCommandResultPayload miningFailure = miningToolFailure();
+            if (miningFailure != null) return miningFailure;
+        }
+        //#endif
         return FabricChatClefCommandResult.failed(
                 request().requestId,
                 "ChatClef user task stopped before natural completion.",

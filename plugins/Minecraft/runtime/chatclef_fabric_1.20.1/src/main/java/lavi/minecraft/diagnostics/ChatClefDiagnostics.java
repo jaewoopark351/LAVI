@@ -23,6 +23,8 @@ import lavi.minecraft.diagnostics.session.admission.DiagnosticSessionSnapshot;
 import lavi.minecraft.diagnostics.session.lifecycle.DiagnosticSessionLifecycleObserver;
 import lavi.minecraft.diagnostics.session.lifecycle.DiagnosticSessionLifecycleRegistry;
 import lavi.minecraft.diagnostics.session.lifecycle.mode.DiagnosticStateCleanupLifecycleObserver;
+import lavi.minecraft.diagnostics.session.lifecycle.registration.DiagnosticOwnerRegistration;
+import lavi.minecraft.diagnostics.session.lifecycle.registration.DiagnosticObserverRegistrationResult;
 import lavi.minecraft.diagnostics.session.runtime.DiagnosticBoundedGroupEmission;
 import lavi.minecraft.diagnostics.session.runtime.DiagnosticDispatchObserver;
 import lavi.minecraft.diagnostics.session.runtime.DiagnosticDispatchResult;
@@ -72,29 +74,36 @@ public final class ChatClefDiagnostics {
             ChatClefDiagnostics::nextOperationId,
             COMMAND_CONTEXTS
     );
+    //20260913_kpopmodder: The foundation's cleanup observers are admitted atomically before diagnostic use.
+    private static final DiagnosticOwnerRegistration FOUNDATION = new DiagnosticOwnerRegistration(
+            "chatclef-foundation", () -> {
+                TASKS.clearForModeTransition();
+                POST_PLACE_CONTAINERS.clearForSessionTransition();
+                BLOCK_INTERACTIONS.clearForSessionTransition();
+                ContainerGuiDiagnostics.lifecycleObserver().beforeModeOff();
+            });
 
     static {
         BLOCK_INTERACTIONS.registerObserver(new StoreDepositInteractionObserver());
         BLOCK_INTERACTIONS.registerObserver(ContainerGuiDiagnostics.interactionObserver());
-        SESSION_LIFECYCLE.register(new DiagnosticStateCleanupLifecycleObserver(
+        SESSION_LIFECYCLE.registerOwner(FOUNDATION, new DiagnosticStateCleanupLifecycleObserver(
                 TASKS::clearForModeTransition
-        ));
-        SESSION_LIFECYCLE.register(new DiagnosticStateCleanupLifecycleObserver(
+        ), new DiagnosticStateCleanupLifecycleObserver(
                 POST_PLACE_CONTAINERS::clearForSessionTransition
-        ));
-        SESSION_LIFECYCLE.register(new DiagnosticStateCleanupLifecycleObserver(
+        ), new DiagnosticStateCleanupLifecycleObserver(
                 BLOCK_INTERACTIONS::clearForSessionTransition
-        ));
-        SESSION_LIFECYCLE.register(ContainerGuiDiagnostics.lifecycleObserver());
+        ), ContainerGuiDiagnostics.lifecycleObserver());
+        lavi.minecraft.diagnostics.observation.ObservationDiagnostics.installLifecycleObserver();
     }
 
     private ChatClefDiagnostics() {
     }
 
     public static void onClientTickHead() {
-        SESSION.runIfEligible(() -> {
+        runIfDiagnosticsEligible(() -> {
             try {
                 TRACE_STATE.advanceClientTick();
+                lavi.minecraft.diagnostics.observation.ObservationDiagnostics.observeWorld(MinecraftClient.getInstance().world);
                 ContainerGuiDiagnostics.onClientTickHead(TRACE_STATE.currentClientTickId());
                 logRuntimeIdentityOnce();
             } catch (RuntimeException | LinkageError ignored) {
@@ -110,6 +119,10 @@ public final class ChatClefDiagnostics {
         return TRACE_STATE.currentClientTickId();
     }
 
+    public static long diagnosticActivationEpoch() {
+        return MODE.modeEpoch();
+    }
+
     public static long nextEventSequence() {
         return TRACE_STATE.nextEventSequence();
     }
@@ -119,18 +132,18 @@ public final class ChatClefDiagnostics {
     }
 
     public static boolean isVerboseEnabled() {
-        return MODE.isVerboseEnabled() && SESSION.isEligible();
+        return MODE.isVerboseEnabled() && isBoundaryEnabled();
     }
 
     public static boolean isBoundaryEnabled() {
-        return SESSION.isEligible();
+        return FOUNDATION != null && FOUNDATION.isAvailable() && SESSION.isEligible();
     }
 
     //20260731_kpopmodder: Allow the LAVI command layer to switch diagnostics between BOUNDARY and OFF without changing engine behavior.
     public static void setBoundaryEnabled(boolean enabled) {
         if (enabled) {
             SESSION.setBoundaryEnabled(true);
-            SESSION.runIfEligible(TRACE_STATE::resetRuntimeIdentityLogged);
+            runIfDiagnosticsEligible(TRACE_STATE::resetRuntimeIdentityLogged);
             return;
         }
         SESSION.setBoundaryEnabled(false, () -> {
@@ -139,9 +152,15 @@ public final class ChatClefDiagnostics {
         });
     }
 
-    public static void registerSessionLifecycleObserver(
+    public static DiagnosticObserverRegistrationResult registerSessionLifecycleObserver(
             DiagnosticSessionLifecycleObserver observer) {
-        SESSION_LIFECYCLE.register(observer);
+        return SESSION_LIFECYCLE.register(observer);
+    }
+
+    //20260913_kpopmodder: Registration rejection is a typed diagnostic result, never a gameplay exception.
+    public static DiagnosticObserverRegistrationResult registerSessionLifecycleOwner(
+            DiagnosticOwnerRegistration owner, DiagnosticSessionLifecycleObserver... observers) {
+        return SESSION_LIFECYCLE.registerOwner(owner, observers);
     }
 
     public static DiagnosticDispatchResult emitCleanTeardownFinalSnapshot() {
@@ -186,25 +205,25 @@ public final class ChatClefDiagnostics {
     }
 
     public static void enterTask(Task task) {
-        SESSION.runIfEligible(() -> {
+        runIfDiagnosticsEligible(() -> {
             ContainerGuiDiagnostics.onTaskEvaluationStarted(task);
             TASKS.enterTask(task);
         });
     }
 
     public static void exitTask(Task task) {
-        SESSION.runIfEligible(() -> TASKS.exitTask(task));
+        runIfDiagnosticsEligible(() -> TASKS.exitTask(task));
     }
 
     public static Task currentTaskForDiagnostics() {
-        return SESSION.callIfEligible(TASKS::currentTask, null);
+        return callIfDiagnosticsEligible(TASKS::currentTask, null);
     }
 
     public static void noteBlockInteractionOwner(Task sourceTask, BlockPos targetPosition) {
         if (!isBoundaryEnabled()) {
             return;
         }
-        SESSION.runIfEligible(() -> BLOCK_INTERACTIONS.noteOwner(
+        runIfDiagnosticsEligible(() -> BLOCK_INTERACTIONS.noteOwner(
                 sourceTask,
                 targetPosition
         ));
@@ -221,7 +240,7 @@ public final class ChatClefDiagnostics {
     }
 
     public static void setParent(Task child, Task parent) {
-        SESSION.runIfEligible(() -> {
+        runIfDiagnosticsEligible(() -> {
             if (MODE.isVerboseEnabled()) {
                 TASKS.setParent(child, parent);
             }
@@ -268,7 +287,7 @@ public final class ChatClefDiagnostics {
     }
 
     public static void logInteractBlock(String phase, String reason, Object hand, BlockHitResult hitResult, Object result) {
-        SESSION.runIfEligible(() -> logInteractBlockEligible(
+        runIfDiagnosticsEligible(() -> logInteractBlockEligible(
                 phase,
                 reason,
                 MinecraftClient.getInstance().player,
@@ -279,7 +298,7 @@ public final class ChatClefDiagnostics {
     }
 
     public static void logInteractBlock(String phase, String reason, ClientPlayerEntity player, Object hand, BlockHitResult hitResult, Object result) {
-        SESSION.runIfEligible(() -> logInteractBlockEligible(
+        runIfDiagnosticsEligible(() -> logInteractBlockEligible(
                 phase,
                 reason,
                 player,
@@ -462,11 +481,15 @@ public final class ChatClefDiagnostics {
     }
 
     public static boolean runIfDiagnosticsEligible(Runnable action) {
-        return SESSION.runIfEligible(action);
+        return SESSION.callIfEligible(() -> {
+            if (!FOUNDATION.isAvailable()) return false;
+            action.run();
+            return true;
+        }, false);
     }
 
     public static <T> T callIfDiagnosticsEligible(Supplier<T> action, T ineligibleValue) {
-        return SESSION.callIfEligible(action, ineligibleValue);
+        return SESSION.callIfEligible(() -> FOUNDATION.isAvailable() ? action.get() : ineligibleValue, ineligibleValue);
     }
 
     public static DiagnosticSessionSnapshot diagnosticSessionSnapshot() {
@@ -491,7 +514,7 @@ public final class ChatClefDiagnostics {
                                                          Object containerType,
                                                          BlockPos targetPosition,
                                                          Object targetBlockState) {
-        SESSION.runIfEligible(() -> POST_PLACE_CONTAINERS.begin(
+        runIfDiagnosticsEligible(() -> POST_PLACE_CONTAINERS.begin(
                 operationId,
                 containerType,
                 targetPosition,
@@ -500,38 +523,38 @@ public final class ChatClefDiagnostics {
     }
 
     public static PostPlaceContainerOpenIntent activePostPlaceContainerOpenIntent(BlockPos targetPosition) {
-        return SESSION.callIfEligible(() -> POST_PLACE_CONTAINERS.active(targetPosition), null);
+        return callIfDiagnosticsEligible(() -> POST_PLACE_CONTAINERS.active(targetPosition), null);
     }
 
     public static int postPlaceContainerAttemptCount(long operationId) {
-        return SESSION.callIfEligible(() -> POST_PLACE_CONTAINERS.attemptCount(operationId), 0);
+        return callIfDiagnosticsEligible(() -> POST_PLACE_CONTAINERS.attemptCount(operationId), 0);
     }
 
     public static String postPlaceContainerLastInteractResult(long operationId) {
-        return SESSION.callIfEligible(
+        return callIfDiagnosticsEligible(
                 () -> POST_PLACE_CONTAINERS.lastInteractResult(operationId),
                 "unavailable"
         );
     }
 
     public static long postPlaceContainerElapsedTicks(long operationId) {
-        return SESSION.callIfEligible(() -> POST_PLACE_CONTAINERS.elapsedTicks(operationId), -1L);
+        return callIfDiagnosticsEligible(() -> POST_PLACE_CONTAINERS.elapsedTicks(operationId), -1L);
     }
 
     public static boolean markPostPlaceContainerGuiOpened(long operationId) {
-        return SESSION.callIfEligible(() -> POST_PLACE_CONTAINERS.markGuiOpened(operationId), false);
+        return callIfDiagnosticsEligible(() -> POST_PLACE_CONTAINERS.markGuiOpened(operationId), false);
     }
 
     public static boolean markPostPlaceContainerGuiTimeout(long operationId) {
-        return SESSION.callIfEligible(() -> POST_PLACE_CONTAINERS.markGuiTimeout(operationId), false);
+        return callIfDiagnosticsEligible(() -> POST_PLACE_CONTAINERS.markGuiTimeout(operationId), false);
     }
 
     public static boolean markPostPlaceContainerWarningLogged(long operationId) {
-        return SESSION.callIfEligible(() -> POST_PLACE_CONTAINERS.markWarningLogged(operationId), false);
+        return callIfDiagnosticsEligible(() -> POST_PLACE_CONTAINERS.markWarningLogged(operationId), false);
     }
 
     public static boolean isPostPlaceContainerGuiOpened(long operationId) {
-        return SESSION.callIfEligible(() -> POST_PLACE_CONTAINERS.isGuiOpened(operationId), false);
+        return callIfDiagnosticsEligible(() -> POST_PLACE_CONTAINERS.isGuiOpened(operationId), false);
     }
 
     public static void clearPostPlaceContainerOpenIntent(long operationId) {

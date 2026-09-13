@@ -33,6 +33,10 @@ public final class FabricChatClefCommandDispatchReturnHandler {
                 taskAfterDispatch
         );
         execution.markDispatchReturned(taskAfterDispatch, classification);
+        //#if MC == 12001
+        //20260913_kpopmodder: Bind at dispatch return before subsequent user-root changes can occur.
+        execution.bindRootLifetime(new lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.root.capture.UserRootSnapshotReader().capture());
+        //#endif
         commandDiagnostics.info("dispatch_returned", execution);
         terminalEvaluator.evaluate(execution, false, null);
     }

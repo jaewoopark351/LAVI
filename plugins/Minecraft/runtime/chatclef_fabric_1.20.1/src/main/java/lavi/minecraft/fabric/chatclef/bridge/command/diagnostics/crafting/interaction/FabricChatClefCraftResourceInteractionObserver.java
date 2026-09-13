@@ -1,5 +1,6 @@
 package lavi.minecraft.fabric.chatclef.bridge.command.diagnostics.crafting.interaction;
 
+import lavi.minecraft.fabric.chatclef.bridge.command.diagnostics.crafting.lifecycle.FabricChatClefCraftResourceDiagnosticLifecycle;
 import lavi.minecraft.diagnostics.crafting.acquisition.association.CraftResourceAssociationStatus;
 import lavi.minecraft.diagnostics.crafting.acquisition.event.CraftResourceAcquisitionEventEmitter;
 import lavi.minecraft.diagnostics.crafting.acquisition.event.CraftResourceSourceEventName;
@@ -43,6 +44,15 @@ public final class FabricChatClefCraftResourceInteractionObserver
 
     @Override
     public void beforeBlockInteraction(
+            BlockInteractionContext context,
+            ClientPlayerEntity player,
+            Object hand,
+            BlockHitResult hitResult) {
+        //20260913_kpopmodder: Keep captured interaction callbacks inside the registered owner.
+        FabricChatClefCraftResourceDiagnosticLifecycle.runIfAvailable(() -> beforeBlockInteractionWhileAvailable(context, player, hand, hitResult));
+    }
+
+    private void beforeBlockInteractionWhileAvailable(
             BlockInteractionContext context,
             ClientPlayerEntity player,
             Object hand,
@@ -111,6 +121,16 @@ public final class FabricChatClefCraftResourceInteractionObserver
 
     @Override
     public void afterBlockInteraction(
+            BlockInteractionContext context,
+            ClientPlayerEntity player,
+            Object hand,
+            BlockHitResult hitResult,
+            Object result) {
+        //20260913_kpopmodder: Keep captured interaction callbacks inside the registered owner.
+        FabricChatClefCraftResourceDiagnosticLifecycle.runIfAvailable(() -> afterBlockInteractionWhileAvailable(context, player, hand, hitResult, result));
+    }
+
+    private void afterBlockInteractionWhileAvailable(
             BlockInteractionContext context,
             ClientPlayerEntity player,
             Object hand,

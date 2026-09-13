@@ -15,11 +15,26 @@ import lavi.minecraft.fabric.chatclef.bridge.command.result.FabricChatClefComman
 import lavi.minecraft.fabric.chatclef.bridge.command.result.effect.FabricChatClefCommandEffectTracker;
 
 import java.util.function.Function;
+//#if MC == 12001
+import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.root.state.RootTerminationState;
+import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.root.capture.UserRootSnapshot;
+//#endif
 
 //20260801_kpopmodder: Keep bridge result fidelity separate from ChatClef command callbacks.
 public final class FabricChatClefCommandExecution {
     private final FabricChatClefCommandExecutionState state;
     private final FabricChatClefCommandResultFactory resultFactory;
+    //#if MC == 12001
+    //20260913_kpopmodder: The existing execution owns root lifetime retirement; no global task registry.
+    public RootTerminationState rootTermination() { return state.rootTermination(); }
+    public void bindRootLifetime(UserRootSnapshot snapshot) { state.bindRootLifetime(snapshot); }
+    public FabricChatClefCommandResultPayload failedFromRootRetirement(String reason) {
+        return resultFactory.failedFromRootRetirement(reason);
+    }
+    public FabricChatClefCommandResultPayload unknownFromRootCompletion(String reason) {
+        return resultFactory.unknownFromRootCompletion(reason);
+    }
+    //#endif
 
     public FabricChatClefCommandExecution(
             FabricChatClefCommandContext context,

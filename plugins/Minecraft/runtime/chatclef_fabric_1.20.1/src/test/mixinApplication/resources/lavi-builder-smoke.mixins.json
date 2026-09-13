@@ -1,0 +1,17 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "adris.altoclef.mixins.diagnostics",
+  "compatibilityLevel": "JAVA_17",
+  "mixins": [
+    "BaritoneProcessHelperDiagnosticAccessor",
+    "BuilderProcessDiagnosticMixin",
+    "PathDiagnosticMixin",
+    "CutoffPathDiagnosticMixin",
+    "SplicedPathDiagnosticMixin",
+    "PathExecutorDiagnosticMixin",
+    "PathingBehaviorDiagnosticMixin",
+    "AbstractNodeCostSearchDiagnosticMixin"
+  ],
+  "injectors": { "defaultRequire": 1 }
+}

@@ -2,6 +2,7 @@ package lavi.minecraft.task.container.deposit.auto;
 
 import adris.altoclef.tasksystem.Task;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.diagnostics.container.store.deposit.pressure.AutoDepositBoundaryDiagnostics;
 import lavi.minecraft.task.container.deposit.auto.maintenance.AutoDepositMaintenanceOutcome;
 import lavi.minecraft.task.container.deposit.auto.maintenance.AutoDepositMaintenancePhase;
 import lavi.minecraft.task.container.deposit.auto.policy.AutoDepositPlan;
@@ -17,7 +18,7 @@ public final class DepositAllAutoDiagnostics {
     }
 
     public static void logRegistered(float priority) {
-        ChatClefDiagnostics.logEvent(
+        logObserved(
                 CATEGORY,
                 "REGISTERED",
                 "automatic_chain_registered",
@@ -31,7 +32,7 @@ public final class DepositAllAutoDiagnostics {
                                      String reason,
                                      DepositAllInventoryPressureSnapshot snapshot,
                                      Task task) {
-        ChatClefDiagnostics.logEvent(
+        logObserved(
                 CATEGORY,
                 "STATE_TRANSITION",
                 reason,
@@ -40,15 +41,15 @@ public final class DepositAllAutoDiagnostics {
                 "nextState", nextState,
                 "occupiedSlots", snapshot == null ? -1 : snapshot.occupiedSlots(),
                 "totalSlots", snapshot == null ? -1 : snapshot.totalSlots(),
-                "thresholdReached", snapshot != null && snapshot.isAtOrAboveThreshold(),
-                "lowWaterReached", snapshot != null && snapshot.isAtOrBelowLowWater()
+                "thresholdReached", snapshot == null ? "NOT_EVALUATED" : snapshot.isAtOrAboveThreshold(),
+                "lowWaterReached", snapshot == null ? "NOT_EVALUATED" : snapshot.isAtOrBelowLowWater()
         );
     }
 
     public static void logTrigger(DepositAllInventoryPressureSnapshot snapshot,
                                   int targetStepCount,
                                   Task task) {
-        ChatClefDiagnostics.logEvent(
+        logObserved(
                 CATEGORY,
                 "TRIGGERED",
                 "high_water_threshold_crossed",
@@ -61,7 +62,7 @@ public final class DepositAllAutoDiagnostics {
 
     public static void logRunnerActivated(DepositAllInventoryPressureSnapshot snapshot,
                                           Task task) {
-        ChatClefDiagnostics.logEvent(
+        logObserved(
                 CATEGORY,
                 "RUNNER_ACTIVATED",
                 "automatic_task_required_inactive_runner",
@@ -74,7 +75,7 @@ public final class DepositAllAutoDiagnostics {
     public static void logDeferred(String reason,
                                    DepositAllInventoryPressureSnapshot pressure,
                                    Task userTaskRoot) {
-        ChatClefDiagnostics.logEvent(
+        logObserved(
                 CATEGORY,
                 "DEFERRED",
                 reason,
@@ -89,7 +90,7 @@ public final class DepositAllAutoDiagnostics {
                                          int surplusTypeCount,
                                          int surplusItemCount,
                                          Task task) {
-        ChatClefDiagnostics.logEvent(
+        logObserved(
                 CATEGORY,
                 "WORKING_SET_PLAN",
                 "automatic_surplus_plan_created",
@@ -103,7 +104,7 @@ public final class DepositAllAutoDiagnostics {
     }
 
     public static void logPolicyPlan(AutoDepositPlan plan, Task task) {
-        ChatClefDiagnostics.logEvent(
+        logObserved(
                 CATEGORY,
                 "POLICY_PLAN",
                 "immutable_automatic_plan_created",
@@ -125,7 +126,7 @@ public final class DepositAllAutoDiagnostics {
     public static void logNoSafeSurplus(String reason,
                                         DepositAllInventoryPressureSnapshot pressure,
                                         Task userTaskRoot) {
-        ChatClefDiagnostics.logEvent(
+        logObserved(
                 CATEGORY,
                 "NO_SAFE_SURPLUS_LATCHED",
                 reason,
@@ -137,7 +138,7 @@ public final class DepositAllAutoDiagnostics {
 
     public static void logMeaningfulReevaluation(DepositAllInventoryPressureSnapshot pressure,
                                                  Task userTaskRoot) {
-        ChatClefDiagnostics.logEvent(
+        logObserved(
                 CATEGORY,
                 "NO_SAFE_SURPLUS_RELEASED",
                 "semantic_fingerprint_changed",
@@ -153,7 +154,7 @@ public final class DepositAllAutoDiagnostics {
                                                 String reason,
                                                 int deficitTypes,
                                                 Task task) {
-        ChatClefDiagnostics.logEvent(
+        logObserved(
                 CATEGORY,
                 "MAINTENANCE_TRANSITION",
                 reason,
@@ -171,7 +172,7 @@ public final class DepositAllAutoDiagnostics {
                                           int expectedFreedSlots,
                                           AutoDepositMaintenanceOutcome outcome,
                                           Task task) {
-        ChatClefDiagnostics.logEvent(
+        logObserved(
                 CATEGORY,
                 "FREE_SLOT_POSTCONDITION",
                 outcome.name(),
@@ -180,32 +181,38 @@ public final class DepositAllAutoDiagnostics {
                 "startingOccupiedSlots", startingOccupiedSlots,
                 "endingOccupiedSlots", endingOccupiedSlots,
                 "actualFreedSlots", Math.max(0, startingOccupiedSlots - endingOccupiedSlots),
+                "signedFreedSlotDelta", startingOccupiedSlots < 0 || endingOccupiedSlots < 0
+                        ? "UNAVAILABLE" : startingOccupiedSlots - endingOccupiedSlots,
+                "slotDeltaAttribution", "NOT_PROVEN_BY_OCCUPANCY_CHANGE",
+                "transferEvidenceSource", "existing_paired_transfer_and_effect_events",
                 "expectedFreedSlots", expectedFreedSlots
         );
     }
 
-    public static void logRecoveryQueue(long operationEpoch,
+    public static void logRecoveryQueue(Task task,
+long operationEpoch,
                                         int deficitTypes,
                                         int candidateCount) {
-        ChatClefDiagnostics.logEvent(
+        logObserved(
                 CATEGORY,
                 "RECOVERY_QUEUE",
                 "bounded_candidate_queue_created",
-                null,
+                task,
                 "operationEpoch", operationEpoch,
                 "deficitTypeCount", deficitTypes,
                 "candidateCount", candidateCount
         );
     }
 
-    public static void logRecoveryCandidateSelected(long operationEpoch,
+    public static void logRecoveryCandidateSelected(Task task,
+long operationEpoch,
                                                     AutoDepositRecoveryCandidate candidate,
                                                     int deficitTypes) {
-        ChatClefDiagnostics.logEvent(
+        logObserved(
                 CATEGORY,
                 "RECOVERY_CANDIDATE_SELECTED",
                 "physical_container_revalidation_started",
-                null,
+                task,
                 "operationEpoch", operationEpoch,
                 "candidateTier", candidate.tier(),
                 "candidatePosition", candidate.position(),
@@ -213,15 +220,16 @@ public final class DepositAllAutoDiagnostics {
         );
     }
 
-    public static void logRecoveryCandidateTerminal(long operationEpoch,
+    public static void logRecoveryCandidateTerminal(Task task,
+long operationEpoch,
                                                     AutoDepositRecoveryCandidate candidate,
                                                     String result,
                                                     int remainingDeficitTypes) {
-        ChatClefDiagnostics.logEvent(
+        logObserved(
                 CATEGORY,
                 "RECOVERY_CANDIDATE_TERMINAL",
                 result,
-                null,
+                task,
                 "operationEpoch", operationEpoch,
                 "candidateTier", candidate == null ? "none" : candidate.tier(),
                 "candidatePosition", candidate == null ? "none" : candidate.position(),
@@ -229,16 +237,16 @@ public final class DepositAllAutoDiagnostics {
         );
     }
 
-    public static void logTrustedCandidateSelected(
+    public static void logTrustedCandidateSelected(Task task,
             long operationEpoch,
             AutoDepositTrustedDestinationCandidate candidate,
             int remainingTargetTypes,
             int remainingCandidates) {
-        ChatClefDiagnostics.logEvent(
+        logObserved(
                 CATEGORY,
                 "TRUSTED_CANDIDATE_SELECTED",
                 "live_container_validation_started",
-                null,
+                task,
                 "operationEpoch", operationEpoch,
                 "destinationId", candidate.destinationId(),
                 "candidatePosition", candidate.position(),
@@ -249,17 +257,17 @@ public final class DepositAllAutoDiagnostics {
         );
     }
 
-    public static void logTrustedCandidateTerminal(
+    public static void logTrustedCandidateTerminal(Task task,
             long operationEpoch,
             AutoDepositTrustedDestinationCandidate candidate,
             String result,
             int remainingTargetTypes,
             int remainingCandidates) {
-        ChatClefDiagnostics.logEvent(
+        logObserved(
                 CATEGORY,
                 "TRUSTED_CANDIDATE_TERMINAL",
                 result,
-                null,
+                task,
                 "operationEpoch", operationEpoch,
                 "destinationId", candidate == null ? "none" : candidate.destinationId(),
                 "candidatePosition", candidate == null ? "none" : candidate.position(),
@@ -269,20 +277,88 @@ public final class DepositAllAutoDiagnostics {
     }
 
     //20260827_kpopmodder: Log only live acceptance and confirmed transfer boundaries.
-    public static void logTrustedCandidateAccepted(
+    public static void logTrustedCandidateAccepted(Task task,
             long operationEpoch,
             AutoDepositTrustedDestinationCandidate candidate,
             int remainingTargetTypes) {
-        ChatClefDiagnostics.logEvent(
+        logObserved(
                 CATEGORY,
                 "TRUSTED_CANDIDATE_LIVE_ACCEPTED",
                 "exact_open_gui_capacity_confirmed",
-                null,
+                task,
                 "operationEpoch", operationEpoch,
                 "destinationId", candidate.destinationId(),
                 "candidatePosition", candidate.position(),
                 "remainingTargetTypes", remainingTargetTypes
         );
+    }
+
+    public static void logTrustedTransferProgress(Task task,
+            long operationEpoch,
+            AutoDepositTrustedDestinationCandidate candidate,
+            int confirmedDelta,
+            int confirmedTotal,
+            int remainingTargetTypes) {
+        logObserved(
+                CATEGORY,
+                "TRUSTED_TRANSFER_PROGRESS",
+                "paired_inventory_and_container_delta_confirmed",
+                task,
+                "operationEpoch", operationEpoch,
+                "destinationId", candidate == null ? "none" : candidate.destinationId(),
+                "candidatePosition", candidate == null ? "none" : candidate.position(),
+                "confirmedDelta", confirmedDelta,
+                "confirmedTotal", confirmedTotal,
+                "remainingTargetTypes", remainingTargetTypes
+        );
+    }
+    //20260913_kpopmodder: Preserve verbose output while observing existing results through bounded BOUNDARY admission.
+    private static void logObserved(String category, String event, String reason, Task task, Object... fields) {
+        ChatClefDiagnostics.logEvent(category, event, reason, task, fields);
+        AutoDepositBoundaryDiagnostics.log("AUTO_DEPOSIT_" + event, reason, task, fields);
+    }
+    //20260913_kpopmodder: Keep existing diagnostic call signatures while accepting exact owner provenance.
+    public static void logRecoveryQueue(long operationEpoch,
+                                        int deficitTypes,
+                                        int candidateCount) {
+        logRecoveryQueue(null, operationEpoch, deficitTypes, candidateCount);
+    }
+
+    public static void logRecoveryCandidateSelected(long operationEpoch,
+                                                    AutoDepositRecoveryCandidate candidate,
+                                                    int deficitTypes) {
+        logRecoveryCandidateSelected(null, operationEpoch, candidate, deficitTypes);
+    }
+
+    public static void logRecoveryCandidateTerminal(long operationEpoch,
+                                                    AutoDepositRecoveryCandidate candidate,
+                                                    String result,
+                                                    int remainingDeficitTypes) {
+        logRecoveryCandidateTerminal(null, operationEpoch, candidate, result, remainingDeficitTypes);
+    }
+
+    public static void logTrustedCandidateSelected(
+            long operationEpoch,
+            AutoDepositTrustedDestinationCandidate candidate,
+            int remainingTargetTypes,
+            int remainingCandidates) {
+        logTrustedCandidateSelected(null, operationEpoch, candidate, remainingTargetTypes, remainingCandidates);
+    }
+
+    public static void logTrustedCandidateTerminal(
+            long operationEpoch,
+            AutoDepositTrustedDestinationCandidate candidate,
+            String result,
+            int remainingTargetTypes,
+            int remainingCandidates) {
+        logTrustedCandidateTerminal(null, operationEpoch, candidate, result, remainingTargetTypes, remainingCandidates);
+    }
+
+    public static void logTrustedCandidateAccepted(
+            long operationEpoch,
+            AutoDepositTrustedDestinationCandidate candidate,
+            int remainingTargetTypes) {
+        logTrustedCandidateAccepted(null, operationEpoch, candidate, remainingTargetTypes);
     }
 
     public static void logTrustedTransferProgress(
@@ -291,17 +367,6 @@ public final class DepositAllAutoDiagnostics {
             int confirmedDelta,
             int confirmedTotal,
             int remainingTargetTypes) {
-        ChatClefDiagnostics.logEvent(
-                CATEGORY,
-                "TRUSTED_TRANSFER_PROGRESS",
-                "paired_inventory_and_container_delta_confirmed",
-                null,
-                "operationEpoch", operationEpoch,
-                "destinationId", candidate == null ? "none" : candidate.destinationId(),
-                "candidatePosition", candidate == null ? "none" : candidate.position(),
-                "confirmedDelta", confirmedDelta,
-                "confirmedTotal", confirmedTotal,
-                "remainingTargetTypes", remainingTargetTypes
-        );
+        logTrustedTransferProgress(null, operationEpoch, candidate, confirmedDelta, confirmedTotal, remainingTargetTypes);
     }
 }

@@ -9,6 +9,8 @@ import baritone.pathing.movement.CalculationContext;
 import baritone.pathing.path.PathExecutor;
 import lavi.minecraft.diagnostics.mining.baritone.executor.BaritoneExecutorProgressDiagnostics;
 import lavi.minecraft.diagnostics.mining.baritone.BaritonePathCalculationDiagnostics;
+import lavi.minecraft.diagnostics.baritone.builder.BuilderExecutorObserver;
+import lavi.minecraft.diagnostics.baritone.correlation.BuilderTraceRegistry;
 import net.minecraft.util.math.BlockPos;
 import org.objectweb.asm.Opcodes;
 import org.spongepowered.asm.mixin.Mixin;
@@ -108,6 +110,7 @@ public abstract class PathingBehaviorDiagnosticMixin {
                                        long primaryTimeout,
                                        long failureTimeout,
                                        CallbackInfo ci) {
+        BuilderTraceRegistry.workerEnter((PathingBehavior) (Object) this, pathfinder);
         BaritonePathCalculationDiagnostics.logWorkerStarted(
                 (PathingBehavior) (Object) this,
                 firstSegment,
@@ -137,6 +140,7 @@ public abstract class PathingBehaviorDiagnosticMixin {
                                                      long primaryTimeout,
                                                      long failureTimeout,
                                                      CallbackInfo ci) {
+        BuilderExecutorObserver.adopted((PathingBehavior) (Object) this, current, next, "BEFORE_LEGACY_CALCULATION_COMPLETE");
         BaritonePathCalculationDiagnostics.logAdoptionDecisionBeforeClear(
                 (PathingBehavior) (Object) this,
                 firstSegment,
@@ -176,5 +180,31 @@ public abstract class PathingBehaviorDiagnosticMixin {
                 cancelRequested,
                 calcFailedLastTick
         );
+    }
+
+    //20260913_kpopmodder: Bind the exact finder before the existing Executor.execute can start its worker.
+    @Inject(method = "findPathInNewThread", at = @At(value = "FIELD",
+            target = "Lbaritone/behavior/PathingBehavior;inProgress:Lbaritone/pathing/calc/AbstractNodeCostSearch;",
+            opcode = Opcodes.PUTFIELD, shift = At.Shift.AFTER), remap = false)
+    private void lavi$bindBeforeScheduling(CallbackInfo ci) {
+        try { BuilderTraceRegistry.scheduled((PathingBehavior) (Object) this, inProgress, goal); }
+        catch (RuntimeException | LinkageError ignored) { }
+    }
+
+    @Inject(method = "lambda$findPathInNewThread$2", at = @At("RETURN"), remap = false)
+    private void lavi$workerReturned(CallbackInfo ci) { BuilderTraceRegistry.workerExit(); }
+
+    @Inject(method = {"tickPath", "softCancelIfSafe", "secretInternalSegmentCancel", "lambda$findPathInNewThread$2"},
+            at = @At(value = "FIELD", target = "Lbaritone/behavior/PathingBehavior;current:Lbaritone/pathing/path/PathExecutor;",
+                    opcode = Opcodes.PUTFIELD, shift = At.Shift.AFTER), remap = false)
+    private void lavi$currentAssigned(CallbackInfo ci) {
+        BuilderExecutorObserver.adopted((PathingBehavior) (Object) this, current, next, "CURRENT_FIELD_WRITE_AFTER");
+    }
+
+    @Inject(method = {"tickPath", "softCancelIfSafe", "secretInternalSegmentCancel", "lambda$findPathInNewThread$2"},
+            at = @At(value = "FIELD", target = "Lbaritone/behavior/PathingBehavior;next:Lbaritone/pathing/path/PathExecutor;",
+                    opcode = Opcodes.PUTFIELD, shift = At.Shift.AFTER), remap = false)
+    private void lavi$nextAssigned(CallbackInfo ci) {
+        BuilderExecutorObserver.adopted((PathingBehavior) (Object) this, current, next, "NEXT_FIELD_WRITE_AFTER");
     }
 }

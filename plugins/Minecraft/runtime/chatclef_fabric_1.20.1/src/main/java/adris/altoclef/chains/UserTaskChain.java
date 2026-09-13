@@ -8,6 +8,7 @@ import adris.altoclef.tasksystem.Task;
 import adris.altoclef.tasksystem.TaskRunner;
 import adris.altoclef.util.time.Stopwatch;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.diagnostics.mining.gold.root.GoldUserRootObservation;
 import lavi.minecraft.diagnostics.container.gui.ContainerGuiDiagnostics;
 import lavi.minecraft.diagnostics.container.store.deposit.StoreDepositDiagnostics;
 import lavi.minecraft.diagnostics.tasktrace.UserTaskChainDiagnostics;
@@ -15,6 +16,12 @@ import lavi.minecraft.diagnostics.tasktrace.userchain.UserTaskChainDiagnosticLed
 import lavi.minecraft.diagnostics.tasktrace.userchain.UserTaskChainDiagnosticLedger.CancelInvocation;
 import lavi.minecraft.diagnostics.tasktrace.userchain.UserTaskChainDiagnosticLedger.FinishTrigger;
 import lavi.minecraft.diagnostics.tasktrace.userchain.UserTaskChainDiagnosticLedger.RootAssignment;
+//#if MC == 12001
+import lavi.minecraft.integration.lifecycle.root.UserRootOwnership;
+import lavi.minecraft.integration.lifecycle.root.UserRootLifetime;
+import lavi.minecraft.integration.lifecycle.root.UserRootCompletion;
+import lavi.minecraft.integration.lifecycle.root.UserRootCompletionCapture;
+//#endif
 
 // A task chain that runs a user defined task at the same priority.
 // This basically replaces our old Task Runner.
@@ -22,7 +29,16 @@ public class UserTaskChain extends SingleTaskChain {
 
     private final Stopwatch taskStopwatch = new Stopwatch();
     private final UserTaskChainDiagnosticLedger diagnosticLedger = new UserTaskChainDiagnosticLedger();
+    //20260913_kpopmodder: Associate only observed gold scopes with actual user-root removal boundaries.
+    private final GoldUserRootObservation diagnosticGoldRoots = new GoldUserRootObservation();
     private Runnable currentOnFinish = null;
+    //#if MC == 12001
+    //20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
+    //20260913_kpopmodder: Expose ownership only; task/callback selection and execution remain unchanged.
+    private final UserRootOwnership rootOwnership = new UserRootOwnership();
+    public UserRootLifetime currentRootLifetime() { return rootOwnership.currentFor(mainTask); }
+    public Object currentRootInvocation() { return rootOwnership.invocationFor(mainTask); }
+    //#endif
 
     private boolean runningIdleTask;
     private boolean nextTaskIdleFlag;
@@ -85,6 +101,8 @@ public class UserTaskChain extends SingleTaskChain {
                             "chain", ChatClefDiagnostics.chainNameForDiagnosticLog(this),
                             cancelInvocation.beforeStopFields()));
             stop();
+            diagnosticGoldRoots.removed(cancelInvocation.rootBeforeStop(), mainTask,
+                    cancelInvocation.rootAssignmentId(), "USER_ROOT_CANCEL_STOP_RETURNED");
             ChatClefDiagnostics.logLifecycleBoundary("USER_TASK_CHAIN_CANCEL_STOP_END", "user_task_chain_cancel_stop_end", cancelInvocation.rootBeforeStop(),
                     UserTaskChainDiagnostics.withOriginAndCommandContext(mod, cancelInvocation.rootBeforeStop(), mainTask, runningIdleTask, nextTaskIdleFlag,
                             "chain", ChatClefDiagnostics.chainNameForDiagnosticLog(this),
@@ -129,6 +147,12 @@ public class UserTaskChain extends SingleTaskChain {
         mod.getTaskRunner().enable();
         taskStopwatch.begin();
         setTask(task);
+        //#if MC == 12001
+        //20260913_kpopmodder: Bind the retained actual root, including equal-task callback replacement.
+        rootOwnership.assigned(mainTask, currentOnFinish, mod.getWorld(), mod.getPlayer());
+        //#endif
+        diagnosticGoldRoots.assigned(rootAssignment.previousRoot(), mainTask,
+                diagnosticLedger.currentRootAssignmentId(), rootAssignment.rootAssignmentId());
         ChatClefDiagnostics.logLifecycleBoundary("USER_TASK_CHAIN_RUN_TASK_ASSIGNED", "user_task_chain_run_task_assigned", task,
                 UserTaskChainDiagnostics.withOriginAndCommandContext(mod, null, task, runningIdleTask, nextTaskIdleFlag,
                         "chain", ChatClefDiagnostics.chainNameForDiagnosticLog(this),
@@ -149,6 +173,11 @@ public class UserTaskChain extends SingleTaskChain {
         boolean shouldIdle = mod.getModSettings().shouldRunIdleCommandWhenNotActive();
         double seconds = taskStopwatch.time();
         Task oldTask = mainTask;
+        //#if MC == 12001
+        //20260913_kpopmodder: Freeze the completing owner's identity before cleanup/callback can assign another root.
+        UserRootLifetime finishedLifetime = rootOwnership.currentFor(oldTask);
+        UserRootCompletion rootCompletion = UserRootCompletionCapture.capture(oldTask);
+        //#endif
         FinishTrigger finishTrigger = diagnosticLedger.consumeFinishTrigger(oldTask);
         //20260730_kpopmodder: Added diagnostic logging to prove the Carry On interaction failure boundary.
         // Diagnostics-only: observe callback and TaskFinishedEvent publish decisions without changing completion logic.
@@ -163,6 +192,8 @@ public class UserTaskChain extends SingleTaskChain {
                         "elapsedSeconds", seconds,
                         finishTrigger.fields(oldTask)));
         mainTask = null;
+        diagnosticGoldRoots.removed(oldTask, mainTask, finishTrigger.rootAssignmentId(),
+                "USER_ROOT_FINISH_CLEAR:" + finishTrigger.finishTriggerHint());
         ChatClefDiagnostics.logLifecycleBoundary("USER_TASK_CHAIN_MAIN_TASK_CLEARED", "user_task_chain_main_task_cleared", oldTask,
                 UserTaskChainDiagnostics.withOriginAndCommandContext(mod, oldTask, null, runningIdleTask, nextTaskIdleFlag,
                         "chain", ChatClefDiagnostics.chainNameForDiagnosticLog(this),
@@ -193,6 +224,10 @@ public class UserTaskChain extends SingleTaskChain {
                             "chain", ChatClefDiagnostics.chainNameForDiagnosticLog(this),
                             "oldTask", ChatClefDiagnostics.taskSummaryForDiagnosticLog(oldTask)));
         }
+        //#if MC == 12001
+        //20260913_kpopmodder: Publish completion ownership only after the existing cleanup has returned.
+        rootOwnership.finished(finishedLifetime, rootCompletion);
+        //#endif
         if (currentOnFinish != null) {
             ChatClefDiagnostics.logLifecycleBoundary("USER_TASK_CHAIN_ON_FINISH_CALLBACK_BEGIN", "user_task_chain_on_finish_callback_begin", oldTask,
                     UserTaskChainDiagnostics.withOriginAndCommandContext(mod, oldTask, null, runningIdleTask, nextTaskIdleFlag,
@@ -235,7 +270,12 @@ public class UserTaskChain extends SingleTaskChain {
                                 "elapsedSeconds", seconds,
                                 "runningIdleTask", runningIdleTask,
                                 finishTrigger.fields(oldTask)));
-                TaskFinishedEvent finishedEvent = new TaskFinishedEvent(seconds, oldTask);
+                //#if MC == 12001
+                //20260913_kpopmodder: The event keeps the finished lifetime even if its callback installed a new root.
+                TaskFinishedEvent finishedEvent = new TaskFinishedEvent(seconds, oldTask, finishedLifetime);
+                //#else
+                //$$ TaskFinishedEvent finishedEvent = new TaskFinishedEvent(seconds, oldTask);
+                //#endif
                 ChatClefDiagnostics.logLifecycleBoundary("USER_TASK_CHAIN_TASK_FINISHED_EVENT_READY", "user_task_chain_task_finished_event_ready", oldTask,
                         UserTaskChainDiagnostics.withOriginAndCommandContext(mod, oldTask, null, runningIdleTask, nextTaskIdleFlag,
                                 "chain", ChatClefDiagnostics.chainNameForDiagnosticLog(this),
@@ -287,6 +327,10 @@ public class UserTaskChain extends SingleTaskChain {
 
     public String diagnosticRootAssignmentId() {
         return diagnosticLedger.currentRootAssignmentId();
+    }
+
+    public GoldUserRootObservation diagnosticGoldRootObservation() {
+        return diagnosticGoldRoots;
     }
 
     public long diagnosticRootGeneration() {

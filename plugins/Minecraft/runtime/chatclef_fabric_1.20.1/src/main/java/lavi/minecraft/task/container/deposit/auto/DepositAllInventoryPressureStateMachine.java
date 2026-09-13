@@ -94,6 +94,11 @@ public final class DepositAllInventoryPressureStateMachine {
         return state;
     }
 
+    //20260913_kpopmodder: Expose the existing latch value to a passive diagnostic snapshot only.
+    public boolean diagnosticThresholdPending() {
+        return thresholdPending;
+    }
+
     private void requireState(DepositAllInventoryPressureState expected, String action) {
         if (state != expected) {
             throw new IllegalStateException("Cannot " + action + " automatic deposit_all while state is " + state);

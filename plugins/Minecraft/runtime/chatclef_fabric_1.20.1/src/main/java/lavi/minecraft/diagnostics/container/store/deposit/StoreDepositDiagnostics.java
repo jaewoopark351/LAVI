@@ -49,6 +49,7 @@ import net.minecraft.util.math.BlockPos;
 
 import java.util.Optional;
 import java.util.function.Supplier;
+import lavi.minecraft.diagnostics.session.lifecycle.registration.DiagnosticOwnerRegistration;
 
 public final class StoreDepositDiagnostics {
     private static final StoreDepositBindingRegistry BINDINGS = new StoreDepositBindingRegistry();
@@ -114,25 +115,21 @@ public final class StoreDepositDiagnostics {
             new StoreDepositFilteredSearchDiagnostics(BINDINGS, EMISSION_GATE);
     private static final StoreDepositUserBlockRangeNullDiagnostics USER_BLOCK_RANGE_NULL_INPUTS =
             new StoreDepositUserBlockRangeNullDiagnostics(EMISSION_GATE);
+    //20260913_kpopmodder: A deposit observer group is usable only when both cleanup and snapshot registration succeed.
+    private static final StoreDepositModeStateInvalidator MODE_INVALIDATOR =
+            new StoreDepositModeStateInvalidator(BINDINGS, INTERACTIONS, TRANSFER_ATTEMPTS,
+                    SLOT_ACTIONS, EFFECTS, EMISSION_GATE, AUTOMATIC_LEDGER);
+    private static final DiagnosticOwnerRegistration LIFECYCLE = new DiagnosticOwnerRegistration(
+            "store-deposit", () -> {
+                MODE_INVALIDATOR.clear();
+            });
 
     static {
-        StoreDepositModeStateInvalidator invalidator =
-                new StoreDepositModeStateInvalidator(
-                        BINDINGS,
-                        INTERACTIONS,
-                        TRANSFER_ATTEMPTS,
-                        SLOT_ACTIONS,
-                        EFFECTS,
-                        EMISSION_GATE,
-                        AUTOMATIC_LEDGER
-                );
-        ChatClefDiagnostics.registerSessionLifecycleObserver(
+        ChatClefDiagnostics.registerSessionLifecycleOwner(LIFECYCLE,
                 new StoreDepositModeLifecycleObserver(
-                        invalidator,
+                        MODE_INVALIDATOR,
                         TERMINAL_LEDGER
-                )
-        );
-        ChatClefDiagnostics.registerSessionLifecycleObserver(
+                ),
                 new StoreDepositSessionSnapshotContributor(
                         new StoreDepositSessionStateSnapshotReader(
                                 BINDINGS,
@@ -743,11 +740,12 @@ public final class StoreDepositDiagnostics {
     }
 
     private static void runEligible(Runnable action) {
-        ChatClefDiagnostics.runIfDiagnosticsEligible(action);
+        ChatClefDiagnostics.runIfDiagnosticsEligible(() -> LIFECYCLE.runIfAvailable(action));
     }
 
     private static <T> T callEligible(Supplier<T> action, T ineligibleValue) {
-        return ChatClefDiagnostics.callIfDiagnosticsEligible(action, ineligibleValue);
+        return ChatClefDiagnostics.callIfDiagnosticsEligible(
+                () -> LIFECYCLE.callIfAvailable(action, ineligibleValue), ineligibleValue);
     }
 
 }

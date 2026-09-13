@@ -13,6 +13,9 @@ import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 import lavi.minecraft.diagnostics.container.gui.ContainerGuiDiagnostics;
 import lavi.minecraft.diagnostics.container.gui.slot.ContainerSlotActionProbe;
 import lavi.minecraft.diagnostics.toolselect.ToolEquipDiagnostics;
+import lavi.minecraft.diagnostics.toolselect.call.ToolEquipDiagnosticCall;
+import lavi.minecraft.diagnostics.toolselect.snapshot.ToolEquipBeforeSnapshot;
+import lavi.minecraft.diagnostics.toolselect.snapshot.ToolEquipSnapshotCapture;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.item.*;
@@ -162,12 +165,9 @@ public class SlotHandler {
     }
 
     public boolean forceEquipItem(Item toEquip, long equipAttemptId, Slot expectedSourceSlot, ItemStack expectedSourceStack) {
-        int selectedSlotBefore = selectedSlotIndex();
-        Slot hotbarSlot1 = Slot.getFromCurrentScreenInventory(1);
-        ItemStack hotbarSlot1Before = copyStackInSlot(hotbarSlot1);
-        Slot equipSlotBefore = currentEquipSlot();
-        ItemStack mainHandBefore = copyStackInSlot(equipSlotBefore);
-        ItemStack expectedSourceStackSnapshot = expectedSourceStack == null ? copyStackInSlot(expectedSourceSlot) : expectedSourceStack.copy();
+        ToolEquipBeforeSnapshot before = ToolEquipDiagnosticCall.capture(equipAttemptId,
+                () -> ToolEquipSnapshotCapture.before(mod, expectedSourceSlot, expectedSourceStack),
+                ToolEquipBeforeSnapshot.UNAVAILABLE);
 
         ChatClefDiagnostics.logEvent("SLOT", "FORCE_EQUIP_BEGIN", "forceEquipItem_begin", null,
                 "toEquip", toEquip,
@@ -180,10 +180,11 @@ public class SlotHandler {
         if (StorageHelper.getItemStackInSlot(PlayerSlot.getEquipSlot()).getItem() == toEquip) {
             ChatClefDiagnostics.logEvent("SLOT", "FORCE_EQUIP_RETURN", "forceEquipItem_already_equipped", null,
                     "toEquip", toEquip);
-            ToolEquipDiagnostics.logEquipResult(mod, toEquip, equipAttemptId, expectedSourceSlot, expectedSourceStackSnapshot,
-                    java.util.Collections.emptyList(), false, selectedSlotBefore, selectedSlotIndex(),
-                    hotbarSlot1Before, copyStackInSlot(hotbarSlot1), mainHandBefore, copyStackInSlot(currentEquipSlot()),
-                    true, "already_equipped");
+            ToolEquipDiagnosticCall.result(equipAttemptId, () -> ToolEquipDiagnostics.logEquipResult(mod, toEquip, equipAttemptId, expectedSourceSlot, before.expectedSource(),
+                    java.util.Collections.emptyList(), false, before.selectedSlot(), ToolEquipSnapshotCapture.selectedSlot(mod),
+                    before.hotbarStack(), ToolEquipSnapshotCapture.stack(before.hotbarSlot()), before.mainHand(),
+                    ToolEquipSnapshotCapture.stack(ToolEquipSnapshotCapture.equipSlot()),
+                    true, "already_equipped"));
             return true;
         }
 
@@ -208,43 +209,21 @@ public class SlotHandler {
                     "toEquip", toEquip,
                     "selectedSlotAfter", ChatClefDiagnostics.safeValue(() -> mod.getPlayer().getInventory().selectedSlot),
                     "equippedAfter", ChatClefDiagnostics.safeValue(() -> StorageHelper.getItemStackInSlot(PlayerSlot.getEquipSlot())));
-            ToolEquipDiagnostics.logEquipResult(mod, toEquip, equipAttemptId, expectedSourceSlot, expectedSourceStackSnapshot,
-                    itemSlots, inCursor, selectedSlotBefore, selectedSlotIndex(),
-                    hotbarSlot1Before, copyStackInSlot(hotbarSlot1), mainHandBefore, copyStackInSlot(currentEquipSlot()),
-                    true, "matching_slots_swapped");
+            ToolEquipDiagnosticCall.result(equipAttemptId, () -> ToolEquipDiagnostics.logEquipResult(mod, toEquip, equipAttemptId, expectedSourceSlot, before.expectedSource(),
+                    itemSlots, inCursor, before.selectedSlot(), ToolEquipSnapshotCapture.selectedSlot(mod),
+                    before.hotbarStack(), ToolEquipSnapshotCapture.stack(before.hotbarSlot()), before.mainHand(),
+                    ToolEquipSnapshotCapture.stack(ToolEquipSnapshotCapture.equipSlot()),
+                    true, "matching_slots_swapped"));
             return true;
         }
         ChatClefDiagnostics.logEvent("SLOT", "FORCE_EQUIP_RETURN", "forceEquipItem_missing_item", null,
                 "toEquip", toEquip);
-        ToolEquipDiagnostics.logEquipResult(mod, toEquip, equipAttemptId, expectedSourceSlot, expectedSourceStackSnapshot,
-                itemSlots, inCursor, selectedSlotBefore, selectedSlotIndex(),
-                hotbarSlot1Before, copyStackInSlot(hotbarSlot1), mainHandBefore, copyStackInSlot(currentEquipSlot()),
-                false, "missing_item");
+        ToolEquipDiagnosticCall.result(equipAttemptId, () -> ToolEquipDiagnostics.logEquipResult(mod, toEquip, equipAttemptId, expectedSourceSlot, before.expectedSource(),
+                itemSlots, inCursor, before.selectedSlot(), ToolEquipSnapshotCapture.selectedSlot(mod),
+                before.hotbarStack(), ToolEquipSnapshotCapture.stack(before.hotbarSlot()), before.mainHand(),
+                ToolEquipSnapshotCapture.stack(ToolEquipSnapshotCapture.equipSlot()),
+                false, "missing_item"));
         return false;
-    }
-
-    private Slot currentEquipSlot() {
-        try {
-            return PlayerSlot.getEquipSlot();
-        } catch (RuntimeException | LinkageError ignored) {
-            return null;
-        }
-    }
-
-    private ItemStack copyStackInSlot(Slot slot) {
-        try {
-            return slot == null ? ItemStack.EMPTY : StorageHelper.getItemStackInSlot(slot).copy();
-        } catch (RuntimeException | LinkageError ignored) {
-            return ItemStack.EMPTY;
-        }
-    }
-
-    private int selectedSlotIndex() {
-        try {
-            return mod.getPlayer().getInventory().selectedSlot;
-        } catch (RuntimeException | LinkageError ignored) {
-            return -1;
-        }
     }
 
     public boolean forceDeequipHitTool() {
@@ -327,6 +306,14 @@ public class SlotHandler {
         Slot target = PlayerSlot.getEquipSlot();
         clickSlotForce(slot, target.getInventorySlot(), SlotActionType.SWAP);
     }
+
+    //#if MC == 12001
+    //20260913_kpopmodder: Exact validated source/destination action without changing the selected hand.
+    public void forceSwapPlayerSlot(Slot source, int destinationHotbar) {
+        if (source == null || destinationHotbar < 0 || destinationHotbar >= 9) return;
+        clickSlotForce(source, destinationHotbar, SlotActionType.SWAP);
+    }
+    //#endif
 
     public boolean forceEquipItem(Item[] matches, boolean unInterruptable) {
         return forceEquipItem(new ItemTarget(matches, 1), unInterruptable);

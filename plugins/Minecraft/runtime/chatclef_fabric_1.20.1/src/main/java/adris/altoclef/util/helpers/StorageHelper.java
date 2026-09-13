@@ -19,7 +19,8 @@ import adris.altoclef.util.slots.PlayerSlot;
 import adris.altoclef.util.slots.Slot;
 import baritone.utils.ToolSet;
 import lavi.minecraft.diagnostics.toolselect.BestToolSlotDiagnostics;
-import lavi.minecraft.diagnostics.toolselect.ToolSavePolicySnapshotDiagnostics;
+import lavi.minecraft.diagnostics.toolselect.call.BestToolScanDiagnosticCall;
+import lavi.minecraft.diagnostics.toolselect.call.ToolSavePolicyDiagnosticCall;
 import lavi.minecraft.integration.toolselect.snapshot.ToolSavePolicySnapshot;
 import lavi.minecraft.integration.toolselect.snapshot.ToolSavePolicySnapshotProvider;
 import net.minecraft.block.Block;
@@ -148,7 +149,7 @@ public class StorageHelper {
         //  }
         //20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
         // Diagnostics-only: observe the actual best-tool candidate filtering without changing selection behavior.
-        BestToolSlotDiagnostics.Scan bestToolDiagnostics = BestToolSlotDiagnostics.start(state);
+        BestToolScanDiagnosticCall bestToolDiagnostics = BestToolScanDiagnosticCall.start(state);
         if (state.getBlock().getHardness() == 0) {
             Slot equipSlot = PlayerSlot.getEquipSlot();
             bestToolDiagnostics.logReturn(equipSlot, BestToolSlotDiagnostics.DECISION_HARDNESS_ZERO_USE_EQUIP_SLOT, Double.NaN);
@@ -209,7 +210,7 @@ public class StorageHelper {
         if (snapshotBacked) {
             snapshot = ToolSavePolicySnapshotProvider.current();
             if (!snapshot.ready()) {
-                ToolSavePolicySnapshotDiagnostics.logConsumed(snapshot, block, stack, "SNAPSHOT_NOT_READY_FAIL_SAVE", true);
+                ToolSavePolicyDiagnosticCall.logConsumed(snapshot, block, stack, "SNAPSHOT_NOT_READY_FAIL_SAVE", true);
                 return true;
             }
             hasDiamondPickaxe = snapshot.hasDiamondPickaxe();
@@ -219,7 +220,7 @@ public class StorageHelper {
 
         if (hasDiamondPickaxe) {
             if (snapshotBacked) {
-                ToolSavePolicySnapshotDiagnostics.logConsumed(snapshot, block, stack, "HAS_DIAMOND_PICKAXE", false);
+                ToolSavePolicyDiagnosticCall.logConsumed(snapshot, block, stack, "HAS_DIAMOND_PICKAXE", false);
             }
             return false;
         }
@@ -243,7 +244,7 @@ public class StorageHelper {
         }
 
         if (snapshotBacked) {
-            ToolSavePolicySnapshotDiagnostics.logConsumed(snapshot, block, stack, decisionReason, shouldSave);
+            ToolSavePolicyDiagnosticCall.logConsumed(snapshot, block, stack, decisionReason, shouldSave);
         }
 
         return shouldSave;

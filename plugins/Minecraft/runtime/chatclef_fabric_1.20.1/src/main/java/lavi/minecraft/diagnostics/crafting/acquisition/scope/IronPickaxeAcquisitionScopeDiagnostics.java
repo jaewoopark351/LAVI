@@ -1,5 +1,6 @@
 package lavi.minecraft.diagnostics.crafting.acquisition.scope;
 
+import lavi.minecraft.fabric.chatclef.bridge.command.diagnostics.crafting.lifecycle.FabricChatClefCraftResourceDiagnosticLifecycle;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 import lavi.minecraft.diagnostics.crafting.acquisition.requirement.CraftResourceArtifactProof;
 import lavi.minecraft.diagnostics.crafting.acquisition.requirement.CraftResourceRequirementDecision;
@@ -36,6 +37,16 @@ public final class IronPickaxeAcquisitionScopeDiagnostics {
     }
 
     public static void captureRequirement(
+            String requestedItem,
+            int requestedCount,
+            int currentItemCount,
+            int targetItemCount
+    ) {
+        //20260913_kpopmodder: Serialize passive capture with owner invalidation.
+        FabricChatClefCraftResourceDiagnosticLifecycle.runIfAvailable(() -> captureRequirementWhileAvailable(requestedItem, requestedCount, currentItemCount, targetItemCount));
+    }
+
+    private static void captureRequirementWhileAvailable(
             String requestedItem,
             int requestedCount,
             int currentItemCount,
@@ -80,7 +91,26 @@ public final class IronPickaxeAcquisitionScopeDiagnostics {
         }
     }
 
-    public static synchronized IronPickaxeAcquisitionActivation activate(
+    public static IronPickaxeAcquisitionActivation activate(
+            boolean commandOwnedRoot,
+            String normalizedCommand,
+            String commandSessionId,
+            long commandConnectionGeneration,
+            String commandRequestId,
+            String commandCorrelationId,
+            String rootAssignmentId,
+            long rootGeneration,
+            String boundRootTaskInstanceId,
+            Object boundRootTask,
+            String rootTaskClass,
+            long clientTick,
+            long monotonicNanos
+    ) {
+        //20260913_kpopmodder: Serialize passive capture with owner invalidation.
+        return FabricChatClefCraftResourceDiagnosticLifecycle.callIfAvailable(() -> activateWhileAvailable(commandOwnedRoot, normalizedCommand, commandSessionId, commandConnectionGeneration, commandRequestId, commandCorrelationId, rootAssignmentId, rootGeneration, boundRootTaskInstanceId, boundRootTask, rootTaskClass, clientTick, monotonicNanos), unavailable(ChatClefDiagnostics.isBoundaryEnabled() ? "DIAGNOSTIC_OWNER_UNAVAILABLE" : "DIAGNOSTICS_OFF"));
+    }
+
+    private static synchronized IronPickaxeAcquisitionActivation activateWhileAvailable(
             boolean commandOwnedRoot,
             String normalizedCommand,
             String commandSessionId,
@@ -173,7 +203,15 @@ public final class IronPickaxeAcquisitionScopeDiagnostics {
         return List.copyOf(ACTIVE_BINDINGS.values());
     }
 
-    public static synchronized void observeRetention(
+    public static void observeRetention(
+            long clientTick,
+            long monotonicNanos
+    ) {
+        //20260913_kpopmodder: Serialize passive capture with owner invalidation.
+        FabricChatClefCraftResourceDiagnosticLifecycle.runIfAvailable(() -> observeRetentionWhileAvailable(clientTick, monotonicNanos));
+    }
+
+    private static synchronized void observeRetentionWhileAvailable(
             long clientTick,
             long monotonicNanos
     ) {

@@ -143,6 +143,9 @@ public final class FabricChatClefCommandLifecycleComponents {
                 observationDrainer,
                 executionStore,
                 terminalEvaluator
+                //#if MC == 12001
+                , new lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.root.RootLifetimeTickObserver(taskFinishedObserver, commandDiagnostics)
+                //#endif
         );
         this.deadlineHandler = new FabricChatClefCommandDeadlineHandler(
                 executionStore,

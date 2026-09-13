@@ -502,6 +502,56 @@ regressions, read:
 plugins/Minecraft/docs/chatclef-baritone-cache-troubleshooting.md
 ```
 
+For the 2026-09-13 16:28:23 `BuilderProcess.updateMovement:801` crash
+(`IndexOutOfBoundsException`, index 0 with zero movements), read the
+[empty-movement diagnostics plan](docs/chatclef-baritone-builder-empty-movements-diagnostics-plan-2026-09-13.md).
+This incident is separate from disk-cache staleness and the older
+`BlockOptionalMeta` NPE; neither cache staleness nor `autoDeposit` is established
+as its cause. Logging-only source is implemented; see the
+[implementation and verification record](docs/chatclef-resource-observation-implementation-2026-09-13.md).
+No empty-list early return or behavior fix is included. Automatic defense remains unchanged;
+agent deployment and live execution were `NOT_RUN` at the implementation checkpoint.
+The later user-run artifact reached the world and crashed on diagnostic observer capacity;
+see the separate incident below.
+
+<!-- 20260913_kpopmodder: Link the separate gold-mining tool-loop and automatic-deposit diagnostics-only plan. -->
+For the 2026-09-13 gold-mining tool-swap loop and missing automatic-deposit
+decisions under inventory pressure, read the
+[gold mining and automatic-deposit diagnostics plan](docs/chatclef-gold-mining-tool-loop-auto-deposit-diagnostics-plan-2026-09-13.md).
+The first gold request has an observed tool-preparation interruption loop;
+the second request's exact cause and automatic-deposit non-start reason remain
+unverified. The plan covers decision correlation, BOUNDARY-mode coverage,
+waiting/rearm reasons, and bounded emission after ordinary log-cap exhaustion.
+Logging-only source is implemented; verification status is tracked in the
+[implementation record](docs/chatclef-resource-observation-implementation-2026-09-13.md).
+Tool/inventory policy and automatic defense are outside the behavior-change scope.
+For the later 21:16 shared-block null/AIOOBE observations and ordinary-cap exhaustion,
+see [shared block read/write and reserved checkpoint diagnostics](docs/chatclef-shared-block-read-checkpoint-diagnostics-2026-09-13.md).
+It adds bounded observation only; collection races and mining behavior are not repaired by this unit.
+The separate 20:19 observer-registration crash violates the intended passive-diagnostics contract; see below.
+
+<!-- 20260913_kpopmodder: Link the reviewed repair design separately from earlier logging-only implementation records. -->
+For the later 22:12 execution and independent review, read the
+[gold-mining repair design](docs/gold-mining-debugging-2026-09-13/README.md).
+It separates exact selected-tool equipping, operation-owned hotbar placement,
+consistent block/protection snapshots, and user-root replacement terminal handling.
+The source/stack mismatch and 1,216 preparation re-entries are recorded;
+the exact null-producing write remains unproven. The observed 31/36 inventory
+occupancy was below the automatic-deposit threshold. These behavior repairs are
+`PLAN_ONLY`; automatic defense remains required and the earlier implementation
+and runtime checkpoints retain their original statuses.
+
+<!-- 20260913_kpopmodder: Distinguish the later observer-registration crash from the earlier Mixin startup failure. -->
+For the 2026-09-13 20:19:38 `ToolEquipDiagnostics` initialization crash, read the
+[diagnostic observer-capacity incident and repair plan](docs/chatclef-diagnostic-observer-capacity-crash-plan-2026-09-13.md).
+The configured observer count grew from 15 to 17 while registration remained capped at 16.
+The final 19:48 artifact was present in the user's instance, but its 8-target Mixin
+transformation check did not exercise the complete lazy observer initialization.
+The follow-up implements the bounded 32-observer registry, atomic owner registration,
+diagnostic initialization isolation, and full production-composition tests. Read the
+incident document's implementation section for fresh build/test results and the
+separate live-game verification status. Historical runtime failure remains recorded.
+
 For furnace/container arbitration, repeated `OPEN_CONTAINER` /
 `GET_CONTAINER_ITEM` decisions, or `DestroyBlockTask` restart symptoms while a
 smelting command is active, read:
@@ -780,6 +830,11 @@ Audit and active snapshot:
   chatclef-engine-divergence-record.md
 
 Incident analyses:
+  gold-mining-debugging-2026-09-13/README.md (reviewed repair design; evidence and four focused units; documentation only)
+  chatclef-baritone-builder-empty-movements-diagnostics-plan-2026-09-13.md (logging-only implemented; verification record linked)
+  chatclef-gold-mining-tool-loop-auto-deposit-diagnostics-plan-2026-09-13.md (logging-only implemented; verification record linked)
+  chatclef-resource-observation-implementation-2026-09-13.md (logging-only implementation and separate test/build/runtime results)
+  chatclef-diagnostic-observer-capacity-crash-plan-2026-09-13.md (20:19 runtime crash; owner-registration fix and separate verification results)
   chatclef-cooked-beef-entity-path-calculation-investigation.md
   chatclef-post-completion-store-loop-investigation.md
   chatclef-bare-deposit-container-handoff-loop-investigation.md

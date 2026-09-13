@@ -1,5 +1,6 @@
 package lavi.minecraft.fabric.chatclef.bridge.command.diagnostics.crafting.terminal;
 
+import lavi.minecraft.fabric.chatclef.bridge.command.diagnostics.crafting.lifecycle.FabricChatClefCraftResourceDiagnosticLifecycle;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 import lavi.minecraft.diagnostics.crafting.acquisition.scope.IronPickaxeAcquisitionActivation;
 import lavi.minecraft.diagnostics.crafting.acquisition.scope.IronPickaxeAcquisitionScopeBinding;
@@ -41,6 +42,14 @@ public final class FabricChatClefCraftResourceTerminalDiagnostics {
             IronPickaxeAcquisitionActivation activation,
             FabricChatClefCommandContext commandContext
     ) {
+        //20260913_kpopmodder: Serialize passive capture with owner invalidation.
+        FabricChatClefCraftResourceDiagnosticLifecycle.runIfAvailable(() -> observeActivationWhileAvailable(activation, commandContext));
+    }
+
+    private static void observeActivationWhileAvailable(
+            IronPickaxeAcquisitionActivation activation,
+            FabricChatClefCommandContext commandContext
+    ) {
         if (activation == null || activation.binding().isEmpty() || commandContext == null) {
             return;
         }
@@ -72,6 +81,17 @@ public final class FabricChatClefCraftResourceTerminalDiagnostics {
             long clientTick,
             long monotonicNanos
     ) {
+        //20260913_kpopmodder: Serialize passive capture with owner invalidation.
+        FabricChatClefCraftResourceDiagnosticLifecycle.runIfAvailable(() -> recordDetachWhileAvailable(binding, reason, sourceEvent, clientTick, monotonicNanos));
+    }
+
+    private static void recordDetachWhileAvailable(
+            FabricChatClefCraftResourceTerminalScopeBinding binding,
+            String reason,
+            String sourceEvent,
+            long clientTick,
+            long monotonicNanos
+    ) {
         SCOPES.recordFirstTerminalSource(binding.terminalKey(), sourceEvent);
         finish(TERMINALS.recordDetach(
                 binding.terminalKey(), reason, clientTick, monotonicNanos
@@ -85,6 +105,17 @@ public final class FabricChatClefCraftResourceTerminalDiagnostics {
             long clientTick,
             long monotonicNanos
     ) {
+        //20260913_kpopmodder: Serialize passive capture with owner invalidation.
+        FabricChatClefCraftResourceDiagnosticLifecycle.runIfAvailable(() -> recordPrimaryCauseWhileAvailable(binding, cause, sourceEvent, clientTick, monotonicNanos));
+    }
+
+    private static void recordPrimaryCauseWhileAvailable(
+            FabricChatClefCraftResourceTerminalScopeBinding binding,
+            CraftResourcePrimaryTerminationCause cause,
+            String sourceEvent,
+            long clientTick,
+            long monotonicNanos
+    ) {
         SCOPES.recordFirstTerminalSource(binding.terminalKey(), sourceEvent);
         finish(TERMINALS.recordPrimaryCause(
                 binding.terminalKey(), cause, clientTick, monotonicNanos
@@ -92,6 +123,15 @@ public final class FabricChatClefCraftResourceTerminalDiagnostics {
     }
 
     static void recordExceptionEvidence(
+            FabricChatClefCraftResourceTerminalScopeBinding binding,
+            String exceptionType,
+            String exceptionMessage
+    ) {
+        //20260913_kpopmodder: Serialize passive capture with owner invalidation.
+        FabricChatClefCraftResourceDiagnosticLifecycle.runIfAvailable(() -> recordExceptionEvidenceWhileAvailable(binding, exceptionType, exceptionMessage));
+    }
+
+    private static void recordExceptionEvidenceWhileAvailable(
             FabricChatClefCraftResourceTerminalScopeBinding binding,
             String exceptionType,
             String exceptionMessage
@@ -110,6 +150,17 @@ public final class FabricChatClefCraftResourceTerminalDiagnostics {
             long clientTick,
             long monotonicNanos
     ) {
+        //20260913_kpopmodder: Serialize passive capture with owner invalidation.
+        FabricChatClefCraftResourceDiagnosticLifecycle.runIfAvailable(() -> recordOwnedRootCancellationWhileAvailable(binding, terminationKind, sourceEvent, clientTick, monotonicNanos));
+    }
+
+    private static void recordOwnedRootCancellationWhileAvailable(
+            FabricChatClefCraftResourceTerminalScopeBinding binding,
+            String terminationKind,
+            String sourceEvent,
+            long clientTick,
+            long monotonicNanos
+    ) {
         SCOPES.recordFirstTerminalSource(binding.terminalKey(), sourceEvent);
         finish(TERMINALS.recordOwnedRootCancellation(
                 binding.terminalKey(),
@@ -121,6 +172,19 @@ public final class FabricChatClefCraftResourceTerminalDiagnostics {
     }
 
     static void recordTaskFinished(
+            FabricChatClefCraftResourceTerminalScopeBinding binding,
+            CraftResourceTaskFinishMatch match,
+            String terminationKind,
+            boolean timedOut,
+            String sourceEvent,
+            long clientTick,
+            long monotonicNanos
+    ) {
+        //20260913_kpopmodder: Serialize passive capture with owner invalidation.
+        FabricChatClefCraftResourceDiagnosticLifecycle.runIfAvailable(() -> recordTaskFinishedWhileAvailable(binding, match, terminationKind, timedOut, sourceEvent, clientTick, monotonicNanos));
+    }
+
+    private static void recordTaskFinishedWhileAvailable(
             FabricChatClefCraftResourceTerminalScopeBinding binding,
             CraftResourceTaskFinishMatch match,
             String terminationKind,
@@ -153,6 +217,21 @@ public final class FabricChatClefCraftResourceTerminalDiagnostics {
             long clientTick,
             long monotonicNanos
     ) {
+        //20260913_kpopmodder: Serialize passive capture with owner invalidation.
+        FabricChatClefCraftResourceDiagnosticLifecycle.runIfAvailable(() -> recordClassificationWhileAvailable(binding, terminalDecisionReason, resultStatus, resultReason, resultFidelity, conclusion, sourceEvent, clientTick, monotonicNanos));
+    }
+
+    private static void recordClassificationWhileAvailable(
+            FabricChatClefCraftResourceTerminalScopeBinding binding,
+            String terminalDecisionReason,
+            String resultStatus,
+            String resultReason,
+            String resultFidelity,
+            String conclusion,
+            String sourceEvent,
+            long clientTick,
+            long monotonicNanos
+    ) {
         finish(TERMINALS.recordClassification(
                 binding.terminalKey(),
                 terminalDecisionReason,
@@ -166,6 +245,17 @@ public final class FabricChatClefCraftResourceTerminalDiagnostics {
     }
 
     static void recordSend(
+            FabricChatClefCraftResourceTerminalScopeBinding binding,
+            FabricChatClefCraftResourceTerminalSendObservation send,
+            String sourceEvent,
+            long clientTick,
+            long monotonicNanos
+    ) {
+        //20260913_kpopmodder: Serialize passive capture with owner invalidation.
+        FabricChatClefCraftResourceDiagnosticLifecycle.runIfAvailable(() -> recordSendWhileAvailable(binding, send, sourceEvent, clientTick, monotonicNanos));
+    }
+
+    private static void recordSendWhileAvailable(
             FabricChatClefCraftResourceTerminalScopeBinding binding,
             FabricChatClefCraftResourceTerminalSendObservation send,
             String sourceEvent,
@@ -190,12 +280,35 @@ public final class FabricChatClefCraftResourceTerminalDiagnostics {
             long clientTick,
             long monotonicNanos
     ) {
+        //20260913_kpopmodder: Serialize passive capture with owner invalidation.
+        FabricChatClefCraftResourceDiagnosticLifecycle.runIfAvailable(() -> recordLifecycleClearedWhileAvailable(binding, clearKind, sourceEvent, clientTick, monotonicNanos));
+    }
+
+    private static void recordLifecycleClearedWhileAvailable(
+            FabricChatClefCraftResourceTerminalScopeBinding binding,
+            CraftResourceLifecycleClearKind clearKind,
+            String sourceEvent,
+            long clientTick,
+            long monotonicNanos
+    ) {
         finish(TERMINALS.recordLifecycleCleared(
                 binding.terminalKey(), clearKind, clientTick, monotonicNanos
         ), sourceEvent, clientTick, monotonicNanos);
     }
 
     static void recordQueueContextCleared(
+            FabricChatClefCraftResourceTerminalScopeBinding binding,
+            boolean mutationApplied,
+            String unbindReason,
+            String sourceEvent,
+            long clientTick,
+            long monotonicNanos
+    ) {
+        //20260913_kpopmodder: Serialize passive capture with owner invalidation.
+        FabricChatClefCraftResourceDiagnosticLifecycle.runIfAvailable(() -> recordQueueContextClearedWhileAvailable(binding, mutationApplied, unbindReason, sourceEvent, clientTick, monotonicNanos));
+    }
+
+    private static void recordQueueContextClearedWhileAvailable(
             FabricChatClefCraftResourceTerminalScopeBinding binding,
             boolean mutationApplied,
             String unbindReason,
@@ -213,6 +326,11 @@ public final class FabricChatClefCraftResourceTerminalDiagnostics {
     }
 
     public static void observeRetention() {
+        //20260913_kpopmodder: Serialize passive capture with owner invalidation.
+        FabricChatClefCraftResourceDiagnosticLifecycle.runIfAvailable(() -> observeRetentionWhileAvailable());
+    }
+
+    private static void observeRetentionWhileAvailable() {
         if (!ChatClefDiagnostics.isBoundaryEnabled()) {
             return;
         }

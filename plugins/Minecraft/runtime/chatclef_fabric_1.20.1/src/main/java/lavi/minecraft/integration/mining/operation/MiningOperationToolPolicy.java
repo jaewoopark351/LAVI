@@ -3,6 +3,9 @@ package lavi.minecraft.integration.mining.operation;
 import adris.altoclef.AltoClef;
 import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.slots.Slot;
+import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import lavi.minecraft.diagnostics.mining.gold.GoldMiningToolObservers;
+import lavi.minecraft.diagnostics.mining.gold.MiningToolFilterTrace;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.item.Item;
@@ -48,8 +51,12 @@ public final class MiningOperationToolPolicy {
         int missingTargetCount = Math.max(1, targetCount - targetInventoryCount);
         int targetDurabilityReserve = missingTargetCount + RAW_GOLD_TARGET_DURABILITY_MARGIN;
 
-        CandidateSelection targetSelection = selectTargetTool(mod, targetDurabilityReserve);
-        CandidateSelection accessSelection = selectAccessTool(mod);
+        //20260913_kpopmodder: Capture executed filters; never rerun the tool protection policy for diagnostics.
+        MiningToolFilterTrace targetTrace = new MiningToolFilterTrace(ChatClefDiagnostics.isBoundaryEnabled());
+        MiningToolFilterTrace accessTrace = new MiningToolFilterTrace(ChatClefDiagnostics.isBoundaryEnabled());
+        CandidateSelection targetSelection = selectTargetTool(mod, targetDurabilityReserve, targetTrace);
+        CandidateSelection accessSelection = selectAccessTool(mod, accessTrace);
+        GoldMiningToolObservers.policyEvaluated(mod, targetTrace, accessTrace);
 
         return new MiningOperationToolState(
                 operationType,
@@ -74,14 +81,15 @@ public final class MiningOperationToolPolicy {
                 && targetCount == other.targetCount;
     }
 
-    private CandidateSelection selectTargetTool(AltoClef mod, int targetDurabilityReserve) {
+    private CandidateSelection selectTargetTool(AltoClef mod, int targetDurabilityReserve, MiningToolFilterTrace trace) {
         CandidateSelection selection = new CandidateSelection();
         for (Slot slot : Slot.getCurrentScreenSlots()) {
             if (!isPlayerInventorySlot(slot)) {
+                trace.nonPlayerSlot();
                 continue;
             }
             ItemStack stack = StorageHelper.getItemStackInSlot(slot);
-            if (!isTargetTool(mod, stack, targetDurabilityReserve)) {
+            if (!isTargetTool(mod, stack, targetDurabilityReserve, trace)) {
                 continue;
             }
             selection.accept(new MiningToolCandidate(slot, stack, remainingDurability(stack), isHotbarSlot(slot)));
@@ -89,14 +97,15 @@ public final class MiningOperationToolPolicy {
         return selection;
     }
 
-    private CandidateSelection selectAccessTool(AltoClef mod) {
+    private CandidateSelection selectAccessTool(AltoClef mod, MiningToolFilterTrace trace) {
         CandidateSelection selection = new CandidateSelection();
         for (Slot slot : Slot.getCurrentScreenSlots()) {
             if (!isPlayerInventorySlot(slot)) {
+                trace.nonPlayerSlot();
                 continue;
             }
             ItemStack stack = StorageHelper.getItemStackInSlot(slot);
-            if (!isAccessTool(mod, stack)) {
+            if (!isAccessTool(mod, stack, trace)) {
                 continue;
             }
             selection.accept(new MiningToolCandidate(slot, stack, remainingDurability(stack), isHotbarSlot(slot)));
@@ -104,31 +113,41 @@ public final class MiningOperationToolPolicy {
         return selection;
     }
 
-    private boolean isTargetTool(AltoClef mod, ItemStack stack, int targetDurabilityReserve) {
+    private boolean isTargetTool(AltoClef mod, ItemStack stack, int targetDurabilityReserve, MiningToolFilterTrace trace) {
         Item item = stack.getItem();
         if (item != Items.IRON_PICKAXE && item != Items.DIAMOND_PICKAXE && item != Items.NETHERITE_PICKAXE) {
+            trace.wrongKind();
             return false;
         }
         if (!item.getDefaultStack().isSuitableFor(targetToolProbeState)) {
+            trace.unsuitable();
             return false;
         }
         if (StorageHelper.shouldSaveStack(mod, targetToolProbeState.getBlock(), stack)) {
+            trace.savedByPolicy();
             return false;
         }
-        return remainingDurability(stack) >= targetDurabilityReserve;
+        boolean durableEnough = remainingDurability(stack) >= targetDurabilityReserve;
+        trace.durability(durableEnough);
+        return durableEnough;
     }
 
-    private boolean isAccessTool(AltoClef mod, ItemStack stack) {
+    private boolean isAccessTool(AltoClef mod, ItemStack stack, MiningToolFilterTrace trace) {
         if (stack.getItem() != Items.STONE_PICKAXE) {
+            trace.wrongKind();
             return false;
         }
         if (!stack.getItem().getDefaultStack().isSuitableFor(accessToolProbeState)) {
+            trace.unsuitable();
             return false;
         }
         if (StorageHelper.shouldSaveStack(mod, accessToolProbeState.getBlock(), stack)) {
+            trace.savedByPolicy();
             return false;
         }
-        return remainingDurability(stack) >= ACCESS_PICKAXE_MIN_REMAINING_DURABILITY;
+        boolean durableEnough = remainingDurability(stack) >= ACCESS_PICKAXE_MIN_REMAINING_DURABILITY;
+        trace.durability(durableEnough);
+        return durableEnough;
     }
 
     private boolean isPlayerInventorySlot(Slot slot) {

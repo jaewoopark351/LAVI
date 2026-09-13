@@ -1,5 +1,6 @@
 package lavi.minecraft.fabric.chatclef.bridge.command.diagnostics.crafting.association;
 
+import lavi.minecraft.fabric.chatclef.bridge.command.diagnostics.crafting.lifecycle.FabricChatClefCraftResourceDiagnosticLifecycle;
 import lavi.minecraft.diagnostics.crafting.acquisition.association.CraftResourceAssociationDiagnosticsRegistry;
 import lavi.minecraft.diagnostics.crafting.acquisition.association.CraftResourceAssociationLedgerSnapshot;
 import lavi.minecraft.diagnostics.crafting.acquisition.association.CraftResourceAssociationStatus;
@@ -17,12 +18,25 @@ public final class FabricChatClefCraftResourceAssociationScopeDiagnostics {
     }
 
     public static void observeActivation(IronPickaxeAcquisitionActivation activation) {
+        //20260913_kpopmodder: Serialize passive capture with owner invalidation.
+        FabricChatClefCraftResourceDiagnosticLifecycle.runIfAvailable(() -> observeActivationWhileAvailable(activation));
+    }
+
+    private static void observeActivationWhileAvailable(IronPickaxeAcquisitionActivation activation) {
         if (activation != null && activation.binding().isPresent()) {
             REGISTRY.activate(activation.binding().get().key());
         }
     }
 
     public static void observeClassification(
+            IronPickaxeAcquisitionScopeKey key,
+            CraftResourceAssociationStatus status
+    ) {
+        //20260913_kpopmodder: Serialize passive capture with owner invalidation.
+        FabricChatClefCraftResourceDiagnosticLifecycle.runIfAvailable(() -> observeClassificationWhileAvailable(key, status));
+    }
+
+    private static void observeClassificationWhileAvailable(
             IronPickaxeAcquisitionScopeKey key,
             CraftResourceAssociationStatus status
     ) {
@@ -36,6 +50,14 @@ public final class FabricChatClefCraftResourceAssociationScopeDiagnostics {
     }
 
     public static void observeObservationGap(
+            IronPickaxeAcquisitionScopeKey key,
+            String boundary,
+            String reason) {
+        //20260913_kpopmodder: Serialize passive capture with owner invalidation.
+        FabricChatClefCraftResourceDiagnosticLifecycle.runIfAvailable(() -> observeObservationGapWhileAvailable(key, boundary, reason));
+    }
+
+    private static void observeObservationGapWhileAvailable(
             IronPickaxeAcquisitionScopeKey key,
             String boundary,
             String reason) {

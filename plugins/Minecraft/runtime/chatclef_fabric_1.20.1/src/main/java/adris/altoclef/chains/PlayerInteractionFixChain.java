@@ -14,6 +14,10 @@ import baritone.api.utils.Rotation;
 import baritone.api.utils.input.Input;
 import lavi.minecraft.diagnostics.ChatClefDiagnostics;
 import lavi.minecraft.diagnostics.toolselect.ToolEquipDiagnostics;
+import lavi.minecraft.diagnostics.toolselect.call.ToolEquipDiagnosticCall;
+//#if MC == 12001
+import lavi.minecraft.integration.toolselect.equip.execution.ExactToolEquipController;
+//#endif
 import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.ChatScreen;
@@ -27,6 +31,10 @@ import net.minecraft.screen.slot.SlotActionType;
 import java.util.Optional;
 
 public class PlayerInteractionFixChain extends TaskChain {
+    //#if MC == 12001
+    //20260913_kpopmodder: Preserve the chosen source through one operation-owned exact equip attempt.
+    private final ExactToolEquipController exactTools = new ExactToolEquipController();
+    //#endif
     private final TimerGame stackHeldTimeout = new TimerGame(1);
     private final TimerGame generalDuctTapeSwapTimeout = new TimerGame(30);
     private final TimerGame shiftDepressTimeout = new TimerGame(10);
@@ -63,6 +71,9 @@ public class PlayerInteractionFixChain extends TaskChain {
         }
 
         AltoClef mod = AltoClef.getInstance();
+        //#if MC == 12001
+        exactTools.onPriorityEvaluation(mod);
+        //#endif
         ChatClefDiagnostics.logEvent("PLAYER_INTERACTION_FIX_CHAIN", "PRIORITY_BEGIN", "getPriority_begin", null,
                 "userTaskChainActive", ChatClefDiagnostics.safeValue(() -> mod.getUserTaskChain().isActive()),
                 "isBreakingBlock", ChatClefDiagnostics.safeValue(() -> mod.getControllerExtras().isBreakingBlock()));
@@ -80,10 +91,10 @@ public class PlayerInteractionFixChain extends TaskChain {
                 // if baritone is running, only accept tools OUTSIDE OF HOTBAR!
                 // Baritone will take care of tools inside the hotbar.
                 if (bestToolSlot.isEmpty()) {
-                    ToolEquipDiagnostics.logSelectionDecision(mod, targetPos, state, currentEquipped, currentStack, null, null, "NO_CANDIDATE");
+                    ToolEquipDiagnosticCall.selection(() -> ToolEquipDiagnostics.logSelectionDecision(mod, targetPos, state, currentEquipped, currentStack, null, null, "NO_CANDIDATE"));
                 } else if (bestToolSlot.get().equals(currentEquipped)) {
-                    ToolEquipDiagnostics.logSelectionDecision(mod, targetPos, state, currentEquipped, currentStack, bestToolSlot.get(),
-                            StorageHelper.getItemStackInSlot(bestToolSlot.get()).copy(), "ALREADY_SELECTED_SLOT");
+                    ToolEquipDiagnosticCall.selection(() -> ToolEquipDiagnostics.logSelectionDecision(mod, targetPos, state, currentEquipped, currentStack, bestToolSlot.get(),
+                            StorageHelper.getItemStackInSlot(bestToolSlot.get()).copy(), "ALREADY_SELECTED_SLOT"));
                 } else {
                     Slot selectedBestToolSlot = bestToolSlot.get();
                     ItemStack selectedBestToolStack = StorageHelper.getItemStackInSlot(selectedBestToolSlot).copy();
@@ -94,23 +105,27 @@ public class PlayerInteractionFixChain extends TaskChain {
                         boolean isAllowedToManage = (!baritonePathing ||
                                 selectedBestToolSlot.getInventorySlot() >= 9) && !foodChainEating;
                         if (isAllowedToManage) {
-                            long equipAttemptId = ToolEquipDiagnostics.logSelectionDecision(mod, targetPos, state, currentEquipped, currentStack,
-                                    selectedBestToolSlot, selectedBestToolStack, "EQUIP_REQUEST");
+                            long equipAttemptId = ToolEquipDiagnosticCall.selection(() -> ToolEquipDiagnostics.logSelectionDecision(mod, targetPos, state, currentEquipped, currentStack,
+                                    selectedBestToolSlot, selectedBestToolStack, "EQUIP_REQUEST"));
                             Debug.logMessage("Found better tool in inventory, equipping.");
                             ChatClefDiagnostics.logEvent("PLAYER_INTERACTION_FIX_CHAIN", "SIDE_EFFECT", "force_equip_better_tool", null,
                                     "equipAttemptId", equipAttemptId,
                                     "bestToolSlot", selectedBestToolSlot,
                                     "currentEquipped", currentEquipped,
                                     "baritonePathing", ChatClefDiagnostics.safeValue(() -> mod.getClientBaritone().getPathingBehavior().isPathing()));
-                            Item bestToolItem = selectedBestToolStack.getItem();
-                            mod.getSlotHandler().forceEquipItem(bestToolItem, equipAttemptId, selectedBestToolSlot, selectedBestToolStack);
+                            //#if MC == 12001
+                            exactTools.equip(mod, selectedBestToolSlot, selectedBestToolStack, targetPos, state);
+                            //#else
+                            //$$ Item bestToolItem = selectedBestToolStack.getItem();
+                            //$$ mod.getSlotHandler().forceEquipItem(bestToolItem, equipAttemptId, selectedBestToolSlot, selectedBestToolStack);
+                            //#endif
                         } else {
-                            ToolEquipDiagnostics.logSelectionDecision(mod, targetPos, state, currentEquipped, currentStack,
-                                    selectedBestToolSlot, selectedBestToolStack, foodChainEating ? "SKIP_EATING" : "SKIP_BARITONE_HOTBAR");
+                            ToolEquipDiagnosticCall.selection(() -> ToolEquipDiagnostics.logSelectionDecision(mod, targetPos, state, currentEquipped, currentStack,
+                                    selectedBestToolSlot, selectedBestToolStack, foodChainEating ? "SKIP_EATING" : "SKIP_BARITONE_HOTBAR"));
                         }
                     } else {
-                        ToolEquipDiagnostics.logSelectionDecision(mod, targetPos, state, currentEquipped, currentStack,
-                                selectedBestToolSlot, selectedBestToolStack, "SAME_ITEM_TYPE_SKIP");
+                        ToolEquipDiagnosticCall.selection(() -> ToolEquipDiagnostics.logSelectionDecision(mod, targetPos, state, currentEquipped, currentStack,
+                                selectedBestToolSlot, selectedBestToolStack, "SAME_ITEM_TYPE_SKIP"));
                     }
                 }
             }

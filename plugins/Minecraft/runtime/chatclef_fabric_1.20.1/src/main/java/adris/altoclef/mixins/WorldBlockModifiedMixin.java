@@ -26,6 +26,13 @@ public class WorldBlockModifiedMixin {
             at = @At("HEAD")
     )
     public void onBlockWasChanged(BlockPos pos, BlockState oldBlock, BlockState newBlock, CallbackInfo ci) {
+        //#if MC == 12001
+        //20260913_kpopmodder: Preserve exact protection types when client-side block states change between partition ticks.
+        if (MinecraftClient.getInstance().isOnThread() && (Object) this == MinecraftClient.getInstance().world
+                && adris.altoclef.AltoClef.getInstance() != null) {
+            adris.altoclef.AltoClef.getInstance().onUserProtectionBlockChanged((World) (Object) this, pos, newBlock);
+        }
+        //#endif
         boolean oldHasBlock = hasBlock(oldBlock, pos);
         boolean newHasBlock = hasBlock(newBlock, pos);
         if (ChatClefDiagnostics.isVerboseEnabled()) {

@@ -170,6 +170,6 @@ class DiagnosticEmissionCoordinatorTest {
         assertEquals(1, cap.admittedRequests());
         assertEquals(0, cap.emissionPending());
         assertEquals(1, cap.emissionFailedAfterAdmission());
-        assertEquals(4_937, authority.snapshot().admittedSlots());
+        assertEquals(DiagnosticSessionLimits.ORDINARY_CEILING + 1, authority.snapshot().admittedSlots());
     }
 }

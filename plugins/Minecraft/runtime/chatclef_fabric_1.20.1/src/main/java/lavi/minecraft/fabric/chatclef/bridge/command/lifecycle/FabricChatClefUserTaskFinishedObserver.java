@@ -9,12 +9,22 @@ import lavi.minecraft.fabric.chatclef.bridge.diagnostics.FabricChatClefBridgeDia
 
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
+//#if MC == 12001
+import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.observation.queue.CompletionObservationQueue;
+//#endif
 
 //20260803_kpopmodder: Queue user task finish observations outside the WebSocket transport path.
 public final class FabricChatClefUserTaskFinishedObserver {
     private final FabricChatClefBridgeDiagnostics diagnostics;
     private final FabricChatClefTaskStateReader taskStateReader;
-    private final ConcurrentLinkedQueue<FabricChatClefCommandTerminationObservation> observations = new ConcurrentLinkedQueue<>();
+    //#if MC == 12001
+    //20260913_kpopmodder: Keep a finite completion prefix independent of the diagnostic sequence.
+    private final CompletionObservationQueue<FabricChatClefCommandTerminationObservation> observations = new CompletionObservationQueue<>();
+    public long acceptedThrough() { return observations.acceptedThrough(); }
+    public long dequeuedThrough() { return observations.dequeuedThrough(); }
+    //#else
+    //$$ private final ConcurrentLinkedQueue<FabricChatClefCommandTerminationObservation> observations = new ConcurrentLinkedQueue<>();
+    //#endif
     private final AtomicBoolean registered = new AtomicBoolean(false);
     private Subscription<TaskFinishedEvent> subscription;
 

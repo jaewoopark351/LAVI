@@ -1,0 +1,53 @@
+//20260914_kpopmodder: Compile shared focused tests without the preprocessor's cross-version test task dependencies.
+gradle.projectsEvaluated {
+    def target = gradle.rootProject.findProject(':1.20.1')
+    if (target == null) throw new GradleException('Missing approved 1.20.1 project')
+    def patterns = [
+        'lavi/minecraft/integration/toolselect/**',
+        'lavi/minecraft/integration/mining/**',
+        'lavi/minecraft/blocks/scanner/**',
+        'lavi/minecraft/blocks/protection/**',
+        'lavi/minecraft/integration/lifecycle/root/**',
+        'lavi/minecraft/fabric/chatclef/bridge/command/**',
+        'lavi/minecraft/diagnostics/toolselect/**',
+        'lavi/minecraft/diagnostics/blocks/**',
+        'lavi/minecraft/diagnostics/session/**',
+        'lavi/minecraft/diagnostics/container/store/deposit/support/**',
+        'lavi/minecraft/testsupport/**',
+        'lavi/minecraft/task/container/deposit/auto/pressure/**'
+    ]
+    def selected = target.fileTree(gradle.rootProject.file('src/test/java')) { include patterns }
+    def runner = gradle.rootProject.file('src/test/goldMining/java/lavi/minecraft/test/GoldFocusedTestRunner.java')
+    def output = new File(target.layout.buildDirectory.get().asFile, 'gold-focused/classes')
+    target.tasks.register('goldCompileTests', JavaCompile) {
+        dependsOn target.tasks.named('compileJava'), target.tasks.named('processResources')
+        source selected, runner
+        // Resolve JARs as files; never import another version's SourceSet task dependencies.
+        classpath = target.files(target.sourceSets.main.output.classesDirs.files,
+                target.sourceSets.main.output.resourcesDir, target.configurations.testCompileClasspath.files,
+                target.configurations.testRuntimeClasspath.files)
+        destinationDirectory.set(output)
+        options.release.set(17)
+        options.encoding = 'UTF-8'
+        options.compilerArgs += ['-proc:none', '-implicit:none']
+    }
+    target.tasks.register('goldFocusedTests', JavaExec) {
+        dependsOn target.tasks.named('goldCompileTests')
+        classpath = target.files(output, target.sourceSets.main.output.classesDirs.files,
+                target.sourceSets.main.output.resourcesDir, target.configurations.testRuntimeClasspath.files)
+        mainClass.set('lavi.minecraft.test.GoldFocusedTestRunner')
+        systemProperty 'user.dir', gradle.rootProject.projectDir.absolutePath
+        def isolatedTemp = new File(target.layout.buildDirectory.get().asFile, 'gold-test-temp')
+        systemProperty 'java.io.tmpdir', isolatedTemp.absolutePath
+        doFirst {
+            isolatedTemp.mkdirs()
+            def names = selected.files.findAll { it.name ==~ /.*Tests?\.java/ }.collect { source ->
+                def match = source.getText('UTF-8') =~ /(?m)^package\s+([^;]+);/
+                if (!match.find()) throw new GradleException('Missing test package: ' + source)
+                match.group(1) + '.' + source.name.replaceFirst(/\.java$/, '')
+            }.unique().sort()
+            if (names.empty) throw new GradleException('No focused tests selected')
+            args names
+        }
+    }
+}

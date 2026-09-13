@@ -26,8 +26,8 @@ class DiagnosticSessionAdmissionAuthorityTest {
         assertEquals(DiagnosticCapTrigger.ORDINARY_CEILING_RESERVE_ACTIVE,
                 firstRejected.newlyClaimedCapTrigger());
         assertNotNull(firstRejected.canonicalCapToken());
-        assertEquals(4_937, firstRejected.snapshot().admittedSlots());
-        assertEquals(4_936, firstRejected.snapshot().ordinarySlotsUsed());
+        assertEquals(DiagnosticSessionLimits.ORDINARY_CEILING + 1, firstRejected.snapshot().admittedSlots());
+        assertEquals(DiagnosticSessionLimits.ORDINARY_CEILING, firstRejected.snapshot().ordinarySlotsUsed());
         assertEquals(1, firstRejected.snapshot().criticalSlotsUsed());
 
         for (int index = 0; index < 1_000; index++) {
@@ -74,7 +74,7 @@ class DiagnosticSessionAdmissionAuthorityTest {
         assertTrue(finalSnapshot.admitted());
         assertEquals(DiagnosticEventFamily.FINAL_SNAPSHOT, finalSnapshot.token().family());
         assertEquals(5_000, finalSnapshot.snapshot().admittedSlots());
-        assertEquals(64, finalSnapshot.snapshot().criticalSlotsUsed());
+        assertEquals(DiagnosticSessionLimits.CRITICAL_RESERVE, finalSnapshot.snapshot().criticalSlotsUsed());
         assertEquals(0, finalSnapshot.snapshot().criticalReserveRemaining());
 
         DiagnosticAdmissionDecision repeatedFinalSnapshot = authority.admitFinalSnapshot(true);
@@ -152,6 +152,18 @@ class DiagnosticSessionAdmissionAuthorityTest {
         admitTimes(authority, DiagnosticEventFamily.AGGREGATE_CHECKPOINT, 8);
         admitTimes(authority, DiagnosticEventFamily.NON_STORE_TERMINAL, 8);
         admitTimes(authority, DiagnosticEventFamily.SUPPRESSION_CONTROL, 6);
+        admitTimes(authority, DiagnosticEventFamily.RESOURCE_MINING_FIRST, 128);
+        admitTimes(authority, DiagnosticEventFamily.RESOURCE_DEPOSIT_FIRST, 128);
+        admitTimes(authority, DiagnosticEventFamily.RESOURCE_BUILDER_FIRST, 128);
+        admitTimes(authority, DiagnosticEventFamily.RESOURCE_OBSERVATION_TERMINAL, 12);
+        admitTimes(authority, DiagnosticEventFamily.RESOURCE_MINING_SUMMARY, 128);
+        admitTimes(authority, DiagnosticEventFamily.RESOURCE_DEPOSIT_SUMMARY, 128);
+        admitTimes(authority, DiagnosticEventFamily.RESOURCE_BUILDER_SUMMARY, 128);
+        admitTimes(authority, DiagnosticEventFamily.BLOCK_COLLECTION_FIRST, 64);
+        admitTimes(authority, DiagnosticEventFamily.BLOCK_COLLECTION_SUMMARY, 32);
+        admitTimes(authority, DiagnosticEventFamily.TOOL_EQUIP_FIRST, 128);
+        admitTimes(authority, DiagnosticEventFamily.TOOL_PLACEMENT_TERMINAL, 4);
+        admitTimes(authority, DiagnosticEventFamily.BLOCK_PROTECTION_BOUNDARY, 64);
     }
 
     private static void admitTimes(DiagnosticSessionAdmissionAuthority authority,

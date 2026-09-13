@@ -12,6 +12,8 @@ import lavi.minecraft.task.container.deposit.auto.pressure.AutoDepositInventoryP
 import lavi.minecraft.task.container.home.execution.StoreHomeTask;
 import lavi.minecraft.testsupport.HeadlessMinecraftClientSession;
 import lavi.minecraft.testsupport.TestObjects;
+import lavi.minecraft.diagnostics.ChatClefDiagnostics;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
@@ -20,9 +22,48 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 //20260831_kpopmodder: Prove the 32-to-33 main-slot boundary through the production pressure callback.
 class DepositAllInventoryPressureBoundaryIntegrationTest {
+
+    @AfterEach
+    void resetDiagnosticSession() {
+        ChatClefDiagnostics.setBoundaryEnabled(false);
+        ChatClefDiagnostics.resetDiagnosticSessionForTests();
+    }
+
+    //20260913_kpopmodder: Diagnostics must not perform a skipped inventory read or consume its original failure.
+    @Test
+    void diagnosticsPreservePressureReadCountsAndExceptions() {
+        for (boolean enabled : new boolean[]{false, true}) {
+            ChatClefDiagnostics.setBoundaryEnabled(enabled);
+            try (HeadlessMinecraftClientSession ignored = HeadlessMinecraftClientSession.inGame()) {
+                TestAltoClef mod = new TestAltoClef();
+                TaskRunner runner = new TaskRunner(mod);
+                UserTaskChain user = new UserTaskChain(runner);
+                AICommandBridge bridge = TestObjects.allocate(AICommandBridge.class);
+                mod.runner = runner;
+                mod.user = user;
+                mod.bridge = bridge;
+                MutablePressureSource source = new MutablePressureSource(32);
+                DepositAllInventoryPressureChain pressure = pressureChain(runner, source);
+
+                bridge.setEnabled(false);
+                pressure.onEndClientTick();
+                assertEquals(0, source.readCalls);
+                bridge.setEnabled(true);
+                pressure.onEndClientTick();
+                assertEquals(1, source.readCalls);
+                assertEquals(DepositAllInventoryPressureState.ARMED, stateMachine(pressure).state());
+
+                source.failRead = true;
+                assertThrows(IllegalStateException.class, pressure::onEndClientTick);
+                assertEquals(2, source.readCalls);
+                assertEquals(DepositAllInventoryPressureState.ARMED, stateMachine(pressure).state());
+            }
+        }
+    }
 
     @Test
     void thirtyTwoSlotsStayArmedAndThirtyThreeSuppressAgainstStoreHome() {
@@ -108,6 +149,8 @@ class DepositAllInventoryPressureBoundaryIntegrationTest {
     private static final class MutablePressureSource
             implements AutoDepositInventoryPressureSource {
         private DepositAllInventoryPressureSnapshot snapshot;
+        private int readCalls;
+        private boolean failRead;
 
         private MutablePressureSource(int occupiedSlots) {
             setOccupiedSlots(occupiedSlots);
@@ -119,6 +162,8 @@ class DepositAllInventoryPressureBoundaryIntegrationTest {
 
         @Override
         public Optional<DepositAllInventoryPressureSnapshot> read(AltoClef mod) {
+            readCalls++;
+            if (failRead) throw new IllegalStateException("original pressure read failure");
             return Optional.of(snapshot);
         }
     }

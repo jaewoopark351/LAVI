@@ -20,6 +20,8 @@ import lavi.minecraft.fabric.chatclef.bridge.command.result.effect.FabricChatCle
 import java.util.function.Function;
 //#if MC == 12001
 import lavi.minecraft.fabric.chatclef.bridge.command.result.gotoresult.GotoCommandResultTracker;
+import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.root.state.RootTerminationState;
+import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.root.capture.UserRootSnapshot;
 //#endif
 
 //20260804_kpopmodder: Keep mutable ChatClef command execution state out of result orchestration.
@@ -45,6 +47,7 @@ final class FabricChatClefCommandExecutionState {
     private volatile Task boundRootTask;
     //#if MC == 12001
     private final GotoCommandResultTracker gotoResultTracker = new GotoCommandResultTracker();
+    private final RootTerminationState rootTermination = new RootTerminationState();
     //#endif
     private volatile FabricChatClefTaskOwnershipEvidence taskAfterDispatchEvidence;
     private volatile FabricChatClefRootOwnershipClassification rootOwnershipClassification =
@@ -161,9 +164,25 @@ final class FabricChatClefCommandExecutionState {
 
     //#if MC == 12001
     GotoCommandResultTracker gotoResultTracker() { return gotoResultTracker; }
+    RootTerminationState rootTermination() { return rootTermination; }
+    Task boundRootReference() { return boundRootTask; }
+    void bindRootLifetime(UserRootSnapshot snapshot) {
+        //20260913_kpopmodder: GOTO retains its existing task result owner and lifecycle projection.
+        String command = normalizedCommand == null ? "" : normalizedCommand.trim();
+        if (command.startsWith("@")) command = command.substring(1);
+        if (command.equalsIgnoreCase("goto") || command.regionMatches(true, 0, "goto ", 0, 5)
+                || gotoResultTracker.hasBinding()) return;
+        rootTermination.bind(snapshot, boundRootTask);
+    }
     //#endif
 
     void markTaskFinishedObservation(FabricChatClefCommandTerminationObservation observation) {
+        //#if MC == 12001
+        //20260913_kpopmodder: Do not overwrite a valid completion with a delayed event from another lifetime.
+        if (rootTermination.bound() && (observation == null
+                || !rootTermination.accepts(observation.task(), observation.rootLifetime())
+                || taskFinishedObservation != null)) return;
+        //#endif
         taskFinishedObservation = observation;
         if (observation != null) {
             terminalTask = FabricChatClefTaskSnapshot.capture(observation.task());

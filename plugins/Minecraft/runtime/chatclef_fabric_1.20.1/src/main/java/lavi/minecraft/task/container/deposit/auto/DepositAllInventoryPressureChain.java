@@ -8,6 +8,7 @@ import adris.altoclef.tasksystem.TaskChain;
 import adris.altoclef.tasksystem.TaskRunner;
 import adris.altoclef.util.ItemTarget;
 import lavi.minecraft.diagnostics.container.store.deposit.StoreDepositDiagnostics;
+import lavi.minecraft.diagnostics.container.store.deposit.pressure.AutoDepositPressureObserver;
 import lavi.minecraft.task.container.deposit.auto.composition.DepositAllInventoryPressureChainPreparation;
 import lavi.minecraft.task.container.deposit.auto.maintenance.AutoDepositMaintenanceTask;
 import lavi.minecraft.task.container.deposit.auto.policy.AutoDepositDecisionFingerprint;
@@ -45,6 +46,8 @@ public final class DepositAllInventoryPressureChain extends SingleTaskChain {
     private long waitingTrustedRevision;
     private long activeRunTrustedRevision = -1L;
     private Task activeDiagnosticMaintenanceTask;
+    //20260913_kpopmodder: Keep passive pressure decisions separate from orchestration and policy ownership.
+    private final AutoDepositPressureObserver pressureDiagnostics = new AutoDepositPressureObserver();
 
     public DepositAllInventoryPressureChain(TaskRunner runner) {
         this(DepositAllInventoryPressureChainPreparation.prepare(
@@ -111,14 +114,21 @@ public final class DepositAllInventoryPressureChain extends SingleTaskChain {
     }
 
     public void onEndClientTick() {
+        pressureDiagnostics.begin(stateMachine.state(), stateMachine.diagnosticThresholdPending(), mainTask);
         if (!AltoClef.inGame()) {
+            pressureDiagnostics.value("inGame", false);
             stopOwnedRun("left_game", null);
+            pressureDiagnostics.decision("left_game", stateMachine.state(), stateMachine.diagnosticThresholdPending());
             return;
         }
+        pressureDiagnostics.value("inGame", true);
         if (!mod.getAiBridge().getEnabled()) {
+            pressureDiagnostics.value("bridgeEnabled", false);
             stopOwnedRun("chatclef_disabled", null);
+            pressureDiagnostics.decision("chatclef_disabled", stateMachine.state(), stateMachine.diagnosticThresholdPending());
             return;
         }
+        pressureDiagnostics.value("bridgeEnabled", true);
         if (stateMachine.state() == DepositAllInventoryPressureState.RUNNING) {
             if (mainTask == null) {
                 if (activeDiagnosticMaintenanceTask != null) {
@@ -130,30 +140,43 @@ public final class DepositAllInventoryPressureChain extends SingleTaskChain {
                 }
                 transitionRunToWaiting("running_task_missing", currentSnapshot(), null);
             }
+            pressureDiagnostics.decision(mainTask == null ? "running_task_missing" : "already_running",
+                    stateMachine.state(), stateMachine.diagnosticThresholdPending());
             return;
         }
 
         Optional<DepositAllInventoryPressureSnapshot> snapshotOptional = pressureSource.read(mod);
         if (snapshotOptional.isEmpty()) {
+            pressureDiagnostics.pressure(null);
+            pressureDiagnostics.decision("pressure_read_unavailable", stateMachine.state(), stateMachine.diagnosticThresholdPending());
             return;
         }
         DepositAllInventoryPressureSnapshot snapshot = snapshotOptional.get();
+        pressureDiagnostics.pressure(snapshot);
 
         if (snapshot.isAtOrBelowLowWater()) {
+            pressureDiagnostics.value("lowWaterReached", true);
             clearDeferredFingerprint();
             clearNoSafeContext();
             observeLowWater(snapshot);
+            pressureDiagnostics.decision("inventory_at_or_below_low_water", stateMachine.state(), stateMachine.diagnosticThresholdPending());
             return;
         }
+        pressureDiagnostics.value("lowWaterReached", false);
 
         if (stateMachine.state() == DepositAllInventoryPressureState.WAIT_FOR_REARM) {
             long currentTrustedRevision = trustedRepository.revision();
+            pressureDiagnostics.value("trustedRevisionChanged", currentTrustedRevision != waitingTrustedRevision);
+            pressureDiagnostics.value("waitingTrustedRevision", waitingTrustedRevision);
+            pressureDiagnostics.value("currentTrustedRevision", currentTrustedRevision);
             if (currentTrustedRevision != waitingTrustedRevision
                     && stateMachine.observeExplicitPolicyChange()
                     == DepositAllInventoryPressureSignal.MEANINGFUL_CHANGE) {
                 waitingTrustedRevision = currentTrustedRevision;
                 clearDeferredFingerprint();
                 clearNoSafeContext();
+                pressureDiagnostics.transition(DepositAllInventoryPressureState.WAIT_FOR_REARM,
+                        stateMachine.state(), "trusted_registry_changed", null, currentTrustedRevision);
                 DepositAllAutoDiagnostics.logMeaningfulReevaluation(
                         snapshot, currentUserTaskRoot()
                 );
@@ -162,25 +185,37 @@ public final class DepositAllInventoryPressureChain extends SingleTaskChain {
 
         if (stateMachine.state() == DepositAllInventoryPressureState.NO_SAFE_SURPLUS_WAIT) {
             if (!snapshot.isAtOrAboveThreshold()) {
+                pressureDiagnostics.value("thresholdReached", false);
+                pressureDiagnostics.decision("no_safe_wait_below_threshold", stateMachine.state(), stateMachine.diagnosticThresholdPending());
                 return;
             }
+            pressureDiagnostics.value("thresholdReached", true);
             AutoDepositDecisionFingerprint current = policyEngine.captureDecisionFingerprint(
                     mod, snapshot, lastNoSafeWorkingSet, lastNoSafeEpoch
             );
             if (stateMachine.observeMeaningfulChange(current)
                     != DepositAllInventoryPressureSignal.MEANINGFUL_CHANGE) {
+                pressureDiagnostics.value("fingerprintChanged", false);
+                pressureDiagnostics.decision("no_safe_fingerprint_unchanged", stateMachine.state(), stateMachine.diagnosticThresholdPending());
                 return;
             }
+            pressureDiagnostics.value("fingerprintChanged", true);
             Task root = currentUserTaskRoot();
+            pressureDiagnostics.transition(DepositAllInventoryPressureState.NO_SAFE_SURPLUS_WAIT,
+                    stateMachine.state(), "semantic_fingerprint_changed", root, waitingTrustedRevision);
             clearNoSafeContext();
             DepositAllAutoDiagnostics.logMeaningfulReevaluation(snapshot, root);
         }
 
         if (!snapshot.isAtOrAboveThreshold()) {
+            pressureDiagnostics.value("thresholdReached", false);
             stateMachine.observe(snapshot);
+            pressureDiagnostics.decision("below_threshold", stateMachine.state(), stateMachine.diagnosticThresholdPending());
             return;
         }
+        pressureDiagnostics.value("thresholdReached", true);
         if (stateMachine.state() != DepositAllInventoryPressureState.ARMED) {
+            pressureDiagnostics.decision("waiting_for_rearm", stateMachine.state(), stateMachine.diagnosticThresholdPending());
             return;
         }
 
@@ -190,12 +225,15 @@ public final class DepositAllInventoryPressureChain extends SingleTaskChain {
                 : userTaskChain.getCurrentTask();
         boolean activeUserTask = userTaskRoot != null
                 && !userTaskChain.isRunningIdleTask();
+        pressureDiagnostics.value("activeUserTask", activeUserTask);
 
         if (suppressExistingStoreHome(snapshot, userTaskChain, userTaskRoot)) {
+            pressureDiagnostics.decision("existing_store_home_task", stateMachine.state(), stateMachine.diagnosticThresholdPending());
             return;
         }
 
         if (activeUserTask && runner.getCurrentTaskChain() != userTaskChain) {
+            pressureDiagnostics.value("cachedUserChainSelected", false);
             latchNoSafe(
                     "user_task_chain_not_selected",
                     snapshot,
@@ -204,20 +242,26 @@ public final class DepositAllInventoryPressureChain extends SingleTaskChain {
                     null,
                     0L
             );
+            pressureDiagnostics.decision("user_task_chain_not_selected", stateMachine.state(), stateMachine.diagnosticThresholdPending());
             return;
         }
+        pressureDiagnostics.value("cachedUserChainSelected", activeUserTask ? true : "NOT_EVALUATED");
 
         if (conflictGuard.hasExistingDepositTask(userTaskRoot)) {
+            pressureDiagnostics.value("existingDepositTask", true);
             DepositAllInventoryPressureSignal signal = stateMachine.observe(snapshot);
             if (signal == DepositAllInventoryPressureSignal.THRESHOLD_REACHED) {
                 transitionArmedToWaiting("existing_deposit_task", snapshot, userTaskRoot);
             }
+            pressureDiagnostics.decision("existing_deposit_task", stateMachine.state(), stateMachine.diagnosticThresholdPending());
             return;
         }
+        pressureDiagnostics.value("existingDepositTask", false);
 
         WorkingSetSnapshot workingSet = null;
         if (activeUserTask) {
             WorkingSetResolution resolution = workingSetResolver.resolve(mod);
+            pressureDiagnostics.workingSet(resolution);
             if (resolution.status() != WorkingSetResolution.Status.SUPPORTED) {
                 latchNoSafe(
                         resolution.reason(),
@@ -227,12 +271,14 @@ public final class DepositAllInventoryPressureChain extends SingleTaskChain {
                         null,
                         0L
                 );
+                pressureDiagnostics.decision("working_set_unsupported", stateMachine.state(), stateMachine.diagnosticThresholdPending());
                 return;
             }
             workingSet = resolution.snapshot();
         }
 
         AutoDepositPlanningResult planning = policyEngine.plan(mod, snapshot, workingSet);
+        pressureDiagnostics.planning(planning);
         if (planning.status() != AutoDepositPlanningResult.Status.READY) {
             AutoDepositPolicyDiagnostics.log(
                     planning.diagnosticPlan().orElse(null),
@@ -244,6 +290,7 @@ public final class DepositAllInventoryPressureChain extends SingleTaskChain {
         }
         if (planning.status() == AutoDepositPlanningResult.Status.CONTEXT_CHANGED) {
             deferChanged(planning.reason(), snapshot, userTaskRoot);
+            pressureDiagnostics.decision("policy_context_changed", stateMachine.state(), stateMachine.diagnosticThresholdPending());
             return;
         }
         if (planning.status() != AutoDepositPlanningResult.Status.READY) {
@@ -262,10 +309,12 @@ public final class DepositAllInventoryPressureChain extends SingleTaskChain {
                     retainedWorkingSet,
                     retainedEpoch
             );
+            pressureDiagnostics.decision("policy_not_ready", stateMachine.state(), stateMachine.diagnosticThresholdPending());
             return;
         }
 
         startPlan(snapshot, planning.plan().orElseThrow());
+        pressureDiagnostics.decision("plan_start_returned", stateMachine.state(), stateMachine.diagnosticThresholdPending());
     }
 
     //20260829_kpopmodder: Suppress automatic storage from the exact StoreHome root before selected-chain admission.
@@ -297,6 +346,8 @@ public final class DepositAllInventoryPressureChain extends SingleTaskChain {
         DepositAllInventoryPressureSignal signal = stateMachine.observe(snapshot);
         if (signal == DepositAllInventoryPressureSignal.REARMED) {
             waitingTrustedRevision = trustedRepository.revision();
+            pressureDiagnostics.transition(previousState, stateMachine.state(),
+                    "inventory_at_or_below_low_water", null, waitingTrustedRevision);
             DepositAllAutoDiagnostics.logTransition(
                     previousState,
                     stateMachine.state(),
@@ -403,6 +454,8 @@ public final class DepositAllInventoryPressureChain extends SingleTaskChain {
             return;
         }
         stateMachine.markNoSafeSurplus(fingerprint);
+        pressureDiagnostics.transition(DepositAllInventoryPressureState.ARMED, stateMachine.state(),
+                reason, userTaskRoot, waitingTrustedRevision);
         lastNoSafeWorkingSet = retainedWorkingSet;
         lastNoSafeEpoch = retainedEpoch;
         clearDeferredFingerprint();
@@ -415,6 +468,7 @@ public final class DepositAllInventoryPressureChain extends SingleTaskChain {
         DepositAllInventoryPressureState previousState = stateMachine.state();
         stateMachine.markThresholdSuppressed();
         waitingTrustedRevision = trustedRepository.revision();
+        pressureDiagnostics.transition(previousState, stateMachine.state(), reason, task, waitingTrustedRevision);
         DepositAllAutoDiagnostics.logTransition(previousState, stateMachine.state(), reason, snapshot, task);
     }
 
@@ -427,6 +481,7 @@ public final class DepositAllInventoryPressureChain extends SingleTaskChain {
                 ? activeRunTrustedRevision
                 : trustedRepository.revision();
         activeRunTrustedRevision = -1L;
+        pressureDiagnostics.transition(previousState, stateMachine.state(), reason, task, waitingTrustedRevision);
         DepositAllAutoDiagnostics.logTransition(previousState, stateMachine.state(), reason, snapshot, task);
         if (activeDiagnosticMaintenanceTask != null) {
             StoreDepositDiagnostics.recordAutomaticPressureRunClosed(
