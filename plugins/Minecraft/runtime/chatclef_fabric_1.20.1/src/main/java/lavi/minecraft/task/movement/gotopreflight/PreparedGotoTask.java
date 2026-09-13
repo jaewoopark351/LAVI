@@ -2,13 +2,18 @@
 package lavi.minecraft.task.movement.gotopreflight;
 
 import adris.altoclef.AltoClef;
-import adris.altoclef.Debug;
 import adris.altoclef.commandsystem.GotoTarget;
 import adris.altoclef.tasks.movement.GetToBlockTask;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.Dimension;
 import adris.altoclef.util.helpers.WorldHelper;
 import baritone.api.utils.input.Input;
+import lavi.minecraft.task.movement.gotopreflight.diagnostics.GotoPreparationDiagnostics;
+import lavi.minecraft.task.movement.gotoresult.binding.GotoTaskBinding;
+import lavi.minecraft.task.movement.gotoresult.model.GotoTargetSnapshot;
+import lavi.minecraft.task.movement.gotoresult.model.GotoTaskResultSource;
+import lavi.minecraft.task.movement.gotoresult.model.GotoTerminalSnapshot;
+import lavi.minecraft.task.movement.gotoresult.tracking.GotoTerminalState;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.client.world.ClientWorld;
 import net.minecraft.util.math.BlockPos;
@@ -25,7 +30,7 @@ import static lavi.minecraft.task.movement.gotopreflight.GotoMaterialPlan.*;
  * Preparation is admitted once, from a nearby dry, grounded, sky-visible location.
  * Native navigation is not given a new timeout, retry policy or path-cost setting.
  */
-public final class PreparedGotoTask extends Task {
+public final class PreparedGotoTask extends Task implements GotoTaskResultSource {
 
     private enum Phase {
         NATIVE,
@@ -59,14 +64,15 @@ public final class PreparedGotoTask extends Task {
     private int quietTicks;
 
     private boolean nativeIssued;
-    private String lastDecision;
-    private int decisionLogs;
-    private static final int MAX_DECISION_LOGS = 32;
-    private final String operation = Integer.toHexString(System.identityHashCode(this));
+    //20260913_kpopmodder: Keep passive output state separate from movement and cleanup ownership.
+    private final GotoPreparationDiagnostics diagnostics = new GotoPreparationDiagnostics(this);
     private boolean announced;
     private boolean collected;
     private boolean arrived;
     private Failure failure;
+    //20260913_kpopmodder: Result storage observes the existing terminal decisions without selecting movement.
+    private final GotoTaskBinding resultBinding;
+    private final GotoTerminalState result = new GotoTerminalState();
 
     /** Called only by GotoCommand.call; shared task factories remain unchanged. */
     public static Task forCommand(AltoClef mod, GotoTarget request, Task legacy) {
@@ -90,6 +96,7 @@ public final class PreparedGotoTask extends Task {
         target = new BlockPos(request.getX(), request.getY(), request.getZ());
         dimension = request.getDimension();
         navigation = nativeTask;
+        resultBinding = new GotoTaskBinding(mod, request);
     }
 
     @Override
@@ -216,15 +223,7 @@ public final class PreparedGotoTask extends Task {
 
     /** Bounded observer output; its counters never influence navigation or admission. */
     private void decision(String reason, String detail) {
-        if (reason.equals(lastDecision)) return;
-        lastDecision = reason;
-        if (decisionLogs < MAX_DECISION_LOGS) {
-            decisionLogs++;
-            log("NATIVE_DECISION reason=" + reason + " " + detail);
-        } else if (decisionLogs == MAX_DECISION_LOGS) {
-            decisionLogs++;
-            log("NATIVE_DECISION_LIMIT reached=true transitionsAndTerminalStillEnabled=true");
-        }
+        diagnostics.decision(reason, detail);
     }
 
     private Task prepare(AltoClef mod) {
@@ -336,6 +335,8 @@ public final class PreparedGotoTask extends Task {
 
         arrived = true;
         phase = Phase.TERMINAL;
+        result.commit(new GotoTerminalSnapshot("ARRIVED", "NONE", true, true, true,
+                "prepared_goto_terminal", GotoTaskBinding.dimension(mod)));
         log("ARRIVED target=" + target
                 + " aerial=" + (aerial != null)
                 + " collected=" + collected);
@@ -417,6 +418,10 @@ public final class PreparedGotoTask extends Task {
         stopOwnedChildren();
         failure = ex;
         phase = Phase.TERMINAL;
+        AltoClef mod = AltoClef.getInstance();
+        result.commit(new GotoTerminalSnapshot("FAILED", ex.reason().name(), false,
+                resultBinding.rootMatches(mod, this), false,
+                "prepared_goto_terminal", GotoTaskBinding.dimension(mod)));
         log("FAILED reason=" + ex.reason()
                 + " detail=" + ex.getMessage()
                 + " target=" + target);
@@ -446,6 +451,9 @@ public final class PreparedGotoTask extends Task {
         return failure == null ? null : failure.reason();
     }
 
+    @Override public GotoTargetSnapshot gotoTarget() { return resultBinding.target(); }
+    @Override public GotoTerminalSnapshot gotoTerminal() { return result.snapshot(); }
+
     @Override
     protected boolean isEqual(Task other) {
         return this == other;
@@ -457,11 +465,7 @@ public final class PreparedGotoTask extends Task {
     }
 
     private void log(String message) {
-        try {
-            Debug.logMessage("[LAVI GOTO V3.1] " + message + " operation=" + operation);
-        } catch (RuntimeException ignored) {
-            // Logs are observers, never behavior gates.
-        }
+        diagnostics.log(message);
     }
 }
 //#endif

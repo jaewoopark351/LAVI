@@ -18,6 +18,9 @@ import lavi.minecraft.fabric.chatclef.bridge.command.result.effect.FabricChatCle
 import lavi.minecraft.fabric.chatclef.bridge.command.result.effect.FabricChatClefNoEffectTracker;
 
 import java.util.function.Function;
+//#if MC == 12001
+import lavi.minecraft.fabric.chatclef.bridge.command.result.gotoresult.GotoCommandResultTracker;
+//#endif
 
 //20260804_kpopmodder: Keep mutable ChatClef command execution state out of result orchestration.
 final class FabricChatClefCommandExecutionState {
@@ -40,6 +43,9 @@ final class FabricChatClefCommandExecutionState {
     private volatile String failureType = "";
     private volatile String failureMessage = "";
     private volatile Task boundRootTask;
+    //#if MC == 12001
+    private final GotoCommandResultTracker gotoResultTracker = new GotoCommandResultTracker();
+    //#endif
     private volatile FabricChatClefTaskOwnershipEvidence taskAfterDispatchEvidence;
     private volatile FabricChatClefRootOwnershipClassification rootOwnershipClassification =
             FabricChatClefRootOwnershipClassification.OWNERSHIP_UNKNOWN;
@@ -147,7 +153,15 @@ final class FabricChatClefCommandExecutionState {
                 ? this.taskAfterDispatchEvidence.rootTask()
                 : null;
         this.taskAfterDispatch = this.taskAfterDispatchEvidence.rootTaskSnapshot();
+        //#if MC == 12001
+        //20260913_kpopmodder: Bind before the admitted Task can reach a later client-tick terminal boundary.
+        gotoResultTracker.bind(context, normalizedCommand, boundRootTask);
+        //#endif
     }
+
+    //#if MC == 12001
+    GotoCommandResultTracker gotoResultTracker() { return gotoResultTracker; }
+    //#endif
 
     void markTaskFinishedObservation(FabricChatClefCommandTerminationObservation observation) {
         taskFinishedObservation = observation;

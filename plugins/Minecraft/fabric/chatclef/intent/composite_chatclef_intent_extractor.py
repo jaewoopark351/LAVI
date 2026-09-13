@@ -1,6 +1,7 @@
 #20260803_kpopmodder: Added deterministic-first intent extraction with optional LLM fallback.
 #20260827_kpopmodder: Keep deterministic STORE_HOME refusals out of the LLM fallback.
 #20260905_kpopmodder: Preserve every H5 guard marker before optional LLM fallback.
+#20260913_kpopmodder: Preserve valid and malformed GOTO rejections before optional LLM fallback.
 from __future__ import annotations
 
 from plugins.Minecraft.fabric.chatclef.intent.auto_deposit_trust import (
@@ -18,6 +19,9 @@ from plugins.Minecraft.fabric.chatclef.intent.chatclef_llm_intent_extractor impo
 from plugins.Minecraft.fabric.chatclef.intent.korean_chatclef_rule_parser import (
     KoreanChatClefRuleParser,
 )
+from plugins.Minecraft.fabric.chatclef.intent.navigation.goto.guard import (
+    GotoGuardMarkerDetector,
+)
 from plugins.Minecraft.fabric.chatclef.intent.store_home import (
     StoreHomeIntentClassification,
 )
@@ -30,6 +34,7 @@ class CompositeChatClefIntentExtractor:
         llm_extractor: ChatClefLLMIntentExtractor | None = None,
         auto_deposit_trust_guard_marker: AutoDepositTrustGuardMarkerDetector
         | None = None,
+        goto_guard_marker: GotoGuardMarkerDetector | None = None,
     ):
         self._rule_parser = rule_parser or KoreanChatClefRuleParser()
         self._llm_extractor = llm_extractor
@@ -37,12 +42,15 @@ class CompositeChatClefIntentExtractor:
             auto_deposit_trust_guard_marker
             or AutoDepositTrustGuardMarkerDetector()
         )
+        self._goto_guard_marker = goto_guard_marker or GotoGuardMarkerDetector()
 
     def extract(self, text: str) -> ChatClefIntentDTO:
         intent = self._rule_parser.parse(text)
         if intent.intent_type is not ChatClefIntentType.UNKNOWN:
             return intent
         if self._auto_deposit_trust_guard_marker.has_marker(intent):
+            return intent
+        if self._goto_guard_marker.has_marker(intent):
             return intent
         if StoreHomeIntentClassification.guarded_from_intent(intent) is not None:
             return intent

@@ -28,11 +28,15 @@ final class FabricChatClefCommandResultFactory {
     }
 
     FabricChatClefCommandResultPayload runningResult() {
+        FabricChatClefCommandResultDataPayload runningData = data("dispatch_started");
+        //#if MC == 12001
+        runningData = state.gotoResultTracker().bindingData(runningData);
+        //#endif
         return FabricChatClefCommandResult.running(
                 request().requestId,
                 "Fabric ChatClef command dispatch started.",
                 FabricChatClefLifecycleEvidenceSequencePayload.of(
-                        data("dispatch_started"),
+                        runningData,
                         state.initialLifecycleEvidenceSequence()
                 )
         );
@@ -95,6 +99,12 @@ final class FabricChatClefCommandResultFactory {
     }
 
     FabricChatClefCommandResultPayload completedFromTaskFinished(FabricChatClefCommandTerminationObservation observation) {
+        //#if MC == 12001
+        //20260913_kpopmodder: Preserve generic classification gates, then project the bound owner's frozen result.
+        FabricChatClefCommandResultPayload gotoResult = state.gotoResultTracker().matchingCompletion(
+                data("matching_task_finished", observation), observation, state.userStopBound());
+        if (gotoResult != null) return gotoResult;
+        //#endif
         return FabricChatClefCommandResult.completed(
                 request().requestId,
                 "ChatClef user task reached natural completion.",
@@ -119,6 +129,7 @@ final class FabricChatClefCommandResultFactory {
                 )
         );
     }
+
 
     FabricChatClefCommandResultPayload failedFromStoppedTask(FabricChatClefCommandTerminationObservation observation) {
         return FabricChatClefCommandResult.failed(

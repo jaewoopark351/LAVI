@@ -2,6 +2,7 @@
 #20260827_kpopmodder: Resolve STORE_HOME before generic item deposit rules.
 #20260828_kpopmodder: Pass raw text to STORE_HOME so question punctuation remains observable.
 #20260905_kpopmodder: Resolve guarded H5 area registration before STORE_HOME and item rules.
+#20260913_kpopmodder: Delegate raw, whole-utterance GOTO interpretation and preserve rejection ownership.
 from __future__ import annotations
 
 import re
@@ -29,6 +30,12 @@ from plugins.Minecraft.fabric.chatclef.intent.korean_item_action_rule_parser imp
 from plugins.Minecraft.fabric.chatclef.intent.korean_text_normalizer import (
     KoreanTextNormalizer,
 )
+from plugins.Minecraft.fabric.chatclef.intent.navigation.goto import (
+    KoreanGotoCoordinateParser,
+)
+from plugins.Minecraft.fabric.chatclef.intent.navigation.goto.guard import (
+    GotoGuardIntentEncoder,
+)
 from plugins.Minecraft.fabric.chatclef.intent.store_home import (
     KoreanStoreHomeIntentClassifier,
     StoreHomeIntentClassification,
@@ -36,10 +43,11 @@ from plugins.Minecraft.fabric.chatclef.intent.store_home import (
 
 
 class KoreanChatClefRuleParser:
-    _GOTO_RE = re.compile(
-        r"(?P<x>-?\d+)\s+(?P<y>-?\d+)\s+(?P<z>-?\d+)"
-        r"(?:\s*(?:으로|로))?\s*(?:이동|이동해|가|가줘|가자)"
-    )
+    #20260803_kpopmodder: Historical partial GOTO search disabled; it loses raw decimal/question meaning.
+    # _GOTO_RE = re.compile(
+    #     r"(?P<x>-?\d+)\s+(?P<y>-?\d+)\s+(?P<z>-?\d+)"
+    #     r"(?:\s*(?:으로|로))?\s*(?:이동|이동해|가|가줘|가자)"
+    # )
     _FOLLOW_RE = re.compile(
         r"(?P<player>[A-Za-z0-9_]{3,16})\s*(?:따라가|따라가줘|팔로우|쫓아가)"
     )
@@ -54,6 +62,8 @@ class KoreanChatClefRuleParser:
         auto_deposit_trust: KoreanAutoDepositTrustIntentClassifier | None = None,
         auto_deposit_trust_guard_encoder: AutoDepositTrustGuardIntentEncoder
         | None = None,
+        goto_parser: KoreanGotoCoordinateParser | None = None,
+        goto_guard_encoder: GotoGuardIntentEncoder | None = None,
     ):
         self._normalizer = normalizer or KoreanTextNormalizer()
         self._quantity_parser = quantity_parser or KoreanQuantityParser()
@@ -73,6 +83,8 @@ class KoreanChatClefRuleParser:
         self._auto_deposit_trust_guard_encoder = (
             auto_deposit_trust_guard_encoder or AutoDepositTrustGuardIntentEncoder()
         )
+        self._goto_parser = goto_parser or KoreanGotoCoordinateParser()
+        self._goto_guard_encoder = goto_guard_encoder or GotoGuardIntentEncoder()
 
     def parse(self, text: object) -> ChatClefIntentDTO:
         original = self._normalizer.normalize(text, lowercase_english=False)
@@ -87,15 +99,31 @@ class KoreanChatClefRuleParser:
         store_home = self._store_home.classify(text)
         if store_home.candidate:
             return self._store_home_intent(original, store_home)
-        goto_match = self._GOTO_RE.search(normalized)
-        if goto_match is not None:
-            return self._intent(
-                ChatClefIntentType.GOTO,
-                original,
-                x=int(goto_match.group("x")),
-                y=int(goto_match.group("y")),
-                z=int(goto_match.group("z")),
-            )
+        #20260803_kpopmodder: Keep the old branch inert for exact history; never fall back to partial matching.
+        # goto_match = self._GOTO_RE.search(normalized)
+        # if goto_match is not None:
+        #     return self._intent(
+        #         ChatClefIntentType.GOTO,
+        #         original,
+        #         x=int(goto_match.group("x")),
+        #         y=int(goto_match.group("y")),
+        #         z=int(goto_match.group("z")),
+        #     )
+        goto = self._goto_parser.parse(text)
+        if goto.candidate:
+            raw_original = str(text)
+            if goto.executable:
+                if goto.xyz is None:
+                    raise RuntimeError("valid_goto_missing_xyz")
+                x, y, z = goto.xyz
+                return self._intent(
+                    ChatClefIntentType.GOTO,
+                    raw_original,
+                    x=x,
+                    y=y,
+                    z=z,
+                )
+            return self._goto_guard_encoder.encode(raw_original, goto)
         follow_match = self._FOLLOW_RE.search(original)
         if follow_match is not None:
             return self._intent(

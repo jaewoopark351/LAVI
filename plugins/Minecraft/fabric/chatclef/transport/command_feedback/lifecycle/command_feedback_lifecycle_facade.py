@@ -129,11 +129,13 @@ class CommandFeedbackLifecycleFacade:
         status: str,
         result_reason: str,
         evidence_sequence: object = None,
+        result_data: object = None,
     ) -> bool:
         return self._results.record_nonterminal(
             status=status,
             result_reason=result_reason,
             evidence_sequence=evidence_sequence,
+            result_data=result_data,
         )
 
     def dispatch_started_observed(self, owner_token: object) -> bool:

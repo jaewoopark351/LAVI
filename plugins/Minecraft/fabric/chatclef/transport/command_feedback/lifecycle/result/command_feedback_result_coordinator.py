@@ -90,6 +90,7 @@ class CommandFeedbackResultCoordinator:
                 status=getattr(status, "value", str(status)),
                 result_reason=result_reason,
                 evidence_sequence=result_data.get("evidence_sequence"),
+                result_data=result_data,
             )
             return None
         if self._stop_terminal_arbitrator.specialized_stop_owns_terminal(
@@ -119,8 +120,12 @@ class CommandFeedbackResultCoordinator:
         if context is None:
             return None
         evaluation = CommandTerminalEvidenceEvaluation(False)
-        if status is CommandResultStatus.COMPLETED:
-            evaluation = self._evaluate_completed(
+        if status is CommandResultStatus.COMPLETED or (
+            status is CommandResultStatus.FAILED
+            and getattr(context.descriptor, "command_name", "") == "goto"
+        ):
+            #20260913_kpopmodder: Validate GOTO failure evidence through its separate projection channel.
+            evaluation = self._evaluate_terminal(
                 result=result,
                 context=context,
                 status=getattr(status, "value", str(status)),
@@ -134,10 +139,11 @@ class CommandFeedbackResultCoordinator:
             event_id=context.event_id,
             owner_token=expected_active,
             evidence_projection=evaluation.projection,
+            failure_projection=evaluation.failure_projection,
         )
         return self._tracker.stage_terminal(expected_active, fact)
 
-    def _evaluate_completed(
+    def _evaluate_terminal(
         self,
         *,
         result: object,
@@ -149,7 +155,13 @@ class CommandFeedbackResultCoordinator:
             if callable(evaluate):
                 evaluation = evaluate(result, context=context)
                 if type(evaluation) is CommandTerminalEvidenceEvaluation:
+                    if (status != "completed" and evaluation.verified) or (
+                        status != "failed" and evaluation.failure_projection is not None
+                    ):
+                        return CommandTerminalEvidenceEvaluation(False)
                     return evaluation
+                return CommandTerminalEvidenceEvaluation(False)
+            if status != "completed":
                 return CommandTerminalEvidenceEvaluation(False)
             verified = getattr(self._evidence_evaluator, "verified", None)
             if not callable(verified):

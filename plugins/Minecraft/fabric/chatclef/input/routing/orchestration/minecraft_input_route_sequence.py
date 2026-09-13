@@ -9,6 +9,7 @@ from plugins.Minecraft.fabric.chatclef.input.gating import (
 from plugins.Minecraft.fabric.chatclef.input.minecraft_chatclef_input_route_decision import (
     MinecraftChatClefInputRouteDecision,
 )
+from plugins.Minecraft.fabric.chatclef.input.routing.goto import GotoInputRouteGuard
 
 
 class MinecraftInputRouteSequence:
@@ -21,6 +22,7 @@ class MinecraftInputRouteSequence:
         generic_crafting_defaults_route_owner,
         auto_deposit_trust_route_coordinator,
         ordinary_command_route_coordinator,
+        goto_input_route_guard=None,
     ) -> None:
         self._input_event_normalizer = input_event_normalizer
         self._stop_control_route_owner = stop_control_route_owner
@@ -34,6 +36,8 @@ class MinecraftInputRouteSequence:
         self._ordinary_command_route_coordinator = (
             ordinary_command_route_coordinator
         )
+        self._goto_input_route_guard = goto_input_route_guard or GotoInputRouteGuard()
+
     def route(
         self,
         value: object,
@@ -90,10 +94,27 @@ class MinecraftInputRouteSequence:
         ):
             return self._auto_deposit_trust_route_coordinator.route(event)
 
+        #20260913_kpopmodder: Keep original GOTO rejection and XYZ before translation.
+        goto_binding, goto_decision = self._goto_input_route_guard.inspect(
+            event, korean_eligibility_proof
+        )
+        if goto_decision is not None:
+            return goto_decision
+        goto_arguments = (
+            {"goto_input_binding": goto_binding}
+            if goto_binding.automatic_input
+            else {}
+        )
+        translation_text = (
+            command_text
+            if goto_binding.automatic_input and goto_binding.parse_result.executable
+            else command_text.strip()
+        )
         decision = self._ordinary_command_route_coordinator.route(
             event,
-            command_text.strip(),
+            translation_text,
             korean_eligibility_proof=korean_eligibility_proof,
+            **goto_arguments,
         )
         if korean_eligibility_proof is not None:
             if decision.route_kind == "minecraft_chatclef":

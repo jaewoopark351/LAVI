@@ -7,6 +7,9 @@ import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefT
 import lavi.minecraft.fabric.chatclef.bridge.command.observation.FabricChatClefTaskSnapshot;
 
 import java.util.Map;
+//#if MC == 12001
+import lavi.minecraft.task.movement.gotoresult.tracking.ReportedGotoBlockTask;
+//#endif
 
 //20260803_kpopmodder: Observe user task termination without changing ChatClef engine behavior.
 public final class FabricChatClefCommandTerminationObservation {
@@ -123,6 +126,16 @@ public final class FabricChatClefCommandTerminationObservation {
             stopStateError = error.getClass().getSimpleName() + ": " + nullSafeMessage(error);
             taskSnapshot = FabricChatClefTaskSnapshot.unavailable(error);
         }
+        //#if MC == 12001
+        //20260913_kpopmodder: Snapshot failure cannot alter the already captured generic stop/lifecycle facts.
+        try {
+            if (task instanceof ReportedGotoBlockTask reported) {
+                reported.observeNaturalCompletion(taskStopped, stopStateAvailable);
+            }
+        } catch (RuntimeException | LinkageError unavailable) {
+            // An unavailable optional snapshot retains the existing cautious result.
+        }
+        //#endif
         return new FabricChatClefCommandTerminationObservation(
                 task,
                 taskPresent,

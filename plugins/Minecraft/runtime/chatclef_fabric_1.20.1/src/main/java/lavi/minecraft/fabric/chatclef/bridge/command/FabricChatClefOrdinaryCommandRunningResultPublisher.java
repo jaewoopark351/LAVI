@@ -27,4 +27,5 @@ public final class FabricChatClefOrdinaryCommandRunningResultPublisher {
             diagnostics.runningResultSubmissionFailed(context, submission);
         }
     }
+
 }

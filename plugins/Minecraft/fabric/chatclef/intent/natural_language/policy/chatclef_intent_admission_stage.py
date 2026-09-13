@@ -1,4 +1,5 @@
 #20260905_kpopmodder: Own deterministic pre-translation intent admission decisions.
+#20260913_kpopmodder: Reject canonical and malformed GOTO guards before generic UNKNOWN handling.
 from __future__ import annotations
 
 from plugins.Minecraft.fabric.chatclef.intent.chatclef_intent_status import (
@@ -6,6 +7,9 @@ from plugins.Minecraft.fabric.chatclef.intent.chatclef_intent_status import (
 )
 from plugins.Minecraft.fabric.chatclef.intent.chatclef_intent_type import (
     ChatClefIntentType,
+)
+from plugins.Minecraft.fabric.chatclef.intent.navigation.goto.guard import (
+    GotoGuardIntentDecoder,
 )
 from plugins.Minecraft.fabric.chatclef.intent.store_home import (
     StoreHomeIntentClassification,
@@ -19,10 +23,12 @@ class ChatClefIntentAdmissionStage:
         schema_validator: object,
         guard_decoder: object,
         rejection_factory: object,
+        goto_guard_decoder: GotoGuardIntentDecoder | None = None,
     ):
         self._schema_validator = schema_validator
         self._guard_decoder = guard_decoder
         self._rejection_factory = rejection_factory
+        self._goto_guard_decoder = goto_guard_decoder or GotoGuardIntentDecoder()
 
     def inspect(self, intent: object) -> object | None:
         guard = self._guard_decoder.decode(intent)
@@ -45,6 +51,15 @@ class ChatClefIntentAdmissionStage:
                 guard.reason_code,
                 guard.message,
                 intent,
+            )
+        goto_guard = self._goto_guard_decoder.decode(intent)
+        if goto_guard is not None:
+            return self._rejection_factory.create(
+                ChatClefIntentStatus.INVALID,
+                goto_guard.reason_code,
+                goto_guard.message,
+                intent,
+                {"goto_decision": goto_guard.decision.value},
             )
         valid, reason_code, message = self._schema_validator.validate(intent)
         if not valid:

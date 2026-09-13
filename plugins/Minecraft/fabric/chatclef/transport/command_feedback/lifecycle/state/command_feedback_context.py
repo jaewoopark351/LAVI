@@ -3,6 +3,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from plugins.Minecraft.fabric.chatclef.result.goto.goto_command_binding import (
+    GotoCommandBinding,
+)
+
 from ..admission.command_feedback_admission_grant import (
     CommandFeedbackAdmissionGrant,
 )
@@ -21,6 +25,9 @@ class CommandFeedbackContext:
     command_message_id: str
     accepted_at_ms: int
     before_target_count: int | None = None
+    #20260913_kpopmodder: Freeze the independently observed Task binding with this request.
+    goto_binding: GotoCommandBinding | None = None
+    goto_binding_rejected: bool = False
 
     def __getattr__(self, name: str):
         descriptor_names = {

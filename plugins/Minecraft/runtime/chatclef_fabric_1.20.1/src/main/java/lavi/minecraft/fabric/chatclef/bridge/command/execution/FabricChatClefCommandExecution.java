@@ -49,6 +49,7 @@ public final class FabricChatClefCommandExecution {
         return resultFactory.runningResult();
     }
 
+
     public int nextLifecycleEvidenceSequence() {
         return state.nextLifecycleEvidenceSequence();
     }

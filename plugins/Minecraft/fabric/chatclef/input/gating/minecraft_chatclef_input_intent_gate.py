@@ -12,6 +12,9 @@ from plugins.Minecraft.fabric.chatclef.intent.korean_acquisition_verb_matcher im
 from plugins.Minecraft.fabric.chatclef.intent.store_home import (
     KoreanStoreHomeIntentClassifier,
 )
+from plugins.Minecraft.fabric.chatclef.intent.navigation.goto import (
+    KoreanGotoCandidateDetector,
+)
 
 from .contracts import MinecraftChatClefInputGateDecision
 
@@ -54,10 +57,14 @@ class MinecraftChatClefInputIntentGate:
         self._auto_deposit_trust = (
             auto_deposit_trust or AutoDepositTrustCandidateDetector()
         )
+        self._goto_candidate = KoreanGotoCandidateDetector()
 
     def inspect(self, text: object) -> MinecraftChatClefInputGateDecision:
         if self._auto_deposit_trust.is_candidate(text):
             return MinecraftChatClefInputGateDecision.h5_auto_deposit_trust()
+        #20260913_kpopmodder: Recognize coordinate movement, not a broad '가줘' trigger.
+        if self._goto_candidate.is_candidate(text):
+            return MinecraftChatClefInputGateDecision.generic()
         normalized = self._normalize(text)
         if not normalized:
             return MinecraftChatClefInputGateDecision.none()

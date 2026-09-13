@@ -26,7 +26,8 @@ _EVIDENCE = {
     "gamma": ("cautious", "cautious_terminal"),
     "get": ("verified", "get_acquisition"),
     "give": ("cautious", "cautious_terminal"),
-    "goto": ("cautious", "cautious_terminal"),
+    #20260913_kpopmodder: Only the bound direct-XYZ evaluator can verify GOTO.
+    "goto": ("verified", "goto_terminal"),
     "hero": ("cautious", "cautious_terminal"),
     "idle": ("cautious", "cautious_terminal"),
     "locate_structure": ("cautious", "cautious_terminal"),

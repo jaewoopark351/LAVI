@@ -19,6 +19,7 @@ class MinecraftInputRouteOrderingComponentGraph:
         failure_handler,
         status_publication_custody_policy=None,
         status_publication_emergency_decision=None,
+        goto_input_route_guard=None,
     ) -> None:
         self.input_gate_inspector = MinecraftInputGateInspector(intent_gate)
         self.optional_route_owner_invoker = MinecraftOptionalRouteOwnerInvoker(
@@ -43,6 +44,7 @@ class MinecraftInputRouteOrderingComponentGraph:
             ordinary_command_route_coordinator=(
                 ordinary_command_route_coordinator
             ),
+            goto_input_route_guard=goto_input_route_guard,
         )
 
 

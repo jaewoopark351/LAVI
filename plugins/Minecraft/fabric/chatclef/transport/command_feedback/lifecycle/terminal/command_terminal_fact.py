@@ -14,12 +14,18 @@ class CommandTerminalFact:
     event_id: str
     owner_token: object = field(compare=False, repr=False)
     evidence_projection: object = field(default=None, compare=False, repr=False)
+    #20260913_kpopmodder: A validated failure reason is independent of verified arrival.
+    failure_projection: object = field(default=None, compare=False, repr=False)
 
     def __post_init__(self) -> None:
         if type(self.verified) is not bool or type(self.dispatch_started) is not bool:
             raise TypeError("command terminal proof flags must be exact bools")
         if type(self.status) is not str or not self.status:
             raise ValueError("command terminal status is required")
+        if self.failure_projection is not None and (
+            self.status != "failed" or self.verified or self.evidence_projection is not None
+        ):
+            raise ValueError("failure projection requires a non-success failed terminal")
 
 
 __all__ = ("CommandTerminalFact",)

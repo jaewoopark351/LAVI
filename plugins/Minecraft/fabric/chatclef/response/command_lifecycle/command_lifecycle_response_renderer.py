@@ -8,9 +8,11 @@ from .profiles.command_phrase_profile_registry import CommandPhraseProfileRegist
 
 
 class CommandLifecycleResponseRenderer:
-    def __init__(self, *, profile_registry=None, phrase_renderer=None) -> None:
+    def __init__(self, *, profile_registry=None, phrase_renderer=None, diagnostic_observer=None) -> None:
         self._profiles = profile_registry or CommandPhraseProfileRegistry()
         self._phrases = phrase_renderer or KoreanCommandPhraseRenderer()
+        #20260913_kpopmodder: Keep passive terminal observation outside phrase selection.
+        self._diagnostic_observer = diagnostic_observer
 
     def render_start(self, descriptor: object) -> str:
         profile = self._profiles.profile(getattr(descriptor, "command_name", ""))
@@ -48,14 +50,24 @@ class CommandLifecycleResponseRenderer:
     def render_terminal(self, fact: object) -> str:
         descriptor = getattr(fact, "descriptor", None)
         profile = self._profiles.profile(getattr(descriptor, "command_name", ""))
-        return self._phrases.terminal(
+        text = self._phrases.terminal(
             descriptor,
             profile,
             status=str(getattr(fact, "status", "unknown") or "unknown"),
             verified=getattr(fact, "verified", False) is True,
             dispatch_started=getattr(fact, "dispatch_started", False) is True,
             evidence_projection=getattr(fact, "evidence_projection", None),
+            failure_projection=getattr(fact, "failure_projection", None),
         )
+        #20260913_kpopmodder: Report only after rendering; preserve every terminal status.
+        if self._diagnostic_observer is not None:
+            try:
+                self._diagnostic_observer.response_rendered(
+                    fact=fact, profile=profile, text=text,
+                )
+            except Exception:
+                pass
+        return text
 
 
 __all__ = ("CommandLifecycleResponseRenderer",)

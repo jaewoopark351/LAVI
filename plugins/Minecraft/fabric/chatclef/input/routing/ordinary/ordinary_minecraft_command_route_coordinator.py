@@ -4,6 +4,7 @@ from __future__ import annotations
 from plugins.Minecraft.fabric.chatclef.input.minecraft_chatclef_input_route_decision import (
     MinecraftChatClefInputRouteDecision,
 )
+from plugins.Minecraft.fabric.chatclef.input.routing.goto import GotoInputBinding
 
 from .composition import OrdinaryMinecraftCommandRouteComponentGraph
 
@@ -51,6 +52,7 @@ class OrdinaryMinecraftCommandRouteCoordinator:
         command_text: str,
         *,
         korean_eligibility_proof: object = None,
+        goto_input_binding: GotoInputBinding | None = None,
     ) -> MinecraftChatClefInputRouteDecision:
         rejection = self._availability_stage.rejection()
         if rejection is not None:
@@ -60,6 +62,7 @@ class OrdinaryMinecraftCommandRouteCoordinator:
                 event,
                 command_text,
                 korean_eligibility_proof=korean_eligibility_proof,
+                goto_input_binding=goto_input_binding,
             )
 
     def route_locked(
@@ -68,11 +71,18 @@ class OrdinaryMinecraftCommandRouteCoordinator:
         command_text: str,
         *,
         korean_eligibility_proof: object = None,
+        goto_input_binding: GotoInputBinding | None = None,
     ) -> MinecraftChatClefInputRouteDecision:
+        #20260913_kpopmodder: No binding means a legacy caller, never inferred trusted GOTO.
+        goto_arguments = (
+            {} if goto_input_binding is None
+            else {"goto_input_binding": goto_input_binding}
+        )
         return self._pipeline.route_locked(
             event,
             command_text,
             korean_eligibility_proof=korean_eligibility_proof,
+            **goto_arguments,
         )
 
 

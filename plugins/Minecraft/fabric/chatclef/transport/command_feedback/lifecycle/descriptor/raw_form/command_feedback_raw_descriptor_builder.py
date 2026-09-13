@@ -79,7 +79,15 @@ class CommandFeedbackRawDescriptorBuilder:
                 evidence_profile_id=evidence.profile_id,
                 rollout_state=(
                     evidence.rollout_state
-                    if command_name == "get" and single_target is not None
+                    if (command_name == "get" and single_target is not None)
+                    or (
+                        command_name == "goto"
+                        and detail_level == CommandFeedbackDescriptor.RAW_TYPED
+                        and len(raw_slots.coordinate_values) == 3
+                        and raw_form.form_kind in {
+                            "xyz", "xyz_dimension", "parenthesized_xyz", "parenthesized_xyz_dimension",
+                        }
+                    )
                     else CommandTerminalEvidenceProfile.CAUTIOUS
                 ),
                 event_id=str(event_id or ""),

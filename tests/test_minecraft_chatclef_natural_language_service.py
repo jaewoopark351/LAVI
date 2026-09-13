@@ -1,9 +1,20 @@
 #20260803_kpopmodder: Cover Korean natural language translation to ChatClef DSL.
+#20260913_kpopmodder: Verify shared GOTO grammar and no LLM recovery of guarded input.
 import unittest
+from unittest.mock import Mock
 
 from plugins.Minecraft.fabric.chatclef.intent import (
     ChatClefIntentStatus,
     ChatClefNaturalLanguageService,
+)
+from plugins.Minecraft.fabric.chatclef.intent.chatclef_intent_dto import ChatClefIntentDTO
+from plugins.Minecraft.fabric.chatclef.intent.chatclef_intent_type import ChatClefIntentType
+from plugins.Minecraft.fabric.chatclef.intent.composite_chatclef_intent_extractor import CompositeChatClefIntentExtractor
+from plugins.Minecraft.fabric.chatclef.intent.navigation.goto.guard.goto_guard_fields import (
+    DECISION_SLOT,
+    GUARD_SLOT,
+    GUARD_SOURCE,
+    REASON_SLOT,
 )
 
 
@@ -80,6 +91,93 @@ class MinecraftChatClefNaturalLanguageServiceTests(unittest.TestCase):
             "get redstone 5",
             service.translate("레드스톤 5개 구해줘").command,
         )
+
+    def test_translates_all_nine_raw_coordinate_forms_using_existing_string_api(self):
+        service = ChatClefNaturalLanguageService()
+        for text in (
+            "500 90 -928로 가줘",
+            "500,90,-928으로 가줘",
+            "500, 90, -928 좌표로 가줘",
+            "좌표 500, 90, -928로 이동해줘",
+            "x 500 y 90 z -928로 가줘",
+            "x=500, y=90, z=-928 좌표로 가줘",
+            "엑스 500 와이 90 제트 마이너스 928 좌표로 가줘",
+            "500 90 마이너스 928로 가줘",
+            "(500, 90, -928)으로 이동해",
+        ):
+            with self.subTest(text=text):
+                result = service.translate(text)
+                self.assertTrue(result.executable)
+                self.assertEqual("goto 500 90 -928", result.command)
+                self.assertEqual(text, result.intent.original_text)
+
+    def test_guarded_coordinate_inputs_never_reach_optional_llm(self):
+        for enabled in (False, True):
+            llm = Mock()
+            llm.extract.return_value = ChatClefIntentDTO(
+                intent_type=ChatClefIntentType.GOTO, x=500, y=90, z=-928
+            )
+            service = ChatClefNaturalLanguageService(
+                extractor=CompositeChatClefIntentExtractor(llm_extractor=llm if enabled else None)
+            )
+            for text in (
+                "500.5 90 -928로 이동해",
+                "500 90로 가줘",
+                "500 90 -928로 가지 마",
+                "500 90 -928로 가면 어떻게 돼?",
+                "오백 구십 마이너스 구백이십팔로 가줘",
+                "500 90 -928로 가고 좀비 공격해",
+                '"500 90 -928로 가줘"라고 말했어',
+            ):
+                with self.subTest(enabled=enabled, text=text):
+                    result = service.translate(text)
+                    self.assertFalse(result.executable)
+                    self.assertEqual(ChatClefIntentStatus.INVALID, result.status)
+                    self.assertIsNone(result.command)
+            llm.extract.assert_not_called()
+
+    def test_malformed_goto_markers_remain_nonexecutable_with_optional_llm(self):
+        malformed = (
+            ChatClefIntentDTO(source=GUARD_SOURCE),
+            ChatClefIntentDTO(slots={GUARD_SLOT: False}),
+            ChatClefIntentDTO(source=GUARD_SOURCE, slots={GUARD_SLOT: True, DECISION_SLOT: "valid_xyz", REASON_SLOT: "goto_noncommand"}),
+            ChatClefIntentDTO(source=GUARD_SOURCE, slots={GUARD_SLOT: True, DECISION_SLOT: "clarify", REASON_SLOT: ["goto_invalid_coordinates"]}),
+            ChatClefIntentDTO(source=GUARD_SOURCE, x=500, slots={GUARD_SLOT: True, DECISION_SLOT: "clarify", REASON_SLOT: "goto_invalid_coordinates"}),
+            ChatClefIntentDTO(intent_type=ChatClefIntentType.GOTO, source=GUARD_SOURCE, x=500, y=90, z=-928),
+        )
+        for enabled in (False, True):
+            for intent in malformed:
+                with self.subTest(enabled=enabled, intent=intent):
+                    rule = Mock()
+                    rule.parse.return_value = intent
+                    llm = Mock()
+                    extractor = CompositeChatClefIntentExtractor(rule_parser=rule, llm_extractor=llm if enabled else None)
+                    result = ChatClefNaturalLanguageService(extractor=extractor).translate("500 90 -928로 가줘")
+                    self.assertFalse(result.executable)
+                    self.assertEqual(ChatClefIntentStatus.INVALID, result.status)
+                    self.assertEqual("invalid_goto_guard", result.reason_code)
+                    llm.extract.assert_not_called()
+
+    def test_negated_movement_favor_endings_keep_noncommand_marker(self):
+        for enabled in (False, True):
+            llm = Mock()
+            service = ChatClefNaturalLanguageService(
+                extractor=CompositeChatClefIntentExtractor(
+                    llm_extractor=llm if enabled else None
+                )
+            )
+            for text in (
+                "500 90 -928로 이동해주지 마",
+                "500 90 -928로 이동해 주지 말아줘",
+                "500 90 -928로 가주지 마",
+                "500 90 -928로 가 주지 말아줘",
+            ):
+                with self.subTest(enabled=enabled, text=text):
+                    result = service.translate(text)
+                    self.assertFalse(result.executable)
+                    self.assertEqual("goto_noncommand", result.reason_code)
+                    self.assertEqual("noncommand", result.data["goto_decision"])
+            llm.extract.assert_not_called()
 
 
 if __name__ == "__main__":

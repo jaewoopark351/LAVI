@@ -48,6 +48,7 @@ class KoreanCommandPhraseRenderer:
         verified: bool,
         dispatch_started: bool,
         evidence_projection: object = None,
+        failure_projection: object = None,
     ) -> str:
         return self._terminals.render(
             descriptor,
@@ -56,6 +57,7 @@ class KoreanCommandPhraseRenderer:
             verified=verified,
             dispatch_started=dispatch_started,
             evidence_projection=evidence_projection,
+            failure_projection=failure_projection,
         )
 
 

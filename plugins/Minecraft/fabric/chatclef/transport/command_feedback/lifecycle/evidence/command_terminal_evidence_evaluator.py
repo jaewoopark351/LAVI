@@ -13,6 +13,7 @@ from .command_terminal_evidence_profile_registry import (
     CommandTerminalEvidenceProfileRegistry,
 )
 from .get import GetAcquisitionTerminalEvidenceEvaluator
+from .goto import GotoTerminalEvidenceEvaluator
 from .store_home import StoreHomeTerminalEvidenceEvaluator
 
 
@@ -23,8 +24,12 @@ class CommandTerminalEvidenceEvaluator:
         *,
         get_evaluator=None,
         store_home_evaluator=None,
+        goto_evaluator=None,
+        diagnostic_observer=None,
     ) -> None:
         self._profiles = profile_registry or CommandTerminalEvidenceProfileRegistry()
+        #20260913_kpopmodder: Observe selected verdicts without supplying evidence.
+        self._diagnostic_observer = diagnostic_observer
         self._evaluators = {
             "get_acquisition": (
                 get_evaluator or GetAcquisitionTerminalEvidenceEvaluator()
@@ -32,6 +37,7 @@ class CommandTerminalEvidenceEvaluator:
             "store_home_completion": (
                 store_home_evaluator or StoreHomeTerminalEvidenceEvaluator()
             ),
+            "goto_terminal": goto_evaluator or GotoTerminalEvidenceEvaluator(),
         }
 
     def evaluate(
@@ -41,10 +47,10 @@ class CommandTerminalEvidenceEvaluator:
         context: object = None,
     ) -> CommandTerminalEvidenceEvaluation:
         if type(result) is not CommandResultDTO:
-            return CommandTerminalEvidenceEvaluation(False)
+            return self._observed(CommandTerminalEvidenceEvaluation(False), result, context, None, "invalid_result_type")
         data = result.data
         if not isinstance(data, Mapping):
-            return CommandTerminalEvidenceEvaluation(False)
+            return self._observed(CommandTerminalEvidenceEvaluation(False), result, context, None, "invalid_result_data")
         descriptor = getattr(context, "descriptor", None)
         command_name = getattr(descriptor, "command_name", None) or getattr(
             context,
@@ -54,23 +60,23 @@ class CommandTerminalEvidenceEvaluator:
         try:
             profile = self._profiles.profile(command_name)
         except (KeyError, TypeError, ValueError):
-            return CommandTerminalEvidenceEvaluation(False)
+            return self._observed(CommandTerminalEvidenceEvaluation(False), result, context, None, "profile_unavailable")
         if profile.rollout_state != CommandTerminalEvidenceProfile.VERIFIED:
-            return CommandTerminalEvidenceEvaluation(False)
+            return self._observed(CommandTerminalEvidenceEvaluation(False), result, context, profile, "profile_not_verified")
         if (
             descriptor is not None
             and getattr(descriptor, "rollout_state", None)
             != CommandTerminalEvidenceProfile.VERIFIED
         ):
-            return CommandTerminalEvidenceEvaluation(False)
+            return self._observed(CommandTerminalEvidenceEvaluation(False), result, context, profile, "descriptor_not_verified")
         if getattr(descriptor, "detail_level", "typed") not in {
             "typed",
             "raw_typed",
         }:
-            return CommandTerminalEvidenceEvaluation(False)
+            return self._observed(CommandTerminalEvidenceEvaluation(False), result, context, profile, "unsupported_detail")
         evaluator = self._evaluators.get(profile.success_evaluator_id)
         if evaluator is None:
-            return CommandTerminalEvidenceEvaluation(False)
+            return self._observed(CommandTerminalEvidenceEvaluation(False), result, context, profile, "evaluator_unavailable")
         evaluation = evaluator.evaluate(
             result,
             data=data,
@@ -78,7 +84,22 @@ class CommandTerminalEvidenceEvaluator:
             profile=profile,
         )
         if type(evaluation) is not CommandTerminalEvidenceEvaluation:
-            return CommandTerminalEvidenceEvaluation(False)
+            return self._observed(CommandTerminalEvidenceEvaluation(False), result, context, profile, "invalid_evaluation_type")
+        return self._observed(
+            evaluation, result, context, profile,
+            evaluation.decision_reason or "evaluated",
+        )
+
+    #20260913_kpopmodder: A throwing observer cannot replace the owner's return value.
+    def _observed(self, evaluation, result, context, profile, reason):
+        if self._diagnostic_observer is not None:
+            try:
+                self._diagnostic_observer.evidence_decided(
+                    result=result, context=context, profile=profile,
+                    evaluation=evaluation, reason=reason,
+                )
+            except Exception:
+                pass
         return evaluation
 
     def verified(self, result: object, *, context: object = None) -> bool:

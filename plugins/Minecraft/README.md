@@ -109,7 +109,46 @@ an existing trusted route is eligible. This policy is
 `IMPLEMENTED_VERIFIED_OFFLINE_LIVE_NOT_RUN`; see the
 [contextual active-command busy response contract](docs/chatclef-python-contextual-active-command-busy-response-pre-change-contract-2026-09-08.md).
 
-The next requested command-input expansion has three conceptually separated
+The 2026-09-13 focused input requirement is Korean XYZ movement from **both
+LAVI Chat and final microphone input**, using the existing GOTO execution path
+without requiring the user to type `@goto`. The
+[Korean Chat/microphone XYZ input contract](docs/chatclef-korean-goto-chat-microphone-input-contract-2026-09-13.md)
+records the original grammar/gate gaps and the implemented **Python-only** scope:
+translate Korean input to canonical `goto x y z`, preserve V3.1 movement and
+existing Korean feedback, add no `@go` alias, and make no Java or terminal-result
+projection changes. No Java rebuild or JAR replacement is required for this
+input connection.
+<!-- 20260913_kpopmodder: Distinguish tested Korean input wiring from unperformed live acceptance. -->
+The initial implementation was recorded as
+`IMPLEMENTED_VERIFIED_OFFLINE_LIVE_NOT_RUN`. Whole-utterance
+XYZ parsing, guarded rejection, original-coordinate binding, and existing live
+ingress proof checks connect the nine documented forms through the existing
+single-submission path. Trusted Chat/final-transcript fixtures are tested;
+actual microphone recognition and the complete live acceptance matrix remain
+unverified.
+See section 9 of the contract for test results, including an existing unrelated
+committed-Java-hash assertion failure in the broader Python regression suite.
+
+<!-- #20260913_kpopmodder: Record one user-run Chat arrival and the separate unimplemented arrival-response contract. -->
+A later user-run Chat case (`500 90 -928로 가줘`, 2026-09-13 12:52:49 KST)
+has correlated input, dispatch, and natural-completion logs; the user and F3
+screenshot confirm the target block was reached. The received result contains
+generic completion, and the reviewed source has no connected arrival-evidence
+response path; its cautious wording matches the observed output. The running
+JAR has not been reconciled with that source in this review. This is one
+observed Chat case, not full live acceptance or a fix for
+historical navigation failures. The
+[arrival-result and TTS response contract](docs/chatclef-goto-arrival-result-and-tts-response-pre-change-contract-2026-09-13.md)
+records the evidence and the original proposal, including the separate TTS
+latency investigation. That review was documentation only. The subsequent
+[arrival-result implementation](docs/chatclef-goto-arrival-result-implementation-2026-09-13.md)
+connects immutable same-dimension XYZ Task outcomes to Java results, Python
+validation, and shared Chat/TTS arrival or typed-failure responses. Legacy or
+unsupported evidence retains cautious wording. The implementation record lists
+source, test, artifact, and live-runtime verification separately. See section 10
+of the input contract for the earlier scoped status update.
+
+The earlier requested command-input expansion has three conceptually separated
 workstreams. At the 2026-09-11 incident audit, the local mixed, uncommitted
 worktree was observed to contain broader Korean XYZ ownership/grammar for the
 existing canonical `@goto`; one live incident verifies the narrow translation,

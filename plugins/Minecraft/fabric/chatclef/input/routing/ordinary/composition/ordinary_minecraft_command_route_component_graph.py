@@ -6,6 +6,8 @@ from plugins.Minecraft.fabric.chatclef.input.routing.ordinary.ordinary_submissio
 from ..rejection import OrdinaryTranslationRejectionStage
 from ..submission import OrdinarySubmissionResultStage
 from ..translation import OrdinaryTranslationStage
+from plugins.Minecraft.fabric.chatclef.input.routing.goto import GotoTranslationBindingStage
+from plugins.Minecraft.fabric.chatclef.input.routing.goto.goto_input_diagnostics import GotoInputDiagnostics
 from .ordinary_minecraft_command_route_compatibility_installer import (
     OrdinaryMinecraftCommandRouteCompatibilityInstaller,
 )
@@ -95,6 +97,10 @@ class OrdinaryMinecraftCommandRouteComponentGraph:
             rejection_stage=self.rejection_stage,
             precheck_stage=self.precheck_stage,
             submission_result_stage=self.submission_result_stage,
+            goto_binding_stage=GotoTranslationBindingStage(
+                live_proof_validator=live_proof_validator,
+                diagnostics=GotoInputDiagnostics(router_logger.log),
+            ),
         )
 
     def install_compatibility_seams(self, owner) -> None:

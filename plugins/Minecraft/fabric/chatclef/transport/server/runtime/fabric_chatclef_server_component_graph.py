@@ -3,6 +3,11 @@ from __future__ import annotations
 
 import threading
 
+#20260913_kpopmodder: Wire passive result and late-terminal diagnostic boundaries.
+from plugins.Minecraft.fabric.chatclef.diagnostics.goto_terminal import (
+    GotoTerminalDiagnosticObserver,
+)
+
 from plugins.Minecraft.fabric.chatclef.input.stop import StopControlClaimRegistry
 from plugins.Minecraft.fabric.chatclef.input.status.command_lifecycle.diagnostics import (
     CommandStatusRouteFailureFormatter,
@@ -40,6 +45,7 @@ from ...command_feedback.crafting import (
 from ...command_feedback.lifecycle import (
     CommandFeedbackServerApi,
     CommandTerminalEvidenceFailureReporter,
+    CommandTerminalEvidenceEvaluator,
 )
 from ...command_feedback.lifecycle.status import (
     CommandStatusFailureDiagnosticCustodyFactory,
@@ -88,7 +94,12 @@ class FabricChatClefServerComponentGraph:
         self.crafting_feedback_terminal_listener = (
             CraftingFeedbackTerminalListener()
         )
-        response_renderer = CommandLifecycleResponseRenderer()
+        goto_terminal_observer = GotoTerminalDiagnosticObserver(
+            diagnostics.info, role="late_terminal",
+        )
+        response_renderer = CommandLifecycleResponseRenderer(
+            diagnostic_observer=goto_terminal_observer,
+        )
         self.crafting_feedback_terminal_presenter = (
             CraftingFeedbackTerminalPresenter(
                 response_renderer=response_renderer,
@@ -97,7 +108,11 @@ class FabricChatClefServerComponentGraph:
         self.crafting_feedback_result_coordinator = (
             CraftingFeedbackResultCoordinator(
                 tracker=self.crafting_feedback_tracker,
-                effect_verifier=CraftingFeedbackEffectVerifier(),
+                effect_verifier=CraftingFeedbackEffectVerifier(
+                    evaluator=CommandTerminalEvidenceEvaluator(
+                        diagnostic_observer=goto_terminal_observer,
+                    ),
+                ),
                 response_renderer=self.crafting_feedback_terminal_presenter,
                 stop_terminal_arbitrator=CommandStopTerminalArbitrator(
                     self.stop_control_tracker_registry

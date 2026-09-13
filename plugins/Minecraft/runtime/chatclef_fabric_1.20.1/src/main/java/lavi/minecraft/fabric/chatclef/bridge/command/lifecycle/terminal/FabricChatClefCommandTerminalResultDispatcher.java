@@ -3,6 +3,7 @@ package lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.terminal;
 //20260905_kpopmodder: Commit and submit terminal ordinary-command result payloads.
 
 import lavi.minecraft.fabric.chatclef.bridge.command.diagnostics.FabricChatClefCommandDiagnostics;
+import lavi.minecraft.fabric.chatclef.bridge.command.diagnostics.gotoresult.GotoTerminalDiagnostics;
 import lavi.minecraft.fabric.chatclef.bridge.command.execution.FabricChatClefCommandExecution;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandResultOutbox;
 import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCommandTerminalDecision;
@@ -19,6 +20,7 @@ public final class FabricChatClefCommandTerminalResultDispatcher {
     private final FabricChatClefBridgeDiagnostics diagnostics;
     private final FabricChatClefCommandDiagnostics commandDiagnostics;
     private final FabricChatClefPreexistingIdleRootStabilityObserver stabilityObserver;
+    private final GotoTerminalDiagnostics gotoTerminalDiagnostics = new GotoTerminalDiagnostics();
 
     public FabricChatClefCommandTerminalResultDispatcher(
             FabricChatClefCommandResultOutbox resultOutbox,
@@ -61,7 +63,11 @@ public final class FabricChatClefCommandTerminalResultDispatcher {
             FabricChatClefCommandExecution execution,
             Supplier<FabricChatClefCommandResultPayload> resultFactory
     ) {
-        boolean sendStarted = resultOutbox.sendTerminal(execution, resultFactory);
+        //20260913_kpopmodder: The existing context commit invokes this factory once, including send retries.
+        boolean sendStarted = resultOutbox.sendTerminal(
+                execution,
+                () -> gotoTerminalDiagnostics.observeResult(execution, resultFactory.get())
+        );
         commandDiagnostics.info(
                 sendStarted ? "terminal_result_send_started" : "terminal_result_send_waiting",
                 execution,

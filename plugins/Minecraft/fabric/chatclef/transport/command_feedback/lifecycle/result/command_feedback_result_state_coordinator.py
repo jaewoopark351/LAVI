@@ -4,12 +4,15 @@ from __future__ import annotations
 
 from typing import Mapping
 
+from ..binding.goto.goto_task_binding_coordinator import GotoTaskBindingCoordinator
+
 
 class CommandFeedbackResultStateCoordinator:
     DISPATCH_STARTED = "dispatch_started"
 
-    def __init__(self, *, state) -> None:
+    def __init__(self, *, state, goto_bindings=None) -> None:
         self._state = state
+        self._goto_bindings = goto_bindings or GotoTaskBindingCoordinator()
 
     def matches_result(
         self,
@@ -39,6 +42,7 @@ class CommandFeedbackResultStateCoordinator:
         status: str,
         result_reason: str,
         evidence_sequence: object = None,
+        result_data: object = None,
     ) -> bool:
         if self._state.context is None or self._state.terminal_claimed:
             return False
@@ -50,6 +54,15 @@ class CommandFeedbackResultStateCoordinator:
         self._state.latest_status = str(status or "").strip().lower()
         self._state.latest_result_reason = str(result_reason or "").strip()
         self._state.latest_evidence_sequence = evidence_sequence
+        #20260913_kpopmodder: Observe only ordered, already-correlated running binding facts.
+        if self._state.latest_status == "running" and (
+            self._state.latest_result_reason == "goto_task_bound"
+            or (
+                self._state.latest_result_reason == self.DISPATCH_STARTED
+                and isinstance(result_data, Mapping) and "goto_binding" in result_data
+            )
+        ):
+            self._state.context = self._goto_bindings.bind(self._state.context, result_data)
         if (
             self._state.latest_status == "running"
             and self._state.latest_result_reason == self.DISPATCH_STARTED

@@ -10,6 +10,7 @@ import adris.altoclef.tasksystem.Task;
 import net.minecraft.util.math.BlockPos;
 //#if MC == 12001
 import lavi.minecraft.task.movement.gotopreflight.PreparedGotoTask;
+import lavi.minecraft.task.movement.gotoresult.tracking.GotoResultTaskFactory;
 //#endif
 
 /**
@@ -44,6 +45,8 @@ public class GotoCommand extends Command {
         Task task = getMovementTaskFor(target);
         //#if MC == 12001
         task = PreparedGotoTask.forCommand(mod, target, task);
+        //20260913_kpopmodder: Add terminal reporting only to the remaining native direct-XYZ command root.
+        task = GotoResultTaskFactory.observeLegacy(mod, target, task);
         //#endif
         mod.runUserTask(task, this::finish);
     }

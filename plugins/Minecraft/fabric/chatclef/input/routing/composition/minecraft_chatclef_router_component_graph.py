@@ -26,6 +26,10 @@ from plugins.Minecraft.fabric.chatclef.input.ownership import (
 from plugins.Minecraft.fabric.chatclef.input.routing.ordinary import (
     OrdinaryMinecraftCommandRouteCoordinator,
 )
+from plugins.Minecraft.fabric.chatclef.input.routing.goto import GotoInputRouteGuard
+from plugins.Minecraft.fabric.chatclef.input.routing.goto.goto_input_diagnostics import (
+    GotoInputDiagnostics,
+)
 from plugins.Minecraft.fabric.chatclef.input.routing.orchestration import (
     MinecraftChatClefRouteFailureHandler,
     MinecraftInputRouteOrderingCoordinator,
@@ -346,6 +350,13 @@ class MinecraftChatClefRouterComponentGraph:
             ),
             status_publication_emergency_decision=(
                 self.command_status_emergency_decision
+            ),
+            #20260913_kpopmodder: Reuse the existing proof owner without issuing new evidence.
+            goto_input_route_guard=GotoInputRouteGuard(
+                live_proof_validator=(
+                    self.trusted_input_route_coordinator.is_live_proof
+                ),
+                diagnostics=GotoInputDiagnostics(self.router_logger.log),
             ),
         )
 

@@ -4,13 +4,21 @@ from __future__ import annotations
 import uuid
 from typing import Any, Mapping
 
+from plugins.Minecraft.fabric.chatclef.intent.navigation.goto import (
+    KoreanGotoCoordinateParser,
+)
+
 
 def natural_language_text(command: Any) -> str:
     if isinstance(command, str):
-        return command.strip()
-    if isinstance(command, Mapping):
-        return str(command.get("text") or command.get("command") or "").strip()
-    return str(command or "").strip()
+        text = command
+    elif isinstance(command, Mapping):
+        text = str(command.get("text") or command.get("command") or "")
+    else:
+        text = str(command or "")
+    #20260913_kpopmodder: Retain valid raw XYZ text at both legacy translation/request boundaries.
+    # Other commands keep their existing coercion; this pure parse grants no authority.
+    return text if KoreanGotoCoordinateParser().parse(text).executable else text.strip()
 
 
 def request_source(command: Any) -> str:

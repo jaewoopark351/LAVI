@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from ...terminal.store_home import KoreanStoreHomeTerminalRenderer
+from ...terminal.goto import KoreanGotoTerminalRenderer
 from ..arguments.command_feedback_descriptor_phrase_semantics import get_verb
 
 
@@ -14,6 +15,7 @@ class KoreanCommandTerminalRenderer:
         hunger_renderer,
         particle_renderer,
         store_home_renderer=None,
+        goto_renderer=None,
     ) -> None:
         self._subjects = subject_renderer
         self._locations = location_renderer
@@ -22,6 +24,7 @@ class KoreanCommandTerminalRenderer:
         self._store_home = (
             store_home_renderer or KoreanStoreHomeTerminalRenderer()
         )
+        self._goto = goto_renderer or KoreanGotoTerminalRenderer()
 
     def render(
         self,
@@ -32,6 +35,7 @@ class KoreanCommandTerminalRenderer:
         verified: bool,
         dispatch_started: bool,
         evidence_projection: object = None,
+        failure_projection: object = None,
     ) -> str:
         if (
             status == "accepted_without_result_callback"
@@ -49,7 +53,7 @@ class KoreanCommandTerminalRenderer:
                 evidence_projection,
             )
         if status == "failed":
-            return self._failed(descriptor, profile, dispatch_started)
+            return self._failed(descriptor, profile, dispatch_started, failure_projection)
         if status == "rejected":
             return self._rejected(descriptor, profile)
         if status == "cancelled":
@@ -87,6 +91,10 @@ class KoreanCommandTerminalRenderer:
             strong_response = self._store_home.render(evidence_projection)
             if strong_response is not None:
                 return strong_response
+        if family == "movement_goto" and verified:
+            arrival = self._goto.arrival(evidence_projection)
+            if arrival is not None:
+                return arrival
         destination = self._particle.attach_directional(
             self._locations.render(descriptor)
         )
@@ -106,7 +114,10 @@ class KoreanCommandTerminalRenderer:
             f"{profile.command_label} 작업은 끝났는데, 요청한 결과는 확인하지 못했어",
         )
 
-    def _failed(self, descriptor: object, profile: object, began: bool) -> str:
+    def _failed(
+        self, descriptor: object, profile: object, began: bool,
+        failure_projection: object = None,
+    ) -> str:
         family = profile.family
         subject = self._subjects.render(descriptor, profile)
         if family == "item_get":
@@ -125,6 +136,9 @@ class KoreanCommandTerminalRenderer:
             action = "건네다가 실패했어" if began else "건네지 못했어"
             return f"{subject} {action}"
         if family == "movement_goto":
+            failure = self._goto.failure(failure_projection)
+            if failure is not None:
+                return failure
             destination = self._particle.attach_directional(
                 self._locations.render(descriptor)
             )

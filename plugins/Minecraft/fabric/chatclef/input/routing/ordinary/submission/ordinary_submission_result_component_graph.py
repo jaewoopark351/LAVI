@@ -12,6 +12,10 @@ from plugins.Minecraft.fabric.chatclef.transport.command_feedback.lifecycle impo
     CommandFeedbackDescriptorFactory,
     CommandFeedbackSubmissionObserver,
 )
+#20260913_kpopmodder: Observe immediate terminal rendering through the existing logger.
+from plugins.Minecraft.fabric.chatclef.diagnostics.goto_terminal import (
+    GotoTerminalDiagnosticObserver,
+)
 
 
 class OrdinarySubmissionResultComponentGraph:
@@ -42,7 +46,11 @@ class OrdinarySubmissionResultComponentGraph:
             decision_factory
         )
         #20260907_kpopmodder: Assemble generalized admission without changing route authority.
-        response_renderer = CommandLifecycleResponseRenderer()
+        response_renderer = CommandLifecycleResponseRenderer(
+            diagnostic_observer=GotoTerminalDiagnosticObserver(
+                router_logger.log, role="immediate_coalesced",
+            ),
+        )
         self.command_feedback = CommandFeedbackSubmissionObserver(
             extension=extension,
             admission_coordinator=CommandFeedbackAdmissionCoordinator(

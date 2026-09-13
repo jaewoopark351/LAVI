@@ -125,14 +125,14 @@ class CommandLifecycleRegistryContractTests(unittest.TestCase):
                     lifecycle_kinds.profile(command_name).terminal_trigger,
                 )
 
-    def test_only_get_and_trusted_store_home_profiles_are_verified(self):
+    def test_only_get_store_home_and_bound_goto_profiles_are_verified(self):
         evidence = CommandTerminalEvidenceProfileRegistry()
 
         for command_name in EXPECTED_COMMANDS:
             with self.subTest(command_name=command_name):
                 expected = (
                     CommandTerminalEvidenceProfile.VERIFIED
-                    if command_name in {"get", "store_home"}
+                    if command_name in {"get", "store_home", "goto"}
                     else CommandTerminalEvidenceProfile.CAUTIOUS
                 )
                 self.assertEqual(expected, evidence.profile(command_name).rollout_state)
@@ -144,6 +144,7 @@ class CommandLifecycleRegistryContractTests(unittest.TestCase):
             "store_home_completion",
             evidence.profile("store_home").success_evaluator_id,
         )
+        self.assertEqual("goto_terminal", evidence.profile("goto").success_evaluator_id)
 
     def test_corrected_acquisition_and_home_labels_are_not_ambiguous(self):
         profiles = CommandPhraseProfileRegistry()

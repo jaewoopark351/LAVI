@@ -22,6 +22,7 @@ class MinecraftInputRouteOrderingCoordinator:
         failure_handler,
         status_publication_custody_policy=None,
         status_publication_emergency_decision=None,
+        goto_input_route_guard=None,
     ):
         self._input_event_normalizer = input_event_normalizer
         self._intent_gate = intent_gate
@@ -59,6 +60,7 @@ class MinecraftInputRouteOrderingCoordinator:
             status_publication_emergency_decision=(
                 status_publication_emergency_decision
             ),
+            goto_input_route_guard=goto_input_route_guard,
         )
         self._input_gate_inspector = self._component_graph.input_gate_inspector
         self._optional_route_owner_invoker = (

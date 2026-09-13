@@ -8,6 +8,19 @@
 
 Date: 2026-09-09
 
+> 2026-09-13 focused follow-up: the user requires Korean coordinate movement
+> from both LAVI Chat and final microphone input, without typing `@goto`.
+> See the [Korean Chat/microphone XYZ input contract](chatclef-korean-goto-chat-microphone-input-contract-2026-09-13.md)
+> for the newly reviewed `99af65f2` baseline, grammar/gate gaps, and preservation
+> of current V3.1 movement. The user's final scope is Python-only Korean input
+> using canonical `goto`: no LAVI or native `@go` alias, no Java changes/build,
+> and no new terminal-result projection. Earlier follow-up alias/result plans
+> are superseded. The optional native alias discussion in Sections 5.4 and 17.6
+> below is not an active requirement or prerequisite for this Python work.
+> The status blocks and incident evidence below retain their dated scope;
+> this link neither implements the input expansion nor supersedes safety gates,
+> FIND decisions, or unrelated all-command rollout requirements.
+
 ## 1. Document status
 
 This document records the requested behavior against the historical reviewed

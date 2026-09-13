@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import threading
 import unittest
+from dataclasses import replace
 from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 from input_core.input_event.adapters import (
     LocalChatInputEventAdapter,
@@ -31,6 +33,15 @@ from plugins.Minecraft.common.protocol.command_result_status import (
 from plugins.Minecraft.fabric.chatclef.extension import (
     MinecraftFabricChatClefExtension,
 )
+from plugins.Minecraft.fabric.chatclef.input.eligibility import (
+    KoreanChatMicrophoneEligibilityAdmission,
+)
+from plugins.Minecraft.fabric.chatclef.intent.chatclef_natural_language_service import (
+    ChatClefNaturalLanguageService,
+)
+from plugins.Minecraft.fabric.chatclef.intent.chatclef_translation_result_dto import (
+    ChatClefTranslationResultDTO,
+)
 from plugins.Minecraft.fabric.chatclef.transport.command_feedback.lifecycle import (
     CommandFeedbackAdmissionCoordinator,
     CommandFeedbackDescriptorFactory,
@@ -43,6 +54,383 @@ from plugins.Minecraft.fabric.chatclef.transport.fabric_chatclef_connection_owne
 
 
 class TrustedKoreanChatVoiceIntegrationTests(unittest.TestCase):
+    #20260913_kpopmodder: Exercise the real consumed-ingress route, not source-string-only GOTO fixtures.
+    def test_all_nine_goto_forms_preserve_chat_and_final_voice_submission(self):
+        inputs = (
+            "500 90 -928로 가줘",
+            "500,90,-928으로 가줘",
+            "500, 90, -928 좌표로 가줘",
+            "좌표 500, 90, -928로 이동해줘",
+            "x 500 y 90 z -928로 가줘",
+            "x=500, y=90, z=-928 좌표로 가줘",
+            "엑스 500 와이 90 제트 마이너스 928 좌표로 가줘",
+            "500 90 마이너스 928로 가줘",
+            "(500, 90, -928)으로 이동해",
+        )
+        for text in inputs:
+            for voice in (False, True):
+                with self.subTest(text=text, voice=voice):
+                    adapter = _RecordingMinecraftAdapter()
+                    service = ChatClefNaturalLanguageService()
+                    extension = MinecraftFabricChatClefExtension(
+                        adapter=adapter, natural_language_service=service,
+                    )
+                    llm, pipeline, _outputs = _llm_harness(extension)
+                    with patch.object(
+                        service, "translate", wraps=service.translate,
+                    ) as translate, patch.object(
+                        llm.input_router, "route_trusted_user_input",
+                        wraps=llm.input_router.route_trusted_user_input,
+                    ) as route:
+                        _dispatch_goto_input(llm, text, voice=voice)
+
+                    translate.assert_called_once_with(text)
+                    self.assertEqual(1, route.call_count)
+                    event, evidence = route.call_args.args
+                    self.assertIsNotNone(evidence)
+                    self.assertEqual(text, event.text)
+                    self.assertEqual(1, len(adapter.requests))
+                    request = adapter.requests[0]
+                    self.assertEqual("goto 500 90 -928", request.command)
+                    self.assertEqual(
+                        "voice_input_final" if voice else "lavi_chat_ui",
+                        request.source,
+                    )
+                    self.assertEqual(
+                        {
+                            "source": event.source,
+                            "provider_id": event.provider_id,
+                            "event_kind": event.event_kind,
+                            "final": event.final,
+                            "event_id": event.event_id,
+                        },
+                        request.metadata["input_event"],
+                    )
+                    self.assertEqual(
+                        text, request.metadata["natural_language"]["original_text"],
+                    )
+                    self.assertEqual(0, pipeline.provider_calls)
+
+    def test_goto_outer_spaces_preserve_raw_event_translation_and_submission(self):
+        text = "  500, 90, -928 좌표로 가줘  "
+        for voice in (False, True):
+            with self.subTest(voice=voice):
+                adapter = _RecordingMinecraftAdapter()
+                service = ChatClefNaturalLanguageService()
+                extension = MinecraftFabricChatClefExtension(
+                    adapter=adapter, natural_language_service=service,
+                )
+                llm, pipeline, _outputs = _llm_harness(extension)
+                with patch.object(
+                    service, "translate", wraps=service.translate,
+                ) as translate, patch.object(
+                    extension, "translate_natural_language_command",
+                    wraps=extension.translate_natural_language_command,
+                ) as extension_translate, patch.object(
+                    llm.input_router, "route_trusted_user_input",
+                    wraps=llm.input_router.route_trusted_user_input,
+                ) as route:
+                    yielded, _queued = _dispatch_goto_input(llm, text, voice=voice)
+
+                extension_translate.assert_called_once_with(text)
+                translate.assert_called_once_with(text)
+                self.assertEqual(1, route.call_count)
+                event, _evidence = route.call_args.args
+                self.assertEqual(text, event.text)
+                self.assertEqual(1, len(adapter.requests))
+                request = adapter.requests[0]
+                self.assertEqual("goto 500 90 -928", request.command)
+                self.assertEqual(
+                    text, request.metadata["natural_language"]["translation_input_text"],
+                )
+                self.assertEqual(
+                    text, request.metadata["natural_language"]["original_text"],
+                )
+                self.assertEqual(event.event_id, request.metadata["input_event"]["event_id"])
+                self.assertEqual(event.source, request.source)
+                self.assertEqual(1, len(yielded))
+                response = getattr(yielded[0], "content", yielded[0])
+                for coordinate in ("500", "90", "-928"):
+                    self.assertIn(coordinate, response)
+                self.assertNotIn("도착했어", response)
+                self.assertEqual(0, pipeline.provider_calls)
+
+    def test_goto_logging_enabled_disabled_or_failing_preserves_route_outcome(self):
+        for text, valid in (
+            ("500, 90, -928 좌표로 가줘", True),
+            ("500.5 90 -928로 이동해", False),
+        ):
+            for voice in (False, True):
+                responses = []
+                for mode in ("enabled", "disabled", "failing"):
+                    with self.subTest(text=text, voice=voice, mode=mode):
+                        adapter = _RecordingMinecraftAdapter()
+                        service = ChatClefNaturalLanguageService()
+                        extension = MinecraftFabricChatClefExtension(
+                            adapter=adapter, natural_language_service=service,
+                        )
+                        llm, pipeline, _outputs = _llm_harness(extension)
+                        logs = []
+                        callback = Mock(
+                            side_effect=(
+                                logs.append if mode == "enabled"
+                                else RuntimeError("test diagnostic sink failed")
+                                if mode == "failing" else None
+                            ),
+                        )
+                        with patch.object(
+                            llm.input_router._router_logger, "_log_callback", callback,
+                        ), patch.object(
+                            service, "translate", wraps=service.translate,
+                        ) as translate:
+                            yielded, _queued = _dispatch_goto_input(llm, text, voice=voice)
+
+                        self.assertEqual(int(valid), translate.call_count)
+                        self.assertEqual(int(valid), len(adapter.requests))
+                        self.assertEqual(0, pipeline.provider_calls)
+                        self.assertEqual(1, len(yielded))
+                        responses.append(getattr(yielded[0], "content", yielded[0]))
+                        self.assertGreater(callback.call_count, 0)
+                        if mode == "enabled":
+                            boundaries = [line for line in logs if "event=korean_goto_input" in line]
+                            self.assertEqual(2 if valid else 1, len(boundaries))
+                            self.assertTrue(all(text not in line for line in boundaries))
+                self.assertEqual([responses[0]] * 3, responses)
+
+    def test_goto_questions_quotes_and_negation_return_to_conversation(self):
+        inputs = (
+            "500 90 -928로 가지 마",
+            "좌표 500 90 -928로 가면 어떻게 돼?",
+            '"500 90 -928로 가줘"라고 말했어',
+            "500 90 -928로 가줘?",
+            "집에 가줘",
+        )
+        for text in inputs:
+            for voice in (False, True):
+                with self.subTest(text=text, voice=voice):
+                    adapter = _RecordingMinecraftAdapter()
+                    service = SimpleNamespace(translate=Mock(
+                        side_effect=AssertionError("Minecraft translation must not run"),
+                    ))
+                    extension = MinecraftFabricChatClefExtension(
+                        adapter=adapter, natural_language_service=service,
+                    )
+                    llm, pipeline, outputs = _llm_harness(extension)
+
+                    yielded, _queued = _dispatch_goto_input(llm, text, voice=voice)
+
+                    self.assertEqual([f"LLM:{text}"], yielded)
+                    self.assertEqual(1, pipeline.provider_calls)
+                    service.translate.assert_not_called()
+                    self.assertEqual([], outputs)
+                    self.assertEqual([], adapter.requests)
+
+    def test_invalid_goto_requests_clarify_once_without_translation_or_submission(self):
+        inputs = (
+            "500 90 좌표로 가줘",
+            "500 90 -928 4 좌표로 가줘",
+            "500.5 90 -928로 이동해",
+            "2147483648 90 -928 좌표로 가줘",
+            "x 500 z -928 y 90 좌표로 가줘",
+            "x 500 y 90 x -928 좌표로 가줘",
+            "500 90 마이너스 -928로 가줘",
+            "오백 구십 마이너스 구백이십팔 좌표로 가줘",
+            "~500 90 -928 좌표로 가줘",
+            "500 90 -928 네더로 이동해줘",
+            "500 90 -928로 가고 좀비 공격해",
+            "(500, 90, -928으로 이동해",
+            "500\t90 -928로 이동해",
+            "\n500 90 -928로 이동해",
+            "500 90 -928로 이동해\r\n",
+        )
+        for text in inputs:
+            for voice in (False, True):
+                with self.subTest(text=text, voice=voice):
+                    adapter = _RecordingMinecraftAdapter()
+                    service = SimpleNamespace(translate=Mock(
+                        side_effect=AssertionError("Invalid GOTO must terminate before translation"),
+                    ))
+                    extension = MinecraftFabricChatClefExtension(
+                        adapter=adapter, natural_language_service=service,
+                    )
+                    llm, pipeline, outputs = _llm_harness(extension)
+
+                    yielded, _queued = _dispatch_goto_input(llm, text, voice=voice)
+
+                    self.assertEqual(1, len(yielded))
+                    self.assertEqual(1, len(outputs))
+                    self.assertEqual(0, pipeline.provider_calls)
+                    service.translate.assert_not_called()
+                    self.assertEqual([], adapter.requests)
+
+    def test_goto_final_voice_queue_replay_cannot_submit_twice(self):
+        adapter = _RecordingMinecraftAdapter()
+        extension = MinecraftFabricChatClefExtension(adapter=adapter)
+        llm, pipeline, _outputs = _llm_harness(extension)
+
+        _yielded, queued = _dispatch_goto_input(
+            llm, "500 90 -928로 가줘", voice=True,
+        )
+        self.assertEqual(1, len(adapter.requests))
+        first_request_id = adapter.requests[0].request_id
+        list(llm.accept_queued_input(queued, [], "system"))
+
+        self.assertEqual([first_request_id], [row.request_id for row in adapter.requests])
+        self.assertEqual(0, pipeline.provider_calls)
+
+    def test_goto_same_words_in_new_events_are_not_permanently_deduplicated(self):
+        adapter = _RecordingMinecraftAdapter()
+        extension = MinecraftFabricChatClefExtension(adapter=adapter)
+        llm, pipeline, _outputs = _llm_harness(extension)
+        voice_adapter = ProviderBoundInputEventAdapter(
+            provider=_voice_provider(), output_callback=lambda _event: None,
+            source_resolver=InputProviderSourceResolver(),
+        )
+        voice = llm.create_trusted_voice_input_final_enqueue_coordinator(voice_adapter)
+        for _attempt in range(2):
+            self.assertIsNotNone(voice.enqueue("500 90 -928로 가줘"))
+            queued = llm.input_queue_worker.input_queue.get_nowait()
+            list(llm.accept_queued_input(queued, [], "system"))
+        self.assertEqual(2, len(adapter.requests))
+        self.assertNotEqual(adapter.requests[0].request_id, adapter.requests[1].request_id)
+        self.assertNotEqual(
+            adapter.requests[0].metadata["input_event"]["event_id"],
+            adapter.requests[1].metadata["input_event"]["event_id"],
+        )
+        self.assertEqual(0, pipeline.provider_calls)
+
+    def test_goto_busy_preserves_active_work_and_does_not_submit_or_replay(self):
+        adapter = _ActiveStatusLifecycleAdapter()
+        extension = MinecraftFabricChatClefExtension(adapter=adapter)
+        llm, pipeline, outputs = _llm_harness(extension)
+        for voice in (False, True):
+            yielded, _queued = _dispatch_goto_input(
+                llm, "500 90 -928로 가줘", voice=voice,
+            )
+            self.assertEqual(1, len(yielded))
+        self.assertEqual([], adapter.command_requests)
+        self.assertEqual(adapter.active_identity, adapter.current_active_identity())
+        self.assertEqual(
+            ["command_busy_current_work", "command_busy_current_work"],
+            [row["route_kind"] for row in outputs],
+        )
+        self.assertEqual(0, pipeline.provider_calls)
+
+    def test_goto_binding_rejects_consistent_mutated_intent_and_command(self):
+        replacements = (
+            {"intent_type": "goto", "x": 501, "y": 90, "z": -928},
+            {"intent_type": "get_item", "item_phrase": "다이아몬드", "quantity": 1},
+        )
+        for replacement in replacements:
+            for voice in (False, True):
+                with self.subTest(replacement=replacement, voice=voice):
+                    payload = {
+                        "status": "validated", "executable": True,
+                        "command": (
+                            "goto 501 90 -928" if replacement["intent_type"] == "goto"
+                            else "get diamond 1"
+                        ),
+                        "intent": replacement, "resolved_target": "diamond",
+                    }
+                    translation = ChatClefTranslationResultDTO.from_mapping(payload)
+                    service = SimpleNamespace(translate=Mock(return_value=translation))
+                    adapter = _RecordingMinecraftAdapter()
+                    extension = MinecraftFabricChatClefExtension(
+                        adapter=adapter, natural_language_service=service,
+                    )
+                    llm, pipeline, _outputs = _llm_harness(extension)
+
+                    _dispatch_goto_input(llm, "500 90 -928로 가줘", voice=voice)
+
+                    service.translate.assert_called_once()
+                    self.assertEqual([], adapter.requests)
+                    self.assertEqual(0, pipeline.provider_calls)
+
+    def test_translation_cannot_invent_goto_for_non_goto_raw_input(self):
+        translation = ChatClefTranslationResultDTO.from_mapping({
+            "status": "validated", "executable": True,
+            "command": "goto 500 90 -928",
+            "intent": {"intent_type": "goto", "x": 500, "y": 90, "z": -928},
+        })
+        for voice in (False, True):
+            with self.subTest(voice=voice):
+                adapter = _RecordingMinecraftAdapter()
+                service = SimpleNamespace(translate=Mock(return_value=translation))
+                extension = MinecraftFabricChatClefExtension(
+                    adapter=adapter, natural_language_service=service,
+                )
+                llm, pipeline, _outputs = _llm_harness(extension)
+
+                _dispatch_goto_input(llm, "다이아몬드 캐줘", voice=voice)
+
+                service.translate.assert_called_once()
+                self.assertEqual([], adapter.requests)
+                self.assertEqual(0, pipeline.provider_calls)
+
+    def test_goto_missing_foreign_or_closed_proof_never_reaches_translation(self):
+        for fault in ("missing", "foreign_owner", "foreign_event", "closed", "interim"):
+            with self.subTest(fault=fault):
+                adapter = _RecordingMinecraftAdapter()
+                service = ChatClefNaturalLanguageService()
+                extension = MinecraftFabricChatClefExtension(
+                    adapter=adapter, natural_language_service=service,
+                )
+                llm, _pipeline, _outputs = _llm_harness(extension)
+                factory = llm.trusted_ingress_producer_registrar_factory
+                chat_adapter = LocalChatInputEventAdapter()
+                factory._bind_local_chat_input_event_adapter(chat_adapter)
+                delivery = factory.begin_invocation(
+                    input_event_adapter=chat_adapter, source_policy=chat_adapter.policy,
+                ).create_registered_delivery("좌표 500 90 -928로 이동해줘")
+                event = delivery.event
+                evidence = delivery.accept_for_dispatch().consume_for_eligibility()
+                owner = object() if fault == "foreign_owner" else llm.input_router
+                proof, reason = KoreanChatMicrophoneEligibilityAdmission(
+                    llm.trusted_user_input_ingress_claim_registry.validate_consumed_evidence,
+                ).issue(event=event, consumed_ingress_evidence=evidence, owner=owner)
+                self.assertEqual("eligible", reason)
+                self.assertTrue(proof.matches_event(event, owner))
+                if fault == "foreign_event":
+                    event = replace(event, event_id="f" * 32)
+                elif fault == "closed":
+                    self.assertTrue(proof.close())
+                elif fault == "interim":
+                    event = replace(
+                        event, source="voice_input_partial", provider_id="VoiceInput",
+                        event_kind="partial_transcript", final=False,
+                    )
+                try:
+                    with patch.object(service, "translate", wraps=service.translate) as translate:
+                        llm.input_router.route(
+                            event,
+                            korean_eligibility_proof=None if fault == "missing" else proof,
+                        )
+                    self.assertEqual([], adapter.requests)
+                    if fault != "interim":
+                        translate.assert_not_called()
+                finally:
+                    proof.close()
+
+    def test_goto_disconnected_input_is_consumed_without_queueing_retry(self):
+        for voice in (False, True):
+            with self.subTest(voice=voice):
+                adapter = _RecordingMinecraftAdapter()
+                extension = MinecraftFabricChatClefExtension(adapter=adapter)
+                llm, pipeline, _outputs = _llm_harness(extension)
+                disconnected = replace(
+                    adapter.get_status(), connected=False,
+                    lifecycle_state=BridgeLifecycleState.DISCONNECTED,
+                )
+                with patch.object(adapter, "get_status", return_value=disconnected):
+                    yielded, _queued = _dispatch_goto_input(
+                        llm, "500 90 -928로 가줘", voice=voice,
+                    )
+
+                self.assertEqual(1, len(yielded))
+                self.assertEqual(0, pipeline.provider_calls)
+                self.assertEqual([], adapter.requests)
+                self.assertTrue(llm.input_queue_worker.input_queue.empty())
+
     def test_chat_and_final_voice_contextual_status_publish_once_without_llm(self):
         adapter = _ActiveStatusLifecycleAdapter()
         extension = MinecraftFabricChatClefExtension(adapter=adapter)
@@ -541,6 +929,23 @@ class TrustedKoreanChatVoiceIntegrationTests(unittest.TestCase):
         self.assertEqual(["LLM:hello"], yielded)
         self.assertEqual(1, pipeline.provider_calls)
         self.assertEqual([], outputs)
+
+
+#20260913_kpopmodder: Reuse the existing trusted producers for focused GOTO input acceptance.
+def _dispatch_goto_input(llm, text, *, voice):
+    if not voice:
+        return list(_chat_coordinator(llm).dispatch(text, [], "system")), None
+    voice_adapter = ProviderBoundInputEventAdapter(
+        provider=_voice_provider(),
+        output_callback=lambda _event: None,
+        source_resolver=InputProviderSourceResolver(),
+    )
+    coordinator = llm.create_trusted_voice_input_final_enqueue_coordinator(voice_adapter)
+    receipt = coordinator.enqueue(text)
+    if receipt is None:
+        raise AssertionError("trusted final-voice fixture was not queued")
+    queued = llm.input_queue_worker.input_queue.get_nowait()
+    return list(llm.accept_queued_input(queued, [], "system")), queued
 
 
 def _llm_harness(extension):
