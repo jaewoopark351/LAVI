@@ -26,7 +26,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 //20260904_kpopmodder: Added this type file to keep one primary Java type per file.
 final class DepositAllInventoryPressureBulkTrustReevaluationTest {
     @Test
-    void bulkRevisionChangeIsObservedOnlyWhenThePressureChainTicksAgain() {
+    //20260914_kpopmodder: A registry revision alone is not cause-related storage recovery evidence.
+    void bulkRevisionAloneDoesNotReleaseThePressureWait() {
         try (HeadlessMinecraftClientSession ignored =
                      HeadlessMinecraftClientSession.inGame()) {
             HeadlessAltoClef mod = new HeadlessAltoClef();
@@ -73,7 +74,7 @@ final class DepositAllInventoryPressureBulkTrustReevaluationTest {
 
             chain.onEndClientTick();
 
-            assertEquals(DepositAllInventoryPressureState.ARMED, stateMachine.state());
+            assertEquals(DepositAllInventoryPressureState.WAIT_FOR_REARM, stateMachine.state());
         }
     }
 

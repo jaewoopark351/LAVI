@@ -9,6 +9,7 @@ import adris.altoclef.util.ItemTarget;
 import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.slots.Slot;
 import lavi.minecraft.task.container.deposit.auto.working.PlayerInventorySnapshotReader;
+import lavi.minecraft.task.container.deposit.auto.recovery.progress.ConfirmedRecoveredItemCount;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.screen.slot.SlotActionType;
@@ -27,6 +28,8 @@ public final class ExactPickupFromContainerTask extends AbstractDoToStorageConta
     private final Map<Item, Integer> targetInventoryCounts;
     private final Map<Item, Integer> remainingWithdrawal;
     private final PlayerInventorySnapshotReader inventoryReader = new PlayerInventorySnapshotReader();
+    //20260914_kpopmodder: Count only the existing successful withdrawal-confirmation boundary.
+    private final ConfirmedRecoveredItemCount recoveredItems = new ConfirmedRecoveredItemCount();
 
     private Result result = Result.RUNNING;
     private MoveItemToSlotTask moveTask;
@@ -174,6 +177,7 @@ public final class ExactPickupFromContainerTask extends AbstractDoToStorageConta
         }
         remainingWithdrawal.computeIfPresent(movingItem, (ignored, remaining) ->
                 Math.max(0, remaining - Math.min(plannedTransfer, gained)));
+        recoveredItems.add(Math.min(plannedTransfer, gained));
         moveTask = null;
         sourceSlot = null;
         movingItem = null;
@@ -204,6 +208,10 @@ public final class ExactPickupFromContainerTask extends AbstractDoToStorageConta
 
     public Result result() {
         return result;
+    }
+
+    public int confirmedRecoveredCount() {
+        return recoveredItems.total();
     }
 
     @Override

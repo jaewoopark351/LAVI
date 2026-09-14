@@ -52,7 +52,7 @@ public final class DepositAllAutoDiagnostics {
         logObserved(
                 CATEGORY,
                 "TRIGGERED",
-                "high_water_threshold_crossed",
+                snapshot.isAtOrAboveThreshold() ? "automatic_storage_admitted" : "same_unit_resumed_below_threshold",
                 task,
                 "occupiedSlots", snapshot.occupiedSlots(),
                 "totalSlots", snapshot.totalSlots(),

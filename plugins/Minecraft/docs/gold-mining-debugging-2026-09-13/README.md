@@ -69,6 +69,8 @@
 
 ## 관련 문서
 
+- [2026-09-14 자동보관 종료 후 재실행 설계](../auto-deposit-rearm-2026-09-14/README.md): 이후 실행에서 확인한 `33→35→30→WAIT→36`과 결과·재무장·유한 한도·STOP의 별도 수정 설계. 아직 미구현이다.
+
 - [프로젝트 지침](../../../../AGENTS.md), [백엔드 분리](../minecraft-backend-separation.md), [ChatClef 연동 방향](../chatclef-carryon-integration-direction.md)
 - [도구 반복·자동보관 로그 보강 계획](../chatclef-gold-mining-tool-loop-auto-deposit-diagnostics-plan-2026-09-13.md)
 - [공유 목록·예약 요약 관측 구현](../chatclef-shared-block-read-checkpoint-diagnostics-2026-09-13.md)

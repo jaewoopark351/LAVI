@@ -537,9 +537,27 @@ It separates exact selected-tool equipping, operation-owned hotbar placement,
 consistent block/protection snapshots, and user-root replacement terminal handling.
 The source/stack mismatch and 1,216 preparation re-entries are recorded;
 the exact null-producing write remains unproven. The observed 31/36 inventory
-occupancy was below the automatic-deposit threshold. These behavior repairs are
-`PLAN_ONLY`; automatic defense remains required and the earlier implementation
-and runtime checkpoints retain their original statuses.
+occupancy was below the automatic-deposit threshold. These repairs were initially
+documented as `PLAN_ONLY`; their later source and verification results are tracked
+in the [implementation record](docs/gold-mining-debugging-2026-09-13/implementation.md).
+Automatic defense remains required, and earlier runtime checkpoints retain their
+original statuses.
+
+<!-- 20260914_kpopmodder: Index the outcome-aware auto-deposit rearm design separately from the completed mining changes. -->
+For the later user-run automatic-deposit sequence `33 -> 35 -> 30 -> WAIT -> 36`,
+read the [automatic-deposit rearm design](docs/auto-deposit-rearm-2026-09-14/README.md).
+The completed run waits for low water or a trusted-registry revision change and
+does not evaluate a new plan when inventory fills again. Five cleared transfer
+source slots and three net freed slots are distinct observations. The new design
+covers terminal results, renewed inventory pressure, bounded continuation,
+survival preemption, and STOP. It is `NOT_IMPLEMENTED`. Automatic defense always
+takes priority over storage. Preemption does not consume storage-failure limits
+or erase prior actual failures and lack of progress. The earlier two-root-registration
+and bounded safety-resume-count proposals are withdrawn; limits on actual failed
+work, lack of progress, and continued storage still need concrete measurement boundaries
+and values. Storage cleanup must preserve defense-owned weapon selection, inputs,
+and paths. Required items, trusted routing, STOP, and manual storage priority remain
+part of the preservation contract.
 
 <!-- 20260913_kpopmodder: Distinguish the later observer-registration crash from the earlier Mixin startup failure. -->
 For the 2026-09-13 20:19:38 `ToolEquipDiagnostics` initialization crash, read the
@@ -830,7 +848,8 @@ Audit and active snapshot:
   chatclef-engine-divergence-record.md
 
 Incident analyses:
-  gold-mining-debugging-2026-09-13/README.md (reviewed repair design; evidence and four focused units; documentation only)
+  auto-deposit-rearm-2026-09-14/README.md (outcome-aware rearm design, evidence and verification plan; not implemented)
+  gold-mining-debugging-2026-09-13/README.md (four focused repair units; implementation and verification record linked)
   chatclef-baritone-builder-empty-movements-diagnostics-plan-2026-09-13.md (logging-only implemented; verification record linked)
   chatclef-gold-mining-tool-loop-auto-deposit-diagnostics-plan-2026-09-13.md (logging-only implemented; verification record linked)
   chatclef-resource-observation-implementation-2026-09-13.md (logging-only implementation and separate test/build/runtime results)

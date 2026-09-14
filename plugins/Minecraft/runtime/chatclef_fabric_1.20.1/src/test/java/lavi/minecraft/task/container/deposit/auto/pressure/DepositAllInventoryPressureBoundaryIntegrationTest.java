@@ -8,6 +8,7 @@ import lavi.minecraft.task.container.deposit.auto.DepositAllInventoryPressureCha
 import lavi.minecraft.task.container.deposit.auto.DepositAllInventoryPressureSnapshot;
 import lavi.minecraft.task.container.deposit.auto.DepositAllInventoryPressureState;
 import lavi.minecraft.task.container.deposit.auto.DepositAllInventoryPressureStateMachine;
+import lavi.minecraft.task.container.deposit.auto.maintenance.relief.AutoDepositFreeSlotVerifier;
 import lavi.minecraft.task.container.deposit.auto.pressure.AutoDepositInventoryPressureSource;
 import lavi.minecraft.task.container.home.execution.StoreHomeTask;
 import lavi.minecraft.testsupport.HeadlessMinecraftClientSession;
@@ -22,7 +23,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
 //20260831_kpopmodder: Prove the 32-to-33 main-slot boundary through the production pressure callback.
 class DepositAllInventoryPressureBoundaryIntegrationTest {
@@ -33,9 +34,9 @@ class DepositAllInventoryPressureBoundaryIntegrationTest {
         ChatClefDiagnostics.resetDiagnosticSessionForTests();
     }
 
-    //20260913_kpopmodder: Diagnostics must not perform a skipped inventory read or consume its original failure.
+    //20260914_kpopmodder: Diagnostics preserve the behavior owner's bounded reads and unavailable outcome.
     @Test
-    void diagnosticsPreservePressureReadCountsAndExceptions() {
+    void diagnosticsPreservePressureReadCountsAndUnavailableOutcome() {
         for (boolean enabled : new boolean[]{false, true}) {
             ChatClefDiagnostics.setBoundaryEnabled(enabled);
             try (HeadlessMinecraftClientSession ignored = HeadlessMinecraftClientSession.inGame()) {
@@ -58,9 +59,10 @@ class DepositAllInventoryPressureBoundaryIntegrationTest {
                 assertEquals(DepositAllInventoryPressureState.ARMED, stateMachine(pressure).state());
 
                 source.failRead = true;
-                assertThrows(IllegalStateException.class, pressure::onEndClientTick);
+                assertDoesNotThrow(pressure::onEndClientTick);
                 assertEquals(2, source.readCalls);
                 assertEquals(DepositAllInventoryPressureState.ARMED, stateMachine(pressure).state());
+                assertNull(pressure.getCurrentTask());
             }
         }
     }
@@ -111,6 +113,8 @@ class DepositAllInventoryPressureBoundaryIntegrationTest {
                 "pressureSource",
                 source
         );
+        TestObjects.setField(chain, DepositAllInventoryPressureChain.class,
+                "pressureObservation", new AutoDepositFreeSlotVerifier(source));
         return chain;
     }
 

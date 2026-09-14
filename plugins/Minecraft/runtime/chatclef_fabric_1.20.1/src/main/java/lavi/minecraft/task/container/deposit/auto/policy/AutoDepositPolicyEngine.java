@@ -68,6 +68,11 @@ public final class AutoDepositPolicyEngine {
         return trustedRepository;
     }
 
+    //20260914_kpopmodder: Share the loaded observation range without introducing a second policy default.
+    public int trustedMaximumDistance() {
+        return definition.trustedMaximumDistance();
+    }
+
     public AutoDepositPlanningResult plan(AltoClef mod,
                                           DepositAllInventoryPressureSnapshot pressure,
                                           WorkingSetSnapshot workingSet) {

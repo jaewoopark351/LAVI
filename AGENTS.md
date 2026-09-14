@@ -236,10 +236,14 @@ cleanup, or change a terminal result. Each entry in
 signature: owner + event family + semantic transition/result/reason, plus a
 generation or phase role when needed to distinguish causal boundaries. Runtime
 or random identifiers remain correlation metadata and are excluded from that
-signature. The first occurrence of every exact required boundary signature and
-the operation terminal must be physically emitted through reserved capacity
-that unchanged summaries cannot consume; a suppression summary cannot replace
-any of those events.
+signature. Within an explicitly bounded diagnostic trace whose required mode,
+output path, and capacity are available, the first occurrence of every exact
+required boundary signature and the operation terminal must be physically
+emitted through protected reserved capacity; a suppression summary cannot
+replace any of those events. Apply Section 21's "Companion-log delivery
+contract" to trace scope, finite reservation, unavailable output, and evidence
+claims. This qualification does not authorize dropping an admitted trace's
+required boundaries merely because ordinary detail is exhausted.
 Logs added with a change cannot retroactively prove the pre-change cause.
 Keep the change and its companion diagnostics independently reviewable and
 reversible; a separate diagnostics-only unit is not mandatory.
@@ -1118,6 +1122,17 @@ This policy applies to the Fabric ChatClef 1.20.1 runtime tree and to LAVI-owned
 
 When this policy conflicts with the generic logging guidance in Sections 21 or 21.1, this scoped policy has higher priority for the Fabric ChatClef 1.20.1 investigation. The GOTO implementation scope above takes precedence over this policy's mandatory diagnostics-first and unknown-cause behavior restrictions.
 
+<!-- 20260914_kpopmodder: Apply the finite companion-log delivery contract without changing safety gates or runtime authorization. -->
+For companion-log delivery, apply Section 21's "Companion-log delivery contract"
+within this scoped policy, including new normal failure records, finite trace
+admission, protected first-boundary/terminal capacity, unavailable sinks, and
+honest output evidence. It qualifies unconditional output language here and in
+linked diagnostic contracts; it does not waive required observation or tests.
+Keep the existing OFF/BOUNDARY/VERBOSE defaults, configured cap values, backend
+ownership, wire contracts, behavior non-interference, and action authorization.
+Changing a budget or logging configuration is not an automatic consequence of
+this documentation rule.
+
 ##### Standing diagnostics-only authorization
 
 Except for user-requested GOTO implementation governed by the scope above, when the user asks Codex to investigate, diagnose, trace, or debug a failure, hang, loop, missing terminal event, crash, or unexplained result in this scope, and the exact root cause is not already proven, Codex must classify the next source change as diagnostics-only.
@@ -1171,7 +1186,7 @@ TaskRunner, Task chain, UserTaskChain, SingleTaskChain, or command lifecycle beh
 thread scheduling, synchronization, object lifecycle, or game-tick ordering
 ```
 
-Do not add a new `try/catch` around observed engine behavior merely to collect a log. Do not catch and suppress a new exception. A diagnostic formatter may protect only its own formatting from malformed optional values; it must not consume an exception thrown by the observed ChatClef, AltoClef, Baritone, input, transport, or container operation.
+Do not add a new `try/catch` around observed engine behavior merely to collect a log. Do not newly catch or suppress an exception from that behavior. A diagnostic formatter or emitter may isolate failures originating only in its own formatting or emission, with bounded non-recursive failure reporting when a safe output path remains. That guard must not enclose the observed operation or consume an exception thrown by ChatClef, AltoClef, Baritone, input, transport, or container behavior. It is not permission for a broad catch of process-fatal failures or for a new gameplay fallback.
 
 Do not call a state-changing ChatClef, AltoClef, Baritone, Minecraft, Fabric, Carry On, input, or container API merely to populate a log field.
 
@@ -1272,7 +1287,7 @@ These values are log budgets only. They must never become a Task retry limit, ga
 
 When events are suppressed, emit a bounded summary containing the event family, meaningful fingerprint, suppressed count, first-observed time or tick, and last-observed time or tick. Do not emit one suppression message per suppressed event.
 
-When the session cap is reached, emit one `DIAGNOSTIC_SESSION_CAP_REACHED` event, continue reserving the terminal budget, and suppress only non-terminal diagnostic detail. Do not stop, cancel, retry, time out, or otherwise alter the observed operation.
+When the ordinary-detail ceiling is reached, emit at most one `DIAGNOSTIC_SESSION_CAP_REACHED` event from its pre-reserved capacity inside the total hard cap, and suppress ordinary detail while preserving already reserved required first-boundary and terminal records. Distinguish this ordinary ceiling from exhaustion of the total hard cap, including reservations. A completely exhausted or unavailable output path cannot promise another emitted event: report the trace gap when safely observable, do not claim delivery, and do not bypass the cap. Apply Section 21's "Companion-log delivery contract"; do not stop, cancel, retry, time out, or otherwise alter the observed operation.
 
 ##### Fingerprint stability and payload bounds
 
@@ -3329,6 +3344,92 @@ If a model path is broken, suggest a config/path fix first.
 
 ## 21. Logging Rules
 
+<!-- 20260914_kpopmodder: Require companion logs for all newly written code and verification of causal boundary output. -->
+<!-- 20260914_kpopmodder: Clarify causal coverage, finite delivery guarantees, evidence levels, and non-interference without authorizing runtime work. -->
+### Mandatory Companion Logging for New and Changed Code (All Components)
+
+#### Scope and Same-Task Requirement
+
+Regardless of language or component, **all new executable behavior and every addition, replacement, or change to existing behavior must include logs that support causal tracing in the same implementation task.** The unit of application is not a file count or line count, but the execution boundary that owns input handling, branching, state changes, event handling, counters, side effects, or success/failure decisions. Do not defer logging until after a failure occurs.
+
+Observe DTOs, interfaces, schemas, constants, and pure calculations through the input-validation, result, and decision logs of the execution owner that uses them. Do not add logs to every getter, constructor, pure function, test helper, or line of code. For changes with no execution semantics, such as documentation-only or formatting-only changes, record the reason the requirement does not apply. Preserve generated and external code, and observe it at the necessary generator, adapter, or caller boundaries. Diagnostic code must also verify its own output path and failure handling, but must not create a recursive obligation to log log calls.
+
+Existing logs may be reused only when they cover the changed execution boundary, actual decision values, operation correlation, and output path. Map the exact source location to the events, fields, activation conditions, and collection evidence, and reinforce changed semantics or missing boundaries in the same task. The name or existence of an existing function is not sufficient evidence of compliance; duplicate logs with identical semantics are not required either. Do not expand instrumentation or refactoring globally beyond boundaries directly related to the change.
+
+Include the following concise coverage mapping in the change review. An existing task report or test description may contain it; no separate document file or approval stage is required.
+
+```text
+Changed execution boundary / exact file, method, and behavior owner
+Events and required fields / operation, generation, and event correlation
+Normal or diagnostic logs / mode, filter, local and shared budget conditions
+Actual output and collection points / verification scenarios and evidence / remaining observation gaps
+```
+
+#### Causal Correlation and Decision Snapshots
+
+Correlate the boundaries applicable to the new behavior as follows. This does not require creating lifecycles or state that do not exist. If an existing contract does not expose a required value, identify the value and the reason, and record the observation gap.
+
+* **Start and correlation:** Record execution start, input validation, and selection or rejection reasons. Correlate existing request/operation IDs with parent and child execution identifiers, attempts, generations, phases, tracker/subscription identifiers, and target bindings as needed. Distinguish different instances of the same class, re-executions, and reconnections. Do not infer ordering from timestamps alone; use existing ticks, event sequence numbers, and causal event links, and interpret sequence numbers from different processes only within their respective scopes.
+* **Publication, subscription, and delivery:** Distinguish subscription requests from effective registration, unsubscription requests from effective deactivation, publication attempts from publication-function returns, and recipient selection from callback entry, processing, rejection, and exit. Record deferred registration, pending unsubscription, stale generations, target mismatches, duplicates, and existing exception paths with their reasons at boundaries where they can be observed. Do not interpret a publication-function return as completion of processing by every recipient. When an event is not created, record the reason only if the actual producer decision boundary is observable.
+* **Binding failures:** Do not rely on logs that can be emitted only after operation binding succeeds. Pre-binding, failed-binding, and unbound states must also be observable in a bounded manner through an existing safe output path, using local identifiers and failure reasons. When the operation ID is unknown, mark the record as unbound rather than arbitrarily attributing it to the current global operation. Do not create a new global registry or wire field for observation.
+* **Counters and quantities:** Record the update owner, tracker/generation, related event, item or matching criteria, unit, value before the change, delta to apply, value after the change, and reasons for application, no change, or rejection. Do not confuse a quantity of 64 items with one occupied slot. Correlate initialization, reset, and replacement with the previous value and reason, and link the completion decision to the minimum information needed to identify the last receipt, application, and reset boundaries. Retention of this diagnostic information must also be bounded.
+* **Completion and failure:** Record a snapshot from the same decision point containing the meaning of the condition expression actually used by the authoritative owner, whether each condition was evaluated and its value, expected and observed values, comparison criteria, the selected branch, and the result. For example, a decision combining `finished`, `stopped`, `storedTargetsSatisfied`, and a stored-item counter must explain the values actually evaluated together with the required quantity. Mark values not read because of short-circuit evaluation as `NOT_EVALUATED`, and unreadable values as `UNAVAILABLE` with a reason. Do not fill unverified values with zero, false, or success, or invoke a decision again merely to log it.
+* **Children, interruption, cleanup, and re-execution:** Correlate child creation, execution, completion, and stopping with existing cancellation, preemption, timeout, retry, and fallback paths, the start and result of owned-resource cleanup, and terminal-result commitment. Do not infer successful completion from a stopped state alone. When the same failure blocks re-execution, correlate the original failed operation, blocking rule/comparison criteria, the current and previous values actually compared, and rearming/reevaluation results as needed. Preserve the first event and meaningful changes rather than emitting the same rejection every tick.
+
+Reuse the component's existing canonical contracts for names and fields. The identifiers and state names above describe required semantics; they do not require bulk renaming of existing fields or a new protocol or shared logger. When a diagnostic ID is needed, create and correlate it only within the existing ownership and lifecycle of the relevant backend. Do not claim that distinct events are the same based solely on object references, timestamps, or the current global operation.
+
+Decision logs must preserve values already read or decided by the behavior owner. Create the minimum necessary immutable snapshot on the owning thread so that an asynchronous logger cannot later read a changed live object and present it as the earlier decision. Do not reevaluate predicates, trigger lazy updates in getters, or repeat event processing, container queries or mutations, or external requests merely to populate a log.
+
+#### Observation Authority and Log Output Evidence
+
+Client-local state changes, state updates received from the server, server confirmation of a specific request, and the parent operation's stored-item counter and completion decision are distinct evidence. Identify the relevant observation source and timing for each record. A decrease on the player side and an increase on the container side, a click return value, a matching `syncId`, or a counter increase alone does not establish server confirmation. If no existing contract exposes server confirmation, state that limitation; do not change the protocol or success decision to satisfy the logging requirement.
+
+Internal diagnostic-state updates, logger-function calls, filter acceptance, and queue admission are not evidence of actual output or collection. Identify the logger, mode, level, filters, appender/sink, collection location, and the point reached by verification. If a test captures only log records, report record-generation verification; if it captures actual formatted output or a file, report verification only through that output point. Do not overstate a normal function return as completed file persistence or external collection.
+
+Distinguish the following causes at available observation points: disabled mode/level filtering, unbound operation, unavailable state observation, deduplication suppression, rate limiting, local detail cap, shared session cap, queue drops, formatting failure, sink emission failure, and missing collection intervals. Leave an unknown cause as `UNKNOWN`. Conclude that an event did not occur only when the producer decision and delivery/collection coverage for that interval have been verified; missing logs alone do not prove non-publication, subscription failure, or functional success.
+
+If the logging system itself fails, use bounded, non-recursive failure reporting only when an existing independent and safe error channel is available. Do not repeatedly report the same failure without a bound through the same logger, or introduce unbounded fallback, flush, or retry behavior. If all output paths are unavailable, acknowledge that recording cannot be guaranteed and report intervals without actual collection evidence as unverified. An in-memory failure counter is supporting state, not output evidence.
+
+#### Companion-log delivery contract: diagnostic modes, finite budgets, and delivery guarantees
+
+This contract defines the delivery scope and evidence for required logs. Where Section 0 refers to this contract, preserve the existing safety, behavior, authorization, and backend boundaries; do not automatically change diagnostic defaults, numeric limits, or wire contracts.
+
+`OFF` does not guarantee detailed causal tracing. Preserve existing normal lifecycle, warning, error, and terminal-failure logs. Every new or replaced failure decision must include a bounded terminal record under supported normal logging settings, containing the failure reason, the core decision values actually used, the operation identifier, and whether detailed tracing is disabled, unbound, or incomplete. Do not make the ability to create this record depend on diagnostic-only in-memory values. If normal output is also filtered out or the sink fails, actual output remains unverified; do not automatically enable settings or override user policy to bypass that condition.
+
+Verify detailed causal tracing in an explicit investigation mode supported by the relevant backend. Fabric ChatClef must make the required causal links observable in `BOUNDARY`; avoid designs that expose essential failure evidence only when `VERBOSE` is enabled. Do not silently switch modes through `VERBOSE`, overlay, or HUD controls. If investigation is enabled partway through execution and start, subscription, or initialization records are missing, record the actual activation boundary and identify the trace as partial; do not pretend that earlier events have been reconstructed.
+
+Reserve capacity for required first events by **owner + event family + meaningful transition/result/reason + required phase role within a finite diagnostic trace scope**. Reuse `REQUIRED_CAUSAL_OWNER_BOUNDARY_SET` when it already exists. Keep actual operation, event, and generation IDs as correlation fields, but do not create a new reservation signature for every ID, tick, slot, item, or changed numeric value. Conversely, do not collapse records from different operations into one merely because they share a semantic signature. Specify the number of protected operations and signatures, the required payload per record, and the trace-ending boundary.
+
+Separate the ordinary-detail budget from reserved capacity within the shared session's total cap. Calculate reservations to accommodate each protected operation's required first events, still-required terminal decisions and cleanup results, first exceptions, and bounded suppression/cap notifications. Repetitive detail, summaries, other operations, and other local gates must not consume those reservations. Do not treat an existing minimum reservation value as proof of sufficient capacity. Bound not only event counts but also message bytes, pending queues, and the size and lifetime of fingerprint/correlation storage. Required IDs and decision values take precedence over optional detail; a design that cannot fit even the required values has an observation gap.
+
+Distinguish exhaustion of the ordinary-detail budget from reaching the total hard cap, including reservations. Cap notifications must also use reserved capacity inside the total cap. Required first events and terminal results already admitted for protection must not be lost to ordinary-detail rate limiting, deduplication, sampling, local detail caps, or shared ordinary-detail caps. Summaries are not substitutes for those events. However, a finite total cap cannot guarantee individual output for an unlimited number of operations, distinct events, or terminal results.
+
+If capacity is insufficient to start a new diagnostic trace, limit **only diagnostic trace completeness or admission**, without consuming capacity already reserved for other traces. Do not reject functional operation start, retry, or termination. Report trace exclusion or insufficient capacity in a bounded manner through any remaining permitted path, and identify the affected scope as incomplete. Do not claim that events were emitted after the actual total cap or output path was exhausted. Do not add together local caps as if they were independent total budgets, or bypass the hard cap through automatic session resets, rotation, or relabeling diagnostic detail as normal logs. Normal operational logs follow their existing separate policy and are not a bypass for diagnostic detail.
+
+The required-output guarantee is therefore a verifiable contract conditional on the declared finite scope, required modes and filters, capacity secured in advance, and a functioning output path. It is not an unconditional guarantee of recording through forced process termination, disk errors, or sink failures. Report unmet conditions as specific limitations; do not use this qualification to excuse missing required instrumentation, reservations, or tests.
+
+#### Behavior Non-Interference, Performance, Architecture, and Sensitive Data
+
+Logging activation, diagnostic counters and IDs, emission admission, suppression or reservation, formatting, and output failures must not change functional branches, retry authorization, success decisions, cleanup, or terminal results. Diagnostic failure must not stop the feature or fabricate success. Diagnostic reservations are not gameplay-resource reservations or task-scheduling authority. Preserve external STOP, existing automatic-defense, evasion, and survival priorities, and input, path, and resource ownership. Do not delay preemption, interruption, or cleanup, or remove a failure decision, merely to produce logs.
+
+Isolate diagnostic exceptions only for failures originating in the formatter or emitter itself; do not wrap the entire observed behavior in a new `try/catch`. Do not change propagation or handling outcomes of existing engine, event, or transport exceptions. Do not add new blocking I/O, flush waits, remote-collection waits, sleeps, synchronization, threads, or unbounded queues to guarantee output. Use the existing logger and apply available diagnostic gates before expensive formatting. Collect required decision snapshots only on the safe owning thread. Review hot-path costs and bounds rather than claiming zero time or memory overhead.
+
+Do not place loggers, diagnostic implementations, session management, or backend implementations in the shared Minecraft backend layer defined in Section 0's "Minecraft Backend Loader and Engine Complete Separation Rule". This restriction does not prohibit the use of existing application-wide logging utilities. Fabric ChatClef and Forge MineMind backend-specific implementations, state, and lifecycles must remain separate. Shared Minecraft code remains limited to backend-neutral protocol contracts, interfaces, DTOs, JSON schema, error codes, and documentation; preserve the existing protocol/interface/DTO boundaries. Limit upstream changes to the smallest observation hunks, and apply responsibility-separation rules to new LAVI-owned diagnostic components. Calling an existing logger and passing already-decided values does not, by itself, create a new independent responsibility. Separate responsibilities when the component owns independent budgets, serialization, emission, or diagnostic lifecycle state. This distinction does not exempt genuinely mixed responsibilities from Sections 29-29.3.
+
+Sensitive-data exclusion applies throughout the logging path. Review inputs, exception messages, paths, targets, and identifiers, retaining only the minimum necessary permitted fields. Do not output tokens, credentials, private conversations, raw audio, personal information, or sensitive server addresses. Exclude full NBT by default; exceptional investigations remain subject to existing explicit approval and strict payload/session caps, and the prohibition on secrets still applies. Preserve correlation with safe masking, abbreviation, and session-local aliases, and identify reasons for omissions. Constrain arbitrary strings, object `toString` output, control characters, and newlines so they cannot cause secret disclosure, log forgery, or unbounded output. Do not assume a secret is safe merely because it is hashed.
+
+#### Actual Output Verification and Completion Reporting
+
+Within the authorized scope, verify the actual logging path using the narrowest test that executes the behavior. Check event correlation and decision values in output or collected results that have passed through the actual formatter, filters, gates, budgets, and appender. Tests may use an in-memory output stream, but do not present results obtained by replacing the logger itself with a mock or bypassing gates as verification of the production output path. Mock call counts, internal diagnostic values, successful compilation, or passing functional tests alone are not substitutes.
+
+For applicable scenarios, verify normal success, new failure decisions, unbound/rejected/unchanged outcomes, resets, late events, generation replacement, interruption, preemption, cleanup, OFF/BOUNDARY modes, repeated-log suppression, local and shared caps, terminal reservations, and formatter/sink failures. Exclude unrelated scenarios only with supporting reasons. A synthetic fixture that reproduces a missing boundary is a verification tool, not evidence of the cause of a past incident. At the narrowest safe level, verify that changing only diagnostic mode, budgets, or output failure conditions for the same input preserves behavior decisions, retries, and cleanup results.
+
+Report source implementation, logging-path implementation/reuse, automated-test verification of actual output, build, deployment, output verification in the actual application or game, and root-cause confirmation separately. For verification actually performed, record PASS/FAIL or the verified scope; for verification not performed, record `NOT_RUN` and the reason; for facts without supporting evidence, record `UNKNOWN`. Use `NOT_APPLICABLE` with a reason only for genuine inapplicability, such as a documentation change with no execution boundary. Implementation completion and actual execution verification cannot substitute for each other. `NOT_RUN` means verification was not executed; it does not excuse missing required logging implementation. If required instrumentation that could be added within current authorization and the smallest safe boundary is omitted, report the source's logging implementation as incomplete as well.
+
+To claim live-game verification, correlate evidence identifying the source/JAR used, diagnostic mode, execution/operation identifiers, collected files and intervals, required events and terminal results, unverified server evidence, and missing coverage. Do not retroactively establish the cause of a past execution using logs added after verification. Even when an authorized execution could not be performed, implementation within that scope may be reported as complete, but do not hide unexecuted or unverified items or claim completed actual-output verification.
+
+This rule grants no additional authorization for builds, deployment, game execution, external-file changes, commits, or pushes. Preserve explicit review-only, read-only, and documentation-only requests. Preserve Section 0's continuous GOTO/GUI implementation ordering and existing safety approvals; log verification must not create unnecessary separate approval stages or a requirement for runtime proof before implementation. When the currently authorized scope is complete, report the reasons for unexecuted work and the remaining verification, then finish.
+
 Logs are useful for debugging but should not be committed.
 
 When adding logs:
@@ -3950,6 +4051,14 @@ A responsibility is independent when one or more of the following is true:
 * it belongs to a different feature, domain, layer, integration, or ownership boundary
 * it performs a distinct stage such as parsing, validation, orchestration, execution, persistence, transport, UI rendering, logging, retry, cleanup, or result conversion
 * it could be replaced, reused, disabled, or extended without replacing the other behavior
+
+<!-- 20260914_kpopmodder: Distinguish a companion-log call site from ownership of diagnostic infrastructure. -->
+Calling an existing logger with an already-decided value or a minimal safe
+snapshot does not, by itself, create a second independent responsibility.
+Owning separate diagnostic budgets, serialization, emission, lifecycle state,
+or recovery policy does. Apply the normal split rules to those actual owners;
+do not trigger a class/file split merely because a companion log was added,
+and do not use this clarification to retain genuinely mixed responsibilities.
 
 Common mixed-responsibility examples that require immediate separation include:
 

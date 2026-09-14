@@ -135,4 +135,11 @@ public final class AutoDepositPlan {
     public AutoDepositDecisionFingerprint fingerprint() {
         return fingerprint;
     }
+
+    //20260914_kpopmodder: Preserve current ownership/reservations while withholding every new storage action.
+    public AutoDepositPlan verificationOnlyCopy() {
+        return new AutoDepositPlan(context, new ItemTarget[0], new ItemTarget[0], List.of(),
+                protectedCounts, Map.of(), List.of(), diagnosticInventoryFingerprint,
+                trustedRevision, trustedCapacityState, startingOccupiedSlots, targetReliefSlots, 0, fingerprint);
+    }
 }

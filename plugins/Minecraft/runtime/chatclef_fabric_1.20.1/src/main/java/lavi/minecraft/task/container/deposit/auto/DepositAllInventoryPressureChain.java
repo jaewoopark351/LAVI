@@ -11,7 +11,6 @@ import lavi.minecraft.diagnostics.container.store.deposit.StoreDepositDiagnostic
 import lavi.minecraft.diagnostics.container.store.deposit.pressure.AutoDepositPressureObserver;
 import lavi.minecraft.task.container.deposit.auto.composition.DepositAllInventoryPressureChainPreparation;
 import lavi.minecraft.task.container.deposit.auto.maintenance.AutoDepositMaintenanceTask;
-import lavi.minecraft.task.container.deposit.auto.policy.AutoDepositDecisionFingerprint;
 import lavi.minecraft.task.container.deposit.auto.policy.AutoDepositPlan;
 import lavi.minecraft.task.container.deposit.auto.policy.AutoDepositPlanningResult;
 import lavi.minecraft.task.container.deposit.auto.policy.diagnostics.AutoDepositPolicyDiagnostics;
@@ -20,11 +19,24 @@ import lavi.minecraft.task.container.deposit.auto.pressure.AutoDepositInventoryP
 import lavi.minecraft.task.container.deposit.auto.trusted.AutoDepositTrustedDestinationRepository;
 import lavi.minecraft.task.container.deposit.auto.trusted.interaction.AutoDepositExactOpenContainerBinding;
 import lavi.minecraft.task.container.deposit.auto.working.ActiveTaskWorkingSetResolver;
-import lavi.minecraft.task.container.deposit.auto.working.WorkingSetResolution;
-import lavi.minecraft.task.container.deposit.auto.working.WorkingSetSnapshot;
 
+import lavi.minecraft.task.container.deposit.auto.admission.AutoDepositPlanAdmission;
+import lavi.minecraft.task.container.deposit.auto.admission.AutoDepositAdmissionResult;
+import lavi.minecraft.task.container.deposit.auto.admission.conditions.AutoDepositConditionReader;
+import lavi.minecraft.task.container.deposit.auto.admission.conditions.AutoDepositConditions;
+import lavi.minecraft.task.container.deposit.auto.lifecycle.AutoDepositExecutionControl;
+import lavi.minecraft.task.container.deposit.auto.lifecycle.AutoDepositSafetyAdmission;
+import lavi.minecraft.task.container.deposit.auto.lifecycle.AutoDepositRunLedger;
+import lavi.minecraft.task.container.deposit.auto.lifecycle.cleanup.AutoDepositSurvivalCleanup;
+import lavi.minecraft.task.container.deposit.auto.maintenance.result.AutoDepositRunReason;
+import lavi.minecraft.task.container.deposit.auto.maintenance.result.AutoDepositRunResult;
+import lavi.minecraft.task.container.deposit.auto.maintenance.result.AutoDepositWorkingSetStatus;
+import lavi.minecraft.task.container.deposit.auto.maintenance.plan.AutoDepositVerificationPlan;
+import lavi.minecraft.task.container.deposit.auto.maintenance.relief.AutoDepositFreeSlotVerifier;
+import lavi.minecraft.task.container.deposit.auto.rearm.AutoDepositRearmPolicy;
+import lavi.minecraft.task.container.deposit.auto.rearm.AutoDepositRearmDecision;
+import lavi.minecraft.task.container.deposit.auto.rearm.diagnostics.AutoDepositRearmDiagnostics;
 import java.util.Objects;
-import java.util.Optional;
 
 //20260827_kpopmodder: Apply one automatic-only immutable policy plan at 33/36 inventory pressure.
 public final class DepositAllInventoryPressureChain extends SingleTaskChain {
@@ -33,19 +45,25 @@ public final class DepositAllInventoryPressureChain extends SingleTaskChain {
     private final AltoClef mod;
     private final TaskRunner runner;
     private final AutoDepositInventoryPressureSource pressureSource;
+    private final AutoDepositFreeSlotVerifier pressureObservation;
     private final DepositAllInventoryPressureStateMachine stateMachine;
     private final DepositAllAutoConflictGuard conflictGuard;
     private final ActiveTaskWorkingSetResolver workingSetResolver;
     private final AutoDepositPolicyEngine policyEngine;
     private final AutoDepositTrustedDestinationRepository trustedRepository;
     private final AutoDepositExactOpenContainerBinding exactOpenContainerBinding;
+    //20260914_kpopmodder: Execution rights, root correlation and retry policy have separate owners.
+    private final AutoDepositRearmPolicy rearm = new AutoDepositRearmPolicy();
+    private final AutoDepositRunLedger runs = new AutoDepositRunLedger(rearm);
+    private final AutoDepositExecutionControl executionControl = new AutoDepositExecutionControl();
+    private final AutoDepositConditionReader conditions;
+    private final AutoDepositPlanAdmission admission;
+    private boolean pendingAdmission;
+    private int nextEvaluation;
+    private Object worldIdentity;
+    private Task activeDiagnosticMaintenanceTask;
     private String lastDeferredReason;
     private Task lastDeferredRoot;
-    private WorkingSetSnapshot lastNoSafeWorkingSet;
-    private long lastNoSafeEpoch;
-    private long waitingTrustedRevision;
-    private long activeRunTrustedRevision = -1L;
-    private Task activeDiagnosticMaintenanceTask;
     //20260913_kpopmodder: Keep passive pressure decisions separate from orchestration and policy ownership.
     private final AutoDepositPressureObserver pressureDiagnostics = new AutoDepositPressureObserver();
 
@@ -92,13 +110,15 @@ public final class DepositAllInventoryPressureChain extends SingleTaskChain {
         runner = preparation.runner();
         mod = preparation.mod();
         pressureSource = preparation.pressureSource();
+        pressureObservation = new AutoDepositFreeSlotVerifier(pressureSource);
         stateMachine = preparation.stateMachine();
         conflictGuard = preparation.conflictGuard();
         workingSetResolver = preparation.workingSetResolver();
         policyEngine = preparation.policyEngine();
         trustedRepository = preparation.trustedRepository();
         exactOpenContainerBinding = preparation.exactOpenContainerBinding();
-        waitingTrustedRevision = preparation.initialTrustedRevision();
+        admission = new AutoDepositPlanAdmission(mod, runner, conflictGuard, workingSetResolver, policyEngine);
+        conditions = new AutoDepositConditionReader(trustedRepository, policyEngine.trustedMaximumDistance());
     }
 
     static DepositAllInventoryPressureChain commit(
@@ -110,296 +130,162 @@ public final class DepositAllInventoryPressureChain extends SingleTaskChain {
 
     @Override
     public float getPriority() {
-        return isActive() ? PRIORITY : Float.NEGATIVE_INFINITY;
+        return isActive() && !AutoDepositSafetyAdmission.claimed(mod) ? PRIORITY : Float.NEGATIVE_INFINITY;
     }
 
     public void onEndClientTick() {
-        pressureDiagnostics.begin(stateMachine.state(), stateMachine.diagnosticThresholdPending(), mainTask);
+        pressureDiagnostics.begin(stateMachine.state(), pendingAdmission, mainTask);
         if (!AltoClef.inGame()) {
-            pressureDiagnostics.value("inGame", false);
-            stopOwnedRun("left_game", null);
-            pressureDiagnostics.decision("left_game", stateMachine.state(), stateMachine.diagnosticThresholdPending());
+            stopOwnedRun(AutoDepositRunReason.CONTEXT_CHANGED, null);
+            runs.resetContext();
+            worldIdentity = null;
+            decide("left_game");
             return;
         }
-        pressureDiagnostics.value("inGame", true);
         if (!mod.getAiBridge().getEnabled()) {
-            pressureDiagnostics.value("bridgeEnabled", false);
-            stopOwnedRun("chatclef_disabled", null);
-            pressureDiagnostics.decision("chatclef_disabled", stateMachine.state(), stateMachine.diagnosticThresholdPending());
+            stopOwnedRun(AutoDepositRunReason.AUTOMATION_DISABLED, null);
+            decide("chatclef_disabled");
             return;
         }
-        pressureDiagnostics.value("bridgeEnabled", true);
-        if (stateMachine.state() == DepositAllInventoryPressureState.RUNNING) {
-            if (mainTask == null) {
-                if (activeDiagnosticMaintenanceTask != null) {
-                    StoreDepositDiagnostics.recordAutomaticMaintenanceTerminal(
-                            activeDiagnosticMaintenanceTask,
-                            "RUNNING_TASK_MISSING",
-                            "UNAVAILABLE_MAINTENANCE_TASK"
-                    );
-                }
-                transitionRunToWaiting("running_task_missing", currentSnapshot(), null);
-            }
-            pressureDiagnostics.decision(mainTask == null ? "running_task_missing" : "already_running",
-                    stateMachine.state(), stateMachine.diagnosticThresholdPending());
+        if (!executionControl.permitsExecution(runner.isActive())) {
+            pendingAdmission = false;
+            decide("explicit_stop");
             return;
         }
-
-        Optional<DepositAllInventoryPressureSnapshot> snapshotOptional = pressureSource.read(mod);
-        if (snapshotOptional.isEmpty()) {
-            pressureDiagnostics.pressure(null);
-            pressureDiagnostics.decision("pressure_read_unavailable", stateMachine.state(), stateMachine.diagnosticThresholdPending());
+        if (worldIdentity != mod.getWorld()) {
+            stopOwnedRun(AutoDepositRunReason.CONTEXT_CHANGED, null);
+            runs.resetContext();
+            worldIdentity = mod.getWorld();
+            nextEvaluation = 0;
+        }
+        if (mainTask != null || pendingAdmission) {
+            decide(mainTask == null ? "awaiting_native_selection" : "already_running");
             return;
         }
-        DepositAllInventoryPressureSnapshot snapshot = snapshotOptional.get();
-        pressureDiagnostics.pressure(snapshot);
-
-        if (snapshot.isAtOrBelowLowWater()) {
-            pressureDiagnostics.value("lowWaterReached", true);
-            clearDeferredFingerprint();
-            clearNoSafeContext();
-            observeLowWater(snapshot);
-            pressureDiagnostics.decision("inventory_at_or_below_low_water", stateMachine.state(), stateMachine.diagnosticThresholdPending());
+        DepositAllInventoryPressureSnapshot pressure = currentSnapshot();
+        pressureDiagnostics.pressure(pressure);
+        if (pressure == null) { decide("pressure_read_unavailable"); return; }
+        if (!pressure.isAtOrAboveThreshold() && !rearm.hasPendingUnit()) {
+            decide("below_threshold");
             return;
         }
-        pressureDiagnostics.value("lowWaterReached", false);
+        String refusal = admission.controlDeferral(this);
+        if (refusal != null) { defer(refusal, pressure); return; }
+        // Bounded read-only evaluation cadence; neither ticks nor plans recharge execution limits.
+        if (nextEvaluation > 0) { nextEvaluation--; decide("evaluation_interval"); return; }
+        nextEvaluation = 19;
+        evaluate(pressure, false);
+    }
 
-        if (stateMachine.state() == DepositAllInventoryPressureState.WAIT_FOR_REARM) {
-            long currentTrustedRevision = trustedRepository.revision();
-            pressureDiagnostics.value("trustedRevisionChanged", currentTrustedRevision != waitingTrustedRevision);
-            pressureDiagnostics.value("waitingTrustedRevision", waitingTrustedRevision);
-            pressureDiagnostics.value("currentTrustedRevision", currentTrustedRevision);
-            if (currentTrustedRevision != waitingTrustedRevision
-                    && stateMachine.observeExplicitPolicyChange()
-                    == DepositAllInventoryPressureSignal.MEANINGFUL_CHANGE) {
-                waitingTrustedRevision = currentTrustedRevision;
-                clearDeferredFingerprint();
-                clearNoSafeContext();
-                pressureDiagnostics.transition(DepositAllInventoryPressureState.WAIT_FOR_REARM,
-                        stateMachine.state(), "trusted_registry_changed", null, currentTrustedRevision);
-                DepositAllAutoDiagnostics.logMeaningfulReevaluation(
-                        snapshot, currentUserTaskRoot()
-                );
-            }
+    @Override
+    protected void onTick() {
+        if (pendingAdmission) {
+            pendingAdmission = false;
+            if (!executionControl.permitsExecution(runner.isActive())) return;
+            // Priorities have now been evaluated exactly once. Rebuild from current state before any storage action.
+            evaluate(currentSnapshot(), true);
         }
+        if (mainTask != null) super.onTick();
+    }
 
-        if (stateMachine.state() == DepositAllInventoryPressureState.NO_SAFE_SURPLUS_WAIT) {
-            if (!snapshot.isAtOrAboveThreshold()) {
-                pressureDiagnostics.value("thresholdReached", false);
-                pressureDiagnostics.decision("no_safe_wait_below_threshold", stateMachine.state(), stateMachine.diagnosticThresholdPending());
-                return;
-            }
-            pressureDiagnostics.value("thresholdReached", true);
-            AutoDepositDecisionFingerprint current = policyEngine.captureDecisionFingerprint(
-                    mod, snapshot, lastNoSafeWorkingSet, lastNoSafeEpoch
-            );
-            if (stateMachine.observeMeaningfulChange(current)
-                    != DepositAllInventoryPressureSignal.MEANINGFUL_CHANGE) {
-                pressureDiagnostics.value("fingerprintChanged", false);
-                pressureDiagnostics.decision("no_safe_fingerprint_unchanged", stateMachine.state(), stateMachine.diagnosticThresholdPending());
-                return;
-            }
-            pressureDiagnostics.value("fingerprintChanged", true);
-            Task root = currentUserTaskRoot();
-            pressureDiagnostics.transition(DepositAllInventoryPressureState.NO_SAFE_SURPLUS_WAIT,
-                    stateMachine.state(), "semantic_fingerprint_changed", root, waitingTrustedRevision);
-            clearNoSafeContext();
-            DepositAllAutoDiagnostics.logMeaningfulReevaluation(snapshot, root);
+    private void evaluate(DepositAllInventoryPressureSnapshot pressure, boolean selected) {
+        if (pressure == null) { decide("pressure_read_unavailable"); return; }
+        if (runs.reconcileUserRoot(admission.currentRoot())) {
+            AutoDepositRearmDiagnostics.decision("FORMER_USER_ROOT_REPLACED", rearm, pressure, null);
         }
-
-        if (!snapshot.isAtOrAboveThreshold()) {
-            pressureDiagnostics.value("thresholdReached", false);
-            stateMachine.observe(snapshot);
-            pressureDiagnostics.decision("below_threshold", stateMachine.state(), stateMachine.diagnosticThresholdPending());
-            return;
-        }
-        pressureDiagnostics.value("thresholdReached", true);
-        if (stateMachine.state() != DepositAllInventoryPressureState.ARMED) {
-            pressureDiagnostics.decision("waiting_for_rearm", stateMachine.state(), stateMachine.diagnosticThresholdPending());
-            return;
-        }
-
-        UserTaskChain userTaskChain = mod.getUserTaskChain();
-        Task userTaskRoot = userTaskChain == null
-                ? null
-                : userTaskChain.getCurrentTask();
-        boolean activeUserTask = userTaskRoot != null
-                && !userTaskChain.isRunningIdleTask();
-        pressureDiagnostics.value("activeUserTask", activeUserTask);
-
-        if (suppressExistingStoreHome(snapshot, userTaskChain, userTaskRoot)) {
-            pressureDiagnostics.decision("existing_store_home_task", stateMachine.state(), stateMachine.diagnosticThresholdPending());
-            return;
-        }
-
-        if (activeUserTask && runner.getCurrentTaskChain() != userTaskChain) {
-            pressureDiagnostics.value("cachedUserChainSelected", false);
-            latchNoSafe(
-                    "user_task_chain_not_selected",
-                    snapshot,
-                    userTaskRoot,
-                    policyEngine.captureGateFingerprint(mod),
-                    null,
-                    0L
-            );
-            pressureDiagnostics.decision("user_task_chain_not_selected", stateMachine.state(), stateMachine.diagnosticThresholdPending());
-            return;
-        }
-        pressureDiagnostics.value("cachedUserChainSelected", activeUserTask ? true : "NOT_EVALUATED");
-
-        if (conflictGuard.hasExistingDepositTask(userTaskRoot)) {
-            pressureDiagnostics.value("existingDepositTask", true);
-            DepositAllInventoryPressureSignal signal = stateMachine.observe(snapshot);
-            if (signal == DepositAllInventoryPressureSignal.THRESHOLD_REACHED) {
-                transitionArmedToWaiting("existing_deposit_task", snapshot, userTaskRoot);
-            }
-            pressureDiagnostics.decision("existing_deposit_task", stateMachine.state(), stateMachine.diagnosticThresholdPending());
-            return;
-        }
-        pressureDiagnostics.value("existingDepositTask", false);
-
-        WorkingSetSnapshot workingSet = null;
-        if (activeUserTask) {
-            WorkingSetResolution resolution = workingSetResolver.resolve(mod);
-            pressureDiagnostics.workingSet(resolution);
-            if (resolution.status() != WorkingSetResolution.Status.SUPPORTED) {
-                latchNoSafe(
-                        resolution.reason(),
-                        snapshot,
-                        userTaskRoot,
-                        policyEngine.captureGateFingerprint(mod),
-                        null,
-                        0L
-                );
-                pressureDiagnostics.decision("working_set_unsupported", stateMachine.state(), stateMachine.diagnosticThresholdPending());
-                return;
-            }
-            workingSet = resolution.snapshot();
-        }
-
-        AutoDepositPlanningResult planning = policyEngine.plan(mod, snapshot, workingSet);
+        AutoDepositAdmissionResult evaluated = admission.plan(this, pressure);
+        if (evaluated.deferred()) { defer(evaluated.reason(), pressure); return; }
+        AutoDepositPlanningResult planning = evaluated.planning();
         pressureDiagnostics.planning(planning);
-        if (planning.status() != AutoDepositPlanningResult.Status.READY) {
-            AutoDepositPolicyDiagnostics.log(
-                    planning.diagnosticPlan().orElse(null),
-                    snapshot,
-                    planning.status().name(),
-                    planning.reason(),
-                    userTaskRoot
-            );
-        }
-        if (planning.status() == AutoDepositPlanningResult.Status.CONTEXT_CHANGED) {
-            deferChanged(planning.reason(), snapshot, userTaskRoot);
-            pressureDiagnostics.decision("policy_context_changed", stateMachine.state(), stateMachine.diagnosticThresholdPending());
+        AutoDepositPlan plan = planning.plan().orElse(null);
+        if (plan == null) { defer(planning.reason(), pressure); return; }
+        AutoDepositConditions observed = conditions.read(mod, plan, rearm.episodeSequence());
+        if (!observed.available()) { defer("destination_observation_unavailable", pressure); return; }
+        String condition = observed.conditionKey(rearm.lastReason());
+        AutoDepositRearmDecision decision = rearm.observe(pressure, condition, observed.scope());
+        AutoDepositRearmDiagnostics.decision(decision.name(), rearm, pressure, null);
+        if (!decision.canEvaluate()) {
+            stateMachine.markPolicyWaiting(false);
+            decide(decision.name());
             return;
         }
-        if (planning.status() != AutoDepositPlanningResult.Status.READY) {
-            AutoDepositPlan retainedPlan = planning.plan().orElse(null);
-            WorkingSetSnapshot retainedWorkingSet = retainedPlan == null
-                    ? workingSet
-                    : retainedPlan.context().workingSet();
-            long retainedEpoch = retainedPlan == null ? 0L : retainedPlan.context().epoch();
-            latchNoSafe(
-                    planning.reason(),
-                    snapshot,
-                    userTaskRoot,
-                    policyEngine.captureDecisionFingerprint(
-                            mod, snapshot, retainedWorkingSet, retainedEpoch
-                    ),
-                    retainedWorkingSet,
-                    retainedEpoch
-            );
-            pressureDiagnostics.decision("policy_not_ready", stateMachine.state(), stateMachine.diagnosticThresholdPending());
+        boolean verificationOnly = runs.mayResumeVerification();
+        boolean continuation = rearm.hasPendingUnit()
+                && planning.status() == AutoDepositPlanningResult.Status.NO_SAFE_SURPLUS;
+        if (planning.status() != AutoDepositPlanningResult.Status.READY && !continuation) {
+            rearm.markPlanBlocked(planning.reason(), observed.scope(), observed.conditionKey(planning.reason()));
+            stateMachine.markPolicyWaiting(true);
+            AutoDepositRearmDiagnostics.decision("PLAN_BLOCKED:" + planning.reason(), rearm, pressure, null);
+            decide("policy_not_ready");
             return;
         }
-
-        startPlan(snapshot, planning.plan().orElseThrow());
-        pressureDiagnostics.decision("plan_start_returned", stateMachine.state(), stateMachine.diagnosticThresholdPending());
-    }
-
-    //20260829_kpopmodder: Suppress automatic storage from the exact StoreHome root before selected-chain admission.
-    boolean suppressExistingStoreHome(
-            DepositAllInventoryPressureSnapshot snapshot,
-            UserTaskChain userTaskChain,
-            Task capturedRoot) {
-        if (snapshot == null
-                || !snapshot.isAtOrAboveThreshold()
-                || stateMachine.state() != DepositAllInventoryPressureState.ARMED
-                || userTaskChain == null
-                || capturedRoot == null
-                || userTaskChain.isRunningIdleTask()
-                || userTaskChain.getCurrentTask() != capturedRoot
-                || !conflictGuard.isStoreHomeRoot(capturedRoot)) {
-            return false;
-        }
-        stateMachine.observe(snapshot);
-        transitionArmedToWaiting(
-                "existing_store_home_task",
-                snapshot,
-                capturedRoot
-        );
-        return true;
-    }
-
-    private void observeLowWater(DepositAllInventoryPressureSnapshot snapshot) {
-        DepositAllInventoryPressureState previousState = stateMachine.state();
-        DepositAllInventoryPressureSignal signal = stateMachine.observe(snapshot);
-        if (signal == DepositAllInventoryPressureSignal.REARMED) {
-            waitingTrustedRevision = trustedRepository.revision();
-            pressureDiagnostics.transition(previousState, stateMachine.state(),
-                    "inventory_at_or_below_low_water", null, waitingTrustedRevision);
-            DepositAllAutoDiagnostics.logTransition(
-                    previousState,
-                    stateMachine.state(),
-                    "inventory_at_or_below_low_water",
-                    snapshot,
-                    null
-            );
-        }
-    }
-
-    private void startPlan(DepositAllInventoryPressureSnapshot pressure,
-                           AutoDepositPlan plan) {
-        DepositAllInventoryPressureSignal signal = stateMachine.observe(pressure);
-        if (signal != DepositAllInventoryPressureSignal.THRESHOLD_REACHED) {
+        if (!selected) {
+            pendingAdmission = true;
+            // Native selection cannot run while disabled, but a latched explicit STOP never reaches this branch.
+            if (!runner.isActive()) runner.enable();
+            decide("awaiting_native_selection");
             return;
         }
-        AutoDepositMaintenanceTask task = new AutoDepositMaintenanceTask(
-                plan,
-                trustedRepository,
-                exactOpenContainerBinding
-        );
-        activeRunTrustedRevision = trustedRepository.revision();
-        clearDeferredFingerprint();
-        clearNoSafeContext();
+        AutoDepositWorkingSetStatus retained = runs.verifyRetainedWorkingSet();
+        if (retained == AutoDepositWorkingSetStatus.DEFICIT && runs.recoverySource() != null) {
+            startRecovery(pressure, plan, condition, observed);
+            return;
+        }
+        if (!retained.satisfiedOrNotApplicable()) {
+            rearm.markPlanBlocked("resume_working_set_" + retained.name(), observed.scope(),
+                    observed.conditionKey("working_set_deficit"));
+            stateMachine.markPolicyWaiting(true);
+            AutoDepositRearmDiagnostics.decision("RESUME_WORKING_SET_" + retained.name(), rearm, pressure, null);
+            return;
+        }
+        if (!verificationOnly && planning.status() != AutoDepositPlanningResult.Status.READY) {
+            rearm.markPlanBlocked(planning.reason(), observed.scope(), observed.conditionKey(planning.reason()));
+            stateMachine.markPolicyWaiting(true);
+            decide("resumed_plan_not_ready");
+            return;
+        }
+        startPlan(pressure, verificationOnly ? AutoDepositVerificationPlan.from(plan) : plan,
+                condition, observed, verificationOnly);
+    }
+
+    private void startRecovery(DepositAllInventoryPressureSnapshot pressure, AutoDepositPlan plan,
+                               String condition, AutoDepositConditions observed) {
+        AutoDepositPlan verification = AutoDepositVerificationPlan.from(plan);
+        AutoDepositMaintenanceTask task = AutoDepositMaintenanceTask.resumeRecovery(verification,
+                runs.recoverySource(), trustedRepository, exactOpenContainerBinding, pressureSource, runs::executionTick);
+        bindAndStart(pressure, verification, condition, observed, task, "resume_reserved_item_recovery");
+    }
+
+    private void startPlan(DepositAllInventoryPressureSnapshot pressure, AutoDepositPlan plan,
+                           String condition, AutoDepositConditions observed, boolean verificationOnly) {
+        AutoDepositMaintenanceTask task = new AutoDepositMaintenanceTask(plan, trustedRepository,
+                exactOpenContainerBinding, pressureSource, runs::executionTick, verificationOnly);
+        bindAndStart(pressure, plan, condition, observed, task, verificationOnly ? "resume_verification" : "ready");
+    }
+
+    private void bindAndStart(DepositAllInventoryPressureSnapshot pressure, AutoDepositPlan plan,
+                              String condition, AutoDepositConditions observed,
+                              AutoDepositMaintenanceTask task, String reason) {
+        runs.begin(task, pressure, condition, observed.scope(), observed);
+        stateMachine.prepareAdmittedRun();
         if (task.diagnosticAutomaticRunEnabled()) {
             activeDiagnosticMaintenanceTask = task;
-            StoreDepositDiagnostics.beginAutomaticRun(
-                    task,
-                    plan.context().userTaskRoot(),
-                    plan.context().epoch(),
-                    null
-            );
+            StoreDepositDiagnostics.beginAutomaticRun(task, plan.context().userTaskRoot(), plan.context().epoch(), null);
         }
         DepositAllAutoDiagnostics.logPolicyPlan(plan, task);
-        AutoDepositPolicyDiagnostics.log(plan, pressure, "READY", "ready", task);
+        AutoDepositPolicyDiagnostics.log(plan, pressure, "READY", reason, task);
         startTask(pressure, plan.allTargets(), task);
+        AutoDepositRearmDiagnostics.decision("ROOT_STARTED", rearm, pressure, task);
+        lastDeferredReason = null;
+        lastDeferredRoot = null;
     }
 
-    private void startTask(DepositAllInventoryPressureSnapshot snapshot,
-                           ItemTarget[] targets,
-                           Task chainTask) {
+    private void startTask(DepositAllInventoryPressureSnapshot snapshot, ItemTarget[] targets, Task chainTask) {
         boolean runnerWasActive = runner.isActive();
         setTask(chainTask);
-        DepositAllInventoryPressureState previousState = stateMachine.state();
+        DepositAllInventoryPressureState previous = stateMachine.state();
         stateMachine.markRunStarted();
-        DepositAllAutoDiagnostics.logTransition(
-                previousState,
-                stateMachine.state(),
-                "automatic_task_started",
-                snapshot,
-                chainTask
-        );
+        DepositAllAutoDiagnostics.logTransition(previous, stateMachine.state(), "automatic_task_started", snapshot, chainTask);
         DepositAllAutoDiagnostics.logTrigger(snapshot, targets.length, chainTask);
         if (!runnerWasActive) {
             runner.enable();
@@ -409,130 +295,98 @@ public final class DepositAllInventoryPressureChain extends SingleTaskChain {
 
     @Override
     protected void onTaskFinish(AltoClef mod) {
-        Task finishedTask = mainTask;
-        setTask(null);
-        transitionRunToWaiting("automatic_task_terminal", currentSnapshot(), finishedTask);
+        stopOwnedRun(AutoDepositRunReason.UNEXPECTED_STOP, null);
     }
 
     @Override
     public void onInterrupt(TaskChain other) {
-        Task interruptingTask = other instanceof SingleTaskChain
-                ? ((SingleTaskChain) other).getCurrentTask()
-                : null;
-        stopOwnedRun("automatic_chain_interrupted", interruptingTask);
+        Task interrupting = other instanceof SingleTaskChain ? ((SingleTaskChain) other).getCurrentTask() : null;
+        stopOwnedRun(AutoDepositRunReason.SAFETY_INTERRUPTED, interrupting);
     }
 
     @Override
     protected void onStop() {
-        boolean wasRunning = stateMachine.state() == DepositAllInventoryPressureState.RUNNING;
-        Task stoppedTask = mainTask;
-        super.onStop();
-        if (wasRunning) {
-            transitionRunToWaiting("automatic_chain_stopped", currentSnapshot(), stoppedTask);
-        }
+        executionControl.stop();
+        stopOwnedRun(AutoDepositRunReason.STOPPED, null);
+        runs.cancelPendingUnit("explicit_stop");
     }
 
     @Override
     public boolean isActive() {
-        return stateMachine.state() == DepositAllInventoryPressureState.RUNNING
-                && mainTask != null;
+        return pendingAdmission || stateMachine.state() == DepositAllInventoryPressureState.RUNNING && mainTask != null;
     }
 
     @Override
-    public String getName() {
-        return "Automatic Deposit All";
-    }
+    public String getName() { return "Automatic Deposit All"; }
 
-    private void latchNoSafe(String reason,
-                             DepositAllInventoryPressureSnapshot snapshot,
-                             Task userTaskRoot,
-                             AutoDepositDecisionFingerprint fingerprint,
-                             WorkingSetSnapshot retainedWorkingSet,
-                             long retainedEpoch) {
-        DepositAllInventoryPressureSignal signal = stateMachine.observe(snapshot);
-        if (signal != DepositAllInventoryPressureSignal.THRESHOLD_REACHED) {
-            return;
+    private void stopOwnedRun(AutoDepositRunReason reason, Task interruptingTask) {
+        pendingAdmission = false;
+        Task owned = mainTask;
+        if (owned == null) return;
+        AutoDepositMaintenanceTask maintenance = owned instanceof AutoDepositMaintenanceTask
+                ? (AutoDepositMaintenanceTask) owned : null;
+        if (maintenance != null) maintenance.terminate(reason);
+        boolean clean = false;
+        try {
+            AutoDepositSurvivalCleanup.run(mod, () -> {
+                if (owned.isActive()) owned.stop(interruptingTask);
+            });
+            clean = true;
+        } finally {
+            mainTask = null;
+            // Maintenance owns the safe post-cleanup verification and preserves its immutable candidate.
+            DepositAllInventoryPressureSnapshot end = maintenance == null ? currentSnapshot() : null;
+            if (maintenance != null) {
+                AutoDepositRunResult result = maintenance.finalizeAfterCleanup(clean).orElseThrow();
+                end = result.endingPressure().orElse(null);
+                String workingFailureKey = result.reason() == AutoDepositRunReason.WORKING_SET_DEFICIT
+                        ? conditions.captureWorkingSetFailure(maintenance.snapshot()) : null;
+                AutoDepositConditions terminalConditions = conditions.read(mod, maintenance.plan(), rearm.episodeSequence());
+                String terminalKey = result.reason() == AutoDepositRunReason.WORKING_SET_DEFICIT ? workingFailureKey
+                        : terminalConditions.available()
+                        ? terminalConditions.conditionKey(result.reason().name() + ":" + result.detail()) : null;
+                boolean userRootReplaced = maintenance.plan().context().worldIdentity() == mod.getWorld()
+                        && maintenance.plan().context().userTaskRoot() != admission.currentRoot();
+                runs.settle(maintenance, result, terminalKey, userRootReplaced);
+                AutoDepositRearmDiagnostics.result(result, rearm, maintenance);
+            }
+            DepositAllInventoryPressureState previous = stateMachine.state();
+            if (previous == DepositAllInventoryPressureState.RUNNING) stateMachine.markRunTerminated();
+            pressureDiagnostics.transition(previous, stateMachine.state(), reason.name(), owned, trustedRepository.revision());
+            DepositAllAutoDiagnostics.logTransition(previous, stateMachine.state(), reason.name(), end, owned);
+            if (activeDiagnosticMaintenanceTask != null) {
+                StoreDepositDiagnostics.recordAutomaticPressureRunClosed(activeDiagnosticMaintenanceTask,
+                        rearm.lastReason(), stateMachine.state().name());
+                activeDiagnosticMaintenanceTask = null;
+            }
+            nextEvaluation = 0;
         }
-        stateMachine.markNoSafeSurplus(fingerprint);
-        pressureDiagnostics.transition(DepositAllInventoryPressureState.ARMED, stateMachine.state(),
-                reason, userTaskRoot, waitingTrustedRevision);
-        lastNoSafeWorkingSet = retainedWorkingSet;
-        lastNoSafeEpoch = retainedEpoch;
-        clearDeferredFingerprint();
-        DepositAllAutoDiagnostics.logNoSafeSurplus(reason, snapshot, userTaskRoot);
     }
 
-    private void transitionArmedToWaiting(String reason,
-                                          DepositAllInventoryPressureSnapshot snapshot,
-                                          Task task) {
-        DepositAllInventoryPressureState previousState = stateMachine.state();
+    // Preserve the exact manual StoreHome classifier used by existing callers and regression tests.
+    boolean suppressExistingStoreHome(DepositAllInventoryPressureSnapshot snapshot,
+                                     UserTaskChain userTaskChain, Task capturedRoot) {
+        if (snapshot == null || !snapshot.isAtOrAboveThreshold()
+                || stateMachine.state() != DepositAllInventoryPressureState.ARMED
+                || userTaskChain == null || capturedRoot == null || userTaskChain.isRunningIdleTask()
+                || userTaskChain.getCurrentTask() != capturedRoot || !conflictGuard.isStoreHomeRoot(capturedRoot)) return false;
+        stateMachine.observe(snapshot);
         stateMachine.markThresholdSuppressed();
-        waitingTrustedRevision = trustedRepository.revision();
-        pressureDiagnostics.transition(previousState, stateMachine.state(), reason, task, waitingTrustedRevision);
-        DepositAllAutoDiagnostics.logTransition(previousState, stateMachine.state(), reason, snapshot, task);
+        DepositAllAutoDiagnostics.logTransition(DepositAllInventoryPressureState.ARMED, stateMachine.state(),
+                "existing_store_home_task", snapshot, capturedRoot);
+        return true;
     }
 
-    private void transitionRunToWaiting(String reason,
-                                        DepositAllInventoryPressureSnapshot snapshot,
-                                        Task task) {
-        DepositAllInventoryPressureState previousState = stateMachine.state();
-        stateMachine.markRunTerminated();
-        waitingTrustedRevision = activeRunTrustedRevision >= 0L
-                ? activeRunTrustedRevision
-                : trustedRepository.revision();
-        activeRunTrustedRevision = -1L;
-        pressureDiagnostics.transition(previousState, stateMachine.state(), reason, task, waitingTrustedRevision);
-        DepositAllAutoDiagnostics.logTransition(previousState, stateMachine.state(), reason, snapshot, task);
-        if (activeDiagnosticMaintenanceTask != null) {
-            StoreDepositDiagnostics.recordAutomaticPressureRunClosed(
-                    activeDiagnosticMaintenanceTask,
-                    reason,
-                    stateMachine.state().name()
-            );
-            activeDiagnosticMaintenanceTask = null;
-        }
-    }
-
-    private void stopOwnedRun(String reason, Task interruptingTask) {
-        if (stateMachine.state() != DepositAllInventoryPressureState.RUNNING) {
-            return;
-        }
-        Task ownedTask = mainTask;
-        if (ownedTask != null && ownedTask.isActive()) {
-            ownedTask.stop(interruptingTask);
-        }
-        mainTask = null;
-        transitionRunToWaiting(reason, currentSnapshot(), ownedTask);
-    }
-
-    private DepositAllInventoryPressureSnapshot currentSnapshot() {
-        return pressureSource.read(mod).orElse(null);
-    }
-
-    private Task currentUserTaskRoot() {
-        UserTaskChain chain = mod.getUserTaskChain();
-        return chain != null && chain.isActive() && !chain.isRunningIdleTask()
-                ? chain.getCurrentTask()
-                : null;
-    }
-
-    private void deferChanged(String reason,
-                              DepositAllInventoryPressureSnapshot snapshot,
-                              Task userTaskRoot) {
-        if (!Objects.equals(lastDeferredReason, reason) || lastDeferredRoot != userTaskRoot) {
-            DepositAllAutoDiagnostics.logDeferred(reason, snapshot, userTaskRoot);
+    private DepositAllInventoryPressureSnapshot currentSnapshot() { return pressureObservation.observe(mod).orElse(null); }
+    private void decide(String reason) { pressureDiagnostics.decision(reason, stateMachine.state(), pendingAdmission); }
+    private void defer(String reason, DepositAllInventoryPressureSnapshot pressure) {
+        if ("manual_storage".equals(reason) && mainTask == null) stateMachine.markPolicyWaiting(false);
+        Task root = admission.currentRoot();
+        if (!Objects.equals(lastDeferredReason, reason) || lastDeferredRoot != root) {
+            DepositAllAutoDiagnostics.logDeferred(reason, pressure, root);
             lastDeferredReason = reason;
-            lastDeferredRoot = userTaskRoot;
+            lastDeferredRoot = root;
         }
-    }
-
-    private void clearDeferredFingerprint() {
-        lastDeferredReason = null;
-        lastDeferredRoot = null;
-    }
-
-    private void clearNoSafeContext() {
-        lastNoSafeWorkingSet = null;
-        lastNoSafeEpoch = 0L;
+        decide(reason);
     }
 }

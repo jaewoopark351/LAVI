@@ -10,6 +10,27 @@ public final class DepositAllInventoryPressureStateMachine {
     private boolean thresholdPending;
     private AutoDepositDecisionFingerprint noSafeFingerprint;
 
+    //20260914_kpopmodder: The typed rearm policy admits resumed work even after pressure has already fallen.
+    public void prepareAdmittedRun() {
+        if (state == DepositAllInventoryPressureState.RUNNING) {
+            throw new IllegalStateException("Cannot admit over an active automatic root");
+        }
+        state = DepositAllInventoryPressureState.ARMED;
+        thresholdPending = true;
+        noSafeFingerprint = null;
+    }
+
+    //20260914_kpopmodder: Project typed policy waiting without using legacy diagnostic fingerprints for admission.
+    public void markPolicyWaiting(boolean planBlocked) {
+        if (state == DepositAllInventoryPressureState.RUNNING) {
+            throw new IllegalStateException("Cannot replace active automatic execution with a planning wait");
+        }
+        state = planBlocked ? DepositAllInventoryPressureState.NO_SAFE_SURPLUS_WAIT
+                : DepositAllInventoryPressureState.WAIT_FOR_REARM;
+        thresholdPending = false;
+        noSafeFingerprint = null;
+    }
+
     public DepositAllInventoryPressureSignal observe(DepositAllInventoryPressureSnapshot snapshot) {
         Objects.requireNonNull(snapshot, "snapshot");
         boolean lowWaterReached = snapshot.isAtOrBelowLowWater();

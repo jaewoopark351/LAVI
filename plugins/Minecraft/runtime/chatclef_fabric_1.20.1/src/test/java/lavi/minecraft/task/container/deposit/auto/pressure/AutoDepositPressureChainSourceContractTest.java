@@ -10,7 +10,6 @@ import java.io.IOException;
 
 import static lavi.minecraft.diagnostics.container.store.deposit.support.StoreDepositSliceATestSupport.source;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 //20260907_kpopmodder: Isolate the pressure-chain source-shape contract from lifecycle ordering tests.
 class AutoDepositPressureChainSourceContractTest {
@@ -27,12 +26,12 @@ class AutoDepositPressureChainSourceContractTest {
     }
 
     @Test
-    @DisplayName("scenario 10 [assertion 15c]: pressure chain keeps the user-root binding shape")
-    void pressureChainKeepsUserRootBindingShape() throws IOException {
+    @DisplayName("pressure diagnostics must not construct a gameplay child")
+    void pressureDiagnosticsDoNotConstructGameplayChildren() throws IOException {
         String pressureChain = source(
                 "src/main/java/lavi/minecraft/task/container/deposit/auto/DepositAllInventoryPressureChain.java"
         );
         assertFalse(pressureChain.contains("Task primaryDepositTask = task.primaryDepositTask()"));
-        assertTrue(pressureChain.contains("plan.context().epoch(),\n                    null"));
+        //20260914_kpopmodder: Root correlation is exercised by AutoDepositRunLedgerTest, not whitespace matching.
     }
 }

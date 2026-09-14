@@ -1,0 +1,75 @@
+//20260914_kpopmodder: Compile and execute automatic-deposit regressions on the 1.20.1 project only.
+gradle.projectsEvaluated {
+    def target = gradle.rootProject.findProject(':1.20.1')
+    if (target == null) throw new GradleException('Missing approved 1.20.1 project')
+    def patterns = [
+        'lavi/minecraft/task/container/deposit/auto/**',
+        'lavi/minecraft/diagnostics/container/store/deposit/support/**',
+        'lavi/minecraft/testsupport/**'
+    ]
+    def selected = target.fileTree(gradle.rootProject.file('src/test/java')) { include patterns }
+    // Reuse the existing explicit Jupiter selector runner rather than create another test harness.
+    def runner = gradle.rootProject.file('src/test/goldMining/java/lavi/minecraft/test/GoldFocusedTestRunner.java')
+    def output = new File(target.layout.buildDirectory.get().asFile, 'auto-deposit-focused/classes')
+    def agentOutput = new File(target.layout.buildDirectory.get().asFile, 'auto-deposit-focused/bootstrap-classes')
+    def agentDirectory = new File(target.layout.buildDirectory.get().asFile, 'auto-deposit-focused/bootstrap-agent')
+    def agentSources = gradle.rootProject.fileTree('src/test/autoDeposit/java') { include '**/*.java' }
+    target.tasks.register('autoDepositCompileBootstrapAgent', JavaCompile) {
+        source agentSources
+        classpath = target.files(target.configurations.testRuntimeClasspath.files)
+        destinationDirectory.set(agentOutput)
+        options.release.set(17)
+        options.encoding = 'UTF-8'
+        options.compilerArgs += ['-proc:none', '-implicit:none']
+    }
+    def agentJar = target.tasks.register('autoDepositBootstrapAgentJar', Jar) {
+        dependsOn target.tasks.named('autoDepositCompileBootstrapAgent')
+        from agentOutput
+        archiveFileName.set('auto-deposit-named-registry-test-agent.jar')
+        destinationDirectory.set(agentDirectory)
+        manifest { attributes 'Premain-Class': 'lavi.minecraft.test.bootstrap.NamedRegistryAccessAgent' }
+    }
+    target.tasks.register('autoDepositVerifyMinecraftBootstrap', JavaExec) {
+        dependsOn agentJar
+        classpath = target.files(agentOutput, target.configurations.testRuntimeClasspath.files)
+        mainClass.set('lavi.minecraft.test.bootstrap.MinecraftBootstrapProbe')
+        systemProperty 'user.dir', gradle.rootProject.projectDir.absolutePath
+        def bootstrapTemp = new File(target.layout.buildDirectory.get().asFile, 'auto-deposit-test-temp/bootstrap')
+        systemProperty 'java.io.tmpdir', bootstrapTemp.absolutePath
+        doFirst {
+            bootstrapTemp.mkdirs()
+            jvmArgs '-javaagent:' + agentJar.get().archiveFile.get().asFile.absolutePath
+        }
+    }
+    target.tasks.register('autoDepositCompileTests', JavaCompile) {
+        dependsOn target.tasks.named('compileJava'), target.tasks.named('processResources')
+        source selected, runner
+        classpath = target.files(target.sourceSets.main.output.classesDirs.files,
+                target.sourceSets.main.output.resourcesDir, target.configurations.testCompileClasspath.files,
+                target.configurations.testRuntimeClasspath.files)
+        destinationDirectory.set(output)
+        options.release.set(17)
+        options.encoding = 'UTF-8'
+        options.compilerArgs += ['-proc:none', '-implicit:none']
+    }
+    target.tasks.register('autoDepositFocusedTests', JavaExec) {
+        dependsOn target.tasks.named('autoDepositCompileTests'), target.tasks.named('autoDepositVerifyMinecraftBootstrap')
+        classpath = target.files(output, target.sourceSets.main.output.classesDirs.files,
+                target.sourceSets.main.output.resourcesDir, target.configurations.testRuntimeClasspath.files)
+        mainClass.set('lavi.minecraft.test.GoldFocusedTestRunner')
+        systemProperty 'user.dir', gradle.rootProject.projectDir.absolutePath
+        def isolatedTemp = new File(target.layout.buildDirectory.get().asFile, 'auto-deposit-test-temp')
+        systemProperty 'java.io.tmpdir', isolatedTemp.absolutePath
+        doFirst {
+            isolatedTemp.mkdirs()
+            jvmArgs '-javaagent:' + agentJar.get().archiveFile.get().asFile.absolutePath
+            def names = selected.files.findAll { it.name ==~ /.*Tests?\.java/ }.collect { source ->
+                def match = source.getText('UTF-8') =~ /(?m)^package\s+([^;]+);/
+                if (!match.find()) throw new GradleException('Missing test package: ' + source)
+                match.group(1) + '.' + source.name.replaceFirst(/\.java$/, '')
+            }.unique().sort()
+            if (names.empty) throw new GradleException('No automatic-deposit tests selected')
+            args names
+        }
+    }
+}

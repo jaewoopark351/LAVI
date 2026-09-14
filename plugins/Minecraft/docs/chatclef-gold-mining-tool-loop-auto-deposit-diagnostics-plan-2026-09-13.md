@@ -4,7 +4,10 @@
 # 금 채굴 도구 교체 반복·자동보관 미실행 — 로그 보강 계획
 
 <!-- 20260913_kpopmodder: Point the later runtime review to a separate behavior-repair design without rewriting this logging-only checkpoint. -->
-22:12 후속 실행의 정확한 도구 장착 불일치·단축바 충돌과 root 교체 시 1,216회 누계는 [후속 디버깅 설계](gold-mining-debugging-2026-09-13/README.md)에 기록했다. 그 실행의 자동보관은 31/36칸으로 기준 미충족이었다. 아래 16시대 관측·미확정 항목과 로그 전용 구현 범위는 당시 기록으로 유지하며, 후속 동작 수정은 현재 문서화만 된 `PLAN_ONLY`다.
+22:12 후속 실행의 정확한 도구 장착 불일치·단축바 충돌과 root 교체 시 1,216회 누계는 [후속 디버깅 설계](gold-mining-debugging-2026-09-13/README.md)에 기록했다. 그 실행의 자동보관은 31/36칸으로 기준 미충족이었다. 아래 16시대 관측·미확정 항목과 로그 전용 구현 범위는 당시 기록으로 유지한다. 후속 동작 수정은 최초 `PLAN_ONLY`에서 이후 구현으로 진행됐으며 [구현과 검증 기록](gold-mining-debugging-2026-09-13/implementation.md)에 별도로 남겼다.
+
+<!-- 20260914_kpopmodder: Preserve the historical unknown cause while linking the later directly observed rearm failure. -->
+2026-09-14의 별도 실행에서는 `33→준비35→보관후30→WAIT→36`과 재무장 차단을 확인했다. [자동보관 종료 후 재실행 설계](auto-deposit-rearm-2026-09-14/README.md)에 원인·상태 전이·실행 한도·STOP/자동방어 검증 계획을 분리한다. 아래 표의 자동보관 원인 UNKNOWN은 2026-09-13 당시 관측을 뜻하며 새 실행까지 미확정이라는 뜻이 아니다. 새 재실행 동작은 아직 `NOT_IMPLEMENTED`다.
 
 ## 1. 목적과 범위
 

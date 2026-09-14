@@ -10,6 +10,8 @@ import lavi.minecraft.diagnostics.observation.ObservationScope;
 import lavi.minecraft.task.container.deposit.auto.DepositAllAutoDiagnostics;
 import lavi.minecraft.task.container.deposit.auto.maintenance.AutoDepositMaintenancePhase;
 import lavi.minecraft.task.container.deposit.auto.maintenance.relief.AutoDepositFreeSlotVerdict;
+import lavi.minecraft.task.container.deposit.auto.maintenance.result.AutoDepositRunResult;
+import lavi.minecraft.task.container.deposit.auto.maintenance.result.AutoDepositRunReason;
 import lavi.minecraft.task.container.deposit.auto.policy.AutoDepositPlan;
 
 import java.util.Objects;
@@ -25,12 +27,20 @@ public final class AutoDepositMaintenanceDiagnostics {
 
     public AutoDepositMaintenanceDiagnostics(AutoDepositPlan plan) {
         Objects.requireNonNull(plan, "plan");
-        automaticRunEnabled = plan.diagnosticPolicyObservationRetained()
-                && ChatClefDiagnostics.isBoundaryEnabled();
-        observation = new AutoDepositOperationObservation(plan.context().userTaskRoot());
+        boolean enabled = false;
+        AutoDepositOperationObservation captured = null;
+        try {
+            enabled = plan.diagnosticPolicyObservationRetained() && ChatClefDiagnostics.isBoundaryEnabled();
+            captured = new AutoDepositOperationObservation(plan.context().userTaskRoot());
+        } catch (RuntimeException | LinkageError ignored) { }
+        automaticRunEnabled = enabled;
+        observation = captured;
     }
 
-    public ObservationScope observationScope() { return observation.scope(); }
+    public ObservationScope observationScope() {
+        try { return observation == null ? ObservationScope.NOOP : observation.scope(); }
+        catch (RuntimeException | LinkageError ignored) { return ObservationScope.NOOP; }
+    }
 
     public boolean automaticRunEnabled() {
         return automaticRunEnabled;
@@ -68,6 +78,7 @@ public final class AutoDepositMaintenanceDiagnostics {
             String reason,
             int deficitTypes,
             Task maintenanceTask) {
+        try {
         DepositAllAutoDiagnostics.logMaintenanceTransition(
                 operationEpoch,
                 previous,
@@ -80,6 +91,7 @@ public final class AutoDepositMaintenanceDiagnostics {
                 || next == AutoDepositMaintenancePhase.CANCELLED) {
             recordTerminal(maintenanceTask, reason, next.name());
         }
+        } catch (RuntimeException | LinkageError ignored) { }
     }
 
     public void recordFreeSlotVerdict(
@@ -88,6 +100,9 @@ public final class AutoDepositMaintenanceDiagnostics {
             int expectedFreedSlots,
             AutoDepositFreeSlotVerdict verdict,
             Task maintenanceTask) {
+        //20260914_kpopmodder: Unavailable observations must not pass through an arithmetic-only diagnostic.
+        if (!verdict.available()) return;
+        try {
         DepositAllAutoDiagnostics.logFreeSlotOutcome(
                 operationEpoch,
                 startingOccupiedSlots,
@@ -96,9 +111,23 @@ public final class AutoDepositMaintenanceDiagnostics {
                 verdict.outcome(),
                 maintenanceTask
         );
+        } catch (RuntimeException | LinkageError ignored) { }
+    }
+
+    //20260914_kpopmodder: Observe immutable root results; emission never selects or replaces the decision.
+    public void recordRunResult(AutoDepositRunResult result, Task maintenanceTask, boolean finalized) {
+        try {
+            String reason = (finalized ? "FINAL_" : "CANDIDATE_") + result.reason().name();
+            boolean terminal = finalized && result.reason() != AutoDepositRunReason.SAFETY_INTERRUPTED
+                    && result.reason() != AutoDepositRunReason.AUTOMATION_DISABLED
+                    && result.reason() != AutoDepositRunReason.REPLAN_REQUIRED;
+            observationScope().record("AUTO_DEPOSIT_MAINTENANCE_RESULT", reason, reason, terminal,
+                    AutoDepositRunResultFields.of(result, finalized));
+        } catch (RuntimeException | LinkageError ignored) { }
     }
 
     public void recordTerminal(Task maintenanceTask, String reason, String terminalState) {
+        try {
         if (!automaticRunEnabled
                 || terminalRecorded
                 || !ChatClefDiagnostics.isBoundaryEnabled()) {
@@ -110,6 +139,7 @@ public final class AutoDepositMaintenanceDiagnostics {
                 terminalState
         );
         terminalRecorded = true;
+        } catch (RuntimeException | LinkageError ignored) { }
     }
 
     private void registerChild(
@@ -118,6 +148,7 @@ public final class AutoDepositMaintenanceDiagnostics {
             Task childTask,
             int childIndex,
             ItemTarget[] targets) {
+        try {
         if (!automaticRunEnabled
                 || !ChatClefDiagnostics.isBoundaryEnabled()
                 || registeredChild == childTask) {
@@ -131,5 +162,6 @@ public final class AutoDepositMaintenanceDiagnostics {
                 targets
         );
         registeredChild = childTask;
+        } catch (RuntimeException | LinkageError ignored) { }
     }
 }

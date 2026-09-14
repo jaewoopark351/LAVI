@@ -352,6 +352,11 @@ public final class AutoDepositTrustedStoreTask extends Task implements AutoDepos
         return outcome;
     }
 
+    //20260914_kpopmodder: Reuse native transfer totals for automatic maintenance progress without another observation or action.
+    public int confirmedStoredCount() {
+        return confirmedCount();
+    }
+
     public StoreInContainerTask activeStoreTask() {
         return activeStoreTask;
     }

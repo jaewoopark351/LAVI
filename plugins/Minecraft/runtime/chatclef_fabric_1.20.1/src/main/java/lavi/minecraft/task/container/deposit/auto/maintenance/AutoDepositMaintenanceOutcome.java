@@ -5,5 +5,7 @@ public enum AutoDepositMaintenanceOutcome {
     FULL_RELIEF,
     PARTIAL_RELIEF,
     NO_SLOT_RELIEF,
-    CANCELLED
+    CANCELLED,
+    //20260914_kpopmodder: Missing pressure evidence is not measured zero relief.
+    UNAVAILABLE
 }

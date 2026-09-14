@@ -9,6 +9,7 @@ import adris.altoclef.util.helpers.WorldHelper;
 import lavi.minecraft.task.container.deposit.auto.DepositAllAutoDiagnostics;
 import lavi.minecraft.task.container.deposit.auto.working.PlayerInventorySnapshotReader;
 import lavi.minecraft.task.container.deposit.auto.working.WorkingSetSnapshot;
+import lavi.minecraft.task.container.deposit.auto.recovery.progress.ConfirmedRecoveredItemCount;
 import net.minecraft.item.Item;
 
 import java.util.ArrayDeque;
@@ -28,6 +29,8 @@ public final class RecoverReservedItemsTask extends Task implements AutoDepositO
     private final Queue<AutoDepositRecoveryCandidate> candidates = new ArrayDeque<>();
     private AutoDepositRecoveryCandidate currentCandidate;
     private ExactPickupFromContainerTask currentPickup;
+    //20260914_kpopmodder: Finished candidates are frozen; a live candidate is added only by the read-only getter.
+    private final ConfirmedRecoveredItemCount completedRecoveredItems = new ConfirmedRecoveredItemCount();
     private Terminal terminal = Terminal.RUNNING;
     private int candidateTicks;
     private boolean queueInitialized;
@@ -80,6 +83,7 @@ public final class RecoverReservedItemsTask extends Task implements AutoDepositO
                         currentPickup.result().name(),
                         currentDeficits(mod).size()
                 );
+                completedRecoveredItems.add(currentPickup.confirmedRecoveredCount());
                 currentPickup = null;
                 currentCandidate = null;
                 candidateTicks = 0;
@@ -92,6 +96,7 @@ public final class RecoverReservedItemsTask extends Task implements AutoDepositO
                         "TIMEOUT",
                         deficits.size()
                 );
+                completedRecoveredItems.add(currentPickup.confirmedRecoveredCount());
                 currentPickup = null;
                 currentCandidate = null;
                 candidateTicks = 0;
@@ -140,6 +145,10 @@ public final class RecoverReservedItemsTask extends Task implements AutoDepositO
 
     public Terminal terminal() {
         return terminal;
+    }
+
+    public int confirmedRecoveredCount() {
+        return completedRecoveredItems.including(currentPickup == null ? 0 : currentPickup.confirmedRecoveredCount());
     }
 
     @Override

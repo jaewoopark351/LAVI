@@ -7,6 +7,8 @@ import org.junit.jupiter.api.Test;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AutoDepositFreeSlotVerifierTest {
     @Test
@@ -17,16 +19,48 @@ class AutoDepositFreeSlotVerifierTest {
     }
 
     @Test
-    void unavailableSnapshotPreservesStartingOccupancyAndReportsNoRelief() {
+    void unavailableSnapshotDoesNotInventAnEndingOccupancyOrZeroProgress() {
         AutoDepositFreeSlotVerifier verifier = new AutoDepositFreeSlotVerifier(
                 ignored -> Optional.empty()
         );
 
         AutoDepositFreeSlotVerdict verdict = verifier.verify(null, 33, 5);
 
-        assertEquals(33, verdict.endingOccupiedSlots());
-        assertEquals(0, verdict.freedSlots());
-        assertEquals(AutoDepositMaintenanceOutcome.NO_SLOT_RELIEF, verdict.outcome());
+        assertEquals(-1, verdict.endingOccupiedSlots());
+        assertEquals(-1, verdict.freedSlots());
+        assertTrue(verdict.endingPressure().isEmpty());
+        assertTrue(verdict.signedDelta().isEmpty());
+        assertEquals(AutoDepositPressureObservationStatus.UNAVAILABLE, verdict.observationStatus());
+        assertEquals(AutoDepositMaintenanceOutcome.UNAVAILABLE, verdict.outcome());
+    }
+
+    //20260914_kpopmodder: Preserve negative inventory delta and incompatible scope independently of transfer progress.
+    @Test
+    void retainsNegativeDeltaAndRejectsAnIncompatibleInventoryScope() {
+        AutoDepositFreeSlotVerdict negative = new AutoDepositFreeSlotVerifier(
+                ignored -> Optional.of(new DepositAllInventoryPressureSnapshot(35, 36))).verify(null, 33, 5);
+        assertEquals(-2, negative.signedDelta().orElseThrow());
+        assertEquals(0, negative.freedSlots());
+        assertEquals(AutoDepositMaintenanceOutcome.NO_SLOT_RELIEF, negative.outcome());
+
+        AutoDepositFreeSlotVerdict wrongScope = new AutoDepositFreeSlotVerifier(
+                ignored -> Optional.of(new DepositAllInventoryPressureSnapshot(27, 27))).verify(null, 33, 5);
+        assertFalse(wrongScope.available());
+        assertEquals(AutoDepositPressureObservationStatus.INCOMPATIBLE_SCOPE, wrongScope.observationStatus());
+        assertEquals(27, wrongScope.endingOccupiedSlots());
+        assertTrue(wrongScope.signedDelta().isEmpty());
+    }
+
+    @Test
+    void aThrowingReadIsUnavailableAndIsInvokedOnlyOnce() {
+        int[] reads = {0};
+        AutoDepositFreeSlotVerdict result = new AutoDepositFreeSlotVerifier(ignored -> {
+            reads[0]++;
+            throw new IllegalStateException("read unavailable");
+        }).verify(null, 33, 5);
+        assertEquals(1, reads[0]);
+        assertEquals(AutoDepositMaintenanceOutcome.UNAVAILABLE, result.outcome());
+        assertTrue(result.endingPressure().isEmpty());
     }
 
     private static void assertVerdict(

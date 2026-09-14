@@ -477,6 +477,25 @@ public class DepositAllTask extends Task {
         return _storedItems.getUnstoredItemTargetsYouCanStore(AltoClef.getInstance(), _toStore).length == 0;
     }
 
+    //20260914_kpopmodder: Expose the native stored-target predicate to automatic maintenance without changing generic completion.
+    public boolean automaticStoredTargetsSatisfied() {
+        for (ItemTarget target : _toStore) {
+            if (target == null || !_storedItems.matches(target)) return false;
+        }
+        return true;
+    }
+
+    //20260914_kpopmodder: Read only this Task's native confirmed target counts; absence of source items is not transfer proof.
+    public int automaticStoredCount() {
+        long total = 0;
+        for (ItemTarget target : _toStore) {
+            if (target != null) {
+                total += Math.max(0, Math.min(target.getTargetCount(), _storedItems.getStoredCount(target.getMatches())));
+            }
+        }
+        return (int) Math.min(Integer.MAX_VALUE, total);
+    }
+
     @Override
     protected void onStop(Task interruptTask) {
         StoreInAnyContainerDiagnostics.logStop(this, interruptTask, _getIfNotPresent, _toStore);
