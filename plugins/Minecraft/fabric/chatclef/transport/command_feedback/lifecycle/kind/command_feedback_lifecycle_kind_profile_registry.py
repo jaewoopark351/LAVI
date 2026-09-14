@@ -1,3 +1,4 @@
+#20260914_kpopmodder: Add FIND to the existing command contract without changing other command ownership.
 #20260907_kpopmodder: Keep exact command-to-response-lifecycle coverage closed and reviewable.
 from __future__ import annotations
 
@@ -21,6 +22,7 @@ _RESPONSE_LIFECYCLE_KINDS = {
     "deposit": "finite_task",
     "deposit_all": "finite_task",
     "equip": "finite_task",
+    "find": "finite_task",
     "follow": "persistent_task",
     "food": "finite_task",
     "gamer": "finite_task",
@@ -50,6 +52,7 @@ _TERMINAL_TRIGGERS = {
     "deposit": "result_callback",
     "deposit_all": "result_callback",
     "equip": "result_callback",
+    "find": "result_callback",
     "follow": "result_callback",
     "food": "result_callback",
     "gamer": "result_callback",

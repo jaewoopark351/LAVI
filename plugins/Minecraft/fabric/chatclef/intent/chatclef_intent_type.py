@@ -15,6 +15,8 @@ class ChatClefIntentType(str, Enum):
     GIVE_ITEM = "give_item"
     FOOD = "food"
     MEAT = "meat"
+    #20260914_kpopmodder: Finding is separate from acquisition and combat.
+    FIND = "find"
     GOTO = "goto"
     FOLLOW = "follow"
     IDLE = "idle"

@@ -1,3 +1,4 @@
+#20260914_kpopmodder: Add FIND to the existing command contract without changing other command ownership.
 #20260907_kpopmodder: Lock all registered raw names to an explicit source-reviewed grammar.
 from __future__ import annotations
 
@@ -19,6 +20,7 @@ _GRAMMARS = {
     "deposit": "optional_item_list",
     "deposit_all": "optional_item_list",
     "equip": "required_equipment_list",
+    "find": "find_target",
     "follow": "optional_player",
     "food": "positive_integer",
     "gamer": "no_arguments",

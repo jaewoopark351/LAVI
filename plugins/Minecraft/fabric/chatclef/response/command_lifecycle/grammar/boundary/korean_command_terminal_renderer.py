@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from ...terminal.store_home import KoreanStoreHomeTerminalRenderer
 from ...terminal.goto import KoreanGotoTerminalRenderer
+#20260914_kpopmodder: Both screen and TTS consume the same verified FIND projection.
+from ...terminal.find import KoreanFindTerminalRenderer
 from ..arguments.command_feedback_descriptor_phrase_semantics import get_verb
 
 
@@ -25,6 +27,7 @@ class KoreanCommandTerminalRenderer:
             store_home_renderer or KoreanStoreHomeTerminalRenderer()
         )
         self._goto = goto_renderer or KoreanGotoTerminalRenderer()
+        self._find = KoreanFindTerminalRenderer()
 
     def render(
         self,
@@ -87,6 +90,10 @@ class KoreanCommandTerminalRenderer:
             )
         if family == "control":
             return "중지 명령은 끝났는데, 실제로 멈췄는지는 확인하지 못했어"
+        if family == "find" and verified:
+            found = self._find.render(evidence_projection)
+            if found is not None:
+                return found
         if family == "store_home" and verified:
             strong_response = self._store_home.render(evidence_projection)
             if strong_response is not None:
@@ -135,6 +142,10 @@ class KoreanCommandTerminalRenderer:
         if family == "item_give":
             action = "건네다가 실패했어" if began else "건네지 못했어"
             return f"{subject} {action}"
+        if family == "find":
+            failure = self._find.render(failure_projection)
+            if failure is not None:
+                return failure
         if family == "movement_goto":
             failure = self._goto.failure(failure_projection)
             if failure is not None:

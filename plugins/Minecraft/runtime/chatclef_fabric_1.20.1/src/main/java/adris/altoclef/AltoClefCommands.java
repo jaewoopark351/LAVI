@@ -52,6 +52,10 @@ public class AltoClefCommands {
                 new GiveCommand(),
                 new ScanCommand(),
                 new AttackPlayerOrMobCommand(),
+                //#if MC == 12001
+                //20260914_kpopmodder: FIND leaves the existing attack command untouched.
+                new lavi.minecraft.task.find.FindCommand(),
+                //#endif
                 new SetAIBridgeEnabledCommand()
         );
     }

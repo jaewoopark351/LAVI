@@ -31,6 +31,12 @@ class ChatClefIntentAdmissionStage:
         self._goto_guard_decoder = goto_guard_decoder or GotoGuardIntentDecoder()
 
     def inspect(self, intent: object) -> object | None:
+        #20260914_kpopmodder: Stop malformed/negative FIND before UNKNOWN or LLM fallback.
+        if getattr(intent, "source", None) == "find_guard" or "find_guard" in getattr(intent, "slots", {}):
+            return self._rejection_factory.create(
+                ChatClefIntentStatus.INVALID, "invalid_find_request",
+                "찾을 대상과 종류를 하나의 요청으로 말해 줘. 예: 마을 주민 찾아줘.", intent,
+            )
         guard = self._guard_decoder.decode(intent)
         if guard.is_valid:
             classification = guard.classification

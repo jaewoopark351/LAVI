@@ -7,6 +7,8 @@ from ..rejection import OrdinaryTranslationRejectionStage
 from ..submission import OrdinarySubmissionResultStage
 from ..translation import OrdinaryTranslationStage
 from plugins.Minecraft.fabric.chatclef.input.routing.goto import GotoTranslationBindingStage
+#20260914_kpopmodder: Keep FIND binding out of GOTO and generic admission policy.
+from plugins.Minecraft.fabric.chatclef.input.routing.find import FindTranslationBindingStage
 from plugins.Minecraft.fabric.chatclef.input.routing.goto.goto_input_diagnostics import GotoInputDiagnostics
 from .ordinary_minecraft_command_route_compatibility_installer import (
     OrdinaryMinecraftCommandRouteCompatibilityInstaller,
@@ -97,6 +99,9 @@ class OrdinaryMinecraftCommandRouteComponentGraph:
             rejection_stage=self.rejection_stage,
             precheck_stage=self.precheck_stage,
             submission_result_stage=self.submission_result_stage,
+            find_binding_stage=FindTranslationBindingStage(
+                live_proof_validator=live_proof_validator, log_callback=router_logger.log,
+            ),
             goto_binding_stage=GotoTranslationBindingStage(
                 live_proof_validator=live_proof_validator,
                 diagnostics=GotoInputDiagnostics(router_logger.log),

@@ -12,6 +12,7 @@ class CommandFeedbackRawScalarGrammar:
     GRAMMAR_IDS = frozenset(
         {
             "attack_target_optional_count",
+            "find_target",
             "no_arguments",
             "on_off_state",
             "optional_block",
@@ -35,6 +36,14 @@ class CommandFeedbackRawScalarGrammar:
         command_name: str,
         arguments: tuple[str, ...],
     ) -> str | None:
+        #20260914_kpopmodder: Raw FIND and Korean FIND use the same strict grammar.
+        if grammar_id == "find_target":
+            from plugins.Minecraft.fabric.chatclef.intent.navigation.find import FindRequest
+            try:
+                FindRequest.parse("find " + " ".join(arguments))
+                return "find_target"
+            except (ValueError, TypeError):
+                return None
         if grammar_id == "no_arguments":
             return "no_arguments" if not arguments else None
         if grammar_id == "on_off_state":

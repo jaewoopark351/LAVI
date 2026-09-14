@@ -60,6 +60,10 @@ class MinecraftChatClefInputIntentGate:
         self._goto_candidate = KoreanGotoCandidateDetector()
 
     def inspect(self, text: object) -> MinecraftChatClefInputGateDecision:
+        #20260914_kpopmodder: Both trusted Chat and final Voice reuse the existing input gate.
+        from plugins.Minecraft.fabric.chatclef.intent.navigation.find import KoreanFindRuleParser
+        if KoreanFindRuleParser.is_candidate(text):
+            return MinecraftChatClefInputGateDecision.generic()
         if self._auto_deposit_trust.is_candidate(text):
             return MinecraftChatClefInputGateDecision.h5_auto_deposit_trust()
         #20260913_kpopmodder: Recognize coordinate movement, not a broad '가줘' trigger.

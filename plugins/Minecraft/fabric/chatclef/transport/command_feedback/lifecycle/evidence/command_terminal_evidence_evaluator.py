@@ -14,6 +14,8 @@ from .command_terminal_evidence_profile_registry import (
 )
 from .get import GetAcquisitionTerminalEvidenceEvaluator
 from .goto import GotoTerminalEvidenceEvaluator
+#20260914_kpopmodder: FIND projects observations, not acquisition or combat effects.
+from .find import FindTerminalEvidenceEvaluator
 from .store_home import StoreHomeTerminalEvidenceEvaluator
 
 
@@ -38,6 +40,7 @@ class CommandTerminalEvidenceEvaluator:
                 store_home_evaluator or StoreHomeTerminalEvidenceEvaluator()
             ),
             "goto_terminal": goto_evaluator or GotoTerminalEvidenceEvaluator(),
+            "find_terminal": FindTerminalEvidenceEvaluator(),
         }
 
     def evaluate(

@@ -26,6 +26,14 @@ class ChatClefCommandCompiler:
     _DANGEROUS_RE = re.compile(r"[;#\r\n\"'@]|[\x00-\x1f\x7f]")
 
     def compile(self, intent: ChatClefIntentDTO, target: str | None = None) -> str:
+        #20260914_kpopmodder: Allow only the parsed leading @find, never a generic raw-command bypass.
+        if intent.intent_type is ChatClefIntentType.FIND:
+            from .navigation.find import FindRequest
+            from .chatclef_intent_schema_validator import ChatClefIntentSchemaValidator
+            valid, reason, _ = ChatClefIntentSchemaValidator().validate(intent)
+            if not valid:
+                raise ValueError(reason)
+            return FindRequest.from_slots(intent.slots).compile()
         self.reject_dangerous_text(intent.original_text)
         if intent.intent_type is ChatClefIntentType.GET_ITEM:
             target_text = self._target(target)

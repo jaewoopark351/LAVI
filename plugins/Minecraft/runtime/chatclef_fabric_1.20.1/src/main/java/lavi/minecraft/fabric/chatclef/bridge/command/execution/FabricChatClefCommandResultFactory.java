@@ -104,6 +104,12 @@ final class FabricChatClefCommandResultFactory {
         FabricChatClefCommandResultPayload gotoResult = state.gotoResultTracker().matchingCompletion(
                 data("matching_task_finished", observation), observation, state.userStopBound());
         if (gotoResult != null) return gotoResult;
+        //20260914_kpopmodder: NOT_FOUND/LOST/timeout cannot become a generic COMPLETED result.
+        FabricChatClefCommandResultPayload findResult =
+                lavi.minecraft.fabric.chatclef.bridge.command.result.find.FabricChatClefFindResultProjector.fromMatchingTask(
+                        request().requestId, state.normalizedCommand(), data("matching_task_finished", observation),
+                        observation, state.userStopBound());
+        if (findResult != null) return findResult;
         //#endif
         return FabricChatClefCommandResult.completed(
                 request().requestId,

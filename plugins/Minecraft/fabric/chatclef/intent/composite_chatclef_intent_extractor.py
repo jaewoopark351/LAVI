@@ -54,6 +54,9 @@ class CompositeChatClefIntentExtractor:
             return intent
         if StoreHomeIntentClassification.guarded_from_intent(intent) is not None:
             return intent
+        #20260914_kpopmodder: Never repair a rejected FIND request into another action.
+        if intent.source == "find_guard" or "find_guard" in intent.slots:
+            return intent
         if self._llm_extractor is None:
             return intent
         return self._llm_extractor.extract(text)

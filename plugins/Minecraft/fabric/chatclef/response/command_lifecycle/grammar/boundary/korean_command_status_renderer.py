@@ -76,6 +76,8 @@ class KoreanCommandStatusRenderer:
             return f"{self._particle.attach(label, '을', '를')} 찾는 중이야"
         values = {
             "attack": "대상을 공격하는 중이야",
+            #20260914_kpopmodder: Do not conflate FIND with attack or acquisition.
+            "find": "요청한 대상을 찾거나 접근하는 중이야",
             "auto_deposit_trust": "자동 보관 대상을 등록하는 중이야",
             "auto_deposit_trusted_list": "자동 보관 위치를 확인하는 중이야",
             "auto_deposit_untrust": "자동 보관 등록을 해제하는 중이야",

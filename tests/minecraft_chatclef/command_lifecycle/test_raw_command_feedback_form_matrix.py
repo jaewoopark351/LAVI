@@ -1,4 +1,5 @@
-#20260907_kpopmodder: Lock all 26 registered raw grammars and bounded slot projections.
+#20260914_kpopmodder: Include FIND in the exact live command matrix.
+#20260907_kpopmodder: Lock all 27 registered raw grammars and bounded slot projections.
 from __future__ import annotations
 
 import unittest
@@ -32,6 +33,7 @@ VALID_FORMS = {
     "deposit": (("deposit", "inventory_default"), ("deposit stone 2", "single_item"), ("deposit [stone 2, dirt]", "item_list"), ("deposit stone 0", "single_item_unprojected")),
     "deposit_all": (("deposit_all", "inventory_default"), ("deposit_all dirt", "single_item"), ("deposit_all dirt -1", "single_item_unprojected")),
     "equip": (("equip iron", "equipment_material_set"), ("equip [iron_helmet, iron_chestplate]", "equipment_item_list"), ("equip iron_helmet 0", "equipment_single_item_unprojected")),
+    "find": (("find 마을 주민", "find_target"), ("find item minecraft:diamond report", "find_target")),
     "follow": (("follow", "butler_player"), ("follow A", "explicit_player"), ("follow Player-With-Dash", "explicit_player_unprojected")),
     "food": (("food 10", "food_units"), ("food 0", "food_units_unprojected")),
     "gamer": (("gamer", "no_arguments"),),
@@ -61,6 +63,7 @@ INVALID_FORMS = {
     "deposit": "deposit [stone two]",
     "deposit_all": "deposit_all stone many",
     "equip": "equip",
+    "find": "find item",
     "follow": "follow Steve Alex",
     "food": "food many",
     "gamer": "gamer target",
@@ -87,7 +90,7 @@ class RawCommandFeedbackFormMatrixTests(unittest.TestCase):
         self.decoder = CommandFeedbackRawFormDecoder()
         self.factory = CommandFeedbackDescriptorFactory()
 
-    def test_exact_26_profile_and_valid_invalid_form_matrix(self):
+    def test_exact_27_profile_and_valid_invalid_form_matrix(self):
         expected = KoreanChatClefCommandRegistry().command_names()
 
         self.assertEqual(expected, tuple(VALID_FORMS))

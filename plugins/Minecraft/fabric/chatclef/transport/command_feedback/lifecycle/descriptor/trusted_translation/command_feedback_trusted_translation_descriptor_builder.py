@@ -180,12 +180,22 @@ class CommandFeedbackTrustedTranslationDescriptorBuilder:
             "food": "food",
             "get": "get_item",
             "give": "give_item",
+            "find": "find",
             "goto": "goto",
             "meat": "meat",
             "store_home": "store_home",
         }
         if intent.get("intent_type") != expected_intents.get(command_name):
             return False
+        #20260914_kpopmodder: Bind feedback to the exact admitted FIND slots.
+        if command_name == "find":
+            from plugins.Minecraft.fabric.chatclef.intent.navigation.find import FindRequest
+            from plugins.Minecraft.fabric.chatclef.intent.chatclef_intent_schema_validator import ChatClefIntentSchemaValidator
+            try:
+                valid, _, _ = ChatClefIntentSchemaValidator().validate(intent)
+                return valid and command == FindRequest.from_slots(intent.get("slots")).compile()
+            except (ValueError, TypeError):
+                return False
         if command_name in {"get", "deposit"}:
             return bool(
                 type(target_item) is str

@@ -34,6 +34,14 @@ class ChatClefTranslationInputGuard:
                 "empty_input",
                 "Korean command is empty.",
             )
+        #20260914_kpopmodder: Native FIND is re-parsed into typed slots, not dispatched as raw text.
+        if raw_text.lower().startswith("@find "):
+            from plugins.Minecraft.fabric.chatclef.intent.navigation.find import FindRequest
+            try:
+                FindRequest.parse(raw_text)
+                return raw_text, None
+            except (ValueError, TypeError):
+                pass
         if self._compiler.has_dangerous_text(raw_text):
             return raw_text, self._rejection_factory.create(
                 ChatClefIntentStatus.INVALID,

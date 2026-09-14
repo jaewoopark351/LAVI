@@ -1,3 +1,4 @@
+#20260914_kpopmodder: FIND permits multiword names; use its actual missing-target invalid form.
 #20260907_kpopmodder: Prove trusted typed and feedback-only raw descriptor boundaries.
 from __future__ import annotations
 
@@ -166,7 +167,7 @@ class CommandFeedbackDescriptorFactoryTests(unittest.TestCase):
         for command_name in KoreanChatClefCommandRegistry().command_names():
             with self.subTest(command_name=command_name):
                 descriptor = self.factory.decode_registered_command_name_only(
-                    f"@{command_name} opaque slots",
+                    "@find item" if command_name == "find" else f"@{command_name} opaque slots",
                     command_source="lavi_gui",
                     event_id="b" * 32,
                     provider_id="minecraft_gui",

@@ -89,6 +89,11 @@ class KoreanChatClefRuleParser:
     def parse(self, text: object) -> ChatClefIntentDTO:
         original = self._normalizer.normalize(text, lowercase_english=False)
         normalized = self._normalizer.normalize(text)
+        #20260914_kpopmodder: Preserve whole FIND utterances before broad item/movement rules.
+        from .navigation.find import KoreanFindRuleParser
+        find = KoreanFindRuleParser().parse(text)
+        if find is not None:
+            return find
         auto_deposit_trust = self._auto_deposit_trust.classify(text)
         if auto_deposit_trust.candidate:
             return self._auto_deposit_trust_intent(original, auto_deposit_trust)

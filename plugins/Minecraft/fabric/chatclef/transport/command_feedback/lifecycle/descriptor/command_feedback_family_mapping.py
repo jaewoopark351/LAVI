@@ -1,3 +1,4 @@
+#20260914_kpopmodder: Add FIND to the existing command contract without changing other command ownership.
 #20260907_kpopmodder: Keep exact command-to-feedback-family coverage immutable.
 from types import MappingProxyType
 
@@ -12,6 +13,7 @@ COMMAND_FEEDBACK_FAMILIES = MappingProxyType(
         "deposit": "item_deposit",
         "deposit_all": "item_deposit",
         "equip": "item_equip",
+        "find": "find",
         "follow": "movement_follow",
         "food": "food_acquisition",
         "gamer": "generic",

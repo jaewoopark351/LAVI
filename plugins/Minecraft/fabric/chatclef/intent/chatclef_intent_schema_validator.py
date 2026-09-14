@@ -54,6 +54,22 @@ class ChatClefIntentSchemaValidator:
     def _validate_intent(self, intent: ChatClefIntentDTO) -> tuple[bool, str, str]:
         if intent.intent_type is ChatClefIntentType.UNKNOWN:
             return True, "validated_unknown_intent", "unknown intent is non-executable"
+        #20260914_kpopmodder: Runtime resolution owns IDs; Python only admits strict rule slots.
+        if intent.intent_type is ChatClefIntentType.FIND:
+            from .navigation.find import FindRequest, KoreanFindRuleParser
+            try:
+                request = FindRequest.from_slots(intent.slots)
+                parsed = KoreanFindRuleParser().parse(intent.original_text)
+                if (intent.source != "rule" or parsed is None
+                        or parsed.intent_type is not ChatClefIntentType.FIND
+                        or parsed.slots != request.slots()
+                        or any((intent.quantity is not None, intent.item_phrase,
+                                intent.food_units is not None, intent.x is not None,
+                                intent.y is not None, intent.z is not None, intent.player_name))):
+                    raise ValueError("find_requires_exact_rule_request")
+            except (ValueError, TypeError):
+                return False, "invalid_find_request", "FIND requires one explicit target request."
+            return True, "validated_intent", "intent schema is valid"
         if intent.intent_type is ChatClefIntentType.STORE_HOME:
             if intent.source != "rule":
                 return (

@@ -122,9 +122,9 @@ class CommandFeedbackResultCoordinator:
         evaluation = CommandTerminalEvidenceEvaluation(False)
         if status is CommandResultStatus.COMPLETED or (
             status is CommandResultStatus.FAILED
-            and getattr(context.descriptor, "command_name", "") == "goto"
+            and getattr(context.descriptor, "command_name", "") in {"goto", "find"}
         ):
-            #20260913_kpopmodder: Validate GOTO failure evidence through its separate projection channel.
+            #20260915_kpopmodder: Preserve verified FIND/GOTO failure reasons through the existing projection channel.
             evaluation = self._evaluate_terminal(
                 result=result,
                 context=context,

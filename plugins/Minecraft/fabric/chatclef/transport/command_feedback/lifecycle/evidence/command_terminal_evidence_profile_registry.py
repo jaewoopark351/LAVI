@@ -1,3 +1,4 @@
+#20260914_kpopmodder: Add FIND to the existing command contract without changing other command ownership.
 #20260907_kpopmodder: Keep exact registered-command evidence coverage closed and reviewable.
 from __future__ import annotations
 
@@ -20,6 +21,7 @@ _EVIDENCE = {
     "deposit": ("cautious", "cautious_terminal"),
     "deposit_all": ("cautious", "cautious_terminal"),
     "equip": ("cautious", "cautious_terminal"),
+    "find": ("verified", "find_terminal"),
     "follow": ("cautious", "cautious_terminal"),
     "food": ("cautious", "cautious_terminal"),
     "gamer": ("cautious", "cautious_terminal"),

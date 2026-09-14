@@ -14,6 +14,7 @@ class OrdinaryMinecraftCommandRoutePipeline:
         precheck_stage,
         submission_result_stage,
         goto_binding_stage,
+        find_binding_stage=None,
     ):
         self._reconciliation_stage = reconciliation_stage
         self._translation_stage = translation_stage
@@ -21,6 +22,8 @@ class OrdinaryMinecraftCommandRoutePipeline:
         self._precheck_stage = precheck_stage
         self._submission_result_stage = submission_result_stage
         self._goto_binding_stage = goto_binding_stage
+        #20260914_kpopmodder: FIND uses the same lock and final trusted input boundary.
+        self._find_binding_stage = find_binding_stage
 
     def route_locked(
         self,
@@ -47,6 +50,13 @@ class OrdinaryMinecraftCommandRoutePipeline:
         )
         if rejection is not None:
             return rejection
+
+        if self._find_binding_stage is not None:
+            rejection = self._find_binding_stage.inspect(
+                event=event, proof=korean_eligibility_proof, translation=translation,
+            )
+            if rejection is not None:
+                return rejection
 
         translation_status, rejection = self._rejection_stage.inspect(
             event=event,

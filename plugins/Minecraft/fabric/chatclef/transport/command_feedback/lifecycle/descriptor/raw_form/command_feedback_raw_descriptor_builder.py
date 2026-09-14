@@ -1,3 +1,4 @@
+#20260914_kpopmodder: Add FIND to the existing command contract without changing other command ownership.
 #20260907_kpopmodder: Build one immutable descriptor from an already closed raw form.
 from __future__ import annotations
 
@@ -80,6 +81,7 @@ class CommandFeedbackRawDescriptorBuilder:
                 rollout_state=(
                     evidence.rollout_state
                     if (command_name == "get" and single_target is not None)
+                    or (command_name == "find" and detail_level == CommandFeedbackDescriptor.RAW_TYPED)
                     or (
                         command_name == "goto"
                         and detail_level == CommandFeedbackDescriptor.RAW_TYPED

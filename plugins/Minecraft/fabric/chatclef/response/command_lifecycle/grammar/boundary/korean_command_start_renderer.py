@@ -47,6 +47,15 @@ class KoreanCommandStartRenderer:
                 self._locations.render(descriptor)
             )
             return f"{destination} 갈게"
+        #20260914_kpopmodder: Do not promise combat or acquisition for FIND.
+        if family == "find":
+            from plugins.Minecraft.fabric.chatclef.intent.navigation.find import FindRequest
+            try:
+                request = FindRequest.parse(descriptor.command)
+                target = self._particle.attach(request.query, "을", "를")
+                return f"{target} 찾아서 위치를 알려줄게" if request.mode == "report" else f"{target} 찾아서 가까이 갈게"
+            except (ValueError, TypeError, AttributeError):
+                return "요청한 대상을 찾아볼게"
         if family == "movement_follow":
             return f"{subject} 따라갈게"
         if family in {"food_acquisition", "meat_acquisition"}:
