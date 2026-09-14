@@ -232,6 +232,10 @@ public final class AutoDepositMaintenanceTask extends Task implements AutoDeposi
                 boolean storedTargetsSatisfied = generalTaskFinished && generalTask.automaticStoredTargetsSatisfied();
                 Optional<AutoDepositRunReason> generalFailure = AutoDepositChildCompletion.generalFailure(
                         generalTaskFinished, generalTaskStopped, storedTargetsSatisfied);
+                //20260914_kpopmodder: Preserve actual short-circuit results before the existing terminal decision.
+                generalTask.observeAutomaticCompletion(this, generalTaskIndex,
+                        generalTaskFinished, generalTaskStopped, generalTaskFinished, storedTargetsSatisfied,
+                        generalFailure.map(Enum::name).orElse("NONE"));
                 if (generalFailure.isPresent()) {
                     captureTerminal(generalFailure.get(), "general_child_" + generalTaskIndex);
                     return null;

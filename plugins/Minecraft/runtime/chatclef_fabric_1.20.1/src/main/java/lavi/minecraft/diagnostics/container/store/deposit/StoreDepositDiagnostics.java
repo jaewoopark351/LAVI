@@ -1,6 +1,12 @@
 package lavi.minecraft.diagnostics.container.store.deposit;
 
 import adris.altoclef.AltoClef;
+import net.minecraft.screen.ScreenHandler;
+import adris.altoclef.eventbus.Subscription;
+import lavi.minecraft.diagnostics.container.store.deposit.counter.StoreCounterDiagnostics;
+import lavi.minecraft.diagnostics.container.store.deposit.counter.StoreCounterTrace;
+import lavi.minecraft.diagnostics.container.store.deposit.counter.StoreCounterDispatchProbe;
+import java.util.List;
 import adris.altoclef.tasks.container.ContainerStoredTracker;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.ItemTarget;
@@ -53,6 +59,8 @@ import lavi.minecraft.diagnostics.session.lifecycle.registration.DiagnosticOwner
 
 public final class StoreDepositDiagnostics {
     private static final StoreDepositBindingRegistry BINDINGS = new StoreDepositBindingRegistry();
+    //20260914_kpopmodder: Counter observation reuses exact bindings and the existing finite session owner.
+    private static final StoreCounterDiagnostics COUNTERS = new StoreCounterDiagnostics(BINDINGS);
     private static final StoreDepositEmissionGate EMISSION_GATE = StoreDepositSharedBudget.emissionGate();
     private static final StoreDepositAutomaticLifecycleLedger AUTOMATIC_LEDGER =
             StoreDepositAutomaticLifecycleState.ledger();
@@ -141,6 +149,27 @@ public final class StoreDepositDiagnostics {
     }
 
     private StoreDepositDiagnostics() {
+    }
+
+    public static StoreCounterTrace counterTrackerStart(ContainerStoredTracker tracker, long trackerId,
+            long generation, Object[] totals, Subscription<?> previous) {
+        return COUNTERS.trackerStart(tracker, trackerId, generation, totals, previous);
+    }
+
+    public static StoreCounterDispatchProbe beginCounterDispatch(Object event, List<?> subscribers) {
+        return COUNTERS.beginDispatch(event, subscribers);
+    }
+
+    public static void observeCounterProducer(String phase, ScreenHandler handler, int slotIndex,
+            int button, SlotActionType action) {
+        COUNTERS.producer(phase, handler, slotIndex, button, action);
+    }
+
+    public static void observeCounterCompletion(Task maintenance, Task child, ContainerStoredTracker tracker,
+            ItemTarget[] targets, int childIndex, boolean finished, boolean stopped,
+            boolean predicateEvaluated, boolean satisfied, String failure) {
+        COUNTERS.completion(maintenance, child, tracker, targets, childIndex,
+                finished, stopped, predicateEvaluated, satisfied, failure);
     }
 
     public static void beginAutomaticRun(Task maintenanceTask,

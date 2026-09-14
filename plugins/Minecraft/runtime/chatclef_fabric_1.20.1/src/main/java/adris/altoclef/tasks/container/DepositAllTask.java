@@ -485,6 +485,13 @@ public class DepositAllTask extends Task {
         return true;
     }
 
+    //20260914_kpopmodder: Observe caller-supplied decisions without re-running any completion predicate.
+    public void observeAutomaticCompletion(Task maintenance, int childIndex, boolean finished,
+            boolean stopped, boolean storedPredicateEvaluated, boolean storedSatisfied, String failure) {
+        StoreDepositDiagnostics.observeCounterCompletion(maintenance, this, _storedItems, _toStore,
+                childIndex, finished, stopped, storedPredicateEvaluated, storedSatisfied, failure);
+    }
+
     //20260914_kpopmodder: Read only this Task's native confirmed target counts; absence of source items is not transfer proof.
     public int automaticStoredCount() {
         long total = 0;

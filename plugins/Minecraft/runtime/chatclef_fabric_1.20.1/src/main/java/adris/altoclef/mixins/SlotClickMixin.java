@@ -20,6 +20,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -29,11 +30,28 @@ import java.util.List;
 public abstract class SlotClickMixin {
 
     //#if MC >= 11701
+    //20260914_kpopmodder: Passive outer-entry witnesses distinguish the click API from the legacy redirect path.
+    // Optional observation only: do not change the old redirect selector or force injection success.
+    @Inject(method = "onSlotClick", at = @At("HEAD"), require = 0)
+    private void laviCounterClickHead(int slotIndex, int button, SlotActionType actionType,
+            PlayerEntity player, CallbackInfo ci) {
+        StoreDepositDiagnostics.observeCounterProducer("CLICK_API_HEAD", (ScreenHandler) (Object) this,
+                slotIndex, button, actionType);
+    }
+
+    @Inject(method = "onSlotClick", at = @At("RETURN"), require = 0)
+    private void laviCounterClickReturn(int slotIndex, int button, SlotActionType actionType,
+            PlayerEntity player, CallbackInfo ci) {
+        StoreDepositDiagnostics.observeCounterProducer("CLICK_API_RETURN", (ScreenHandler) (Object) this,
+                slotIndex, button, actionType);
+    }
+
     @Redirect(
             method = "internalOnSlotClick",
             at = @At(value = "INVOKE", target = "Lnet/minecraft/screen/ScreenHandler;internalOnSlotClick(IILnet/minecraft/screen/slot/SlotActionType;Lnet/minecraft/entity/player/PlayerEntity;)V")
     )
     private void slotClick(ScreenHandler self, int slotIndex, int button, SlotActionType actionType, PlayerEntity player) {
+        StoreDepositDiagnostics.observeCounterProducer("LEGACY_REDIRECT_ENTER", self, slotIndex, button, actionType);
         // TODO: "self" is misleading, reread Mixin docs to understand the implications here.
 
         // This calculation is already done, BUT we also want a "before&after" type beat.
@@ -64,6 +82,7 @@ public abstract class SlotClickMixin {
                         diagnosticCursorCopy(self)
                 );
             }
+            StoreDepositDiagnostics.observeCounterProducer("LEGACY_ACTION_RETURN", self, slotIndex, button, actionType);
             // Check for changes and alert
             int mutationOrdinal = 0;
             for (int i = 0; i < beforeStacks.size(); ++i) {

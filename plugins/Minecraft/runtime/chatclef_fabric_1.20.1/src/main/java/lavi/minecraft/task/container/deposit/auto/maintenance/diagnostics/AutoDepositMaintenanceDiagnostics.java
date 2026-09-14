@@ -117,6 +117,12 @@ public final class AutoDepositMaintenanceDiagnostics {
     //20260914_kpopmodder: Observe immutable root results; emission never selects or replaces the decision.
     public void recordRunResult(AutoDepositRunResult result, Task maintenanceTask, boolean finalized) {
         try {
+            //20260914_kpopmodder: Keep this new failure's actual post-cleanup outcome observable even with diagnostics OFF.
+            if (finalized) {
+                ChatClefDiagnostics.logLifecycleBoundary("AUTO_DEPOSIT_RUN_FINAL",
+                        result.reason().name(), maintenanceTask,
+                        AutoDepositRunResultFields.of(result, true));
+            }
             String reason = (finalized ? "FINAL_" : "CANDIDATE_") + result.reason().name();
             boolean terminal = finalized && result.reason() != AutoDepositRunReason.SAFETY_INTERRUPTED
                     && result.reason() != AutoDepositRunReason.AUTOMATION_DISABLED
