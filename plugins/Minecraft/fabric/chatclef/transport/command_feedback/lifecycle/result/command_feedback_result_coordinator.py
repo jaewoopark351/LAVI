@@ -122,7 +122,7 @@ class CommandFeedbackResultCoordinator:
         evaluation = CommandTerminalEvidenceEvaluation(False)
         if status is CommandResultStatus.COMPLETED or (
             status is CommandResultStatus.FAILED
-            and getattr(context.descriptor, "command_name", "") == "goto"
+            and getattr(context.descriptor, "command_name", "") in {"goto", "find"}
         ):
             #20260913_kpopmodder: Validate GOTO failure evidence through its separate projection channel.
             evaluation = self._evaluate_terminal(
@@ -140,6 +140,7 @@ class CommandFeedbackResultCoordinator:
             owner_token=expected_active,
             evidence_projection=evaluation.projection,
             failure_projection=evaluation.failure_projection,
+            query_projection=evaluation.query_projection,
         )
         return self._tracker.stage_terminal(expected_active, fact)
 
@@ -157,6 +158,8 @@ class CommandFeedbackResultCoordinator:
                 if type(evaluation) is CommandTerminalEvidenceEvaluation:
                     if (status != "completed" and evaluation.verified) or (
                         status != "failed" and evaluation.failure_projection is not None
+                    ) or (
+                        status != "completed" and evaluation.query_projection is not None
                     ):
                         return CommandTerminalEvidenceEvaluation(False)
                     return evaluation

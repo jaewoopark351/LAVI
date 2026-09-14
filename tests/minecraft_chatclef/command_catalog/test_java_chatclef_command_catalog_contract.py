@@ -84,13 +84,13 @@ class JavaChatClefCommandCatalogContractTests(unittest.TestCase):
         self.assertEqual(expected, actual)
         self.assertEqual(4, len(actual))
 
-    def test_active_catalog_has_exact_26_names_without_duplicates(self):
+    def test_active_catalog_has_exact_27_names_without_duplicates(self):
         snapshot = _registered_command_snapshot()
         names = [row["command"] for row in snapshot]
         expected_names = set(_support_by_command())
 
-        self.assertEqual(26, len(names))
-        self.assertEqual(26, len(set(names)))
+        self.assertEqual(27, len(names))
+        self.assertEqual(27, len(set(names)))
         self.assertEqual([], [name for name, count in Counter(names).items() if count > 1])
         self.assertEqual(expected_names, set(names))
 
@@ -147,6 +147,7 @@ class JavaChatClefCommandCatalogContractTests(unittest.TestCase):
             {
                 "deposit",
                 "equip",
+                "find",
                 "follow",
                 "food",
                 "get",
@@ -171,6 +172,15 @@ class JavaChatClefCommandCatalogContractTests(unittest.TestCase):
             with self.subTest(command=row["command"]):
                 self.assertNotIn("golden_case_ids", row)
                 self.assertNotIn("golden_tests", row)
+
+    #20260914_kpopmodder: Verify FIND snapshot provenance through the actual entrypoint and registrar rather than a fixture alone.
+    def test_find_registrar_and_entrypoint_activate_the_new_snapshot_row(self):
+        registrar = (JAVA_ROOT / "lavi/minecraft/find/command/FindCommandRegistrar.java").read_text(encoding="utf-8")
+        entrypoint = (JAVA_ROOT / "lavi/minecraft/find/FindEntrypoint.java").read_text(encoding="utf-8")
+        mod = json.loads((JAVA_ROOT.parent / "resources/fabric.mod.json").read_text(encoding="utf-8"))
+        self.assertIn("new FindCommand()", registrar)
+        self.assertIn("registrar.onEndClientTick()", entrypoint)
+        self.assertIn("lavi.minecraft.find.FindEntrypoint", mod["entrypoints"]["main"])
 
 
 def _registered_altoclef_command_classes() -> list[str]:

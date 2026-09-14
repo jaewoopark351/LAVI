@@ -95,6 +95,11 @@ class FabricChatClefWebSocketServer:
     def submit_command(self, request: CommandRequestDTO) -> CommandResultDTO:
         return self._components.command_api.submit(request)
 
+    #20260914_kpopmodder: Expose only a validated immutable active-session catalog.
+    def get_find_catalog_snapshot(self):
+        with self._command_lock:
+            return self._components.find_catalog_receiver.snapshot()
+
     def submit_stop_control(
         self,
         *,

@@ -36,7 +36,13 @@ class KoreanCommandTerminalRenderer:
         dispatch_started: bool,
         evidence_projection: object = None,
         failure_projection: object = None,
+        query_projection: object = None,
     ) -> str:
+        #20260914_kpopmodder: FIND has distinct found, completed-negative and failure evidence.
+        if profile.family == "find":
+            from ...terminal.find import KoreanFindTerminalRenderer
+            return KoreanFindTerminalRenderer().render(descriptor, status=status, verified=verified,
+                evidence=evidence_projection, failure=failure_projection, query=query_projection)
         if (
             status == "accepted_without_result_callback"
             and getattr(descriptor, "command_name", "") == "gamma"

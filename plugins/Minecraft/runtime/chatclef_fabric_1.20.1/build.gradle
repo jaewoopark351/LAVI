@@ -145,6 +145,8 @@ processResources {
     inputs.property("version", project.version)
     inputs.property("mcVersion", project.name)
     inputs.property("omitLegacyLocalPlayerMixin", mcVersion >= 12001)
+    //20260914_kpopmodder: The FIND input lease is scoped to the approved 1.20.1 backend.
+    inputs.property("omitFindInputLeaseMixin", mcVersion != 12001)
 
     filesMatching("fabric.mod.json") {
         expand "version": project.version,
@@ -156,6 +158,14 @@ processResources {
         filesMatching("altoclef.mixins.json") {
             filter { String line ->
                 line.contains('"MixinLocalPlayer"') ? null : line
+            }
+        }
+    }
+
+    if (mcVersion != 12001) {
+        filesMatching("altoclef.mixins.json") {
+            filter { String line ->
+                line.contains('"ownership.InputOverrideLeaseMixin"') ? null : line
             }
         }
     }

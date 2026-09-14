@@ -56,6 +56,12 @@ class CommandFeedbackRawDescriptorBuilder:
             return None
         if evidence.rollout_state == CommandTerminalEvidenceProfile.DISABLED:
             return None
+        #20260914_kpopmodder: Native FIND uses exact independent kind/target/mode slots.
+        if command_name == "find":
+            from ..find import FindFeedbackDescriptorBuilder
+            return FindFeedbackDescriptorBuilder().build_raw(command=command_text, source=source,
+                event_id=event_id, provider_id=provider_id, event_kind=event_kind,
+                spec=spec, evidence=evidence, lifecycle=lifecycle)
         targets = self._targets(command_name, raw_slots.target_entries)
         single_target = targets[0] if len(targets) == 1 else None
         requested_count = raw_slots.requested_count

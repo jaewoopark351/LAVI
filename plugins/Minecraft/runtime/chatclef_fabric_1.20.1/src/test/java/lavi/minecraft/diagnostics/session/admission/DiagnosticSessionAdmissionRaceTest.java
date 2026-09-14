@@ -84,6 +84,8 @@ class DiagnosticSessionAdmissionRaceTest {
         admitTimes(authority, DiagnosticEventFamily.TOOL_EQUIP_FIRST, 128);
         admitTimes(authority, DiagnosticEventFamily.TOOL_PLACEMENT_TERMINAL, 4);
         admitTimes(authority, DiagnosticEventFamily.BLOCK_PROTECTION_BOUNDARY, 64);
+        //20260914_kpopmodder: Fill the new FIND pool without changing the 4998/4999 cap-race contract.
+        admitTimes(authority, DiagnosticEventFamily.FIND_RESERVED_BOUNDARY, DiagnosticSessionLimits.FIND_RESERVED_BOUNDARY_SLOTS);
         assertEquals(4_998, authority.snapshot().admittedSlots());
 
         ExecutorService executor = Executors.newFixedThreadPool(2);

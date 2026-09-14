@@ -18,6 +18,7 @@ class FabricChatClefActiveMessageDispatcher:
         command_result_handler,
         stop_control_result_demultiplexer,
         status_provider: Callable[[], dict[str, Any]],
+        find_catalog_receiver=None,
     ) -> None:
         self._connection_ownership = connection_ownership
         self._command_lock = command_lock
@@ -26,6 +27,7 @@ class FabricChatClefActiveMessageDispatcher:
         self._command_result_handler = command_result_handler
         self._stop_control_result_demultiplexer = stop_control_result_demultiplexer
         self._status_provider = status_provider
+        self._find_catalog_receiver = find_catalog_receiver
 
     async def dispatch(self, websocket: Any, envelope) -> None:
         with self._command_lock:
@@ -48,6 +50,12 @@ class FabricChatClefActiveMessageDispatcher:
                 f"session={envelope.session_id}"
             )
             return
+
+        #20260914_kpopmodder: Catalog events reuse this exact active-session transport boundary.
+        if envelope.message_type == BridgeMessageType.EVENT and self._find_catalog_receiver is not None:
+            with self._command_lock:
+                if self._find_catalog_receiver.receive(websocket, envelope):
+                    return
 
         if envelope.message_type == BridgeMessageType.STATUS_REQUEST:
             await self._envelope_transport.send_status_snapshot(

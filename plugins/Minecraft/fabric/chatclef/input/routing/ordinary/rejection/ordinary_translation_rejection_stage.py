@@ -36,6 +36,8 @@ class OrdinaryTranslationRejectionStage:
         )
         self._item_rejection_owner = self._component_graph.item_rejection_owner
         self._generic_rejection = self._component_graph.generic_rejection
+        from plugins.Minecraft.fabric.chatclef.input.routing.find.find_translation_rejection_owner import FindTranslationRejectionOwner
+        self._find_rejection = FindTranslationRejectionOwner(live_proof_validator=live_proof_validator)
 
     def inspect(
         self,
@@ -46,6 +48,10 @@ class OrdinaryTranslationRejectionStage:
         korean_eligibility_proof: object,
     ):
         translation_status = self._translation_boundary.status(translation)
+        find = self._find_rejection.inspect(event=event, translation=translation,
+            proof=korean_eligibility_proof)
+        if find is not None:
+            return translation_status, find
         if self._item_rejection_owner.owns_status(translation_status):
             return translation_status, self._item_rejection_owner.decide(
                 event=event,

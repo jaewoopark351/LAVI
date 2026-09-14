@@ -100,6 +100,11 @@ final class FabricChatClefCommandResultFactory {
 
     FabricChatClefCommandResultPayload completedFromTaskFinished(FabricChatClefCommandTerminationObservation observation) {
         //#if MC == 12001
+//$$         //20260914_kpopmodder: FIND's exact owner projection is independent of the unchanged GOTO/general branches.
+//$$         FabricChatClefCommandResultPayload findResult = new lavi.minecraft.fabric.chatclef.bridge.command.result.find.FabricChatClefFindResultProjector()
+//$$                 .fromMatchingCompletion(request().requestId, data("matching_task_finished", observation),
+//$$                         state.boundRootReference(), observation, state.userStopBound());
+//$$         if (findResult != null) return findResult;
         //20260913_kpopmodder: Preserve generic classification gates, then project the bound owner's frozen result.
         FabricChatClefCommandResultPayload gotoResult = state.gotoResultTracker().matchingCompletion(
                 data("matching_task_finished", observation), observation, state.userStopBound());
@@ -133,6 +138,7 @@ final class FabricChatClefCommandResultFactory {
     //#if MC == 12001
     //20260913_kpopmodder: Reuse the existing FAILED/UNKNOWN wire contract and immutable outbox commit.
     FabricChatClefCommandResultPayload failedFromRootRetirement(String reason) {
+//$$         lavi.minecraft.fabric.chatclef.bridge.command.result.find.FabricChatClefFindDiagnosticRetirement.observe(state.boundRootReference(), reason);
         if (state.rootTermination().completion() != null && state.rootTermination().completion().stopStateAvailable()
                 && state.rootTermination().completion().stopped()) {
             FabricChatClefCommandResultPayload miningFailure = miningToolFailure();
@@ -144,6 +150,7 @@ final class FabricChatClefCommandResultFactory {
                         data(reason), state.rootTermination()));
     }
     FabricChatClefCommandResultPayload unknownFromRootCompletion(String reason) {
+//$$         lavi.minecraft.fabric.chatclef.bridge.command.result.find.FabricChatClefFindDiagnosticRetirement.observe(state.boundRootReference(), reason);
         return FabricChatClefCommandResult.unknown(request().requestId,
                 "ChatClef user task completion was observed, but the complete result handoff was unavailable.",
                 lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.root.payload.RootRetirementPayload.attach(
@@ -163,6 +170,7 @@ final class FabricChatClefCommandResultFactory {
 
     FabricChatClefCommandResultPayload failedFromStoppedTask(FabricChatClefCommandTerminationObservation observation) {
         //#if MC == 12001
+//$$         if (state.matchesBoundRootTask(observation)) lavi.minecraft.fabric.chatclef.bridge.command.result.find.FabricChatClefFindDiagnosticRetirement.observe(state.boundRootReference(), "matching_task_stopped");
         if (observation != null && observation.taskStopped() && state.matchesBoundRootTask(observation)) {
             FabricChatClefCommandResultPayload miningFailure = miningToolFailure();
             if (miningFailure != null) return miningFailure;
@@ -180,6 +188,9 @@ final class FabricChatClefCommandResultFactory {
     }
 
     FabricChatClefCommandResultPayload cancelledFromUserStop() {
+        //#if MC == 12001
+//$$         lavi.minecraft.fabric.chatclef.bridge.command.result.find.FabricChatClefFindDiagnosticRetirement.observe(state.boundRootReference(), "user_stop");
+        //#endif
         return originalCancellationResultFactory.create(state.context());
     }
 
@@ -204,6 +215,9 @@ final class FabricChatClefCommandResultFactory {
     }
 
     FabricChatClefCommandResultPayload deadlineExceededResult(String message) {
+        //#if MC == 12001
+//$$         lavi.minecraft.fabric.chatclef.bridge.command.result.find.FabricChatClefFindDiagnosticRetirement.observe(state.boundRootReference(), "bridge_deadline_exceeded");
+        //#endif
         return FabricChatClefCommandResult.deadlineExceeded(
                 request().requestId,
                 message,

@@ -16,6 +16,7 @@ class ChatClefIntentType(str, Enum):
     FOOD = "food"
     MEAT = "meat"
     GOTO = "goto"
+    FIND = "find"
     FOLLOW = "follow"
     IDLE = "idle"
     STOP = "stop"

@@ -16,6 +16,8 @@ public final class FabricChatClefBridgeEntrypoint implements ModInitializer {
         ClientLifecycleEvents.CLIENT_STARTED.register(client -> components.bridgeClient().start());
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> components.bridgeClient().stop());
         ClientTickEvents.END_CLIENT_TICK.register(components.commandDispatcher()::onEndClientTick);
+        //20260914_kpopmodder: Compose a bounded catalog publication into the existing Fabric client lifecycle.
+        ClientTickEvents.END_CLIENT_TICK.register(client -> components.bridgeClient().onFindCatalogTick());
         ClientTickEvents.END_CLIENT_TICK.register(
                 FabricChatClefCraftResourceTerminalRetentionDiagnostics::onEndClientTick
         );

@@ -28,6 +28,9 @@ public final class FabricChatClefBridgeClient implements WebSocket.Listener, Fab
     private final FabricChatClefResultEnvelopeSender resultEnvelopeSender;
     private final FabricChatClefStopControlResultOutbox stopControlResultOutbox;
     private final FabricChatClefWebSocketConnectionLifecycle connectionLifecycle;
+    //#if MC == 12001
+//$$     private final lavi.minecraft.fabric.chatclef.bridge.transport.find.FabricChatClefFindCatalogPublisher findCatalogPublisher;
+    //#endif
 
     public FabricChatClefBridgeClient(
             FabricChatClefBridgeConfig config,
@@ -43,6 +46,12 @@ public final class FabricChatClefBridgeClient implements WebSocket.Listener, Fab
     ) {
         FabricChatClefWebSocketConnectionState connectionState =
                 new FabricChatClefWebSocketConnectionState();
+        //#if MC == 12001
+//$$         //20260914_kpopmodder: Catalog exchange shares existing transport/session ownership; its page lifetime is composed separately.
+//$$         this.findCatalogPublisher = new lavi.minecraft.fabric.chatclef.bridge.transport.find.FabricChatClefFindCatalogPublisher(
+//$$                 new lavi.minecraft.fabric.chatclef.bridge.transport.find.FabricChatClefFindCatalogPageSender(connectionState, sessionGuard, json),
+//$$                 lavi.minecraft.find.catalog.FindCatalogRuntime.instance()::currentSnapshot, diagnostics);
+        //#endif
         this.resultEnvelopeSender = new FabricChatClefResultEnvelopeSender(
                 diagnostics,
                 json,
@@ -96,6 +105,13 @@ public final class FabricChatClefBridgeClient implements WebSocket.Listener, Fab
 
     public void stop() {
         connectionLifecycle.stop();
+    }
+
+    //20260914_kpopmodder: Execute catalog publication only on the existing client tick, never on WebSocket callbacks.
+    public void onFindCatalogTick() {
+        //#if MC == 12001
+//$$         findCatalogPublisher.tick();
+        //#endif
     }
 
     @Override

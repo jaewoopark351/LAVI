@@ -6,6 +6,8 @@ import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.List;
+import java.util.ArrayList;
 
 /**
  * The sole mutable accounting owner for one diagnostic session.
@@ -140,6 +142,26 @@ public final class DiagnosticSessionAdmissionAuthority {
         finalSnapshotAdmitted = true;
         DiagnosticAdmissionToken token = grant(DiagnosticEventFamily.FINAL_SNAPSHOT, DiagnosticCapTrigger.NONE);
         return DiagnosticAdmissionDecision.granted(token, snapshotUnsafe());
+    }
+
+    //20260914_kpopmodder: Reserve a complete finite trace atomically; a rejected trace cannot consume another trace's capacity.
+    public synchronized List<DiagnosticAdmissionToken> reserveTrace(
+            DiagnosticEventFamily family, int slots, boolean modeEligible) {
+        Objects.requireNonNull(family, "family");
+        if (slots < 1 || slots > 32 || family.tier() != DiagnosticAdmissionTier.CRITICAL
+                || family.reservedInternalFamily() || family.admissionUnitSlots() != 1) {
+            throw new IllegalArgumentException("A deferred trace requires 1..32 single-record critical slots.");
+        }
+        if (!modeEligible) return List.of();
+        MutableFamilyCounters counters = familyCounters.get(family);
+        if (wouldExceed(admittedSlots, slots, normalAdmissionCeiling())
+                || wouldExceed(counters.admittedSlots, slots, family.slotQuota())) {
+            recordSuppression(family);
+            return List.of();
+        }
+        List<DiagnosticAdmissionToken> tokens = new ArrayList<>(slots);
+        for (int index = 0; index < slots; index++) tokens.add(grant(family, DiagnosticCapTrigger.NONE));
+        return List.copyOf(tokens);
     }
 
     public synchronized DiagnosticEmissionLease beginEmission(DiagnosticAdmissionToken token) {

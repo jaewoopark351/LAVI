@@ -86,6 +86,12 @@ class FabricChatClefServerComponentGraph:
             ),
             crafting_feedback_tracker=self.crafting_feedback_tracker,
         )
+        #20260914_kpopmodder: Complete FIND catalog state belongs to this Fabric session graph.
+        from ...find_catalog import FindCatalogReceiver
+        from ...command_feedback.lifecycle.evidence.find import FindTerminalEvidenceEvaluator
+        self.find_catalog_receiver = FindCatalogReceiver(
+            connection_ownership=self.connection_ownership, diagnostics=diagnostics,
+        )
         self.envelope_transport = FabricChatClefEnvelopeTransport(
             message_id_factory=message_id_factory,
             now_ms=now_ms,
@@ -111,6 +117,10 @@ class FabricChatClefServerComponentGraph:
                 effect_verifier=CraftingFeedbackEffectVerifier(
                     evaluator=CommandTerminalEvidenceEvaluator(
                         diagnostic_observer=goto_terminal_observer,
+                        find_evaluator=FindTerminalEvidenceEvaluator(
+                            catalog_provider=self.find_catalog_receiver.snapshot,
+                            diagnostics=diagnostics,
+                        ),
                     ),
                 ),
                 response_renderer=self.crafting_feedback_terminal_presenter,
@@ -221,6 +231,7 @@ class FabricChatClefServerComponentGraph:
             stopping_provider=lambda: lifecycle.stopping,
             last_error_reporter=lifecycle.record_client_error,
             now_ms=now_ms,
+            find_catalog_receiver=self.find_catalog_receiver,
         )
         self.stop_control_submitter = StopControlSubmitter(
             connection_ownership=self.connection_ownership,

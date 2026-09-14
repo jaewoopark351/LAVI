@@ -67,7 +67,10 @@ class MinecraftFabricChatClefExtensionComponentGraph:
         self.plugin = plugin
         self.adapter = adapter or self._adapter_resolver.resolve(plugin)
         self.natural_language_service = (
-            natural_language_service or ChatClefNaturalLanguageService()
+            natural_language_service or ChatClefNaturalLanguageService(
+                find_catalog_provider=lambda: self.adapter.get_find_catalog_snapshot()
+                if callable(getattr(self.adapter, "get_find_catalog_snapshot", None)) else None,
+            )
         )
         self.korean_command_registry = KoreanChatClefCommandRegistry()
         self.store_home_command_admission = StoreHomeCommandAdmission()

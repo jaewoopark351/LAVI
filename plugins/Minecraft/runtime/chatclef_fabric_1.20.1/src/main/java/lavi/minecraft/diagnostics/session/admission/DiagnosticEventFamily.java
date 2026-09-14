@@ -2,6 +2,9 @@ package lavi.minecraft.diagnostics.session.admission;
 
 public enum DiagnosticEventFamily {
     //#if MC == 12001
+    //20260914_kpopmodder: Deferred FIND first boundaries and terminal share one reserved pool.
+    FIND_RESERVED_BOUNDARY(DiagnosticAdmissionTier.CRITICAL,
+            DiagnosticSessionLimits.FIND_RESERVED_BOUNDARY_SLOTS, 1, false),
     //20260913_kpopmodder: Separate new behavior evidence from ordinary repeats and the historical diagnostic pools.
     TOOL_EQUIP_FIRST(DiagnosticAdmissionTier.CRITICAL,
             DiagnosticSessionLimits.TOOL_EQUIP_FIRST_SLOTS, 1, false),

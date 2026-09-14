@@ -15,6 +15,7 @@ import lavi.minecraft.diagnostics.session.reset.DiagnosticSessionTestResetResult
 import java.util.Objects;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Supplier;
+import java.util.List;
 
 //20260831_kpopmodder: Serialize mode eligibility with shared admission while keeping I/O outside the accounting lock.
 public final class DiagnosticSessionRuntime {
@@ -105,6 +106,38 @@ public final class DiagnosticSessionRuntime {
         } finally {
             read.unlock();
         }
+    }
+
+    //20260914_kpopmodder: Bind deferred admission to this session; ordinary dispatch cannot spend these tokens.
+    public List<DiagnosticAdmissionToken> reserveTrace(DiagnosticEventFamily family, int slots) {
+        var read = eligibilityLock.readLock();
+        read.lock();
+        try { return authority.reserveTrace(family, slots, mode.isBoundaryEnabled() && !cleanTeardownStarted); }
+        finally { read.unlock(); }
+    }
+
+    public DiagnosticEmissionOutcome emitReserved(DiagnosticAdmissionToken token, DiagnosticPhysicalEmission emission) {
+        var read = eligibilityLock.readLock();
+        read.lock();
+        try {
+            if (!mode.isBoundaryEnabled() || cleanTeardownStarted) {
+                abandonToken(token);
+                return null;
+            }
+            return emit(authority, token, emission);
+        } finally { read.unlock(); }
+    }
+
+    public void abandonReserved(DiagnosticAdmissionToken token) {
+        var read = eligibilityLock.readLock();
+        read.lock();
+        try { abandonToken(token); }
+        finally { read.unlock(); }
+    }
+
+    private void abandonToken(DiagnosticAdmissionToken token) {
+        // An unused or mode-ineligible reservation is settled as non-output, never as physical emission.
+        if (authority.beginEmission(token).started()) authority.failEmission(token);
     }
 
     public <T> T callIfEligible(Supplier<T> action, T ineligibleValue) {

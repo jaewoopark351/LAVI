@@ -27,6 +27,7 @@
     "GameOverlayMixin",
     "MiningToolItemAccessor",
     "MovementHelperMixin",
+    "ownership.InputOverrideLeaseMixin",
     "PersistentProjectileEntityAccessor",
     "PortalManagerAccessor",
     "SlotClickMixin",

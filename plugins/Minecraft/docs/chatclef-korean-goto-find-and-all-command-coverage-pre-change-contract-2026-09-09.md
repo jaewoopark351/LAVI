@@ -8,6 +8,22 @@
 
 Date: 2026-09-09
 
+<!-- 20260914_kpopmodder: Linked the updated docs-only FIND direction while preserving historical evidence and unresolved implementation decisions. -->
+> 2026-09-14 FIND design review: see the
+> [Chat/final-microphone FIND design](chatclef-find-chat-microphone-design-2026-09-14.md)
+> for the reviewed `2ecc1283` source boundary, registry/observation design,
+> current report-default/explicit-approach direction and logging/verification
+> plan. Direct commands, Korean Chat, and final microphone input use report by
+> default in that design; optional explicit approach uses observed targets only,
+> with no initial exploration for an absent target. Initial item queries report
+> dropped ItemEntity instances; inventory/container/acquisition queries are
+> separate extensions. Player scope, measured limits, safety/admission, and wire
+> contracts remain unresolved. This is documentation only: it neither implements
+> FIND nor authorizes source, build, deployment, or game execution. Section 17's
+> remaining workstream decisions, GOTO, historical evidence, and all-command
+> rollout scopes remain intact; optional exploration clauses below describe a
+> separate future extension rather than the initial approach direction.
+
 > 2026-09-13 focused follow-up: the user requires Korean coordinate movement
 > from both LAVI Chat and final microphone input, without typing `@goto`.
 > See the [Korean Chat/microphone XYZ input contract](chatclef-korean-goto-chat-microphone-input-contract-2026-09-13.md)
@@ -655,6 +671,16 @@ belong to separate capabilities.
 
 ### 6.5 FIND behavior and completion
 
+<!-- 20260914_kpopmodder: Scoped initial FIND approach to observed targets without activating historical exploration proposals. -->
+> Current direction note: Section 2 of the [2026-09-14 FIND design](chatclef-find-chat-microphone-design-2026-09-14.md)
+> uses report for omitted mode and bare Korean find requests. Only an explicit
+> supported approach request may move toward an initially observed target.
+> A loaded-scope miss or observation exhaustion does not start exploration.
+> The conditional exploration descriptions in Sections 6.5–6.6 are historical
+> proposals for a separate future extension, not part of this initial direction.
+> Ownership, finite-budget, defense, revalidation, and completion safeguards
+> remain applicable; no runtime action is authorized by this note.
+
 The request says “find” but does not decide whether success means reporting a
 location or moving to the target. Implementation must not silently add
 movement. The safe required base mode is:
@@ -866,6 +892,15 @@ does not authorize an `AltoClef`, `TaskRunner`, input-owner, or Baritone
 lifecycle subclass.
 
 ### 6.8 FIND presentation contract
+
+<!-- 20260914_kpopmodder: Marked partial-found presentation as pending reconciliation with existing nearest and exhausted-query obligations. -->
+> The [2026-09-14 FIND design](chatclef-find-chat-microphone-design-2026-09-14.md)
+> includes a proposed partial-scope found response. Before adopting it, reconcile
+> Sections 6.4–6.5's coverage/nearest obligations, this presentation table, and
+> the closed protocol/validator result matrix under D7. It is not an active
+> exception: an `OBSERVATION_BOUNDS_EXHAUSTED` result must not be promoted to
+> FOUND or given success coordinates. Existing proof and rendering requirements
+> remain in force until that explicit contract reconciliation.
 
 FIND uses bounded deterministic Korean templates, not an LLM rewrite:
 
@@ -1732,6 +1767,15 @@ or registry claims before this decision.
 
 ### 17.3 Before optional approach source work
 
+<!-- 20260914_kpopmodder: Separated observed-target approach decisions from future exploration decisions. -->
+> The current documented initial direction is explicit approach to a target
+> confirmed in the initial bounded observation. Close its exact supported forms,
+> time/path limits, safe stand-off, lifecycle, and ownership contracts before
+> implementation. New-region search and exploration-radius decisions below
+> apply only to a separately requested exploration extension; they do not widen
+> initial approach or block an independently closable report unit. The new note
+> does not approve approach source work, alter player scope, or waive admission.
+
 Decide:
 
 1. whether `LOCATE_AND_APPROACH` is authorized at all and which explicit
@@ -1784,3 +1828,30 @@ Until a workstream's applicable decisions and tests exist, documentation must
 continue to call that workstream `DOCUMENTED_NOT_IMPLEMENTED`. An undecided
 optional extension remains disabled; it does not block a base unit whose own
 prerequisites hold and must not be presented as current runtime behavior.
+
+<!-- 20260914_kpopmodder: Record initial FIND decisions separately from the historical pre-change evidence. -->
+## 18. FIND implementation follow-up, 2026-09-14
+
+The user subsequently requested repository-local implementation and verification
+and explicitly included player-name search in the initial release. Current source
+and verification are documented in the
+[FIND implementation contract](chatclef-find-implementation-contract-2026-09-14.md).
+The earlier reviewed HEAD and documentation-only evidence remain historical.
+
+The initial decisions are: report for omitted mode; explicit approach only to an
+initially observed target; no new-region exploration; dropped-item report only;
+exact literal player names; nearest eligible candidate within a completed bounded
+loaded scope; partial/bounds-exhausted scans fail without candidate coordinates;
+and no acquisition fallback. Both modes retain command-level safety tier R2 and
+the existing finite-operation lifecycle. No scheduler or mode-specific admission
+redesign is included. Conservative approach uses unchanged native dry flat
+movement states through a composed ownership adapter; unsupported safety and
+routes have typed failures. Fixed limits and the closed protocol are in the current
+contract, with resource/session revalidation and separate matching natural-root
+completion proof. Existing defense, survival and STOP remain authoritative.
+
+The exact-name artifacts include 27 registered names and 26 semantic capabilities
+after FIND; `자동보관등록` remains the compatibility alias. This synchronizes
+FIND's artifacts only and does not waive another command's public-exposure gate.
+Repository verification is distinct from deployment or live Minecraft acceptance;
+the latter remain `NOT_RUN` in this work unit.

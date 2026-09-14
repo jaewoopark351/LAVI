@@ -19,6 +19,7 @@ _GRAMMARS = {
     "deposit": "optional_item_list",
     "deposit_all": "optional_item_list",
     "equip": "required_equipment_list",
+    "find": "find_target",
     "follow": "optional_player",
     "food": "positive_integer",
     "gamer": "no_arguments",

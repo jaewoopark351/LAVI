@@ -32,6 +32,7 @@ VALID_FORMS = {
     "deposit": (("deposit", "inventory_default"), ("deposit stone 2", "single_item"), ("deposit [stone 2, dirt]", "item_list"), ("deposit stone 0", "single_item_unprojected")),
     "deposit_all": (("deposit_all", "inventory_default"), ("deposit_all dirt", "single_item"), ("deposit_all dirt -1", "single_item_unprojected")),
     "equip": (("equip iron", "equipment_material_set"), ("equip [iron_helmet, iron_chestplate]", "equipment_item_list"), ("equip iron_helmet 0", "equipment_single_item_unprojected")),
+    "find": (("find entity minecraft:villager", "find_report"), ("find block minecraft:chest approach", "find_approach"), ("find player TestPlayer report", "find_report")),
     "follow": (("follow", "butler_player"), ("follow A", "explicit_player"), ("follow Player-With-Dash", "explicit_player_unprojected")),
     "food": (("food 10", "food_units"), ("food 0", "food_units_unprojected")),
     "gamer": (("gamer", "no_arguments"),),
@@ -61,6 +62,7 @@ INVALID_FORMS = {
     "deposit": "deposit [stone two]",
     "deposit_all": "deposit_all stone many",
     "equip": "equip",
+    "find": "find item minecraft:diamond approach",
     "follow": "follow Steve Alex",
     "food": "food many",
     "gamer": "gamer target",
@@ -87,7 +89,7 @@ class RawCommandFeedbackFormMatrixTests(unittest.TestCase):
         self.decoder = CommandFeedbackRawFormDecoder()
         self.factory = CommandFeedbackDescriptorFactory()
 
-    def test_exact_26_profile_and_valid_invalid_form_matrix(self):
+    def test_exact_27_profile_and_valid_invalid_form_matrix(self):
         expected = KoreanChatClefCommandRegistry().command_names()
 
         self.assertEqual(expected, tuple(VALID_FORMS))

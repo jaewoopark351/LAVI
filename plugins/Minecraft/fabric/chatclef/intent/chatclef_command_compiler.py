@@ -27,6 +27,10 @@ class ChatClefCommandCompiler:
 
     def compile(self, intent: ChatClefIntentDTO, target: str | None = None) -> str:
         self.reject_dangerous_text(intent.original_text)
+        #20260914_kpopmodder: FIND uses its own namespaced target grammar.
+        if intent.intent_type is ChatClefIntentType.FIND:
+            from .find.find_command_compiler import FindCommandCompiler
+            return FindCommandCompiler().compile(intent, target)
         if intent.intent_type is ChatClefIntentType.GET_ITEM:
             target_text = self._target(target)
             quantity = self._positive_int(intent.quantity, "quantity")

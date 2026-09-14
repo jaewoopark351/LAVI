@@ -644,3 +644,35 @@ This is not a protocol-version bump because the envelope, status key, and
 `command_result.data` map remain v1-compatible. The new fidelity value states
 that Java observed a command callback but no matching command-owned
 `TaskFinishedEvent`.
+
+<!-- 20260914_kpopmodder: Add the Fabric-owned FIND catalog and strict result profile without changing the v1 envelope. -->
+## FIND catalog and terminal profiles, 2026-09-14
+
+Fabric ChatClef 1.20.1 uses existing `event` envelopes for `find_catalog_page`
+and `find_catalog_invalidated`. The complete catalog has version1, actual runtime
+registry IDs and resource translations; players are searched by an explicit name
+and never included in catalog records. Pages use the existing accepted session,
+server connection generation and local socket fences. The receiver publishes only
+a complete validated immutable catalog. Partial exchange, reconnect and resource
+replacement invalidate interpretation evidence; no new transport owner is added.
+
+Matching natural command-owned FIND completion can emit these closed profiles:
+
+| Mode | Profile ID | Effect kind | Completion mode |
+| --- | --- | --- | --- |
+| report | `fabric_chatclef_find_observation` | `find_observation` | `LOCATE_AND_REPORT` |
+| approach | `fabric_chatclef_find_approach` | `find_approach` | `LOCATE_AND_APPROACH` |
+
+Both profiles have version1 and require the existing
+`result_reason=matching_task_finished` and
+`result_fidelity=callback_plus_matching_user_task_event` proof. Discovery and
+safe-range satisfaction require valid candidate identity and coordinates;
+unsatisfied results exclude those fields. A completed bounded miss is unsatisfied,
+not evidence that the world contains no target. STOP remains authoritative and
+late resource-binding invalidation produces cautious UNKNOWN without coordinates.
+
+Exact page fields, Unicode rules, digests, caps, target separation and result/status
+matrix are defined in the [FIND implementation contract](chatclef-find-implementation-contract-2026-09-14.md).
+These values belong to Fabric ChatClef; no Forge/MineMind values, session state or
+shared implementation are introduced. The v1 envelope and existing lifecycle
+owners are retained.

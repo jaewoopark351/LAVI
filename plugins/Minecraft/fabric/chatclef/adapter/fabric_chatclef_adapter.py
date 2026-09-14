@@ -131,6 +131,11 @@ class FabricChatClefAdapter:
     def get_status(self) -> StatusSnapshotDTO:
         return self._server.status_snapshot(enabled=self._config.enabled)
 
+    #20260914_kpopmodder: Keep runtime target authority behind the Fabric adapter.
+    def get_find_catalog_snapshot(self):
+        getter = getattr(self._server, "get_find_catalog_snapshot", None)
+        return getter() if callable(getter) else None
+
     def _reject(
         self,
         request: CommandRequestDTO,

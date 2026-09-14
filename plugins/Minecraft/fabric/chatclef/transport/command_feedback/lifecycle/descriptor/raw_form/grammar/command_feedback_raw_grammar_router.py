@@ -7,6 +7,7 @@ from .command_feedback_raw_auto_deposit_grammar import (
 from .command_feedback_raw_item_grammar import CommandFeedbackRawItemGrammar
 from .command_feedback_raw_location_grammar import CommandFeedbackRawLocationGrammar
 from .command_feedback_raw_scalar_grammar import CommandFeedbackRawScalarGrammar
+from .command_feedback_raw_find_grammar import CommandFeedbackRawFindGrammar
 
 
 class CommandFeedbackRawGrammarRouter:
@@ -23,6 +24,7 @@ class CommandFeedbackRawGrammarRouter:
             location_grammar or CommandFeedbackRawLocationGrammar(),
             scalar_grammar or CommandFeedbackRawScalarGrammar(),
             auto_deposit_grammar or CommandFeedbackRawAutoDepositGrammar(),
+            CommandFeedbackRawFindGrammar(),
         )
         self._by_id = {
             grammar_id: grammar

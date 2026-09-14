@@ -237,6 +237,14 @@ final class DiagnosticEventEmitter {
         );
     }
 
+    //20260914_kpopmodder: Use the existing bounded formatter and physical sink for pre-admitted FIND boundaries.
+    lavi.minecraft.diagnostics.session.emission.DiagnosticEmissionOutcome emitReservedBoundary(
+            lavi.minecraft.diagnostics.session.admission.DiagnosticAdmissionToken token,
+            String eventName, String reason, Task task, Object[] fields) {
+        return session.emitReserved(token, () -> emitBoundedBoundaryEventPhysical(
+                "[LAVI ChatClefBoundary]", eventName, reason, task, 2048, fields, new Object[0]));
+    }
+
     void emitRawLine(String eventName, String message, boolean warning) {
         session.dispatch(
                 DiagnosticEventFamilyClassifier.classify(eventName),

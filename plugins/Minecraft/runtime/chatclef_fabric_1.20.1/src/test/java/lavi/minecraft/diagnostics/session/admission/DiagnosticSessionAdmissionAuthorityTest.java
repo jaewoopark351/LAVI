@@ -164,6 +164,8 @@ class DiagnosticSessionAdmissionAuthorityTest {
         admitTimes(authority, DiagnosticEventFamily.TOOL_EQUIP_FIRST, 128);
         admitTimes(authority, DiagnosticEventFamily.TOOL_PLACEMENT_TERMINAL, 4);
         admitTimes(authority, DiagnosticEventFamily.BLOCK_PROTECTION_BOUNDARY, 64);
+        //20260914_kpopmodder: The canonical hard-cap fixture also fills FIND's bounded reserved pool.
+        admitTimes(authority, DiagnosticEventFamily.FIND_RESERVED_BOUNDARY, DiagnosticSessionLimits.FIND_RESERVED_BOUNDARY_SLOTS);
     }
 
     private static void admitTimes(DiagnosticSessionAdmissionAuthority authority,

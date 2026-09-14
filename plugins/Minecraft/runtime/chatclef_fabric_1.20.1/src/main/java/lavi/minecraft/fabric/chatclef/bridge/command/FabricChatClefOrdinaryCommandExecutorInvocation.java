@@ -26,6 +26,11 @@ public final class FabricChatClefOrdinaryCommandExecutorInvocation {
     ) {
         try {
             execution.openExecutorExecuteInvocation();
+            //#if MC == 12001
+//$$             //20260914_kpopmodder: Validate only FIND interpretation provenance; all other command invocation behavior is unchanged.
+//$$             lavi.minecraft.fabric.chatclef.bridge.command.admission.find.FabricChatClefFindAdmissionBindingGuard.validate(
+//$$                     command, executor.getCommandPrefix(), execution.context(), lavi.minecraft.find.catalog.FindCatalogRuntime.instance().currentSnapshot());
+            //#endif
             executor.execute(
                     command,
                     () -> lifecycleCoordinator.markCommandFinish(

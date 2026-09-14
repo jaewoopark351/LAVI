@@ -2,6 +2,7 @@
   "schema_version": 1,
   "evidence_maturity": "PRE_SHARED_CASE",
   "commands": [
+    { "command": "find", "owner": "lavi_find", "natural_language_status": "IMPLEMENTED", "support_status": "supported_korean" },
     { "command": "attack", "owner": "chatclef_java", "natural_language_status": "RAW_ONLY", "support_status": "java_only_task_command" },
     { "command": "chatclef", "owner": "chatclef_java", "natural_language_status": "RAW_ONLY", "support_status": "java_only_user_or_dev_command" },
     { "command": "deposit", "owner": "chatclef_java", "natural_language_status": "IMPLEMENTED", "support_status": "supported_korean" },

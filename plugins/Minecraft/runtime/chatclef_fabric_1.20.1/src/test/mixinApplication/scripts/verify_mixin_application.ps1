@@ -1,6 +1,6 @@
 #20260913_kpopmodder: Apply real installed Sponge/MixinExtras to named or packaged 1.20.1 bytecode in an isolated JVM.
 param([switch] $PrepareOnly, [string] $MainInput = '', [switch] $PreviousArtifact, [switch] $ArtifactJar,
-      [switch] $GoldProtection, [switch] $CompileOnly)
+      [switch] $GoldProtection, [switch] $CompileOnly, [switch] $FindInputLease)
 $ErrorActionPreference = 'Stop'
 $taskRepository = 'C:\Vtuber_Souorce_Code\LAVI'
 if ((Get-Location).Path -ne $taskRepository -or (git rev-parse --show-toplevel).Trim() -ne $taskRepository.Replace('\', '/')) {
@@ -13,6 +13,10 @@ $taskSourceRoot = Join-Path $taskRuntime 'src/test/mixinApplication'
 if ($GoldProtection -and $PreviousArtifact) { throw 'GoldProtection does not support the unrelated Builder negative control.' }
 $taskGoldSourceRoot = Join-Path $taskRuntime 'src/test/goldMixinApplication'
 if ($GoldProtection) { $taskHarness = Join-Path $taskRepository 'test/test_Isolation/minecraft/gold_mixin_application' }
+#20260914_kpopmodder: FIND input-lease transformation is another explicit isolated target; defaults remain unchanged.
+if ($FindInputLease -and ($GoldProtection -or $PreviousArtifact)) { throw 'FindInputLease cannot combine unrelated target/control modes.' }
+$taskFindInputLeaseSourceRoot = Join-Path $taskRuntime 'src/test/findInputLeaseMixinApplication'
+if ($FindInputLease) { $taskHarness = Join-Path $taskRepository 'test/test_Isolation/minecraft/find_input_lease_mixin_application' }
 if ([string]::IsNullOrWhiteSpace($MainInput)) { $MainInput = Join-Path $taskRuntime 'versions/1.20.1/build/classes/java/main' }
 $taskMain = [IO.Path]::GetFullPath($MainInput)
 if (-not (Test-Path -LiteralPath $taskMain)) { throw "Missing main bytecode input: $taskMain" }
@@ -78,12 +82,17 @@ $taskSources = @(Get-ChildItem -LiteralPath (Join-Path $taskSourceRoot 'java') -
 if ($GoldProtection) {
     $taskSources += @(Get-ChildItem -LiteralPath (Join-Path $taskGoldSourceRoot 'java') -Recurse -File -Filter '*.java' | ForEach-Object FullName)
 }
+if ($FindInputLease) {
+    $taskSources += @(Get-ChildItem -LiteralPath (Join-Path $taskFindInputLeaseSourceRoot 'java') -Recurse -File -Filter '*.java' | ForEach-Object FullName)
+}
 $taskCompile = @('--release', '17', '-encoding', 'UTF-8', '-proc:none', '-implicit:none', '-classpath', $taskClasspath, '-d', $taskOutput) + $taskSources
 $taskSmokeMain = 'lavi.minecraft.testsupport.mixin.BuilderMixinApplicationSmoke'
 if ($GoldProtection) { $taskSmokeMain = 'lavi.minecraft.testsupport.mixin.gold.GoldProtectionMixinApplicationSmoke' }
+if ($FindInputLease) { $taskSmokeMain = 'lavi.minecraft.testsupport.mixin.inputlease.FindInputLeaseMixinApplicationSmoke' }
 $taskRun = @(('-Djava.io.tmpdir=' + $taskTemp), '-Dmixin.debug.export=false', '-Dmixin.dumpTargetOnFailure=false',
     '-Dmixin.debug.verify=true', '-classpath', $taskClasspath, $taskSmokeMain)
 if ($GoldProtection) { $taskRun = @('-Dlavi.gold.smoke.output=' + $taskOutput) + $taskRun }
+if ($FindInputLease) { $taskRun = @('-Dlavi.find.input.lease.smoke.output=' + $taskOutput) + $taskRun }
 if ($PreviousArtifact) { $taskRun += '--previous-artifact' }
 if ($ArtifactJar) { $taskRun += '--intermediary-artifact' }
 foreach ($taskArgumentSet in @(@{Name='javac.args';Values=$taskCompile}, @{Name='java.args';Values=$taskRun})) {
@@ -96,6 +105,11 @@ if ($GoldProtection) {
     $taskManifest += 'OPT_IN_TARGET=WORLD_BLOCK_PROTECTION; DEFAULT_BUILDER_TARGETS=UNCHANGED'
     $taskManifest += 'TEST_CONFIG=DERIVED_FROM_ACTUAL_APPLICATION_CONFIG; REF_MAP=ACTUAL_SELECTED_INPUT; CONFIG_HASH=TRANSFORMATION_LOG'
 }
+if ($FindInputLease) {
+    if ($ArtifactJar) { $taskManifest[0] = 'SCOPE=REAL_MIXIN_APPLICATION; NAMESPACE=INTERMEDIARY_1.20.1; MINECRAFT_LAUNCH=NOT_RUN' }
+    $taskManifest += 'OPT_IN_TARGET=FIND_INPUT_LEASE; DEFAULT_BUILDER_AND_GOLD_MODES=UNCHANGED'
+    $taskManifest += 'TEST_CONFIG=DERIVED_FROM_ACTUAL_APPLICATION_CONFIG; REMAP=FALSE; NATIVE_WRITE_BODY=PRESERVED_INSTRUCTION_SUFFIX'
+}
 $taskManifest += (@($taskMixin, $taskLoader, $taskExtras) + $taskAsm + $taskSources) | ForEach-Object {
     "SHA256=$((Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash) PATH=$_"
 }
@@ -105,6 +119,9 @@ if ((Get-Item -LiteralPath $taskMain).PSIsContainer) {
     if ($GoldProtection) {
         $taskManifest += @('adris/altoclef/mixins/WorldBlockModifiedMixin.class', 'adris/altoclef/AltoClef.class') |
             ForEach-Object { $taskClass = Join-Path $taskMain $_; "MAIN_CLASS_SHA256=$((Get-FileHash -LiteralPath $taskClass -Algorithm SHA256).Hash) PATH=$taskClass" }
+    } elseif ($FindInputLease) {
+        $taskClass = Join-Path $taskMain 'adris/altoclef/mixins/ownership/InputOverrideLeaseMixin.class'
+        $taskManifest += "MAIN_CLASS_SHA256=$((Get-FileHash -LiteralPath $taskClass -Algorithm SHA256).Hash) PATH=$taskClass"
     } else {
         $taskManifest += Get-ChildItem -LiteralPath (Join-Path $taskMain 'adris/altoclef/mixins/diagnostics') -File -Filter '*.class' |
             ForEach-Object { "MAIN_CLASS_SHA256=$((Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash) PATH=$($_.FullName)" }
@@ -132,6 +149,7 @@ if ($taskCompileExit -ne 0) {
 }
 if ($CompileOnly) {
     $taskCompilationResult = "MIXIN_SMOKE_COMPILE_RESULT=PASS; GOLD_PROTECTION=$GoldProtection; TRANSFORMATION=NOT_RUN; LIVE_MINECRAFT=NOT_RUN"
+    if ($FindInputLease) { $taskCompilationResult += '; FIND_INPUT_LEASE=True' }
     $taskCompilationResult | Set-Content -LiteralPath (Join-Path $taskOutput 'compile-result.txt') -Encoding UTF8
     Write-Output $taskCompilationResult
     return

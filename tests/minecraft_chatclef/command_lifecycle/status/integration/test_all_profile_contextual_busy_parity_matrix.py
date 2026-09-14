@@ -29,7 +29,7 @@ from .trusted_status_input_fixture import issue_trusted_status_input
 
 
 class AllProfileContextualBusyParityMatrixTests(unittest.TestCase):
-    def test_all_25_active_profiles_match_independent_explicit_status_inspection(self):
+    def test_all_26_active_profiles_match_independent_explicit_status_inspection(self):
         proof_owner = object()
         _registry, status_event, proof = issue_trusted_status_input(
             voice=False,
@@ -136,7 +136,7 @@ class AllProfileContextualBusyParityMatrixTests(unittest.TestCase):
         finally:
             proof.close()
 
-        self.assertEqual(25, routed)
+        self.assertEqual(26, routed)
 
 
 def _busy_decision(active):

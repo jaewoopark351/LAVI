@@ -20,6 +20,7 @@ _FAMILIES = {
     "equip": ("item_equip", "아이템 장착"),
     "give": ("item_give", "아이템 전달"),
     "goto": ("movement_goto", "위치 이동"),
+    "find": ("find", "대상 찾기"),
     "follow": ("movement_follow", "플레이어 따라가기"),
     "food": ("food_acquisition", "음식 모으기"),
     "meat": ("meat_acquisition", "고기 모으기"),

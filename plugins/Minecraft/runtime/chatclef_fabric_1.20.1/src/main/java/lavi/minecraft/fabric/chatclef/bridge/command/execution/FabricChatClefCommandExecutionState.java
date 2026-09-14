@@ -157,6 +157,8 @@ final class FabricChatClefCommandExecutionState {
                 : null;
         this.taskAfterDispatch = this.taskAfterDispatchEvidence.rootTaskSnapshot();
         //#if MC == 12001
+        //20260914_kpopmodder: The exact bridge-owned FIND root uses existing LAVI result delivery instead of duplicate native chat.
+//$$         if (boundRootTask instanceof lavi.minecraft.find.result.FindTaskResultSource find) find.suppressNativePresentation();
         //20260913_kpopmodder: Bind before the admitted Task can reach a later client-tick terminal boundary.
         gotoResultTracker.bind(context, normalizedCommand, boundRootTask);
         //#endif

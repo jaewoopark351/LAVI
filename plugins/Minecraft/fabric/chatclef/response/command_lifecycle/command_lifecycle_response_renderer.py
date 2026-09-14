@@ -50,6 +50,8 @@ class CommandLifecycleResponseRenderer:
     def render_terminal(self, fact: object) -> str:
         descriptor = getattr(fact, "descriptor", None)
         profile = self._profiles.profile(getattr(descriptor, "command_name", ""))
+        query = getattr(fact, "query_projection", None)
+        query_arguments = {} if query is None else {"query_projection": query}
         text = self._phrases.terminal(
             descriptor,
             profile,
@@ -58,6 +60,7 @@ class CommandLifecycleResponseRenderer:
             dispatch_started=getattr(fact, "dispatch_started", False) is True,
             evidence_projection=getattr(fact, "evidence_projection", None),
             failure_projection=getattr(fact, "failure_projection", None),
+            **query_arguments,
         )
         #20260913_kpopmodder: Report only after rendering; preserve every terminal status.
         if self._diagnostic_observer is not None:

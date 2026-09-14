@@ -153,16 +153,26 @@ workstreams. At the 2026-09-11 incident audit, the local mixed, uncommitted
 worktree was observed to contain broader Korean XYZ ownership/grammar for the
 existing canonical `@goto`; one live incident verifies the narrow translation,
 admission, dispatch, and root-binding path, not navigation success. The new
-LAVI-owned Java `@find` command and command-by-
-command Korean Chat/final-microphone exposure remain documented but not
-implemented. FIND's safe base only reports a terminally revalidated target from
-a bounded loaded/known scope, with approach and exploration still unapproved.
-The 26 registered names represent 25 semantic capabilities because
-`자동보관등록` is a compatibility alias; the target after FIND is 27 names and
-26 semantic Korean routes. At the 2026-09-11 audit, comparison commit
+LAVI-owned Java `@find` command now has repository-local source and Korean
+Chat/final-microphone routes. It reports a terminally revalidated target from
+a bounded currently loaded scope. Approach requires an explicit request to
+an observed target; exploration is outside the initial scope.
+The current 27 registered names represent 26 semantic capabilities because
+`자동보관등록` is a compatibility alias. Independent all-command public exposure
+requirements remain governed by the coverage contract. At the 2026-09-11 audit, comparison commit
 `92760206652ce155b482f3ddc85505702f9d811e` had no `@find` or `@go`, and only
 10 commands were public Korean input commands. See the
 [Korean GOTO, FIND, and all-command coverage contract](docs/chatclef-korean-goto-find-and-all-command-coverage-pre-change-contract-2026-09-09.md).
+
+<!-- 20260914_kpopmodder: Link current FIND implementation separately from the historical documentation-only review. -->
+For the historical FIND design review, see
+[FIND Chat/final-microphone design](docs/chatclef-find-chat-microphone-design-2026-09-14.md).
+The [FIND implementation contract and verification record](docs/chatclef-find-implementation-contract-2026-09-14.md)
+defines report by default, explicit conservative approach, initial exact player-name
+search, dropped-item report, fixed search limits, and closed catalog/result fields.
+An absent target does not trigger exploration. Inventory, container-content and
+acquisition queries are separate extensions. Existing automatic defense and
+survival priorities remain. Deployment and live Minecraft acceptance are `NOT_RUN`.
 
 A historical 2026-09-10 user-run GOTO investigation recorded repeated
 high-cost path calculation, wander, and blacklist handling until STOP after
@@ -895,8 +905,11 @@ Contextual natural active-command STATUS responses for all ordinary command-life
 Contextual current-task wording for an exact typed pre-submit busy rejection, with rejected admission, zero submission and unchanged active identity (implemented and verified offline; Java/Gradle/live runtime not run; no commit or push performed):
   chatclef-python-contextual-active-command-busy-response-pre-change-contract-2026-09-08.md
 
-Korean coordinate GOTO ownership/grammar, bounded loaded-scope LAVI-owned FIND behavior, and Korean Chat/final-microphone coverage for every registered command (mixed-worktree GOTO grammar; one incident verifies translation/admission/root binding only; navigation failed; FIND and full coverage remain unimplemented):
+Historical Korean coordinate GOTO/FIND/all-command pre-change contract (GOTO incident proves translation/admission/root binding only; navigation failed; current FIND implementation is linked separately below):
   chatclef-korean-goto-find-and-all-command-coverage-pre-change-contract-2026-09-09.md
+
+Current Fabric ChatClef FIND source, fixed bounds, initial player search, conservative approach, catalog/result contract and separate verification evidence:
+  chatclef-find-implementation-contract-2026-09-14.md
 
 Historical GOTO high-Y material-readiness and pre-runtime implementation ledger (reference-only after matching-JAR failed runtime acceptance; root cause and exact safe rollback scope unproven):
   chatclef-goto-vertical-navigation-building-material-readiness-pre-change-contract-2026-09-10.md

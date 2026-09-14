@@ -27,6 +27,7 @@ EXPECTED_COMMANDS = (
     "deposit",
     "deposit_all",
     "equip",
+    "find",
     "follow",
     "food",
     "gamer",
@@ -56,6 +57,7 @@ EXPECTED_RESPONSE_LIFECYCLE_KINDS = {
     "deposit": "finite_task",
     "deposit_all": "finite_task",
     "equip": "finite_task",
+    "find": "finite_task",
     "follow": "persistent_task",
     "food": "finite_task",
     "gamer": "finite_task",
@@ -125,14 +127,14 @@ class CommandLifecycleRegistryContractTests(unittest.TestCase):
                     lifecycle_kinds.profile(command_name).terminal_trigger,
                 )
 
-    def test_only_get_store_home_and_bound_goto_profiles_are_verified(self):
+    def test_only_get_store_home_bound_goto_and_find_profiles_are_verified(self):
         evidence = CommandTerminalEvidenceProfileRegistry()
 
         for command_name in EXPECTED_COMMANDS:
             with self.subTest(command_name=command_name):
                 expected = (
                     CommandTerminalEvidenceProfile.VERIFIED
-                    if command_name in {"get", "store_home", "goto"}
+                    if command_name in {"get", "store_home", "goto", "find"}
                     else CommandTerminalEvidenceProfile.CAUTIOUS
                 )
                 self.assertEqual(expected, evidence.profile(command_name).rollout_state)

@@ -58,12 +58,17 @@ class MinecraftChatClefInputIntentGate:
             auto_deposit_trust or AutoDepositTrustCandidateDetector()
         )
         self._goto_candidate = KoreanGotoCandidateDetector()
+        from plugins.Minecraft.fabric.chatclef.intent.find.find_input_parser import FindInputParser
+        self._find_candidate = FindInputParser()
 
     def inspect(self, text: object) -> MinecraftChatClefInputGateDecision:
         if self._auto_deposit_trust.is_candidate(text):
             return MinecraftChatClefInputGateDecision.h5_auto_deposit_trust()
         #20260913_kpopmodder: Recognize coordinate movement, not a broad '가줘' trigger.
         if self._goto_candidate.is_candidate(text):
+            return MinecraftChatClefInputGateDecision.generic()
+        #20260914_kpopmodder: Do not let FIND requests become acquisition or conversation.
+        if self._find_candidate.is_candidate(text):
             return MinecraftChatClefInputGateDecision.generic()
         normalized = self._normalize(text)
         if not normalized:

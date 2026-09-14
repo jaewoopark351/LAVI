@@ -15,6 +15,7 @@ from .command_terminal_evidence_profile_registry import (
 from .get import GetAcquisitionTerminalEvidenceEvaluator
 from .goto import GotoTerminalEvidenceEvaluator
 from .store_home import StoreHomeTerminalEvidenceEvaluator
+from .find import FindTerminalEvidenceEvaluator
 
 
 class CommandTerminalEvidenceEvaluator:
@@ -26,6 +27,7 @@ class CommandTerminalEvidenceEvaluator:
         store_home_evaluator=None,
         goto_evaluator=None,
         diagnostic_observer=None,
+        find_evaluator=None,
     ) -> None:
         self._profiles = profile_registry or CommandTerminalEvidenceProfileRegistry()
         #20260913_kpopmodder: Observe selected verdicts without supplying evidence.
@@ -38,6 +40,7 @@ class CommandTerminalEvidenceEvaluator:
                 store_home_evaluator or StoreHomeTerminalEvidenceEvaluator()
             ),
             "goto_terminal": goto_evaluator or GotoTerminalEvidenceEvaluator(),
+            "find_terminal": find_evaluator or FindTerminalEvidenceEvaluator(),
         }
 
     def evaluate(

@@ -25,6 +25,7 @@ class KoreanChatClefCommandRegistry:
         "deposit",
         "deposit_all",
         "equip",
+        "find",
         "follow",
         "food",
         "gamer",
@@ -54,6 +55,7 @@ class KoreanChatClefCommandRegistry:
             "deposit",
             "deposit_all",
             "equip",
+            "find",
             "follow",
             "food",
             "gamer",
@@ -79,6 +81,7 @@ class KoreanChatClefCommandRegistry:
             "auto_deposit_trust",
             "deposit",
             "equip",
+            "find",
             "food",
             "get",
             "give",
@@ -93,6 +96,7 @@ class KoreanChatClefCommandRegistry:
             "auto_deposit_trust",
             "deposit",
             "equip",
+            "find",
             "follow",
             "food",
             "get",
@@ -109,6 +113,7 @@ class KoreanChatClefCommandRegistry:
             "auto_deposit_trust",
             "deposit",
             "equip",
+            "find",
             "food",
             "get",
             "give",
@@ -123,6 +128,7 @@ class KoreanChatClefCommandRegistry:
             "auto_deposit_trust",
             "deposit",
             "equip",
+            "find",
             "food",
             "get",
             "give",
@@ -132,7 +138,7 @@ class KoreanChatClefCommandRegistry:
             "store_home",
         }
     )
-    _GAMEPLAY_VERIFIABLE_COMMANDS = frozenset({"get", "store_home"})
+    _GAMEPLAY_VERIFIABLE_COMMANDS = frozenset({"find", "get", "store_home"})
     _SAFETY_TIERS = MappingProxyType({
         "attack": "R3",
         "auto_deposit_trust": "R2",
@@ -142,6 +148,7 @@ class KoreanChatClefCommandRegistry:
         "deposit": "R2",
         "deposit_all": "R2",
         "equip": "R1",
+        "find": "R2",
         "follow": "R3",
         "food": "R1",
         "gamer": "R3",
@@ -176,6 +183,7 @@ class KoreanChatClefCommandRegistry:
         "deposit": ("item", "count"),
         "deposit_all": ("items?",),
         "equip": ("equipment_item",),
+        "find": ("kind", "target", "mode?"),
         "follow": ("player",),
         "food": ("count",),
         "gamer": ("target",),
@@ -260,6 +268,7 @@ class KoreanChatClefCommandRegistry:
             "equip",
             "give",
             "goto",
+            "find",
             "follow",
             "food",
             "meat",
@@ -282,6 +291,8 @@ class KoreanChatClefCommandRegistry:
     def _allowed_input_sources(self, command: str) -> tuple[str, ...]:
         if command == "auto_deposit_trust":
             return ("lavi_chat_ui", "voice_input_final")
+        if command == "find":
+            return ("lavi_chat_ui", "voice_input_final", "direct_typed")
         if command == "store_home":
             return ("lavi_chat_ui", "voice_input_final", "direct_typed")
         if command == "stop":

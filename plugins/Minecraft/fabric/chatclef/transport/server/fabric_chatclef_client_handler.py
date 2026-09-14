@@ -23,6 +23,7 @@ class FabricChatClefClientHandler:
         stopping_provider: Callable[[], bool],
         last_error_reporter: Callable[[str], None],
         now_ms: Callable[[], int],
+        find_catalog_receiver=None,
     ) -> None:
         self._components = FabricChatClefClientSessionComponentGraph(
             connection_ownership=connection_ownership,
@@ -36,6 +37,7 @@ class FabricChatClefClientHandler:
             stopping_provider=stopping_provider,
             last_error_reporter=last_error_reporter,
             now_ms=now_ms,
+            find_catalog_receiver=find_catalog_receiver,
         )
         self._envelope_reader = self._components.envelope_reader
         self._handshake_handler = self._components.handshake_handler

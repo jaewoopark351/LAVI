@@ -24,6 +24,9 @@ class KoreanCommandStartRenderer:
 
     def render(self, descriptor: object, profile: object) -> str:
         family = profile.family
+        if family == "find":
+            from ...terminal.find import KoreanFindTerminalRenderer
+            return KoreanFindTerminalRenderer().start(descriptor)
         subject = self._subjects.render(descriptor, profile)
         if family == "item_get":
             action = {"craft": "만들어 줄게", "mining": "캐 올게"}.get(

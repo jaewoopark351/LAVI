@@ -29,7 +29,7 @@ class PythonKoreanCommandRegistryTests(unittest.TestCase):
         }
 
         self.assertEqual(expected, set(registry.command_names()))
-        self.assertEqual(26, len(registry.command_names()))
+        self.assertEqual(27, len(registry.command_names()))
 
     def test_auto_deposit_trust_is_public_with_exact_h5_metadata(self):
         registry = KoreanChatClefCommandRegistry()

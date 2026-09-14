@@ -10,9 +10,9 @@ class DiagnosticSessionLimitsTest {
     @Test
     void fixedCriticalPartitionPreservesOldPoolsAndReservesResourceBoundaries() {
         assertEquals(5_000, DiagnosticSessionLimits.HARD_CAP);
-        assertEquals(3_864, DiagnosticSessionLimits.ORDINARY_CEILING);
-        assertEquals(1_136, DiagnosticSessionLimits.CRITICAL_RESERVE);
-        assertEquals(1_136, DiagnosticSessionLimits.criticalPartitionTotal());
+        assertEquals(3_736, DiagnosticSessionLimits.ORDINARY_CEILING);
+        assertEquals(1_264, DiagnosticSessionLimits.CRITICAL_RESERVE);
+        assertEquals(1_264, DiagnosticSessionLimits.criticalPartitionTotal());
         assertEquals(128, DiagnosticEventFamily.TOOL_EQUIP_FIRST.slotQuota());
         assertEquals(4, DiagnosticEventFamily.TOOL_PLACEMENT_TERMINAL.slotQuota());
         assertEquals(64, DiagnosticEventFamily.BLOCK_PROTECTION_BOUNDARY.slotQuota());

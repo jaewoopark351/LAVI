@@ -20,6 +20,7 @@ _EVIDENCE = {
     "deposit": ("cautious", "cautious_terminal"),
     "deposit_all": ("cautious", "cautious_terminal"),
     "equip": ("cautious", "cautious_terminal"),
+    "find": ("verified", "find_terminal"),
     "follow": ("cautious", "cautious_terminal"),
     "food": ("cautious", "cautious_terminal"),
     "gamer": ("cautious", "cautious_terminal"),

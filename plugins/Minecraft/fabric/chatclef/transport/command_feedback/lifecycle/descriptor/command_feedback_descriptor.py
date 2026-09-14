@@ -49,10 +49,16 @@ class CommandFeedbackDescriptor:
     structure_name: str = ""
     destination_id: str = ""
     operation_target: str = ""
+    #20260914_kpopmodder: FIND binding is distinct from item acquisition and raw targets.
+    find_binding: object = None
 
     _EVENT_ID = re.compile(r"[0-9a-f]{32}\Z", re.ASCII)
 
     def __post_init__(self) -> None:
+        if self.find_binding is not None:
+            from plugins.Minecraft.fabric.chatclef.result.find import FindCommandBinding
+            if type(self.find_binding) is not FindCommandBinding or self.command_name != "find":
+                raise ValueError("invalid_find_feedback_binding")
         required = (
             self.command_name,
             self.command,

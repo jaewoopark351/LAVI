@@ -12,6 +12,7 @@ COMMAND_FEEDBACK_FAMILIES = MappingProxyType(
         "deposit": "item_deposit",
         "deposit_all": "item_deposit",
         "equip": "item_equip",
+        "find": "find",
         "follow": "movement_follow",
         "food": "food_acquisition",
         "gamer": "generic",

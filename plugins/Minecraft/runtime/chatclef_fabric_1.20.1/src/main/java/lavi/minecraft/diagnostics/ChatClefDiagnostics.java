@@ -496,6 +496,23 @@ public final class ChatClefDiagnostics {
         return SESSION.snapshot();
     }
 
+    //20260914_kpopmodder: Expose finite diagnostic leases without exposing gameplay or admission decisions.
+    public static java.util.List<lavi.minecraft.diagnostics.session.admission.DiagnosticAdmissionToken>
+            reserveDiagnosticTrace(DiagnosticEventFamily family, int slots) {
+        return SESSION.reserveTrace(family, slots);
+    }
+
+    public static lavi.minecraft.diagnostics.session.emission.DiagnosticEmissionOutcome emitReservedBoundary(
+            lavi.minecraft.diagnostics.session.admission.DiagnosticAdmissionToken token,
+            String eventName, String reason, Task task, Object[] fields) {
+        return EVENTS.emitReservedBoundary(token, eventName, reason, task, fields);
+    }
+
+    public static void abandonReservedBoundary(
+            lavi.minecraft.diagnostics.session.admission.DiagnosticAdmissionToken token) {
+        SESSION.abandonReserved(token);
+    }
+
     public static DiagnosticSessionSnapshot resetDiagnosticSessionForTests() {
         if (!MODE.isOff()) {
             throw new IllegalStateException("Disable diagnostics before using the OFF-only test reset seam.");

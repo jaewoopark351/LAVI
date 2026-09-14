@@ -8,6 +8,7 @@ from ..submission import OrdinarySubmissionResultStage
 from ..translation import OrdinaryTranslationStage
 from plugins.Minecraft.fabric.chatclef.input.routing.goto import GotoTranslationBindingStage
 from plugins.Minecraft.fabric.chatclef.input.routing.goto.goto_input_diagnostics import GotoInputDiagnostics
+from plugins.Minecraft.fabric.chatclef.input.routing.find import FindTranslationBindingStage
 from .ordinary_minecraft_command_route_compatibility_installer import (
     OrdinaryMinecraftCommandRouteCompatibilityInstaller,
 )
@@ -101,6 +102,8 @@ class OrdinaryMinecraftCommandRouteComponentGraph:
                 live_proof_validator=live_proof_validator,
                 diagnostics=GotoInputDiagnostics(router_logger.log),
             ),
+            find_binding_stage=FindTranslationBindingStage(extension=extension,
+                live_proof_validator=live_proof_validator, log_callback=router_logger.log),
         )
 
     def install_compatibility_seams(self, owner) -> None:

@@ -23,6 +23,15 @@ class KoreanCommandStatusRenderer:
         self._particle = particle_renderer
 
     def render(self, descriptor: object, profile: object, state: str) -> str:
+        if profile.family == "find":
+            from ...terminal.find import KoreanFindTerminalRenderer
+            subject = self._particle.attach(KoreanFindTerminalRenderer.label(descriptor), "을", "를")
+            if state == "pending":
+                return f"{subject} 찾는 작업이 시작됐는지 확인 중이야"
+            if state == "running":
+                mode = getattr(getattr(descriptor, "find_binding", None), "mode", "report")
+                return f"{subject} 찾아서 접근하는 중이야" if mode == "approach" else f"{subject} 찾는 중이야"
+            return "지금 마인크래프트 작업 상태를 확인하지 못했어"
         if state == "pending":
             if profile.family == "item_get" and get_verb(descriptor) == "craft":
                 subject = self._subjects.render(descriptor, profile)

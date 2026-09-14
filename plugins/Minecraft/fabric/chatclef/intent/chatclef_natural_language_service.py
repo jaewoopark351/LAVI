@@ -55,6 +55,7 @@ class ChatClefNaturalLanguageService:
         auto_deposit_trust_guard_decoder: AutoDepositTrustGuardIntentDecoder
         | None = None,
         scoped_rule_parser: KoreanChatClefRuleParser | None = None,
+        find_catalog_provider=None,
     ):
         graph = ChatClefNaturalLanguageComponentGraph(
             extractor=extractor,
@@ -71,12 +72,18 @@ class ChatClefNaturalLanguageService:
         self._intent_policy = graph.intent_policy
         self._rejection_factory = graph.rejection_factory
         self._scoped_translation_service = graph.scoped_translation_service
+        #20260914_kpopmodder: Deterministic FIND owns its candidates before generic extraction.
+        from .find.find_translation_service import FindTranslationService
+        self._find_translation = FindTranslationService(catalog_provider=find_catalog_provider)
 
     def translate(self, text: object) -> ChatClefTranslationResultDTO:
         raw_text, rejection = self._input_guard.inspect(text)
         if rejection is not None:
             return rejection
         try:
+            find = self._find_translation.translate_if_candidate(raw_text)
+            if find is not None:
+                return find
             intent = self._extractor.extract(raw_text)
             return self._translate_intent(intent, self._resolver)
         except Exception as error:

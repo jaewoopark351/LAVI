@@ -157,6 +157,8 @@ class DiagnosticSessionTestResetCoordinatorTest {
         admitAndComplete(authority, DiagnosticEventFamily.TOOL_EQUIP_FIRST, 128);
         admitAndComplete(authority, DiagnosticEventFamily.TOOL_PLACEMENT_TERMINAL, 4);
         admitAndComplete(authority, DiagnosticEventFamily.BLOCK_PROTECTION_BOUNDARY, 64);
+        //20260914_kpopmodder: Settle FIND's bounded reserved pool before the canonical final-snapshot reset.
+        admitAndComplete(authority, DiagnosticEventFamily.FIND_RESERVED_BOUNDARY, DiagnosticSessionLimits.FIND_RESERVED_BOUNDARY_SLOTS);
     }
 
     private static void admitAndComplete(DiagnosticSessionAdmissionAuthority authority,

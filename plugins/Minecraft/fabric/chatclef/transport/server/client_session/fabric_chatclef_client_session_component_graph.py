@@ -32,6 +32,7 @@ class FabricChatClefClientSessionComponentGraph:
         stopping_provider,
         last_error_reporter,
         now_ms,
+        find_catalog_receiver=None,
     ) -> None:
         self.envelope_reader = FabricChatClefInboundEnvelopeReader(
             envelope_transport=envelope_transport
@@ -63,6 +64,7 @@ class FabricChatClefClientSessionComponentGraph:
             command_result_handler=command_result_handler,
             stop_control_result_demultiplexer=stop_control_result_demultiplexer,
             status_provider=status_provider,
+            find_catalog_receiver=find_catalog_receiver,
         )
         self.disconnect_cleanup = FabricChatClefClientDisconnectCleanup(
             connection_ownership=connection_ownership,

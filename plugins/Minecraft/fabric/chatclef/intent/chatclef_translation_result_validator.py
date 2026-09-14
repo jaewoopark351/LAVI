@@ -59,6 +59,7 @@ class ChatClefTranslationResultValidator:
         resolved_target: str | None,
     ) -> str:
         if intent.intent_type in {
+            ChatClefIntentType.FIND,
             ChatClefIntentType.GET_ITEM,
             ChatClefIntentType.EQUIP_ITEM,
             ChatClefIntentType.DEPOSIT_ITEM,

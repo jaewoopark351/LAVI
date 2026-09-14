@@ -54,6 +54,20 @@ class ChatClefIntentSchemaValidator:
     def _validate_intent(self, intent: ChatClefIntentDTO) -> tuple[bool, str, str]:
         if intent.intent_type is ChatClefIntentType.UNKNOWN:
             return True, "validated_unknown_intent", "unknown intent is non-executable"
+        if intent.intent_type is ChatClefIntentType.FIND:
+            from .find.find_command_compiler import FindCommandCompiler
+            if (intent.source != "rule" or set(intent.slots) != {"target_kind", "target_phrase", "mode"}
+                    or type(intent.slots.get("target_phrase")) is not str
+                    or not 1 <= len(intent.slots["target_phrase"]) <= 256
+                    or any((intent.quantity is not None, bool(intent.item_phrase), intent.food_units is not None,
+                            intent.x is not None, intent.y is not None, intent.z is not None, bool(intent.player_name)))):
+                return False, "invalid_find_slots", "FIND requires closed deterministic slots"
+            try:
+                FindCommandCompiler.compile_slots(intent.slots["target_kind"],
+                    "PlayerName" if intent.slots["target_kind"] == "player" else "minecraft:stone", intent.slots["mode"])
+            except ValueError:
+                return False, "invalid_find_slots", "invalid FIND kind or mode"
+            return True, "validated_intent", "intent schema is valid"
         if intent.intent_type is ChatClefIntentType.STORE_HOME:
             if intent.source != "rule":
                 return (

@@ -64,6 +64,11 @@ class MinecraftFabricChatClefExtension(GameExtensionInterface):
     def handle_command(self, command: Any) -> dict[str, Any]:
         return self._command_submission.submit(command)
 
+    #20260914_kpopmodder: Read current target authority through the Fabric adapter boundary.
+    def get_find_catalog_snapshot(self):
+        getter = getattr(self.adapter, "get_find_catalog_snapshot", None)
+        return getter() if callable(getter) else None
+
     def submit_stop_control(
         self,
         *,

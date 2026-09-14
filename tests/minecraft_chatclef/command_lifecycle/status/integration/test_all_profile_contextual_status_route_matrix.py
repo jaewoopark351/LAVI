@@ -54,6 +54,7 @@ PROFILE_FIXTURES = {
     "deposit": ("deposit stone 2", "돌 2개 보관하는 중이야"),
     "deposit_all": ("deposit_all dirt 2", "흙 2개 보관하는 중이야"),
     "equip": ("equip iron_helmet", "철 투구 장착하는 중이야"),
+    "find": ("find entity minecraft:villager report", "요청한 대상을 찾는 중이야"),
     "follow": ("follow Steve", "Steve를 따라가는 중이야"),
     "food": ("food 10", "허기를 10만큼 채울 음식을 모으는 중이야"),
     "gamer": ("gamer", "게임을 공략하는 중이야"),
@@ -91,10 +92,10 @@ PROFILE_FIXTURES = {
 
 
 class AllProfileContextualStatusRouteMatrixTests(unittest.TestCase):
-    def test_all_25_ordinary_profiles_route_exact_running_phrase_and_stop_bypasses(self):
+    def test_all_26_ordinary_profiles_route_exact_running_phrase_and_stop_bypasses(self):
         commands = KoreanChatClefCommandRegistry().command_names()
         self.assertEqual(commands, tuple(PROFILE_FIXTURES))
-        self.assertEqual(26, len(commands))
+        self.assertEqual(27, len(commands))
 
         proof_owner = object()
         _registry, event, proof = issue_trusted_status_input(
@@ -178,10 +179,10 @@ class AllProfileContextualStatusRouteMatrixTests(unittest.TestCase):
         finally:
             proof.close()
 
-        self.assertEqual(25, routed_profiles)
+        self.assertEqual(26, routed_profiles)
         self.assertEqual(0, harness.ordinary_route_calls)
 
-    def test_all_25_ordinary_profiles_route_from_reconciled_running_lifecycle(self):
+    def test_all_26_ordinary_profiles_route_from_reconciled_running_lifecycle(self):
         proof_owner = object()
         _registry, event, proof = issue_trusted_status_input(
             voice=False,
@@ -265,7 +266,7 @@ class AllProfileContextualStatusRouteMatrixTests(unittest.TestCase):
         finally:
             proof.close()
 
-        self.assertEqual(25, routed_profiles)
+        self.assertEqual(26, routed_profiles)
 
 
 class _Diagnostics:

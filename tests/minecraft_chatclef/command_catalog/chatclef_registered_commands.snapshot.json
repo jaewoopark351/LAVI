@@ -3,6 +3,12 @@
   "snapshot_authority": "source_extraction",
   "commands": [
     {
+      "class_name": "FindCommand",
+      "command": "find",
+      "owner": "lavi_find",
+      "path": "lavi/minecraft/find/command/FindCommand.java"
+    },
+    {
       "class_name": "AttackPlayerOrMobCommand",
       "command": "attack",
       "owner": "chatclef_java",

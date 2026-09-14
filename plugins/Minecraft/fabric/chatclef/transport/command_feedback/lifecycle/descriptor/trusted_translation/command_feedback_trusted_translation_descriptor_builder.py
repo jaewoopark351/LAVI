@@ -71,6 +71,11 @@ class CommandFeedbackTrustedTranslationDescriptorBuilder:
         identity = self._event_identity(event)
         if identity is None:
             return None
+        #20260914_kpopmodder: FIND owns its own typed target/catalog meaning.
+        if command_name == "find":
+            from ..find import FindFeedbackDescriptorBuilder
+            return FindFeedbackDescriptorBuilder().build(event=event, translation=dict(translation),
+                spec=spec, evidence=evidence, lifecycle=lifecycle)
         intent_kind = str(intent.get("intent_type") or "unknown")
         target_item = self._optional_text(translation.get("resolved_target"))
         requested_count = self._quantity(intent, command_name)
