@@ -10,6 +10,26 @@ The goal of this file is to keep the project stable, prevent accidental dependen
 
 These rules override all other instructions in this file.
 
+### Minimal Complete Change Rule
+
+<!-- 20260914_kpopmodder: Prefer the smallest complete owner-local change over automatic structural expansion while preserving safety and companion logging. -->
+
+For local bug fixes, compatibility changes, diagnostics, and narrowly scoped features, prefer the smallest complete, evidence-backed implementation that satisfies the active request. Preserve behavior outside the intended change. "Smallest" means the least unnecessary expansion of ownership, dependencies, contracts, and lifecycles, not the fewest lines or files.
+
+Start at the authoritative owner of the affected decision, state, or side effect. Inspect its relevant callers and existing contracts, then reuse that owner, established collaborators, logging utilities, and test seams when they can implement the requirement correctly and safely. Do not route around a required backend, plugin, trust, thread, or lifecycle boundary merely because a direct edit is shorter.
+
+Do not introduce an abstraction, manager, coordinator, service, lifecycle layer, DTO, helper, package, or inheritance hierarchy merely to satisfy a structural checklist, prepare for hypothetical reuse, or make a local patch look cleaner. Add or extract a unit only for a current requirement or a concrete ownership, dependency, lifecycle, compatibility, or testing constraint that the existing boundary cannot safely satisfy. A private method, focused function, existing typed contract, or small immutable snapshot may be sufficient; do not force it into a new framework.
+
+Judge independent responsibilities by actual contracts and ownership. Validation, calculation, state transitions, calls to existing collaborators or loggers, and operation-owned cleanup can be cohesive steps of one responsibility. A separately testable step or a different method name alone does not require a separate class or file. Keep genuinely independent implementations, mutable state, policies, and lifecycles separate; delegation does not transfer ownership of the delegated implementation to the caller.
+
+An existing mixed-responsibility file may receive a local correction without unrelated restructuring when the change stays within an established responsibility and preserves required boundaries. Do not add an unrelated responsibility or expand prohibited coupling. Newly introduced independent responsibilities must use an existing focused owner or the smallest necessary new unit. Perform an in-scope split when direct source evidence shows that the existing mix prevents a correct or safe implementation, or when the user explicitly requests that structural work.
+
+This rule takes precedence only over mechanical split-on-touch, refactor-first, folderization, type-count, and inheritance triggers in Sections 29-29.3 and equivalent structural instructions elsewhere in this file, including references to new or touched LAVI-owned code. It does not override Minecraft backend separation, upstream preservation and engine-modification gates, explicit contracts or resource ownership, shared-mutable-state and null/reference safety, compatibility requirements, dependency/version stability, privacy, filesystem safeguards, or action authorization. Existing diagnostics-first rules and the scoped GOTO/GUI exceptions keep their current applicability and ordering.
+
+A complete implementation includes the required companion logs and the applicable authorized verification in the same task. Section 21 and its "Companion-log delivery contract" remain mandatory, including actual decision values, correlation, bounded delivery, non-interference, output evidence, and separate implementation/test/runtime reporting. Do not use minimality or `NOT_RUN` to excuse missing required instrumentation or tests. Unexecuted verification must remain explicitly unverified.
+
+Record the chosen owner and any necessary structural expansion briefly in the existing change report; do not require a new document, generic framework, or separate approval stage solely for this rule. Existing mandatory companion documents, scoped reports, and safety confirmations still apply. Explicitly requested refactoring must be completed within its approved scope. Once the requested change and its required authorized verification are complete, report remaining uncertainty and finish without opportunistic redesign. This rule grants no additional permission to build, deploy, run a game, modify external files, commit, or push.
+
 ### Active repository root
 
 For this project, the active repository root is:
@@ -516,8 +536,9 @@ This AGENTS.md-only amendment changes no companion document.
 Before source changes, inspect the actual command entry, placement selector,
 child lifecycle, and owned cleanup boundaries; record exact files/hunks,
 ownership, unrelated dirty changes, and the independently reversible unit.
-New or touched LAVI-owned code with two or more independent responsibilities
-must be split into focused files and meaningful packages. Keep upstream-derived
+Apply the Minimal Complete Change Rule above to new or touched LAVI-owned code.
+Keep new independent responsibilities separate, but do not restructure an
+existing owner solely because this task touches it. Keep upstream-derived
 changes minimal; do not move or broadly refactor upstream engine classes.
 Bounded companion logs and focused tests must accompany the feature. Logs
 observe decisions and never control behavior, cleanup, or terminal results.
@@ -597,8 +618,8 @@ request as one continuous in-repository work unit covering:
 
 1. baseline, ownership, route, and dirty-worktree inspection
 2. the smallest ownership-preserving implementation
-3. responsibility-based splitting and package organization for new or touched
-   LAVI-owned code
+3. responsibility separation only where required by the Minimal Complete Change
+   Rule, reusing suitable existing LAVI-owned files and packages
 4. bounded state-change and boundary logging reinforcement
 5. focused unit and integration tests
 6. the required clean forced build
@@ -697,7 +718,7 @@ For this tree:
 * Do not treat `gradle/wrapper/gradle-wrapper.jar`, required API JARs, vendor JARs, or runtime JARs as disposable build artifacts.
 * Do not add broad `*.jar` ignore rules that can hide required wrapper, API, vendor, or runtime JARs. Verify every ignored JAR path with `git check-ignore -v` before proposing an ignore change.
 
-General refactoring rules still apply to newly created LAVI-owned code when that code is not replacing, restructuring, or forcing changes across the upstream baseline. Any such new structure must remain narrow and optional.
+General refactoring rules, as scoped by the Minimal Complete Change Rule above, still apply to newly created LAVI-owned code when that code is not replacing, restructuring, or forcing changes across the upstream baseline. Any such new structure must remain narrow and optional.
 
 #### ChatClef engine boundary and composition-first design rule
 
@@ -1608,7 +1629,7 @@ Upstream-derived ChatClef and AltoClef files must remain in their existing files
 
 Do not force an upstream-derived class to satisfy the LAVI-owned two-responsibility, one-class-per-file, folderization, or inheritance rules merely because a diagnostic line is added.
 
-New LAVI-owned diagnostics code remains subject to Sections 29, 29.1, and 29.2:
+New LAVI-owned diagnostics code remains subject to Sections 29, 29.1, and 29.2, using the Minimal Complete Change Rule above to identify actual independent ownership:
 
 * a narrow helper with one responsibility may remain a single focused file
 * when a new LAVI-owned diagnostics helper owns two or more independent responsibilities, split those responsibilities into focused files and evaluate a meaningful diagnostics package or folder
@@ -2829,7 +2850,7 @@ If unsure whether a file is a build artifact or a runtime dependency, keep it an
 
 Always inspect existing code before editing.
 
-Prefer minimal patches.
+Prefer minimal patches under Section 0's "Minimal Complete Change Rule". Start at the existing authoritative owner; do not turn a local correction into unrelated restructuring.
 
 Do not rewrite a whole file when a small change is enough.
 
@@ -4024,33 +4045,36 @@ __pycache__/
 
 This section applies to LAVI-owned production code.
 
-It does not override the scoped Minecraft ChatClef upstream baseline rules in Section 0, and it does not require retroactive restructuring of vendored, upstream-derived, generated, or third-party code. When ownership is uncertain, classify the code before applying this section.
+It is subordinate to Section 0's "Minimal Complete Change Rule" and scoped Minecraft ChatClef upstream baseline rules. It does not require retroactive restructuring of vendored, upstream-derived, generated, or third-party code. When ownership is uncertain, classify the code before applying this section.
 
-For LAVI-owned production code covered by this section, refactoring is mandatory whenever the code touched by the current task violates the responsibility rules below.
+For LAVI-owned production code, touching a file does not automatically require refactoring its pre-existing structure. Start with the smallest complete change at the authoritative owner.
 
-Maintaining working behavior remains required, but existing behavior is not a reason to keep mixed responsibilities in the same LAVI-owned class, module, source file, service, manager, controller, adapter, facade, worker, handler, or package.
+Structural work is required within the current task only when it is explicitly requested, when a newly introduced independent responsibility needs a focused owner, or when direct source evidence shows that the existing mix prevents a correct or safe implementation. Limit extraction and reference updates to that requirement; preserve unrelated structure and working behavior.
 
 ### Non-Negotiable Two-Responsibility Rule
 
-Use this rule as a mandatory gate for LAVI-owned production code, subject to the higher-priority scoped exceptions in Section 0:
+Use the following ownership rule, subject to Section 0. It is not a mechanical count of methods, stages, or files:
 
 ```text
-one responsibility        -> the unit may remain as-is
-two or more responsibilities -> refactor, separate files, and evaluate folder/package separation immediately
+one cohesive responsibility                 -> reuse or modify the existing owner
+new independent responsibility              -> use a focused existing or necessary new owner
+existing mixed unit with a safe local change -> patch the affected responsibility without unrelated restructuring
+existing mix blocks correctness or safety   -> separate the minimum required responsibilities in this task
+explicitly requested refactoring            -> complete the approved structural scope
 ```
 
-If a LAVI-owned production unit has two or more independent responsibilities, Codex must split it during the current task before adding, extending, or fixing behavior in that unit.
+Do not introduce or expand an unrelated responsibility in a LAVI-owned unit. A local correction within an existing responsibility does not require splitting every other responsibility already present in the file.
 
-This is a mandatory execution gate, not a recommendation, optional cleanup, future improvement, or style preference.
+Required backend, trust, dependency, state, and resource-ownership boundaries remain mandatory. A shorter diff is not permission to bypass them.
 
-A responsibility is independent when one or more of the following is true:
+Identify independent responsibilities from concrete contracts and ownership, such as:
 
-* it can change for a different reason
-* it has a separate lifecycle, state, dependency, or failure mode
-* it can be tested independently
-* it belongs to a different feature, domain, layer, integration, or ownership boundary
-* it performs a distinct stage such as parsing, validation, orchestration, execution, persistence, transport, UI rendering, logging, retry, cleanup, or result conversion
-* it could be replaced, reused, disabled, or extended without replacing the other behavior
+* separately owned mutable state, resources, lifecycle, persistence, or execution policy
+* a distinct feature, domain, layer, integration, or trust boundary with its own contract
+* behavior that has an independently required reason to change under current callers or requirements
+* an actual replaceable or reusable component role, rather than hypothetical future reuse
+
+Independent testability, different method names, different error cases, or distinct algorithm stages alone do not establish a second responsibility. Validation, calculation, state transitions, calls to existing collaborators, and cleanup of the same operation's resources may belong to one cohesive owner. Calling a transport, logger, or policy collaborator does not mean owning its implementation. Diagnostics that select recovery or success still cross a prohibited behavior boundary.
 
 <!-- 20260914_kpopmodder: Distinguish a companion-log call site from ownership of diagnostic infrastructure. -->
 Calling an existing logger with an already-decided value or a minimal safe
@@ -4060,7 +4084,7 @@ or recovery policy does. Apply the normal split rules to those actual owners;
 do not trigger a class/file split merely because a companion log was added,
 and do not use this clarification to retain genuinely mixed responsibilities.
 
-Common mixed-responsibility examples that require immediate separation include:
+Inspect the following combinations for independent ownership under the trigger above. A call to another owner is not ownership of its implementation; mandatory backend and layer boundaries still apply:
 
 ```text
 parsing + command execution
@@ -4075,41 +4099,41 @@ model invocation + response formatting
 logging/diagnostics + behavioral recovery policy
 ```
 
-Do not use line count as the deciding factor. A small class or file with two responsibilities must still be split.
+Do not use line count as the deciding factor. A small new unit must not own unrelated responsibilities, and a large existing unit is not automatically a redesign target.
 
 ### Mandatory Refactoring Procedure
 
-Before modifying production code, Codex must:
+When the ownership trigger above requires structural work, Codex must:
 
-1. Inspect every directly affected class, module, source file, service, manager, controller, adapter, facade, worker, handler, and package.
-2. List the responsibilities currently owned by each affected unit.
-3. Count independent responsibilities by reason-to-change, lifecycle, dependency, failure mode, and ownership boundary.
-4. If the count is two or more, stop adding behavior to that unit.
-5. Define focused replacement units with one primary responsibility each.
-6. Place the extracted units in responsibility-oriented, feature-oriented, domain-oriented, or component-oriented folders/packages.
-7. Perform the split in the same task before implementing the requested feature or fix.
+1. Inspect the affected owners and their directly relevant callers and contracts.
+2. Identify the responsibilities that the requested change actually affects.
+3. State the concrete requirement or source-proven boundary problem that requires separation.
+4. Limit the split to the affected responsibilities; do not make unrelated cleanup a prerequisite.
+5. Reuse focused existing units before creating the smallest necessary replacement units.
+6. Reuse suitable responsibility-oriented folders/packages; create a new boundary only when needed.
+7. Integrate necessary separation and the requested correction in one independently reviewable work unit. A separate refactor-first phase is not required when the smallest correct patch combines them.
 8. Update imports, exports, package declarations, registrations, dynamic loading paths, configuration references, tests, mocks, build files, and documentation affected by the split.
-9. Preserve public APIs, config keys, runtime behavior, result shapes, and compatibility paths unless the user explicitly approves a breaking change.
-10. Run the smallest relevant syntax, compile, unit, integration, and runtime-loading checks.
+9. Preserve public APIs, config keys, result shapes, compatibility paths, and behavior outside the requested change unless the user explicitly approves a breaking change.
+10. Within the active authorization, run the smallest relevant syntax, compile, unit, integration, and runtime-loading checks. Report unexecuted verification as `NOT_RUN` with its reason.
 
-The required order is:
+For required structural work, use this order:
 
 ```text
-inspect responsibilities
-    -> split mixed responsibilities
-    -> organize files into clear folders/packages
-    -> update references and compatibility paths
-    -> implement the requested behavior
-    -> validate structure and runtime behavior
+inspect the requested contract and authoritative owner
+    -> establish the need for in-scope separation
+    -> reuse or extract only the required ownership boundaries
+    -> implement the requested behavior with companion logs
+    -> update affected references and tests
+    -> validate and finish
 ```
 
-Do not implement the requested behavior first and postpone the split until later.
+Do not leave a required ownership separation incomplete. Do not make optional restructuring a prerequisite for an otherwise correct local fix.
 
 ### Folderization Is Part of the Refactor
 
-Separating classes or functions into new files is not sufficient when the files still remain in a folder that mixes unrelated responsibilities.
+A required extraction must also preserve a clear owning component and valid dependencies. Sharing a parent directory does not, by itself, prove mixed ownership or require another package.
 
-When a responsibility split creates multiple focused units, Codex must also evaluate and, when needed, reorganize the directly affected folder/package structure in the same task.
+Evaluate the placement of extracted units and reuse a suitable existing folder/package. Reorganize only the boundary required by the same in-scope separation, not unrelated neighboring code.
 
 Required outcome:
 
@@ -4123,55 +4147,43 @@ Do not leave extracted files beside unrelated code merely to avoid updating impo
 Do not create meaningless folders only to satisfy the wording of this rule.
 Every new or reorganized folder must represent a clear responsibility, feature, domain, component, integration, or lifecycle boundary.
 
-The detailed folder rules in section 29.1 remain mandatory.
+The detailed folder rules in Section 29.1 apply within this scope and Section 0's "Minimal Complete Change Rule".
 
 ### No Deferral or Avoidance
 
-The following are not valid reasons to skip or postpone the split:
+When separation is required by the ownership trigger above, a short method, a small patch, additional files, or necessary import/test updates do not excuse leaving that required boundary incomplete. Do not hide an unrelated responsibility in a generic manager, service, helper, facade, or controller.
 
-* the requested change is small
-* the current code already works
-* only a few lines are being added
-* the class or file is not yet large
-* creating more files feels inconvenient
-* imports or tests need updates
-* the user did not explicitly ask for refactoring in the current prompt
-* the task is described as a bug fix, hotfix, compatibility fix, logging change, or minor feature
-* the existing mixed-responsibility design was created by a previous Codex task
-* the split increases class count or file count
-* a generic manager, service, helper, utility, facade, or controller could hide the additional responsibility
+Conversely, a bug fix, hotfix, compatibility change, logging change, or minor feature does not automatically authorize or require unrelated refactoring. Keeping an existing structure under the Minimal Complete Change Rule is not deferral or structural incompleteness.
 
-Do not respond only with a future refactoring recommendation.
-Do not add `TODO`, `later`, `follow-up`, or backlog notes as a substitute for performing the required split.
-Do not continue expanding a mixed-responsibility unit.
+Do not substitute `TODO`, `later`, or backlog notes for separation required by the current change. Note optional structural improvements briefly only when useful; do not implement them or block the requested work on them.
 
 ### Safety and Blocker Handling
 
-The responsibility split remains mandatory even when a filesystem safety rule, move/rename confirmation, external dependency, unavailable runtime, or compatibility risk temporarily blocks completion.
+If an actually required separation is blocked by a filesystem safeguard, move/rename confirmation, external dependency, or compatibility constraint, do not bypass that safeguard. An optional structural improvement does not block a safe local correction. Unavailable runtime verification is reported separately from source implementation.
 
-When blocked, Codex must:
+When required structural work is blocked, Codex must:
 
-1. Stop adding behavior to the mixed-responsibility unit.
+1. Stop the affected work that depends on that separation; do not substitute an unsafe shortcut.
 2. Print the exact current responsibilities.
 3. Print the exact proposed files and folder/package structure.
 4. Print every exact source and destination path requiring confirmation.
 5. Explain the specific blocker.
 6. Ask only for the confirmation or missing external condition required by the safety rules.
-7. Mark the task as structurally incomplete until the split is completed.
+7. Mark the affected implementation scope incomplete only while its required separation is missing. Do not mark a permitted local patch incomplete because optional cleanup was left unchanged.
 
-A blocker may delay execution, but it must not be used to justify adding more logic to the mixed-responsibility code.
+A blocker may delay required work, but it must not justify adding an unrelated responsibility, bypassing ownership, or claiming verification that was not performed.
 
 ### Readability-First Separation Rule
 
-* Prefer more small, explicit classes and files over fewer dense classes when that makes ownership easier to understand, test, replace, and extend.
-* Do not avoid a split merely because it increases the class or file count.
-* Optimize for clear responsibility boundaries first. Performance, allocation count, and class-count efficiency are secondary unless a measured runtime problem exists or the user explicitly asks for optimization.
+* Prefer the clearest complete implementation with the least unnecessary indirection and ownership expansion.
+* Neither fewer nor more classes or files is a goal by itself. Use the number required by actual responsibilities and contracts.
+* Preserve existing performance and hot-path constraints. Do not add objects, calls, packages, or abstraction layers solely for structural preferences, or bypass ownership merely to reduce allocations.
 * Avoid clever consolidation that hides responsibilities behind generic utility classes, broad managers, overloaded facades, configurable god objects, or unrelated helper modules.
-* If there is doubt whether two behaviors are independent, prefer separation when they have different reasons to change or different failure modes.
+* When independence is uncertain, inspect current callers, state ownership, and lifecycle evidence instead of automatically creating another unit.
 
 ### Required Refactoring Report
 
-Before editing mixed-responsibility code, Codex must report:
+For structural work required by the trigger above, include the following in the existing change report. A permitted local fix does not need a separate refactoring report or approval stage:
 
 ```text
 Affected unit:
@@ -4209,7 +4221,7 @@ Validation:
 - <commands and runtime checks>
 ```
 
-After completing the change, Codex must report:
+After completing that structural work, Codex must report:
 
 ```text
 Responsibilities separated:
@@ -4262,16 +4274,16 @@ Do not only make the code work. Confirm that every affected behavior belongs to 
 
 Before adding new logic:
 
-* Check whether an existing focused unit already owns the responsibility.
-* Do not append a second responsibility to an existing class, module, file, service, manager, controller, adapter, facade, worker, or handler.
-* If the target already owns another independent responsibility, perform the mandatory split first.
+* Locate the existing authoritative owner and reuse it when it can safely implement the requested behavior.
+* Do not append a new unrelated responsibility to an existing class, module, file, service, manager, controller, adapter, facade, worker, or handler.
+* Apply Section 29's ownership trigger. Existing mixed structure alone does not require a split before a local correction.
 * Group related code by responsibility, feature, domain, component, integration, or lifecycle.
-* Evaluate folder and package placement during every production code change.
-* Create or reorganize folders when the current structure does not clearly represent ownership.
+* Confirm the owning component and reuse suitable existing folder/package placement.
+* Create or reorganize folders only for an in-scope ownership requirement or explicitly requested structural work.
 * Do not create arbitrary directory depth without a meaningful boundary.
 * Prefer clear boundaries between UI, application logic, domain/core logic, game integration, memory, audio, TTS, STT, vision, configuration, infrastructure, transport, persistence, and adapters.
 * Preserve existing behavior and compatibility while improving structure.
-* Perform the refactor in small, safe, complete steps. “Small” limits scope; it does not permit leaving two responsibilities together.
+* Complete every separation required by the current change, but do not turn optional cleanup of existing structure into a prerequisite for that change.
 
 When refactoring:
 
@@ -4286,13 +4298,13 @@ When refactoring:
 
 ## 29.1 Folder and Package Organization Rule
 
-This section applies to LAVI-owned production files and is subordinate to the scoped upstream baseline override in Section 0. Do not move or reorganize the ChatClef runtime baseline merely because a compatibility task touches it.
+This section applies to LAVI-owned production files and is subordinate to Section 0's "Minimal Complete Change Rule" and scoped upstream baseline override. Do not move or reorganize the ChatClef runtime baseline merely because a compatibility task touches it.
 
 LAVI-owned production files must be grouped into folders and packages by responsibility, feature, domain, or component boundary.
 
-Folder organization is a continuous code-structure rule. It is not a subordinate task that applies only when classes are split into separate files.
+Confirm component ownership continuously, but do not equate a file touch with a required move or package redesign.
 
-Whenever Codex creates, modifies, splits, moves, or reorganizes production code, it must evaluate whether the affected files are located in the correct folder or package. If the current structure does not clearly represent ownership and responsibility, Codex must include the necessary folder organization in the same structural change, limited to the directly affected component.
+For each new or changed file, reuse a suitable existing folder/package. New files must belong to the actual owning component. Existing files may remain in place for a safe local change; reorganize only when Section 29's ownership trigger or an explicit structural request requires it. Keep any necessary reference updates within that scope.
 
 ### Core Principle
 
@@ -4369,7 +4381,7 @@ adapters/starcraft_bridge.py
 
 ### Required Folder Evaluation
 
-During every production code change, Codex must check:
+When evaluating placement for new files or required structural work, check the applicable items below. Confirming suitable existing placement during a local edit does not require a separate report:
 
 1. Which responsibility, feature, domain, or component owns each affected file.
 2. Whether an appropriate existing folder or package already exists.
@@ -4380,13 +4392,13 @@ During every production code change, Codex must check:
 7. Whether the proposed structure would introduce circular dependencies.
 8. Whether backward-compatible import or loading paths must be preserved.
 
-Do not leave a file in an unrelated folder merely because moving it was not explicitly requested.
+Do not put new code in an unrelated folder. For existing files, perform a move only when required by the current ownership or structural scope and authorized under the safety rules; do not move a file merely because it was edited.
 
 Do not perform unrelated repository-wide folder reorganization during a small feature, bug-fix, or maintenance task.
 
 ### When Folder Organization Is Required
 
-Create or reorganize folders when one or more of the following conditions apply:
+Create or reorganize folders only for required in-scope separation or explicitly requested structural work. The following are signals to evaluate, not automatic move or refactoring triggers:
 
 * Files with different responsibilities are mixed in the same folder.
 * A new feature, domain, component, plugin, adapter, or external integration boundary is being introduced.
@@ -4398,9 +4410,9 @@ Create or reorganize folders when one or more of the following conditions apply:
 * New code would otherwise be added to an unrelated existing folder.
 * A class, function, interface, event, adapter, worker, controller, configuration module, or other production unit is being separated and needs a clearer package boundary.
 
-Folder organization must be performed when it is necessary for maintainability, portability, extensibility, or clear responsibility boundaries.
+Perform folder organization necessary to preserve required ownership, dependency, loading, or compatibility boundaries in the requested change. Broader maintainability, portability, or future-extensibility improvements are separate structural scope unless the user requested them.
 
-Do not postpone an obviously necessary folder separation merely because the current task is not explicitly named as a refactoring task.
+Do not defer a required boundary correction, but do not block a safe local fix on optional folder cleanup.
 
 ### When a New Folder Must Not Be Created
 
@@ -4711,11 +4723,13 @@ It is complete only after responsibility boundaries, references, backward compat
 
 ## 29.2 File and Type Separation Rule
 
-This section applies to LAVI-owned production code and is subordinate to the scoped upstream baseline override in Section 0. Existing vendored or upstream-derived files are not retroactive split targets unless the user explicitly requests that migration.
+This section applies to LAVI-owned production code and is subordinate to Section 0's "Minimal Complete Change Rule" and scoped upstream baseline override. Existing vendored or upstream-derived files are not retroactive split targets unless the user explicitly requests that migration.
 
 LAVI-owned production code must follow a one-primary-type-or-responsibility-per-file rule.
 
 The purpose of this rule is to keep classes, types, and modules independently maintainable without changing existing runtime behavior.
+
+Apply the language-specific separation rules below to newly introduced independent types and required structural work. A safe local change in an existing multi-type file does not require extracting unrelated types. Do not add new unrelated types to that file, invent a type merely to wrap one cohesive step, or use a private-helper exception to hide independent ownership. Existing-file migration follows the conditional procedure below.
 
 ### Common Rules
 
@@ -4735,7 +4749,7 @@ Python production code must follow the one-class-per-file rule.
 
 * A `.py` file may define at most one top-level project class.
 * If a module already contains a class, do not add a second top-level class to that module.
-* Move each additional class into its own `.py` file and import it where needed.
+* Place each new independent class in its own `.py` file and import it where needed. Move existing additional classes only within required or explicitly requested structural work.
 * Use `PascalCase` for class names and `snake_case.py` for module names.
 * Functions, constants, and type aliases that do not belong to a class may remain in a class-free module organized by responsibility.
 * A small class must still be separated when it has independent state or responsibility.
@@ -4836,7 +4850,7 @@ Java production code must follow the one-top-level-type-per-file rule.
 * Do not place multiple independent package-private top-level classes in one file.
 * Each independent `class`, `interface`, `enum`, `record`, or annotation type must have its own `.java` file.
 * A small nested class may remain inside the owning class only when it is used exclusively by that class and has no independent responsibility.
-* Move a nested class into its own file when it grows, is referenced externally, or becomes independently testable or reusable.
+* Extract a nested class when the current change gives it independent responsibility or independent external use. Size or separate testability alone does not require extraction during a local fix.
 
 Examples:
 
@@ -4874,13 +4888,13 @@ Do not use an exception to hide a second independent responsibility in an existi
 
 ### Refactoring Existing Files
 
-When an existing file contains multiple independent classes or primary types:
+When an explicit structural request or Section 29's source-proven ownership trigger requires separating an existing multi-type file, use this procedure. Mere presence of multiple types is not a split-on-touch trigger:
 
 1. List every class or primary type and its current file.
 2. Propose the exact new file paths before moving code.
 3. Split one package, component, or responsibility group at a time.
 4. Preserve public names, behavior, configuration, and compatibility paths.
-5. Move each independent class or type into its own file or matching header/source pair.
+5. Move only the independent classes or types in that required structural scope into their own files or matching header/source pairs.
 6. Update imports, includes, package declarations, namespaces, exports, build settings, and tests.
 7. Check for circular dependencies and extract shared contracts when necessary.
 8. Run syntax or compile checks and the smallest relevant tests.
@@ -4894,15 +4908,15 @@ Do not combine file separation with unrelated feature work or large architectura
 
 ## 29.3 Inheritance and Common Base Class Rule
 
-This section applies to LAVI-owned project classes and is subordinate to the scoped upstream baseline override in Section 0. Do not introduce or reshape inheritance in upstream-derived ChatClef code merely to remove duplication or satisfy a general architecture preference.
+This section applies to LAVI-owned project classes and is subordinate to Section 0's "Minimal Complete Change Rule" and scoped upstream baseline override. Do not introduce or reshape inheritance in upstream-derived ChatClef code merely to remove duplication or satisfy a general architecture preference.
 
-Inheritance must be actively considered when multiple LAVI-owned project classes share the same stable responsibility, lifecycle, validation flow, execution sequence, or error-handling template.
+Reuse a suitable existing contract or implementation first. When the requested change introduces or extends duplicated behavior with a currently required shared invariant, compare focused functions, composition, delegation, and inheritance. Similar class names or control flow alone do not justify a new hierarchy.
 
 Do not repeatedly copy the same control flow into sibling classes when the differences can be expressed as small subclass-specific steps.
 
 ### Mandatory Inheritance Evaluation Trigger
 
-Before adding or modifying a second class with behavior similar to an existing class, Codex must compare the classes and determine whether they share:
+Before introducing or extending duplicated flow that affects a current shared contract, compare the relevant implementations using the applicable items below. Merely editing a second similar class does not trigger a hierarchy redesign:
 
 * the same public operation or lifecycle
 * the same ordered execution steps
@@ -4911,15 +4925,15 @@ Before adding or modifying a second class with behavior similar to an existing c
 * the same result conversion or response-building flow
 * differences limited to an action name, endpoint, command prefix, strategy hook, payload type, or one small execution step
 
-If two or more concrete classes share a stable algorithm or control-flow skeleton, Codex must evaluate a common abstract base class before adding more duplicated logic.
+The number of similar classes is not an automatic extraction threshold. Choose the smallest implementation that preserves the actual shared invariant and compatibility. A common abstract base class is appropriate only for a source-supported stable `is-a` contract; a focused function, existing collaborator, or composition may be the better boundary.
 
-If three or more classes already repeat the same skeleton, Codex must not add another copied implementation. It must first extract or extend a common base class unless doing so would violate substitutability, create an unsafe dependency, or break compatibility.
+Do not duplicate safety-critical validation or lifecycle policy to avoid an established owner. Conversely, do not migrate unaffected sibling classes or create a new base class merely to fix a local defect in one existing implementation. When the same correction is required in multiple current consumers, keep those changes within the smallest complete verified scope.
 
-This evaluation is required even when the current duplicated methods are individually short.
+This comparison may be brief and part of the existing change report. It is not a separate document or approval stage; existing hierarchy and safety approval rules still apply.
 
 ### Preferred Inheritance Pattern: Template Method
 
-Use the Template Method pattern when the overall algorithm must remain consistent but one or more steps vary by implementation.
+When inheritance has been selected under the rules above, use the Template Method pattern when the overall algorithm must remain consistent but one or more steps vary by implementation.
 
 The base class should:
 
@@ -6512,7 +6526,7 @@ Any change in these areas should be small and carefully explained.
 Before editing:
 
 1. Verify the current directory, Git root, branch, upstream, and working tree using read-only commands.
-2. Classify each affected file as LAVI-owned, upstream-derived, vendored, generated, or third-party, and apply the highest-priority scoped rule before evaluating refactoring.
+2. Classify each affected file as LAVI-owned, upstream-derived, vendored, generated, or third-party. Apply Section 0's safety and scope rules, including the "Minimal Complete Change Rule", before selecting structural work.
 3. Inspect the relevant files, surrounding callers, fallback paths, cleanup ownership, and existing tests.
    The Fabric ChatClef container GUI-open stabilization contract uses its
    higher-priority continuous order: implement, reinforce bounded logs, then
@@ -6525,8 +6539,8 @@ Before editing:
 6. Reproduce the problem and inspect the new trace.
 7. If any material boundary, branch, state, value, callback, queue operation, external response, timeout, fallback, cleanup step, or terminal result remains unobservable, add more logs and reproduce again.
 8. Continue the logging and reproduction cycle until the exact failure mechanism is verified. No speculative behavioral patch is allowed before this point.
-9. Summarize the planned root-cause change, exact files, ownership boundaries, and compatibility that must be preserved.
-10. Make the smallest safe patch allowed by the applicable scoped rules.
+9. Summarize the requested change, exact authoritative owner and files, available evidence, and compatibility to preserve. Briefly justify any necessary extraction or new boundary in the existing report.
+10. Make the smallest complete patch allowed by the scoped rules, including required companion logs and focused tests. Reuse existing owners and packages; do not insert an automatic refactor-first phase.
 11. Show what changed.
 12. Suggest the smallest relevant test command and any required manual runtime scenario.
 13. Before any cleanup, deletion, move, rename, reset, branch deletion, force operation, or mass file operation, print the exact target list and stop for user confirmation.
@@ -6540,6 +6554,7 @@ After editing:
 5. Report every file created, modified, moved, or proposed for deletion.
 6. Do not commit or push unless asked.
 7. If cleanup candidates were found, report them only. Do not delete them automatically.
+8. Once the requested scope, required companion logging, and applicable authorized verification are complete, report remaining uncertainty and finish. Optional structural cleanup does not create another implementation or approval stage. Keep implementation, tests, build, and runtime evidence separate under Section 21.
 
 ---
 
@@ -6559,7 +6574,9 @@ When in doubt:
 * do not guess the root cause
 * add more structured diagnostic logs until the failing boundary is proven
 * accept bounded, information-dense investigation logs rather than an unsupported behavioral change
-* make smaller changes
+* make the smallest complete change at the correct existing owner
+* add structure only for a current requirement or a proven ownership boundary
+* keep required companion logs and verification in scope; do not trade them away for fewer files
 * document fragile assumptions
 * ask before changing versions
 * prioritize Windows runtime stability
