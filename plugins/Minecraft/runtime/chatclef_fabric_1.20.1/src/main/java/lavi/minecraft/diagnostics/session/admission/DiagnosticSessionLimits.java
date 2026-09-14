@@ -7,7 +7,7 @@ public final class DiagnosticSessionLimits {
     public static final int HARD_CAP = 5_000;
     //#if MC == 12001
     //20260913_kpopmodder: New behavior-boundary evidence has its own reserve; existing first/summary pools are unchanged.
-    //20260914_kpopmodder: Protect four finite FIND traces without increasing the shared 5,000-slot cap.
+    //20260914_kpopmodder: Protect one complete 128-slot FIND trace without increasing the shared 5,000-slot cap.
     public static final int ORDINARY_CEILING = 3_736;
     public static final int CRITICAL_RESERVE = 1_264;
     public static final int FIND_RESERVED_BOUNDARY_SLOTS = 128;

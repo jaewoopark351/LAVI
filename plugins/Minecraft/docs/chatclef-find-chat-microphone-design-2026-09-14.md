@@ -8,15 +8,74 @@
 Date: 2026-09-14
 
 <!-- 20260914_kpopmodder: Preserve the documentation-only evidence and link the later implementation request. -->
-## Current implementation follow-up
+## Current exploration implementation follow-up
+
+The later mob exploration implementation is recorded in the
+[authorized exploration unit](chatclef-find-exploration-contract-2026-09-14.md#authorized-implementation-unit-2026-09-14).
+Both entity modes now share bounded discovery travel and Tracker observation
+without the old 64-block cutoff; report stops intentional target-directed travel
+after discovery. Player/item/block scopes and the wire fields remain unchanged.
+Exploration verification is in progress; the earlier 236-test result below
+verifies the preceding Tracker checkpoint, not this new implementation.
+
+## Earlier FIND and Tracker implementation checkpoints (historical)
 
 The sections below preserve the earlier documentation-only review and its exact
 evidence snapshot. A later explicit user request authorizes repository-local FIND
-implementation and verification, including initial player-name search. The current
+implementation and verification, including initial player-name search. The checkpoint
 behavior, fixed bounds, conservative approach, catalog and terminal schemas are
 recorded in the [implementation contract and verification record](chatclef-find-implementation-contract-2026-09-14.md).
 Its evidence is separate from the historical `NOT_IMPLEMENTED` ledger below.
-Deployment and live Minecraft execution remain `NOT_RUN`.
+Deployment and live Minecraft execution were `NOT_RUN` in that implementation-stage
+snapshot. The later [tracker-reuse direction and implementation record](chatclef-find-tracker-reuse-direction-2026-09-14.md)
+separates read-only matching-JAR evidence from the subsequently authorized source
+change. At that preceding checkpoint, entity report consumed the tracker's read-only live client-membership
+view without its old default 64-block cutoff, cache refresh/copy or movement
+blacklist filtering. Player/item/block radii and all approach conditions remain
+unchanged; existing wire fields and scope literals are retained. Initial
+player-name support remains included; the older unresolved-player proposals below
+are historical. Source implementation is complete; targeted repository verification
+is `VERIFIED_AUTOMATED`: clean 1.20.1 production/JAR checks and the final 236/236
+focused tests passed, while the canonical multi-version build remains `FAIL` at
+five unchanged 1.21.1 errors. The follow-up is `NOT_RUNTIME_VERIFIED`. Its deployment, live acceptance,
+registered modded-mob acceptance and audible voice checks are `NOT_RUN`; the old
+miss's root cause remains `UNKNOWN`.
+
+<!-- 20260914_kpopmodder: Preserve initial no-exploration evidence while linking the new docs-only direction for mob searches. -->
+## Earlier bounded-exploration planning (historical documentation-only snapshot)
+
+The user's subsequent request is recorded in the
+[bounded-exploration contract](chatclef-find-exploration-contract-2026-09-14.md).
+At this earlier planning boundary, the extension was `DOCUMENTED / NOT_IMPLEMENTED`
+and changed the planned meaning of mob entity
+FIND in both modes: complete local observation, explore/reobserve after a completed
+miss within finite total limits, stop exploration and make its owned movement
+quiescent on discovery, revalidate, then report or explicitly approach. Under this
+direction, report allows search movement and requests no further intentional
+travel toward the selected target after discovery; automatic defense remains
+permitted and approach adds safe target proximity. Both entity modes would use the
+Tracker's client-observable discovery without a 64-block cutoff, including selected
+target revalidation. Removing entity approach's old discovery/revalidation cutoff
+is an intentional planned change; its dry flat native movement, safe proximity and
+finite approach deadline remain. Player/item/block searches retain their existing
+bounds and behavior in this first expansion. Automatic exploration uses existing
+report/approach requests, with no new command option or mode.
+
+Every local scan freezes its own observation origin; the original admission origin
+remains the total-range anchor. Selection proves nearest only in the completed
+current local scope, not throughout all explored or unobserved areas. The finite
+overall deadline and cumulative budgets must survive defensive preemption and
+cannot reset on each reobservation; STOP/root replacement retain priority. Numeric
+defaults are `PROPOSED`, to be frozen in a concrete contract before implementation.
+LAVI chat and final trusted microphone requests must have equivalent intent and
+verified Korean result meaning. This revision changes no source or wire schema;
+the implemented Tracker's 236-test result and old runtime records are not
+exploration acceptance. Initial no-exploration statements below remain historical.
+
+The numbered sections below preserve the initial design-review snapshot and its
+then-unresolved decisions. Their no-exploration statements and implementation
+ledgers do not describe the later source. The current exploration unit above
+supersedes changed mob behavior and freezes its implementation limits.
 
 ## 1. 상태, 근거, 권한
 

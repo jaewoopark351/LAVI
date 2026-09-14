@@ -31,12 +31,26 @@ class KoreanFindTerminalRenderer:
             if status == "completed" and result == "NOT_OBSERVED_IN_LOADED_SCOPE" and not terminal.find_satisfied:
                 return f"불러온 범위에서는 {subject} 확인하지 못했어"
             if status == "failed":
+                if result == "UNREACHABLE":
+                    if terminal.reason == "post_discovery_approach_unreachable":
+                        return "대상을 발견했지만 허용된 이동 방식으로 가까이 갈 수는 없었어"
+                    if terminal.reason in {"exploration_route_unavailable", "exploration_no_progress"}:
+                        return "탐험을 계속할 수 없어서 대상을 찾지는 못했어"
+                    return "허용된 이동 방식으로 가까이 갈 수는 없었어"
+                if result == "TIMEOUT":
+                    if terminal.reason == "exploration_step_deadline_exhausted":
+                        return "탐험 이동의 시간 한도에 도달해서 탐색을 계속하지는 못했어"
+                    if terminal.reason == "native_approach_step_deadline_exhausted":
+                        return "접근 이동의 시간 한도에 도달해서 가까이 도착하지는 못했어"
+                    if terminal.reason == "discovery_deadline_exhausted":
+                        return "찾기 시간 한도에 도달해서 탐색을 완료하지는 못했어"
+                    if terminal.reason == "approach_deadline_exhausted":
+                        return "접근 시간 한도에 도달해서 가까이 도착하지는 못했어"
+                    return "찾기 작업의 시간 한도에 도달해서 요청을 완료하지는 못했어"
                 return {
                     "OBSERVATION_BOUNDS_EXHAUSTED": "탐색 한도에 도달해서 전부 확인하지는 못했어",
                     "TARGET_LOST": "확인하던 대상을 지금은 확인할 수 없어",
                     "CANDIDATE_NOT_REVALIDATABLE": "확인하던 대상을 지금은 확인할 수 없어",
-                    "UNREACHABLE": "대상을 발견했지만 허용된 이동 방식으로 가까이 갈 수는 없었어",
-                    "TIMEOUT": "시간 한도 안에 대상에게 접근하지 못했어",
                     "INVALID_TARGET": "찾을 대상을 확인하지 못했어",
                     "INTERNAL_ERROR": "대상을 찾는 중 오류가 발생했어",
                     "INTERRUPTED": "대상을 찾는 작업이 중단됐어",

@@ -148,9 +148,14 @@ public final class DiagnosticSessionAdmissionAuthority {
     public synchronized List<DiagnosticAdmissionToken> reserveTrace(
             DiagnosticEventFamily family, int slots, boolean modeEligible) {
         Objects.requireNonNull(family, "family");
-        if (slots < 1 || slots > 32 || family.tier() != DiagnosticAdmissionTier.CRITICAL
+        int maximumTraceSlots = 32;
+        //#if MC == 12001
+        //20260914_kpopmodder: One complete FIND trace uses its existing 128-slot quota; other trace request limits are unchanged.
+        if (family == DiagnosticEventFamily.FIND_RESERVED_BOUNDARY) maximumTraceSlots = DiagnosticSessionLimits.FIND_RESERVED_BOUNDARY_SLOTS;
+        //#endif
+        if (slots < 1 || slots > maximumTraceSlots || family.tier() != DiagnosticAdmissionTier.CRITICAL
                 || family.reservedInternalFamily() || family.admissionUnitSlots() != 1) {
-            throw new IllegalArgumentException("A deferred trace requires 1..32 single-record critical slots.");
+            throw new IllegalArgumentException("A deferred trace requires a family-bounded positive number of single-record critical slots.");
         }
         if (!modeEligible) return List.of();
         MutableFamilyCounters counters = familyCounters.get(family);

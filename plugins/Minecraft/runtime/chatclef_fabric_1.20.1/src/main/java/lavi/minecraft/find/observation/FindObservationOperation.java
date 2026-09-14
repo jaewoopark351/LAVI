@@ -52,7 +52,9 @@
 //$$                 "canonicalTargetId", request.canonicalTargetId(),
 //$$                 "playerIdentityDigest", request.kind().equals("player") ? MinecraftFindObservationPort.digest(request.playerName()) : "",
 //$$                 "catalogDigest", request.catalogDigest(), "resourceGeneration", request.resourceGeneration(),
-//$$                 "radius", request.kind().equals("block") ? 32 : 64, "elapsedBudgetMillis", 5000,
+//$$                 "radius", request.kind().equals("entity") && request.mode().equals("report") ? "NOT_APPLIED" : request.kind().equals("block") ? 32 : 64,
+//$$                 "distancePolicy", request.kind().equals("entity") && request.mode().equals("report") ? "CLIENT_OBSERVABLE_NO_RADIUS" : "FROZEN_ORIGIN_RADIUS",
+//$$                 "originX", binding.x(), "originY", binding.y(), "originZ", binding.z(), "elapsedBudgetMillis", 5000,
 //$$                 "visitLimit", cursor == null ? ENTITY_VISIT_LIMIT : BLOCK_VISIT_LIMIT,
 //$$                 "visitedBefore", 0, "visitedDelta", 0, "visitedAfter", visited,
 //$$                 "matchedBefore", 0, "matchedDelta", 0, "matchedAfter", matched);
@@ -69,9 +71,13 @@
 //$$         if (expired()) { commit("OBSERVATION_BOUNDS_EXHAUSTED", false, "elapsed_budget_exhausted", null); return; }
 //$$         if (!observationComplete) {
 //$$             if (cursor == null) {
-//$$                 FindObservationPort.EntityScan scan = port.scanEntities(request, binding, ENTITY_VISIT_LIMIT);
+//$$                 FindObservationPort.EntityScan scan = port.scanEntities(request, binding, ENTITY_VISIT_LIMIT, () -> !expired(), log);
 //$$                 visited = scan.visited(); matched = scan.matched(); nearest = scan.nearest();
-//$$                 if (!scan.complete()) { commit("OBSERVATION_BOUNDS_EXHAUSTED", false, "entity_visit_limit_exhausted", null); return; }
+//$$                 if (!scan.complete()) {
+//$$                     String result = scan.reason().equals("entity_read_failed") ? "INTERNAL_ERROR"
+//$$                             : scan.reason().equals("world_or_player_binding_changed") ? "INTERRUPTED" : "OBSERVATION_BOUNDS_EXHAUSTED";
+//$$                     commit(result, false, scan.reason(), null); return;
+//$$                 }
 //$$                 observationComplete = true;
 //$$             } else {
 //$$                 long tickStarted = clock.getAsLong();
@@ -94,7 +100,7 @@
 //$$         }
 //$$         if (expired()) { commit("OBSERVATION_BOUNDS_EXHAUSTED", false, "elapsed_budget_exhausted", null); return; }
 //$$         if (nearest == null) { commit("NOT_OBSERVED_IN_LOADED_SCOPE", false, "complete_loaded_scope_no_match", null); return; }
-//$$         FindCandidate current = port.revalidate(request, binding, nearest);
+//$$         FindCandidate current = port.revalidate(request, binding, nearest, log);
 //$$         if (!port.resourceBindingMatches(request)) { commit("INTERRUPTED", false, "catalog_resource_binding_changed", null); return; }
 //$$         if (expired()) { commit("OBSERVATION_BOUNDS_EXHAUSTED", false, "elapsed_budget_exhausted", null); return; }
 //$$         if (current == null) { commit("TARGET_LOST", false, "selected_candidate_not_revalidated", null); return; }

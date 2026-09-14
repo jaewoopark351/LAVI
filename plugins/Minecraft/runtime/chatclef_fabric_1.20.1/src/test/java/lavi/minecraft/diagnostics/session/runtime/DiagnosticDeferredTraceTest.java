@@ -11,6 +11,34 @@ import static org.junit.jupiter.api.Assertions.*;
 
 //20260914_kpopmodder: Verify deferred terminal protection, atomic exclusion, OFF settlement and foreign-session rejection.
 class DiagnosticDeferredTraceTest {
+    @Test void complete128SlotFindTraceIsAtomicAfterOrdinarySaturationAndRetirementDoesNotRefund() {
+        var runtime = runtime(DiagnosticOutputMode.BOUNDARY);
+        for (int index = 0; index <= DiagnosticSessionLimits.ORDINARY_CEILING; index++)
+            runtime.dispatch(DiagnosticEventFamily.ORDINARY_DETAIL, "DETAIL", () -> {}, ignored -> {});
+        var trace = runtime.reserveTrace(DiagnosticEventFamily.FIND_RESERVED_BOUNDARY, 128);
+        assertEquals(128, trace.size());
+        long admitted = runtime.snapshot().admittedSlots();
+        assertTrue(runtime.reserveTrace(DiagnosticEventFamily.FIND_RESERVED_BOUNDARY, 1).isEmpty());
+        assertEquals(admitted, runtime.snapshot().admittedSlots());
+        for (var token : trace) runtime.abandonReserved(token);
+        assertTrue(runtime.reserveTrace(DiagnosticEventFamily.FIND_RESERVED_BOUNDARY, 128).isEmpty());
+        assertEquals(admitted, runtime.snapshot().admittedSlots());
+        assertEquals(128, runtime.snapshot().family(DiagnosticEventFamily.FIND_RESERVED_BOUNDARY).admittedSlots());
+        assertEquals(0, runtime.snapshot().emissionPending());
+        assertEquals(5000, DiagnosticSessionLimits.HARD_CAP);
+        assertTrue(runtime.snapshot().admittedSlots() <= 5000);
+    }
+    @Test void findRequest128ExceptionDoesNotExpandOtherFamilyTraceLimitsOrBypassExistingGuardrails() {
+        var runtime = runtime(DiagnosticOutputMode.BOUNDARY);
+        assertThrows(IllegalArgumentException.class, () -> runtime.reserveTrace(DiagnosticEventFamily.RESOURCE_MINING_FIRST, 33));
+        assertThrows(IllegalArgumentException.class, () -> runtime.reserveTrace(DiagnosticEventFamily.FIND_RESERVED_BOUNDARY, 129));
+        assertThrows(IllegalArgumentException.class, () -> runtime.reserveTrace(DiagnosticEventFamily.CANONICAL_CAP, 1));
+        assertThrows(IllegalArgumentException.class, () -> runtime.reserveTrace(DiagnosticEventFamily.ABNORMAL_STORE_TERMINAL, 1));
+        assertEquals(0, runtime.snapshot().admittedSlots());
+        var ordinarySized = runtime.reserveTrace(DiagnosticEventFamily.RESOURCE_MINING_FIRST, 32);
+        assertEquals(32, ordinarySized.size());
+        for (var token : ordinarySized) runtime.abandonReserved(token);
+    }
     private DiagnosticSessionRuntime runtime(DiagnosticOutputMode mode) {
         return new DiagnosticSessionRuntime(new DiagnosticModeController(mode),
                 new DiagnosticSessionAdmissionAuthority("find-test"));

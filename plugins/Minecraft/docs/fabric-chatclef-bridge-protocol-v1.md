@@ -673,6 +673,81 @@ late resource-binding invalidation produces cautious UNKNOWN without coordinates
 
 Exact page fields, Unicode rules, digests, caps, target separation and result/status
 matrix are defined in the [FIND implementation contract](chatclef-find-implementation-contract-2026-09-14.md).
+The later [tracker-reuse direction and implementation record](chatclef-find-tracker-reuse-direction-2026-09-14.md)
+records the subsequently authorized entity-report source change without modifying
+these wire profiles. Entity report borrows current client membership through a
+read-only tracker getter without the old default 64-block cutoff; player/item/block
+radii and all approach conditions remain unchanged. Source implementation is
+complete; targeted repository verification is `VERIFIED_AUTOMATED`: clean 1.20.1
+production/JAR checks and final 236/236 focused tests passed. The canonical
+multi-version build remains `FAIL` at five unchanged 1.21.1 errors. This follow-up
+is `NOT_RUNTIME_VERIFIED`; deployment and live acceptance of this change are `NOT_RUN`.
+Partial or exhausted observation remains unsatisfied without candidate coordinates.
+No exploration mode or optional-radius field is added.
+Existing scope literals remain `loaded_entities`, `loaded_players`,
+`loaded_dropped_items` and `loaded_blocks`. The closed payload has no radius field;
+the entity-report distance policy belongs to selection, live revalidation and owner
+logs. Do not introduce a new scope literal or radius sentinel for this direction.
 These values belong to Fabric ChatClef; no Forge/MineMind values, session state or
 shared implementation are introduced. The v1 envelope and existing lifecycle
 owners are retained.
+
+<!-- 20260914_kpopmodder: Record the planned exploration semantic change without editing the closed wire profiles. -->
+### Earlier bounded-exploration planning checkpoint
+
+The [bounded-exploration contract](chatclef-find-exploration-contract-2026-09-14.md)
+was `NOT_IMPLEMENTED` at that documentation-only checkpoint. It proposed local observation, bounded exploration and
+reobservation on a completed miss for mob entity FIND in both report and approach
+modes. Discovery must stop exploration, make its owned movement quiescent and
+revalidate the target before position report or explicitly requested safe approach.
+Report would permit search movement but request no further intentional travel
+toward the selected target after discovery; automatic defense remains permitted.
+Both entity modes would share Tracker client-observable discovery without a
+64-block discovery or selected-target revalidation cutoff. This planned removal
+of entity approach's old cutoff preserves its dry flat native movement and finite
+safety/deadline rules. Player/item/block searches retain their existing bounds and
+behavior in this first expansion. Each local scan freezes its own origin, while the original admission
+origin anchors total range; nearest applies to the completed current local scope.
+
+Automatic entity exploration uses the existing report/approach requests.
+This documentation-only revision adds no command argument, mode, scope literal,
+radius field, payload key or profile version. Later implementation must reconcile
+the admitted intent and result meaning with the closed validators and equivalent
+Korean UI/TTS; it cannot bypass the schemas or claim success from an incomplete
+local scan. Numeric defaults remain `PROPOSED` until a concrete implementation
+contract freezes them. Tracker build/test evidence and historical matching-JAR
+logs are separate from exploration verification; none of this new behavior has
+been built, deployed or executed by this documentation task.
+
+The reviewed exploration contract requires a closed reason/mode/result matrix
+for the new mob parent. Current v1 `reason` is bounded text, and an unsatisfied
+payload has no independent discovery/phase proof. The producer must freeze and
+validate its authoritative terminal-phase/discovery snapshot before projection;
+the receiver validates known combinations and cannot infer discovery from an
+arbitrary reason or `UNREACHABLE`. Preserve explicit legacy/non-mob compatibility
+without claiming new phase facts. This uses the existing field set, but requires
+later validator and native/Python Korean-renderer changes together.
+
+An existing request `deadline_ms` remains authoritative even when earlier than
+the proposed parent budget. The bridge's deadline terminal can indicate that
+the Task may still be running; it is neither exploration cleanup evidence nor
+matching natural completion for a FIND profile. Do not rewrite that external
+terminal or synthesize a later FIND success. The parent must stop admitting new
+work and use existing cautious evidence-gap handling when cleanup/completion
+cannot be verified; exact owned retirement remains a later implementation task.
+
+The later authorized exploration implementation supplies this retirement at the
+authoritative bridge deadline and native root/world lifetime boundaries. It
+fences only operation-owned work and releases exact leases, independently of
+diagnostic trace closure. A new mob terminal carries an internal same-operation,
+same-request, same-root phase snapshot; the producer rejects unverified success
+or phase reasons before projecting the unchanged v1 fields. The receiver accepts
+only the closed reason/mode/result combinations, with explicit legacy failure
+compatibility. Pre-discovery exploration failure and post-discovery approach
+failure produce different Korean messages through the same UI/TTS result route.
+See the exploration contract's authorized implementation unit for frozen limits
+and the added route-work and native step-deadline reasons. Its
+[final verification record](chatclef-find-exploration-contract-2026-09-14.md#final-exploration-verification-2026-09-14)
+for 309/309 Java tests, the successful forced clean 1.20.1 artifact, Python
+UI/TTS regression evidence and distinct canonical-build/live-runtime limitations.
+Source/test/build evidence and deployment/live acceptance remain separate.

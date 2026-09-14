@@ -1,11 +1,144 @@
 <!-- 20260914_kpopmodder: Record the user-authorized FIND implementation unit separately from the earlier documentation-only review. -->
 # Fabric ChatClef FIND implementation contract
 
-The current user request authorizes repository-local implementation, companion logs, focused tests and the canonical clean build. It explicitly requires focused files and packages when code has two independent responsibilities. Player-name search is included from the initial release by the user's explicit reply. Earlier documentation-only evidence remains historical.
+The implementation request recorded here authorized repository-local implementation, companion logs, focused tests and the canonical clean build. It explicitly required focused files and packages when code has two independent responsibilities. Player-name search is included from the initial release by the user's explicit reply. Earlier documentation-only evidence remains historical.
 
-Repository: `C:\Vtuber_Souorce_Code\LAVI`; comparison HEAD: `2ecc1283a1e5cf48357dd0e263c2526e7bcb64e2`; branch: `minecraft-plugin-fix/alto-clef-infinite-loop`. Existing dirty README and FIND design/pre-change documents are preserved. No deployment, external-instance copy, live-world execution, process control, cache mutation, commit or push is authorized in this unit.
+Initial implementation checkpoint: repository `C:\Vtuber_Souorce_Code\LAVI`; comparison HEAD `2ecc1283a1e5cf48357dd0e263c2526e7bcb64e2`; branch `minecraft-plugin-fix/alto-clef-infinite-loop`. Existing dirty README and FIND design/pre-change documents were preserved. No deployment, external-instance copy, live-world execution, process control, cache mutation, commit or push was authorized in that unit. Later follow-ups retain their own checkpoint identities below.
 
-## Frozen behavior
+<!-- 20260914_kpopmodder: Record the separately authorized tracker implementation without replacing initial checkpoint evidence. -->
+## Exploration implementation follow-up
+
+The later implementation request adds a single mob FIND parent with bounded
+loaded-waypoint exploration and periodic live Tracker observations. Both modes
+discover without a 64-block cutoff, then release exploration resources and
+revalidate the same target before reporting or safe approach. The exact frozen
+limits, independent owners, preservation snapshot and dry-flat-terrain limitation
+are recorded in the [exploration implementation unit](chatclef-find-exploration-contract-2026-09-14.md#authorized-implementation-unit-2026-09-14).
+Player, item and block searches retain their preceding paths. New parent clocks
+start at Java submission; owned retirement is separate from diagnostic closure.
+Final forced clean 1.20.1 verification and 309/309 focused Java tests passed.
+The Python Minecraft suite passed 1,354 tests and 14,407 subtests, with two skips.
+The canonical multiversion build still fails at five unchanged 1.21.1 errors.
+The [final exploration verification record](chatclef-find-exploration-contract-2026-09-14.md#final-exploration-verification-2026-09-14)
+contains the current source manifest, fresh JAR identity and distinct limitations.
+Deployment and live acceptance are `NOT_RUN`.
+
+## Earlier exploration planning: documentation only
+
+The user's later documentation request records this new mob FIND flow in the
+[FIND exploration contract](chatclef-find-exploration-contract-2026-09-14.md):
+complete local observation; if absent, bounded exploration and reobservation;
+when found, stop exploration and prove owned cleanup; then revalidate the same
+target and report coordinates or perform the explicitly requested approach.
+This extension is `DOCUMENTED / NOT_IMPLEMENTED`. No source, test, configuration,
+build or live-game action is part of this documentation update.
+
+For the future entity extension, omitted mode and `report` permit discovery
+travel but no further intentional travel toward the discovered target;
+`approach` permits the later supported safe movement. Both entity modes use
+Tracker client-observable discovery without a default 64-block cutoff, including
+same-target revalidation. This intentionally supersedes the existing entity
+approach observation cutoff; it does not widen approach path, planning or safe
+range limits. Player/item local64 and block32 scope remain unchanged and do not
+gain exploration in this first extension.
+
+A single parent retains the original root, binding, cumulative limits and final
+immutable result. Each new completed local scan ranks from its frozen current
+origin; the original admission origin bounds total exploration displacement.
+Nearest means nearest in the first fully completed local scan with a match,
+not globally nearest. Partial scans cannot establish discovery. An internal
+miss cannot emit a command terminal or close the parent's diagnostic trace.
+Defense/STOP, owned child/path/input cleanup and strict Korean UI/TTS projection
+follow the linked contract. Its numerical limits are proposed design defaults,
+not current constants or live acceptance.
+
+The reviewed extension binds one monotonic clock at accepted Java user-root
+submission. Discovery time includes exploration cleanup and live revalidation;
+latching a candidate before expiry does not authorize a later expired handoff.
+The 120-second maximum is retained as a new post-cleanup approach phase budget,
+an intentional change from the current operation's first-start clock. Freeze a
+separate planning origin at that validated handoff without changing parent
+identity, scan ranking evidence or cumulative budgets. Sampled movement is a
+measured limit, not proof of actual route length. The linked closed phase-reason
+matrix and authoritative terminal/discovery snapshot must accompany strict
+projection and Korean rendering; arbitrary reason text cannot establish finding.
+Unproven cleanup cannot manufacture matching completion or a satisfied result.
+
+The source and evidence sections below describe the preceding implementation.
+Their no-exploration/no-report-movement/initial-approach requirements remain
+accurate for that source; they are superseded only for the future entity
+extension. Existing automated tests and packaged identity are not exploration
+verification. The recorded zero-match miss's cause remains `UNKNOWN`.
+
+## Preceding source: tracker implementation follow-up
+
+The user subsequently authorized implementation of the
+[tracker-reuse direction and implementation record](chatclef-find-tracker-reuse-direction-2026-09-14.md).
+Source implementation is complete; targeted repository verification is
+`VERIFIED_AUTOMATED`, and this follow-up is `NOT_RUNTIME_VERIFIED`. The initial checkpoint
+behavior and verification snapshots below remain historical. The recorded
+72-visit/zero-match villager miss's root cause remains `UNKNOWN`; this source change
+does not retroactively establish it.
+
+Mob searches with `target_kind=entity` and `mode=report`, including omitted mode,
+now obtain live client-world membership through
+[EntityTracker.getClientObservedEntities](../runtime/chatclef_fabric_1.20.1/src/main/java/adris/altoclef/trackers/EntityTracker.java).
+This small, read-only client-thread getter borrows the current iterable; it does
+not refresh or copy tracker caches, query exact runtime-class buckets, or apply or
+mutate the movement blacklist. FIND owns exact registered mob-ID matching,
+frozen-origin nearest ranking and stable ties. Initial selection and final live
+revalidation no longer apply a default 64-block cutoff to entity report.
+
+Player/item reports retain their 64-block radius, blocks retain 32, and all
+approach conditions and observation radii remain unchanged. A report beyond 64
+blocks does not supply or expand a later approach target. No new exploration,
+acquisition, combat or report movement is added. Existing `loaded_entities` and
+the other wire scope literals, field sets and profile versions are unchanged;
+radius is an internal observation policy and owner-log value, not a wire field.
+
+The existing port delegates entity and block observations to focused
+`observation/entity` and `observation/block` owners. Entity iteration checks the
+original five-second monotonic deadline and caps actual visits at 4,096. Complete
+scope requires exhausting one synchronous live iterable and revalidating the
+binding; partial/exhausted scans remain unsatisfied without coordinates. These
+checks do not promise interruption of an individual engine call or a hard
+per-client-tick time bound. FIND initiates no tracker refresh or membership copy.
+Bounded companion logs record the no-radius policy, frozen origin, query outcome,
+filter counts, selected candidate and live revalidation; diagnostics remain
+observational. Their implementation, automated output verification and actual
+Minecraft output are separate evidence in the linked follow-up record.
+
+Final targeted verification: the 1.20.1 clean production compilation, remap and
+access-widener checks succeeded in
+[the clean production run](../../../logs/find_verification_20260914_212014_166/fabric12001.log).
+That invocation ended in failure solely at five test-fixture/assertion failures;
+it is not reported as a successful combined build/test invocation. After exact
+test-only corrections, [the final focused run](../../../logs/find_verification_20260914_212424_425/fabric12001-focused.log)
+passed with 236 tests started and successful, zero failed/aborted/skipped and zero
+container failures, in 43 seconds. The final focused run is incremental test
+verification, not a replacement for the separate clean production evidence. All
+12 changed production-file hashes match the clean-run source manifest.
+
+The clean 1.20.1 JAR is 9,014,621 bytes with SHA-256
+`99D97BF3FA6E82DCFB596C269B92F3C14520D123F198227CB1D894BFB3B3B261`.
+Its 49 FIND classes have Java class version61 and contain no test artifacts;
+packaged bytecode confirms the live Tracker getter. This establishes packaged
+identity and targeted automated verification, not runtime execution. The earlier
+[canonical multi-version clean build](../../../logs/find_verification_20260914_211321_244/canonical.log)
+remains `FAIL` at the same five unchanged 1.21.1 source errors. These log links are
+local Git-ignored evidence. Deployment, live acceptance, registered modded-mob
+acceptance and audible voice checks for this change are `NOT_RUN`.
+
+The subsequently requested external-PowerShell build is recorded separately in
+[the 21:30 build report](../../../logs/find_verification_20260914_213023_643/build-report.md).
+Its canonical multi-version command failed with the same five unchanged 1.21.1
+errors; its forced clean 1.20.1 compilation/remap/validation and focused suite
+passed together with 236 started and successful, zero failures/aborts/skips or
+container failures, and 36 executed tasks. The JAR hash and size above are
+unchanged. This later clean acceptance replaces neither the earlier failed-run
+transcripts nor the separate runtime evidence, and does not cover exploration.
+
+## Initial checkpoint frozen behavior (historical)
 
 `@find <entity|block|item|player> <namespace:id|playerName> [report|approach]` defaults to `report`. Chat and final trusted microphone text compile through the existing admission/lifecycle path. FIND rejection never falls through to GET, mining or acquisition. Literal player names use the existing 3..16 ASCII name contract.
 
@@ -99,9 +232,14 @@ resource/session generation and reason rather than interpreting an omitted
 diagnostic trace as proof that the Task never ran. OFF/cap-excluded traces retain
 bounded truthful terminal evidence but do not promise a complete detailed trace.
 
-## Final repository verification, 2026-09-14
+## Implementation-stage repository verification, 2026-09-14
 
-Source implementation is complete in the current worktree. No commit, push,
+This section preserves the initial implementation-stage results and action scope,
+before the Tracker and bounded-exploration follow-ups. Later
+read-only runtime evidence is linked above; it does not replace these build/test
+results or establish successful live acceptance.
+
+Source implementation was complete at that initial checkpoint. No commit, push,
 external-instance copy or live-world action was performed.
 
 | Evidence | Actual result |

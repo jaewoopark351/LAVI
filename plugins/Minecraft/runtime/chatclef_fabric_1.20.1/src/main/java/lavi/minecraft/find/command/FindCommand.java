@@ -8,6 +8,7 @@
 //$$ import adris.altoclef.commandsystem.CommandException;
 //$$ import lavi.minecraft.find.approach.task.FindApproachTask;
 //$$ import lavi.minecraft.find.observation.task.FindObservationTask;
+//$$ import lavi.minecraft.find.exploration.task.FindExplorationTask;
 //$$ import adris.altoclef.tasksystem.Task;
 //$$ import lavi.minecraft.find.result.FindTaskResultSource;
 
@@ -21,7 +22,9 @@
 //$$     @Override protected void call(AltoClef mod, ArgParser parser) throws CommandException {
 //$$         FindNativeAdmission.requireAvailable(mod);
 //$$         var request = FindRequestResolver.resolve(parser.get(String.class), parser.get(String.class), parser.get(String.class));
-//$$         Task task = request.mode().equals("approach") ? new FindApproachTask(request) : new FindObservationTask(request);
+//$$         long admittedNanos = System.nanoTime();
+//$$         Task task = request.kind().equals("entity") ? new FindExplorationTask(request, admittedNanos)
+//$$                 : request.mode().equals("approach") ? new FindApproachTask(request) : new FindObservationTask(request);
 //$$         nativeObserver.prepare(task, (FindTaskResultSource) task, mod);
 //$$         boolean submitted = false;
 //$$         try {

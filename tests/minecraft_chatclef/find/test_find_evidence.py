@@ -16,6 +16,61 @@ from .fixtures import context, data, translation
 
 
 class FindEvidenceTests(unittest.TestCase):
+    def test_exploration_reason_matrix_rejects_unknown_wrong_mode_result_kind_and_extra_phase_keys(self):
+        for mode in ("report", "approach"):
+            for result, reason in (("UNREACHABLE", "exploration_no_progress"),
+                    ("TIMEOUT", "discovery_deadline_exhausted"),
+                    ("OBSERVATION_BOUNDS_EXHAUSTED", "scan_count_limit_exhausted"),
+                    ("OBSERVATION_BOUNDS_EXHAUSTED", "exploration_route_work_limit_exhausted"),
+                    ("TIMEOUT", "exploration_step_deadline_exhausted"),
+                    ("INTERNAL_ERROR", "owned_cleanup_failed")):
+                payload = data(result, mode=mode)
+                payload["effect_payload"]["reason"] = reason
+                self.assertIsNotNone(FindTerminalPayload.from_data(payload))
+                payload["effect_payload"]["reason"] = "unknown_exploration_claim"
+                if result != "INTERNAL_ERROR":
+                    self.assertIsNone(FindTerminalPayload.from_data(payload))
+        for mode, kind, reason in (("report", "entity", "post_discovery_approach_unreachable"),
+                ("report", "entity", "approach_deadline_exhausted"),
+                ("approach", "block", "post_discovery_approach_unreachable")):
+            payload = data("TIMEOUT" if "deadline" in reason else "UNREACHABLE", mode=mode, kind=kind)
+            payload["effect_payload"]["reason"] = reason
+            self.assertIsNone(FindTerminalPayload.from_data(payload))
+        payload = data("UNREACHABLE", mode="approach")
+        payload["effect_payload"].update(reason="post_discovery_approach_unreachable", discovery_verified=True)
+        self.assertIsNone(FindTerminalPayload.from_data(payload))  # Internal phase proof never adds wire keys.
+
+    def test_exploration_and_post_discovery_failures_have_distinct_cautious_korean_for_both_input_sources(self):
+        from plugins.Minecraft.fabric.chatclef.response.command_lifecycle.terminal.find.korean_find_terminal_renderer import KoreanFindTerminalRenderer
+        for source in ("lavi_chat_ui", "voice_input_final"):
+            for mode, result, reason, phrase, forbidden in (
+                    ("report", "UNREACHABLE", "exploration_route_unavailable", "탐험을 계속할 수 없어서", "발견했지만"),
+                    ("approach", "UNREACHABLE", "post_discovery_approach_unreachable", "발견했지만", "찾았어"),
+                    ("report", "TIMEOUT", "discovery_deadline_exhausted", "탐색을 완료하지는", "접근 시간"),
+                    ("approach", "TIMEOUT", "approach_deadline_exhausted", "접근 시간", "찾았어"),
+                    ("report", "TIMEOUT", "exploration_step_deadline_exhausted", "탐험 이동의", "발견"),
+                    ("approach", "TIMEOUT", "native_approach_step_deadline_exhausted", "접근 이동의", "찾았어"),
+                    ("approach", "TIMEOUT", "parent_deadline_exhausted", "요청을 완료하지는", "발견")):
+                current = context(source, "마을 주민 찾아서 가까이 가줘" if mode == "approach" else "마을 주민 찾아줘")
+                payload = data(result, mode=mode)
+                payload["effect_payload"]["reason"] = reason
+                decision = self.evaluate(payload, current=current, status="failed")
+                self.assertIsNotNone(decision.failure_projection)
+                text = KoreanFindTerminalRenderer().render(current.descriptor, status="failed", verified=False,
+                    failure=decision.failure_projection)
+                self.assertIn(phrase, text)
+                self.assertNotIn(forbidden, text)
+                self.assertNotIn("X ", text)
+
+    def test_legacy_exception_names_remain_cautious_failures_and_never_new_phase_evidence(self):
+        for kind in ("entity", "block", "player", "item"):
+            payload = data("INTERNAL_ERROR", kind=kind)
+            payload["effect_payload"]["reason"] = "CustomReadFailure"
+            self.assertIsNotNone(FindTerminalPayload.from_data(payload))
+        payload = data("FOUND_AND_REPORTED")
+        payload["effect_payload"]["reason"] = "CustomReadFailure"
+        self.assertIsNone(FindTerminalPayload.from_data(payload))
+
     def evaluate(self, payload=None, *, current=None, status="completed", request="find-request"):
         result = CommandResultDTO(request_id=request, status=status, ok=status == "completed",
             error_code="internal_error" if status == "failed" else None, data=data() if payload is None else payload)

@@ -167,12 +167,58 @@ requirements remain governed by the coverage contract. At the 2026-09-11 audit, 
 <!-- 20260914_kpopmodder: Link current FIND implementation separately from the historical documentation-only review. -->
 For the historical FIND design review, see
 [FIND Chat/final-microphone design](docs/chatclef-find-chat-microphone-design-2026-09-14.md).
-The [FIND implementation contract and verification record](docs/chatclef-find-implementation-contract-2026-09-14.md)
-defines report by default, explicit conservative approach, initial exact player-name
+The initial [FIND implementation contract and verification record](docs/chatclef-find-implementation-contract-2026-09-14.md)
+defined report by default, explicit conservative approach, initial exact player-name
 search, dropped-item report, fixed search limits, and closed catalog/result fields.
-An absent target does not trigger exploration. Inventory, container-content and
+In that initial release an absent target did not trigger exploration. Inventory, container-content and
 acquisition queries are separate extensions. Existing automatic defense and
-survival priorities remain. Deployment and live Minecraft acceptance are `NOT_RUN`.
+survival priorities remain. Deployment and live Minecraft execution were `NOT_RUN`
+in the implementation-stage record. The later
+[FIND tracker-reuse direction and implementation record](docs/chatclef-find-tracker-reuse-direction-2026-09-14.md)
+separates read-only matching-JAR execution with 72 visits and zero matches from the
+subsequently authorized source change. That preceding entity report implementation borrows current client
+membership through a read-only tracker getter without a default 64-block cutoff,
+cache refresh/copy or movement blacklist filtering. Player/item/block radii, all
+approach conditions and the closed wire schemas were unchanged by that follow-up. Its source
+implementation is complete and its own targeted repository verification is
+`VERIFIED_AUTOMATED`: clean 1.20.1 production/JAR checks and final 236/236 focused
+tests passed. The canonical multi-version build remains `FAIL` at five unchanged
+1.21.1 errors. This change is `NOT_RUNTIME_VERIFIED`. Deployment, live acceptance, registered
+modded-mob acceptance and audible voice checks are `NOT_RUN`. The recorded miss's
+exact cause remains `UNKNOWN`.
+
+<!-- 20260914_kpopmodder: Link the subsequently requested bounded-exploration direction separately from implemented Tracker evidence. -->
+The later [FIND bounded-exploration contract](docs/chatclef-find-exploration-contract-2026-09-14.md)
+records the implemented bounded follow-up (`VERIFIED_AUTOMATED / NOT_RUNTIME_VERIFIED`): for mob
+entity FIND in both report and approach modes, complete a local observation, then
+explore and observe again if no target was found, within finite operation limits.
+On discovery, stop and clean up exploration-owned movement, revalidate the target,
+then report its location or perform the explicitly requested safe approach.
+Report allows search movement but requests no further intentional travel
+toward the selected target after discovery; automatic defense remains permitted.
+Both entity modes share Tracker client-observable discovery without a
+64-block cutoff, including selected-target revalidation. Removing entity approach's
+old discovery/revalidation cutoff is part of this implementation; its dry flat native movement,
+safe proximity and finite approach deadline remain. Player/item/block searches
+retain their existing bounds and behavior in this first expansion. Each local
+scan freezes its own origin; the original admission origin
+anchors the total exploration range, and nearest means nearest in the completed
+current local scope. The authorized implementation unit freezes numerical
+limits and movement containment. No command argument or wire schema is added;
+automatic exploration for entity FIND uses the existing modes rather
+than a new command option. The Tracker's 236-test evidence does not verify exploration.
+
+The implementation uses loaded safe waypoints and existing native flat-path
+calculation with exact input leases; dry flat terrain is the supported movement
+scope. It does not submit the shared ExploreProcess or TimeoutWanderTask.
+The parent owns cumulative budgets, phase-bound terminal evidence and behavioral
+retirement. Current exploration verification is separate from preceding Tracker
+builds and historical game logs. Final forced clean 1.20.1 verification passed
+309/309 Java focused tests; the Python Minecraft suite passed 1,354 tests and
+14,407 subtests, with two skips. The canonical multiversion build still fails
+at five unchanged 1.21.1 compatibility errors. Current artifact and verification
+logs are in the [exploration verification record](docs/chatclef-find-exploration-contract-2026-09-14.md#final-exploration-verification-2026-09-14).
+Deployment and live acceptance are `NOT_RUN`.
 
 A historical 2026-09-10 user-run GOTO investigation recorded repeated
 high-cost path calculation, wander, and blacklist handling until STOP after
@@ -910,6 +956,9 @@ Historical Korean coordinate GOTO/FIND/all-command pre-change contract (GOTO inc
 
 Current Fabric ChatClef FIND source, fixed bounds, initial player search, conservative approach, catalog/result contract and separate verification evidence:
   chatclef-find-implementation-contract-2026-09-14.md
+
+Fabric ChatClef mob FIND exploration implementation, stop/cleanup before report or approach, frozen limits and separate acceptance evidence:
+  chatclef-find-exploration-contract-2026-09-14.md
 
 Historical GOTO high-Y material-readiness and pre-runtime implementation ledger (reference-only after matching-JAR failed runtime acceptance; root cause and exact safe rollback scope unproven):
   chatclef-goto-vertical-navigation-building-material-readiness-pre-change-contract-2026-09-10.md

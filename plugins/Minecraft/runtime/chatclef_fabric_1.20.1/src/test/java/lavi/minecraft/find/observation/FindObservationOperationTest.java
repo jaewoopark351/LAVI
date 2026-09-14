@@ -59,6 +59,15 @@ class FindObservationOperationTest {
         assertFalse(operation.outcome().satisfied()); assertNull(operation.outcome().candidate());
         assertFalse(operation.outcome().scopeComplete()); assertEquals(4096, operation.outcome().visited());
     }
+    @Test void interruptedEntityReadPreservesActualCountsWithoutPromotingPrefixCandidate() {
+        Port port = new Port(); port.scan = new EntityScan(2, 1, false, candidate(80), "entity_read_failed");
+        var operation = operation("entity", port, new AtomicLong(), new ArrayList<>());
+        operation.tick(); var result = operation.outcome();
+        assertEquals("INTERNAL_ERROR", result.findResult()); assertEquals("entity_read_failed", result.reason());
+        assertEquals(2, result.visited()); assertEquals(1, result.matched());
+        assertFalse(result.scopeComplete()); assertFalse(result.satisfied()); assertNull(result.candidate());
+        operation.tick(); assertSame(result, operation.outcome()); assertEquals(1, port.scans);
+    }
     @Test void noMatchRequiresCompleteEnumeration() {
         Port port = new Port(); port.scan = new EntityScan(7, 0, true, null);
         var operation = operation("entity", port, new AtomicLong(), new ArrayList<>());

@@ -3,6 +3,7 @@
 //$$
 //$$ import java.util.List;
 //$$ import java.util.Map;
+//$$ import java.util.function.BooleanSupplier;
 //$$ import adris.altoclef.AltoClef;
 //$$ import baritone.api.pathing.movement.MovementStatus;
 //$$ import baritone.api.utils.Rotation;
@@ -27,6 +28,7 @@
 //$$     private final MinecraftClient client;
 //$$     private final MinecraftFindObservationPort observations;
 //$$     private final FindLog log;
+//$$     private final BooleanSupplier withinBudget;
 //$$     private FindObservationPort.Binding binding;
 //$$     private FindRequest request;
 //$$     private FindCandidate originalCandidate;
@@ -40,7 +42,11 @@
 //$$     private String failure;
 //$$
 //$$     public MinecraftFindNativeMovement(MinecraftClient client, FindLog log) {
+//$$         this(client, log, () -> true);
+//$$     }
+//$$     public MinecraftFindNativeMovement(MinecraftClient client, FindLog log, BooleanSupplier withinBudget) {
 //$$         this.client = client; this.log = log; observations = new MinecraftFindObservationPort(client);
+//$$         this.withinBudget = withinBudget;
 //$$     }
 //$$     @Override public void begin(FindObservationPort.Binding binding, FindRequest request, FindCandidate candidate) {
 //$$         if (began) throw new IllegalStateException("find_approach_movement_already_bound");
@@ -58,6 +64,7 @@
 //$$     }
 //$$     @Override public Step tick() {
 //$$         if (!client.isOnThread()) throw new IllegalStateException("client_thread_required");
+//$$         if (!withinBudget.getAsBoolean()) return failed("elapsed_budget_exhausted");
 //$$         if (failure != null) return failed(failure);
 //$$         if (!observations.matches(binding) || !client.player.isAlive()) return failed("world_or_player_binding_changed");
 //$$         FindCandidate current = observations.revalidate(request, binding, originalCandidate);
@@ -106,7 +113,9 @@
 //$$         if (!movement.toBreak(AltoClef.getInstance().getClientBaritone().bsi).isEmpty()
 //$$                 || !movement.toPlace(AltoClef.getInstance().getClientBaritone().bsi).isEmpty()) return failed("native_step_requires_world_mutation");
 //$$         state.getInputStates().clear();
+//$$         if (!withinBudget.getAsBoolean()) return failed("elapsed_budget_exhausted");
 //$$         state = movement.updateState(state);
+//$$         if (!withinBudget.getAsBoolean()) return failed("elapsed_budget_exhausted");
 //$$         Map<Input, Boolean> staged = Map.copyOf(state.getInputStates());
 //$$         if (FindOwnedMovementInputs.hasForbiddenInput(staged)) return failed("native_step_requested_forbidden_input");
 //$$         MovementStatus status = state.getStatus();
@@ -123,8 +132,10 @@
 //$$         if (rotation.isPresent()) {
 //$$             Rotation requested = rotation.get();
 //$$             if (!Float.isFinite(requested.getYaw()) || !Float.isFinite(requested.getPitch())) return failed("invalid_native_rotation");
+//$$             if (!withinBudget.getAsBoolean()) return failed("elapsed_budget_exhausted");
 //$$             AltoClef.getInstance().getInputControls().forceLook(requested.getYaw(), requested.getPitch());
 //$$         }
+//$$         if (!withinBudget.getAsBoolean()) return failed("elapsed_budget_exhausted");
 //$$         if (!inputs.apply(staged)) return failed("forced_input_lease_rejected_or_superseded");
 //$$         moved |= staged.entrySet().stream().anyMatch(e -> Boolean.TRUE.equals(e.getValue()) && e.getKey() != Input.SPRINT);
 //$$         return Step.waiting();

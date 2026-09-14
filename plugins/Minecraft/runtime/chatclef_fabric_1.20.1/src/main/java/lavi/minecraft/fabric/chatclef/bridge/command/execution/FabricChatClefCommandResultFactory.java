@@ -83,6 +83,9 @@ final class FabricChatClefCommandResultFactory {
     }
 
     FabricChatClefCommandResultPayload failedFromCommandException() {
+        //#if MC == 12001
+//$$         lavi.minecraft.fabric.chatclef.bridge.command.result.find.FabricChatClefFindOperationRetirement.retire(state.boundRootReference(), "command_exception");
+        //#endif
         return FabricChatClefCommandResult.failed(
                 request().requestId,
                 state.failureType() + ": " + state.failureMessage(),
@@ -91,6 +94,9 @@ final class FabricChatClefCommandResultFactory {
     }
 
     FabricChatClefCommandResultPayload failedFromDispatchException() {
+        //#if MC == 12001
+//$$         lavi.minecraft.fabric.chatclef.bridge.command.result.find.FabricChatClefFindOperationRetirement.retire(state.boundRootReference(), "dispatch_exception");
+        //#endif
         return FabricChatClefCommandResult.failed(
                 request().requestId,
                 state.failureType() + ": " + state.failureMessage(),
@@ -138,6 +144,7 @@ final class FabricChatClefCommandResultFactory {
     //#if MC == 12001
     //20260913_kpopmodder: Reuse the existing FAILED/UNKNOWN wire contract and immutable outbox commit.
     FabricChatClefCommandResultPayload failedFromRootRetirement(String reason) {
+//$$         lavi.minecraft.fabric.chatclef.bridge.command.result.find.FabricChatClefFindOperationRetirement.retire(state.boundRootReference(), reason);
 //$$         lavi.minecraft.fabric.chatclef.bridge.command.result.find.FabricChatClefFindDiagnosticRetirement.observe(state.boundRootReference(), reason);
         if (state.rootTermination().completion() != null && state.rootTermination().completion().stopStateAvailable()
                 && state.rootTermination().completion().stopped()) {
@@ -150,6 +157,7 @@ final class FabricChatClefCommandResultFactory {
                         data(reason), state.rootTermination()));
     }
     FabricChatClefCommandResultPayload unknownFromRootCompletion(String reason) {
+//$$         lavi.minecraft.fabric.chatclef.bridge.command.result.find.FabricChatClefFindOperationRetirement.retire(state.boundRootReference(), reason);
 //$$         lavi.minecraft.fabric.chatclef.bridge.command.result.find.FabricChatClefFindDiagnosticRetirement.observe(state.boundRootReference(), reason);
         return FabricChatClefCommandResult.unknown(request().requestId,
                 "ChatClef user task completion was observed, but the complete result handoff was unavailable.",
@@ -189,6 +197,7 @@ final class FabricChatClefCommandResultFactory {
 
     FabricChatClefCommandResultPayload cancelledFromUserStop() {
         //#if MC == 12001
+//$$         lavi.minecraft.fabric.chatclef.bridge.command.result.find.FabricChatClefFindOperationRetirement.retire(state.boundRootReference(), "user_stop");
 //$$         lavi.minecraft.fabric.chatclef.bridge.command.result.find.FabricChatClefFindDiagnosticRetirement.observe(state.boundRootReference(), "user_stop");
         //#endif
         return originalCancellationResultFactory.create(state.context());
@@ -216,6 +225,7 @@ final class FabricChatClefCommandResultFactory {
 
     FabricChatClefCommandResultPayload deadlineExceededResult(String message) {
         //#if MC == 12001
+//$$         lavi.minecraft.fabric.chatclef.bridge.command.result.find.FabricChatClefFindOperationRetirement.retire(state.boundRootReference(), "bridge_deadline_exceeded");
 //$$         lavi.minecraft.fabric.chatclef.bridge.command.result.find.FabricChatClefFindDiagnosticRetirement.observe(state.boundRootReference(), "bridge_deadline_exceeded");
         //#endif
         return FabricChatClefCommandResult.deadlineExceeded(

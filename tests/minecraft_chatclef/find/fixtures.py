@@ -44,7 +44,20 @@ def context(source="lavi_chat_ui", text="마을 주민 찾아줘"):
 def data(result="FOUND_AND_REPORTED", *, kind="entity", target="minecraft:villager", mode="report"):
     payload = dict(target_kind=kind, completion_mode="LOCATE_AND_REPORT" if mode == "report" else "LOCATE_AND_APPROACH",
         observation_scope={"entity": "loaded_entities", "block": "loaded_blocks", "item": "loaded_dropped_items", "player": "loaded_players"}[kind],
-        find_result=result, find_satisfied=result in {"FOUND_AND_REPORTED", "FOUND_AND_IN_SAFE_RANGE", "ALREADY_IN_SAFE_RANGE"}, reason="bounded_observation")
+        find_result=result, find_satisfied=result in {"FOUND_AND_REPORTED", "FOUND_AND_IN_SAFE_RANGE", "ALREADY_IN_SAFE_RANGE"}, reason={
+            "FOUND_AND_REPORTED": "complete_loaded_scope_candidate_revalidated",
+            "FOUND_AND_IN_SAFE_RANGE": "same_target_safe_range_and_owned_cleanup",
+            "ALREADY_IN_SAFE_RANGE": "same_target_safe_range_and_owned_cleanup",
+            "NOT_OBSERVED_IN_LOADED_SCOPE": "complete_loaded_scope_no_match",
+            "OBSERVATION_BOUNDS_EXHAUSTED": "elapsed_budget_exhausted",
+            "TARGET_LOST": "selected_candidate_not_revalidated",
+            "CANDIDATE_NOT_REVALIDATABLE": "selected_identity_unverifiable",
+            "INVALID_TARGET": "invalid_target",
+            "INTERNAL_ERROR": "observation_read_or_revalidation_failed",
+            "INTERRUPTED": "catalog_resource_binding_changed",
+            "UNREACHABLE": "exploration_route_unavailable",
+            "TIMEOUT": "parent_deadline_exhausted",
+        }.get(result, "unknown_fixture_outcome"))
     if kind == "player":
         import hashlib
         payload["player_identity_digest"] = hashlib.sha256(target.encode("utf-8")).hexdigest()

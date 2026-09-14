@@ -8,11 +8,56 @@
 
 Date: 2026-09-09
 
+> Latest mob FIND source: the
+> [authorized exploration unit](chatclef-find-exploration-contract-2026-09-14.md#authorized-implementation-unit-2026-09-14)
+> records bounded discovery travel for both entity modes, with no-radius Tracker
+> observation and same-target revalidation before report or safe approach.
+> Player/item/block scopes and the wire fields remain unchanged. Exploration
+> verification is in progress. The planning and Tracker checkpoint notes below
+> preserve earlier evidence; their `NOT_IMPLEMENTED` and no-exploration statements
+> do not describe this later source and change no GOTO or all-command rollout scope.
+
+<!-- 20260914_kpopmodder: Link the subsequent docs-only exploration contract without altering historical rollout evidence. -->
+> Earlier FIND exploration planning snapshot, documentation only: the
+> [bounded-exploration contract](chatclef-find-exploration-contract-2026-09-14.md)
+> was `NOT_IMPLEMENTED` at that boundary. Mob entity FIND in both modes would observe locally,
+> explore/reobserve after a completed miss within finite total limits, stop and
+> quiesce exploration on discovery, revalidate, then report or explicitly approach.
+> Report would permit search movement and request no further intentional travel
+> toward the selected target after discovery; automatic defense remains permitted.
+> Both entity modes would use Tracker client-observable discovery with
+> no 64-block discovery or selected-target revalidation cutoff. The planned removal
+> of entity approach's old cutoff preserves dry flat native movement and its finite
+> safety/deadline rules. Player/item/block searches remain unchanged in this first
+> expansion. Automatic exploration uses the existing modes, with no new command option.
+> Each local scan freezes its own origin; the original admission origin anchors
+> total range. Nearest applies to a completed current local scope. Numeric defaults
+> remain `PROPOSED` until frozen before implementation. No source or wire schema is
+> changed, and the implemented Tracker's 236-test evidence does not prove exploration.
+> Earlier no-exploration contracts, hashes and runtime ledgers remain historical;
+> the old villager miss's root cause remains `UNKNOWN`. This changes no GOTO scope.
+
+<!-- 20260914_kpopmodder: Link the separately authorized tracker implementation without rewriting historical FIND or GOTO evidence. -->
+> Preceding FIND and Tracker checkpoints: the [implementation contract](chatclef-find-implementation-contract-2026-09-14.md)
+> records implemented FIND, including initial player-name support. The later
+> [tracker-reuse direction](chatclef-find-tracker-reuse-direction-2026-09-14.md)
+> records the subsequently authorized source change limited to mob entity report:
+> live client membership through a read-only tracker getter, no default 64-block
+> cutoff, and unchanged player/item/block limits, approach conditions and wire
+> fields/literals. Source implementation is complete; targeted repository
+> verification is `VERIFIED_AUTOMATED`: clean 1.20.1 production/JAR checks and final
+> 236/236 focused tests passed. The canonical multi-version build remains `FAIL`
+> at five unchanged 1.21.1 errors, and live behavior is `NOT_RUNTIME_VERIFIED`. The old matching-JAR
+> 72-visit/zero-match execution is separate evidence with root cause `UNKNOWN`.
+> Deployment and live acceptance of the change are `NOT_RUN`. The earlier
+> unresolved decisions and `NOT_IMPLEMENTED` ledgers below are dated snapshots.
+> This follow-up changes no GOTO source, behavior or evidence.
+
 <!-- 20260914_kpopmodder: Linked the updated docs-only FIND direction while preserving historical evidence and unresolved implementation decisions. -->
 > 2026-09-14 FIND design review: see the
 > [Chat/final-microphone FIND design](chatclef-find-chat-microphone-design-2026-09-14.md)
 > for the reviewed `2ecc1283` source boundary, registry/observation design,
-> current report-default/explicit-approach direction and logging/verification
+> then-current report-default/explicit-approach direction and logging/verification
 > plan. Direct commands, Korean Chat, and final microphone input use report by
 > default in that design; optional explicit approach uses observed targets only,
 > with no initial exploration for an absent target. Initial item queries report
@@ -672,7 +717,7 @@ belong to separate capabilities.
 ### 6.5 FIND behavior and completion
 
 <!-- 20260914_kpopmodder: Scoped initial FIND approach to observed targets without activating historical exploration proposals. -->
-> Current direction note: Section 2 of the [2026-09-14 FIND design](chatclef-find-chat-microphone-design-2026-09-14.md)
+> Earlier initial direction note: Section 2 of the [2026-09-14 FIND design](chatclef-find-chat-microphone-design-2026-09-14.md)
 > uses report for omitted mode and bare Korean find requests. Only an explicit
 > supported approach request may move toward an initially observed target.
 > A loaded-scope miss or observation exhaustion does not start exploration.
@@ -1768,7 +1813,7 @@ or registry claims before this decision.
 ### 17.3 Before optional approach source work
 
 <!-- 20260914_kpopmodder: Separated observed-target approach decisions from future exploration decisions. -->
-> The current documented initial direction is explicit approach to a target
+> The earlier documented initial direction is explicit approach to a target
 > confirmed in the initial bounded observation. Close its exact supported forms,
 > time/path limits, safe stand-off, lifecycle, and ownership contracts before
 > implementation. New-region search and exploration-radius decisions below
@@ -1830,7 +1875,7 @@ optional extension remains disabled; it does not block a base unit whose own
 prerequisites hold and must not be presented as current runtime behavior.
 
 <!-- 20260914_kpopmodder: Record initial FIND decisions separately from the historical pre-change evidence. -->
-## 18. FIND implementation follow-up, 2026-09-14
+## 18. Initial FIND implementation follow-up, 2026-09-14 (historical checkpoint)
 
 The user subsequently requested repository-local implementation and verification
 and explicitly included player-name search in the initial release. Current source

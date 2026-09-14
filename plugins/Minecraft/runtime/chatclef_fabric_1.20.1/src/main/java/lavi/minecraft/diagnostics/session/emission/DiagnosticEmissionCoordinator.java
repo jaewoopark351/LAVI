@@ -10,6 +10,7 @@ import java.util.Objects;
 /**
  * Formats and emits one already-admitted record without ever requesting another shared slot.
  */
+//20260914_kpopmodder: Settle nonfatal diagnostic assertions at the existing formatter/sink failure owner.
 public final class DiagnosticEmissionCoordinator {
     private final DiagnosticSessionAdmissionAuthority authority;
 
@@ -37,13 +38,13 @@ public final class DiagnosticEmissionCoordinator {
         String encoded;
         try {
             encoded = Objects.requireNonNull(formatter.format(record), "formatted diagnostic record");
-        } catch (RuntimeException | LinkageError failure) {
+        } catch (RuntimeException | LinkageError | AssertionError failure) {
             return failed(token, DiagnosticEmissionOutcome.FailureStage.FORMATTER, failure);
         }
 
         try {
             sink.emit(encoded);
-        } catch (RuntimeException | LinkageError failure) {
+        } catch (RuntimeException | LinkageError | AssertionError failure) {
             return failed(token, DiagnosticEmissionOutcome.FailureStage.SINK, failure);
         }
 

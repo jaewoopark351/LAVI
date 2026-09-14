@@ -216,6 +216,27 @@ public class EntityTracker extends Tracker {
         });
     }
 
+    //#if MC == 12001
+    //20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
+    //20260914_kpopmodder: Expose live client observation without changing cache refresh or movement reachability.
+    // Source-contract/rollback record: Minecraft docs/chatclef-find-tracker-reuse-direction-2026-09-14.md, baseline861adc0.
+    /**
+     * Borrows current client-world membership without refreshing or copying tracker caches.
+     * Consume synchronously on the client thread; this is a live view, not a saved snapshot.
+     */
+    public Iterable<Entity> getClientObservedEntities() {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client == null || !client.isOnThread()) {
+            throw new IllegalStateException("client_thread_required");
+        }
+        if (mod == null || client.world == null || client.player == null
+                || mod.getWorld() != client.world || mod.getPlayer() != client.player) {
+            throw new IllegalStateException("client_world_or_player_unavailable_or_mismatched");
+        }
+        return client.world.getEntities();
+    }
+    //#endif
+
     public boolean entityFound(Predicate<Entity> shouldAccept, Class... types) {
         ensureUpdated();
         types = parsePossiblyNullEntityTypes(types);

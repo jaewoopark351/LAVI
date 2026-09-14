@@ -51,10 +51,15 @@
 //$$             try { lavi.minecraft.diagnostics.ChatClefDiagnostics.logLifecycleBoundary(
 //$$                     "FIND_RESULT_PUBLICATION_REJECTED", "resource_binding_changed", boundRoot,
 //$$                     "requestId", requestId, "operationId", outcome.operationId(), "coordinatesPublished", false); }
-//$$             catch (RuntimeException | LinkageError ignored) { }
+//$$             catch (RuntimeException | LinkageError | AssertionError ignored) { }
 //$$             FabricChatClefFindDiagnosticRetirement.observe(boundRoot, "resource_binding_changed_before_publication");
 //$$             return FabricChatClefCommandResult.unknown(requestId,
 //$$                     "FIND catalog changed before result publication; request binding is unverified.", data);
+//$$         }
+//$$         if (!lavi.minecraft.find.result.FindTerminalReasonContract.validates(outcome, boundRoot)) {
+//$$             FabricChatClefFindDiagnosticRetirement.observe(boundRoot, "terminal_phase_evidence_rejected");
+//$$             return FabricChatClefCommandResult.unknown(requestId,
+//$$                     "FIND terminal reason or bound phase evidence is unverified.", data);
 //$$         }
 //$$         var payload = new LinkedHashMap<String, Object>();
 //$$         FindRequest request = outcome.request();
@@ -92,7 +97,7 @@
 //$$                 "requestId", requestId, "operationId", outcome.operationId(),
 //$$                 "targetKind", request.kind(), "completionMode", request.completionMode(),
 //$$                 "findResult", outcome.findResult(), "findSatisfied", outcome.satisfied()); }
-//$$         catch (RuntimeException | LinkageError ignored) { }
+//$$         catch (RuntimeException | LinkageError | AssertionError ignored) { }
 //$$         FabricChatClefFindDiagnosticRetirement.observe(boundRoot, "matching_task_finished");
 //$$         return COMPLETED_RESULTS.contains(outcome.findResult())
 //$$                 ? FabricChatClefCommandResult.completed(requestId, "FIND query reached a verified terminal outcome.", projected)

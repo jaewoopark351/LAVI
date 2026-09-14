@@ -16,6 +16,42 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DiagnosticEmissionCoordinatorTest {
     @Test
+    void nonfatalFormatterAndSinkErrorsSettleOnceWithoutRefundOrRetry() {
+        for (DiagnosticEmissionOutcome.FailureStage stage : new DiagnosticEmissionOutcome.FailureStage[]{
+                DiagnosticEmissionOutcome.FailureStage.FORMATTER, DiagnosticEmissionOutcome.FailureStage.SINK}) {
+            for (Error failure : new Error[]{new AssertionError("diagnostic assertion"), new LinkageError("diagnostic linkage")}) {
+                DiagnosticSessionAdmissionAuthority authority = new DiagnosticSessionAdmissionAuthority("nonfatal-diagnostic-error");
+                DiagnosticAdmissionDecision admission = authority.admit(
+                        DiagnosticAdmissionRequest.eligible(DiagnosticEventFamily.EXCEPTION_COVERAGE));
+                AtomicInteger formatterCalls = new AtomicInteger(), sinkCalls = new AtomicInteger();
+                DiagnosticEmissionCoordinator coordinator = new DiagnosticEmissionCoordinator(authority);
+                DiagnosticEmissionOutcome outcome = coordinator.emit(admission.token(), "record", value -> {
+                    formatterCalls.incrementAndGet();
+                    if (stage == DiagnosticEmissionOutcome.FailureStage.FORMATTER) throw failure;
+                    return value;
+                }, ignored -> { sinkCalls.incrementAndGet(); throw failure; });
+
+                assertEquals(DiagnosticEmissionOutcome.Status.EMISSION_FAILED_AFTER_ADMISSION, outcome.status());
+                assertEquals(stage, outcome.failureStage()); assertEquals(failure.getClass().getName(), outcome.failureType());
+                assertFalse(outcome.completed()); assertTrue(outcome.settlement().settled());
+                assertEquals(1, formatterCalls.get());
+                assertEquals(stage == DiagnosticEmissionOutcome.FailureStage.SINK ? 1 : 0, sinkCalls.get());
+                assertEquals(1, authority.snapshot().admittedSlots());
+                assertEquals(0, authority.snapshot().emissionPending()); assertEquals(0, authority.snapshot().emissionInProgress());
+                assertEquals(1, authority.snapshot().emissionFailedAfterAdmission());
+
+                DiagnosticEmissionOutcome repeated = coordinator.emit(admission.token(), "record", value -> {
+                    formatterCalls.incrementAndGet(); return value;
+                }, ignored -> sinkCalls.incrementAndGet());
+                assertEquals(DiagnosticEmissionOutcome.Status.TOKEN_UNAVAILABLE, repeated.status());
+                assertEquals(1, formatterCalls.get());
+                assertEquals(stage == DiagnosticEmissionOutcome.FailureStage.SINK ? 1 : 0, sinkCalls.get());
+                assertEquals(1, authority.snapshot().admittedSlots());
+            }
+        }
+    }
+
+    @Test
     void formatterFailureConsumesTheAdmittedSlotWithoutRefundOrRetry() {
         DiagnosticSessionAdmissionAuthority authority =
                 new DiagnosticSessionAdmissionAuthority("formatter-failure-session");

@@ -18,13 +18,14 @@ class FabricChatClefFindResultProjectorTest {
     private static final String DIGEST = "a".repeat(64);
     private static final class Root extends Task implements FindTaskResultSource {
         private final FindRequest request;
-        private final FindOutcome outcome;
+        private FindOutcome outcome;
         private boolean throwDiagnostics;
         Root(String kind, String result, boolean found) {
             request = new FindRequest(kind, kind.equals("player") ? "TestPlayer" : "minecraft:chest", "report", DIGEST, 1);
             var candidate = found ? new FindCandidate(-1, "b".repeat(64), "", 1, 64, -3, 4) : null;
             outcome = new FindOutcome("op", request, result, found, "minecraft:overworld", candidate, 4, found ? 1 : 0,
-                    !result.equals("OBSERVATION_BOUNDS_EXHAUSTED"), "query_fixture");
+                    !result.equals("OBSERVATION_BOUNDS_EXHAUSTED"), found ? "complete_loaded_scope_candidate_revalidated"
+                            : result.equals("OBSERVATION_BOUNDS_EXHAUSTED") ? "elapsed_budget_exhausted" : "complete_loaded_scope_no_match");
         }
         public FindRequest request() { return request; }
         public String operationId() { return "op"; }
@@ -114,6 +115,26 @@ class FabricChatClefFindResultProjectorTest {
         var legacy = FabricChatClefCommandTerminationObservation.fromTaskFinishedEvent(new TaskFinishedEvent(1, root));
         assertNull(new FabricChatClefFindResultProjector(request -> true).fromMatchingCompletion("request",
                 FabricChatClefCommandResultDataPayload.empty(), root, legacy, false));
+    }
+    @Test void explorationSnapshotIsCheckedBeforeAnyUnchangedWireEvidenceIsPublished() {
+        Root root = new Root("entity", "FOUND_AND_REPORTED", true);
+        var old = root.outcome;
+        var proof = new lavi.minecraft.find.result.FindTerminalPhaseEvidence("op", root.request, root,
+                lavi.minecraft.find.result.FindTerminalPhaseEvidence.Phase.STOPPING_EXPLORATION,
+                true, true, true, false, false, true);
+        root.outcome = new FindOutcome("op", root.request, old.findResult(), true, old.dimension(), old.candidate(),
+                old.visited(), old.matched(), true, "discovery_target_revalidated_and_exploration_quiet", proof);
+        var result = project(root);
+        assertEquals("completed", result.get("status"));
+        assertFalse(effect(result).containsKey("terminal_phase")); assertFalse(effect(result).containsKey("discovery_verified"));
+        assertEquals(14, effect(result).size()); // Exactly the existing registry report-success fields.
+        root.outcome = new FindOutcome("op", root.request, old.findResult(), true, old.dimension(), old.candidate(),
+                old.visited(), old.matched(), true, root.outcome.reason(),
+                new lavi.minecraft.find.result.FindTerminalPhaseEvidence("op", root.request, new Object(), proof.phase(),
+                        true, true, true, false, false, true));
+        var rejected = project(root);
+        assertEquals("unknown", rejected.get("status"));
+        assertFalse(((Map<?,?>) rejected.get("data")).containsKey("effect_payload"));
     }
 }
 //#endif
