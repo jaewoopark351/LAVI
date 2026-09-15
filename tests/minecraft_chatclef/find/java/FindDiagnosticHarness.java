@@ -13,7 +13,7 @@ public final class FindDiagnosticHarness {
         try (var output=new PrintStream(sink, true, StandardCharsets.UTF_8)) {
             System.setOut(output);
             var m=reset(); FindDiagnosticEmitterBridge.reset(true);
-            var t=start("find 주민"); expire(t); for(int i=0;i<100;i++)tick(t);
+            var t=start("find entity minecraft:villager"); expire(t); for(int i=0;i<100;i++)tick(t);
             check(!t.isFinished(),"actual output path does not stop a long search");
             entity(m,2); tick(t);
             String text=sink.toString(StandardCharsets.UTF_8);
@@ -22,7 +22,7 @@ public final class FindDiagnosticHarness {
             check(text.contains("event=FIND_TERMINAL") && text.contains("code=ARRIVED"),"terminal uses reserved existing event family");
             check(text.contains("findOperationId="+t.outcome().operationId()),"actual output retains operation identity");
             check(text.contains("traceId=") && text.contains("clientTickId=") && text.contains("taskInstanceId="),"canonical lifecycle identifiers emitted");
-            check(text.contains("%EB%AF%BC") && !text.contains("command=find auto 주민"),"Korean fields use real whitespace-safe UTF8 encoding");
+            check(text.contains("resolutionSource=registry_id") && text.contains("id=minecraft:villager"),"actual emitter exposes language-neutral ID resolution");
             check(text.lines().filter(s->s.contains("reason=scan_complete")).count()<=8,"owner repetition cap reaches actual emitter");
             check(FindDiagnosticEmitterBridge.completed()>0,"real session records emission completion");
             check(text.contains("searchLifetime=UNTIL_FOUND_OR_STOP"),"actual emitter exposes continuous-search policy");
@@ -30,7 +30,7 @@ public final class FindDiagnosticHarness {
             String evidence=text;
 
             sink.reset(); m=reset(); FindDiagnosticEmitterBridge.reset(true);
-            entity(m,20); t=start("find 주민"); expireApproach(t); tick(t);
+            entity(m,20); t=start("find entity minecraft:villager"); expireApproach(t); tick(t);
             text=sink.toString(StandardCharsets.UTF_8);
             check(t.outcome().code().equals("APPROACH_TIMEOUT"),"bounded selected-target approach still terminates");
             check(text.contains("reason=approach_time_limit") && text.contains("approachActiveMs=90000"),
@@ -40,13 +40,13 @@ public final class FindDiagnosticHarness {
             evidence += text;
 
             sink.reset(); m=reset(); FindDiagnosticEmitterBridge.reset(false);
-            t=start("find 주민"); entity(m,2); tick(t);
+            t=start("find entity minecraft:villager"); entity(m,2); tick(t);
             check(t.outcome().code().equals("ARRIVED") && sink.size()==0,"real OFF mode emits no lines and preserves result");
             check(FindDiagnosticEmitterBridge.completed()==0,"OFF has no admitted emissions");
 
             sink.reset(); m=reset(); FindDiagnosticEmitterBridge.reset(true);
             FindDiagnosticEmitterBridge.exhaustOrdinaryBudget();
-            t=start("find 주민"); entity(m,2); tick(t);
+            t=start("find entity minecraft:villager"); entity(m,2); tick(t);
             text=sink.toString(StandardCharsets.UTF_8);
             check(text.contains("event=FIND_TERMINAL") && text.contains("code=ARRIVED"),"ordinary cap does not spend terminal reserve");
             check(!text.contains("reason=scan_complete"),"ordinary detail remains suppressed after cap");

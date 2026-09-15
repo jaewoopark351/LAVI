@@ -5,10 +5,21 @@ from plugins.Minecraft.fabric.chatclef.result.find import FindTerminalPayload
 
 
 class KoreanFindTerminalRenderer:
+    def __init__(self):
+        self._find_names = None
+
     def render(self, projection: object) -> str | None:
         if type(projection) is not FindTerminalPayload:
             return None
         target = projection.label or projection.request.query
+        #20260915_kpopmodder: Display labels are Python-owned; a Java ID is not a Korean sentence.
+        try:
+            from plugins.Minecraft.fabric.chatclef.intent.navigation.find.find_target_resolver import FindTargetResolver
+            if self._find_names is None:
+                self._find_names = FindTargetResolver()
+            target = self._find_names.label_for(projection.kind, projection.registry_id or projection.request.query)
+        except (ValueError, TypeError, OSError):
+            pass
         code = projection.code
         if code in FindTerminalPayload.SUCCESS:
             if len(projection.position) != 3:
@@ -21,7 +32,7 @@ class KoreanFindTerminalRenderer:
             scope = "주변 각 축" if projection.kind == "block" else "주변 반경"
             return f"현재 로드된 {scope} {projection.radius}블록 범위에서 대상 ‘{target}’을 찾지 못했어."
         if code == "UNKNOWN_TARGET":
-            return "대상 이름을 해석하지 못했어. 종류와 정확한 이름 또는 레지스트리 ID를 지정해 줘."
+            return "현재 게임에 해당 종류의 레지스트리 ID가 없어. 대상 ID와 설치된 모드를 확인해 줘."
         if code == "AMBIGUOUS_TARGET":
             return "같은 이름의 대상이 여러 종류야. 종류와 ID를 지정해 줘. 후보: " + ", ".join(projection.suggestions)
         reasons = {

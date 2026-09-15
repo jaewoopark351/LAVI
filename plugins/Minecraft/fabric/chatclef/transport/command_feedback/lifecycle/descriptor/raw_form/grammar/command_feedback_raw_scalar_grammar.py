@@ -36,11 +36,13 @@ class CommandFeedbackRawScalarGrammar:
         command_name: str,
         arguments: tuple[str, ...],
     ) -> str | None:
-        #20260914_kpopmodder: Raw FIND and Korean FIND use the same strict grammar.
+        #20260915_kpopmodder: Raw Java FIND accepts IDs; Korean names are compiled by the trusted Python route.
         if grammar_id == "find_target":
             from plugins.Minecraft.fabric.chatclef.intent.navigation.find import FindRequest
             try:
-                FindRequest.parse("find " + " ".join(arguments))
+                request = FindRequest.parse("find " + " ".join(arguments))
+                if request.kind != "player" and re.fullmatch(r"(?:[a-z0-9_.-]+:)?[a-z0-9_./-]+", request.query, re.ASCII) is None:
+                    return None
                 return "find_target"
             except (ValueError, TypeError):
                 return None

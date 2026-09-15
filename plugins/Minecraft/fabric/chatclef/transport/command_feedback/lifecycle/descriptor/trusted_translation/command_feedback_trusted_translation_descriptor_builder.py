@@ -189,12 +189,14 @@ class CommandFeedbackTrustedTranslationDescriptorBuilder:
             return False
         #20260914_kpopmodder: Bind feedback to the exact admitted FIND slots.
         if command_name == "find":
-            from plugins.Minecraft.fabric.chatclef.intent.navigation.find import FindRequest
+            from plugins.Minecraft.fabric.chatclef.intent.chatclef_command_compiler import ChatClefCommandCompiler
+            from plugins.Minecraft.fabric.chatclef.intent.chatclef_intent_dto import ChatClefIntentDTO
             from plugins.Minecraft.fabric.chatclef.intent.chatclef_intent_schema_validator import ChatClefIntentSchemaValidator
             try:
                 valid, _, _ = ChatClefIntentSchemaValidator().validate(intent)
-                return valid and command == FindRequest.from_slots(intent.get("slots")).compile()
-            except (ValueError, TypeError):
+                #20260915_kpopmodder: Recompile the original Korean slots; never trust the translated ID alone.
+                return valid and command == ChatClefCommandCompiler().compile(ChatClefIntentDTO.from_mapping(intent))
+            except (ValueError, TypeError, OSError):
                 return False
         if command_name in {"get", "deposit"}:
             return bool(

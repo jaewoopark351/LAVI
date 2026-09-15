@@ -148,6 +148,15 @@ unsupported evidence retains cautious wording. The implementation record lists
 source, test, artifact, and live-runtime verification separately. See section 10
 of the input contract for the earlier scoped status update.
 
+<!-- 20260915_kpopmodder: Distinguish the current Python-owned FIND vocabulary from the historical audit below. -->
+Current FIND name handling is documented in
+[Python JSON names and Java registry IDs](docs/chatclef-find-python-names-2026-09-15.md).
+Korean Chat/final-voice requests resolve to typed English IDs in Python;
+Java validates live registries and retains the existing search/approach and defense behavior.
+The linked record includes local language-asset configuration, mod alias limitations,
+source-only delivery, and separate build/runtime verification status.
+The next paragraph preserves the historical 2026-09-11 audit, not the current FIND status.
+
 The earlier requested command-input expansion has three conceptually separated
 workstreams. At the 2026-09-11 incident audit, the local mixed, uncommitted
 worktree was observed to contain broader Korean XYZ ownership/grammar for the

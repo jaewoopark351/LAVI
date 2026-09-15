@@ -7,22 +7,28 @@ from plugins.Minecraft.fabric.chatclef.intent.navigation.find import FindRequest
 from plugins.Minecraft.fabric.chatclef.input.routing.find.find_translation_binding_stage import FindTranslationBindingStage
 
 CASES = (
-    ("마을 주민 찾아줘", "find auto 마을 주민 approach"),
-    ("마을주민 찾아줘", "find auto 마을주민 approach"),
-    ("좀비 찾아줘", "find auto 좀비 approach"),
-    ("상자 블록 찾아줘", "find block 상자 블록 approach"),
-    ("상자 찾아줘", "find auto 상자 approach"),
-    ("떨어진 다이아몬드 찾아줘", "find item 다이아몬드 approach"),
-    ("다이아몬드 아이템을 찾아줘", "find item 다이아몬드 approach"),
-    ("다이아몬드 블록 찾아줘", "find block 다이아몬드 블록 approach"),
-    ("라비야, 철 골렘을 좀 찾아 주세요.", "find auto 철 골렘 approach"),
+    ("철골램 찾아줘", "find entity minecraft:iron_golem approach"),
+    ("철 골램 찾아줘", "find entity minecraft:iron_golem approach"),
+    ("아이언 골렘 찾아줘", "find entity minecraft:iron_golem approach"),
+    ("소 찾아줘", "find entity minecraft:cow approach"),
+    ("양 찾아줘", "find entity minecraft:sheep approach"),
+    ("돼지 찾아줘", "find entity minecraft:pig approach"),
+    ("마을 주민 찾아줘", "find entity minecraft:villager approach"),
+    ("마을주민 찾아줘", "find entity minecraft:villager approach"),
+    ("좀비 찾아줘", "find entity minecraft:zombie approach"),
+    ("상자 블록 찾아줘", "find block minecraft:chest approach"),
+    ("상자 찾아줘", "find block minecraft:chest approach"),
+    ("떨어진 다이아몬드 찾아줘", "find item minecraft:diamond approach"),
+    ("다이아몬드 아이템을 찾아줘", "find item minecraft:diamond approach"),
+    ("다이아몬드 블록 찾아줘", "find block minecraft:diamond_block approach"),
+    ("라비야, 철 골렘을 좀 찾아 주세요.", "find entity minecraft:iron_golem approach"),
     ("플레이어 Steve 찾아줘", "find player Steve approach"),
-    ("모드몹 위치만 알려줘", "find auto 모드몹 report"),
-    ("주민 찾아서 알려줘", "find auto 주민 report"),
-    ("주민 찾아서 가줘", "find auto 주민 approach"),
+    ("엔티티 example:new_mob 위치만 알려줘", "find entity example:new_mob report"),
+    ("주민 찾아서 알려줘", "find entity minecraft:villager report"),
+    ("주민 찾아서 가줘", "find entity minecraft:villager approach"),
     ("@find entity minecraft:villager", "find entity minecraft:villager approach"),
     ("@find item example:rare_gem report", "find item example:rare_gem report"),
-    ("find block 상자 report", "find block 상자 report"),
+    ("find block 상자 report", "find block minecraft:chest report"),
 )
 
 @pytest.mark.parametrize("text, command", CASES)
@@ -64,7 +70,7 @@ def test_raw_parser_round_trip(command, expected):
     assert FindRequest.parse(expected.compile()) == expected
 
 @pytest.mark.parametrize("mutate", (
-    lambda t: t.update(command="find auto 좀비 approach"),
+    lambda t: t.update(command="find entity minecraft:zombie approach"),
     lambda t: t["intent"].update(source="llm"),
     lambda t: t["intent"].update(slots={"kind":"auto", "query":"좀비", "mode":"approach"}),
     lambda t: t["intent"].update(original_text="좀비 찾아줘"),

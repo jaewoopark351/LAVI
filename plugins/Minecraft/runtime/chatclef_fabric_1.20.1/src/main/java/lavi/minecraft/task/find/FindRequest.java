@@ -12,23 +12,17 @@ public record FindRequest(String kind, String query, String mode) {
     public static final Set<String> MODES = Set.of("approach", "report");
 
     public FindRequest {
-        if (!KINDS.contains(kind) || !MODES.contains(mode) || query == null
-                || query.isBlank() || query.codePointCount(0, query.length()) > 128
-                || !query.equals(query.trim().replaceAll(" +", " "))
-                || query.codePoints().anyMatch(c -> !allowed(c))) {
-            throw new IllegalArgumentException("대상 이름과 종류를 확인해 줘.");
+        //20260915_kpopmodder: Native/bridge execution is language-neutral. Korean text belongs to Python.
+        if (kind == null || mode == null || !KINDS.contains(kind) || !MODES.contains(mode)
+                || query == null || query.isBlank() || query.length() > 128) {
+            throw new IllegalArgumentException("Invalid FIND kind, ID or mode.");
         }
-        if (kind.equals("player") && !query.matches("[A-Za-z0-9_]{1,16}")) {
-            throw new IllegalArgumentException("플레이어 이름은 영문, 숫자, 밑줄로 지정해 줘.");
+        if (kind.equals("player")) {
+            if (!query.matches("[A-Za-z0-9_]{1,16}"))
+                throw new IllegalArgumentException("Invalid player name.");
+        } else if (!query.matches("(?:[a-z0-9_.-]+:)?[a-z0-9_./-]+")) {
+            throw new IllegalArgumentException("Use an English registry ID, e.g. minecraft:iron_golem. Korean requests belong in LAVI chat/voice.");
         }
-    }
-
-    private static boolean allowed(int c) {
-        int type = Character.getType(c);
-        return Character.isLetterOrDigit(c) || type == Character.NON_SPACING_MARK
-                || type == Character.COMBINING_SPACING_MARK || type == Character.ENCLOSING_MARK
-                || type == Character.LETTER_NUMBER || type == Character.OTHER_NUMBER
-                || " _:/.-".indexOf(c) >= 0;
     }
 
     public static FindRequest parse(String command) {

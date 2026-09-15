@@ -58,7 +58,7 @@ public class FindExplorationHarness {
 
     public static void main(String[] args) throws Exception {
         int initialChecks = checks;
-        var m = reset(); var t = start("find 마을 주민");
+        var m = reset(); var t = start("find entity minecraft:villager");
         check(t.outcome() == null, "initial empty observation must NOT be terminal");
         check(m.baritone.explore.active && m.baritone.explore.starts == 1, "missing target actually starts native exploration");
         check(t.thisOrChildSatisfies(c -> c instanceof DoToClosestEntityTask), "reuses the actual ATTACK selection class");
@@ -83,7 +83,7 @@ public class FindExplorationHarness {
         // Real scheduler chooses 65-priority defense instead of 50-priority FIND; defense can kill the target.
         m = reset(); e = new Entity(zombie,10,20,64,.5); m.world.entities.add(e);
         var runner = new TaskRunner(m); var user = new HarnessChain(runner);
-        t = new FindTask(FindRequest.parse("find 좀비")); user.setTask(t);
+        t = new FindTask(FindRequest.parse("find entity minecraft:zombie")); user.setTask(t);
         var defenseTask = new DefendTask(e); var defense = new DefenseChain(runner, defenseTask);
         runner.enable(); runner.tick();
         check(runner.getCurrentTaskChain() == user && m.baritone.process.active, "FIND runs when defense has no demand");
@@ -103,7 +103,7 @@ public class FindExplorationHarness {
 
         // Repeated defense/flee preemption preserves ownership and the original request identity.
         m=reset(); runner=new TaskRunner(m); user=new HarnessChain(runner);
-        t=new FindTask(FindRequest.parse("find 주민")); user.setTask(t);
+        t=new FindTask(FindRequest.parse("find entity minecraft:villager")); user.setTask(t);
         defenseTask=new DefendTask(null); defense=new DefenseChain(runner,defenseTask);
         runner.enable(); runner.tick(); beforeTime=field(t,"startedNanos");
         for(int i=0;i<6;i++) {
@@ -117,7 +117,7 @@ public class FindExplorationHarness {
         runner.disable(); check(m.behaviour.depth==0 && !m.baritone.explore.active,"disable cleans the active leaf");
 
         // An aura/shield input claim can happen even without a higher-priority chain.
-        m = reset(); e = entity(m,20); t = start("find 주민");
+        m = reset(); e = entity(m,20); t = start("find entity minecraft:villager");
         m.defense.claimed = true; tick(t);
         check(!m.baritone.process.active && t.outcome() == null, "force-field input claim yields movement without terminal outcome");
         var external = new GoalBlock(new BlockPos(30,64,0)); m.baritone.process.setGoalAndPath(external);
@@ -128,7 +128,7 @@ public class FindExplorationHarness {
         check(m.baritone.process.active && m.baritone.process.getGoal() != external, "FIND resumes after foreign process releases");
         t.stop(); check(logged("defense_yield") && logged("defense_resume"), "aura-level yield/resume are logged");
 
-        m = reset(); e = entity(m,20); t = start("find 주민");
+        m = reset(); e = entity(m,20); t = start("find entity minecraft:villager");
         e.pos = new Vec3d(26,64,.5); tick(t);
         check(m.baritone.process.starts == 2, "moving entity goal is replanned by the same owner");
         m.player.pos = new Vec3d(18,64,.5); tick(t);
@@ -136,7 +136,7 @@ public class FindExplorationHarness {
         m.player.pos = new Vec3d(24,64,.5); tick(t); code(t,"ARRIVED");
 
         // Blocks use the native scanner/closest-object loop, not a fixed one-shot cube.
-        m = reset(); t = start("find block 상자");
+        m = reset(); t = start("find block minecraft:chest");
         check(m.baritone.explore.active && t.thisOrChildSatisfies(c -> c instanceof DoToClosestBlockTask), "missing block uses native block selector and explore");
         m.player.pos = new Vec3d(80,64,.5); var chestPos = new BlockPos(100,64,0);
         m.world.blocks.put(chestPos,new BlockState(chest,true)); tick(t);
@@ -162,7 +162,7 @@ public class FindExplorationHarness {
         m.player.pos = new Vec3d(6,64,.5); tick(t); code(t,"ARRIVED");
 
         // Dropped item identity is the contained ITEM id, and disappearance re-enters the same search.
-        m = reset(); t = start("find item 다이아몬드");
+        m = reset(); t = start("find item minecraft:diamond");
         var drop = new ItemEntity(itemType,10,new ItemStack(diamond),20,64,.5); m.world.entities.add(drop); tick(t);
         check(m.baritone.process.active && m.behaviour.walking != null, "dropped item discovered after exploration");
         drop.stack.count=0; tick(t);
@@ -170,21 +170,21 @@ public class FindExplorationHarness {
         drop.stack.count=1; drop.pos=new Vec3d(2,64,.5); tick(t); code(t,"ARRIVED");
 
         // STOP and stale owners: no replay, no late cleanup of another operation's goal.
-        m = reset(); t = start("find 주민"); chains.get(t).stop();
+        m = reset(); t = start("find entity minecraft:villager"); chains.get(t).stop();
         check(!m.baritone.explore.active, "STOP releases ongoing explore"); int starts=m.baritone.explore.starts;
         chains.get(t).tick(); check(m.baritone.explore.starts==starts, "stopped user chain cannot replay FIND");
-        entity(m,20); var next=start("find 주민"); var nextGoal=m.baritone.process.getGoal(); t.stop();
+        entity(m,20); var next=start("find entity minecraft:villager"); var nextGoal=m.baritone.process.getGoal(); t.stop();
         check(m.baritone.process.getGoal()==nextGoal, "late old-root cleanup cannot clear next request goal"); next.stop();
 
-        m = reset(); entity(m,20); t = start("find 주민");
+        m = reset(); entity(m,20); t = start("find entity minecraft:villager");
         m.player=new PlayerEntity(playerType,2,"LAVI",.5,64,.5); tick(t); code(t,"SCOPE_CHANGED");
         check(!m.baritone.process.active && m.behaviour.depth==0, "player replacement aborts cleanly");
-        m = reset(); t=start("find 주민"); t.interrupt(null); expire(t); tick(t);
+        m = reset(); t=start("find entity minecraft:villager"); t.interrupt(null); expire(t); tick(t);
         check(!t.isFinished() && m.baritone.explore.active, "same search resumes even after old lifetime");
         chains.get(t).stop(); check(!m.baritone.explore.active,"STOP still releases continuous search");
 
         // Continuous search: elapsed wall time alone is not evidence that a target cannot be found.
-        m=reset(); t=start("find 마을 주민"); expire(t);
+        m=reset(); t=start("find entity minecraft:villager"); expire(t);
         for(int i=0;i<100;i++) tick(t);
         check(!t.isFinished() && m.baritone.explore.starts==1,"search continues after former 90-second cutoff without resubmission");
         entity(m,20); tick(t);
@@ -193,12 +193,12 @@ public class FindExplorationHarness {
         m.player.pos=new Vec3d(18,64,.5); tick(t); code(t,"ARRIVED");
 
         // Report remains a stationary bounded query, not an endless watcher.
-        m=reset(); t=start("find block 상자 report"); expire(t); tick(t); code(t,"SEARCH_LIMIT");
+        m=reset(); t=start("find block minecraft:chest report"); expire(t); tick(t); code(t,"SEARCH_LIMIT");
         check(!m.baritone.explore.active && !m.baritone.process.active,"report deadline never starts movement");
 
         // Real TaskRunner interruption excludes defense wall time without resetting time already spent approaching.
         m=reset(); entity(m,20); runner=new TaskRunner(m); user=new HarnessChain(runner);
-        t=new FindTask(FindRequest.parse("find 주민")); user.setTask(t);
+        t=new FindTask(FindRequest.parse("find entity minecraft:villager")); user.setTask(t);
         defenseTask=new DefendTask(null); defense=new DefenseChain(runner,defenseTask);
         runner.enable(); runner.tick(); runner.tick();
         var checkpoint=FindTask.class.getDeclaredField("approachTickNanos"); checkpoint.setAccessible(true);
@@ -214,7 +214,7 @@ public class FindExplorationHarness {
         m.player.pos=new Vec3d(18,64,.5); runner.tick(); code(t,"ARRIVED"); runner.disable();
 
         // Force-field/shield claims are equally authoritative, even when the user chain stays selected.
-        m=reset(); entity(m,20); t=start("find 주민"); tick(t);
+        m=reset(); entity(m,20); t=start("find entity minecraft:villager"); tick(t);
         checkpoint.setLong(t,System.nanoTime()-30_000_000_000L); tick(t);
         spent=(long)field(t,"approachActiveNanos"); m.defense.claimed=true; tick(t);
         checkpoint.setLong(t,System.nanoTime()-180_000_000_000L); expire(t); tick(t);
@@ -227,7 +227,7 @@ public class FindExplorationHarness {
         check(logged("approach_time_limit"),"approach timeout reason and budget are logged");
 
         // Defense may kill the selected zombie long after search begins; a different live zombie can complete it.
-        m=reset(); e=new Entity(zombie,10,20,64,.5); m.world.entities.add(e); t=start("find 좀비");
+        m=reset(); e=new Entity(zombie,10,20,64,.5); m.world.entities.add(e); t=start("find entity minecraft:zombie");
         expire(t); m.defense.claimed=true; tick(t); e.alive=false; m.defense.claimed=false; tick(t);
         check(!t.isFinished() && m.baritone.explore.active,"defense kill reenters continuous search beyond old lifetime");
         check((long)field(t,"approachActiveNanos")==0L,"lost target clears only its own approach budget");
@@ -235,23 +235,23 @@ public class FindExplorationHarness {
 
         // Resource caps still terminate honestly instead of converting incomplete scans into NOT_FOUND.
         m=reset(); for(int i=0;i<4097;i++) m.world.entities.add(new Entity(zombie,i+20,3,64,3));
-        t=start("find 주민"); code(t,"SEARCH_LIMIT");
+        t=start("find entity minecraft:villager"); code(t,"SEARCH_LIMIT");
         check(!m.baritone.explore.active && !t.outcome().scanComplete(),"continuous mode retains per-observation entity cap");
 
         // A partial movement-start failure must not leak process or policy ownership.
-        m = reset(); m.baritone.explore.failStart=true; t=start("find 주민"); code(t,"INTERNAL_ERROR");
+        m = reset(); m.baritone.explore.failStart=true; t=start("find entity minecraft:villager"); code(t,"INTERNAL_ERROR");
         check(!m.baritone.explore.active && m.behaviour.depth==0, "partial exploration failure unwinds local state");
         m = reset(); m.world.blocks.put(new BlockPos(20,64,0),new BlockState(chest,true));
-        m.baritone.process.failStart=true; t=start("find block 상자"); code(t,"INTERNAL_ERROR");
+        m.baritone.process.failStart=true; t=start("find block minecraft:chest"); code(t,"INTERNAL_ERROR");
         check(!m.baritone.process.active && m.behaviour.depth==0, "partial goal failure releases policy and own goal");
         m = reset(); m.world.blocks.put(new BlockPos(20,64,0),new BlockState(chest,true));
-        m.behaviour.failConfigure=true; t=start("find block 상자"); code(t,"INTERNAL_ERROR");
+        m.behaviour.failConfigure=true; t=start("find block minecraft:chest"); code(t,"INTERNAL_ERROR");
         check(m.behaviour.depth==0 && !m.baritone.process.active, "policy failure does not leak a behavior frame");
 
         // Diagnostics are bounded and changing diagnostics alone cannot change gameplay decisions.
         for (int mode=0;mode<3;mode++) {
             m=reset(); ChatClefDiagnostics.off=mode==1; ChatClefDiagnostics.fail=mode==2;
-            t=start("find 주민"); expire(t); for(int i=0;i<100;i++)tick(t);
+            t=start("find entity minecraft:villager"); expire(t); for(int i=0;i<100;i++)tick(t);
             check(!t.isFinished()&&m.baritone.explore.starts==1,"all diagnostic modes retain exploration");
             entity(m,2); tick(t); code(t,"ARRIVED");
             check(m.baritone.path.cancels==0&&m.behaviour.depth==0,"diagnostics do not alter cleanup");

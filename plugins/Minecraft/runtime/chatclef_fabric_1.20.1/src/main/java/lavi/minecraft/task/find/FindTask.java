@@ -94,7 +94,9 @@ public final class FindTask extends Task {
                         resolution.candidates().stream().limit(5).map(e -> e.kind() + " " + e.id()).toList());
                 return;
             }
-            boundary("resolved", "kind", target.kind(), "id", target.id(), "languageWarnings", languageWarnings);
+            //20260915_kpopmodder: Observe the ID-only resolver at its operation-owned boundary.
+            boundary("resolved", "kind", target.kind(), "id", target.id(), "languageWarnings", languageWarnings,
+                    "resolutionSource", "registry_id", "requestedKind", request.kind(), "query", request.query());
             if (request.mode().equals("approach")) {
                 if (target.kind().equals("block")) blockSearch = new FindBlockSearchTask(this, target.id());
                 else entitySearch = new FindEntitySearchTask(this);

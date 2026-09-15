@@ -25,15 +25,29 @@ class ChatClefCommandCompiler:
     _PLAYER_RE = re.compile(r"^[A-Za-z0-9_]{3,16}$")
     _DANGEROUS_RE = re.compile(r"[;#\r\n\"'@]|[\x00-\x1f\x7f]")
 
+    #20260915_kpopmodder: Keep FIND vocabulary instance-owned and lazily loaded; other commands are unchanged.
+    def __init__(self, find_resolver=None):
+        self._find_resolver = find_resolver
+
+    @property
+    def find_resolver(self):
+        if self._find_resolver is None:
+            from .navigation.find.find_target_resolver import FindTargetResolver
+            self._find_resolver = FindTargetResolver()
+        return self._find_resolver
+
+    def resolve_find(self, intent: ChatClefIntentDTO):
+        from .navigation.find import FindRequest
+        from .chatclef_intent_schema_validator import ChatClefIntentSchemaValidator
+        valid, reason, _ = ChatClefIntentSchemaValidator().validate(intent)
+        if not valid or intent.intent_type is not ChatClefIntentType.FIND:
+            raise ValueError(reason or "not_find_intent")
+        return self.find_resolver.resolve(FindRequest.from_slots(intent.slots))
+
     def compile(self, intent: ChatClefIntentDTO, target: str | None = None) -> str:
         #20260914_kpopmodder: Allow only the parsed leading @find, never a generic raw-command bypass.
         if intent.intent_type is ChatClefIntentType.FIND:
-            from .navigation.find import FindRequest
-            from .chatclef_intent_schema_validator import ChatClefIntentSchemaValidator
-            valid, reason, _ = ChatClefIntentSchemaValidator().validate(intent)
-            if not valid:
-                raise ValueError(reason)
-            return FindRequest.from_slots(intent.slots).compile()
+            return self.resolve_find(intent).request.compile()
         self.reject_dangerous_text(intent.original_text)
         if intent.intent_type is ChatClefIntentType.GET_ITEM:
             target_text = self._target(target)

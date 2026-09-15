@@ -30,7 +30,10 @@ def run_java(tmp_path, sources, main):
 def test_pure_java_find_contracts(tmp_path):
     sources=[JAVA/"lavi/minecraft/task/find"/name for name in ("FindRequest.java","FindNameIndex.java","FindOutcome.java")]
     sources.append(HERE/"java/FindContractHarness.java")
-    assert "PURE_JAVA_CONTRACT_CHECKS=" in run_java(tmp_path,sources,"lavi.minecraft.task.find.FindContractHarness")
+    #20260915_kpopmodder: Retain actual pure-contract output in verification runs using pytest -s.
+    output=run_java(tmp_path,sources,"lavi.minecraft.task.find.FindContractHarness")
+    assert "PURE_JAVA_CONTRACT_CHECKS=" in output
+    print(output.strip())
 
 
 def test_real_find_sources_against_simulated_runtime_apis(tmp_path):

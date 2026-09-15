@@ -21,6 +21,7 @@ class KoreanCommandStartRenderer:
         self._locations = location_renderer
         self._hunger = hunger_renderer
         self._particle = particle_renderer
+        self._find_names = None
 
     def render(self, descriptor: object, profile: object) -> str:
         family = profile.family
@@ -52,9 +53,14 @@ class KoreanCommandStartRenderer:
             from plugins.Minecraft.fabric.chatclef.intent.navigation.find import FindRequest
             try:
                 request = FindRequest.parse(descriptor.command)
-                target = self._particle.attach(request.query, "을", "를")
+                #20260915_kpopmodder: The wire command contains an ID; presentation remains Korean.
+                from plugins.Minecraft.fabric.chatclef.intent.navigation.find.find_target_resolver import FindTargetResolver
+                if self._find_names is None:
+                    self._find_names = FindTargetResolver()
+                label = self._find_names.label_for(request.kind, request.query)
+                target = self._particle.attach(label, "을", "를")
                 return f"{target} 찾아서 위치를 알려줄게" if request.mode == "report" else f"{target} 찾아서 가까이 갈게"
-            except (ValueError, TypeError, AttributeError):
+            except (ValueError, TypeError, AttributeError, OSError):
                 return "요청한 대상을 찾아볼게"
         if family == "movement_follow":
             return f"{subject} 따라갈게"

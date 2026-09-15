@@ -1,3 +1,9 @@
+<!-- 20260915_kpopmodder: Preserve this historical record and point to the superseding name-boundary contract. -->
+> 이름 해석 및 네이티브 명령 문법의 현재 기준은
+> [Python JSON 이름 해석 이관 기록](chatclef-find-python-names-2026-09-15.md)이다.
+> 아래 기록 당시의 Java 한국어 이름 해석/명령 예시는 이관 전 내용이며,
+> 탐색·자동방어·접근 수명주기는 이번 이름 처리 변경으로 다시 설계하지 않았다.
+
 # FIND 탐색 이동 및 자동방어 수정 기록
 
 ## 적용 기준과 상태

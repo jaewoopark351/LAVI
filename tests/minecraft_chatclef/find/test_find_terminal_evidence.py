@@ -73,7 +73,7 @@ def test_success_cannot_be_published_for_failed_status():
 
 
 def test_report_evidence_and_block_outcome_decode_without_entity_uuid():
-    value=FindTerminalPayload.from_data(terminal_data("FOUND", kind="block", requested_kind="block", query="상자", mode="report"))
+    value=FindTerminalPayload.from_data(terminal_data("FOUND", kind="block", requested_kind="block", query="minecraft:chest", mode="report"))
     assert value is not None
     assert "이동하지 않았어" in KoreanFindTerminalRenderer().render(value)
 

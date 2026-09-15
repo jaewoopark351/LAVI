@@ -55,7 +55,7 @@ class KoreanFindRuleParser:
                     if target.startswith(prefix):
                         kind, target = hint, target[len(prefix):].strip()
                         break
-                # Keep official names such as '다이아몬드 블록' intact; Java tries exact aliases first.
+                #20260915_kpopmodder: Keep official names intact; Python resolves exact names before category suffix fallback.
                 if kind == "auto" and target.endswith(" 블록"):
                     kind = "block"
                 elif target.endswith(" 아이템"):

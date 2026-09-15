@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "minecraft_version": "1.20.1",
+  "asset_index_paths": [],
+  "entity": {
+    "minecraft:iron_golem": [
+      "철 골램",
+      "아이언 골렘"
+    ],
+    "minecraft:snow_golem": [
+      "눈 골램",
+      "스노우 골렘"
+    ],
+    "minecraft:villager": [
+      "마을 주민"
+    ],
+    "minecraft:zombified_piglin": [
+      "좀비 피글린"
+    ],
+    "minecraft:mooshroom": [
+      "버섯 소"
+    ]
+  },
+  "block": {
+    "minecraft:crafting_table": [
+      "작업대"
+    ],
+    "minecraft:diamond_ore": [
+      "다이아 광석"
+    ],
+    "minecraft:diamond_block": [
+      "다이아 블록"
+    ]
+  },
+  "item": {
+    "minecraft:diamond": [
+      "다이아",
+      "다야"
+    ],
+    "minecraft:iron_ingot": [
+      "철괴"
+    ],
+    "minecraft:gold_ingot": [
+      "금괴"
+    ]
+  }
+}

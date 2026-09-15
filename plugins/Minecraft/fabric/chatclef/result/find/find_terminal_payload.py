@@ -106,6 +106,15 @@ class FindTerminalPayload:
                     return None
             elif success or code in {"NOT_FOUND", "TARGET_LOST", "NO_APPROACH", "APPROACH_TIMEOUT"}:
                 return None
+            #20260915_kpopmodder: A result for another ID cannot satisfy this English-ID request.
+            if request.kind != "player":
+                if not re.fullmatch(r"(?:[a-z0-9_.-]+:)?[a-z0-9_./-]+", request.query, re.ASCII):
+                    return None
+                expected_id = request.query if ":" in request.query else "minecraft:" + request.query
+                if value["registry_id"] and value["registry_id"] != expected_id:
+                    return None
+            elif value["registry_id"] and value["registry_id"].casefold() != request.query.casefold():
+                return None
             if value["entity_uuid"] and str(UUID(value["entity_uuid"])) != value["entity_uuid"]:
                 return None
             if kind == "block" and value["entity_uuid"]:

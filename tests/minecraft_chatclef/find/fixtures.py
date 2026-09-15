@@ -15,7 +15,7 @@ def descriptor(source="lavi_chat_ui", text="마을 주민 찾아줘"):
     return result
 
 
-def terminal_data(code="ARRIVED", query="마을 주민", kind="entity", requested_kind="auto", mode="approach"):
+def terminal_data(code="ARRIVED", query="minecraft:villager", kind="entity", requested_kind="entity", mode="approach"):
     success = code in {"ARRIVED", "FOUND"}
     unresolved = code in {"UNKNOWN_TARGET", "AMBIGUOUS_TARGET"}
     found = code not in {"UNKNOWN_TARGET", "AMBIGUOUS_TARGET", "NOT_FOUND", "SEARCH_LIMIT", "PLAYER_UNAVAILABLE"}
@@ -23,7 +23,7 @@ def terminal_data(code="ARRIVED", query="마을 주민", kind="entity", requeste
                "requested_kind": requested_kind, "mode": mode, "code": code,
                "kind": requested_kind if unresolved else kind,
                "registry_id": "" if unresolved else ("minecraft:chest" if kind == "block" else "minecraft:villager"),
-               "label": "" if unresolved else ("상자" if kind == "block" else "주민"),
+               "label": "" if unresolved else ("minecraft:chest" if kind == "block" else "minecraft:villager"),
                "dimension": "minecraft:overworld", "position": [10, 64, -20] if found else [],
                "radius": 32 if (requested_kind if unresolved else kind) == "block" else 64,
                "scanned": 0 if unresolved else 10,
