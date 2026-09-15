@@ -24,7 +24,8 @@ from plugins.Minecraft.fabric.chatclef.transport.command_feedback.lifecycle impo
 
 
 class CommandFeedbackPublicationCoalescingTests(unittest.TestCase):
-    def test_accepted_gamma_without_java_callback_stages_one_cautious_terminal(self):
+    #20260915_kpopmodder: Acceptance does not consume the native setting readback that now follows.
+    def test_accepted_gamma_waits_for_java_callback_and_readback(self):
         descriptor = _gamma_descriptor("a" * 32)
         grant = CommandFeedbackAdmissionGrant._issue(descriptor=descriptor)
         tracker = CommandFeedbackLifecycleFacade()
@@ -57,18 +58,11 @@ class CommandFeedbackPublicationCoalescingTests(unittest.TestCase):
         permit = tracker.claim_start(grant, _accepted_submission_result())
         terminal = tracker.select_coalesced_terminal(permit)
 
-        self.assertIsNotNone(terminal)
-        self.assertEqual("accepted_without_result_callback", terminal.status)
-        self.assertFalse(terminal.verified)
-        self.assertFalse(terminal.dispatch_started)
-        self.assertEqual(
-            "감마 변경 명령은 보냈는데, 실제로 바뀌었는지는 확인하지 못했어",
-            CommandLifecycleResponseRenderer().render_terminal(terminal),
-        )
+        self.assertIsNone(terminal)
         resolution = tracker.acknowledge_publication(permit, True)
         self.assertTrue(resolution.accepted)
-        self.assertTrue(resolution.retire_lifecycle)
-        self.assertIsNone(tracker.context)
+        self.assertFalse(resolution.retire_lifecycle)
+        self.assertIsNotNone(tracker.context)
 
     def test_async_immediate_staged_terminal_is_selected_once_and_retires_on_ack(self):
         publications = CommandFeedbackPublicationCoordinator()

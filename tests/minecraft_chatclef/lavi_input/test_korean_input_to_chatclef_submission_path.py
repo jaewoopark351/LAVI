@@ -160,7 +160,8 @@ class KoreanInputToChatClefSubmissionPathTests(unittest.TestCase):
         self.assertIsNone(decision.translation.get("command"))
         self.assertEqual([], adapter.requests)
 
-    def test_parse_ready_non_public_commands_do_not_reach_adapter(self):
+    #20260915_kpopmodder: Public high-risk input never accepts fabricated provenance.
+    def test_high_risk_commands_without_trusted_proof_do_not_reach_adapter(self):
         for text in ["Steve 따라가", "가만히 있어"]:
             with self.subTest(text=text):
                 adapter = _RecordingAdapter()
@@ -173,10 +174,25 @@ class KoreanInputToChatClefSubmissionPathTests(unittest.TestCase):
                 decision = router.route(text)
 
                 self.assertTrue(decision.handled)
-                self.assertEqual("minecraft_command_rejected", decision.reason)
-                self.assertEqual("invalid_request", decision.result.get("error"))
-                self.assertFalse(decision.result["details"]["public_korean_enabled"])
                 self.assertEqual([], adapter.requests)
+
+    def test_continuous_chat_and_final_voice_require_confirmation_before_one_submit(self):
+        from tests.minecraft_chatclef.lavi_input.confirmation.trusted_route_fixture import (
+            TrustedConfirmationRouteFixture,
+        )
+
+        for voice in (False, True):
+            for text, command in (("Steve 따라가", "follow Steve"), ("가만히 있어", "idle")):
+                with self.subTest(text=text, voice=voice):
+                    fixture = TrustedConfirmationRouteFixture()
+                    response, _ = fixture.dispatch(text, voice=voice)
+                    self.assertIn("확인", response[0])
+                    self.assertEqual([], fixture.adapter.requests)
+                    fixture.dispatch("확인", voice=voice)
+                    self.assertEqual([command], [row.command for row in fixture.adapter.requests])
+                    fixture.dispatch("확인", voice=voice)
+                    self.assertEqual(1, len(fixture.adapter.requests))
+                    self.assertEqual(0, fixture.pipeline.provider_calls)
 
     def test_stop_requires_the_separate_trusted_control_lane(self):
         adapter = _RecordingAdapter()

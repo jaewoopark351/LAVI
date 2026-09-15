@@ -41,6 +41,8 @@ public final class AutoDepositTrustedListCommand extends Command {
                     .sorted(Comparator.comparing(AutoDepositTrustedDestination::key))
                     .toList();
             if (destinations.isEmpty()) {
+                lavi.minecraft.command.result.instant.InstantCommandResultCapture.record("auto_deposit_trusted_list", true,
+                        "LISTED", java.util.Map.of("total", 0, "listed", 0, "truncated", false, "destinations", java.util.List.of()));
                 mod.log("No trusted automatic-deposit destinations are registered.");
                 return;
             }
@@ -48,17 +50,23 @@ public final class AutoDepositTrustedListCommand extends Command {
             Dimension dimension = mod.getWorld() == null ? null : WorldHelper.getCurrentDimension();
             int listed = Math.min(MAX_LISTED_DESTINATIONS, destinations.size());
             mod.log("Trusted automatic-deposit destinations: " + destinations.size());
+            java.util.List<java.util.Map<String, Object>> observed = new java.util.ArrayList<>();
             for (int index = 0; index < listed; index++) {
                 AutoDepositTrustedDestination destination = destinations.get(index);
                 AutoDepositTrustedDestinationStatus status = statusInspector.inspect(
                         mod, destination, worldKey, dimension
                 );
+                observed.add(lavi.minecraft.command.result.instant.trusted.TrustedDestinationResultValues.entry(destination, status));
                 mod.log(AutoDepositTrustedCommandFormatter.listing(destination, status));
             }
             if (listed < destinations.size()) {
                 mod.logWarning("Trusted destination list truncated: "
                         + (destinations.size() - listed) + " additional registrations.");
             }
+            //20260915_kpopmodder: Reuse the exact inspected entries; omit world paths and preserve the native list cap.
+            lavi.minecraft.command.result.instant.InstantCommandResultCapture.record("auto_deposit_trusted_list", true,
+                    "LISTED", java.util.Map.of("total", destinations.size(), "listed", listed,
+                            "truncated", listed < destinations.size(), "destinations", java.util.List.copyOf(observed)));
         } finally {
             finish();
         }

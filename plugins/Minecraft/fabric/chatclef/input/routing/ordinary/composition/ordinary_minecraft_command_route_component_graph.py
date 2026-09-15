@@ -13,6 +13,8 @@ from plugins.Minecraft.fabric.chatclef.input.routing.goto.goto_input_diagnostics
 from .ordinary_minecraft_command_route_compatibility_installer import (
     OrdinaryMinecraftCommandRouteCompatibilityInstaller,
 )
+from plugins.Minecraft.fabric.chatclef.input.confirmation import KoreanCommandConfirmationOwner
+from plugins.Minecraft.fabric.chatclef.input.auto_deposit_trust.single_registration import SingleContainerTrustOwner
 
 
 class OrdinaryMinecraftCommandRouteComponentGraph:
@@ -49,6 +51,14 @@ class OrdinaryMinecraftCommandRouteComponentGraph:
         self.live_proof_validator = live_proof_validator
         self.failure_handler = failure_handler
         self.router_logger = router_logger
+        self.confirmation_owner = KoreanCommandConfirmationOwner(
+            extension=extension, submission_precheck=submission_precheck,
+            live_proof_validator=live_proof_validator, log_callback=router_logger.log,
+        )
+        self.single_registration_owner = SingleContainerTrustOwner(
+            extension=extension, submission_precheck=submission_precheck,
+            live_proof_validator=live_proof_validator, log_callback=router_logger.log,
+        )
 
         self.availability_stage = OrdinaryRouteAvailabilityStage(
             extension=extension,
@@ -89,7 +99,7 @@ class OrdinaryMinecraftCommandRouteComponentGraph:
             submission_boundary=submission_boundary,
             submission_reconciliation=submission_reconciliation,
             decision_factory=decision_factory,
-            live_proof_validator=live_proof_validator,
+            live_proof_validator=self.confirmation_owner.validate_feedback_proof,
             failure_handler=failure_handler,
             router_logger=router_logger,
         )
@@ -99,6 +109,8 @@ class OrdinaryMinecraftCommandRouteComponentGraph:
             rejection_stage=self.rejection_stage,
             precheck_stage=self.precheck_stage,
             submission_result_stage=self.submission_result_stage,
+            confirmation_owner=self.confirmation_owner,
+            single_registration_owner=self.single_registration_owner,
             find_binding_stage=FindTranslationBindingStage(
                 live_proof_validator=live_proof_validator, log_callback=router_logger.log,
             ),

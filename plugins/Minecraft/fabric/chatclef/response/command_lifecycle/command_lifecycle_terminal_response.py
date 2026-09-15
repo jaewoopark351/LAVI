@@ -15,6 +15,8 @@ class CommandLifecycleTerminalResponse:
     event_id: str
     command_name: str
     presentation_detail_log: str = ""
+    #20260915_kpopmodder: Optional numbered speech keeps the display ID outside audio text.
+    speech_text: str | None = None
 
     ROUTE_KIND = "command_lifecycle"
     RESPONSE_KIND = "command_terminal"
@@ -24,6 +26,10 @@ class CommandLifecycleTerminalResponse:
     def __post_init__(self) -> None:
         if type(self.text) is not str or not self.text:
             raise ValueError("command terminal response text must be an exact str")
+        if self.speech_text is not None and (
+            type(self.speech_text) is not str or not self.speech_text or len(self.speech_text) > 32768
+        ):
+            raise ValueError("command terminal speech text must be bounded exact text")
         if type(self.event_id) is not str or self._EVENT_ID.fullmatch(self.event_id) is None:
             raise ValueError("command terminal response event_id is invalid")
         if type(self.command_name) is not str or self._COMMAND_NAME.fullmatch(self.command_name) is None:

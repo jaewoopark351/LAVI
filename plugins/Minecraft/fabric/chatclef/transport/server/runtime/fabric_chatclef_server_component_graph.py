@@ -1,5 +1,7 @@
 #20260905_kpopmodder: Compose the focused Fabric ChatClef websocket server collaborators.
 from __future__ import annotations
+from plugins.Minecraft.fabric.chatclef.diagnostics.instant_command import InstantCommandDiagnosticObserver
+from plugins.Minecraft.fabric.chatclef.diagnostics.equip_command import EquipCommandDiagnosticObserver
 
 import threading
 
@@ -111,6 +113,8 @@ class FabricChatClefServerComponentGraph:
                 effect_verifier=CraftingFeedbackEffectVerifier(
                     evaluator=CommandTerminalEvidenceEvaluator(
                         diagnostic_observer=goto_terminal_observer,
+                        instant_diagnostic_observer=InstantCommandDiagnosticObserver(diagnostics.info),
+                        equip_diagnostic_observer=EquipCommandDiagnosticObserver(diagnostics.info),
                     ),
                 ),
                 response_renderer=self.crafting_feedback_terminal_presenter,
@@ -246,6 +250,9 @@ class FabricChatClefServerComponentGraph:
             message_id_factory=message_id_factory,
             now_ms=now_ms,
             stop_control_admission_barrier=self.stop_control_admission_barrier,
+            catalogue_provider=lambda: session_registry.command_catalogue(
+                self.connection_ownership.active_session_id
+            ),
         )
         self.shutdown_state_reset = FabricChatClefServerShutdownStateReset(
             connection_ownership=self.connection_ownership,

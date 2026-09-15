@@ -27,6 +27,8 @@ class ChatClefIntentDTO:
     confidence: float = 1.0
     language: str = "ko"
     slots: dict[str, Any] = field(default_factory=dict)
+    #20260915_kpopmodder: Closed interpretation evidence only; never an execution or permission flag.
+    parse_rule_id: str = ""
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "intent_type", ChatClefIntentType(self.intent_type))
@@ -37,6 +39,8 @@ class ChatClefIntentDTO:
         object.__setattr__(self, "language", str(self.language or "ko"))
         object.__setattr__(self, "confidence", float(self.confidence))
         object.__setattr__(self, "slots", dict(self.slots or {}))
+        if type(self.parse_rule_id) is not str or self.parse_rule_id not in {"", "chatclef_verified_spelling"}:
+            raise ValueError("invalid_parse_rule_id")
         object.__setattr__(self, "quantity", self._optional_int(self.quantity, "quantity"))
         object.__setattr__(self, "food_units", self._optional_int(self.food_units, "food_units"))
         object.__setattr__(self, "x", self._optional_int(self.x, "x"))
@@ -62,10 +66,11 @@ class ChatClefIntentDTO:
             confidence=payload.get("confidence", 1.0),
             language=payload.get("language", "ko"),
             slots=payload.get("slots", {}),
+            parse_rule_id=payload.get("parse_rule_id", ""),
         )
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        payload = {
             "intent_type": self.intent_type.value,
             "quantity": self.quantity,
             "item_phrase": self.item_phrase,
@@ -80,6 +85,10 @@ class ChatClefIntentDTO:
             "language": self.language,
             "slots": dict(self.slots),
         }
+        #20260915_kpopmodder: Preserve the established metadata shape when no spelling rule was selected.
+        if self.parse_rule_id:
+            payload["parse_rule_id"] = self.parse_rule_id
+        return payload
 
     def _optional_int(self, value: Any, field_name: str) -> int | None:
         if value is None:

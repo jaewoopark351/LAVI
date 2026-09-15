@@ -6,6 +6,7 @@ from core.logger import log_print
 from .command_feedback_delivery_logger import CommandFeedbackDeliveryLogger
 from .routed_response_emission import RoutedResponseEmission
 from .routed_response_request import RoutedResponseRequest
+from .diagnostics.routed_response_text_projection_formatter import RoutedResponseTextProjectionFormatter
 
 
 class RoutedResponseDeliveryObserver:
@@ -29,6 +30,16 @@ class RoutedResponseDeliveryObserver:
         self._delivery_logger = delivery_logger or CommandFeedbackDeliveryLogger(
             log_callback
         )
+
+    def observe_text_projection(self, request) -> None:
+        #20260915_kpopmodder: Observe the already-selected variant once at output delivery.
+        if type(request) is not RoutedResponseRequest or request.speech_text is None:
+            return
+        try:
+            self._log_callback(RoutedResponseTextProjectionFormatter.format(request))
+        except Exception:
+            # Diagnostic formatting/emission cannot suppress the selected response.
+            pass
 
     def observe_requested_sinks(
         self,

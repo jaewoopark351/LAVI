@@ -16,6 +16,13 @@ public final class FabricChatClefCommandOutcomeClassifier {
         if (classification == null) {
             return FabricChatClefCommandTerminalDecision.waiting("root_ownership_unknown");
         }
+        //20260915_kpopmodder: Immediate commands own their synchronous result, never a preexisting idle task.
+        if (execution.hasInstantResult() && execution.finishCallbackReceived()
+                && execution.finishCallbackFirstObservedBeforeDispatchReturn()
+                && (classification == FabricChatClefRootOwnershipClassification.NO_ROOT_VISIBLE
+                    || classification == FabricChatClefRootOwnershipClassification.PREEXISTING_UNCHANGED_IDLE_ROOT)) {
+            return FabricChatClefCommandTerminalDecision.terminal("instant_command_observed", execution.completedWithoutUserTask());
+        }
         switch (classification) {
             case PREEXISTING_UNCHANGED_IDLE_ROOT:
                 return classifyPreexistingUnchangedIdleRoot(execution);

@@ -19,12 +19,14 @@ class FabricChatClefCommandAdmission:
         command_lock,
         now_ms,
         stop_control_admission_barrier=None,
+        catalogue_provider=None,
     ) -> None:
         self._components = FabricChatClefCommandAdmissionComponentGraph(
             connection_ownership=connection_ownership,
             command_lock=command_lock,
             now_ms=now_ms,
             stop_control_admission_barrier=stop_control_admission_barrier,
+            catalogue_provider=catalogue_provider,
         )
 
     def inspect(

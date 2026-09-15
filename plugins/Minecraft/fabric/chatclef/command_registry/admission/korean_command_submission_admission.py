@@ -16,6 +16,7 @@ from plugins.Minecraft.fabric.chatclef.command_registry.admission.korean_command
 from plugins.Minecraft.fabric.chatclef.command_registry.admission.store_home_command_admission import (
     StoreHomeCommandAdmission,
 )
+from plugins.Minecraft.fabric.chatclef.input.confirmation.confirmation_receipt import KoreanCommandConfirmationReceipt
 
 
 class KoreanCommandSubmissionAdmission:
@@ -58,7 +59,19 @@ class KoreanCommandSubmissionAdmission:
         )
         if h5_decision is not None:
             return h5_decision
-        return self._public_policy.inspect(command, request_source, spec)
+        public = self._public_policy.inspect(command, request_source, spec)
+        if not public.allowed:
+            return public
+        if spec.safety_tier in {"R3", "R4"}:
+            if (type(route_claim) is not KoreanCommandConfirmationReceipt
+                    or not route_claim.matches_admission(command, request_source)):
+                return KoreanCommandSubmissionAdmissionDecision(
+                    allowed=False, command_name=command, source=request_source,
+                    reason_code="korean_confirmation_required",
+                    message="이 명령은 신뢰할 수 있는 한국어 입력에서 요청을 확인한 뒤 실행할 수 있어.",
+                    expose_admission_reason=True,
+                )
+        return public
 
     def commit(
         self,
@@ -66,6 +79,15 @@ class KoreanCommandSubmissionAdmission:
         route_claim: object,
         request: object,
     ) -> KoreanCommandSubmissionAdmissionDecision:
+        if type(route_claim) is KoreanCommandConfirmationReceipt:
+            if not inspection.allowed or not route_claim.commit(request):
+                return KoreanCommandSubmissionAdmissionDecision(
+                    allowed=False, command_name=inspection.command_name, source=inspection.source,
+                    reason_code="korean_confirmation_binding_rejected",
+                    message="확인한 요청의 연결이나 대상 정보가 달라져 실행하지 않았어.",
+                    expose_admission_reason=True,
+                )
+            return inspection
         return self._auto_deposit_trust_policy.commit(
             inspection,
             route_claim,
@@ -73,4 +95,7 @@ class KoreanCommandSubmissionAdmission:
         )
 
     def abandon_if_issued(self, route_claim: object) -> None:
+        if type(route_claim) is KoreanCommandConfirmationReceipt:
+            route_claim.abandon()
+            return
         self._auto_deposit_trust_policy.abandon_if_issued(route_claim)

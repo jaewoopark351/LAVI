@@ -48,6 +48,9 @@ class KoreanStopInputClassifier:
         normalized = unicodedata.normalize("NFKC", body)
         normalized = re.sub(r" +", " ", normalized).strip(" ")
         normalized = re.sub(r"[A-Z]", lambda match: match.group(0).lower(), normalized)
+        #20260915_kpopmodder: Preserve the exact whole-utterance policy while accepting Korean auxiliary spacing.
+        normalized = re.sub(r"멈춰 +줘$", "멈춰줘", normalized)
+        normalized = re.sub(r"중지(?:해|해 +줘|해줘)$", "중지", normalized)
         rule_id = self._PHRASES.get(normalized)
         if rule_id is None:
             return self._guarded_if_stop_like(normalized, "not_exact_whole_utterance")

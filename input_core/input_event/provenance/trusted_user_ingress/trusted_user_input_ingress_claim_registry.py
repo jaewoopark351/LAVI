@@ -181,6 +181,7 @@ class TrustedUserInputIngressClaimRegistry:
         text: str,
         source: str,
         response_kind: str = "immediate",
+        speech_text: str | None = None,
     ) -> bool:
         return self._trusted_response_capability_consumer.consume(
             capability,
@@ -188,6 +189,7 @@ class TrustedUserInputIngressClaimRegistry:
             text=text,
             source=source,
             response_kind=response_kind,
+            speech_text=speech_text,
         )
 
     @property

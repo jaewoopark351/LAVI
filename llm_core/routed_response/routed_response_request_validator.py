@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from .routed_response_request import RoutedResponseRequest
+from .presentation.routed_response_text import RoutedResponseText
 from .presentation import (
     RoutedResponseNonPreemptingDeliveryPolicy,
     RoutedResponsePresentationMetadata,
@@ -65,7 +66,7 @@ class RoutedResponseRequestValidator:
         ):
             raise ValueError("non_preempting delivery requires an event_id")
         return RoutedResponseRequest(
-            text=str(text or "").strip(),
+            text=(text.display_text if type(text) is RoutedResponseText else str(text or "").strip()),
             source=source,
             send_output=send_output,
             send_full_output=send_full_output,
@@ -76,6 +77,7 @@ class RoutedResponseRequestValidator:
             delivery_mode=normalized_delivery_mode,
             presentation_metadata=presentation_metadata,
             send_ui=send_ui,
+            speech_text=text.speech_text if type(text) is RoutedResponseText else None,
         )
 
 

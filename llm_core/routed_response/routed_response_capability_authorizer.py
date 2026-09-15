@@ -29,12 +29,14 @@ class RoutedResponseCapabilityAuthorizer:
         ):
             return False, "authorization_unavailable"
         try:
+            speech_args = {} if request.speech_text is None else {"speech_text": request.speech_text}
             accepted = self._capability_consumer(
                 emission_capability,
                 event=event,
                 text=request.text,
                 source=request.source,
                 response_kind=request.response_kind,
+                **speech_args,
             )
         except Exception:
             return False, "authorization_failed"

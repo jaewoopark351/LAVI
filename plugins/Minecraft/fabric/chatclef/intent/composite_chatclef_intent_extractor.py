@@ -46,6 +46,9 @@ class CompositeChatClefIntentExtractor:
 
     def extract(self, text: str) -> ChatClefIntentDTO:
         intent = self._rule_parser.parse(text)
+        #20260915_kpopmodder: New rejected command families retain deterministic refusal ownership.
+        if intent.source == "all_commands_guard" or "all_commands_guard" in intent.slots:
+            return intent
         if intent.intent_type is not ChatClefIntentType.UNKNOWN:
             return intent
         if self._auto_deposit_trust_guard_marker.has_marker(intent):

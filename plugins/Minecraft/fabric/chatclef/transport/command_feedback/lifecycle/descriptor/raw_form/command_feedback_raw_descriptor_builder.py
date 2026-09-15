@@ -82,6 +82,8 @@ class CommandFeedbackRawDescriptorBuilder:
                     evidence.rollout_state
                     if (command_name == "get" and single_target is not None)
                     or (command_name == "find" and detail_level == CommandFeedbackDescriptor.RAW_TYPED)
+                    #20260915_kpopmodder: Exact instant payload validation remains necessary before any strong result.
+                    or (evidence.success_evaluator_id == "instant_command" and raw_slots.slots_recoverable)
                     or (
                         command_name == "goto"
                         and detail_level == CommandFeedbackDescriptor.RAW_TYPED

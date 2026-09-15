@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 from typing import Any, Mapping
+from plugins.Minecraft.fabric.chatclef.input.confirmation.confirmation_receipt import KoreanCommandConfirmationReceipt
+from plugins.Minecraft.fabric.chatclef.input.auto_deposit_trust.single_registration.single_container_trust_receipt import SingleContainerTrustReceipt
 
 from plugins.Minecraft.fabric.chatclef.input.routing.submission.minecraft_chatclef_submission_boundary_component_graph import (
     MinecraftChatClefSubmissionBoundaryComponentGraph,
@@ -54,6 +56,10 @@ class MinecraftChatClefSubmissionBoundary:
             original_text=original_text,
             translation_input_text=translation_input_text,
         )
+        if type(route_claim) is KoreanCommandConfirmationReceipt:
+            request["metadata"]["korean_confirmation"] = route_claim.binding_metadata()
+        if type(route_claim) is SingleContainerTrustReceipt:
+            request["metadata"]["korean_single_trust"] = route_claim.binding_metadata()
         request_id = str(request["request_id"])
         try:
             payload = self._transport_invoker.invoke(

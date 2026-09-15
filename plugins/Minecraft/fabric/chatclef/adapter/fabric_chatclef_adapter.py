@@ -131,6 +131,15 @@ class FabricChatClefAdapter:
     def get_status(self) -> StatusSnapshotDTO:
         return self._server.status_snapshot(enabled=self._config.enabled)
 
+    #20260915_kpopmodder: Name data is readable only for the currently connected session.
+    def get_command_catalogue(self):
+        status = self.get_status()
+        if not self._config.enabled or not status.connected:
+            return None
+        commands = status.details.get("commands", {})
+        session_id = commands.get("active_session_id")
+        return self._session_registry.command_catalogue(session_id)
+
     def _reject(
         self,
         request: CommandRequestDTO,

@@ -1,6 +1,7 @@
 #20260820_kpopmodder: Lock Python Korean command registry axes against ChatClef command drift.
 #20260829_openai: Lock raw-only deposit_all metadata and 22-command parity.
 #20260905_kpopmodder: Lock H5 metadata, independent readiness, and exact 26-command parity.
+#20260915_kpopmodder: Match native optional/list grammar and complete trusted Korean readiness.
 from __future__ import annotations
 
 import json
@@ -28,14 +29,16 @@ class PythonKoreanCommandRegistryTests(unittest.TestCase):
             )["commands"]
         }
 
-        self.assertEqual(expected, set(registry.command_names()))
-        self.assertEqual(26, len(registry.command_names()))
+        # The historical extraction predates the separately registered FIND owner.
+        self.assertEqual(expected | {"find"}, set(registry.command_names()))
+        self.assertEqual(27, len(registry.command_names()))
+        self.assertEqual(26, len(registry.public_korean_command_names()))
 
     def test_auto_deposit_trust_is_public_with_exact_h5_metadata(self):
         registry = KoreanChatClefCommandRegistry()
         spec = registry.spec("auto_deposit_trust")
 
-        self.assertEqual((), spec.slot_schema)
+        self.assertEqual(("area?", "size?"), spec.slot_schema)
         self.assertEqual("command_specific", spec.resolver_domain)
         self.assertEqual("immediate", spec.lifecycle_kind)
         self.assertEqual("R2", spec.safety_tier)
@@ -57,7 +60,7 @@ class PythonKoreanCommandRegistryTests(unittest.TestCase):
             spec.readiness_axes.to_dict(),
         )
 
-    def test_other_h5_registrar_commands_remain_raw_only_shadow_rows(self):
+    def test_h5_canonical_commands_are_public_and_unicode_alias_stays_canonicalized(self):
         registry = KoreanChatClefCommandRegistry()
         expectations = {
             "auto_deposit_untrust": (("destinationId?",), "R2"),
@@ -74,16 +77,21 @@ class PythonKoreanCommandRegistryTests(unittest.TestCase):
                 self.assertEqual("immediate", spec.lifecycle_kind)
                 self.assertEqual(safety_tier, spec.safety_tier)
                 self.assertEqual("none", spec.confirmation_mode)
-                self.assertEqual((), spec.allowed_input_sources)
+                canonical = command != "자동보관등록"
+                self.assertEqual(
+                    ("lavi_chat_ui", "voice_input_final", "direct_typed", "lavi_gui_korean")
+                    if canonical else (),
+                    spec.allowed_input_sources,
+                )
                 self.assertEqual(f"prefixless_{command}", spec.serializer_id)
                 self.assertEqual(
                     {
                         "SOURCE_REGISTERED": True,
-                        "KOREAN_PARSE_COMPILE_READY": False,
-                        "PYTHON_ADMISSION_READY": False,
-                        "BRIDGE_LIFECYCLE_READY": False,
+                        "KOREAN_PARSE_COMPILE_READY": canonical,
+                        "PYTHON_ADMISSION_READY": canonical,
+                        "BRIDGE_LIFECYCLE_READY": canonical,
                         "GAMEPLAY_EFFECT_VERIFIABLE": False,
-                        "PUBLIC_KOREAN_ENABLED": False,
+                        "PUBLIC_KOREAN_ENABLED": canonical,
                     },
                     spec.readiness_axes.to_dict(),
                 )
@@ -105,7 +113,7 @@ class PythonKoreanCommandRegistryTests(unittest.TestCase):
             & registry._PYTHON_ADMISSION_READY_COMMANDS,
         )
 
-    def test_deposit_all_is_raw_only_shadow_metadata(self):
+    def test_deposit_all_is_public_with_its_own_optional_list_grammar(self):
         registry = KoreanChatClefCommandRegistry()
         spec = registry.spec("deposit_all")
 
@@ -114,20 +122,23 @@ class PythonKoreanCommandRegistryTests(unittest.TestCase):
         self.assertEqual("task", spec.lifecycle_kind)
         self.assertEqual("R2", spec.safety_tier)
         self.assertEqual("none", spec.confirmation_mode)
-        self.assertEqual((), spec.allowed_input_sources)
+        self.assertEqual(
+            ("lavi_chat_ui", "voice_input_final", "direct_typed", "lavi_gui_korean"),
+            spec.allowed_input_sources,
+        )
         self.assertEqual("prefixless_deposit_all", spec.serializer_id)
         self.assertEqual(
             {
                 "SOURCE_REGISTERED": True,
-                "KOREAN_PARSE_COMPILE_READY": False,
-                "PYTHON_ADMISSION_READY": False,
-                "BRIDGE_LIFECYCLE_READY": False,
+                "KOREAN_PARSE_COMPILE_READY": True,
+                "PYTHON_ADMISSION_READY": True,
+                "BRIDGE_LIFECYCLE_READY": True,
                 "GAMEPLAY_EFFECT_VERIFIABLE": False,
-                "PUBLIC_KOREAN_ENABLED": False,
+                "PUBLIC_KOREAN_ENABLED": True,
             },
             spec.readiness_axes.to_dict(),
         )
-        self.assertNotIn("deposit_all", registry.public_korean_command_names())
+        self.assertIn("deposit_all", registry.public_korean_command_names())
 
     def test_store_home_is_ready_for_public_korean_submission(self):
         spec = KoreanChatClefCommandRegistry().spec("store_home")
@@ -153,10 +164,10 @@ class PythonKoreanCommandRegistryTests(unittest.TestCase):
         registry = KoreanChatClefCommandRegistry()
 
         expectations = {
-            "get": ("item_target", ("item", "count")),
-            "equip": ("equipment_item_target", ("equipment_item",)),
-            "deposit": ("item_target", ("item", "count")),
-            "give": ("player_and_item_target", ("player", "item", "count")),
+            "get": ("item_target", ("items",)),
+            "equip": ("equipment_item_target", ("equipment_items_or_material",)),
+            "deposit": ("item_target", ("items?",)),
+            "give": ("player_and_item_target", ("player?", "item", "count?")),
         }
         for command, (resolver_domain, slot_schema) in expectations.items():
             with self.subTest(command=command):
@@ -179,7 +190,7 @@ class PythonKoreanCommandRegistryTests(unittest.TestCase):
                     spec.allowed_input_sources,
                 )
 
-    def test_high_risk_commands_are_registered_without_public_korean_enablement(self):
+    def test_high_risk_commands_require_trusted_korean_confirmation(self):
         registry = KoreanChatClefCommandRegistry()
 
         for command in {
@@ -196,30 +207,31 @@ class PythonKoreanCommandRegistryTests(unittest.TestCase):
                 spec = registry.spec(command)
 
                 self.assertTrue(spec.readiness_axes.source_registered)
-                self.assertFalse(spec.readiness_axes.public_korean_enabled)
+                self.assertTrue(spec.readiness_axes.public_korean_enabled)
                 self.assertIn(spec.safety_tier, {"R3", "R4"})
                 self.assertEqual(
-                    "direct_typed_confirmation_required",
+                    "trusted_korean_confirmation_required",
                     spec.confirmation_mode,
                 )
 
-    def test_lifecycle_open_commands_are_parse_ready_but_not_public(self):
+    def test_continuous_commands_are_public_with_confirmation_and_native_defaults(self):
         registry = KoreanChatClefCommandRegistry()
 
-        expectations = {
-            "follow": ("direct_typed_confirmation_required", ("direct_typed_only",)),
-            "idle": ("direct_typed_confirmation_required", ("direct_typed_only",)),
-        }
-        for command, (confirmation_mode, allowed_sources) in expectations.items():
+        expectations = {"follow": ("player?",), "idle": ()}
+        for command, slots in expectations.items():
             with self.subTest(command=command):
                 spec = registry.spec(command)
 
                 self.assertTrue(spec.readiness_axes.source_registered)
                 self.assertTrue(spec.readiness_axes.korean_parse_compile_ready)
-                self.assertFalse(spec.readiness_axes.python_admission_ready)
-                self.assertFalse(spec.readiness_axes.public_korean_enabled)
-                self.assertEqual(confirmation_mode, spec.confirmation_mode)
-                self.assertEqual(allowed_sources, spec.allowed_input_sources)
+                self.assertTrue(spec.readiness_axes.python_admission_ready)
+                self.assertTrue(spec.readiness_axes.public_korean_enabled)
+                self.assertEqual("trusted_korean_confirmation_required", spec.confirmation_mode)
+                self.assertEqual(slots, spec.slot_schema)
+                self.assertEqual(
+                    ("lavi_chat_ui", "voice_input_final", "direct_typed", "lavi_gui_korean"),
+                    spec.allowed_input_sources,
+                )
 
     #20260905_kpopmodder: STOP is public-ready only through its guarded control lane.
     def test_stop_has_separate_public_control_readiness(self):

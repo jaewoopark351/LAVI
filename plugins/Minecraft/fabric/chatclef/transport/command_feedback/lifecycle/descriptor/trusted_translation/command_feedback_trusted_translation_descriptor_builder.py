@@ -9,6 +9,9 @@ from ..command_feedback_family_mapping import COMMAND_FEEDBACK_FAMILIES
 from ..command_feedback_quantity_semantics import (
     command_feedback_quantity_semantics,
 )
+from .command_feedback_trusted_slot_validator import CommandFeedbackTrustedSlotValidator
+from .command_feedback_trusted_slot_projector import CommandFeedbackTrustedSlotProjector
+from .command_feedback_spoken_label_resolver import CommandFeedbackSpokenLabelResolver
 
 
 class CommandFeedbackTrustedTranslationDescriptorBuilder:
@@ -34,6 +37,8 @@ class CommandFeedbackTrustedTranslationDescriptorBuilder:
         self._verb_matcher = verb_matcher
         self._item_phrases = item_phrase_resolver
         self._lifecycle_kinds = lifecycle_kind_profiles
+        self._slot_projector = CommandFeedbackTrustedSlotProjector(display_names)
+        self._spoken_labels = CommandFeedbackSpokenLabelResolver(display_names, item_phrase_resolver)
 
     def build(
         self,
@@ -74,9 +79,17 @@ class CommandFeedbackTrustedTranslationDescriptorBuilder:
         intent_kind = str(intent.get("intent_type") or "unknown")
         target_item = self._optional_text(translation.get("resolved_target"))
         requested_count = self._quantity(intent, command_name)
-        spoken_label = self._spoken_label(target_item, intent.get("item_phrase"))
-        coordinates = self._coordinates(intent, command_name)
-        if coordinates is False or not self._trusted_slots_match(
+        data = translation.get("data")
+        labels = data.get("target_labels") if isinstance(data, Mapping) else None
+        def spoken(target, phrase):
+            return self._spoken_labels.resolve(target, phrase, labels)
+        spoken_label = spoken(target_item, intent.get("item_phrase"))
+        projection = self._slot_projector.project(command.strip(), intent, spoken)
+        if projection is None:
+            return None
+        form, slots, targets = projection
+        coordinates = slots.coordinate_values if len(slots.coordinate_values) == 3 else None
+        if not self._trusted_slots_match(
             command_name=command_name,
             command=command.strip(),
             intent=intent,
@@ -85,6 +98,11 @@ class CommandFeedbackTrustedTranslationDescriptorBuilder:
             coordinates=coordinates,
         ):
             return None
+        if targets:
+            # The compiler may aggregate repeated list entries; freeze its actual resulting quantity.
+            target_item = targets[0].canonical_target if len(targets) == 1 else None
+            requested_count = targets[0].requested_count if len(targets) == 1 else None
+            spoken_label = targets[0].spoken_label if len(targets) == 1 else ""
         verb_class = ""
         if command_name == "get":
             verb_class = self._verb_matcher.classify(
@@ -111,10 +129,17 @@ class CommandFeedbackTrustedTranslationDescriptorBuilder:
             quantity_semantics=command_feedback_quantity_semantics(command_name),
             acquisition_verb_class=verb_class,
             spoken_target_label=spoken_label,
-            player_name=self._optional_text(intent.get("player_name")) or "",
+            player_name=self._optional_text(intent.get("player_name")) or slots.player_name,
             coordinates=coordinates,
-            form_kind="trusted_translation",
+            form_kind=("equipment_material_set" if form.form_kind == "equipment_material_set" else "trusted_translation"),
             response_lifecycle_kind=lifecycle.response_lifecycle_kind,
+            targets=targets,
+            coordinate_values=slots.coordinate_values,
+            dimension=slots.dimension,
+            setting_value=slots.setting_value,
+            structure_name=slots.structure_name,
+            destination_id=slots.destination_id,
+            operation_target=slots.operation_target,
         )
 
     @staticmethod
@@ -129,20 +154,7 @@ class CommandFeedbackTrustedTranslationDescriptorBuilder:
         return values
 
     def _spoken_label(self, target: str | None, item_phrase: object) -> str:
-        phrase = str(item_phrase or "").strip()
-        if target and self._SAFE_KOREAN_LABEL.fullmatch(phrase):
-            try:
-                resolution = self._item_phrases.resolve(phrase)
-            except Exception:
-                resolution = {}
-            if (
-                resolution.get("status") == "validated"
-                and resolution.get("target") == target
-            ):
-                return phrase
-        if target and target in self._display_names.display_names:
-            return self._display_names.display_names[target]
-        return "요청한 아이템" if target else ""
+        return self._spoken_labels.resolve(target, item_phrase)
 
     @staticmethod
     def _quantity(intent: Mapping, command_name: str):
@@ -173,74 +185,13 @@ class CommandFeedbackTrustedTranslationDescriptorBuilder:
         requested_count: int | None,
         coordinates: tuple[int, int, int] | None,
     ) -> bool:
-        expected_intents = {
-            "auto_deposit_trust": "auto_deposit_trust_area",
-            "deposit": "deposit_item",
-            "equip": "equip_item",
-            "food": "food",
-            "get": "get_item",
-            "give": "give_item",
-            "find": "find",
-            "goto": "goto",
-            "meat": "meat",
-            "store_home": "store_home",
-        }
-        if intent.get("intent_type") != expected_intents.get(command_name):
-            return False
         #20260914_kpopmodder: Bind feedback to the exact admitted FIND slots.
-        if command_name == "find":
-            from plugins.Minecraft.fabric.chatclef.intent.chatclef_command_compiler import ChatClefCommandCompiler
-            from plugins.Minecraft.fabric.chatclef.intent.chatclef_intent_dto import ChatClefIntentDTO
-            from plugins.Minecraft.fabric.chatclef.intent.chatclef_intent_schema_validator import ChatClefIntentSchemaValidator
-            try:
-                valid, _, _ = ChatClefIntentSchemaValidator().validate(intent)
-                #20260915_kpopmodder: Recompile the original Korean slots; never trust the translated ID alone.
-                return valid and command == ChatClefCommandCompiler().compile(ChatClefIntentDTO.from_mapping(intent))
-            except (ValueError, TypeError, OSError):
-                return False
-        if command_name in {"get", "deposit"}:
-            return bool(
-                type(target_item) is str
-                and cls._TARGET.fullmatch(target_item)
-                and type(requested_count) is int
-                and requested_count <= cls._JAVA_INT_MAX
-                and command == f"{command_name} {target_item} {requested_count}"
-            )
-        if command_name == "equip":
-            return bool(
-                type(target_item) is str
-                and cls._TARGET.fullmatch(target_item)
-                and command == f"equip {target_item}"
-            )
-        if command_name == "give":
-            player = cls._optional_text(intent.get("player_name"))
-            return bool(
-                type(player) is str
-                and cls._PLAYER.fullmatch(player)
-                and type(target_item) is str
-                and cls._TARGET.fullmatch(target_item)
-                and type(requested_count) is int
-                and requested_count <= cls._JAVA_INT_MAX
-                and command == f"give {player} {target_item} {requested_count}"
-            )
-        if command_name in {"food", "meat"}:
-            return bool(
-                type(requested_count) is int
-                and requested_count <= cls._JAVA_INT_MAX
-                and command == f"{command_name} {requested_count}"
-            )
-        if command_name == "goto":
-            return bool(
-                type(coordinates) is tuple
-                and all(cls._JAVA_INT_MIN <= value <= cls._JAVA_INT_MAX for value in coordinates)
-                and command
-                == f"goto {coordinates[0]} {coordinates[1]} {coordinates[2]}"
-            )
-        if command_name == "auto_deposit_trust":
-            return command == "auto_deposit_trust area 16x16"
-        if command_name == "store_home":
-            return command == "store_home"
-        return False
+        #20260915_kpopmodder: Recompile original Korean slots in the extracted validator.
+        #20260915_kpopmodder: Preserve the compatibility seam while delegating typed validation.
+        return CommandFeedbackTrustedSlotValidator().matches(
+            command_name=command_name, command=command, intent=intent,
+            target_item=target_item, requested_count=requested_count, coordinates=coordinates,
+        )
 
     @staticmethod
     def _optional_text(value: object) -> str | None:

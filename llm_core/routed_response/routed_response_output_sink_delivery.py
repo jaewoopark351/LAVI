@@ -35,6 +35,7 @@ class RoutedResponseOutputSinkDelivery:
             raise TypeError("routed response request must be exact")
         if not request.send_output:
             return False
+        self._observer.observe_text_projection(request)
         try:
             payload = self._payload_adapter.build(
                 request,

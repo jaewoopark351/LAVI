@@ -89,6 +89,12 @@ public final class FabricChatClefCommandExecution {
         state.markFinishCallbackReceived(taskAtFinish);
     }
 
+    public void attachInstantResult(lavi.minecraft.command.result.instant.InstantCommandResult result) {
+        state.attachInstantResult(result);
+    }
+
+    public boolean hasInstantResult() { return state.instantResult() != null; }
+
     public FabricChatClefCommandResultPayload unknownAfterFinish(FabricChatClefTaskSnapshot taskAtFinish) {
         return resultFactory.unknownAfterFinish();
     }

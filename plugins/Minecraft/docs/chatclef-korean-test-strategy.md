@@ -17,6 +17,18 @@
 
 Date: 2026-08-15
 
+> 2026-09-15 documentation-only follow-up: use the
+> [all-command Korean Chat/microphone requirements](chatclef-all-commands-korean-chat-microphone-requirements-2026-09-15.md)
+> for the current 27-name / 26-semantic-command target and full ingress-to-result
+> acceptance matrix. This strategy retains ownership of test evidence and safety;
+> older 20/22/26 counts below are dated snapshots. Parser/public flags, Korean
+> response profiles, and raw-ID fallback do not establish complete Korean
+> execution. Test trusted Chat and final microphone separately, retain current
+> GET/FIND/GOTO and defense/deposit regressions, and distinguish simulation,
+> actual formatter/sink output, full clean build, targeted artifact generation,
+> deployment, and live runtime. No test or build is executed by this documentation
+> update, and earlier test totals are not all-command acceptance evidence.
+
 This document records the documentation-only test strategy for Korean Fabric
 ChatClef command handling.
 

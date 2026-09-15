@@ -17,7 +17,8 @@ class CommandFeedbackRawItemGrammar:
             "required_item_list",
         }
     )
-    _ITEM = re.compile(r"[a-z0-9_]+\Z", re.ASCII)
+    #20260915_kpopmodder: GIVE may accept the exact full translation key of a mod item.
+    _ITEM = re.compile(r"[A-Za-z0-9_:./-]{1,256}\Z", re.ASCII)
     _PLAYER = re.compile(r"[A-Za-z0-9_]{1,16}\Z", re.ASCII)
     _ARMOR_SETS = frozenset({"leather", "iron", "gold", "diamond", "netherite"})
 

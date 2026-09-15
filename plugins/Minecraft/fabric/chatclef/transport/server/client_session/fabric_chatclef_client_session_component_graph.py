@@ -15,6 +15,7 @@ from .fabric_chatclef_inbound_envelope_reader import (
     FabricChatClefInboundEnvelopeReader,
 )
 from .handshake import FabricChatClefHandshakeComponentGraph
+from .catalogue import FabricChatClefCatalogueEventHandler
 
 
 class FabricChatClefClientSessionComponentGraph:
@@ -63,6 +64,10 @@ class FabricChatClefClientSessionComponentGraph:
             command_result_handler=command_result_handler,
             stop_control_result_demultiplexer=stop_control_result_demultiplexer,
             status_provider=status_provider,
+            catalogue_event_handler=FabricChatClefCatalogueEventHandler(
+                connection_ownership=connection_ownership, command_lock=command_lock,
+                session_registry=session_registry, diagnostics=diagnostics,
+            ),
         )
         self.disconnect_cleanup = FabricChatClefClientDisconnectCleanup(
             connection_ownership=connection_ownership,

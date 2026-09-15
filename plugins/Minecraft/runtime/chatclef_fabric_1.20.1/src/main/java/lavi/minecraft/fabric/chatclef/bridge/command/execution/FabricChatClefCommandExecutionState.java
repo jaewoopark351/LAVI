@@ -38,6 +38,10 @@ final class FabricChatClefCommandExecutionState {
     private final FabricChatClefCommandEffectTracker commandEffectTracker;
     private volatile boolean executorExecuteInvocationOpen;
     private volatile boolean dispatchReturned;
+    private lavi.minecraft.command.result.instant.InstantCommandResult instantResult;
+
+    void attachInstantResult(lavi.minecraft.command.result.instant.InstantCommandResult result) { instantResult = result; }
+    lavi.minecraft.command.result.instant.InstantCommandResult instantResult() { return instantResult; }
     private volatile boolean finishCallbackReceived;
     private volatile long finishCallbackReceivedAtMs;
     private volatile FabricChatClefFinishCallbackObservation firstFinishCallbackObservation;
@@ -68,7 +72,8 @@ final class FabricChatClefCommandExecutionState {
                 context,
                 normalizedCommand,
                 taskBeforeDispatchEvidence,
-                FabricChatClefCommandEffectTrackerFactory::capture
+                (Function<String, FabricChatClefCommandEffectTracker>) command ->
+                        FabricChatClefCommandEffectTrackerFactory.capture(command, context)
         );
     }
 

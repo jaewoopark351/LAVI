@@ -33,12 +33,17 @@ public class AttackPlayerOrMobCommand extends Command {
         String nameToAttack = parser.get(String.class);
         int countToAttack = parser.get(Integer.class);
 
-        mod.runUserTask(new AttackAndGetDropsTask(nameToAttack, countToAttack), this::finish);
+        //20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
+        //20260915_kpopmodder: Freeze Korean mob-only permission; native English attack keeps its existing policy.
+        // Exact scope/inverse: docs/chatclef-all-commands-korean-implementation-2026-09-15.md.
+        mod.runUserTask(new AttackAndGetDropsTask(nameToAttack, countToAttack,
+                lavi.minecraft.command.attack.KoreanAttackExecutionScope.mobOnly()), this::finish);
     }
 
     private static class AttackAndGetDropsTask extends ResourceTask {
 
         private final String _toKill;
+        private final boolean _mobOnly;
     
         private final Task _killTask;
 
@@ -77,11 +82,18 @@ public class AttackPlayerOrMobCommand extends Command {
     };
 
         public AttackAndGetDropsTask(String toKill, int killCount) {
+            this(toKill, killCount, false);
+        }
+
+        public AttackAndGetDropsTask(String toKill, int killCount, boolean mobOnly) {
             super(drops);
             _toKill = toKill;
+            _mobOnly = mobOnly;
             _mobKillTargetCount = killCount;
 
             _shouldAttackPredicate = (entity) -> {
+                // This guard also applies to players entering the loaded world after admission.
+                if (!lavi.minecraft.command.attack.KoreanAttackExecutionScope.mayTarget(_mobOnly, entity instanceof PlayerEntity)) return false;
                 // Done, don't attack any mobs just collect
                 if (_mobsKilledCount >= _mobKillTargetCount) {
                     return false;
@@ -175,7 +187,7 @@ public class AttackPlayerOrMobCommand extends Command {
         @Override
         protected boolean isEqualResource(ResourceTask other) {
             if (other instanceof AttackAndGetDropsTask task) {
-                return task._toKill.equals(_toKill) && task._mobKillTargetCount == _mobKillTargetCount;
+                return task._toKill.equals(_toKill) && task._mobKillTargetCount == _mobKillTargetCount && task._mobOnly == _mobOnly;
             }
             return false;
         }

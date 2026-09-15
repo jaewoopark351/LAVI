@@ -32,6 +32,7 @@ class ConsumedIngressResponseCapabilityIssuer:
         text: str,
         source: str,
         response_kind: str = "immediate",
+        deferred_selection=None,
     ) -> RoutedResponseEmissionCapability | None:
         if (
             not self._lifecycle.matches_event(event)
@@ -56,6 +57,7 @@ class ConsumedIngressResponseCapabilityIssuer:
                 text=text,
                 source=source,
                 response_kind=response_kind,
+                deferred_selection=deferred_selection,
             )
 
 

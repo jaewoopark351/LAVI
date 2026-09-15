@@ -23,6 +23,9 @@ public final class OverlayCommand extends Command {
             case ON -> visibilityController.setVisible(mod, true);
             case OFF -> visibilityController.setVisible(mod, false);
         }
+        //20260915_kpopmodder: Observe the existing controller's returned visibility change.
+        lavi.minecraft.command.result.instant.InstantCommandResultCapture.record("overlay", true, "SETTING_APPLIED",
+                java.util.Map.of("enabled", toggle == OverlayToggleState.ON));
         finish();
     }
 }

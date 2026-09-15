@@ -24,11 +24,13 @@ class FabricChatClefCommandAdmissionComponentGraph:
         command_lock,
         now_ms,
         stop_control_admission_barrier=None,
+        catalogue_provider=None,
     ) -> None:
         self.inspector = FabricChatClefOrdinaryAdmissionInspector(
             connection_ownership=connection_ownership,
             now_ms=now_ms,
             stop_control_admission_barrier=stop_control_admission_barrier,
+            catalogue_provider=catalogue_provider,
         )
         self.ownership_committer = FabricChatClefCommandOwnershipCommitter(
             connection_ownership=connection_ownership,

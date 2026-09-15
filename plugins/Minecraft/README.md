@@ -148,6 +148,23 @@ unsupported evidence retains cautious wording. The implementation record lists
 source, test, artifact, and live-runtime verification separately. See section 10
 of the input contract for the earlier scoped status update.
 
+<!-- 20260915_kpopmodder: Link the authorized implementation while retaining the earlier requirements snapshot. -->
+The [all-command Korean implementation record](docs/chatclef-all-commands-korean-implementation-2026-09-15.md)
+tracks the user-authorized implementation: shared Chat/final-microphone parsing,
+per-command validation, Korean confirmation, native grammar serialization, and
+runtime registry names. It includes all 26 canonical command examples plus the
+compatibility alias, data coverage counts, and separate test/build/runtime evidence.
+Python route tests with a substitute bridge do not prove live-game success;
+the implementation record identifies the remaining verification scope.
+
+The [all-command Korean Chat/microphone requirements](docs/chatclef-all-commands-korean-chat-microphone-requirements-2026-09-15.md)
+record the requested complete input-to-execution/result path, Java grammar review,
+argument/name coverage, confirmation, safety, and acceptance matrix.
+The earlier requirements snapshot has 27 registered names (26 semantic commands) and 11 public
+Korean metadata rows; those flags are not proof of complete Chat/microphone support.
+That snapshot records the documentation phase. The later implementation record
+above owns current implementation and verification status while preserving FIND/GOTO.
+
 <!-- 20260915_kpopmodder: Distinguish the current Python-owned FIND vocabulary from the historical audit below. -->
 Current FIND name handling is documented in
 [Python JSON names and Java registry IDs](docs/chatclef-find-python-names-2026-09-15.md).
@@ -904,7 +921,13 @@ Contextual natural active-command STATUS responses for all ordinary command-life
 Contextual current-task wording for an exact typed pre-submit busy rejection, with rejected admission, zero submission and unchanged active identity (implemented and verified offline; Java/Gradle/live runtime not run; no commit or push performed):
   chatclef-python-contextual-active-command-busy-response-pre-change-contract-2026-09-08.md
 
-Korean coordinate GOTO ownership/grammar, bounded loaded-scope LAVI-owned FIND behavior, and Korean Chat/final-microphone coverage for every registered command (mixed-worktree GOTO grammar; one incident verifies translation/admission/root binding only; navigation failed; FIND and full coverage remain unimplemented):
+All-command Korean Chat/final-microphone implementation (26-command usage, shared route verification, data coverage, and distinct build/live evidence):
+  chatclef-all-commands-korean-implementation-2026-09-15.md
+
+All-command Korean Chat/final-microphone requirements (earlier documentation snapshot; Java grammar, existing FIND preservation, confirmation, and end-to-end acceptance):
+  chatclef-all-commands-korean-chat-microphone-requirements-2026-09-15.md
+
+Historical Korean GOTO/FIND and Workstream C design with dated incident evidence (use the 2026-09-15 requirements and current FIND record for present scope):
   chatclef-korean-goto-find-and-all-command-coverage-pre-change-contract-2026-09-09.md
 
 Historical GOTO high-Y material-readiness and pre-runtime implementation ledger (reference-only after matching-JAR failed runtime acceptance; root cause and exact safe rollback scope unproven):

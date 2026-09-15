@@ -28,6 +28,9 @@ public class GiveCommand extends Command {
             if (mod.getButler().hasCurrentUser()) {
                 username = mod.getButler().getCurrentUser();
             } else {
+                //20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
+                //20260915_kpopmodder: Observe an existing early rejection; leave Task and inventory logic untouched.
+                lavi.minecraft.command.result.instant.InstantCommandResultCapture.record("give", false, "BUTLER_USER_UNAVAILABLE", java.util.Map.of());
                 mod.logWarning("No butler user currently present. Running this command with no user argument can ONLY be done via butler.");
                 finish();
                 return;
@@ -55,6 +58,7 @@ public class GiveCommand extends Command {
 
         // Fail if user not found in render distance or not in user list
         if (!mod.getEntityTracker().isPlayerLoaded(username)) {
+            lavi.minecraft.command.result.instant.InstantCommandResultCapture.record("give", false, "PLAYER_NOT_LOADED", java.util.Map.of());
             String nearbyUsernames = String.join(",", mod.getEntityTracker().getAllLoadedPlayerUsernames());
             Debug.logMessage("No user in render distance found with username \"" + username + "\". Maybe this was a typo or there is a user with a similar name around? Nearby users: [" + nearbyUsernames + "].");
             finish();
@@ -66,6 +70,7 @@ public class GiveCommand extends Command {
             mod.runUserTask(new GiveItemToPlayerTask(username, target), this::finish);
         } else {
             // Valid names = task_resources U inventory
+            lavi.minecraft.command.result.instant.InstantCommandResultCapture.record("give", false, "ITEM_UNAVAILABLE", java.util.Map.of());
 
             Set<String> validNames = new HashSet<>(TaskCatalogue.resourceNames());
             for (int i = 0; i < mod.getPlayer().getInventory().size(); ++i) {

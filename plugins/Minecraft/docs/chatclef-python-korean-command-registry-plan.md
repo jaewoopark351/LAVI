@@ -16,6 +16,24 @@
 
 Date: 2026-08-20
 
+## 2026-09-15 all-command requirements reconciliation
+
+The [all-command Korean Chat/microphone requirements](chatclef-all-commands-korean-chat-microphone-requirements-2026-09-15.md)
+record the latest documentation-only scope and source snapshot: 27 registered
+names, 26 semantic commands, 11 public Korean rows, and 13 parser-ready rows.
+`follow`/`idle` parser readiness does not grant admission; `gamer`'s Python
+`target` slot conflicts with its argument-free Java constructor. No metadata
+or production code is changed by this reconciliation.
+
+This plan retains ownership of registry/readiness policy. The dated 20/22/26
+snapshots and their implementation results below are historical evidence.
+The new requirements use actual Java grammar and per-command capability as
+the source of argument contracts, retain existing FIND, and require both Chat
+and final-microphone execution/results. They permit only necessary scoped
+Java/bridge support in a later explicitly requested implementation; the older
+Python-only proposal is not a reason to leave required execution paths missing.
+Documentation itself grants no implementation, test, build, or runtime authority.
+
 ## 2026-09-07 lifecycle-feedback reconciliation
 
 The registry remains the authority for command names, slot domains, safety,

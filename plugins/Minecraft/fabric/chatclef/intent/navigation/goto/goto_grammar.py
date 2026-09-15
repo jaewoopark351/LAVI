@@ -3,6 +3,8 @@ import re
 
 
 MOVE_VERBS = ("이동해주세요", "이동해줘", "가주세요", "이동해", "가줘", "가자", "이동", "가")
+#20260915_kpopmodder: Final microphone spacing may separate the request ending.
+MOVE_VERBS = MOVE_VERBS + ("이동해 주세요", "이동해 줘", "가 주세요", "가 줘")
 NEGATED_FAVOR_MOVE = r"(?:이동해|가)[ ]*주지[ ]*(?:마|말)"
 MOVE_CONTEXT_RE = re.compile(
     r"이동|가(?:주세요|줘|자|면|고|지|나요|니|도|야|려|는|서|겠|라고)|"

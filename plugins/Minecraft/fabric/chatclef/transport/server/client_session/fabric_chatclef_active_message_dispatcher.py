@@ -18,6 +18,7 @@ class FabricChatClefActiveMessageDispatcher:
         command_result_handler,
         stop_control_result_demultiplexer,
         status_provider: Callable[[], dict[str, Any]],
+        catalogue_event_handler=None,
     ) -> None:
         self._connection_ownership = connection_ownership
         self._command_lock = command_lock
@@ -26,6 +27,7 @@ class FabricChatClefActiveMessageDispatcher:
         self._command_result_handler = command_result_handler
         self._stop_control_result_demultiplexer = stop_control_result_demultiplexer
         self._status_provider = status_provider
+        self._catalogue_event_handler = catalogue_event_handler
 
     async def dispatch(self, websocket: Any, envelope) -> None:
         with self._command_lock:
@@ -47,6 +49,10 @@ class FabricChatClefActiveMessageDispatcher:
                 f"type={envelope.message_type.value} "
                 f"session={envelope.session_id}"
             )
+            return
+
+        #20260915_kpopmodder: Refresh names only through the exact active socket/session.
+        if self._catalogue_event_handler is not None and self._catalogue_event_handler.handle(websocket, envelope):
             return
 
         if envelope.message_type == BridgeMessageType.STATUS_REQUEST:

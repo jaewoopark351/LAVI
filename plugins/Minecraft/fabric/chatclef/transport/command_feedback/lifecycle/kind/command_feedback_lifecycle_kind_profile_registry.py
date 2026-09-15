@@ -56,7 +56,8 @@ _TERMINAL_TRIGGERS = {
     "follow": "result_callback",
     "food": "result_callback",
     "gamer": "result_callback",
-    "gamma": "accepted_submission_caution",
+    #20260915_kpopmodder: Gamma now finishes its existing callback and reports the setting readback.
+    "gamma": "result_callback",
     "get": "result_callback",
     "give": "result_callback",
     "goto": "result_callback",

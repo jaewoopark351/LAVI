@@ -7,11 +7,24 @@ from plugins.Minecraft.fabric.chatclef.intent.chatclef_translation_result_dto im
 
 
 class ChatClefNonItemTranslationStage:
-    def translate(self, intent: object, compiler: object) -> ChatClefTranslationResultDTO:
+    def translate(self, intent: object, compiler: object, resolver=None) -> ChatClefTranslationResultDTO:
         #20260915_kpopmodder: Name resolution is a Python boundary, not a Java search or LLM fallback.
         from ...chatclef_intent_type import ChatClefIntentType
         if intent.intent_type is ChatClefIntentType.FIND:
             return self._translate_find(intent, compiler)
+        #20260915_kpopmodder: Non-item named slots consume native command capabilities.
+        if intent.intent_type in {ChatClefIntentType.ATTACK, ChatClefIntentType.SCAN} and intent.item_phrase:
+            from ...chatclef_intent_status import ChatClefIntentStatus
+            resolution = resolver.resolve(intent.item_phrase)
+            status = ChatClefIntentStatus(resolution["status"])
+            if not status.executable:
+                from ...names.korean_name_resolution_message import KoreanNameResolutionMessage
+                return ChatClefTranslationResultDTO.rejected(status, resolution["reason_code"],
+                    KoreanNameResolutionMessage.ambiguous(resolution) or
+                    "대상 이름 또는 이 명령의 지원 여부를 확인하지 못했어. 정확한 대상을 알려줘.", intent, {"resolution": resolution})
+            target = resolution["target"]
+            return ChatClefTranslationResultDTO.validated(compiler.compile(intent, target), intent,
+                resolved_target=target, data={"resolution": resolution})
         command = compiler.compile(intent)
         return ChatClefTranslationResultDTO.validated(command=command, intent=intent)
 

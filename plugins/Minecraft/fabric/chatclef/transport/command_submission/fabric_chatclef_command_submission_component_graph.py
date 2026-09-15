@@ -35,6 +35,7 @@ class FabricChatClefCommandSubmissionComponentGraph:
         message_id_factory=None,
         now_ms=None,
         stop_control_admission_barrier=None,
+        catalogue_provider=None,
     ) -> None:
         self.loop_provider = loop_provider
         self.envelope_transport = envelope_transport
@@ -51,6 +52,7 @@ class FabricChatClefCommandSubmissionComponentGraph:
             command_lock=command_lock,
             now_ms=self.now_ms,
             stop_control_admission_barrier=stop_control_admission_barrier,
+            catalogue_provider=catalogue_provider,
         )
         self.delivery = FabricChatClefCommandDelivery(
             future_scheduler=future_scheduler,

@@ -58,11 +58,19 @@ class MinecraftChatClefInputIntentGate:
             auto_deposit_trust or AutoDepositTrustCandidateDetector()
         )
         self._goto_candidate = KoreanGotoCandidateDetector()
+        from plugins.Minecraft.fabric.chatclef.intent.korean_chatclef_rule_parser import KoreanChatClefRuleParser
+        self._command_parser = KoreanChatClefRuleParser()
 
     def inspect(self, text: object) -> MinecraftChatClefInputGateDecision:
         #20260914_kpopmodder: Both trusted Chat and final Voice reuse the existing input gate.
         from plugins.Minecraft.fabric.chatclef.intent.navigation.find import KoreanFindRuleParser
         if KoreanFindRuleParser.is_candidate(text):
+            return MinecraftChatClefInputGateDecision.generic()
+        #20260915_kpopmodder: Single trust/list/untrust are separate native operations;
+        # the existing broad H5 candidate must not reinterpret them as area registration.
+        from plugins.Minecraft.fabric.chatclef.intent.chatclef_intent_type import ChatClefIntentType as I
+        parsed = self._command_parser.parse(text)
+        if parsed.intent_type in {I.AUTO_DEPOSIT_TRUST, I.AUTO_DEPOSIT_TRUSTED_LIST, I.AUTO_DEPOSIT_UNTRUST}:
             return MinecraftChatClefInputGateDecision.generic()
         if self._auto_deposit_trust.is_candidate(text):
             return MinecraftChatClefInputGateDecision.h5_auto_deposit_trust()
@@ -75,6 +83,11 @@ class MinecraftChatClefInputIntentGate:
         if self._store_home.is_candidate(text):
             return MinecraftChatClefInputGateDecision.generic()
         if self._acquisition_verbs.matches(text):
+            return MinecraftChatClefInputGateDecision.generic()
+        # The same typed parser supplies command coverage; no parallel Chat/voice dictionary.
+        # Legacy GET inference accepts item/count statements for direct translation;
+        # automatic ingress still requires the existing acquisition verb owner.
+        if parsed.intent_type not in {I.UNKNOWN, I.GET_ITEM}:
             return MinecraftChatClefInputGateDecision.generic()
         if any(
             self._normalize(term) in normalized

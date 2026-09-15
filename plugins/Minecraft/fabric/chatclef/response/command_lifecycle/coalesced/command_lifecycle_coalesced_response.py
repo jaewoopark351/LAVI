@@ -15,6 +15,8 @@ class CommandLifecycleCoalescedResponse:
     event_id: str
     command_name: str
     presentation_detail_log: str = ""
+    #20260915_kpopmodder: Preserve the same validated speech projection when terminal coalesces.
+    speech_text: str | None = None
 
     ROUTE_KIND = "command_lifecycle"
     RESPONSE_KIND = "command_coalesced"
@@ -27,6 +29,10 @@ class CommandLifecycleCoalescedResponse:
     def __post_init__(self) -> None:
         if type(self.text) is not str or not self.text:
             raise ValueError("command coalesced response text must be an exact str")
+        if self.speech_text is not None and (
+            type(self.speech_text) is not str or not self.speech_text or len(self.speech_text) > 32768
+        ):
+            raise ValueError("command coalesced speech text must be bounded exact text")
         if (
             type(self.event_id) is not str
             or self._EVENT_ID.fullmatch(self.event_id) is None

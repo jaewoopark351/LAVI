@@ -13,7 +13,8 @@ from .generic_crafting_quantity_shape import GenericCraftingQuantityShape
 
 class GenericCraftingQuantityShapeGuard:
     _DIGIT_TOKEN_RE = re.compile(
-        r"(?<![A-Za-z0-9_])[+-]?[0-9]+\s*(?:개|만큼)"
+        #20260915_kpopmodder: Strip rejected Unicode decimal tokens only to recover exact feature ownership.
+        r"(?<![A-Za-z0-9_])[+-]?\d+\s*(?:개|만큼)"
     )
     _KOREAN_TOKEN_RE = re.compile(
         r"(?<![가-힣])(?:하나|한|둘|두|셋|세|넷|네)(?:\s*(?:개|만큼))?(?![가-힣])"

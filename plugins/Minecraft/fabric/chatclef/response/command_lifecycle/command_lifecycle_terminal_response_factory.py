@@ -6,6 +6,7 @@ from plugins.Minecraft.fabric.chatclef.presentation.command_lifecycle import (
 )
 
 from .command_lifecycle_terminal_response import CommandLifecycleTerminalResponse
+from .terminal.instant.list_output.trusted_destination_list_speech_projector import TrustedDestinationListSpeechProjector
 
 
 class CommandLifecycleTerminalResponseFactory:
@@ -25,6 +26,7 @@ class CommandLifecycleTerminalResponseFactory:
         descriptor = getattr(fact, "descriptor", None)
         return CommandLifecycleTerminalResponse(
             text=self._response_renderer.render_terminal(fact),
+            speech_text=TrustedDestinationListSpeechProjector.project(fact),
             event_id=getattr(fact, "event_id", ""),
             command_name=getattr(descriptor, "command_name", ""),
             presentation_detail_log=self._presentation_details.project(

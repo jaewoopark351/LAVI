@@ -14,6 +14,7 @@ class OrdinarySubmissionTransport:
         event: object,
         command_text: str,
         translation: object,
+        route_claim: object = None,
     ):
         try:
             return (
@@ -23,6 +24,7 @@ class OrdinarySubmissionTransport:
                     translation,
                     original_text=command_text,
                     translation_input_text=command_text,
+                    **({"route_claim": route_claim} if route_claim is not None else {}),
                 ),
                 None,
             )

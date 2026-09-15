@@ -7,6 +7,21 @@ from enum import Enum
 
 
 class ChatClefIntentType(str, Enum):
+    #20260915_kpopmodder: Mirror the remaining registered command semantics without raw DSL slots.
+    ATTACK = "attack"
+    AUTO_DEPOSIT_TRUST = "auto_deposit_trust"
+    AUTO_DEPOSIT_TRUSTED_LIST = "auto_deposit_trusted_list"
+    AUTO_DEPOSIT_UNTRUST = "auto_deposit_untrust"
+    CHATCLEF = "chatclef"
+    DEPOSIT_ALL = "deposit_all"
+    GAMER = "gamer"
+    GAMMA = "gamma"
+    HERO = "hero"
+    LOCATE_STRUCTURE = "locate_structure"
+    OVERLAY = "overlay"
+    RELOAD_SETTINGS = "reload_settings"
+    RESETMEMORY = "resetmemory"
+    SCAN = "scan"
     GET_ITEM = "get_item"
     EQUIP_ITEM = "equip_item"
     DEPOSIT_ITEM = "deposit_item"

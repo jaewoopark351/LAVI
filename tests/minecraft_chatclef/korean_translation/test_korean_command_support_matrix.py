@@ -12,6 +12,10 @@ from plugins.Minecraft.fabric.chatclef.intent import (
 
 
 SUPPORTED_KOREAN_TRANSLATION_CASES = {
+    #20260915_kpopmodder: Settings now compile through the shared grammar; execution confirmation is tested at input admission.
+    "gamma": [("감마 1로 설정해", "gamma 1.0")],
+    "overlay": [("오버레이 켜줘", "overlay on")],
+    "chatclef": [("챗클레프 꺼줘", "chatclef off")],
     "auto_deposit_trust": [
         ("auto_deposit_trust area 16x16", "auto_deposit_trust area 16x16"),
         ("자동보관등록 반경 16×16", "auto_deposit_trust area 16x16"),
@@ -83,18 +87,15 @@ SUPPORTED_KOREAN_TRANSLATION_CASES = {
     ],
 }
 
-UNSUPPORTED_OR_PLANNED_KOREAN_CASES = {
+UNSUPPORTED_WORDING_OR_MISSING_CATALOGUE_CASES = {
     "deposit_bare_junk": "잡템 상자에 넣어줘",
     "deposit_missing_quantity": "다이아몬드 상자에 넣어줘",
     "attack": "좀비 2마리 공격해",
-    "gamma": "감마 1로 설정해",
     "hero": "주변 몬스터 처리해",
     "locate_structure": "네더 요새 찾아줘",
-    "overlay": "오버레이 켜줘",
     "reload_settings": "설정 다시 불러와",
     "resetmemory": "기억 초기화해",
     "scan": "다이아몬드 원석 스캔해",
-    "chatclef": "챗클레프 꺼줘",
     "gamer": "엔더드래곤 잡아줘",
 }
 
@@ -117,6 +118,9 @@ class KoreanCommandSupportMatrixTests(unittest.TestCase):
         self.assertEqual(
             {
                 "auto_deposit_trust",
+                "gamma",
+                "overlay",
+                "chatclef",
                 "deposit",
                 "equip",
                 "follow",
@@ -132,10 +136,10 @@ class KoreanCommandSupportMatrixTests(unittest.TestCase):
             set(SUPPORTED_KOREAN_TRANSLATION_CASES),
         )
 
-    def test_planned_or_java_only_commands_do_not_claim_korean_support_yet(self):
+    def test_unsupported_wording_or_missing_runtime_names_do_not_submit(self):
         service = ChatClefNaturalLanguageService()
 
-        for command_name, text in UNSUPPORTED_OR_PLANNED_KOREAN_CASES.items():
+        for command_name, text in UNSUPPORTED_WORDING_OR_MISSING_CATALOGUE_CASES.items():
             with self.subTest(command_name=command_name, text=text):
                 result = service.translate(text)
 

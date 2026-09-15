@@ -28,6 +28,7 @@ public final class FabricChatClefBridgeClient implements WebSocket.Listener, Fab
     private final FabricChatClefResultEnvelopeSender resultEnvelopeSender;
     private final FabricChatClefStopControlResultOutbox stopControlResultOutbox;
     private final FabricChatClefWebSocketConnectionLifecycle connectionLifecycle;
+    private final lavi.minecraft.fabric.chatclef.bridge.transport.catalogue.FabricChatClefCatalogueEventPublisher cataloguePublisher;
 
     public FabricChatClefBridgeClient(
             FabricChatClefBridgeConfig config,
@@ -43,6 +44,8 @@ public final class FabricChatClefBridgeClient implements WebSocket.Listener, Fab
     ) {
         FabricChatClefWebSocketConnectionState connectionState =
                 new FabricChatClefWebSocketConnectionState();
+        this.cataloguePublisher = new lavi.minecraft.fabric.chatclef.bridge.transport.catalogue.FabricChatClefCatalogueEventPublisher(
+                connectionState, sessionGuard, json, diagnostics);
         this.resultEnvelopeSender = new FabricChatClefResultEnvelopeSender(
                 diagnostics,
                 json,
@@ -96,6 +99,11 @@ public final class FabricChatClefBridgeClient implements WebSocket.Listener, Fab
 
     public void stop() {
         connectionLifecycle.stop();
+    }
+
+    //20260915_kpopmodder: Delegate changed-snapshot publication to its Fabric-only transport owner.
+    public void publishCatalogueIfChanged() {
+        cataloguePublisher.publishIfChanged();
     }
 
     @Override

@@ -21,7 +21,8 @@ from plugins.Minecraft.fabric.chatclef.intent.chatclef_numeric_constraints impor
 
 class ChatClefCommandCompiler:
     _AUTO_DEPOSIT_TRUST_AREA_COMMAND = "auto_deposit_trust area 16x16"
-    _TARGET_RE = re.compile(r"^[a-z0-9_]+$")
+    #20260915_kpopmodder: Match the bounded native metadata token contract after capability validation.
+    _TARGET_RE = re.compile(r"[A-Za-z0-9_.:/-]{1,256}\Z", re.ASCII)
     _PLAYER_RE = re.compile(r"^[A-Za-z0-9_]{3,16}$")
     _DANGEROUS_RE = re.compile(r"[;#\r\n\"'@]|[\x00-\x1f\x7f]")
 
@@ -49,12 +50,22 @@ class ChatClefCommandCompiler:
         if intent.intent_type is ChatClefIntentType.FIND:
             return self.resolve_find(intent).request.compile()
         self.reject_dangerous_text(intent.original_text)
+        #20260915_kpopmodder: Delegate new domain serializers while preserving established scalar forms.
+        from .grammar.compilation.korean_command_serializer import KoreanCommandSerializer
+        from .grammar.validation.korean_command_request_validator import KoreanCommandRequestValidator
+        validation = KoreanCommandRequestValidator().validate(intent)
+        if validation is not None and not validation[0]:
+            raise ValueError(validation[1])
+        extended = KoreanCommandSerializer().compile(intent, target)
+        if extended is not None:
+            return extended
         if intent.intent_type is ChatClefIntentType.GET_ITEM:
             target_text = self._target(target)
             quantity = self._positive_int(intent.quantity, "quantity")
             return f"get {target_text} {quantity}"
         if intent.intent_type is ChatClefIntentType.EQUIP_ITEM:
-            return f"equip {self._target(target)}"
+            quantity = 1 if intent.quantity is None else self._positive_int(intent.quantity, "quantity")
+            return f"equip {self._target(target)}" + (f" {quantity}" if quantity != 1 else "")
         if intent.intent_type is ChatClefIntentType.DEPOSIT_ITEM:
             target_text = self._target(target)
             quantity = self._positive_int(intent.quantity, "quantity")
@@ -68,7 +79,8 @@ class ChatClefCommandCompiler:
             self.reject_dangerous_text(player_name)
             if not self._PLAYER_RE.fullmatch(player_name):
                 raise ValueError("invalid_player_name")
-            target_text = self._target(target)
+            #20260915_kpopmodder: GIVE inventory lookup can use a full mod translation key.
+            target_text = KoreanCommandSerializer.token(target)
             quantity = self._positive_int(intent.quantity, "quantity")
             return f"give {player_name} {target_text} {quantity}"
         if intent.intent_type is ChatClefIntentType.FOOD:

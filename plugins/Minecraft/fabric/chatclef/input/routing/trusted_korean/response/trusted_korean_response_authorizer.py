@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+from .coalesced.trusted_korean_coalesced_response_binding import TrustedKoreanCoalescedResponseBinding
+
 
 class TrustedKoreanResponseAuthorizer:
     _RESPONSE_SOURCE = "minecraft_chatclef"
@@ -22,22 +24,28 @@ class TrustedKoreanResponseAuthorizer:
                 return decision
             return self._suppressed(decision)
 
+        binding = TrustedKoreanCoalescedResponseBinding.create(decision, event)
+        selection_args = {} if binding is None else {"deferred_selection": binding.selection()}
         capability = proof.issue_response_emission_capability(
             event,
             self._owner,
             text=str(decision.response_text),
             source=self._RESPONSE_SOURCE,
             response_kind=str(decision.response_kind or "immediate"),
+            **selection_args,
         )
         if capability is None:
             return self._suppressed(decision, clear_text=True)
-        return replace(
+        authorized = replace(
             decision,
             publish_external_response=True,
             response_source=self._RESPONSE_SOURCE,
             response_emission_capability=capability,
             suppress_response=False,
         )
+        if binding is not None:
+            binding.bind_decision(authorized)
+        return authorized
 
     @staticmethod
     def _suppressed(decision, *, clear_text: bool = False):

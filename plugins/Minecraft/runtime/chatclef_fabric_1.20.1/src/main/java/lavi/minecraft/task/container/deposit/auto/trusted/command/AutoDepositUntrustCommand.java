@@ -45,6 +45,8 @@ public final class AutoDepositUntrustCommand extends Command {
                 Optional<String> worldKey = worldKeyReader.read();
                 Optional<AutoDepositTrustedTarget> target = targetResolver.resolve(mod);
                 if (worldKey.isEmpty() || target.isEmpty() || mod.getWorld() == null) {
+                    lavi.minecraft.command.result.instant.InstantCommandResultCapture.record("auto_deposit_untrust", false,
+                            "TARGET_UNAVAILABLE", java.util.Map.of());
                     mod.logWarning("Trusted destination not removed: provide a destination ID or target a supported container.");
                     return;
                 }
@@ -57,6 +59,10 @@ public final class AutoDepositUntrustCommand extends Command {
                 result = repository.unregister(destination);
             }
             String message = AutoDepositTrustedCommandFormatter.mutation(result);
+            //20260915_kpopmodder: Preserve native persistence decisions in the exact invoking command result.
+            lavi.minecraft.command.result.instant.InstantCommandResultCapture.record("auto_deposit_untrust", result.success(),
+                    result.status().name(), java.util.Map.of("destination_id",
+                            result.destination().map(AutoDepositTrustedDestination::destinationId).orElse("")));
             if (result.success()) {
                 mod.log(message);
             } else {

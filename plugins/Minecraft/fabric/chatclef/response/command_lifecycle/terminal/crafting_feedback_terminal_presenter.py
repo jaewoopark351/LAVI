@@ -9,6 +9,7 @@ from plugins.Minecraft.fabric.chatclef.response.crafting_lifecycle import (
 )
 
 from ..command_lifecycle_terminal_response import CommandLifecycleTerminalResponse
+from .instant.list_output.trusted_destination_list_speech_projector import TrustedDestinationListSpeechProjector
 
 
 class CraftingFeedbackTerminalPresenter:
@@ -38,6 +39,7 @@ class CraftingFeedbackTerminalPresenter:
         return CommandLifecycleTerminalResponse(
             **values,
             command_name=getattr(descriptor, "command_name", ""),
+            speech_text=TrustedDestinationListSpeechProjector.project(fact),
         )
 
     def _render_text(self, fact: object) -> str:

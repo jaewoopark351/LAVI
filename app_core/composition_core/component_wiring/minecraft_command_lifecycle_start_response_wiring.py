@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from llm_core.routed_response import RoutedResponsePresentationMetadata
+from llm_core.routed_response.presentation.routed_response_text import RoutedResponseText
 from plugins.Minecraft.fabric.chatclef.response.command_lifecycle import (
     CommandLifecycleCoalescedResponse,
     CommandLifecycleStartResponse,
@@ -33,8 +34,10 @@ class MinecraftCommandLifecycleStartResponseWiring:
                     CommandLifecycleStartResponse,
                 }:
                     return None
+                speech_text = getattr(response, "speech_text", None)
+                text = response.text if speech_text is None else RoutedResponseText(response.text, speech_text)
                 return emitter(
-                    response.text,
+                    text,
                     source="minecraft_chatclef",
                     send_output=True,
                     send_full_output=False,

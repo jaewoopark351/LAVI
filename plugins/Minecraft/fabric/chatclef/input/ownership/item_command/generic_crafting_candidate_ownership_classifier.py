@@ -21,6 +21,15 @@ class GenericCraftingCandidateOwnershipClassifier:
         candidate: GenericCraftingDefaultsCandidate,
     ) -> ItemCommandOwnershipDecision:
         intent = candidate.deterministic_intent
+        #20260915_kpopmodder: Preserve the exact craft owner when the shared parser rejects malformed quantities.
+        if (candidate.matches_profile and candidate.verb_class == "craft"
+                and not candidate.quantity_shape.valid):
+            return ItemCommandOwnershipDecision(
+                ItemCommandOwnership.OWNED_INVALID,
+                candidate.quantity_shape.reason_code,
+                "제작 수량은 지원되는 표현 하나만 사용할 수 있어요.",
+                candidate,
+            )
         if (
             not candidate.matches_profile
             or candidate.verb_class != "craft"

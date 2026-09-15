@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import ast
+import re
 import unittest
 from pathlib import Path
 
@@ -31,7 +32,7 @@ class TrustedKoreanRouteStructureTests(unittest.TestCase):
             )
             self.assertTrue(
                 any(
-                    line.startswith("#20260905_kpopmodder")
+                    re.match(r"#\d{8}_kpopmodder:", line) is not None
                     for line in source.splitlines()[:5]
                 ),
                 path,

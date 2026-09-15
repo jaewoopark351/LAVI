@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from llm_core.routed_response import RoutedResponsePresentationMetadata
+from llm_core.routed_response.presentation.routed_response_text import RoutedResponseText
 
 
 class RoutedInputExternalResponsePublisher:
@@ -70,8 +71,10 @@ class RoutedInputExternalResponsePublisher:
                     badge_label=presentation_metadata.badge_label,
                     detail_log=presentation_detail_log,
                 )
+            speech_text = getattr(decision, "response_speech_text", None)
+            text = response_text if speech_text is None else RoutedResponseText(response_text, speech_text)
             return publisher.emit_capability_response(
-                response_text,
+                text,
                 emission_capability=getattr(
                     decision,
                     "response_emission_capability",

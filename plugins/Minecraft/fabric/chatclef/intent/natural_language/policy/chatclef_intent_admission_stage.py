@@ -31,6 +31,13 @@ class ChatClefIntentAdmissionStage:
         self._goto_guard_decoder = goto_guard_decoder or GotoGuardIntentDecoder()
 
     def inspect(self, intent: object) -> object | None:
+        #20260915_kpopmodder: Consume explicit whole-command refusals before generic UNKNOWN.
+        if getattr(intent, "source", None) == "all_commands_guard" or "all_commands_guard" in getattr(intent, "slots", {}):
+            reason = getattr(intent, "slots", {}).get("all_commands_guard", "invalid_command_request")
+            return self._rejection_factory.create(
+                ChatClefIntentStatus.INVALID, str(reason),
+                "명령의 대상과 수량을 다시 확인해 줘. 질문·부정문·여러 동작은 실행하지 않았어.", intent,
+            )
         #20260914_kpopmodder: Stop malformed/negative FIND before UNKNOWN or LLM fallback.
         if getattr(intent, "source", None) == "find_guard" or "find_guard" in getattr(intent, "slots", {}):
             return self._rejection_factory.create(

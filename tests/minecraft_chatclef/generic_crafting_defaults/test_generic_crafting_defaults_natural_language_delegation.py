@@ -298,6 +298,8 @@ class GenericCraftingDefaultsNaturalLanguageDelegationTests(unittest.TestCase):
     def test_ordinary_natural_language_behavior_bypasses_feature_lifecycle(self):
         adapter = Mock()
         adapter.backend_id = "fabric_chatclef"
+        #20260915_kpopmodder: A disconnected adapter supplies no runtime catalogue, not an auto-created Mock.
+        adapter.get_command_catalogue.return_value = None
         adapter.submit_command.side_effect = lambda request: CommandResultDTO(
             request_id=request.request_id,
             ok=True,

@@ -10,6 +10,8 @@ import lavi.minecraft.fabric.chatclef.bridge.command.lifecycle.FabricChatClefCom
 public final class FabricChatClefOrdinaryCommandExecutorInvocation {
     private final FabricChatClefCommandLifecycleCoordinator lifecycleCoordinator;
     private final FabricChatClefTaskStateReader taskStateReader;
+    private final FabricChatClefOrdinaryCommandDispatchDiagnostics diagnostics =
+            new FabricChatClefOrdinaryCommandDispatchDiagnostics(new lavi.minecraft.fabric.chatclef.bridge.diagnostics.FabricChatClefBridgeDiagnostics());
 
     public FabricChatClefOrdinaryCommandExecutorInvocation(
             FabricChatClefCommandLifecycleCoordinator lifecycleCoordinator,
@@ -24,8 +26,22 @@ public final class FabricChatClefOrdinaryCommandExecutorInvocation {
             String command,
             FabricChatClefCommandExecution execution
     ) {
-        try {
+        String prefixlessCommand = command.substring(executor.getCommandPrefix().length());
+        try (var instantCapture = lavi.minecraft.command.result.instant.InstantCommandResultCapture.begin(prefixlessCommand);
+             var attackScope = lavi.minecraft.command.attack.KoreanAttackExecutionScope.begin(prefixlessCommand, execution.context().request().metadata)) {
+            String catalogueRejection = lavi.minecraft.fabric.chatclef.bridge.catalogue.admission.FabricChatClefRuntimeCatalogueAdmission.rejectionReason(
+                    execution.context().request().metadata, execution.context().sessionId(),
+                    lavi.minecraft.fabric.chatclef.bridge.catalogue.FabricChatClefCatalogueSnapshotStore.current());
+            if (catalogueRejection != null) {
+                diagnostics.catalogueAdmissionRejected(execution.context(), catalogueRejection);
+                lifecycleCoordinator.completeCommandException(execution,
+                        new lavi.minecraft.fabric.chatclef.bridge.catalogue.admission.FabricChatClefRuntimeCatalogueAdmissionException(catalogueRejection),
+                        taskStateReader.captureCurrentTaskSnapshot());
+                return;
+            }
             execution.openExecutorExecuteInvocation();
+            if (lavi.minecraft.command.attack.KoreanAttackExecutionScope.mobOnly())
+                diagnostics.koreanAttackBound(execution.context());
             executor.execute(
                     command,
                     () -> lifecycleCoordinator.markCommandFinish(
@@ -39,6 +55,10 @@ public final class FabricChatClefOrdinaryCommandExecutorInvocation {
                     )
             );
             execution.closeExecutorExecuteInvocation();
+            //20260915_kpopmodder: Observe settings and native query outcomes inside this exact invocation.
+            lavi.minecraft.command.result.instant.InstantSettingResultReader.observe(prefixlessCommand);
+            execution.attachInstantResult(instantCapture.result());
+            diagnostics.instantResultObserved(execution.context(), instantCapture.result());
             lifecycleCoordinator.markDispatchReturned(execution, taskStateReader.ownershipEvidence());
         } catch (Throwable error) {
             execution.closeExecutorExecuteInvocation();

@@ -105,9 +105,10 @@ class FinalTranslationDiagnosticsResponsibilityTests(unittest.TestCase):
         for path in paths:
             with self.subTest(path=path.relative_to(PROJECT_ROOT)):
                 source = path.read_text(encoding="utf-8")
-                self.assertIn(
-                    "#20260905_kpopmodder",
+                #20260915_kpopmodder: Require a real dated marker without forcing new owners to claim an old date.
+                self.assertRegex(
                     "\n".join(source.splitlines()[:5]),
+                    r"(?m)^#\d{8}_kpopmodder(?::|\s|$)",
                 )
                 tree = ast.parse(source)
                 self.assertLessEqual(

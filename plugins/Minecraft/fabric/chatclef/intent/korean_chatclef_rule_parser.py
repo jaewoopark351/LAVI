@@ -87,6 +87,40 @@ class KoreanChatClefRuleParser:
         self._goto_guard_encoder = goto_guard_encoder or GotoGuardIntentEncoder()
 
     def parse(self, text: object) -> ChatClefIntentDTO:
+        #20260915_kpopmodder: Request safety and domain grammars precede lossy legacy matching.
+        from .grammar.validation.korean_command_request_guard import KoreanCommandRequestGuard
+        from .grammar.control.korean_control_rule_parser import KoreanControlRuleParser
+        from .grammar.control.korean_observation_rule_parser import KoreanObservationRuleParser
+        from .grammar.combat.korean_combat_rule_parser import KoreanCombatRuleParser
+        from .grammar.item.korean_item_list_rule_parser import KoreanItemListRuleParser
+        raw = str(text or "")
+        # Keep established mutation-family refusal identities before the common guard.
+        control = KoreanControlRuleParser().parse(text)
+        h5 = self._auto_deposit_trust.classify(text)
+        if h5.candidate and control is None:
+            return self._auto_deposit_trust_intent(raw, h5)
+        home = self._store_home.classify(text)
+        if home.candidate and ("집" in raw or "home" in raw.lower()):
+            return self._store_home_intent(raw, home)
+        goto = self._goto_parser.parse(text)
+        if goto.candidate:
+            if not goto.executable:
+                return self._goto_guard_encoder.encode(raw, goto)
+            if goto.xyz is None:
+                return self._intent(ChatClefIntentType.GOTO, raw,
+                                    slots={"coordinates": list(goto.coordinates), "dimension": goto.dimension})
+            x, y, z = goto.xyz
+            return self._intent(ChatClefIntentType.GOTO, raw, x=x, y=y, z=z)
+        # Native FIND owns its existing quoted/ID grammar and safety exceptions.
+        if not raw.lstrip().lower().startswith(("@find ", "find ")):
+            reason = KoreanCommandRequestGuard.reason(text)
+            if reason:
+                return KoreanCommandRequestGuard.reject(text, reason)
+        for parser in (KoreanControlRuleParser(), KoreanObservationRuleParser(),
+                       KoreanCombatRuleParser(self._quantity_parser)):
+            parsed = parser.parse(text)
+            if parsed is not None:
+                return parsed
         original = self._normalizer.normalize(text, lowercase_english=False)
         normalized = self._normalizer.normalize(text)
         #20260914_kpopmodder: Preserve whole FIND utterances before broad item/movement rules.
@@ -101,9 +135,16 @@ class KoreanChatClefRuleParser:
             return self._intent(ChatClefIntentType.STOP, original)
         if self._is_idle(normalized):
             return self._intent(ChatClefIntentType.IDLE, original)
+        parsed_items = KoreanItemListRuleParser(self._quantity_parser, self._acquisition_verbs).parse(text)
+        # Exact item names such as "아이템 액자" must not become inventory-wide STORE_HOME requests.
+        # Explicit house requests already passed the authoritative house guard above.
+        if parsed_items is not None and parsed_items.intent_type is not ChatClefIntentType.UNKNOWN:
+            return parsed_items
         store_home = self._store_home.classify(text)
         if store_home.candidate:
             return self._store_home_intent(original, store_home)
+        if parsed_items is not None:
+            return parsed_items
         #20260803_kpopmodder: Keep the old branch inert for exact history; never fall back to partial matching.
         # goto_match = self._GOTO_RE.search(normalized)
         # if goto_match is not None:
@@ -119,7 +160,8 @@ class KoreanChatClefRuleParser:
             raw_original = str(text)
             if goto.executable:
                 if goto.xyz is None:
-                    raise RuntimeError("valid_goto_missing_xyz")
+                    return self._intent(ChatClefIntentType.GOTO, raw_original,
+                                        slots={"coordinates": list(goto.coordinates), "dimension": goto.dimension})
                 x, y, z = goto.xyz
                 return self._intent(
                     ChatClefIntentType.GOTO,
@@ -142,9 +184,17 @@ class KoreanChatClefRuleParser:
         item_action_intent = self._item_actions.parse(original, normalized)
         if item_action_intent is not None:
             return item_action_intent
-        if self._looks_like_get_item(normalized):
-            quantity = self._quantity_parser.parse(normalized)
-            item_phrase = self._item_phrase(normalized)
+        try:
+            looks_like_get = self._looks_like_get_item(normalized)
+        except ValueError as error:
+            return KoreanCommandRequestGuard.reject(text, str(error))
+        if looks_like_get:
+            try:
+                # Raw punctuation must survive until exact numeric parsing rejects decimals.
+                quantity = self._quantity_parser.parse(str(text))
+                item_phrase = self._item_phrase(normalized)
+            except ValueError as error:
+                return KoreanCommandRequestGuard.reject(text, str(error))
             return self._intent(
                 ChatClefIntentType.GET_ITEM,
                 original,

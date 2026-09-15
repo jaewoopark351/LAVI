@@ -52,7 +52,7 @@ class ChatClefIntentTranslationPolicy:
             return rejection
         if self._branch_selector.is_item_action(intent):
             return self._item_translator.translate(intent, resolver)
-        return self._non_item_translation_stage.translate(intent, self._compiler)
+        return self._non_item_translation_stage.translate(intent, self._compiler, resolver)
 
 
 __all__ = ("ChatClefIntentTranslationPolicy",)

@@ -25,7 +25,9 @@ class ChatClefItemTargetValidator:
         target: str,
         resolution: dict[str, object],
     ) -> object | None:
-        if not self._catalog().contains(target):
+        #20260915_kpopmodder: Native per-command capability may admit GIVE inventory items outside GET.
+        native = callable(getattr(resolver, "native_capability", None)) and resolver.native_capability(resolution)
+        if not native and not self._catalog().contains(target):
             return self._rejection_factory.create(
                 ChatClefIntentStatus.UNSUPPORTED,
                 "target_not_in_chatclef_catalog",

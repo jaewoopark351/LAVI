@@ -26,6 +26,7 @@ class FabricChatClefCommandSubmitter:
         message_id_factory: Callable[[], str] | None = None,
         now_ms: Callable[[], int] | None = None,
         stop_control_admission_barrier: object = None,
+        catalogue_provider=None,
     ) -> None:
         self._components = FabricChatClefCommandSubmissionComponentGraph(
             connection_ownership=connection_ownership,
@@ -38,6 +39,7 @@ class FabricChatClefCommandSubmitter:
             message_id_factory=message_id_factory,
             now_ms=now_ms,
             stop_control_admission_barrier=stop_control_admission_barrier,
+            catalogue_provider=catalogue_provider,
         )
         self._loop_provider = self._components.loop_provider
         self._envelope_transport = self._components.envelope_transport

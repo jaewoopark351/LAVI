@@ -18,6 +18,13 @@ class KoreanGotoCoordinateParser:
         self._candidate_detector = candidate_detector or KoreanGotoCandidateDetector()
 
     def parse(self, text: object) -> GotoParseResult:
+        #20260915_kpopmodder: Additional native forms use the same raw-input guard and binding path.
+        from .korean_goto_variant_parser import KoreanGotoVariantParser
+        # Exact existing XYZ has priority over the additional Y/XZ clue detector.
+        canonical_xyz = isinstance(text, str) and any(pattern.fullmatch(unicodedata.normalize("NFKC", text)) for pattern in COORDINATE_COMMAND_PATTERNS)
+        variant = None if canonical_xyz else KoreanGotoVariantParser().parse(text)
+        if variant is not None:
+            return variant
         if not self._candidate_detector.is_candidate(text):
             return GotoParseResult(GotoParseDecision.NOT_CANDIDATE)
         if any(unicodedata.category(character) in {"Cc", "Cf", "Cs"} for character in text):

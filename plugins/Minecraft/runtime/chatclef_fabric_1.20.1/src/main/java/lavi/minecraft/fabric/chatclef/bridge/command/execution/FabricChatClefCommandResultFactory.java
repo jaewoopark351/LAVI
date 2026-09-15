@@ -83,6 +83,12 @@ final class FabricChatClefCommandResultFactory {
     }
 
     FabricChatClefCommandResultPayload failedFromCommandException() {
+        if ("FabricChatClefRuntimeCatalogueAdmissionException".equals(state.failureType())) {
+            var values = new java.util.LinkedHashMap<String, Object>(data("runtime_catalogue_admission_rejected").toMap());
+            values.put("runtime_catalogue_admission", java.util.Map.of("accepted", false, "reason", state.failureMessage()));
+            return FabricChatClefCommandResult.failed(request().requestId, "Runtime command catalogue changed before execution.",
+                    FabricChatClefCommandResultDataPayload.fromMap(values));
+        }
         return FabricChatClefCommandResult.failed(
                 request().requestId,
                 state.failureType() + ": " + state.failureMessage(),
@@ -126,6 +132,9 @@ final class FabricChatClefCommandResultFactory {
     }
 
     FabricChatClefCommandResultPayload completedWithoutUserTask() {
+        var instant = lavi.minecraft.fabric.chatclef.bridge.command.result.instant.FabricChatClefInstantResultProjector.project(
+                request().requestId, data("callback_completed_without_user_task"), state.instantResult());
+        if (instant != null) return instant;
         return FabricChatClefCommandResult.completed(
                 request().requestId,
                 "ChatClef command completed without starting a user task.",

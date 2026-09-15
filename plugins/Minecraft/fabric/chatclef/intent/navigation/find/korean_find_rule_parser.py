@@ -30,6 +30,12 @@ class KoreanFindRuleParser:
 
     def parse(self, text: object) -> ChatClefIntentDTO | None:
         raw = str(text or "").strip()
+        #20260915_kpopmodder: Explicit supported structures belong to their existing Java command.
+        from ...grammar.control.korean_observation_rule_parser import KoreanObservationRuleParser
+        observation = KoreanObservationRuleParser().parse(raw)
+        if observation is not None and (observation.intent_type is ChatClefIntentType.LOCATE_STRUCTURE
+                                        or observation.slots.get("all_commands_guard") in {"ambiguous_structure", "unsupported_structure"}):
+            return None
         if not self.is_candidate(raw):
             return None
         try:

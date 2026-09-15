@@ -9,6 +9,7 @@ from plugins.Minecraft.common.protocol.bridge_error_code import BridgeErrorCode
 from .fabric_chatclef_ordinary_admission_inspection import (
     FabricChatClefOrdinaryAdmissionInspection,
 )
+from .korean_submission_context_validator import KoreanSubmissionContextValidator
 
 
 class FabricChatClefOrdinaryAdmissionInspector:
@@ -18,10 +19,12 @@ class FabricChatClefOrdinaryAdmissionInspector:
         connection_ownership,
         now_ms,
         stop_control_admission_barrier=None,
+        catalogue_provider=None,
     ) -> None:
         self._connection_ownership = connection_ownership
         self._now_ms = now_ms
         self._stop_control_admission_barrier = stop_control_admission_barrier
+        self._korean_context = KoreanSubmissionContextValidator(connection_ownership, catalogue_provider)
 
     def inspect(
         self,
@@ -59,6 +62,15 @@ class FabricChatClefOrdinaryAdmissionInspector:
                         self._connection_ownership.local_admission_snapshot()
                     ),
                 },
+            )
+        #20260915_kpopmodder: A receipt must not cross a reconnect or catalogue refresh.
+        reason = self._korean_context.rejection_reason(request)
+        if reason is not None:
+            return FabricChatClefOrdinaryAdmissionInspection(
+                request=request, allowed=False, error_code=BridgeErrorCode.INVALID_REQUEST,
+                message="Minecraft 연결 또는 대상 정보가 바뀌었어. 요청을 다시 말해줘.",
+                event="command_rejected_korean_context_changed",
+                details={"reason": reason, "active_generation": self._connection_ownership.active_generation},
             )
         commands = self._connection_ownership.local_admission_snapshot()
         quarantine = _active_quarantine(commands)

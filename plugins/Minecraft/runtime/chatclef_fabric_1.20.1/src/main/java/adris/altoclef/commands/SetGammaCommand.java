@@ -19,6 +19,10 @@ public class SetGammaCommand extends Command {
     protected void call(AltoClef mod, ArgParser parser) throws CommandException {
         double gammaValue = parser.get(Double.class);
         changeGamma(gammaValue);
+        //20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
+        //20260915_kpopmodder: The synchronous setter returned; complete this command's existing callback contract.
+        // Exact inverse and source evidence: docs/chatclef-all-commands-korean-implementation-2026-09-15.md.
+        finish();
     }
 
     public static void changeGamma(double value) {

@@ -15,4 +15,6 @@ GUARDED_REASONS = MappingProxyType({
     "goto_unsupported_whitespace": GotoParseDecision.CLARIFY,
     "goto_coordinate_out_of_range": GotoParseDecision.CLARIFY,
     "goto_invalid_coordinates": GotoParseDecision.CLARIFY,
+    #20260915_kpopmodder: Invalid variants retain the same no-reinterpretation guard contract.
+    "goto_invalid_variant": GotoParseDecision.CLARIFY,
 })

@@ -7,3 +7,5 @@ class GotoParseDecision(str, Enum):
     NONCOMMAND = "noncommand"
     CLARIFY = "clarify"
     VALID_XYZ = "valid_xyz"
+    #20260915_kpopmodder: Additional native forms retain a distinct immutable input binding.
+    VALID_VARIANT = "valid_variant"

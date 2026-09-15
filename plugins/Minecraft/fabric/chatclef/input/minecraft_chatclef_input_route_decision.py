@@ -25,6 +25,8 @@ class MinecraftChatClefInputRouteDecision:
     response_kind: str = "immediate"
     response_publication_acknowledgement: Any = None
     presentation_detail_log: str = ""
+    #20260915_kpopmodder: Carry only the speech selected by the coalesced terminal owner.
+    response_speech_text: str | None = None
 
     def __post_init__(self) -> None:
         CommandLifecyclePresentationDetailLogPolicy.validate(

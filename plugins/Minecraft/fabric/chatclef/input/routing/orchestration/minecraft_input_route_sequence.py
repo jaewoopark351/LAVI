@@ -58,7 +58,17 @@ class MinecraftInputRouteSequence:
                 "minecraft_stop_route_failed",
             )
             if stop_decision is not None:
+                cancel = getattr(self._ordinary_command_route_coordinator, "cancel_pending_confirmation", None)
+                # A question/negation rejected by the STOP owner is no stop action.
+                if callable(cancel) and stop_decision.reason != "unsafe_stop_phrase":
+                    cancel()
                 return replace(stop_decision, route_kind="stop_control")
+            #20260915_kpopmodder: A trusted reply consumes one pending request after STOP.
+            confirmation = getattr(self._ordinary_command_route_coordinator, "route_confirmation", None)
+            if callable(confirmation):
+                confirmation_decision = confirmation(event, korean_eligibility_proof)
+                if confirmation_decision is not None:
+                    return confirmation_decision
             #20260907_kpopmodder: Route status after STOP and before crafting/busy handling.
             status_decision = optional_route_callback(
                 self._crafting_status_route_owner,

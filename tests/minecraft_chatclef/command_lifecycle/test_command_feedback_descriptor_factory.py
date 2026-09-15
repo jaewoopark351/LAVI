@@ -118,7 +118,7 @@ class CommandFeedbackDescriptorFactoryTests(unittest.TestCase):
                 self.assertEqual(CommandFeedbackDescriptor.TYPED, descriptor.detail_level)
                 self.assertEqual(
                     CommandTerminalEvidenceProfile.VERIFIED
-                    if command_name in {"get", "store_home", "goto"}
+                    if command_name in {"get", "store_home", "goto", "give", "auto_deposit_trust", "equip"}
                     else CommandTerminalEvidenceProfile.CAUTIOUS,
                     descriptor.rollout_state,
                 )

@@ -7,6 +7,7 @@ from plugins.Minecraft.fabric.chatclef.command_registry.admission.auto_deposit_t
 from plugins.Minecraft.fabric.chatclef.command_registry.admission.korean_command_submission_admission_decision import (
     KoreanCommandSubmissionAdmissionDecision,
 )
+from plugins.Minecraft.fabric.chatclef.input.auto_deposit_trust.single_registration.single_container_trust_receipt import SingleContainerTrustReceipt
 
 
 class KoreanAutoDepositTrustInspector:
@@ -22,6 +23,11 @@ class KoreanAutoDepositTrustInspector:
     ) -> KoreanCommandSubmissionAdmissionDecision | None:
         if command_name != AutoDepositTrustCommandAdmission.COMMAND_NAME:
             return None
+        if type(route_claim) is SingleContainerTrustReceipt:
+            if route_claim.matches_admission(command_name, source):
+                return None  # Public readiness/source policy is still checked by the caller.
+            return self._decision(command_name, source, "single_container_trust_claim_invalid",
+                                  "Single-container registration requires an exact live input claim.")
         if self._admission is None:
             return self._decision(
                 command_name,

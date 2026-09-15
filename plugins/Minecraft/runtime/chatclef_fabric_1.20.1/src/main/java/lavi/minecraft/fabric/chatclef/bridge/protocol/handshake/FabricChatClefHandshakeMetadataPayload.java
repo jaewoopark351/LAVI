@@ -28,6 +28,11 @@ final class FabricChatClefHandshakeMetadataPayload {
         payload.put("backend", backend);
         payload.put("loader", loader);
         payload.put("phase", phase);
+        //#if MC == 12001
+        //20260915_kpopmodder: Add a bounded immutable catalogue without reading game objects on the socket thread.
+        payload.put("korean_command_catalogue_v1",
+                lavi.minecraft.fabric.chatclef.bridge.catalogue.FabricChatClefCatalogueSnapshotStore.current().wireValue());
+        //#endif
         return payload;
     }
 }

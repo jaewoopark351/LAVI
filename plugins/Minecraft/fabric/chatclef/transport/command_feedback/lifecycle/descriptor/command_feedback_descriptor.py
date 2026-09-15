@@ -114,9 +114,9 @@ class CommandFeedbackDescriptor:
                     self.setting_value,
                     self.structure_name,
                     self.destination_id,
-                    self.operation_target,
                 )
             )
+            or type(self.operation_target) is not str or len(self.operation_target) > 256
         ):
             raise ValueError("command feedback typed slot projection is invalid")
         if self.quantity_semantics not in {

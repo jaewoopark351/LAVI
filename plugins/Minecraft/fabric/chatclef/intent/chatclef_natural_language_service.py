@@ -55,6 +55,7 @@ class ChatClefNaturalLanguageService:
         auto_deposit_trust_guard_decoder: AutoDepositTrustGuardIntentDecoder
         | None = None,
         scoped_rule_parser: KoreanChatClefRuleParser | None = None,
+        runtime_catalog_provider=None,
     ):
         graph = ChatClefNaturalLanguageComponentGraph(
             extractor=extractor,
@@ -71,6 +72,9 @@ class ChatClefNaturalLanguageService:
         self._intent_policy = graph.intent_policy
         self._rejection_factory = graph.rejection_factory
         self._scoped_translation_service = graph.scoped_translation_service
+        #20260915_kpopmodder: Session ownership stays outside translation; read a fresh snapshot per request.
+        self._runtime_catalog_provider = runtime_catalog_provider
+        self._name_vocabulary = None
 
     def translate(self, text: object) -> ChatClefTranslationResultDTO:
         raw_text, rejection = self._input_guard.inspect(text)
@@ -97,4 +101,38 @@ class ChatClefNaturalLanguageService:
         intent: ChatClefIntentDTO,
         resolver: object,
     ) -> ChatClefTranslationResultDTO:
-        return self._intent_policy.translate(intent, resolver)
+        from dataclasses import replace
+        from .names.command_target_resolver import CommandTargetResolver
+        from .names.runtime_command_name_catalog import RuntimeCommandNameCatalog
+        from .chatclef_intent_type import ChatClefIntentType as I
+        snapshot = self._runtime_catalog_provider() if callable(self._runtime_catalog_provider) else None
+        catalog = None
+        if snapshot is not None:
+            if self._name_vocabulary is None:
+                from .navigation.find.find_name_repository import FindNameRepository
+                self._name_vocabulary = FindNameRepository()
+            catalog = RuntimeCommandNameCatalog(snapshot, self._name_vocabulary)
+        command = {I.GET_ITEM: "get", I.EQUIP_ITEM: "equip", I.DEPOSIT_ITEM: "deposit", I.GIVE_ITEM: "give"}.get(intent.intent_type, intent.intent_type.value)
+        scoped = CommandTargetResolver(resolver, command, catalog)
+        if intent.slots.get("butler_user") is True:
+            import re
+            if catalog is None or type(catalog.butler_user) is not str or not re.fullmatch(r"[A-Za-z0-9_]{3,16}", catalog.butler_user):
+                from .chatclef_intent_status import ChatClefIntentStatus
+                return ChatClefTranslationResultDTO.rejected(ChatClefIntentStatus.INVALID, "verified_butler_user_required",
+                    "연결된 게임 사용자 정보가 없어. 플레이어 이름을 직접 알려줘.", intent)
+        result = self._intent_policy.translate(intent, scoped)
+        if catalog is not None:
+            data = {**result.data, "runtime_catalogue": dict(catalog.identity)}
+            resolutions = result.data.get("resolutions", [result.data.get("resolution", {})])
+            labels = {}
+            for resolution in resolutions:
+                detail = resolution.get("data", {})
+                label, token = detail.get("label"), resolution.get("target")
+                if detail.get("native_capability") is True and type(label) is str and type(token) is str:
+                    labels[token] = label
+            if labels:
+                data["target_labels"] = labels
+            if intent.slots.get("butler_user") is True:
+                data["butler_user_bound"] = catalog.butler_user
+            result = replace(result, data=data)
+        return result

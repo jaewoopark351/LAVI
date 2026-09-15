@@ -48,6 +48,7 @@ class OrdinarySubmissionResultStage:
         translation,
         translation_status: str,
         korean_eligibility_proof: object = None,
+        route_claim: object = None,
     ):
         #20260907_kpopmodder: Reserve before send, then claim START after owner commit.
         grant = self._command_feedback.prepare(
@@ -60,6 +61,7 @@ class OrdinarySubmissionResultStage:
                 event=event,
                 command_text=command_text,
                 translation=translation,
+                **({"route_claim": route_claim} if route_claim is not None else {}),
             )
             if failure is not None:
                 return failure

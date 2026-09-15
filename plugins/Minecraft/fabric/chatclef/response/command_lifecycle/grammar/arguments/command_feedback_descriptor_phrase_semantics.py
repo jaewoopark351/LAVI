@@ -20,6 +20,7 @@ def inventory_default(descriptor: object) -> bool:
         or (
             getattr(descriptor, "detail_level", "typed") == "typed"
             and not getattr(descriptor, "target_item", None)
+            and not getattr(descriptor, "targets", ())
         )
     )
 

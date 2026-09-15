@@ -20,10 +20,13 @@ class ChatClefItemResolutionStage:
         status = ChatClefIntentStatus(resolution["status"])
         if status is ChatClefIntentStatus.VALIDATED:
             return resolution, str(resolution["target"]), None
+        #20260915_kpopmodder: Keep real ambiguity candidates in the shared Korean screen/voice message.
+        from ...names.korean_name_resolution_message import KoreanNameResolutionMessage
+        message = KoreanNameResolutionMessage.ambiguous(resolution)
         rejection = self._rejection_factory.create(
             status,
             str(resolution["reason_code"]),
-            "Korean item phrase could not be resolved to one ChatClef target.",
+            message or "아이템 이름 또는 이 명령의 지원 여부를 확인하지 못했어. 정확한 대상을 알려줘.",
             intent,
             {"resolution": resolution},
         )

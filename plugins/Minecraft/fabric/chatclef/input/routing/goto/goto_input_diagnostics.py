@@ -36,6 +36,9 @@ class GotoInputDiagnostics:
             if parsed is not None and parsed.xyz is not None:
                 x, y, z = parsed.xyz
                 coordinates = f" x={x} y={y} z={z}"
+            elif parsed is not None and parsed.executable:
+                #20260915_kpopmodder: Observe bound native forms without inventing missing axes.
+                coordinates = f" coordinates={','.join(map(str, parsed.coordinates)) or 'none'} dimension={parsed.dimension or 'current'}"
             self._log_callback(" ".join(fields) + coordinates)
         except Exception:
             # Emission failure is diagnostic-only and cannot change admission.

@@ -8,6 +8,18 @@
 
 Date: 2026-09-09
 
+> 2026-09-15 documentation-only reconciliation: the
+> [all-command Korean Chat/microphone requirements](chatclef-all-commands-korean-chat-microphone-requirements-2026-09-15.md)
+> carry forward Workstream C for all 26 semantic commands, with 27 registered
+> names including the compatibility alias. Current Python metadata marks 11
+> commands public; that is not end-to-end verification. FIND is already registered
+> and its [Python-owned names and existing approach/report behavior](chatclef-find-python-names-2026-09-15.md)
+> must be preserved. Earlier absent-FIND, disabled-approach, 26-name, and staged
+> rollout descriptions below retain their historical scope. They do not authorize
+> reverting current FIND/GOTO or postponing a later explicit full implementation
+> request to another documentation phase. This amendment authorizes no source,
+> configuration, test, build, deployment, runtime, commit, or push action.
+
 > 2026-09-13 focused follow-up: the user requires Korean coordinate movement
 > from both LAVI Chat and final microphone input, without typing `@goto`.
 > See the [Korean Chat/microphone XYZ input contract](chatclef-korean-goto-chat-microphone-input-contract-2026-09-13.md)
@@ -893,7 +905,7 @@ a STOPped FIND yields no FIND terminal in addition to `멈췄어`.
 
 ### 7.1 Coverage definition
 
-For each current command, and for FIND after its Java registration is proven,
+For each current semantic command, including the already registered FIND,
 Korean input support requires all of the following independently:
 
 ```text
@@ -918,10 +930,11 @@ natural-language parser does not grant authority to internal automation,
 interim microphone text, arbitrary GUI strings, or an untrusted caller.
 
 Coverage tracks registered names and semantic command capabilities separately.
-The current 26-name registry contains 25 semantic capabilities because the
-Unicode `자동보관등록` row is a native compatibility alias for the bounded bulk
-form of `auto_deposit_trust`. With FIND and without `go`, the target is 27
-registered names and 26 public semantic Korean routes. The alias row is
+The 2026-09-15 source-reviewed registry contains 27 names and 26 semantic
+capabilities, including FIND. The Unicode `자동보관등록` row is a native
+compatibility alias for the bounded bulk form of `auto_deposit_trust`.
+The target is all 26 semantic Korean routes; current public metadata covers
+11 and is not execution proof. The alias row is
 accounted for explicitly, but trusted Chat/final microphone compiles its
 meaning to canonical `auto_deposit_trust`; it does not need to serialize the
 Unicode command spelling. STOP's command-specific presentation continues to
@@ -948,7 +961,7 @@ list. Every accepted synonym must compile to the same typed command.
 | `gamma` | `밝기를 1.5로 설정해` | bounded finite number; current Java has no finish/result callback, so public remains false until an authoritative terminal/reconciliation clears active ownership; wording stays cautious until separate effect proof exists |
 | `get` | `다이아 곡괭이 하나 만들어줘` | existing item/crafting resolver and quantity contract |
 | `give` | `Alex에게 철괴 3개 줘` | exact player, item, quantity, and R2 give/drop evidence |
-| `goto` | `100, 64, -30 좌표로 가줘` | dedicated absolute XYZ grammar from Section 5 |
+| `goto` | `100, 64, -30 좌표로 가줘` | all source-supported Java coordinate/dimension forms in the 2026-09-15 requirements; preserve Section 5's existing absolute XYZ grammar regression contract |
 | `hero` | `적대 몹 계속 정리해` | continuous/broad combat scope; R3 confirmation and STOP |
 | `idle` | `가만히 있어` | continuous lifecycle, explicit resume/STOP behavior |
 | `locate_structure` | `엔드 요새 찾아가` | only source-proven supported structures; bare `요새` remains ambiguous; do not claim every structure |
@@ -960,7 +973,7 @@ list. Every accepted synonym must compile to the same typed command.
 | `stop` | `멈춰줘` | existing trusted control lane and terminal-only visible response |
 | `store_home` | `아이템 집에 정리해` | existing strict STORE_HOME evidence evaluator |
 | `자동보관등록` | `주변 16x16 자동 보관 장소 등록해` | Chat/final mic compiles to `auto_deposit_trust area 16x16`; Unicode alias remains raw/direct compatibility only |
-| `find` | `마을 주민 찾아줘` | finite non-destructive loaded-scope locate-and-report operation from Section 6; approach remains disabled |
+| `find` | `마을 주민 찾아줘` | preserve current Python name resolution, Java registry validation, report/approach modes, exploration, defense yielding, and terminal evidence; Section 6 retains its historical base-design scope |
 
 Supporting a command in Korean does not expand its Java capability. For
 example, Korean `locate_structure` initially covers only the structures the
@@ -992,6 +1005,9 @@ satisfy an “all commands” count.
   confirmation receipt before execution. The confirmation must bind source,
   session, generation, request/message identity, normalized typed command,
   expiry, and one-time consumption.
+  Consumption must revalidate current source trust, session, command authority,
+  target, and busy/admission conditions; a valid receipt alone cannot bypass
+  those gates. A rejected revalidation causes zero submissions.
 - A second unrelated utterance, an interim transcript, a repeated UI event, or
   an LLM paraphrase cannot consume the confirmation.
 - Rejection, timeout, cancellation, or duplicate confirmation causes zero Java
@@ -1006,6 +1022,9 @@ Chat/final microphone, tests must prove one terminal receipt is deliverable
 across the disable transition, one independent user-accessible raw/direct
 `@chatclef on` recovery path remains available, and confirmation cancellation
 or expiry produces zero submissions.
+The 2026-09-15 all-command acceptance also requires Korean `chatclef on` recovery
+through both trusted Chat and final microphone after disabling; raw/direct
+recovery alone does not complete Korean on/off coverage.
 
 ### 7.4 Items and other argument domains
 
@@ -1016,9 +1035,9 @@ Resolution must be scoped by command and slot:
 item target          -> GET/DEPOSIT/GIVE command capability
 equipment target     -> EQUIP capability subset
 entity/player target -> ATTACK/FOLLOW/FIND-specific resolver
-block target         -> SCAN/FIND block registry
+block target         -> SCAN's actual Blocks fields / FIND block registry
 structure target     -> LOCATE_STRUCTURE, plus FIND only after structure approval
-coordinate target    -> GOTO integer XYZ parser
+coordinate target    -> GOTO native XYZ/XZ/Y/dimension forms; existing XYZ regression
 setting value        -> CHATCLEF/GAMMA/OVERLAY typed bounds
 destination identity -> auto-deposit trust/untrust/list contracts
 ```
@@ -1035,11 +1054,16 @@ not implicitly authorize player ATTACK.
 
 For an item-bearing command, “all items” means every target in that command's
 actual capability catalogue, not every item accepted by a different command.
-Each translatable target needs a unique approved Korean alias to count toward
-all-Korean coverage. A validated canonical or namespaced-ID fallback keeps an
-opaque or modded target reachable, but is reported separately and does not
-inflate the Korean-alias metric. There is no hard-coded sample-item ceiling,
-and catalogue coverage never widens EQUIP or another narrower Java capability.
+Each target counted toward all-Korean coverage needs an unambiguous, validated
+Korean translation or an approved Korean user alias. Report translation and
+alias coverage separately without double-counting targets. A validated native
+command token keeps an opaque or modded target reachable but is reported
+separately and does not inflate Korean coverage. That token is command-specific,
+not necessarily a namespaced ID; GIVE's inventory fallback can require a full
+translation key. There is no hard-coded sample-item ceiling, and catalogue
+coverage never widens EQUIP or another narrower Java capability. EQUIP's
+argument acceptance and actual equipment Task capability must be checked
+separately as specified in Section 5.1 of the 2026-09-15 requirements.
 
 ### 7.5 Numeric argument contract
 
@@ -1048,6 +1072,8 @@ helper:
 
 - an explicit numeric token that is malformed, out of range, duplicated, or
   not recognized by the command's closed grammar rejects with zero submission;
+  a repeated ItemList target is different from a duplicated quantity token:
+  preserve the native per-target sum and reject overflow in that sum;
 - a command-specific default may apply only when the quantity is genuinely
   absent, never when an explicit quantity failed to parse;
 - exact integer slots accept Arabic digits and only the approved closed Korean
@@ -1055,7 +1081,8 @@ helper:
 - booleans are not integers, and each command fixes and tests its own minimum
   and maximum;
 - FOOD and MEAT quantities are integer food points, not a count of full hunger
-  icons;
+  icons; both current Java commands add the inventory's existing total food
+  score before passing the target to their respective Tasks;
 - GAMMA accepts only a finite decimal inside a source-reviewed explicit bound;
   NaN, infinity, overflow, and an as-yet-unfixed bound reject;
 - GOTO coordinates use the signed-integer grammar and Java-int bounds in
@@ -1500,7 +1527,7 @@ as FIND success.
 
 ### 12.4 All-command matrix tests
 
-For every current 26-row command and FIND after registration:
+For all 27 source-reviewed registered names, counting 26 semantic routes and the compatibility alias separately:
 
 - source-registration/parser/admission/bridge/effect/public axes are asserted
   independently;
@@ -1517,7 +1544,7 @@ For every current 26-row command and FIND after registration:
   admitted` passes; a cautious sentence alone is not ownership retirement or
   strong effect proof;
 - Chat and final microphone have parity after confirmation requirements;
-- all 25 current semantic capabilities plus FIND are publicly executable from
+- all 26 semantic capabilities, including FIND, are publicly executable from
   both trusted sources after their applicable confirmation, while the Unicode
   alias row is separately accounted for through canonical
   `auto_deposit_trust` compilation;
@@ -1530,12 +1557,18 @@ For every current 26-row command and FIND after registration:
 - terminal claims, output, UI, and TTS are consumed once;
 - no LLM recall, automatic retry, automatic replay, or command resubmission.
 
-The existing 26-command exact-set tests must prove that an isolated FIND count
-drift would fail. The activation unit updates all 27 authoritative artifacts
-atomically so no committed boundary has an incoherent catalog. Tests must not
-be weakened to accept arbitrary count drift.
+The exact-set tests must compare the current activation-aware Java registrations,
+Python registry, support/lifecycle profiles, and compatibility alias accounting.
+At this source snapshot the expected set contains 27 registered names. Preserve
+FIND's existing registration rather than replaying its historical activation
+steps, and do not weaken tests to accept arbitrary count drift.
 
 ## 13. Implementation and verification order
+
+For a later all-command implementation request, use the current-source order in
+the [2026-09-15 requirements](chatclef-all-commands-korean-chat-microphone-requirements-2026-09-15.md).
+The numbered sequence below is historical: absent FIND and its original
+activation stages are not prerequisites to reimplement or roll back current code.
 
 The implementation order is retained below. Before the failed live run, steps 1
 and 2 were recorded as source-complete with focused tests in the mixed worktree;

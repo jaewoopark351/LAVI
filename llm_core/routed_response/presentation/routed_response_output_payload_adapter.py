@@ -17,7 +17,7 @@ class RoutedResponseOutputPayloadAdapter:
 
     def build(self, request, response_generation: object):
         payload = self._build_output_payload_callback(
-            request.text,
+            request.text if request.speech_text is None else request.speech_text,
             response_generation,
         )
         if (

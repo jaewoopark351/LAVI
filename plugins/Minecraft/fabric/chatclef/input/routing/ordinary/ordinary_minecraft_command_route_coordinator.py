@@ -85,5 +85,30 @@ class OrdinaryMinecraftCommandRouteCoordinator:
             **goto_arguments,
         )
 
+    def route_confirmation(self, event, korean_eligibility_proof):
+        owner = self._component_graph.confirmation_owner
+        with self._submission_route_lock:
+            receipt, decision = owner.reply(event=event, proof=korean_eligibility_proof)
+            if receipt is None:
+                return decision
+            try:
+                rejection = self._availability_stage.rejection()
+                if rejection is not None:
+                    return rejection
+                # Re-translate the frozen original request with current validators.
+                # The receipt binds the current confirmation proof to that exact request.
+                return self._pipeline.route_locked(
+                    receipt.pending.event, receipt.pending.command_text,
+                    korean_eligibility_proof=receipt,
+                    confirmation_receipt=receipt,
+                    goto_input_binding=receipt.pending.goto_input_binding,
+                )
+            finally:
+                owner.abandon(receipt)
+
+    def cancel_pending_confirmation(self):
+        with self._submission_route_lock:
+            self._component_graph.confirmation_owner.cancel_all()
+
 
 __all__ = ("OrdinaryMinecraftCommandRouteCoordinator",)

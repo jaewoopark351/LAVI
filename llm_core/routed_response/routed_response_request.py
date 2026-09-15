@@ -19,6 +19,8 @@ class RoutedResponseRequest:
     delivery_mode: str = "current_input"
     presentation_metadata: RoutedResponsePresentationMetadata | None = None
     send_ui: bool = False
+    #20260915_kpopmodder: Output listeners retain their normal filtering for optional speech text.
+    speech_text: str | None = None
 
 
 __all__ = ("RoutedResponseRequest",)

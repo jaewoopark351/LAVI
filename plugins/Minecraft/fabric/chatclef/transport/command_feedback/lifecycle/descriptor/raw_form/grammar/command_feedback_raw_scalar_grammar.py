@@ -22,7 +22,8 @@ class CommandFeedbackRawScalarGrammar:
             "structure",
         }
     )
-    _SAFE_TARGET = re.compile(r"[A-Za-z0-9_]{1,64}\Z", re.ASCII)
+    #20260915_kpopmodder: Preserve the exact bounded native token supplied by the runtime catalogue.
+    _SAFE_TARGET = re.compile(r"[A-Za-z0-9_:./-]{1,256}\Z", re.ASCII)
     _PLAYER = re.compile(r"[A-Za-z0-9_]{1,16}\Z", re.ASCII)
     _BLOCK = re.compile(r"[A-Za-z0-9_]+\Z", re.ASCII)
     _STRUCTURES = frozenset({"stronghold", "desert_temple"})

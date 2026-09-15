@@ -92,6 +92,7 @@ class KoreanItemPhraseResolver:
                     target=target,
                     material=material,
                     equipment=equipment,
+                    equipment_alias=equipment_alias,
                     phrase=normalized,
                 )
         return None

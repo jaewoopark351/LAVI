@@ -5,6 +5,7 @@ from plugins.Minecraft.fabric.chatclef.input.minecraft_chatclef_input_route_deci
     MinecraftChatClefInputRouteDecision,
 )
 from plugins.Minecraft.fabric.chatclef.input.ownership import ItemCommandOwnership
+from .name.minecraft_name_rejection_policy import MinecraftNameRejectionPolicy
 
 
 class OrdinaryItemTranslationRejectionOwner:
@@ -26,6 +27,7 @@ class OrdinaryItemTranslationRejectionOwner:
             item_command_rejection_evidence_parser
         )
         self._live_proof_validator = live_proof_validator
+        self._name_rejections = MinecraftNameRejectionPolicy()
 
     def owns_status(self, translation_status: str) -> bool:
         return translation_status in self._OWNED_STATUSES
@@ -57,6 +59,11 @@ class OrdinaryItemTranslationRejectionOwner:
                 translation,
                 ownership.reason_code,
                 ownership.message,
+            )
+        message = self._name_rejections.message(translation, command_text, evidence.trusted_scope_live)
+        if message is not None:
+            return self._decision_factory.item_command_translation_rejection(
+                translation, translation["reason_code"], message,
             )
         return MinecraftChatClefInputRouteDecision.not_handled(
             f"{translation_status}_intent"

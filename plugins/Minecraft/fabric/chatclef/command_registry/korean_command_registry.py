@@ -77,68 +77,13 @@ class KoreanChatClefCommandRegistry:
             "자동보관등록",
         }
     )
-    _PUBLIC_KOREAN_COMMANDS = frozenset(
-        {
-            "auto_deposit_trust",
-            "deposit",
-            "equip",
-            "find",
-            "food",
-            "get",
-            "give",
-            "goto",
-            "meat",
-            "stop",
-            "store_home",
-        }
-    )
-    _PARSER_READY_COMMANDS = frozenset(
-        {
-            "auto_deposit_trust",
-            "deposit",
-            "equip",
-            "find",
-            "follow",
-            "food",
-            "get",
-            "give",
-            "goto",
-            "idle",
-            "meat",
-            "stop",
-            "store_home",
-        }
-    )
-    _PYTHON_ADMISSION_READY_COMMANDS = frozenset(
-        {
-            "auto_deposit_trust",
-            "deposit",
-            "equip",
-            "find",
-            "food",
-            "get",
-            "give",
-            "goto",
-            "meat",
-            "stop",
-            "store_home",
-        }
-    )
-    _BRIDGE_LIFECYCLE_READY_COMMANDS = frozenset(
-        {
-            "auto_deposit_trust",
-            "deposit",
-            "equip",
-            "find",
-            "food",
-            "get",
-            "give",
-            "goto",
-            "meat",
-            "stop",
-            "store_home",
-        }
-    )
+    #20260915_kpopmodder: All canonical routes share the existing source/admission gates.
+    # The native Unicode compatibility spelling is serialized through its canonical route.
+    _PUBLIC_KOREAN_COMMANDS = frozenset(c for c in _REGISTERED_COMMANDS if c.isascii())
+    # Keep separate readiness axes: grammar, trusted admission, and result ownership.
+    _PARSER_READY_COMMANDS = frozenset(c for c in _REGISTERED_COMMANDS if c.isascii())
+    _PYTHON_ADMISSION_READY_COMMANDS = frozenset(c for c in _REGISTERED_COMMANDS if c.isascii())
+    _BRIDGE_LIFECYCLE_READY_COMMANDS = frozenset(c for c in _REGISTERED_COMMANDS if c.isascii())
     _GAMEPLAY_VERIFIABLE_COMMANDS = frozenset({"find", "get", "store_home"})
     _SAFETY_TIERS = MappingProxyType({
         "attack": "R3",
@@ -178,21 +123,21 @@ class KoreanChatClefCommandRegistry:
     })
     _SLOT_SCHEMAS = MappingProxyType({
         "attack": ("target", "count?"),
-        "auto_deposit_trust": (),
+        "auto_deposit_trust": ("area?", "size?"),
         "auto_deposit_trusted_list": (),
         "auto_deposit_untrust": ("destinationId?",),
         "chatclef": ("state",),
-        "deposit": ("item", "count"),
+        "deposit": ("items?",),
         "deposit_all": ("items?",),
-        "equip": ("equipment_item",),
+        "equip": ("equipment_items_or_material",),
         "find": ("kind?", "target", "mode?"),
-        "follow": ("player",),
+        "follow": ("player?",),
         "food": ("count",),
-        "gamer": ("target",),
-        "gamma": ("value",),
-        "get": ("item", "count"),
-        "give": ("player", "item", "count"),
-        "goto": ("x", "y", "z"),
+        "gamer": (),
+        "gamma": ("value?",),
+        "get": ("items",),
+        "give": ("player?", "item", "count?"),
+        "goto": ("coordinates?", "dimension?"),
         "hero": (),
         "idle": (),
         "locate_structure": ("structure",),
@@ -200,7 +145,7 @@ class KoreanChatClefCommandRegistry:
         "overlay": ("state",),
         "reload_settings": (),
         "resetmemory": (),
-        "scan": ("target",),
+        "scan": ("block?",),
         "stop": (),
         "store_home": (),
         "자동보관등록": (),
@@ -283,11 +228,10 @@ class KoreanChatClefCommandRegistry:
     def _confirmation_mode(self, command: str) -> str:
         if command in {"deposit", "give"}:
             return "explicit_slot_required"
-        if command in self._PUBLIC_KOREAN_COMMANDS:
-            return "none"
+        #20260915_kpopmodder: Public readiness never removes high-risk confirmation.
         tier = self._SAFETY_TIERS[command]
         if tier in {"R3", "R4"}:
-            return "direct_typed_confirmation_required"
+            return "trusted_korean_confirmation_required"
         return "none"
 
     def _allowed_input_sources(self, command: str) -> tuple[str, ...]:

@@ -12,6 +12,18 @@
 
 Date: 2026-08-15
 
+> 2026-09-15 documentation-only follow-up: the
+> [all-command Korean Chat/microphone requirements](chatclef-all-commands-korean-chat-microphone-requirements-2026-09-15.md)
+> reuse this plan's item/action and ambiguity boundaries. Whole-registry names,
+> command capability, Korean route availability, and actual gameplay success
+> are separate coverage measures. Do not propagate GET-only catalog limits into
+> other commands or count raw-ID fallback as Korean-name coverage. Conversely,
+> record a catalog restriction actually imposed by a native Java command as an
+> existing capability limit, not a Korean resolver defect. Preserve current FIND.
+> Historical phase gates do not reduce a later explicit full implementation
+> request to sample aliases or another documentation phase. This update changes
+> no alias data, runtime policy, source, or action authorization.
+
 This document records the documentation-only v2 design for expanding Korean
 Minecraft item names across ChatClef item commands:
 

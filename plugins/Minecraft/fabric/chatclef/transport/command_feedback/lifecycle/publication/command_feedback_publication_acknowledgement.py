@@ -60,12 +60,15 @@ class CommandFeedbackPublicationAcknowledgement:
             self._spent = True
         return self._callback(self._permit, published) is True
 
-    def select_coalesced_terminal(self):
+    def select_coalesced_terminal(self, *, expected_selector=None):
         selector = self._coalesced_terminal_selector
         if selector is None:
             return None
         with self._lock:
-            if self._spent or self._selection_claimed:
+            if (self._spent or self._selection_claimed
+                    or (expected_selector is not None and (
+                        selector is not expected_selector
+                        or self._coalesced_terminal_selector is not expected_selector))):
                 return None
             self._selection_claimed = True
             try:

@@ -63,7 +63,14 @@ class ChatClefTranslationResultValidator:
             ChatClefIntentType.EQUIP_ITEM,
             ChatClefIntentType.DEPOSIT_ITEM,
             ChatClefIntentType.GIVE_ITEM,
+            ChatClefIntentType.DEPOSIT_ALL,
+            ChatClefIntentType.ATTACK,
+            ChatClefIntentType.SCAN,
         }:
+            #20260915_kpopmodder: Typed bulk, armor shortcuts and default SCAN carry no target.
+            if (intent.slots.get("bulk") is True or "armor_set" in intent.slots
+                    or (intent.intent_type is ChatClefIntentType.SCAN and not intent.item_phrase)):
+                return self._compiler.compile(intent)
             if not isinstance(resolved_target, str) or not resolved_target.strip():
                 raise ValueError("item_action_translation_requires_resolved_target")
             return self._compiler.compile(intent, target=resolved_target)

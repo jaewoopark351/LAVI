@@ -20,6 +20,7 @@ class TrustedRoutedResponseCapabilityConsumer:
         text: str,
         source: str,
         response_kind: str = "immediate",
+        speech_text: str | None = None,
     ) -> bool:
         return self.consumer.consume(
             capability,
@@ -27,6 +28,7 @@ class TrustedRoutedResponseCapabilityConsumer:
             text=text,
             source=source,
             response_kind=response_kind,
+            speech_text=speech_text,
         )
 
 

@@ -35,6 +35,8 @@ public final class AutoDepositExactTrustService implements AutoDepositSingleTrus
         Optional<String> worldKey = worldKeyReader.read();
         Optional<AutoDepositTrustedTarget> target = targetResolver.resolve(mod);
         if (worldKey.isEmpty() || target.isEmpty() || mod.getWorld() == null) {
+            lavi.minecraft.command.result.instant.InstantCommandResultCapture.record("auto_deposit_trust", false,
+                    "TARGET_UNAVAILABLE", java.util.Map.of());
             mod.logWarning("Trusted destination not registered: look at a supported container or use an exactly bound open container.");
             return;
         }
@@ -43,6 +45,9 @@ public final class AutoDepositExactTrustService implements AutoDepositSingleTrus
                 worldKey.get(), dimension, target.get().position(), true
         );
         AutoDepositTrustedDestinationMutationResult result = repository.register(destination);
+        //20260915_kpopmodder: Observe the existing exact-container mutation result without changing protection.
+        lavi.minecraft.command.result.instant.InstantCommandResultCapture.record("auto_deposit_trust", result.success(),
+                result.status().name(), java.util.Map.of("destination_id", destination.destinationId()));
         String message = AutoDepositTrustedCommandFormatter.mutation(result)
                 + ", source=" + target.get().source();
         if (result.success()) {

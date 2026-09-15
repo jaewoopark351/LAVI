@@ -46,6 +46,9 @@ public class ScanCommand extends Command {
         }
 
         if (block == null) {
+            //20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
+            //20260915_kpopmodder: Observe the already-decided query result; exact inverse is these observation calls.
+            lavi.minecraft.command.result.instant.InstantCommandResultCapture.record("scan", false, "INVALID_BLOCK", java.util.Map.of());
             String closest = FuzzySearchHelper.getClosestMatchMinecraftItems(blockStr, allBlockNames);
             mod.log("Block named: \"" + blockStr + "\" not a valid block. Perhaps the user meant \"" + closest + "\"?");
             finish();
@@ -55,8 +58,11 @@ public class ScanCommand extends Command {
         BlockScanner blockScanner = mod.getBlockScanner();
         Optional<BlockPos> p = blockScanner.getNearestBlock(block,mod.getPlayer().getPos());
         if (p.isPresent()) {
+            lavi.minecraft.command.result.instant.InstantCommandResultCapture.record("scan", true, "BLOCK_FOUND",
+                    java.util.Map.of("block", blockStr, "x", p.get().getX(), "y", p.get().getY(), "z", p.get().getZ()));
             mod.log("Closest " + blockStr + ": " + p.get().toString());
         } else {
+            lavi.minecraft.command.result.instant.InstantCommandResultCapture.record("scan", false, "NOT_FOUND", java.util.Map.of("block", blockStr));
             mod.log("No blocks of type " + blockStr + " found nearby.");
         }
         finish();

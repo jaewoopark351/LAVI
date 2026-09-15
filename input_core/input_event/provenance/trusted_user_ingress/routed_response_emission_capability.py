@@ -4,6 +4,8 @@ from __future__ import annotations
 import hashlib
 import threading
 
+from .routed_response_deferred_selection import RoutedResponseDeferredSelection
+
 
 _ISSUANCE_TOKEN = object()
 
@@ -19,6 +21,9 @@ class RoutedResponseEmissionCapability:
         "_spent",
         "_text_digest",
         "_text_length",
+        "_deferred_selection",
+        "_replacement_allowed",
+        "_speech_text",
     )
 
     def __init__(
@@ -30,6 +35,9 @@ class RoutedResponseEmissionCapability:
         text: str,
         source: str,
         response_kind: str,
+        deferred_selection=None,
+        replacement_allowed: bool = True,
+        speech_text: str | None = None,
         _issuance_token: object = None,
     ):
         if _issuance_token is not _ISSUANCE_TOKEN:
@@ -45,6 +53,11 @@ class RoutedResponseEmissionCapability:
         self._response_kind = response_kind
         self._lock = threading.Lock()
         self._spent = False
+        if deferred_selection is not None and type(deferred_selection) is not RoutedResponseDeferredSelection:
+            raise TypeError("deferred selection must be exact")
+        self._deferred_selection = deferred_selection
+        self._replacement_allowed = replacement_allowed
+        self._speech_text = speech_text
 
     @classmethod
     def _issue(
@@ -56,6 +69,7 @@ class RoutedResponseEmissionCapability:
         text: str,
         source: str,
         response_kind: str,
+        deferred_selection=None,
     ) -> "RoutedResponseEmissionCapability":
         return cls(
             registry_token=registry_token,
@@ -64,6 +78,7 @@ class RoutedResponseEmissionCapability:
             text=text,
             source=source,
             response_kind=response_kind,
+            deferred_selection=deferred_selection,
             _issuance_token=_ISSUANCE_TOKEN,
         )
 
@@ -75,6 +90,7 @@ class RoutedResponseEmissionCapability:
         text: str,
         source: str,
         response_kind: str,
+        speech_text: str | None = None,
     ) -> bool:
         if (
             registry_token is not self._registry_token
@@ -86,13 +102,54 @@ class RoutedResponseEmissionCapability:
             != self._text_digest
             or source != self._source
             or response_kind != self._response_kind
+            or speech_text != self._speech_text
         ):
             return False
         with self._lock:
             if self._spent:
                 return False
+            #20260915_kpopmodder: Commit under the original publication owner's
+            # cancellation lock; closing ingress proof never grants new authority.
             self._spent = True
+            if self._deferred_selection is not None:
+                return RoutedResponseDeferredSelection.run(
+                    self._deferred_selection,
+                    lambda selected_text, selected_source, selected_kind, selected_speech: (
+                        selected_text == text and selected_source == source
+                        and selected_kind == response_kind
+                        and selected_speech == speech_text
+                    ),
+                ) is True
             return True
+
+    def _replace_from_selection(self, owner: object):
+        # No caller-provided text or response kind can be re-signed here.
+        with self._lock:
+            if self._spent:
+                return None
+            self._spent = True
+            selection = self._deferred_selection
+            if (not self._replacement_allowed or selection is None
+                    or owner is not selection.owner or not self._event_matches(self._event)):
+                return None
+
+            def issue_selected(text, source, response_kind, speech_text):
+                if (type(text) is not str or not text or len(text) > 32768
+                        or source != self._source or type(response_kind) is not str
+                        or not response_kind or response_kind == self._response_kind
+                        or (speech_text is not None and (type(speech_text) is not str
+                            or not speech_text or len(speech_text) > 32768))):
+                    return None
+                return RoutedResponseEmissionCapability(
+                    registry_token=self._registry_token, event=self._event,
+                    event_signature=self._event_signature, text=text,
+                    source=source, response_kind=response_kind,
+                    deferred_selection=selection, replacement_allowed=False,
+                    speech_text=speech_text,
+                    _issuance_token=_ISSUANCE_TOKEN,
+                )
+
+            return RoutedResponseDeferredSelection.run(selection, issue_selected)
 
     def _event_matches(self, event: object) -> bool:
         try:

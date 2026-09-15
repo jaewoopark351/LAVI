@@ -13,7 +13,8 @@ class CommandFeedbackTarget:
     spoken_label: str
     slot_provenance: str = "explicit"
 
-    _TARGET = re.compile(r"[a-z0-9_]+\Z", re.ASCII)
+    #20260915_kpopmodder: Preserve full native mod-item translation tokens in feedback.
+    _TARGET = re.compile(r"[A-Za-z0-9_:./-]{1,256}\Z", re.ASCII)
 
     def __post_init__(self) -> None:
         if (

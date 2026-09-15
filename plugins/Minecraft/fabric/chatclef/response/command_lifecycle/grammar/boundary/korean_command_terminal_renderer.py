@@ -5,6 +5,8 @@ from ...terminal.store_home import KoreanStoreHomeTerminalRenderer
 from ...terminal.goto import KoreanGotoTerminalRenderer
 #20260914_kpopmodder: Both screen and TTS consume the same verified FIND projection.
 from ...terminal.find import KoreanFindTerminalRenderer
+from ...terminal.instant import KoreanInstantCommandTerminalRenderer
+from ...terminal.equip import KoreanEquipTerminalRenderer
 from ..arguments.command_feedback_descriptor_phrase_semantics import get_verb
 
 
@@ -28,6 +30,8 @@ class KoreanCommandTerminalRenderer:
         )
         self._goto = goto_renderer or KoreanGotoTerminalRenderer()
         self._find = KoreanFindTerminalRenderer()
+        self._instant = KoreanInstantCommandTerminalRenderer()
+        self._equip = KoreanEquipTerminalRenderer(particle_renderer=self._particle)
 
     def render(
         self,
@@ -40,6 +44,15 @@ class KoreanCommandTerminalRenderer:
         evidence_projection: object = None,
         failure_projection: object = None,
     ) -> str:
+        #20260915_kpopmodder: Native task completion and observed slot mismatch remain distinct facts.
+        if status == "completed" and getattr(descriptor, "command_name", None) == "equip":
+            observed = self._equip.render(evidence_projection if verified else failure_projection, descriptor)
+            if observed is not None:
+                return observed
+        if status in {"completed", "failed", "unknown"}:
+            observed = self._instant.render(evidence_projection if verified else failure_projection)
+            if observed is not None:
+                return observed
         if (
             status == "accepted_without_result_callback"
             and getattr(descriptor, "command_name", "") == "gamma"

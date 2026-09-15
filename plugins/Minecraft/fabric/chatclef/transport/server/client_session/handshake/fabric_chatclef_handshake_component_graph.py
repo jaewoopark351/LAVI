@@ -26,6 +26,7 @@ class FabricChatClefHandshakeComponentGraph:
         self.persistence = FabricChatClefHandshakeSessionPersistence(
             session_registry=session_registry,
             now_ms=now_ms,
+            diagnostics=diagnostics,
         )
         self.acknowledger = FabricChatClefHandshakeAcknowledger(
             envelope_transport=envelope_transport,

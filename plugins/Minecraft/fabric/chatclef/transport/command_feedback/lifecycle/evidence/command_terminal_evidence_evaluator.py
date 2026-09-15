@@ -17,6 +17,8 @@ from .goto import GotoTerminalEvidenceEvaluator
 #20260914_kpopmodder: FIND projects observations, not acquisition or combat effects.
 from .find import FindTerminalEvidenceEvaluator
 from .store_home import StoreHomeTerminalEvidenceEvaluator
+from .instant import InstantCommandEvidenceEvaluator
+from .equip import EquipTerminalEvidenceEvaluator
 
 
 class CommandTerminalEvidenceEvaluator:
@@ -28,10 +30,14 @@ class CommandTerminalEvidenceEvaluator:
         store_home_evaluator=None,
         goto_evaluator=None,
         diagnostic_observer=None,
+        instant_diagnostic_observer=None,
+        equip_diagnostic_observer=None,
     ) -> None:
         self._profiles = profile_registry or CommandTerminalEvidenceProfileRegistry()
         #20260913_kpopmodder: Observe selected verdicts without supplying evidence.
         self._diagnostic_observer = diagnostic_observer
+        self._instant_diagnostic_observer = instant_diagnostic_observer
+        self._equip_diagnostic_observer = equip_diagnostic_observer
         self._evaluators = {
             "get_acquisition": (
                 get_evaluator or GetAcquisitionTerminalEvidenceEvaluator()
@@ -41,6 +47,8 @@ class CommandTerminalEvidenceEvaluator:
             ),
             "goto_terminal": goto_evaluator or GotoTerminalEvidenceEvaluator(),
             "find_terminal": FindTerminalEvidenceEvaluator(),
+            "instant_command": InstantCommandEvidenceEvaluator(),
+            "equip_slots": EquipTerminalEvidenceEvaluator(),
         }
 
     def evaluate(
@@ -75,7 +83,7 @@ class CommandTerminalEvidenceEvaluator:
         if getattr(descriptor, "detail_level", "typed") not in {
             "typed",
             "raw_typed",
-        }:
+        } and profile.success_evaluator_id != "instant_command":
             return self._observed(CommandTerminalEvidenceEvaluation(False), result, context, profile, "unsupported_detail")
         evaluator = self._evaluators.get(profile.success_evaluator_id)
         if evaluator is None:
@@ -95,9 +103,11 @@ class CommandTerminalEvidenceEvaluator:
 
     #20260913_kpopmodder: A throwing observer cannot replace the owner's return value.
     def _observed(self, evaluation, result, context, profile, reason):
-        if self._diagnostic_observer is not None:
+        for observer in (self._diagnostic_observer, self._instant_diagnostic_observer, self._equip_diagnostic_observer):
+            if observer is None:
+                continue
             try:
-                self._diagnostic_observer.evidence_decided(
+                observer.evidence_decided(
                     result=result, context=context, profile=profile,
                     evaluation=evaluation, reason=reason,
                 )

@@ -20,6 +20,7 @@ class KoreanChatMicrophoneResponseCapabilityIssuer:
         text: str,
         source: str,
         response_kind: str = "immediate",
+        deferred_selection=None,
     ):
         if event is not self._lifecycle.event or owner is not self._lifecycle.owner:
             return None
@@ -35,6 +36,7 @@ class KoreanChatMicrophoneResponseCapabilityIssuer:
                         text=text,
                         source=source,
                         response_kind=response_kind,
+                        deferred_selection=deferred_selection,
                     )
                 )
             except Exception:

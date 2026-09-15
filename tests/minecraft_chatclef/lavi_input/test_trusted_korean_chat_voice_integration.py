@@ -236,7 +236,8 @@ class TrustedKoreanChatVoiceIntegrationTests(unittest.TestCase):
             "500 90 마이너스 -928로 가줘",
             "오백 구십 마이너스 구백이십팔 좌표로 가줘",
             "~500 90 -928 좌표로 가줘",
-            "500 90 -928 네더로 이동해줘",
+            #20260915_kpopmodder: Valid dimension+XYZ is covered by the shared all-command submission matrix.
+            "500 90 -928 4 네더로 이동해줘",
             "500 90 -928로 가고 좀비 공격해",
             "(500, 90, -928으로 이동해",
             "500\t90 -928로 이동해",

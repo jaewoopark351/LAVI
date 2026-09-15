@@ -5,6 +5,7 @@ from llm_core.routed_response import (
     RoutedResponseNonPreemptingDeliveryPolicy,
     RoutedResponsePresentationMetadata,
 )
+from llm_core.routed_response.presentation.routed_response_text import RoutedResponseText
 from plugins.Minecraft.fabric.chatclef.response.command_lifecycle import (
     CommandLifecycleTerminalResponse,
 )
@@ -38,8 +39,10 @@ class MinecraftCommandLifecycleTerminalResponseWiring:
                     CraftingLifecycleTerminalResponse,
                 }:
                     return None
+                speech_text = getattr(response, "speech_text", None)
+                text = response.text if speech_text is None else RoutedResponseText(response.text, speech_text)
                 return emitter(
-                    response.text,
+                    text,
                     source="minecraft_chatclef",
                     send_output=True,
                     send_full_output=False,

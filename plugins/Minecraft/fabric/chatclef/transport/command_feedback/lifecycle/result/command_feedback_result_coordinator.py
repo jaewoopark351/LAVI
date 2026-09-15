@@ -4,6 +4,8 @@ from __future__ import annotations
 from typing import Mapping
 
 from plugins.Minecraft.common.protocol.command_result_status import CommandResultStatus
+from plugins.Minecraft.fabric.chatclef.result.instant import InstantCommandPayload
+from plugins.Minecraft.fabric.chatclef.result.equip import EquipEffectPayload
 
 from ..evidence.command_terminal_evidence_evaluation import (
     CommandTerminalEvidenceEvaluation,
@@ -123,6 +125,9 @@ class CommandFeedbackResultCoordinator:
         if status is CommandResultStatus.COMPLETED or (
             status is CommandResultStatus.FAILED
             and getattr(context.descriptor, "command_name", "") in {"goto", "find"}
+        ) or (
+            status in {CommandResultStatus.FAILED, CommandResultStatus.UNKNOWN}
+            and getattr(context.descriptor, "command_name", "") in InstantCommandPayload.COMMANDS
         ):
             #20260915_kpopmodder: Preserve verified FIND/GOTO failure reasons through the existing projection channel.
             evaluation = self._evaluate_terminal(
@@ -157,6 +162,11 @@ class CommandFeedbackResultCoordinator:
                 if type(evaluation) is CommandTerminalEvidenceEvaluation:
                     if (status != "completed" and evaluation.verified) or (
                         status != "failed" and evaluation.failure_projection is not None
+                        and not (status == "unknown" and type(evaluation.failure_projection) is InstantCommandPayload
+                                 and evaluation.failure_projection.outcome == "unknown")
+                        and not (status == "completed" and type(evaluation.failure_projection) is EquipEffectPayload
+                                 and evaluation.failure_projection.observed_mismatch
+                                 and getattr(context.descriptor, "command_name", None) == "equip")
                     ):
                         return CommandTerminalEvidenceEvaluation(False)
                     return evaluation

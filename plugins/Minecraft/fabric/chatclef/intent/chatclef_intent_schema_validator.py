@@ -19,7 +19,7 @@ from plugins.Minecraft.fabric.chatclef.intent.chatclef_numeric_constraints impor
 
 
 class ChatClefIntentSchemaValidator:
-    _ALLOWED_FIELDS = set(ChatClefIntentDTO().to_dict())
+    _ALLOWED_FIELDS = set(ChatClefIntentDTO().to_dict()) | {"parse_rule_id"}
     _FORBIDDEN_FIELDS = {
         "command",
         "chatclef_command",
@@ -52,6 +52,14 @@ class ChatClefIntentSchemaValidator:
         raise TypeError("intent must be a mapping or ChatClefIntentDTO")
 
     def _validate_intent(self, intent: ChatClefIntentDTO) -> tuple[bool, str, str]:
+        #20260915_kpopmodder: Interpretation metadata cannot be attached to unrelated intent families.
+        if intent.parse_rule_id and intent.intent_type is not ChatClefIntentType.CHATCLEF:
+            return False, "invalid_parse_rule_id", "parse rule metadata does not match this command"
+        #20260915_kpopmodder: New families and native subgrammars have a focused closed-slot owner.
+        from .grammar.validation.korean_command_request_validator import KoreanCommandRequestValidator
+        extended = KoreanCommandRequestValidator().validate(intent)
+        if extended is not None:
+            return extended
         if intent.intent_type is ChatClefIntentType.UNKNOWN:
             return True, "validated_unknown_intent", "unknown intent is non-executable"
         #20260914_kpopmodder: Runtime resolution owns IDs; Python only admits strict rule slots.
@@ -141,6 +149,9 @@ class ChatClefIntentSchemaValidator:
         if intent.intent_type is ChatClefIntentType.EQUIP_ITEM:
             if not intent.item_phrase.strip():
                 return False, "missing_item_phrase", "equip_item requires item_phrase"
+            #20260915_kpopmodder: Explicit EQUIP quantities retain ItemList integer validation.
+            if intent.quantity is not None and not 1 <= intent.quantity <= JAVA_INT_MAX:
+                return False, "invalid_quantity", "equipment quantity must be in 1..2147483647"
         if intent.intent_type in {ChatClefIntentType.FOOD, ChatClefIntentType.MEAT}:
             if (
                 intent.food_units is None

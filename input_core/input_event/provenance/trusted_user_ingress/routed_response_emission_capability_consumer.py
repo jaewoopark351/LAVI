@@ -18,6 +18,7 @@ class RoutedResponseEmissionCapabilityConsumer:
         text: str,
         source: str,
         response_kind: str = "immediate",
+        speech_text: str | None = None,
     ) -> bool:
         if type(capability) is not RoutedResponseEmissionCapability:
             return False
@@ -28,6 +29,7 @@ class RoutedResponseEmissionCapabilityConsumer:
                 text=text,
                 source=source,
                 response_kind=response_kind,
+                speech_text=speech_text,
             ) is True
         except Exception:
             return False

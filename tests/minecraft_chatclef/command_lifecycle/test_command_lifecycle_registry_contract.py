@@ -117,9 +117,7 @@ class CommandLifecycleRegistryContractTests(unittest.TestCase):
                     evidence.profile(command_name).response_lifecycle_kind,
                 )
                 expected_trigger = (
-                    "accepted_submission_caution"
-                    if command_name == "gamma"
-                    else "specialized_control_result"
+                    "specialized_control_result"
                     if command_name == "stop"
                     else "result_callback"
                 )
@@ -135,7 +133,10 @@ class CommandLifecycleRegistryContractTests(unittest.TestCase):
             with self.subTest(command_name=command_name):
                 expected = (
                     CommandTerminalEvidenceProfile.VERIFIED
-                    if command_name in {"get", "store_home", "goto", "find"}
+                    if command_name in {"get", "store_home", "goto", "find", "auto_deposit_trust",
+                                        "auto_deposit_trusted_list", "auto_deposit_untrust", "chatclef",
+                                        "follow", "gamma", "give", "overlay", "reload_settings",
+                                        "resetmemory", "scan", "자동보관등록", "equip"}
                     else CommandTerminalEvidenceProfile.CAUTIOUS
                 )
                 self.assertEqual(expected, evidence.profile(command_name).rollout_state)

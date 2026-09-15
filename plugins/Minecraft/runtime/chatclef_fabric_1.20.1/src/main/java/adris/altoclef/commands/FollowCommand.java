@@ -19,6 +19,9 @@ public class FollowCommand extends Command {
             if (mod.getButler().hasCurrentUser()) {
                 username = mod.getButler().getCurrentUser();
             } else {
+                //20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
+                //20260915_kpopmodder: Observe the existing early rejection without changing follow behavior.
+                lavi.minecraft.command.result.instant.InstantCommandResultCapture.record("follow", false, "BUTLER_USER_UNAVAILABLE", java.util.Map.of());
                 mod.logWarning("No butler user currently present. Running this command with no user argument can ONLY be done via butler.");
                 finish();
                 return;

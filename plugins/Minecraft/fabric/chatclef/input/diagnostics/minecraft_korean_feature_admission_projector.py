@@ -1,6 +1,8 @@
 #20260905_kpopmodder: Coordinate bounded feature-admission diagnostic projection.
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 from .minecraft_korean_feature_admission_record import (
     MinecraftKoreanFeatureAdmissionRecord,
 )
@@ -12,6 +14,7 @@ from .projection import (
     MinecraftKoreanLanguageStatusProjector,
     MinecraftKoreanRouteDecisionProjector,
 )
+from .projection.minecraft_korean_interpretation_rule_projector import MinecraftKoreanInterpretationRuleProjector
 
 
 class MinecraftKoreanFeatureAdmissionProjector:
@@ -60,6 +63,16 @@ class MinecraftKoreanFeatureAdmissionProjector:
             if proof_issued
             else eligibility_reason
         )
+        if proof_issued and route_kind in {"minecraft_command", "minecraft_chatclef"}:
+            selected_rule = MinecraftKoreanInterpretationRuleProjector.project(getattr(route_decision, "translation", None))
+            if selected_rule != "none":
+                phrase_rule_id = selected_rule
+        #20260915_kpopmodder: Observe the already-selected closed runtime ambiguity decision without changing routing.
+        result = getattr(route_decision, "result", None)
+        if reason == "minecraft_item_command_translation_rejected" and isinstance(result, Mapping):
+            actual_reason = result.get("error")
+            if type(actual_reason) is str and actual_reason in MinecraftKoreanControlledReasonSanitizer.NAME_REASONS:
+                reason = actual_reason
         return MinecraftKoreanFeatureAdmissionRecord(
             event_id=getattr(event, "event_id", None),
             source=getattr(event, "source", None),

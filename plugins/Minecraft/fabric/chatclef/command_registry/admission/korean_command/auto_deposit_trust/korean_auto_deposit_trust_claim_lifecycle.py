@@ -7,6 +7,7 @@ from plugins.Minecraft.fabric.chatclef.command_registry.admission.auto_deposit_t
 from plugins.Minecraft.fabric.chatclef.command_registry.admission.korean_command_submission_admission_decision import (
     KoreanCommandSubmissionAdmissionDecision,
 )
+from plugins.Minecraft.fabric.chatclef.input.auto_deposit_trust.single_registration.single_container_trust_receipt import SingleContainerTrustReceipt
 
 
 class KoreanAutoDepositTrustClaimLifecycle:
@@ -25,6 +26,11 @@ class KoreanAutoDepositTrustClaimLifecycle:
             != AutoDepositTrustCommandAdmission.COMMAND_NAME
         ):
             return inspection
+        if type(route_claim) is SingleContainerTrustReceipt:
+            accepted = route_claim.commit(request)
+            return self._decision(inspection.command_name, inspection.source, accepted,
+                "" if accepted else "single_container_trust_claim_invalid",
+                "" if accepted else "Single-container registration input binding changed.")
         if self._admission is None:
             return self._decision(
                 inspection.command_name,
@@ -48,6 +54,9 @@ class KoreanAutoDepositTrustClaimLifecycle:
         )
 
     def abandon_if_issued(self, route_claim: object) -> None:
+        if type(route_claim) is SingleContainerTrustReceipt:
+            route_claim.abandon()
+            return
         if self._admission is not None:
             self._admission.abandon_if_issued(route_claim)
 

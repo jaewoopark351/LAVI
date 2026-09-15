@@ -186,6 +186,10 @@ class KoreanAutoDepositTrustIntentClassifier:
         r"(?:전부|모두)?"
         r"등록해(?:줘|줘요|주세요|주십시오)?(?:[,!.，。！]+)?$"
     )
+    #20260915_kpopmodder: The explicit fixed-size storage-location wording has the same existing H5 scope.
+    _LOCATION_EXECUTION_RE = re.compile(
+        r"^(?:주변|반경|영역|범위)16x16자동보관(?:장소|목적지)(?:로)?등록해(?:줘|줘요|주세요|주십시오)?[.!。！]*$"
+    )
 
     def __init__(
         self,
@@ -270,6 +274,7 @@ class KoreanAutoDepositTrustIntentClassifier:
         if not (
             self._NATURAL_EXECUTION_RE.fullmatch(compact)
             or self._CURRENT_POSITION_EXECUTION_RE.fullmatch(compact)
+            or self._LOCATION_EXECUTION_RE.fullmatch(compact)
         ):
             return self._decision(AutoDepositTrustIntentDecision.AMBIGUOUS)
         return self._decision(

@@ -37,6 +37,10 @@ public final class AutoDepositTrustedBulkRegistrationCommandOperation
                 "bulk registration result"
         );
         String message = AutoDepositTrustedBulkRegistrationFormatter.format(result);
+        //20260915_kpopmodder: Project the existing bounded bulk decision, never a replacement registration.
+        lavi.minecraft.command.result.instant.InstantCommandResultCapture.record("auto_deposit_trust", result.success(),
+                result.status(), java.util.Map.of("registered", result.newlyRegisteredCount(), "reenabled", result.reenabledCount(),
+                        "already_registered", result.alreadyRegisteredCount(), "coverage_complete", result.coverageComplete()));
         if (result.success()) {
             checkedMod.log(message);
         } else {
