@@ -16,6 +16,10 @@ def natural_language_text(command: Any) -> str:
         text = str(command.get("text") or command.get("command") or "")
     else:
         text = str(command or "")
+    #20260915_openai: The native deposit guard must receive original controls even through this facade.
+    from plugins.Minecraft.fabric.chatclef.intent.grammar.item.korean_item_list_rule_parser import KoreanItemListRuleParser
+    if KoreanItemListRuleParser().parse_native_deposit_all(text) is not None:
+        return text
     #20260913_kpopmodder: Retain valid raw XYZ text at both legacy translation/request boundaries.
     # Other commands keep their existing coercion; this pure parse grants no authority.
     return text if KoreanGotoCoordinateParser().parse(text).executable else text.strip()

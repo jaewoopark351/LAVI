@@ -45,7 +45,8 @@ public final class AutoDepositExecutionBudget {
         if (before != AutoDepositBudgetStatus.AVAILABLE) return before;
         executionTicks++;
         if (meaningfulProgress) {
-            observeConfirmedProgress();
+            //20260915_kpopmodder: May be verified preparation; it never proves stored-item success.
+            consecutiveNoProgress = 0;
         } else {
             consecutiveNoProgress++;
             cumulativeNoProgress++;

@@ -65,7 +65,10 @@ class KoreanChatMicrophoneEligibilityAdmission:
         )
         if source_tuple not in self._TUPLES:
             return None, "input_source_not_eligible"
-        if not self._contains_hangul(event.text):
+        #20260915_openai: Exact native deposit_all syntax uses this same trusted-final proof boundary.
+        # Do not force an English command through the unproved legacy fallthrough path.
+        from plugins.Minecraft.fabric.chatclef.intent.grammar.item.korean_item_list_rule_parser import KoreanItemListRuleParser
+        if not self._contains_hangul(event.text) and KoreanItemListRuleParser().parse_native_deposit_all(event.text) is None:
             return None, "input_language_not_korean"
         if not consumed_ingress_evidence.claim_for_eligibility(event, owner):
             return None, "consumed_ingress_evidence_spent"

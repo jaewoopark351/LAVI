@@ -34,6 +34,18 @@ class ChatClefTranslationInputGuard:
                 "empty_input",
                 "Korean command is empty.",
             )
+        #20260915_openai: Reuse the exact typed native grammar; only its leading @ is exempt.
+        from ..grammar.item.korean_item_list_rule_parser import KoreanItemListRuleParser
+        from ..chatclef_intent_type import ChatClefIntentType
+        native = KoreanItemListRuleParser().parse_native_deposit_all(text)
+        if native is not None:
+            if native.intent_type is ChatClefIntentType.DEPOSIT_ALL:
+                return raw_text, None
+            return raw_text, self._rejection_factory.create(
+                ChatClefIntentStatus.INVALID,
+                native.slots.get("all_commands_guard", "invalid_deposit_all_syntax"),
+                "전체 보관 명령과 아이템 목록을 확인해 줘.",
+            )
         #20260914_kpopmodder: Native FIND is re-parsed into typed slots, not dispatched as raw text.
         if raw_text.lower().startswith("@find "):
             from plugins.Minecraft.fabric.chatclef.intent.navigation.find import FindRequest

@@ -14,6 +14,14 @@ class MinecraftRequestEvidence:
         self._names = None
 
     def matches(self, intent, command_text):
+        #20260915_openai: A source-bound explicit native deposit request owns unknown item names too.
+        # RejectionRequestBinding already verifies live provenance and exact original-slot replay.
+        from plugins.Minecraft.fabric.chatclef.intent.grammar.item.korean_item_list_rule_parser import KoreanItemListRuleParser
+        from plugins.Minecraft.fabric.chatclef.intent.chatclef_intent_type import ChatClefIntentType
+        if intent.intent_type is ChatClefIntentType.DEPOSIT_ALL:
+            native = KoreanItemListRuleParser().parse_native_deposit_all(command_text)
+            if native is not None and native.intent_type is ChatClefIntentType.DEPOSIT_ALL:
+                return True
         if self._markers.matches(command_text):
             return True
         phrases = [intent.item_phrase] + [row["phrase"] for row in intent.slots.get("items", ())]

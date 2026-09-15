@@ -8,7 +8,9 @@ public final class AutoDepositObservationFields {
     private static final Set<String> SEMANTIC_FIELDS = Set.of(
             "previousState", "nextState", "occupiedSlots", "totalSlots", "activeObserved",
             "priorityObserved", "selectedChainClass", "selectedPriority", "previousPhase", "nextPhase",
-            "endingOccupiedSlots", "confirmedTotal", "remainingTargetTypes", "candidatePosition");
+            "endingOccupiedSlots", "confirmedTotal", "remainingTargetTypes", "candidatePosition",
+            //20260915_openai: Keep admission-source transitions visible even when pressure/reason are unchanged.
+            "bridgeEnabled", "runnerActive", "automationAvailable", "explicitStopBefore", "executionPermitted");
 
     private AutoDepositObservationFields() {
     }

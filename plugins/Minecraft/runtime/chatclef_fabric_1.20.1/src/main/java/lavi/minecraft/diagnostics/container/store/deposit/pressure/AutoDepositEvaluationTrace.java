@@ -12,7 +12,9 @@ public final class AutoDepositEvaluationTrace {
         fields.put("captureTick", tick);
         fields.put("stateBefore", state);
         fields.put("thresholdPendingBefore", pending);
-        for (String key : new String[]{"inGame", "bridgeEnabled", "pressureRead", "occupiedSlots",
+        //20260915_openai: Unreached native/legacy admission inputs remain explicitly NOT_EVALUATED.
+        for (String key : new String[]{"inGame", "bridgeEnabled", "runnerActive", "automationAvailable",
+                "explicitStopBefore", "executionPermitted", "pressureRead", "occupiedSlots",
                 "totalSlots", "thresholdReached", "lowWaterReached", "trustedRevisionChanged",
                 "fingerprintChanged", "activeUserTask", "cachedUserChainSelected",
                 "existingDepositTask", "workingSetStatus", "planningStatus"}) {

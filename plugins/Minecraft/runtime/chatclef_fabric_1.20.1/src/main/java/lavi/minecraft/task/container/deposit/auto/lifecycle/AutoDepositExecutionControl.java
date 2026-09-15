@@ -4,6 +4,11 @@ package lavi.minecraft.task.container.deposit.auto.lifecycle;
 public final class AutoDepositExecutionControl {
     private boolean stopped;
 
+    //20260915_openai: The native runner is independent of the legacy LAVI(old) AI bridge toggle.
+    public static boolean automationAvailable(boolean legacyBridgeEnabled, boolean runnerActive) {
+        return legacyBridgeEnabled || runnerActive;
+    }
+
     public void stop() { stopped = true; }
 
     /** A native command's runner.enable is the existing explicit resume boundary. */

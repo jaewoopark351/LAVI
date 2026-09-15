@@ -4,6 +4,10 @@ import adris.altoclef.tasksystem.Task;
 import lavi.minecraft.task.container.deposit.auto.admission.conditions.AutoDepositConditions;
 import lavi.minecraft.task.container.deposit.auto.DepositAllInventoryPressureSnapshot;
 import lavi.minecraft.task.container.deposit.auto.budget.AutoDepositBudgetStatus;
+import lavi.minecraft.task.container.deposit.auto.budget.AutoDepositExecutionBudget;
+import lavi.minecraft.task.container.deposit.auto.progress.AutoDepositProgressSample;
+import lavi.minecraft.task.container.deposit.auto.progress.AutoDepositProgressTracker;
+import lavi.minecraft.task.container.deposit.auto.rearm.diagnostics.AutoDepositRearmDiagnostics;
 import lavi.minecraft.task.container.deposit.auto.maintenance.AutoDepositMaintenanceTask;
 import lavi.minecraft.task.container.deposit.auto.maintenance.result.AutoDepositRunReason;
 import lavi.minecraft.task.container.deposit.auto.maintenance.result.AutoDepositRunResult;
@@ -16,6 +20,12 @@ public final class AutoDepositRunLedger {
     private AutoDepositMaintenanceTask active;
     private AutoDepositMaintenanceTask suspended;
     private AutoDepositMaintenanceTask originalReservationOwner;
+    //20260915_kpopmodder: Preparation watermarks belong to the same finite budget, not a disposable root.
+    private AutoDepositExecutionBudget progressBudget;
+    private AutoDepositProgressTracker preparation = new AutoDepositProgressTracker();
+    private long lastMeaningfulProgressTick = -1;
+    private String lastMeaningfulProgressKind = "NONE";
+    private AutoDepositProgressSample.Target lastProgressTarget;
     private int confirmedCount;
     private int confirmedRecovered;
     private String condition = "unobserved";
@@ -32,7 +42,15 @@ public final class AutoDepositRunLedger {
     public void begin(AutoDepositMaintenanceTask task, DepositAllInventoryPressureSnapshot pressure,
                       String condition, String scope, AutoDepositConditions admissionConditions) {
         if (active != null) throw new IllegalStateException("Automatic storage already owns a root");
-        policy.beginUnit(pressure, condition, scope);
+        AutoDepositExecutionBudget budget = policy.beginUnit(pressure, condition, scope);
+        if (progressBudget != budget) {
+            progressBudget = budget;
+            preparation = new AutoDepositProgressTracker();
+            lastMeaningfulProgressTick = -1;
+            lastMeaningfulProgressKind = "NONE";
+            lastProgressTarget = null;
+        }
+        preparation.breakContinuity();
         if (originalReservationOwner == null) originalReservationOwner = task;
         this.active = task;
         this.suspended = null;
@@ -44,14 +62,35 @@ public final class AutoDepositRunLedger {
     }
 
     public void executionTick(AutoDepositMaintenanceTask task) {
-        if (task != active) return;
+        if (task == null || task != active) return;
+        executionTick(task, task.preparationProgress());
+    }
+
+    //20260915_kpopmodder: The test seam supplies facts only; accounting, ownership and termination remain real.
+    void executionTick(AutoDepositMaintenanceTask task, AutoDepositProgressSample sample) {
+        if (task == null || task != active) return;
         int now = task.confirmedStoredCount();
         int recovered = task.confirmedRecoveredCount();
-        boolean progressed = now > confirmedCount || recovered > confirmedRecovered;
+        boolean storageProgress = now > confirmedCount;
+        boolean recoveryProgress = recovered > confirmedRecovered;
+        boolean confirmedProgress = storageProgress || recoveryProgress;
         confirmedCount = Math.max(confirmedCount, now);
         confirmedRecovered = Math.max(confirmedRecovered, recovered);
-        AutoDepositBudgetStatus status = policy.activeBudget().onExecutionTick(progressed);
-        if (status != AutoDepositBudgetStatus.AVAILABLE) task.terminate(AutoDepositRunReason.BUDGET_EXHAUSTED);
+        AutoDepositExecutionBudget budget = policy.activeBudget();
+        AutoDepositProgressTracker.Decision preparationDecision = preparation.observe(sample);
+        long before = budget.consumedExecutionTicks();
+        AutoDepositBudgetStatus status = budget.onExecutionTick(confirmedProgress || preparationDecision.progressed());
+        if (budget.consumedExecutionTicks() > before && (confirmedProgress || preparationDecision.progressed())) {
+            lastMeaningfulProgressTick = budget.consumedExecutionTicks();
+            lastMeaningfulProgressKind = storageProgress ? "CONFIRMED_STORAGE" : recoveryProgress ? "CONFIRMED_RECOVERY"
+                    : preparationDecision.navigationAdvanced() ? "APPROACH_ADVANCED" : "PREPARATION_RESOURCE_INCREASED";
+            lastProgressTarget = preparationDecision.target();
+        }
+        if (status != AutoDepositBudgetStatus.AVAILABLE) {
+            task.terminate(AutoDepositRunReason.BUDGET_EXHAUSTED, status.name());
+        }
+        AutoDepositRearmDiagnostics.executionProgress(task, policy, preparationDecision,
+                storageProgress, recoveryProgress, lastMeaningfulProgressTick, lastMeaningfulProgressKind, lastProgressTarget, status);
     }
 
     public boolean settle(AutoDepositMaintenanceTask task, AutoDepositRunResult result, String terminalCondition) {
@@ -68,6 +107,7 @@ public final class AutoDepositRunLedger {
         confirmedCount = Math.max(confirmedCount, finalConfirmed);
         confirmedRecovered = Math.max(confirmedRecovered, finalRecovered);
         active = null;
+        preparation.breakContinuity();
         if (result.cleanupComplete() && result.reason() == AutoDepositRunReason.STOPPED) {
             cancelPendingUnit("explicit_stop");
             return true;
@@ -134,5 +174,10 @@ public final class AutoDepositRunLedger {
         suspended = null;
         originalReservationOwner = null;
         policy.resetContext();
+        progressBudget = null;
+        preparation = new AutoDepositProgressTracker();
+        lastMeaningfulProgressTick = -1;
+        lastMeaningfulProgressKind = "NONE";
+        lastProgressTarget = null;
     }
 }

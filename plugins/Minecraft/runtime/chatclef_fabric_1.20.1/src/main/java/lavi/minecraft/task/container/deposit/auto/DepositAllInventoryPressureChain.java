@@ -135,19 +135,32 @@ public final class DepositAllInventoryPressureChain extends SingleTaskChain {
 
     public void onEndClientTick() {
         pressureDiagnostics.begin(stateMachine.state(), pendingAdmission, mainTask);
-        if (!AltoClef.inGame()) {
+        boolean inGame = AltoClef.inGame();
+        pressureDiagnostics.value("inGame", inGame);
+        if (!inGame) {
             stopOwnedRun(AutoDepositRunReason.CONTEXT_CHANGED, null);
             runs.resetContext();
             worldIdentity = null;
             decide("left_game");
             return;
         }
-        if (!mod.getAiBridge().getEnabled()) {
+        //20260915_openai: Native Chat/mic commands can enable the runner while LAVI(old) stays OFF.
+        // Read each admission input once; diagnostics receive those same values without re-evaluation.
+        boolean bridgeEnabled = mod.getAiBridge().getEnabled();
+        boolean runnerActive = runner.isActive();
+        boolean automationAvailable = AutoDepositExecutionControl.automationAvailable(bridgeEnabled, runnerActive);
+        pressureDiagnostics.value("bridgeEnabled", bridgeEnabled);
+        pressureDiagnostics.value("runnerActive", runnerActive);
+        pressureDiagnostics.value("automationAvailable", automationAvailable);
+        pressureDiagnostics.value("explicitStopBefore", executionControl.stopped());
+        if (!automationAvailable) {
             stopOwnedRun(AutoDepositRunReason.AUTOMATION_DISABLED, null);
             decide("chatclef_disabled");
             return;
         }
-        if (!executionControl.permitsExecution(runner.isActive())) {
+        boolean executionPermitted = executionControl.permitsExecution(runnerActive);
+        pressureDiagnostics.value("executionPermitted", executionPermitted);
+        if (!executionPermitted) {
             pendingAdmission = false;
             decide("explicit_stop");
             return;
@@ -336,9 +349,12 @@ public final class DepositAllInventoryPressureChain extends SingleTaskChain {
             mainTask = null;
             // Maintenance owns the safe post-cleanup verification and preserves its immutable candidate.
             DepositAllInventoryPressureSnapshot end = maintenance == null ? currentSnapshot() : null;
+            //20260915_kpopmodder: The finalized result, not the fallback callback, owns the wait reason.
+            AutoDepositRunReason effectiveReason = reason;
             if (maintenance != null) {
                 AutoDepositRunResult result = maintenance.finalizeAfterCleanup(clean).orElseThrow();
                 end = result.endingPressure().orElse(null);
+                effectiveReason = result.reason();
                 String workingFailureKey = result.reason() == AutoDepositRunReason.WORKING_SET_DEFICIT
                         ? conditions.captureWorkingSetFailure(maintenance.snapshot()) : null;
                 AutoDepositConditions terminalConditions = conditions.read(mod, maintenance.plan(), rearm.episodeSequence());
@@ -348,12 +364,12 @@ public final class DepositAllInventoryPressureChain extends SingleTaskChain {
                 boolean userRootReplaced = maintenance.plan().context().worldIdentity() == mod.getWorld()
                         && maintenance.plan().context().userTaskRoot() != admission.currentRoot();
                 runs.settle(maintenance, result, terminalKey, userRootReplaced);
-                AutoDepositRearmDiagnostics.result(result, rearm, maintenance);
+                AutoDepositRearmDiagnostics.result(result, rearm, maintenance, reason);
             }
             DepositAllInventoryPressureState previous = stateMachine.state();
             if (previous == DepositAllInventoryPressureState.RUNNING) stateMachine.markRunTerminated();
-            pressureDiagnostics.transition(previous, stateMachine.state(), reason.name(), owned, trustedRepository.revision());
-            DepositAllAutoDiagnostics.logTransition(previous, stateMachine.state(), reason.name(), end, owned);
+            pressureDiagnostics.transition(previous, stateMachine.state(), effectiveReason.name(), owned, trustedRepository.revision());
+            DepositAllAutoDiagnostics.logTransition(previous, stateMachine.state(), effectiveReason.name(), end, owned);
             if (activeDiagnosticMaintenanceTask != null) {
                 StoreDepositDiagnostics.recordAutomaticPressureRunClosed(activeDiagnosticMaintenanceTask,
                         rearm.lastReason(), stateMachine.state().name());

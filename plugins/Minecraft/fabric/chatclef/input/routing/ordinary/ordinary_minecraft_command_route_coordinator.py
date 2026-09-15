@@ -73,6 +73,24 @@ class OrdinaryMinecraftCommandRouteCoordinator:
         korean_eligibility_proof: object = None,
         goto_input_binding: GotoInputBinding | None = None,
     ) -> MinecraftChatClefInputRouteDecision:
+        #20260915_openai: Newly recognized native syntax cannot be executed with forged source strings,
+        # partial transcripts, spent proofs or direct legacy router calls. Keep one existing transport.
+        from plugins.Minecraft.fabric.chatclef.intent.grammar.item.korean_item_list_rule_parser import KoreanItemListRuleParser
+        native = KoreanItemListRuleParser().parse_native_deposit_all(command_text)
+        if native is not None:
+            live_proof = self._live_proof_validator(korean_eligibility_proof, event) is True
+            self._router_logger.log(
+                f"native deposit_all admission: live_proof={live_proof} parsed_intent={native.intent_type.value}"
+            )
+            if not live_proof:
+                from plugins.Minecraft.fabric.chatclef.intent.chatclef_translation_result_dto import ChatClefTranslationResultDTO
+                from plugins.Minecraft.fabric.chatclef.intent.chatclef_intent_status import ChatClefIntentStatus
+                return self._decision_factory.translation_rejection(
+                    ChatClefTranslationResultDTO.rejected(
+                        ChatClefIntentStatus.INVALID, "deposit_all_live_proof_required",
+                        "입력 확인이 끝난 채팅 또는 최종 마이크 문장으로 다시 말해 줘.",
+                    ).to_dict()
+                )
         #20260913_kpopmodder: No binding means a legacy caller, never inferred trusted GOTO.
         goto_arguments = (
             {} if goto_input_binding is None

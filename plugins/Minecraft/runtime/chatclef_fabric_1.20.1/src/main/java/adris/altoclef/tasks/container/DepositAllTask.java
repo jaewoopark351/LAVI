@@ -492,6 +492,11 @@ public class DepositAllTask extends Task {
                 childIndex, finished, stopped, storedPredicateEvaluated, storedSatisfied, failure);
     }
 
+    //20260915_kpopmodder: Expose the already-selected target without rescanning or changing route ownership.
+    public Optional<BlockPos> automaticSelectedContainerTarget() {
+        return _targetState.selectedTarget().map(BlockPos::toImmutable);
+    }
+
     //20260914_kpopmodder: Read only this Task's native confirmed target counts; absence of source items is not transfer proof.
     public int automaticStoredCount() {
         long total = 0;

@@ -62,6 +62,10 @@ class MinecraftChatClefInputIntentGate:
         self._command_parser = KoreanChatClefRuleParser()
 
     def inspect(self, text: object) -> MinecraftChatClefInputGateDecision:
+        #20260915_openai: Own malformed native requests too, so they are rejected rather than sent to the LLM.
+        from plugins.Minecraft.fabric.chatclef.intent.grammar.item.korean_item_list_rule_parser import KoreanItemListRuleParser
+        if KoreanItemListRuleParser().parse_native_deposit_all(text) is not None:
+            return MinecraftChatClefInputGateDecision.generic()
         #20260914_kpopmodder: Both trusted Chat and final Voice reuse the existing input gate.
         from plugins.Minecraft.fabric.chatclef.intent.navigation.find import KoreanFindRuleParser
         if KoreanFindRuleParser.is_candidate(text):

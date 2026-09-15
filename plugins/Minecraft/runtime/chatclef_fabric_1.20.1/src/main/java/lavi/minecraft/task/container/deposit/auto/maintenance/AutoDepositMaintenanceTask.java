@@ -22,6 +22,8 @@ import lavi.minecraft.task.container.deposit.auto.maintenance.working.AutoDeposi
 import lavi.minecraft.task.container.deposit.auto.maintenance.working.AutoDepositWorkingSetVerifier;
 import lavi.minecraft.task.container.deposit.auto.maintenance.working.AutoDepositWorkingSetVerdict;
 import lavi.minecraft.task.container.deposit.auto.pressure.AutoDepositInventoryPressureSource;
+import lavi.minecraft.task.container.deposit.auto.progress.AutoDepositProgressReader;
+import lavi.minecraft.task.container.deposit.auto.progress.AutoDepositProgressSample;
 import lavi.minecraft.task.container.deposit.auto.policy.AutoDepositPlan;
 import lavi.minecraft.task.container.deposit.auto.recovery.AutoDepositDestinationManifest;
 import lavi.minecraft.task.container.deposit.auto.recovery.AutoDepositDestinationManifestLifecycle;
@@ -182,13 +184,15 @@ public final class AutoDepositMaintenanceTask extends Task implements AutoDeposi
 
     @Override
     protected Task onTick() {
-        executionTickObserver.accept(this);
         if (isFinished()) return null;
         AltoClef mod = AltoClef.getInstance();
         if (!plan.context().matches(mod)) {
             terminate(AutoDepositRunReason.CONTEXT_CHANGED);
             return null;
         }
+        //20260915_kpopmodder: A stale world/root cannot supply preparation progress or consume this budget.
+        executionTickObserver.accept(this);
+        if (isFinished()) return null;
         if (recoveryResume != null && recoveryResume.refusal().isPresent()) {
             AutoDepositRunReason refused = recoveryResume.refusal().orElseThrow();
             captureTerminal(refused, "prior_recovery_" + refused.name());
@@ -461,7 +465,13 @@ public final class AutoDepositMaintenanceTask extends Task implements AutoDeposi
 
     //20260914_kpopmodder: Capture only; the chain performs owned stop/detach and settles cleanup afterwards.
     public void terminate(AutoDepositRunReason reason) {
+        terminate(reason, Objects.requireNonNull(reason, "reason").name());
+    }
+
+    //20260915_kpopmodder: Preserve the actual budget limit while retaining child-failure precedence.
+    public void terminate(AutoDepositRunReason reason, String detail) {
         Objects.requireNonNull(reason, "reason");
+        Objects.requireNonNull(detail, "detail");
         if (completion.candidate().isPresent()) return;
         // Preserve the current original-reservation evidence without treating defense itself as a failure.
         workingSetStatus = verifyWorkingSetBeforeResume();
@@ -495,7 +505,7 @@ public final class AutoDepositMaintenanceTask extends Task implements AutoDeposi
             captureTerminal(AutoDepositRunReason.CHILD_STOPPED, "general_child_stopped_before_termination");
             return;
         }
-        captureTerminal(reason, reason.name());
+        captureTerminal(reason, detail);
     }
 
     private void captureTerminal(AutoDepositRunReason reason, String detail) {
@@ -530,6 +540,15 @@ public final class AutoDepositMaintenanceTask extends Task implements AutoDeposi
         }
         result.ifPresent(value -> diagnostics.recordRunResult(value, this, true));
         return result;
+    }
+
+    //20260915_kpopmodder: Only an existing, owned general child may supply pre-transfer facts.
+    public AutoDepositProgressSample preparationProgress() {
+        if (phase != AutoDepositMaintenancePhase.DEPOSIT_GENERAL || generalTasks == null
+                || generalTaskIndex >= generalTasks.size()) return AutoDepositProgressSample.UNAVAILABLE;
+        DepositAllTask child = generalTasks.get(generalTaskIndex);
+        if (!thisOrChildSatisfies(task -> task == child)) return AutoDepositProgressSample.UNAVAILABLE;
+        return AutoDepositProgressReader.capture(AltoClef.getInstance(), child);
     }
 
     /** Read native transfer totals without creating children or evaluating any Task's priority/completion. */

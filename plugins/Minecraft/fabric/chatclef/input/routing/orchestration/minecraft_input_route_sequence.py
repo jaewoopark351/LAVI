@@ -115,9 +115,12 @@ class MinecraftInputRouteSequence:
             if goto_binding.automatic_input
             else {}
         )
+        #20260915_openai: Native deposit validation must see trailing controls before any trim.
+        from plugins.Minecraft.fabric.chatclef.intent.grammar.item.korean_item_list_rule_parser import KoreanItemListRuleParser
+        native_deposit = KoreanItemListRuleParser().parse_native_deposit_all(command_text)
         translation_text = (
             command_text
-            if goto_binding.automatic_input and goto_binding.parse_result.executable
+            if native_deposit is not None or (goto_binding.automatic_input and goto_binding.parse_result.executable)
             else command_text.strip()
         )
         decision = self._ordinary_command_route_coordinator.route(

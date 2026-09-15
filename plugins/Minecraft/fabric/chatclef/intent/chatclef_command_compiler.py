@@ -49,7 +49,15 @@ class ChatClefCommandCompiler:
         #20260914_kpopmodder: Allow only the parsed leading @find, never a generic raw-command bypass.
         if intent.intent_type is ChatClefIntentType.FIND:
             return self.resolve_find(intent).request.compile()
-        self.reject_dangerous_text(intent.original_text)
+        #20260915_openai: Exempt only a successfully parsed deposit_all head; provenance below still
+        # requires the original request to replay to these exact slots, and output is re-serialized.
+        from .grammar.item.korean_item_list_rule_parser import KoreanItemListRuleParser
+        native_deposit = (
+            KoreanItemListRuleParser().parse_native_deposit_all(intent.original_text)
+            if intent.intent_type is ChatClefIntentType.DEPOSIT_ALL else None
+        )
+        if native_deposit is None or native_deposit.intent_type is not ChatClefIntentType.DEPOSIT_ALL:
+            self.reject_dangerous_text(intent.original_text)
         #20260915_kpopmodder: Delegate new domain serializers while preserving established scalar forms.
         from .grammar.compilation.korean_command_serializer import KoreanCommandSerializer
         from .grammar.validation.korean_command_request_validator import KoreanCommandRequestValidator
