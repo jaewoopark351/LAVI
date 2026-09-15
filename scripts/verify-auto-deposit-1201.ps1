@@ -32,14 +32,21 @@ $logPath = Join-Path $outputRoot 'verification.log'
 $started = Get-Date
 $code = 1
 if ($Mode -eq 'Build') {
-    $sourcePaths = @(& rg --files src/main src/test/autoDeposit src/test/java/lavi/minecraft/task/container/deposit/auto)
+    #20260916_kpopmodder: Include the actual slot-event, bootstrap, support and Mixin verification inputs.
+    $verificationSourceRoots = @('src/main', 'src/test/autoDeposit', 'src/test/mixinApplication',
+        'src/test/java/lavi/minecraft/task/container/deposit/auto',
+        'src/test/java/lavi/minecraft/inventory/slotclick',
+        'src/test/java/lavi/minecraft/diagnostics/container/store/deposit/support',
+        'src/test/java/lavi/minecraft/testsupport',
+        'src/test/goldMining/java/lavi/minecraft/test/GoldFocusedTestRunner.java')
+    $sourcePaths = @(& rg --files @verificationSourceRoots)
     $sourcePaths += @('build.gradle','root.gradle.kts','settings.gradle.kts','gradle.properties')
     $sourceManifest = foreach ($sourcePath in ($sourcePaths | Sort-Object -Unique)) {
         $resolved = [IO.Path]::GetFullPath((Join-Path $runtimeRoot $sourcePath))
         if (-not $resolved.StartsWith($runtimeRoot + '\', [StringComparison]::OrdinalIgnoreCase)) { throw 'Source manifest escaped runtime boundary' }
         [ordered]@{ path=$sourcePath; sha256=(Get-FileHash -LiteralPath $resolved -Algorithm SHA256).Hash }
     }
-    [ordered]@{ repository=$repositoryRoot; branch=(& git branch --show-current).Trim(); head=(& git rev-parse HEAD).Trim(); started=$started.ToString('o'); dirty_paths=@(& git -C $repositoryRoot status --porcelain --untracked-files=all); sources=$sourceManifest } |
+    [ordered]@{ repository=$repositoryRoot; branch=(& git branch --show-current).Trim(); head=(& git rev-parse HEAD).Trim(); started=$started.ToString('o'); verification_script_sha256=(Get-FileHash -LiteralPath $PSCommandPath -Algorithm SHA256).Hash; dirty_paths=@(& git -C $repositoryRoot status --porcelain --untracked-files=all); sources=$sourceManifest } |
         ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $outputRoot 'source-manifest.json') -Encoding UTF8
 }
 try {

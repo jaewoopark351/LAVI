@@ -2,6 +2,7 @@ package lavi.minecraft.testsupport;
 
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayNetworkHandler;
+import net.minecraft.client.network.ClientPlayerEntity;
 
 import java.lang.reflect.Field;
 
@@ -13,10 +14,11 @@ public final class HeadlessMinecraftClientSession implements AutoCloseable {
         previousClient = readInstance();
         TestMinecraftClient client = TestObjects.allocate(TestMinecraftClient.class);
         if (inGame) {
-            Object playerSentinel = new Object();
+            //20260916_kpopmodder: A real typed sentinel permits virtual reads; an Unsafe-written Object can crash the JVM.
+            // Leave its inventory/world unset so this remains a presence-only headless session.
+            client.player = TestObjects.allocate(ClientPlayerEntity.class);
             ClientPlayNetworkHandler networkHandler =
                     TestObjects.allocate(ClientPlayNetworkHandler.class);
-            TestObjects.setField(client, MinecraftClient.class, "player", playerSentinel);
             TestObjects.setField(
                     client,
                     TestMinecraftClient.class,

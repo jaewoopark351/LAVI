@@ -1,6 +1,6 @@
 #20260913_kpopmodder: Apply real installed Sponge/MixinExtras to named or packaged 1.20.1 bytecode in an isolated JVM.
 param([switch] $PrepareOnly, [string] $MainInput = '', [switch] $PreviousArtifact, [switch] $ArtifactJar,
-      [switch] $GoldProtection, [switch] $CompileOnly)
+      [switch] $GoldProtection, [switch] $CompileOnly, [switch] $SlotClick)
 $ErrorActionPreference = 'Stop'
 $taskRepository = 'C:\Vtuber_Souorce_Code\LAVI'
 if ((Get-Location).Path -ne $taskRepository -or (git rev-parse --show-toplevel).Trim() -ne $taskRepository.Replace('\', '/')) {
@@ -11,8 +11,10 @@ $taskHarness = Join-Path $taskRepository 'test/test_Isolation/minecraft/mixin_ap
 $taskSourceRoot = Join-Path $taskRuntime 'src/test/mixinApplication'
 #20260914_kpopmodder: The gold target is an explicit opt-in; default eight-target Builder checks are unchanged.
 if ($GoldProtection -and $PreviousArtifact) { throw 'GoldProtection does not support the unrelated Builder negative control.' }
+if ($SlotClick -and ($GoldProtection -or $PreviousArtifact)) { throw 'SlotClick is a separate explicit target.' }
 $taskGoldSourceRoot = Join-Path $taskRuntime 'src/test/goldMixinApplication'
 if ($GoldProtection) { $taskHarness = Join-Path $taskRepository 'test/test_Isolation/minecraft/gold_mixin_application' }
+if ($SlotClick) { $taskHarness = Join-Path $taskRepository 'test/test_Isolation/minecraft/slot_click_mixin_application' }
 if ([string]::IsNullOrWhiteSpace($MainInput)) { $MainInput = Join-Path $taskRuntime 'versions/1.20.1/build/classes/java/main' }
 $taskMain = [IO.Path]::GetFullPath($MainInput)
 if (-not (Test-Path -LiteralPath $taskMain)) { throw "Missing main bytecode input: $taskMain" }
@@ -81,9 +83,11 @@ if ($GoldProtection) {
 $taskCompile = @('--release', '17', '-encoding', 'UTF-8', '-proc:none', '-implicit:none', '-classpath', $taskClasspath, '-d', $taskOutput) + $taskSources
 $taskSmokeMain = 'lavi.minecraft.testsupport.mixin.BuilderMixinApplicationSmoke'
 if ($GoldProtection) { $taskSmokeMain = 'lavi.minecraft.testsupport.mixin.gold.GoldProtectionMixinApplicationSmoke' }
+if ($SlotClick) { $taskSmokeMain = 'lavi.minecraft.testsupport.mixin.slotclick.SlotClickMixinApplicationSmoke' }
 $taskRun = @(('-Djava.io.tmpdir=' + $taskTemp), '-Dmixin.debug.export=false', '-Dmixin.dumpTargetOnFailure=false',
     '-Dmixin.debug.verify=true', '-classpath', $taskClasspath, $taskSmokeMain)
 if ($GoldProtection) { $taskRun = @('-Dlavi.gold.smoke.output=' + $taskOutput) + $taskRun }
+if ($SlotClick) { $taskRun = @('-Dlavi.slotclick.smoke.output=' + $taskOutput) + $taskRun }
 if ($PreviousArtifact) { $taskRun += '--previous-artifact' }
 if ($ArtifactJar) { $taskRun += '--intermediary-artifact' }
 foreach ($taskArgumentSet in @(@{Name='javac.args';Values=$taskCompile}, @{Name='java.args';Values=$taskRun})) {
@@ -96,13 +100,20 @@ if ($GoldProtection) {
     $taskManifest += 'OPT_IN_TARGET=WORLD_BLOCK_PROTECTION; DEFAULT_BUILDER_TARGETS=UNCHANGED'
     $taskManifest += 'TEST_CONFIG=DERIVED_FROM_ACTUAL_APPLICATION_CONFIG; REF_MAP=ACTUAL_SELECTED_INPUT; CONFIG_HASH=TRANSFORMATION_LOG'
 }
+if ($SlotClick) {
+    if ($ArtifactJar) { $taskManifest[0] = 'SCOPE=REAL_MIXIN_APPLICATION; NAMESPACE=INTERMEDIARY_1.20.1; MINECRAFT_LAUNCH=NOT_RUN' }
+    $taskManifest += 'OPT_IN_TARGET=SLOT_CLICK; TEST_CONFIG=DERIVED_FROM_ACTUAL_APPLICATION_CONFIG; REF_MAP=ACTUAL_SELECTED_INPUT'
+}
 $taskManifest += (@($taskMixin, $taskLoader, $taskExtras) + $taskAsm + $taskSources) | ForEach-Object {
     "SHA256=$((Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash) PATH=$_"
 }
 $taskManifest += 'CLASSPATH=' + $taskClasspath
 $taskManifest += "MAIN_INPUT=$taskMain"
 if ((Get-Item -LiteralPath $taskMain).PSIsContainer) {
-    if ($GoldProtection) {
+    if ($SlotClick) {
+        $taskManifest += @('adris/altoclef/mixins/SlotClickMixin.class', 'lavi/minecraft/inventory/slotclick/SlotClickEventBridge.class') |
+            ForEach-Object { $taskClass = Join-Path $taskMain $_; "MAIN_CLASS_SHA256=$((Get-FileHash -LiteralPath $taskClass -Algorithm SHA256).Hash) PATH=$taskClass" }
+    } elseif ($GoldProtection) {
         $taskManifest += @('adris/altoclef/mixins/WorldBlockModifiedMixin.class', 'adris/altoclef/AltoClef.class') |
             ForEach-Object { $taskClass = Join-Path $taskMain $_; "MAIN_CLASS_SHA256=$((Get-FileHash -LiteralPath $taskClass -Algorithm SHA256).Hash) PATH=$taskClass" }
     } else {
@@ -112,7 +123,7 @@ if ((Get-Item -LiteralPath $taskMain).PSIsContainer) {
 } else { $taskManifest += "MAIN_JAR_SHA256=$((Get-FileHash -LiteralPath $taskMain -Algorithm SHA256).Hash)" }
 if ($ArtifactJar) {
     $taskManifest += "PACKAGED_BARITONE_SHA256=$((Get-FileHash -LiteralPath $taskPackagedBaritone -Algorithm SHA256).Hash)"
-    if ($GoldProtection) {
+    if ($GoldProtection -or $SlotClick) {
         $taskManifest += 'NAMESPACE=INTERMEDIARY_1.20.1; TARGET_SOURCE=ACTUAL_CACHED_INTERMEDIARY_MINECRAFT; MIXIN_SOURCE=ACTUAL_MAIN_JAR'
     } else {
         $taskManifest += 'NAMESPACE=INTERMEDIARY_1.20.1; TARGET_SOURCE=ACTUAL_MAIN_JAR_NESTED_BARITONE'

@@ -4,6 +4,7 @@ gradle.projectsEvaluated {
     if (target == null) throw new GradleException('Missing approved 1.20.1 project')
     def patterns = [
         'lavi/minecraft/task/container/deposit/auto/**',
+        'lavi/minecraft/inventory/slotclick/**', //20260916_kpopmodder: Verify the 1.20.1 slot-event producer feeding automatic storage.
         'lavi/minecraft/diagnostics/container/store/deposit/support/**',
         'lavi/minecraft/testsupport/**'
     ]

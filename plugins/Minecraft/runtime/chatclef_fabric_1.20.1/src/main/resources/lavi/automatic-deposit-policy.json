@@ -1,5 +1,5 @@
 {
-  "revision": 1,
+  "revision": 2,
   "alwaysHardIds": [
     "minecraft:filled_map",
     "minecraft:written_book",
@@ -34,13 +34,19 @@
     "minecraft:netherite_ingot",
     "minecraft:netherite_block",
     "minecraft:echo_shard",
-    "minecraft:enchanted_book"
+    "minecraft:enchanted_book",
+    "minecraft:lapis_lazuli"
   ],
   "valuablePrefixes": [
     "minecraft:diamond_",
     "minecraft:netherite_"
   ],
   "generalSurplusIds": [
+    "minecraft:tuff",
+    "minecraft:gravel",
+    "minecraft:andesite",
+    "minecraft:granite",
+    "minecraft:diorite",
     "minecraft:coal",
     "minecraft:charcoal",
     "minecraft:raw_iron",
@@ -72,7 +78,6 @@
     "minecraft:deepslate_lapis_ore",
     "minecraft:nether_quartz_ore",
     "minecraft:redstone",
-    "minecraft:lapis_lazuli",
     "minecraft:quartz",
     "minecraft:amethyst_shard",
     "minecraft:flint",

@@ -31,7 +31,7 @@ public abstract class SlotClickMixin {
 
     //#if MC >= 11701
     //20260914_kpopmodder: Passive outer-entry witnesses distinguish the click API from the legacy redirect path.
-    // Optional observation only: do not change the old redirect selector or force injection success.
+    // These optional witnesses remain independent of the required native-call redirect.
     @Inject(method = "onSlotClick", at = @At("HEAD"), require = 0)
     private void laviCounterClickHead(int slotIndex, int button, SlotActionType actionType,
             PlayerEntity player, CallbackInfo ci) {
@@ -46,6 +46,26 @@ public abstract class SlotClickMixin {
                 slotIndex, button, actionType);
     }
 
+    //#if MC == 12001
+    //20260730_kpopmodder: Minimal LAVI divergence at the verified ChatClef engine boundary.
+    //20260916_kpopmodder: Wrap the outer native call once; never re-enter onSlotClick from this redirect.
+    @Shadow
+    private void internalOnSlotClick(int slotIndex, int button, SlotActionType actionType, PlayerEntity player) {
+        throw new AssertionError("Mixin must bind the native internalOnSlotClick method");
+    }
+
+    @Redirect(
+            method = "onSlotClick",
+            at = @At(value = "INVOKE", target = "Lnet/minecraft/screen/ScreenHandler;internalOnSlotClick(IILnet/minecraft/screen/slot/SlotActionType;Lnet/minecraft/entity/player/PlayerEntity;)V"),
+            require = 1,
+            allow = 1
+    )
+    private void slotClick(ScreenHandler self, int slotIndex, int button, SlotActionType actionType, PlayerEntity player) {
+        lavi.minecraft.inventory.slotclick.SlotClickEventBridge.run(
+                self, slotIndex, button, actionType, player,
+                () -> internalOnSlotClick(slotIndex, button, actionType, player));
+    }
+    //#else
     @Redirect(
             method = "internalOnSlotClick",
             at = @At(value = "INVOKE", target = "Lnet/minecraft/screen/ScreenHandler;internalOnSlotClick(IILnet/minecraft/screen/slot/SlotActionType;Lnet/minecraft/entity/player/PlayerEntity;)V")
@@ -138,6 +158,7 @@ public abstract class SlotClickMixin {
             return null;
         }
     }
+    //#endif
     //#endif
 
 }
